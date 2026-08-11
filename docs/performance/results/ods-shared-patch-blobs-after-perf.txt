@@ -1,0 +1,553 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 8K of event 'cycles:P'
+# Event count (approx.): 43093296926
+#
+# Overhead  Command          Shared Object                            Symbol
+# ........  ...............  .......................................  ..............................................................................................................................................................
+#
+    42.88%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+            |
+            ---zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               zlib_rs::stable::Deflate::compress
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |
+               |--40.63%--flate2::zio::Writer<W,D>::write_with_status
+               |          std::io::Write::write_all
+               |          soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+               |          _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17hb84d7cac4c8dbc92E.llvm.17475570438763808224
+               |          |
+               |           --40.53%--litchi_odf_common::core::writer::PackageWriter<W>::copy_source_files_from_except
+               |                     litchi_odf_common::package::edit::rebuild_package
+               |                     litchi_odf_common::package::edit::replace_content_xml
+               |                     litchi_ods::worksheet::snapshot::Edit::commit
+               |                     litchi_ods::document::Edit::worksheets
+               |                     litchi_perf_baseline::run_ods_media_one_edit_save
+               |                     0xffffffffffffffff
+               |
+               |--1.58%--flate2::zio::Writer<W,D>::write_with_status
+               |          soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+               |          _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17h622ec3d313453d2dE.llvm.12592586514332291734
+               |          litchi_odf_common::core::writer::PackageWriter<W>::add_file_with_media_type
+               |          litchi_perf_baseline::build_ods_media_corpus
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --0.64%--<flate2::zio::Writer<W,D> as std::io::Write>::flush
+                          soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+                          _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17hb84d7cac4c8dbc92E.llvm.17475570438763808224
+                          litchi_odf_common::core::writer::PackageWriter<W>::copy_source_files_from_except
+                          litchi_odf_common::package::edit::rebuild_package
+                          litchi_odf_common::package::edit::replace_content_xml
+                          litchi_ods::worksheet::snapshot::Edit::commit
+                          litchi_ods::document::Edit::worksheets
+                          litchi_perf_baseline::run_ods_media_one_edit_save
+                          0xffffffffffffffff
+
+    14.81%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::deflate::longest_match::longest_match
+            |
+            ---zlib_rs::deflate::longest_match::longest_match
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               zlib_rs::stable::Deflate::compress
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |
+               |--14.00%--flate2::zio::Writer<W,D>::write_with_status
+               |          std::io::Write::write_all
+               |          soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+               |          _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17hb84d7cac4c8dbc92E.llvm.17475570438763808224
+               |          litchi_odf_common::core::writer::PackageWriter<W>::copy_source_files_from_except
+               |          litchi_odf_common::package::edit::rebuild_package
+               |          litchi_odf_common::package::edit::replace_content_xml
+               |          litchi_ods::worksheet::snapshot::Edit::commit
+               |          litchi_ods::document::Edit::worksheets
+               |          litchi_perf_baseline::run_ods_media_one_edit_save
+               |          0xffffffffffffffff
+               |
+                --0.57%--flate2::zio::Writer<W,D>::write_with_status
+                          soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+                          _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17h622ec3d313453d2dE.llvm.12592586514332291734
+                          litchi_odf_common::core::writer::PackageWriter<W>::add_file_with_media_type
+                          litchi_perf_baseline::build_ods_media_corpus
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     6.89%  litchi-perf-005  libc.so.6                                [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memcpy_avx512_unaligned_erms (inlined)
+               |
+               |--1.31%--litchi_ods::document::changed_package_files
+               |
+                --0.60%--flate2::zio::read
+                          <soapberry_zip::archive::ZipSliceVerifier<D> as std::io::Read>::read
+                          std::io::default_read_to_end
+                          soapberry_zip::office::ArchiveReader::read
+                          litchi_odf_common::package::codec::<impl litchi_odf_common::package::model::Archive>::read
+                          litchi_odf_common::core::package::Package::get_file
+
+     6.27%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_perf_baseline::payload_bytes
+            |
+            ---litchi_perf_baseline::payload_bytes
+               |
+                --6.04%--litchi_perf_baseline::verify_ods_media_archive
+                          |
+                           --5.80%--litchi_perf_baseline::run_ods_media_one_edit_save
+                                     litchi_perf_baseline::main
+                                     0xffffffffffffffff
+
+     6.06%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] sha2::sha256::x86_sha::compress
+            |
+            ---sha2::sha256::x86_sha::compress
+               |
+               |--3.99%--<D as digest::digest::Digest>::digest
+               |          litchi_core::patch::BlobBundle::insert_shared
+               |          litchi_ods::document::Patch::build
+               |          litchi_ods::document::Edit::commit_with_security
+               |          litchi_ods::document::Edit::commit
+               |          litchi_perf_baseline::run_ods_media_one_edit_save
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --2.07%--litchi_perf_baseline::sha256_hex
+                          |
+                           --1.99%--litchi_perf_baseline::run_ods_media_one_edit_save
+                                     litchi_perf_baseline::main
+                                     0xffffffffffffffff
+
+     3.41%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::deflate::Heap::pqdownheap
+            |
+            ---zlib_rs::deflate::Heap::pqdownheap
+               |
+                --3.11%--zlib_rs::deflate::Heap::construct_huffman_tree
+                          zlib_rs::deflate::flush_block_only
+                          zlib_rs::deflate::algorithm::medium::deflate_medium
+                          zlib_rs::deflate::deflate
+                          zlib_rs::stable::Deflate::compress
+                          <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+                          |
+                           --2.91%--flate2::zio::Writer<W,D>::write_with_status
+                                     std::io::Write::write_all
+                                     soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+                                     _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17hb84d7cac4c8dbc92E.llvm.17475570438763808224
+                                     litchi_odf_common::core::writer::PackageWriter<W>::copy_source_files_from_except
+                                     0xffffffffffffffff
+
+     1.26%  litchi-perf-005  libc.so.6                                [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+               |
+                --0.65%--core::ops::function::impls::<impl core::ops::function::FnMut<A> for &mut F>::call_mut
+                          <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+                          <alloc::collections::btree::set::BTreeSet<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+                          litchi_odf_common::package::edit::raw_identical_members
+                          litchi_ods::document::changed_package_files
+
+     1.17%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c5a56ba
+            |
+            ---0xffffffff9c5a56ba
+               0xffffffff9c4d7ef8
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               |
+                --1.13%--__memcpy_avx512_unaligned_erms (inlined)
+
+     0.85%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] crc32fast::specialized::pclmulqdq::calculate
+            |
+            ---crc32fast::specialized::pclmulqdq::calculate
+               crc32fast::Hasher::update
+               |
+                --0.67%--<soapberry_zip::archive::ZipSliceVerifier<D> as std::io::Read>::read
+                          std::io::default_read_to_end
+                          soapberry_zip::office::ArchiveReader::read
+                          litchi_odf_common::package::codec::<impl litchi_odf_common::package::model::Archive>::read
+                          litchi_odf_common::core::package::Package::get_file
+
+     0.83%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d6600b7
+            |
+            ---0xffffffff9d6600b7
+               |
+                --0.78%--0xffffffff9c82e7e3
+                          0xffffffff9c82f8db
+                          0xffffffff9c82ff44
+                          0xffffffff9c83021a
+                          0xffffffff9c4d7f29
+                          0xffffffff9d64e923
+                          0xffffffff9d800bc7
+                          |
+                           --0.76%--__memcpy_avx512_unaligned_erms (inlined)
+
+     0.78%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d5cfb97
+            |
+            ---0xffffffff9d5cfb97
+               0xffffffff9c85c182
+               0xffffffff9c85d999
+               0xffffffff9c8974c1
+               |
+                --0.77%--0xffffffff9c897834
+                          0xffffffff9c82e51c
+                          0xffffffff9c82e70c
+                          0xffffffff9c82f8db
+                          0xffffffff9c82ff44
+                          0xffffffff9c83021a
+                          0xffffffff9c4d7f29
+                          0xffffffff9d64e923
+                          0xffffffff9d800bc7
+                          |
+                           --0.76%--__memcpy_avx512_unaligned_erms (inlined)
+
+     0.77%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::name::NamespaceResolver::resolve_event
+            |
+            ---quick_xml::name::NamespaceResolver::resolve_event
+
+     0.74%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c848383
+            |
+            ---0xffffffff9c848383
+               0xffffffff9c82797f
+               0xffffffff9c8284e0
+               0xffffffff9c8290c6
+               0xffffffff9c829389
+               0xffffffff9c8299c5
+               0xffffffff9c835a28
+               0xffffffff9c836b98
+               |
+                --0.71%--0xffffffff9c83a981
+                          0xffffffff9c83aa12
+                          0xffffffff9c40747b
+                          0xffffffff9d6485af
+                          0xffffffff9d800130
+                          __brk
+                          __GI___sbrk (inlined)
+                          __glibc_morecore (inlined)
+                          systrim (inlined)
+                          __GI___libc_free (inlined)
+
+     0.70%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d5cfb9a
+            |
+            ---0xffffffff9d5cfb9a
+               0xffffffff9c85c182
+               0xffffffff9c85d999
+               0xffffffff9c8974c1
+               0xffffffff9c897834
+               0xffffffff9c82e51c
+               0xffffffff9c82e70c
+               0xffffffff9c82f8db
+               0xffffffff9c82ff44
+               0xffffffff9c83021a
+               0xffffffff9c4d7f29
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               |
+                --0.68%--__memcpy_avx512_unaligned_erms (inlined)
+
+     0.66%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_ods::authoring::builder::validate_content_xml
+            |
+            ---litchi_ods::authoring::builder::validate_content_xml
+               litchi_ods::package::document::Package::from_bytes
+
+     0.54%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d6602e0
+            |
+            ---0xffffffff9d6602e0
+
+     0.53%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d800ba0
+            |
+            ---0xffffffff9d800ba0
+               __memcpy_avx512_unaligned_erms (inlined)
+
+     0.49%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d800f30
+     0.40%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::deflate::flush_block_only
+     0.39%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.7579840799103574076
+     0.33%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_ods::worksheet::validation::validate_text
+     0.27%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+     0.25%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c7d8dce
+     0.25%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+     0.25%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c827cc6
+     0.25%  litchi-perf-005  libc.so.6                                [.] __memset_avx512_unaligned_erms
+     0.22%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+     0.21%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::deflate::Heap::construct_huffman_tree
+     0.21%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::reader::state::ReaderState::emit_start
+     0.21%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::deflate::slide_hash::avx2::slide_hash_chain
+     0.21%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c5a5c2c
+     0.20%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d65f8cb
+     0.20%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+     0.18%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_ods::settings::codec::locate
+     0.16%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_ods::protection::codec::parse
+     0.16%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _RNvNtNtCsgEmfK2I1SDS_4core3str8converts9from_utf8
+     0.15%  litchi-perf-005  libc.so.6                                [.] __memmove_avx512_unaligned
+     0.15%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_odf_common::compact_xml::validate_with_limits
+     0.14%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::deflate::gen_codes
+     0.14%  litchi-perf-005  libc.so.6                                [.] _int_free
+     0.13%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::events::attributes::IterState::next
+     0.12%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::inflate::inflate_fast_help_avx2
+     0.12%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c7d873c
+     0.11%  litchi-perf-005  libc.so.6                                [.] unlink_chunk.isra.0
+     0.11%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::deflate::scan_tree
+     0.11%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+     0.10%  litchi-perf-005  libc.so.6                                [.] _int_malloc
+     0.08%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::name::NamespaceResolver::resolve_prefix
+     0.08%  litchi-perf-005  libc.so.6                                [.] malloc
+     0.08%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c7d8c36
+     0.08%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::reader::state::ReaderState::emit_end
+     0.08%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _ZN10litchi_ods5codec5names4scan17h540cd18e4c440a9eE.llvm.5863836175338154810
+     0.07%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c7d6d20
+     0.07%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8480f8
+     0.07%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::events::attributes::IterState::check_for_duplicates
+     0.07%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::inflate::inftrees::inflate_table
+     0.07%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c82e9d2
+     0.06%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+     0.06%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d5ae0ab
+     0.06%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_odf_common::compact_xml::validate_markup
+     0.06%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c7d673d
+     0.06%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_ods::worksheet::codec::Attributes::from_element
+     0.06%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c5db4a5
+     0.06%  litchi-perf-005  libc.so.6                                [.] cfree@GLIBC_2.2.5
+     0.05%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] xml_minifier::audit::verify_with_policy
+     0.05%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8591bf
+     0.05%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral
+     0.05%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::reader::Reader<R>::read_event_impl
+     0.04%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::inflate::inflate
+     0.03%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_odf_common::calculation::codec::parse
+     0.03%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] crc32fast::baseline::update_fast_16
+     0.03%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_odf_common::package::edit::xml_splice_publication
+     0.03%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _ZN7zlib_rs7deflate5State10init_block17h5b29c3ed55853e22E.llvm.6877377404663027520
+     0.03%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+     0.03%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8cde3c
+     0.03%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c7a4704
+     0.03%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c5a653b
+     0.03%  litchi-perf-005  libc.so.6                                [.] malloc_consolidate
+     0.03%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _ZN71_$LT$core..hash..sip..Hasher$LT$S$GT$$u20$as$u20$core..hash..Hasher$GT$5write17ha1fc6b778c84e4eaE.llvm.4889487549084414097
+     0.03%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17ha34f0284a646bfcbE.llvm.410775697957024005
+     0.03%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+     0.03%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_ods::worksheet::package::scan
+     0.03%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c7fcde9
+     0.03%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::events::Event::into_owned
+     0.03%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw
+     0.02%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d5b0501
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_ods::worksheet::codec::Attributes::cell
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] memchr::arch::x86_64::avx2::memchr::One::find_raw
+     0.02%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8452a7
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_ods::model::protection::parse_protection
+     0.02%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8cdc1f
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] alloc::raw_vec::RawVec<T,A>::grow_one
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] hashbrown::map::HashMap<K,V,S,A>::insert
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] <alloc::vec::Vec<T,A> as core::clone::Clone>::clone
+     0.02%  rustc            libc.so.6                                [.] malloc
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::stable::Inflate::decompress
+     0.02%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c5db490
+     0.02%  git              libc.so.6                                [.] __strncmp_evex
+     0.02%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c877989
+     0.02%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c56d4c4
+     0.02%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c4c7c46
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::reader::Reader<R>::read_event_impl
+     0.02%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c5e1115
+     0.02%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c844f25
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+     0.02%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8c4895
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd46f5c1bce89aab0E.llvm.12199942006246249649
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String15from_utf8_lossy
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+     0.02%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c56dd60
+     0.02%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c7d7cc2
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_odf_common::core::writer::PackageWriter<W>::copy_source_files_from_except
+     0.02%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] core::iter::adapters::try_process
+     0.02%  rustc            [unknown]                                [k] 0xffffffff9c7c6082
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c82792b
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c855f80
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8d2a28
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c855fff
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c856b43
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _RNvCsfLfy6EI15iL_7___rustc13___rdl_realloc
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _ZN99_$LT$alloc..collections..btree..map..IntoIter$LT$K$C$V$C$A$GT$$u20$as$u20$core..ops..drop..Drop$GT$4drop17hc66c6ff455691e39E.llvm.3045366842770347598
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c588024
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8cc81b
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c84503e
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d3836e5
+     0.01%  rustc            ld-linux-x86-64.so.2                     [.] do_lookup_x
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c5e24f9
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c867c16
+     0.01%  rustc            [unknown]                                [k] 0xffffffff9d65066e
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c82fccc
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9cc743d0
+     0.01%  litchi-perf-005  libc.so.6                                [.] __memset_avx512_unaligned
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] core::hash::BuildHasher::hash_one
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c56e4fb
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c648e57
+     0.01%  rustc            rustup                                   [.] OBJ_nid2obj
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c82faee
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9cbfedd0
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c897489
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c5a56a9
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c859485
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] crc32fast::Hasher::update
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9cc743bc
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c7fce0e
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c82fa86
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c82340b
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c83013d
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::inflate::window::Window::extend
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c844fde
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9cbfedc2
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c7d8d33
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_ods::worksheet::package::push_span
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c61033a
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_perf_baseline::semantic_ods_full_cell_text
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c85bfb6
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d5c37dd
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8c886a
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c85d917
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8d2a30
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_ods::worksheet::validation::validate_sheet
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c4d7ef0
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d5ae0ad
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c855fa0
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] zlib_rs::deflate::compare256::avx2::compare256
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_ods::worksheet::model::CellValue::validate
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8561d7
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_odf_common::package::codec::parse_entry
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_odf_common::core::package::OwnedPackage::get_file
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d5ae1e3
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c845277
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d5ae0a1
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] soapberry_zip::archive::ZipSliceArchive<T>::get_entry
+     0.01%  git              git                                      [.] 0x0000000000209f53
+     0.01%  git              git                                      [.] 0x0000000000247245
+     0.01%  git              [unknown]                                [k] 0xffffffff9c4c7c46
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c60e2ea
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c6253fc
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d5ae3a6
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c85480c
+     0.01%  rustc            rustup                                   [.] toml::de::parser::document::descend_path
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] aho_corasick::automaton::try_find_fwd
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d6600b3
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c566f50
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c60c93d
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8c4bec
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d800bb9
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c85c058
+     0.01%  litchi-perf-005  libc.so.6                                [.] alloc_perturb
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c82b24f
+     0.01%  rustc            rustup                                   [.] <toml_parser::parser::event::ValidateWhitespace as toml_parser::parser::event::EventReceiver>::newline
+     0.01%  rustc            [unknown]                                [k] 0xffffffff9c5db4a5
+     0.01%  git              [unknown]                                [k] 0xffffffff9c8ecab4
+     0.01%  git              [unknown]                                [k] 0xffffffff9c93464e
+     0.01%  rustc            libc.so.6                                [.] __memcmp_evex_movbe
+     0.01%  git              [unknown]                                [k] 0xffffffff9c8cc3da
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8cdc1d
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c85c025
+     0.01%  rustc            [unknown]                                [k] 0xffffffff9d5ae0ab
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_ods::worksheet::validation::validate_cell
+     0.01%  rustc            rustup                                   [.] regex_syntax::ast::parse::NestLimiter<P>::check
+     0.01%  rustc            [unknown]                                [k] 0xffffffff9d6602e0
+     0.01%  git              git                                      [.] 0x000000000020a550
+     0.01%  rustc            rustup                                   [.] toml::de::parser::parse_document
+     0.01%  rustc            rustup                                   [.] <toml_parser::parser::event::RecursionGuard as toml_parser::parser::event::EventReceiver>::simple_key
+     0.01%  git              [unknown]                                [k] 0xffffffff9ca06050
+     0.01%  rustc            [unknown]                                [k] 0xffffffff9c85d85b
+     0.01%  rustc            [unknown]                                [k] 0xffffffff9c82792b
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c844f2b
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d64e1db
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c855f95
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+     0.01%  git              libc.so.6                                [.] __printf_buffer
+     0.01%  git              [unknown]                                [k] 0xffffffff9c8f5b48
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c827927
+     0.01%  git              [unknown]                                [k] 0xffffffff9c9dfed3
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c56d4f7
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8c4740
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c60d485
+     0.01%  git              [unknown]                                [k] 0xffffffff9c7c79d6
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c60e2c6
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c844ff3
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c82340f
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c897477
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8ca7d0
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c897460
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d5ae0af
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] <quick_xml::name::NamespaceResolver as core::default::Default>::default
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c70e4f3
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c5569e0
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c856015
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c588087
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c4c5924
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] <litchi_ods::worksheet::model::CellValue as core::cmp::PartialEq>::eq
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9cbfedb7
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] hashbrown::map::HashMap<K,V,S,A>::insert
+     0.01%  rustc            [unknown]                                [k] 0xffffffff9d5cc52f
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c7fcdfb
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c574d0a
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c56e0f0
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c59b2ab
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c56d652
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] soapberry_zip::preserve::PreservationIndex<R>::new
+     0.01%  git              [unknown]                                [k] 0xffffffff9c8fba47
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_ods::settings::codec::classify
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c61ee46
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c5110e1
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c845108
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8cfd31
+     0.01%  rustc            [unknown]                                [k] 0xffffffff9d5ae2a0
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_odf_common::core::family::Package::from_bytes
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] litchi_odf_common::package::codec::parse_manifest
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c85bfc4
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _ZN4core3ptr55drop_in_place$LT$litchi_ods..worksheet..model..Cell$GT$17h2a698f67638226dfE.llvm.7428105530893699264
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c859297
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8cde25
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c57b3e8
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c82f9e1
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c844f90
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::escape::normalize_attribute_value
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] <alloc::vec::into_iter::IntoIter<T,A> as core::iter::traits::iterator::Iterator>::fold
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c82fc90
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] flate2::zio::read
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c85bfd7
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c856b30
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c576bdd
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c826eb7
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8d0fa8
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c85888d
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c87f6d0
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8c8ec5
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffffc079c021
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d5ae295
+     0.01%  litchi-perf-005  libc.so.6                                [.] __sbrk
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c844f30
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] _ZN71_$LT$core..hash..sip..Hasher$LT$S$GT$$u20$as$u20$core..hash..Hasher$GT$5write17h1c4d815f2636c73fE.llvm.12415526586518285900
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9d6600cc
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c5db4b1
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] soapberry_zip::office::ArchiveReader::new_with_limits
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c85b398
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c574ebd
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c5db496
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c8cdf31
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c57485b
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+     0.01%  rustc            [unknown]                                [k] 0xffffffff9c5a56ba
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c85c0be
+     0.01%  litchi-perf-005  litchi-perf-0054-after-ods-shared-blobs  [.] quick_xml::reader::Reader<R>::read_event_impl
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c82342a
+     0.01%  rustc            ld-linux-x86-64.so.2                     [.] _dl_relocate_object
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c5f8127
+     0.01%  litchi-perf-005  [unknown]                                [k] 0xffffffff9c817e48
+     0.00%  taskset          [unknown]                                [k] 0xffffffff9cb6832f
+     0.00%  taskset          [unknown]                                [k] 0xffffffff9d5bb046
+     0.00%  taskset          [unknown]                                [k] 0xffffffff9c51f4f4
+     0.00%  taskset          [unknown]                                [k] 0xffffffff9d6602e0
+     0.00%  perf-exec        [unknown]                                [k] 0xffffffff9d6601e5
+     0.00%  taskset          [unknown]                                [k] 0xffffffff9c7a0a61
+     0.00%  perf-exec        [unknown]                                [k] 0xffffffff9c7a0a65
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

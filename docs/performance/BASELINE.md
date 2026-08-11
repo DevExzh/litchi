@@ -328,6 +328,14 @@ incomplete program and CRUD matrix.
   `extract_runs` self-cycle frame falls from 7.56% to 1.23%; allocation counts,
   peak heap, and uninstrumented RSS remain flat. See
   [`0053`](changes/0053-doc-chpx-range-index.md).
+- ODS durable-patch construction now retains its already owned immutable
+  source and target package allocations in the semantic blob bundles and
+  reuses their content addresses for operation preconditions. On the fixed
+  16 MiB-media one-cell edit/save case, p50 falls from 326.694 to 297.958 ms
+  (-8.80%), mean falls 9.07%, and p95 falls 13.85%. The former 33.58 MB
+  `BlobBundle::insert` payload-copy site disappears; matched peak heap falls
+  1.92%, while uninstrumented RSS is flat. See
+  [`0054`](changes/0054-ods-shared-durable-patch-blobs.md).
 - The positional XLSX source record reports p50 opens of 33.881 us (tiny),
   56.493 us (medium), and 139.897 us (dense); list-after-open has zero timed
   source reads. First-cell and narrow-range operations physically overlap only
@@ -564,10 +572,10 @@ See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 bounded by `SourceCacheLimits`, but are not yet charged to the hierarchical
 `Budget`.
 
-Consolidated changed-crate tests, formatter checks and focused warning-denied
-Clippy gates passed. The current ODS all-target Clippy and rustdoc gates retain
-the unrelated pre-existing findings recorded in change 0027. The ODT tranche
-compiled the ODF fuzz target offline; the PPT tranche has no dedicated fuzz
-target in the current tree. A workspace all-target/all-feature gate was not
-rerun because iWork was explicitly excluded while its crates are changing
-independently.
+Consolidated changed-crate tests, formatter checks, warning-denied production
+Clippy and rustdoc gates passed. The current ODS all-target Clippy gate retains
+the unrelated pre-existing test-only findings recorded in change 0027. The ODT
+tranche compiled the ODF fuzz target offline; the PPT and ODS tranches have no
+dedicated fuzz target in the current tree. A workspace all-target/all-feature
+gate was not rerun because iWork was explicitly excluded while its crates are
+changing independently.

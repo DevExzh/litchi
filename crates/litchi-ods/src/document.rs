@@ -1678,10 +1678,14 @@ impl Patch {
         }
         let mut forward_blobs = BlobBundle::new(limits.patch.blobs());
         let mut reverse_blobs = BlobBundle::new(limits.patch.blobs());
-        let _target_id = forward_blobs.insert(&target).map_err(patch_error)?;
-        let _source_id = reverse_blobs.insert(&source).map_err(patch_error)?;
-        let source_hash = DiagnosticFingerprint::of(&source).as_hex();
-        let target_hash = DiagnosticFingerprint::of(&target).as_hex();
+        let target_id = forward_blobs
+            .insert_shared(Arc::clone(&target))
+            .map_err(patch_error)?;
+        let source_id = reverse_blobs
+            .insert_shared(Arc::clone(&source))
+            .map_err(patch_error)?;
+        let source_hash = source_id.as_hex();
+        let target_hash = target_id.as_hex();
         let mut operations = Vec::new();
         operations
             .try_reserve_exact(steps.len())
@@ -2692,9 +2696,14 @@ mod raw_package_diff_tests {
         reason = "fixed in-memory ZIP fixtures keep physical-diff assertions concise"
     )]
 
-    use std::io::{Cursor, Write};
+    use std::{
+        io::{Cursor, Write},
+        sync::Arc,
+    };
 
-    use super::changed_effects;
+    use litchi_core::DiagnosticFingerprint;
+
+    use super::{Limits, Patch, Step, changed_effects};
 
     const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xml="http://www.w3.org/XML/1998/namespace" office:version="1.3"><office:body><office:spreadsheet><table:table xml:id="sheet" table:name="Sheet1"/></office:spreadsheet></office:body></office:document-content>"#;
     const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
@@ -2760,6 +2769,59 @@ mod raw_package_diff_tests {
         assert_eq!(
             changed_effects(&source, &changed_payload).unwrap(),
             ["part:Pictures/opaque.bin"]
+        );
+    }
+
+    #[test]
+    fn durable_patch_blobs_share_exact_package_allocations_and_hashes() {
+        let source: Arc<[u8]> = Arc::from(raw_package(
+            zip::CompressionMethod::Stored,
+            "application/octet-stream",
+            b"source payload",
+        ));
+        let target: Arc<[u8]> = Arc::from(raw_package(
+            zip::CompressionMethod::Stored,
+            "application/octet-stream",
+            b"target payload",
+        ));
+        let source_pointer = source.as_ptr();
+        let target_pointer = target.as_ptr();
+        let source_hash = DiagnosticFingerprint::of(&source).as_hex();
+        let target_hash = DiagnosticFingerprint::of(&target).as_hex();
+        let effects = changed_effects(&source, &target).unwrap();
+
+        let patch = Patch::build(
+            Arc::clone(&source),
+            Arc::clone(&target),
+            vec![Step {
+                op: "resource.put".to_string(),
+                target: "Pictures/opaque.bin".to_string(),
+                effects,
+            }],
+            Limits::default(),
+        )
+        .unwrap();
+
+        let target_id = patch.semantic.blobs().ids().next().unwrap();
+        assert_eq!(target_id.as_hex(), target_hash);
+        assert_eq!(
+            patch.semantic.blobs().get(target_id).map(<[u8]>::as_ptr),
+            Some(target_pointer)
+        );
+        let inverse = patch.inverse();
+        let source_id = inverse.semantic.blobs().ids().next().unwrap();
+        assert_eq!(source_id.as_hex(), source_hash);
+        assert_eq!(
+            inverse.semantic.blobs().get(source_id).map(<[u8]>::as_ptr),
+            Some(source_pointer)
+        );
+        assert_eq!(
+            patch.operations()[0].preconditions.get("source_sha256"),
+            Some(&serde_json::json!(source_hash))
+        );
+        assert_eq!(
+            patch.operations()[0].preconditions.get("target_sha256"),
+            Some(&serde_json::json!(target_hash))
         );
     }
 }

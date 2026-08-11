@@ -3,7 +3,7 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0053`](changes/0053-doc-chpx-range-index.md)
+[`change 0054`](changes/0054-ods-shared-durable-patch-blobs.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -284,6 +284,16 @@ down 8.78%. The existing medium no-media p50 falls 0.77%. Encryption,
 signatures, unsupported layouts and every unproved member retain established
 logical rebuild/comparison. See
 [`change 0031`](changes/0031-ods-unchanged-media-preservation.md).
+
+ODS durable-patch construction formerly copied both exact package archives
+into semantic blob bundles even though the outer patch already retained the
+same immutable `Arc<[u8]>` owners, then hashed both packages again for
+operation preconditions. The bundles now retain those existing allocations
+and the preconditions reuse their content addresses. Media-rich one-cell
+edit/save p50/mean/p95 improve 8.80%/9.07%/13.85%; the 33.58 MB payload-copy
+site disappears and matched peak heap falls 1.92%. ZIP publication,
+comparison, compact audit, final reopen and media verification remain. See
+[`change 0054`](changes/0054-ods-shared-durable-patch-blobs.md).
 
 A matching media-rich ODP case now adds one source-backed text box beside
 eight deterministic 2 MiB opaque resources. Reusing the same accepted common

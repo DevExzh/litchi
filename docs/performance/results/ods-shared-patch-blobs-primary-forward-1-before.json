@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "df8398132d252de56c4fe2468f090ae35f69cb7d",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1"
+  },
+  "configuration": {
+    "samples_per_case": 50,
+    "warmup_iterations_per_case": 10,
+    "cases": [
+      "ods_media_one_edit_save"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ]
+  },
+  "results": [
+    {
+      "case": "ods_media_one_edit_save",
+      "corpus": {
+        "name": "ods-media-publication",
+        "generator": "litchi-ods-media-publication-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "media-rich",
+        "payload_kind": "deterministic-incompressible-media",
+        "compression": "deflate",
+        "entry_count": 2056,
+        "archive_member_count": 11,
+        "entry_bytes": 2097152,
+        "uncompressed_payload_bytes": 16887808,
+        "archive_bytes": 16790689,
+        "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+        "target_entry": "Sheet 1!R16C16",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          302789826,
+          302833545,
+          305833669,
+          307318547,
+          307674945,
+          307813088,
+          309322232,
+          310541060,
+          311213030,
+          312042810,
+          312191897,
+          312478955,
+          312938216,
+          313170102,
+          313327197,
+          313702269,
+          316074075,
+          316459999,
+          316720168,
+          318040867,
+          318109802,
+          318805433,
+          320052089,
+          321434180,
+          321483201,
+          324200584,
+          325569713,
+          325692552,
+          325874182,
+          325998072,
+          326594134,
+          327914789,
+          328347488,
+          328918250,
+          328975845,
+          329537596,
+          329667224,
+          329813040,
+          329912380,
+          330795160,
+          331087303,
+          331107474,
+          331368724,
+          331653011,
+          332711974,
+          334131176,
+          339787751,
+          341633635,
+          342959329,
+          346247648
+        ],
+        "min": 302789826,
+        "p50": 322841892,
+        "p95": 341633635,
+        "p99": 346247648,
+        "max": 346247648,
+        "mean": 322057404.71999997,
+        "standard_deviation": 10753691.227195838,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 319001239.91160595,
+          "upper": 325113569.528394
+        }
+      },
+      "sink": null
+    }
+  ]
+}
