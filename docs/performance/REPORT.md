@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest tranche: `78ac94b2113b67db3b59090dd6b09407b0a3a140`
+Production base for the latest tranche: `e0434ae15`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,9 +13,10 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **111 selectable cases**: 36 default cases and 198 default
+harness contains **112 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
-opt-in XLSX commit/read attribution case, 16
+opt-in XLSX commit/read attribution case, one opt-in opaque-heavy common OLE2
+publication case, 16
 opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic case names across
 four capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 23 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
@@ -37,6 +38,7 @@ is still not broad program or CRUD coverage.
 | Native DOC/XLS/PPT semantic baseline | Large one-edit/save p50: XLS **1.722 ms**, DOC **1.416 ms**, PPT **0.357 ms**; large XLS open **1.383 ms** | Generated writer corpora; accepted XLS and DOC follow-ups are listed below |
 | Native XLS validated-editor reuse | Large one-cell edit/save p50 **-7.72%**, mean **-7.90%** | Final exact owner parse, public Workbook reopen and typed readback remain; peak heap/RSS flat |
 | Rejected XLS terminal-render handoff | Tiny changed save p50 **-7.55%**; large changed save **-0.39%** (neutral) | Fully reverted: repeated large exact no-op p50 **+22.00%**, mean **+16.69%** |
+| Common OLE2 publication case and rejected handoffs | Heavy validated-render prototype p50 **-34.06%**; shared-payload prototype **+32.02%** | Both fully reverted: validated-render DOC open **+21.64%**, DOC one-edit/save **+9.08%**; deterministic 4x4 MiB benchmark retained |
 | Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
 | Native PPT root snapshot CFB reuse | Repeated large root open p50 **-8.78%**, mean **-10.58%**; allocation calls **-5.01%** | Reuses only the validated CFB index; independent stream/current-user/live-document, slide-order, review-history and public-reader checks remain |
 | Native PPT text-edit resolver reuse | Direct large edit/save p50 **-14.12%**, mean **-15.39%**; allocation calls **-3.53%** | Reuses the full editor preflight for persisted-record resolution; exact error precedence, fresh commit editor and complete readback remain; minor-fault increase disclosed |
@@ -154,6 +156,14 @@ The accepted XLSX no-extension scan evidence is under
 guards, allocation/RSS/counter attribution and malformed-input precedence are
 summarized in
 [`change 0032`](changes/0032-xlsx-no-extension-scan.md).
+
+The new common OLE2 publication evidence is under
+`results/abba-ole-common-*.json`. It retains the deterministic opaque-heavy
+case, but both measured production handoffs were reverted: direct shared
+writer payloads regressed 32.02% p50, while retaining the validated render
+improved the target 34.06% but regressed DOC open 21.64%. The full rationale
+and DOC/XLS guards are in
+[`change 0033`](changes/0033-ole-common-publication-handoffs-rejected.md).
 
 The ODS row-local publication evidence is
 [`before A`](results/abba-ods-row-splice-one-edit-before-a.json),
@@ -324,6 +334,7 @@ The underlying records are:
 - [`0030-xlsx-action-plan-flattening-rejected.md`](changes/0030-xlsx-action-plan-flattening-rejected.md)
 - [`0031-ods-unchanged-media-preservation.md`](changes/0031-ods-unchanged-media-preservation.md)
 - [`0032-xlsx-no-extension-scan.md`](changes/0032-xlsx-no-extension-scan.md)
+- [`0033-ole-common-publication-handoffs-rejected.md`](changes/0033-ole-common-publication-handoffs-rejected.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -441,7 +452,7 @@ ZIP layouts use the fully validated rewrite path before any sink output.
 
 ## Evidence and verification
 
-The standalone harness provides 111 selectable cases and a 198-record default
+The standalone harness provides 112 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus
@@ -540,7 +551,10 @@ editor-reuse, DOC batched-publication, PPT root-open reuse and direct PPT
 text-edit resolver reuse follow-ups.
 Remaining native work requires new attribution inside the retained final
 owner/public-reader validation layers. The rejected XLS terminal-render
-handoff is not a reusable shortcut for those checks. ODT full-text block
+handoff is not a reusable shortcut for those checks. The new opaque-heavy
+common OLE2 case also rejects direct shared writer payloads (+32.02% p50) and
+an editor-wide validated-render cache: its heavy path improved 34.06%, but DOC
+open regressed 21.64% and DOC edit/save 9.08%. ODT full-text block
 ownership is accepted, and repeated ODS facade cell lookup now has a bounded
 lazy index. Compact ODS content edits now preserve unchanged ZIP members, but
 broader ODF source-backed reads, repeated ODT/ODP semantic scans, other family
