@@ -293,6 +293,12 @@ incomplete program and CRUD matrix.
   906.439 to 15.615 ms (-98.28%, 58.05x), allocation calls fall 96.13%, and
   scalar one-edit guards remain neutral. See
   [`0045`](changes/0045-odt-coalesced-paragraph-publication.md).
+- Public ODT middle-paragraph lookup now validates the complete XML while
+  retaining only the requested paragraph. Large-corpus p50 falls from 3.202 to
+  1.647 ms (-48.56%), allocation calls fall 27.05%, peak heap falls 24.74%,
+  and uninstrumented RSS falls 10.93%. The unchanged paragraph-list p50 moves
+  +0.38%; a shared-mode parser prototype that regressed listing was removed.
+  See [`0047`](changes/0047-odt-indexed-paragraph-selector.md).
 - The positional XLSX source record reports p50 opens of 33.881 us (tiny),
   56.493 us (medium), and 139.897 us (dense); list-after-open has zero timed
   source reads. First-cell and narrow-range operations physically overlap only

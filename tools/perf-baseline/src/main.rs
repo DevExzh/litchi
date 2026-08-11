@@ -6195,9 +6195,8 @@ fn run_semantic_odt(
             Case::OdtSemanticOneParagraph => {
                 let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
                 let started = Instant::now();
-                let paragraphs = document.paragraphs()?;
-                let text = paragraphs
-                    .get(index)
+                let text = document
+                    .paragraph(index)?
                     .ok_or("semantic ODT selected paragraph is missing")?
                     .text()?;
                 let duration = started.elapsed();

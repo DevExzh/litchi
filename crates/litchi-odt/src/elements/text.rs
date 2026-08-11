@@ -911,6 +911,81 @@ struct ActiveTextBlock {
     slot: usize,
 }
 
+struct ActiveSelectedTextBlock {
+    element: Option<Element>,
+    depth: usize,
+    text: RetainedText,
+}
+
+struct RetainedText {
+    value: Option<String>,
+    len: usize,
+}
+
+impl RetainedText {
+    fn new(retain: bool) -> Self {
+        Self {
+            value: retain.then(String::new),
+            len: 0,
+        }
+    }
+
+    fn append(&mut self, value: &str) -> Result<()> {
+        self.len = self
+            .len
+            .checked_add(value.len())
+            .ok_or_else(|| Error::InvalidFormat("ODF text size overflow".to_string()))?;
+        if self.len > MAX_TEXT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "ODF text exceeds {MAX_TEXT_BYTES} bytes"
+            )));
+        }
+        if let Some(output) = &mut self.value {
+            output.push_str(value);
+        }
+        Ok(())
+    }
+
+    fn append_spaces(&mut self, count: usize) -> Result<()> {
+        self.len = self
+            .len
+            .checked_add(count)
+            .ok_or_else(|| Error::InvalidFormat("ODF text size overflow".to_string()))?;
+        if self.len > MAX_TEXT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "ODF text exceeds {MAX_TEXT_BYTES} bytes"
+            )));
+        }
+        if let Some(output) = &mut self.value {
+            output.extend(std::iter::repeat_n(' ', count));
+        }
+        Ok(())
+    }
+}
+
+struct ParagraphOutput {
+    target: usize,
+    next_paragraph: usize,
+    paragraph: Option<Paragraph>,
+}
+
+impl ParagraphOutput {
+    fn begin(&mut self, source: &BytesStart<'_>) -> bool {
+        if source.local_name().as_ref() != b"p" {
+            return false;
+        }
+        let retain = self.next_paragraph == self.target;
+        self.next_paragraph += 1;
+        retain
+    }
+
+    fn store(&mut self, mut element: Element, text: String) -> Result<()> {
+        element.set_text_owned(text);
+        self.paragraph = Some(Paragraph::from_element(element)?);
+        Ok(())
+    }
+}
+
 /// Parse every `text:p` and `text:h` in `xml_content` into flat text blocks.
 ///
 /// ODF allows a paragraph to contain further paragraphs through frames
@@ -928,6 +1003,16 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
 
 pub(crate) fn parse_text_blocks_owned(xml_content: &str) -> Result<Vec<TextBlock>> {
     parse_text_blocks_with_ownership(xml_content, true)
+}
+
+pub(crate) fn parse_paragraph_at(xml_content: &str, index: usize) -> Result<Option<Paragraph>> {
+    let mut output = ParagraphOutput {
+        target: index,
+        next_paragraph: 0,
+        paragraph: None,
+    };
+    parse_selected_paragraph(xml_content, &mut output)?;
+    Ok(output.paragraph)
 }
 
 fn parse_text_blocks_with_ownership(xml_content: &str, own_text: bool) -> Result<Vec<TextBlock>> {
@@ -1089,6 +1174,167 @@ fn parse_text_blocks_with_ownership(xml_content: &str, own_text: bool) -> Result
     Ok(blocks.into_iter().flatten().collect())
 }
 
+fn parse_selected_paragraph(xml_content: &str, output: &mut ParagraphOutput) -> Result<()> {
+    let mut reader = NsReader::from_str(xml_content);
+    let mut buffer = Vec::new();
+    let mut active: Vec<ActiveSelectedTextBlock> = Vec::new();
+    let mut block_count = 0usize;
+    let mut document_depth = 0usize;
+    let mut tracked_changes_depth = 0usize;
+    let mut skipped_depth = 0usize;
+    let mut total_text_bytes = 0usize;
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid ODF text XML: {error}")))?;
+        let text_namespace =
+            matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE);
+        match event {
+            Event::Start(ref element) => {
+                document_depth = document_depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODF text nesting depth overflow".to_string())
+                })?;
+                if document_depth > MAX_TEXT_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODF text nesting exceeds {MAX_TEXT_DEPTH} levels"
+                    )));
+                }
+
+                if tracked_changes_depth > 0 {
+                    tracked_changes_depth += 1;
+                    buffer.clear();
+                    continue;
+                }
+                if is_text_element(text_namespace, element, b"tracked-changes") {
+                    tracked_changes_depth = 1;
+                    buffer.clear();
+                    continue;
+                }
+
+                let starts_block = skipped_depth == 0 && is_text_block(text_namespace, element);
+                if !starts_block && let Some(current) = active.last_mut() {
+                    current.depth += 1;
+                }
+
+                if starts_block {
+                    count_text_block(&mut block_count)?;
+                    let retain = output.begin(element);
+                    active.push(ActiveSelectedTextBlock {
+                        element: parse_selected_text_block_element(&reader, element, retain)?,
+                        depth: 1,
+                        text: RetainedText::new(retain),
+                    });
+                } else if skipped_depth > 0 {
+                    skipped_depth += 1;
+                } else if let Some(current) = active.last_mut() {
+                    if is_text_element(text_namespace, element, b"note-body")
+                        || is_text_element(text_namespace, element, b"ruby-text")
+                    {
+                        skipped_depth = 1;
+                    } else {
+                        append_selected_text_control(
+                            &reader,
+                            text_namespace,
+                            element,
+                            &mut current.text,
+                        )?;
+                    }
+                }
+            },
+            Event::Empty(ref element) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+                if is_text_element(text_namespace, element, b"note-body")
+                    || is_text_element(text_namespace, element, b"ruby-text")
+                {
+                    // An empty suppressed run contributes nothing either way.
+                } else if is_text_block(text_namespace, element) {
+                    count_text_block(&mut block_count)?;
+                    let retain = output.begin(element);
+                    finish_selected_text_block(
+                        parse_selected_text_block_element(&reader, element, retain)?,
+                        RetainedText::new(retain),
+                        output,
+                        &mut total_text_bytes,
+                    )?;
+                } else if let Some(current) = active.last_mut() {
+                    append_selected_text_control(
+                        &reader,
+                        text_namespace,
+                        element,
+                        &mut current.text,
+                    )?;
+                }
+            },
+            Event::Text(ref value) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+                if let Some(current) = active.last_mut() {
+                    let decoded = value
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("invalid ODF text content: {error}"))
+                        })?;
+                    current.text.append(&decoded)?;
+                }
+            },
+            Event::CData(ref value) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+                if let Some(current) = active.last_mut() {
+                    let decoded = value
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("invalid ODF text CDATA: {error}"))
+                        })?;
+                    current.text.append(&decoded)?;
+                }
+            },
+            Event::GeneralRef(ref reference)
+                if tracked_changes_depth == 0 && skipped_depth == 0 =>
+            {
+                if let Some(current) = active.last_mut() {
+                    let decoded = decode_reference(reference)?;
+                    current.text.append(&decoded)?;
+                }
+            },
+            Event::End(_) => {
+                document_depth = document_depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODF text element stack underflow".to_string())
+                })?;
+                if tracked_changes_depth > 0 {
+                    tracked_changes_depth -= 1;
+                    buffer.clear();
+                    continue;
+                }
+                skipped_depth = skipped_depth.saturating_sub(1);
+                if let Some(current) = active.last_mut() {
+                    current.depth = current.depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODF text block stack underflow".to_string())
+                    })?;
+                    if current.depth == 0 {
+                        let current = active
+                            .pop()
+                            .ok_or_else(|| Error::InvalidFormat(BLOCK_STACK_ERROR.to_string()))?;
+                        finish_selected_text_block(
+                            current.element,
+                            current.text,
+                            output,
+                            &mut total_text_bytes,
+                        )?;
+                    }
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+
+    if !active.is_empty() || tracked_changes_depth != 0 || skipped_depth != 0 || document_depth != 0
+    {
+        return Err(Error::InvalidFormat(
+            "incomplete ODF text XML structure".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn is_text_element(text_namespace: bool, element: &BytesStart<'_>, local_name: &[u8]) -> bool {
     text_namespace && element.local_name().as_ref() == local_name
 }
@@ -1156,6 +1402,100 @@ fn make_text_block_element(reader: &NsReader<&[u8]>, source: &BytesStart<'_>) ->
         element.set_attribute(&name, &value);
     }
     Ok(element)
+}
+
+fn parse_selected_text_block_element(
+    reader: &NsReader<&[u8]>,
+    source: &BytesStart<'_>,
+    retain: bool,
+) -> Result<Option<Element>> {
+    let _tag_name = match source.local_name().as_ref() {
+        b"p" => "text:p",
+        b"h" => "text:h",
+        _ => {
+            return Err(Error::InvalidFormat(
+                "element is not an ODF paragraph or heading".to_string(),
+            ));
+        },
+    };
+    if retain {
+        return make_text_block_element(reader, source).map(Some);
+    }
+    let mut discarded_names = Vec::new();
+    for attribute in source.attributes() {
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODF text attribute: {error}"))
+        })?;
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
+        let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+        let local_name = std::str::from_utf8(local_name.as_ref()).map_err(|_error| {
+            Error::InvalidFormat("non-UTF-8 ODF text attribute name".to_string())
+        })?;
+        let name = match namespace {
+            ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE => {
+                format!("text:{local_name}")
+            },
+            ResolveResult::Bound(Namespace(uri)) if uri == XLINK_NAMESPACE => {
+                format!("xlink:{local_name}")
+            },
+            ResolveResult::Bound(Namespace(uri)) if uri == XML_NAMESPACE => {
+                format!("xml:{local_name}")
+            },
+            ResolveResult::Bound(_) | ResolveResult::Unbound => {
+                std::str::from_utf8(attribute.key.as_ref())
+                    .map_err(|_error| {
+                        Error::InvalidFormat("non-UTF-8 ODF text attribute name".to_string())
+                    })?
+                    .to_string()
+            },
+            ResolveResult::Unknown(prefix) => {
+                return Err(Error::InvalidFormat(format!(
+                    "unknown ODF text attribute namespace prefix '{}'",
+                    String::from_utf8_lossy(&prefix)
+                )));
+            },
+        };
+        let _value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODF text attribute value: {error}"))
+            })?;
+        if discarded_names.iter().any(|existing| existing == &name) {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate ODF text attribute '{name}'"
+            )));
+        }
+        discarded_names.push(name);
+    }
+    Ok(None)
+}
+
+fn append_selected_text_control(
+    reader: &NsReader<&[u8]>,
+    text_namespace: bool,
+    element: &BytesStart<'_>,
+    output: &mut RetainedText,
+) -> Result<()> {
+    if !text_namespace {
+        return Ok(());
+    }
+    match element.local_name().as_ref() {
+        b"s" => {
+            let count = text_space_count(reader, element)?.unwrap_or(1);
+            if count > MAX_SPACE_COUNT {
+                return Err(Error::InvalidFormat(format!(
+                    "text:s count exceeds {MAX_SPACE_COUNT}"
+                )));
+            }
+            output.append_spaces(count)?;
+        },
+        b"tab" => output.append("\t")?,
+        b"line-break" => output.append("\n")?,
+        _ => {},
+    }
+    Ok(())
 }
 
 fn append_text_control(
@@ -1287,6 +1627,40 @@ fn store_text_block(
         .get_mut(slot)
         .ok_or_else(|| Error::InvalidFormat(BLOCK_STACK_ERROR.to_string()))?;
     *target = Some(block);
+    Ok(())
+}
+
+fn count_text_block(block_count: &mut usize) -> Result<()> {
+    if *block_count >= MAX_TEXT_BLOCKS {
+        return Err(Error::InvalidFormat(format!(
+            "ODF text exceeds {MAX_TEXT_BLOCKS} paragraphs and headings"
+        )));
+    }
+    *block_count += 1;
+    Ok(())
+}
+
+fn finish_selected_text_block(
+    element: Option<Element>,
+    text: RetainedText,
+    output: &mut ParagraphOutput,
+    total_text_bytes: &mut usize,
+) -> Result<()> {
+    *total_text_bytes = total_text_bytes
+        .checked_add(text.len)
+        .ok_or_else(|| Error::InvalidFormat("ODF text size overflow".to_string()))?;
+    if *total_text_bytes > MAX_TEXT_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "ODF text exceeds {MAX_TEXT_BYTES} bytes"
+        )));
+    }
+    if let Some(element) = element {
+        output.store(
+            element,
+            text.value
+                .ok_or_else(|| Error::InvalidFormat(BLOCK_STACK_ERROR.to_string()))?,
+        )?;
+    }
     Ok(())
 }
 
@@ -1605,6 +1979,15 @@ mod tests {
         assert_eq!(paragraphs.len(), 2);
         assert_eq!(paragraphs[0].text().unwrap(), "First paragraph");
         assert_eq!(paragraphs[1].text().unwrap(), "Second paragraph");
+        assert_eq!(
+            TextElements::parse_paragraph_at(xml, 1)
+                .unwrap()
+                .unwrap()
+                .text()
+                .unwrap(),
+            "Second paragraph"
+        );
+        assert!(TextElements::parse_paragraph_at(xml, 2).unwrap().is_none());
     }
 
     #[test]
@@ -1697,6 +2080,25 @@ mod tests {
             std::str::from_utf8(TEXT_NAMESPACE).unwrap()
         );
         assert_eq!(TextElements::extract_text(&zero).unwrap(), "AB");
+
+        let malformed_tail = format!(
+            r#"<t:p xmlns:t="{}">Selected</t:p><t:p>unfinished"#,
+            std::str::from_utf8(TEXT_NAMESPACE).unwrap()
+        );
+        assert!(TextElements::parse_paragraph_at(&malformed_tail, 0).is_err());
+
+        let excessive_tail = format!(
+            r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="{}"><t:p>Selected</t:p><t:p><t:s t:c="{}"/></t:p></o:text>"#,
+            std::str::from_utf8(TEXT_NAMESPACE).unwrap(),
+            MAX_SPACE_COUNT + 1
+        );
+        assert!(TextElements::parse_paragraph_at(&excessive_tail, 0).is_err());
+
+        let duplicate_tail = format!(
+            r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:a="{0}" xmlns:b="{0}"><a:p>Selected</a:p><a:p a:style-name="one" b:style-name="two">Invalid</a:p></o:text>"#,
+            std::str::from_utf8(TEXT_NAMESPACE).unwrap()
+        );
+        assert!(TextElements::parse_paragraph_at(&duplicate_tail, 0).is_err());
     }
 
     #[test]

@@ -44,6 +44,22 @@ fn text_box_paragraphs_inside_a_paragraph_become_their_own_blocks() {
         "before  after\nframed"
     );
     assert_eq!(TextElements::parse_paragraphs(&xml).unwrap().len(), 2);
+    assert_eq!(
+        TextElements::parse_paragraph_at(&xml, 0)
+            .unwrap()
+            .unwrap()
+            .text()
+            .unwrap(),
+        "before  after"
+    );
+    assert_eq!(
+        TextElements::parse_paragraph_at(&xml, 1)
+            .unwrap()
+            .unwrap()
+            .text()
+            .unwrap(),
+        "framed"
+    );
 }
 
 #[test]

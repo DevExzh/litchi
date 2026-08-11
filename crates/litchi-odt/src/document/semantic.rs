@@ -86,6 +86,14 @@ impl Document {
         TextElements::parse_paragraphs(self.content.xml_content())
     }
 
+    /// Get one paragraph by its zero-based paragraph index.
+    ///
+    /// Headings do not contribute to the index. The complete document XML is
+    /// still validated, but only the requested paragraph is retained.
+    pub fn paragraph(&self, index: usize) -> Result<Option<ElementParagraph>> {
+        TextElements::parse_paragraph_at(self.content.xml_content(), index)
+    }
+
     /// Get all tables in the document.
     ///
     /// Returns a vector of `Table` elements representing all tables found

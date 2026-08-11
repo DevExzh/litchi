@@ -379,9 +379,9 @@ in-memory publication rather than OS/filesystem behavior.
 
 Each ODT batch uses `Builder`, `Document::from_bytes`, paragraph enumeration,
 full-text extraction, and the source-bound `Document::edit` transaction.
-`odt_semantic_one_paragraph` necessarily calls the public `paragraphs()` API
-and then selects the middle value because ODT has no public indexed paragraph
-query; it is deliberately not described as a lazy lookup.
+`odt_semantic_one_paragraph` calls the public `Document::paragraph(index)`
+selector. The selector validates the complete XML through EOF but retains only
+the requested paragraph; it is not a positional or early-return XML read.
 `odt_semantic_one_percent_edit_save` stages deterministic evenly spaced
 replacements through the ordinary scalar transaction API, then commits once,
 materializes the package, reopens it, verifies every paragraph and full text,
