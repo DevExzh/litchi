@@ -201,6 +201,45 @@ def add_keynote_soundtrack_settings_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_numbers_sheet_order_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.NUMBERS_SHEET_ORDER_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic_source = (
+        semantic.read_text(encoding="utf-8") if semantic.is_file() else ""
+    )
+    semantic.write_text(
+        semantic_source
+        + "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_SHEET_ORDER_CANONICAL_TYPES
+        ),
+        encoding="utf-8",
+    )
+    owner = root / boundaries.NUMBERS_SHEET_ORDER_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    if not owner.is_file():
+        owner.write_text("// Private package owner.\n", encoding="utf-8")
+    lib_export = root / boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES[0]
+    lib_source = (
+        lib_export.read_text(encoding="utf-8") if lib_export.is_file() else ""
+    )
+    lib_export.write_text(lib_source + "pub mod sheet;\n", encoding="utf-8")
+    package_export = root / boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES[1]
+    package_source = (
+        package_export.read_text(encoding="utf-8")
+        if package_export.is_file()
+        else ""
+    )
+    package_export.write_text(
+        package_source + "mod sheet_order;\n", encoding="utf-8"
+    )
+    sheet_export = root / boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES[2]
+    sheet_source = (
+        sheet_export.read_text(encoding="utf-8") if sheet_export.is_file() else ""
+    )
+    sheet_export.write_text(sheet_source + "pub mod order;\n", encoding="utf-8")
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -4810,6 +4849,810 @@ class BoundaryPolicyTests(unittest.TestCase):
                 boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
                     root
                 ),
+                [],
+            )
+
+    def test_numbers_sheet_order_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_SHEET_ORDER_METHODS,
+            ("move_sheet",),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_SHEET_ORDER_EXAMPLE,
+            Path("crates/litchi-iwa/examples/move_numbers_sheet.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_SHEET_ORDER_TESTS,
+            (
+                "reorders_and_removes_sheets_transactionally",
+                "sheet_list_crud_preserves_raw_references_and_restores_exact_component",
+                "duplicate_sheet_references_fail_transactionally",
+            ),
+        )
+        self.assertEqual(
+            boundaries.IWA_NUMBERS_EDITOR_TEST_SOURCE,
+            Path("crates/litchi-iwa/src/numbers/editor/tests.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_SHEET_ORDER_SEMANTIC_SOURCE,
+            Path("crates/litchi-numbers/src/sheet/order.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_SHEET_ORDER_OWNER_SOURCE,
+            Path("crates/litchi-numbers/src/package/sheet_order.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_SHEET_ORDER_OWNER_HELPER_ROOT,
+            Path("crates/litchi-numbers/src/package/sheet_order"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_SHEET_ORDER_OWNER_HELPER_SOURCES,
+            (
+                Path("crates/litchi-numbers/src/package/sheet_order/error.rs"),
+                Path("crates/litchi-numbers/src/package/sheet_order/resolve.rs"),
+                Path("crates/litchi-numbers/src/package/sheet_order/rewrite.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_SHEET_ORDER_IMPLEMENTATION_SOURCES,
+            (
+                Path("crates/litchi-numbers/src/sheet/order.rs"),
+                Path("crates/litchi-numbers/src/package/sheet_order.rs"),
+                *boundaries.NUMBERS_SHEET_ORDER_OWNER_HELPER_SOURCES,
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES,
+            (
+                Path("crates/litchi-numbers/src/lib.rs"),
+                Path("crates/litchi-numbers/src/package.rs"),
+                Path("crates/litchi-numbers/src/sheet.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_SHEET_ORDER_CANONICAL_TYPES,
+            ("Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_SHEET_ORDER_PACKAGE_METHODS,
+            ("edit_sheet_order", "apply_sheet_order"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_SHEET_ORDER_FLAT_ALIASES,
+            frozenset(
+                {
+                    "SheetOrderEdit",
+                    "SheetOrderPatch",
+                    "SheetOrderCommit",
+                    "SheetOrderDiagnostics",
+                    "SheetOrderError",
+                    "SheetOrderLimitKind",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_SHEET_ORDER_PHYSICAL_TYPES,
+            frozenset(
+                {
+                    "Archive",
+                    "ArchiveObject",
+                    "ComponentCatalog",
+                    "DocumentSnapshot",
+                    "EntryEdit",
+                    "ExactArtifacts",
+                    "IWorkPackage",
+                    "PhysicalSource",
+                    "RawMessage",
+                    "Resolved",
+                    "SheetOrderSnapshot",
+                    "SheetSnapshot",
+                    "SnappyStream",
+                    "SourceCatalog",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_SHEET_ORDER_WIRE_TYPES,
+            frozenset(
+                {
+                    "DecodeOptions",
+                    "NestedFieldEdit",
+                    "NestedFieldReplacement",
+                    "WireDescent",
+                    "WireError",
+                    "WireLimits",
+                    "WireResourceLimit",
+                    "WireView",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_SHEET_ORDER_PROTO_ORIGINS,
+            frozenset({"tn", "tsp"}),
+        )
+
+    def test_retired_iwa_numbers_sheet_order_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workbook = root / boundaries.IWA_NUMBERS_SEMANTIC_WORKBOOK_SOURCE
+            workbook.parent.mkdir(parents=True)
+            workbook.write_text("pub fn r#move_sheet() {}\n", encoding="utf-8")
+            tests = root / boundaries.IWA_NUMBERS_EDITOR_TEST_SOURCE
+            tests.parent.mkdir(parents=True, exist_ok=True)
+            tests.write_text(
+                "fn reorders_and_removes_sheets_transactionally() {}\n"
+                "fn sheet_list_crud_preserves_raw_references_and_restores_exact_component() {}\n"
+                "fn duplicate_sheet_references_fail_transactionally() {}\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.RETIRED_IWA_NUMBERS_SHEET_ORDER_EXAMPLE
+            example.parent.mkdir(parents=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_sheet_order_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Numbers sheet-order example returned: "
+                        "crates/litchi-iwa/examples/move_numbers_sheet.rs",
+                        "retired litchi-iwa Numbers sheet-order method move_sheet: "
+                        "crates/litchi-iwa/src/numbers/editor/semantic/workbook.rs:1",
+                        "retired litchi-iwa Numbers sheet-order test "
+                        "reorders_and_removes_sheets_transactionally: "
+                        "crates/litchi-iwa/src/numbers/editor/tests.rs:1",
+                        "retired litchi-iwa Numbers sheet-order test "
+                        "sheet_list_crud_preserves_raw_references_and_restores_exact_"
+                        "component: crates/litchi-iwa/src/numbers/editor/tests.rs:2",
+                        "retired litchi-iwa Numbers sheet-order test "
+                        "duplicate_sheet_references_fail_transactionally: "
+                        "crates/litchi-iwa/src/numbers/editor/tests.rs:3",
+                    ]
+                ),
+            )
+
+    def test_retired_iwa_numbers_sheet_order_readme_calls_and_example(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            readme = root / boundaries.IWA_NUMBERS_README
+            readme.parent.mkdir(parents=True)
+            readme.write_text(
+                "numbers.r#move_sheet(0, 1);\n"
+                "numbers_editor\n  .\n  move_sheet(1, 0);\n"
+                "crate::nested::NumbersEditor::\n  r#move_sheet(0, 1);\n"
+                "move_numbers_sheet\n"
+                "move_numbers_sheet.rs\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_sheet_order_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Numbers sheet-order README call move_sheet: "
+                        "crates/litchi-iwa/README.md:1",
+                        "retired litchi-iwa Numbers sheet-order README call move_sheet: "
+                        "crates/litchi-iwa/README.md:4",
+                        "retired litchi-iwa Numbers sheet-order README call move_sheet: "
+                        "crates/litchi-iwa/README.md:6",
+                        "retired litchi-iwa Numbers sheet-order README example reference "
+                        "move_numbers_sheet: crates/litchi-iwa/README.md:7",
+                        "retired litchi-iwa Numbers sheet-order README example reference "
+                        "move_numbers_sheet: crates/litchi-iwa/README.md:8",
+                    ]
+                ),
+            )
+
+    def test_iwa_numbers_sheet_order_policy_retains_other_sheet_operations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workbook = root / boundaries.IWA_NUMBERS_SEMANTIC_WORKBOOK_SOURCE
+            workbook.parent.mkdir(parents=True)
+            workbook.write_text(
+                "// fn move_sheet() {}\n"
+                'const NOTE: &str = "fn r#move_sheet() {}";\n'
+                "/* fn move_sheet() {} */\n"
+                "pub fn move_sheet_drawable() {}\n"
+                "pub fn move_table() {}\n"
+                "pub fn add_empty_sheet() {}\n"
+                "pub fn duplicate_sheet() {}\n"
+                "pub fn remove_sheet() {}\n"
+                "pub fn update_numbers_document() {}\n",
+                encoding="utf-8",
+            )
+            tests = root / boundaries.IWA_NUMBERS_EDITOR_TEST_SOURCE
+            tests.parent.mkdir(parents=True, exist_ok=True)
+            tests.write_text(
+                "// fn reorders_and_removes_sheets_transactionally() {}\n"
+                'const NOTE: &str = "fn duplicate_sheet_references_fail_transactionally() {}";\n'
+                "fn reorders_and_removes_sheets_transactionally_v2() {}\n",
+                encoding="utf-8",
+            )
+            other_owner = root / "crates/litchi-pages/src/editor.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text("pub fn move_sheet() {}\n", encoding="utf-8")
+            retained = root / "crates/litchi-iwa/examples/create_numbers_sheets.rs"
+            retained.parent.mkdir(parents=True)
+            retained.write_text("fn main() {}\n", encoding="utf-8")
+            readme = root / boundaries.IWA_NUMBERS_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "`move_sheet` is retired prose.\n"
+                "move_sheet\n"
+                "edit.move_sheet(selector, 1)\n"
+                "package.edit_sheet_order()\n"
+                "package.apply_sheet_order(patch)\n"
+                "move_numbers_sheets.rs\n",
+                encoding="utf-8",
+            )
+            other_readme = root / "README.md"
+            other_readme.write_text("numbers.move_sheet(0, 1)\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_sheet_order_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_sheet_order_requires_each_canonical_type(self) -> None:
+        for missing in boundaries.NUMBERS_SHEET_ORDER_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_sheet_order_canonical_scaffold(root)
+                    semantic = root / boundaries.NUMBERS_SHEET_ORDER_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.NUMBERS_SHEET_ORDER_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+                    self.assertEqual(
+                        boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                        [
+                            "focused litchi-numbers sheet-order public API is missing "
+                            f"canonical sheet::order type {missing}: "
+                            "crates/litchi-numbers/src/sheet/order.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_sheet_order_requires_nested_modules_and_private_owner(
+        self,
+    ) -> None:
+        missing_root = (
+            "",
+            "mod sheet;\n",
+            "pub(crate) mod sheet;\n",
+            "pub(super) mod r#sheet {}\n",
+            "pub(in crate) mod sheet;\n",
+            "// pub mod sheet;\n",
+            'const NOTE: &str = "pub mod sheet;";\n',
+        )
+        accepted_root = (
+            "pub mod sheet;\n",
+            "pub mod r#sheet;\n",
+            "pub mod sheet {}\n",
+            "pub\nmod\nr#sheet\n{}\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-numbers sheet-order public API is missing "
+                        "canonical root sheet module: crates/litchi-numbers/src/lib.rs"
+                    ],
+                )
+                for declaration in missing_root
+            ],
+            *[(declaration, []) for declaration in accepted_root],
+        ):
+            with self.subTest(scope="root", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_sheet_order_canonical_scaffold(root)
+                    path = root / boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES[0]
+                    path.write_text(declaration, encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                        expected,
+                    )
+
+        missing_nested = (
+            "",
+            "mod order;\n",
+            "pub(crate) mod order;\n",
+            "pub(super) mod r#order {}\n",
+            "pub(in crate) mod order;\n",
+            "// pub mod order;\n",
+            'const NOTE: &str = "pub mod order;";\n',
+        )
+        accepted_nested = (
+            "pub mod order;\n",
+            "pub mod r#order;\n",
+            "pub mod order {}\n",
+            "pub\nmod\nr#order\n{}\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-numbers sheet-order public API is missing "
+                        "canonical sheet::order module: crates/litchi-numbers/src/sheet.rs"
+                    ],
+                )
+                for declaration in missing_nested
+            ],
+            *[(declaration, []) for declaration in accepted_nested],
+        ):
+            with self.subTest(scope="nested", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_sheet_order_canonical_scaffold(root)
+                    path = root / boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES[2]
+                    path.write_text(declaration, encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                        expected,
+                    )
+
+        missing_owner = (
+            "",
+            "// mod sheet_order;\n",
+            'const NOTE: &str = "mod sheet_order;";\n',
+            "mod sheet_orders;\n",
+        )
+        accepted_owner = (
+            "mod sheet_order;\n",
+            "mod r#sheet_order {}\n",
+            "pub(crate) mod sheet_order;\n",
+            "pub(super) mod r#sheet_order {}\n",
+            "pub(in crate)\nmod\nsheet_order\n;\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-numbers sheet-order public API is missing "
+                        "private package owner module: "
+                        "crates/litchi-numbers/src/package.rs"
+                    ],
+                )
+                for declaration in missing_owner
+            ],
+            *[(declaration, []) for declaration in accepted_owner],
+        ):
+            with self.subTest(scope="owner", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_sheet_order_canonical_scaffold(root)
+                    path = root / boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES[1]
+                    path.write_text(declaration, encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                        expected,
+                    )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_sheet_order_canonical_scaffold(root)
+            (root / boundaries.NUMBERS_SHEET_ORDER_OWNER_SOURCE).unlink()
+            self.assertEqual(
+                boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                [
+                    "focused litchi-numbers sheet-order public API is missing "
+                    "private package owner source: "
+                    "crates/litchi-numbers/src/package/sheet_order.rs"
+                ],
+            )
+
+    def test_focused_numbers_sheet_order_rejects_duplicate_package_module(self) -> None:
+        for declaration in (
+            "pub mod sheet_order;",
+            "pub mod r#sheet_order;",
+            "pub mod sheet_order {}",
+            "pub\nmod\nr#sheet_order\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_sheet_order_canonical_scaffold(root)
+                    package = root / boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES[1]
+                    package.write_text(declaration + "\n", encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                        [
+                            "focused litchi-numbers sheet-order public API exposes "
+                            "duplicate package::sheet_order module: "
+                            "crates/litchi-numbers/src/package.rs:1"
+                        ],
+                    )
+
+    def test_focused_numbers_sheet_order_rejects_all_flat_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative_sources = (
+                boundaries.NUMBERS_SHEET_ORDER_IMPLEMENTATION_SOURCES
+                + boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES
+            )
+            sources = tuple(root / path for path in relative_sources)
+            declarations: dict[Path, list[str]] = {path: [] for path in sources}
+            expected: list[str] = []
+            for index, name in enumerate(sorted(boundaries.NUMBERS_SHEET_ORDER_FLAT_ALIASES)):
+                source_index = index % len(sources)
+                path = sources[source_index]
+                declaration = (
+                    f"pub struct {name};"
+                    if source_index < 2
+                    else f"pub use crate::legacy::Legacy as {name};"
+                )
+                declarations[path].append(declaration)
+                expected.append(
+                    "focused litchi-numbers sheet-order public API retains flat alias "
+                    f"{name}: {relative_sources[source_index]}:"
+                    f"{len(declarations[path])}"
+                )
+            for path, lines in declarations.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            add_numbers_sheet_order_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                sorted(expected),
+            )
+
+    def test_focused_numbers_sheet_order_rejects_root_aliases_glob_and_owner_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lib, package, sheet = (
+                root / path for path in boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES
+            )
+            lib.parent.mkdir(parents=True)
+            aliases = sorted(boundaries.NUMBERS_SHEET_ORDER_SHORT_NAMES)
+            lib_names, package_names, sheet_names = aliases[:2], aliases[2:4], aliases[4:]
+            lib.write_text(
+                "pub use crate::sheet::order::{" + ", ".join(lib_names) + "};\n",
+                encoding="utf-8",
+            )
+            package.write_text(
+                "pub use crate::sheet_order::{" + ", ".join(package_names) + "};\n"
+                "pub use crate::sheet::order::*;\n",
+                encoding="utf-8",
+            )
+            sheet.write_text(
+                "pub use crate::sheet::order::{" + ", ".join(sheet_names) + "};\n",
+                encoding="utf-8",
+            )
+            add_numbers_sheet_order_canonical_scaffold(root)
+            expected = [
+                *[
+                    "focused litchi-numbers sheet-order public API retains root alias "
+                    f"{name}: crates/litchi-numbers/src/lib.rs:1"
+                    for name in lib_names
+                ],
+                *[
+                    "focused litchi-numbers sheet-order public API retains root alias "
+                    f"{name}: crates/litchi-numbers/src/package.rs:1"
+                    for name in package_names
+                ],
+                *[
+                    "focused litchi-numbers sheet-order public API retains root alias "
+                    f"{name}: crates/litchi-numbers/src/sheet.rs:1"
+                    for name in sheet_names
+                ],
+                "focused litchi-numbers sheet-order public API exposes public "
+                "sheet-order owner alias: crates/litchi-numbers/src/lib.rs:1",
+                "focused litchi-numbers sheet-order public API exposes public "
+                "sheet-order owner alias: crates/litchi-numbers/src/package.rs:1",
+                "focused litchi-numbers sheet-order public API exposes public "
+                "sheet-order owner alias: crates/litchi-numbers/src/package.rs:2",
+                "focused litchi-numbers sheet-order public API exposes public "
+                "sheet-order owner alias: crates/litchi-numbers/src/sheet.rs:1",
+                "focused litchi-numbers sheet-order public API retains root aliases "
+                "via sheet::order glob: crates/litchi-numbers/src/package.rs:2",
+            ]
+            self.assertEqual(
+                boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                sorted(expected),
+            )
+
+    def test_focused_numbers_sheet_order_rejects_public_owner_alias_variants(
+        self,
+    ) -> None:
+        for relative in boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES:
+            for declaration in (
+                "pub use crate::sheet::order as ordering;",
+                "pub use crate::r#sheet_order as ordering;",
+                "pub\nuse\ncrate::sheet::order as ordering;",
+                "pub type sheet_order = bool;",
+            ):
+                with self.subTest(relative=relative, declaration=declaration):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        add_numbers_sheet_order_canonical_scaffold(root)
+                        path = root / relative
+                        source = path.read_text(encoding="utf-8")
+                        line = source.count("\n") + 1
+                        path.write_text(source + declaration + "\n", encoding="utf-8")
+                        self.assertEqual(
+                            boundaries.audit_numbers_sheet_order_facade_source_topology(
+                                root
+                            ),
+                            [
+                                "focused litchi-numbers sheet-order public API exposes "
+                                f"public sheet-order owner alias: {relative}:{line}"
+                            ],
+                        )
+
+    def test_focused_numbers_sheet_order_rejects_physical_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.NUMBERS_SHEET_ORDER_SEMANTIC_SOURCE
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub fn order(r#source_bytes: &[u8], r#object_id: u64) "
+                "-> DocumentArchive { todo!() }\n"
+                "pub type Projection = buffa::DocumentArchiveView;\n"
+                "impl prost::Message for order::Edit {}\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.NUMBERS_SHEET_ORDER_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner_lines = [
+                f"pub type Physical{index} = {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.NUMBERS_SHEET_ORDER_PHYSICAL_TYPES)
+                )
+            ]
+            owner_lines.extend(
+                f"pub type WireLeak{index} = {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.NUMBERS_SHEET_ORDER_WIRE_TYPES)
+                )
+            )
+            owner_lines.extend(
+                [
+                    "pub type ProtoProjection = (tn::DocumentArchive, "
+                    "tsp::ReferenceArchive);",
+                    "pub fn physical_names(component_name: &str, "
+                    "member_name: &str, entry_name: &str) {}",
+                ]
+            )
+            owner.write_text("\n".join(owner_lines) + "\n", encoding="utf-8")
+            lib, package, sheet = (
+                root / path for path in boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES
+            )
+            lib.write_text(
+                "pub fn edit_sheet_order(value: litchi_iwa_protos::GeneratedSheetOrder) "
+                "-> order::Edit { todo!() }\n",
+                encoding="utf-8",
+            )
+            package.write_text(
+                "pub fn apply_sheet_order(value: prost_types::MessageInfo) "
+                "-> order::Commit { todo!() }\n",
+                encoding="utf-8",
+            )
+            sheet.write_text(
+                "pub fn edit_sheet_order() -> SourceBytes { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_numbers_sheet_order_canonical_scaffold(root)
+
+            violations = boundaries.audit_numbers_sheet_order_facade_source_topology(root)
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-numbers sheet-order public API exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "archive/IWA type DocumentArchive",
+                "protobuf type buffa",
+                "archive/IWA type DocumentArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "protobuf type tn",
+                "protobuf type tsp",
+                "protobuf type ProtoProjection",
+                "physical package name component_name",
+                "physical package name member_name",
+                "physical package name entry_name",
+                "archive/IWA type litchi_iwa_protos",
+                "generated type GeneratedSheetOrder",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+                "raw source bytes SourceBytes",
+                *tuple(
+                    f"archive/IWA type {name}"
+                    for name in sorted(boundaries.NUMBERS_SHEET_ORDER_PHYSICAL_TYPES)
+                ),
+                *tuple(
+                    f"wire type {name}"
+                    for name in sorted(boundaries.NUMBERS_SHEET_ORDER_WIRE_TYPES)
+                ),
+            )
+            self.assertEqual(len(violations), 43)
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused sheet-order leak: {fragment}",
+                    )
+
+    def test_focused_numbers_sheet_order_recursively_scans_private_helpers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_sheet_order_canonical_scaffold(root)
+            nested_relative = (
+                boundaries.NUMBERS_SHEET_ORDER_OWNER_HELPER_ROOT
+                / "future"
+                / "nested.rs"
+            )
+            nested = root / nested_relative
+            nested.parent.mkdir(parents=True, exist_ok=True)
+            nested.write_text(
+                "pub fn expose(source_bytes: &[u8], object_id: u64) "
+                "-> ArchiveObject { todo!() }\n"
+                "pub type SheetOrderEdit = WireView;\n"
+                "impl prost::Message for SheetOrderPatch<RawMessage> {}\n",
+                encoding="utf-8",
+            )
+            path = str(nested_relative)
+            self.assertEqual(
+                boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                sorted(
+                    [
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"raw source bytes source_bytes: {path}:1",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"raw byte slice &[u8]: {path}:1",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"raw identifier object_id: {path}:1",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"archive/IWA type ArchiveObject: {path}:1",
+                        "focused litchi-numbers sheet-order public API retains flat "
+                        f"alias SheetOrderEdit: {path}:2",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"wire type WireView: {path}:2",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"protobuf type prost: {path}:3",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"protobuf type Message: {path}:3",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"archive/IWA type RawMessage: {path}:3",
+                    ]
+                ),
+            )
+
+    def test_focused_numbers_sheet_order_allows_canonical_and_retained_surfaces(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.NUMBERS_SHEET_ORDER_SEMANTIC_SOURCE
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "// pub type SheetOrderEdit = DocumentArchive;\n"
+                'const NOTE: &str = "pub struct SheetOrderPatch;";\n'
+                "pub struct Sheet;\n"
+                "pub struct SheetSelector;\n"
+                "pub fn move_sheet(selector: SheetSelector, destination: usize) {}\n"
+                "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                "-> ArchiveObject { todo!() }\n"
+                "pub(crate) fn restricted(value: WireView) {}\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.NUMBERS_SHEET_ORDER_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            private_aliases = [
+                ("struct" if index % 2 == 0 else "pub(crate) struct")
+                + f" {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.NUMBERS_SHEET_ORDER_FLAT_ALIASES)
+                )
+            ]
+            private_physical = [
+                f"pub(super) type Private{index} = {name};"
+                for index, name in enumerate(
+                    sorted(
+                        boundaries.NUMBERS_SHEET_ORDER_PHYSICAL_TYPES
+                        | boundaries.NUMBERS_SHEET_ORDER_WIRE_TYPES
+                    )
+                )
+            ]
+            owner.write_text(
+                "\n".join(
+                    [
+                        "pub fn edit_sheet_order() -> sheet::order::Edit { todo!() }",
+                        "pub fn apply_sheet_order(patch: sheet::order::Patch) "
+                        "-> sheet::order::Commit { todo!() }",
+                        "pub fn move_sheet(selector: SheetSelector, destination: usize) {}",
+                        *private_aliases,
+                        *private_physical,
+                        "impl SheetOrderEdit {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib, package, sheet = (
+                root / path for path in boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES
+            )
+            private_roots = "\n".join(
+                ("use" if index % 2 == 0 else "pub(crate) use")
+                + f" crate::sheet::order::{name};"
+                for index, name in enumerate(
+                    sorted(boundaries.NUMBERS_SHEET_ORDER_SHORT_NAMES)
+                )
+            )
+            lib.write_text(
+                "// pub use crate::sheet::order::{Edit, Patch};\n"
+                'const NOTE: &str = "pub use crate::sheet::order::*;";\n'
+                + private_roots
+                + "\npub(crate) use crate::sheet::order::*;\n"
+                "pub use crate::table::{Edit, Patch, Commit, Diagnostics, Error, LimitKind};\n"
+                "pub struct Sheet;\n"
+                "pub struct SheetSelector;\n",
+                encoding="utf-8",
+            )
+            package.write_text(
+                "mod sheet_order;\n"
+                "pub(crate) mod r#sheet_order;\n"
+                "pub(super) use crate::sheet::order::{Edit, Patch};\n"
+                "pub fn move_table() {}\n"
+                "pub fn add_empty_sheet() {}\n"
+                "pub fn duplicate_sheet() {}\n"
+                "pub fn remove_sheet() {}\n",
+                encoding="utf-8",
+            )
+            sheet.write_text(
+                "pub mod order;\n"
+                "pub struct Sheet;\n"
+                "pub struct SheetSelector;\n",
+                encoding="utf-8",
+            )
+            helper = root / boundaries.NUMBERS_SHEET_ORDER_OWNER_HELPER_ROOT / "private.rs"
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text(
+                "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                "-> ArchiveObject { todo!() }\n"
+                "pub(crate) type SheetOrderPatch = WireView;\n"
+                "impl SheetOrderEdit {}\n",
+                encoding="utf-8",
+            )
+            helper.with_suffix(".txt").write_text(
+                "pub type SheetOrderEdit = ArchiveObject;\n",
+                encoding="utf-8",
+            )
+            nonfocused = root / boundaries.NUMBERS_SOURCE_ROOT / "names.rs"
+            nonfocused.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(boundaries.NUMBERS_SHEET_ORDER_FLAT_ALIASES)
+                )
+                + "\npub fn move_sheet(object_id: u64) -> ArchiveObject { todo!() }\n",
+                encoding="utf-8",
+            )
+            other_owner = root / "crates/litchi-pages/src/sheet/order.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "pub struct SheetOrderEdit;\n"
+                "pub fn move_sheet(object_id: u64) -> ArchiveObject { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_numbers_sheet_order_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_sheet_order_facade_source_topology(root),
                 [],
             )
 

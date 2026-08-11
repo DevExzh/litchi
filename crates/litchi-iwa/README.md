@@ -1039,6 +1039,7 @@ use litchi_iwa::numbers::{
 };
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_numbers::{SheetSelector, TableSelector};
 use litchi_pages::header_footer::Kind;
 use litchi_pages::section::Background;
 use litchi_iwa::keynote::{
@@ -1050,27 +1051,27 @@ use litchi_iwa::keynote::{
 let mut numbers = NumbersEditor::open("input.numbers")?;
 let table = numbers.tables()?.remove(0);
 numbers.set_table_title_settings(
-    table.object_id,
+    table.id(),
     TableTitleSettings::new(Some(true), Some(false)),
 )?;
-numbers.set_cell(table.object_id, 1, 2, CellValue::Number(42.0))?;
+numbers.set_cell(table.id(), 1, 2, CellValue::Number(42.0))?;
 // Existing rich-text cells use the same call. Their TSWP formatting storage is
 // retained, and shared payloads are isolated with copy-on-write.
-numbers.set_cell(table.object_id, 1, 3, CellValue::Text("Revised".into()))?;
-numbers.set_cell_comment(table.object_id, 1, 3, "Check this value")?;
-let _comment = numbers.cell_comment(table.object_id, 1, 3)?;
-let reply_id = numbers.add_cell_comment_reply(table.object_id, 1, 3, "Looks good")?;
+numbers.set_cell(table.id(), 1, 3, CellValue::Text("Revised".into()))?;
+numbers.set_cell_comment(table.id(), 1, 3, "Check this value")?;
+let _comment = numbers.cell_comment(table.id(), 1, 3)?;
+let reply_id = numbers.add_cell_comment_reply(table.id(), 1, 3, "Looks good")?;
 let reply_id = numbers.set_cell_comment_reply(
-    table.object_id,
+    table.id(),
     1,
     3,
     reply_id,
     "Verified",
 )?;
-numbers.remove_cell_comment_reply(table.object_id, 1, 3, reply_id)?;
-numbers.clear_cell_comment(table.object_id, 1, 3)?;
+numbers.remove_cell_comment_reply(table.id(), 1, 3, reply_id)?;
+numbers.clear_cell_comment(table.id(), 1, 3)?;
 numbers.set_formula(
-    table.object_id,
+    table.id(),
     2,
     2,
     FormulaExpression::function(
@@ -1079,7 +1080,7 @@ numbers.set_formula(
     ),
 )?;
 numbers.set_formula(
-    table.object_id,
+    table.id(),
     4,
     2,
     FormulaExpression::function(
@@ -1091,7 +1092,7 @@ numbers.set_formula(
     ),
 )?;
 numbers.set_formula(
-    table.object_id,
+    table.id(),
     3,
     2,
     FormulaExpression::function(
@@ -1106,53 +1107,58 @@ let pivot_categories = numbers.pivot_categories()?;
 // Each entry's typed `reference` can be passed to
 // `FormulaExpression::pivot_category` when editing a pivot value formula.
 assert!(pivot_categories.iter().all(|category| category.label.is_some()));
-numbers.resize_table(table.object_id, 30, 10)?;
-let original_sheet_id = numbers.sheets()?[0].object_id;
-let copied_sheet = numbers.duplicate_sheet(original_sheet_id)?;
-numbers.remove_sheet(copied_sheet.object_id)?;
+numbers.resize_table(table.id(), 30, 10)?;
+let original_sheet = numbers.sheets()?[0].clone();
+let copied_sheet = numbers.duplicate_sheet(SheetSelector::index(original_sheet.index))?;
+numbers.remove_sheet(SheetSelector::index(copied_sheet.index))?;
 let new_sheet = numbers.add_empty_sheet("Archive")?;
-let new_table = numbers.add_empty_table(new_sheet.object_id, "Log", 100, 6)?;
-numbers.move_table(table.object_id, new_sheet.object_id)?;
-numbers.move_table(table.object_id, original_sheet_id)?;
-numbers.move_sheet(new_sheet.index, 0)?;
-numbers.remove_table(new_table.object_id)?;
-numbers.remove_sheet(new_sheet.object_id)?;
+let new_table = numbers.add_empty_table(SheetSelector::index(new_sheet.index), "Log", 100, 6)?;
+numbers.move_table(
+    TableSelector::name(&table.name),
+    SheetSelector::index(new_sheet.index),
+)?;
+numbers.move_table(
+    TableSelector::name(&table.name),
+    SheetSelector::index(original_sheet.index),
+)?;
+numbers.remove_table(TableSelector::name(&new_table.name))?;
+numbers.remove_sheet(SheetSelector::index(new_sheet.index))?;
 if let Some(sheet) = numbers.sheets()?.first()
-    && let Some(text_box) = numbers.sheet_text_boxes(sheet.object_id)?.first()
+    && let Some(text_box) = numbers.sheet_text_boxes(sheet.id())?.first()
 {
     numbers.set_sheet_text_box_text(
-        sheet.object_id,
+        sheet.id(),
         text_box.drawable_object_id,
         "Updated text box",
     )?;
     let geometry =
-        numbers.sheet_text_box_geometry(sheet.object_id, text_box.drawable_object_id)?;
+        numbers.sheet_text_box_geometry(sheet.id(), text_box.drawable_object_id)?;
     numbers.set_sheet_text_box_geometry(
-        sheet.object_id,
+        sheet.id(),
         text_box.drawable_object_id,
         geometry,
     )?;
     let properties =
-        numbers.sheet_text_box_properties(sheet.object_id, text_box.drawable_object_id)?;
+        numbers.sheet_text_box_properties(sheet.id(), text_box.drawable_object_id)?;
     numbers.set_sheet_text_box_properties(
-        sheet.object_id,
+        sheet.id(),
         text_box.drawable_object_id,
         properties,
     )?;
     numbers.set_sheet_drawable_comment(
-        sheet.object_id,
+        sheet.id(),
         text_box.drawable_object_id,
         "Review this text box",
     )?;
     let _comment =
-        numbers.sheet_drawable_comment(sheet.object_id, text_box.drawable_object_id)?;
-    numbers.clear_sheet_drawable_comment(sheet.object_id, text_box.drawable_object_id)?;
+        numbers.sheet_drawable_comment(sheet.id(), text_box.drawable_object_id)?;
+    numbers.clear_sheet_drawable_comment(sheet.id(), text_box.drawable_object_id)?;
     let copy = numbers.duplicate_sheet_text_box(
-        sheet.object_id,
+        sheet.id(),
         text_box.drawable_object_id,
         "Independent copy",
     )?;
-    numbers.remove_sheet_text_box(sheet.object_id, copy.drawable_object_id)?;
+    numbers.remove_sheet_text_box(sheet.id(), copy.drawable_object_id)?;
 }
 numbers.save("updated.numbers")?;
 
@@ -1554,6 +1560,55 @@ through the migration host. See `litchi-numbers/examples/edit_names.rs` for a
 distinct-output workflow that streams with `Package::write_to` through a
 synchronized sibling temporary file and no-clobber publication.
 
+### Numbers sheet order uses a focused package transaction
+
+Moving a sheet is no longer a `NumbersEditor` operation. Use
+`litchi_numbers::sheet::order::{Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}` with `Package::{edit_sheet_order, apply_sheet_order}`. The selected
+sheet is an exact-name or zero-based-position `SheetSelector`, and the
+destination is its final zero-based position after removing the selected
+sheet. No physical identifiers enter this API.
+
+```rust,no_run
+use litchi_numbers::{Package, SheetSelector};
+
+let package = Package::open("input.numbers")?;
+let commit = package
+    .edit_sheet_order()
+    .move_sheet(SheetSelector::name("Archive"), 0)?
+    .commit()?;
+assert!(commit.diagnostics().changed());
+assert_eq!(commit.diagnostics().touched_components(), 1);
+assert_eq!(commit.diagnostics().deleted_previews(), 3);
+assert!(commit.diagnostics().full_reparse_performed());
+assert_eq!(commit.package().sheets()[0].name(), "Archive");
+
+let restored = commit
+    .package()
+    .apply_sheet_order(&commit.patch().inverse())?;
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The transaction atomically keeps both the document order and navigator/sidebar
+order in sync. Moving a sheet to its current position is an exact no-op; a
+changed move rewrites one owning component, removes the three stale root
+previews, and fully reopens its candidate. Its inverse restores all three
+previews (`3 → 0` forward, `0 → 3` inverse), accepts only the exact committed
+package, and restores the original package bytes. The native gate opens the
+changed package warning-free in Numbers, verifies both orders, and confirms a
+subsequent Save As/reopen succeeds. See
+`litchi-numbers/examples/edit_sheet_order.rs` for synchronized sibling-temp,
+distinct-output, no-clobber publication through `Package::write_to`.
+
+Sheet creation, duplication, removal, and moving a table between sheets remain
+legacy migration-host capabilities; this focused transaction owns only the
+ordering of existing sheets.
+
 Existing Keynote title, body, and speaker-notes storage is owned by the focused
 `litchi-keynote` package. Ordinary users must use these APIs rather than the
 legacy host's generic storage or raw-ID compatibility paths. They select slides
@@ -1897,6 +1952,10 @@ Workbook sheet ordering and standard or form-sheet table ownership lists reuse
 the original raw `TSP.Reference` payloads, preserving extensions inside each
 reference; newly appended references are removed byte-exactly on rollback or
 create/delete cycles.
+Focused `litchi_numbers::sheet::order` owns only the order of existing sheets:
+it rewrites the document and sidebar order owners together without exposing
+their physical identifiers. The migration host retains sheet creation,
+duplication, removal, and table moves.
 `NumbersEditor::add_empty_table` can also recreate the first native table after
 the workbook's last table was removed. It derives the style graph from the
 workbook theme, builds independent storage and row/column identities, and

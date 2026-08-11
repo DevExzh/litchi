@@ -2130,3 +2130,105 @@ exactly and fields/work/references stay within 2.3x; no wall-clock performance
 claim is made. Boundary tests pass 152/152, host and focused audits each report
 zero diagnostics, and the full checker reports only the unchanged 14 baselines: six
 dev-only annotation findings and eight edge classifications.
+
+## 2026-08-11 amendment: Numbers sheet-order host exit
+
+The focused exit for sheet ordering is
+`sheet::order::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` with
+`Package::{edit_sheet_order, apply_sheet_order}`. One semantic selector and
+one checked final-position destination replace direct editor movement; existing
+semantic sheet iteration remains the read surface. The transaction exposes no
+native identifier, component, protobuf, or source artifact.
+
+This vertical owns both order lists, not merely Document field 1. Document
+field 5 selects a same-component type-205 sidebar root whose field-2 children
+must correspond positionally through their field-3 sheet associations. The
+Document field-1 sheet references and sidebar-root field-2 child references
+must be unique ordered aggregate subsequences and move together. Any selected
+order reference attributed through a `FieldInfo` is refused; sidebar, child
+association, and descendant metadata is accepted only on exact field 5/3/2
+paths. Roles must be nonzero, nonexternal, disjoint, uniquely resolved,
+canonical, non-merge, and within `Index/Document.iwa`. Only plain type-2
+`TN.SheetArchive` changed sources are proven; FormBasedSheet and split ownership
+return `UnsupportedSource`.
+
+The intentionally scalar-only
+`TNNumbersSheetReferenceArchive.proto` projects `TSP.Reference`. Handwritten
+strict two-pass routing owns Document 1/5 and TreeNode 2/3 repeated records and
+forces Buffa parity per scalar. No generated repeated view or encoder owns
+preservation. The build produces five files/32,579 bytes, zero repeated-view
+types, below 33 KiB, SHA-256
+`2a0850fd82cfbf337ed48e582d4a998bd27e5046eb63c61f6939fa5ff1a09854`.
+
+Finite codec and transaction budgets cover bytes, fields, depth, wire work,
+references, object-index lookup, object/message/field metadata, raw and
+aggregate reorder, archive extent/allocation, compression/output, reassembly,
+preview deletion, reopen, and exact physical comparison. Fallible allocation
+and content-redacted typed failure are atomic.
+
+Same-position no-op shares exact source and skips native resolution/reopen. A
+changed source must contain exactly one of each canonical root preview;
+missing/repeated preview states are unsupported. Commit rewrites one component,
+deletes all three previews, reopens once, and proves the exact dual-order delta.
+Forward apply verifies previews 3 -> 0 and inverse verifies 0 -> 3. Changed
+apply authorizes exact source and stored target, charges both plus reopen work,
+and verifies the moved identity; conflict and inverse remain exact. Changed
+legacy/non-exact sources fail closed. Patch remains process-local and output
+uses `write_to`.
+
+The focused cut preserves child IDs/nodes/associations/descendants, CalcEngine,
+ViewState, sheet/table/drawable graphs, global table order, data sidecars, and
+unknowns. It does not retire sheet creation, duplication, removal,
+FormBasedSheet/general Document-reference helpers, table/drawable CRUD,
+component/ID allocation or reclamation, or their mixed tests/examples. The
+host deletion must therefore remove only direct ordering scope and retain that
+shared substrate.
+
+The independent P0/P1 review found no release blocker and no O(S²). A 4,096 to
+8,192 reference test passes the strict codec, raw record reorder, and core
+aggregate-header reorder and holds production work/references/payload within
+2.3x plus a fixed 32-unit allowance; codec-only scaling is strict 2.3x. No
+timing claim is made. P2 tradeoffs remain the bounded roughly-four-snapshots-per-sheet
+Patch for no reselection/O(1) inverse, transient Vec-to-Arc target duplication,
+and one possible bounded O(package-bytes) byte-equal-source authorization
+comparison before charging; identity authorization is O(1).
+
+Matched Apple artifacts are control
+`f9c5cbec4f422484c63d1d39bd8d09da122d011596561a5feb2ad1e812574990`
+(133,594 bytes) and reorder
+`7b3bcbc853346a433e84ee815d28671d01fc3da857e43b8b7d29b310f94e7e1a`
+(153,498 bytes). Native reverses both order lists/aggregate subsequences and
+keeps child field-3 associations exact; 93/103 decompressed members, including
+all table sidecars, are unchanged. Apple TableInfo cache culling, physical
+subgraph movement and tree/ViewState/ID/metadata/property/timestamp churn are
+normalization rather than focused requirements.
+
+Rust artifact
+`97c76894503a2628c1828babd93d9a9a891794d86c86177cab60f09333997a68`
+opened in Numbers 14.4 without warnings, repair, or conversion and retained the
+expected `FirstCreated`/`SecondCreated`, `A-new`/`A-old`/`B-only` associations
+with benign CalcEngine preservation. Native Save As/close/exact reopen yielded
+the same semantics at 103-member
+`4aa257e4db61a3c03950360b29267c9495985d460ae22b6f679bee31f2693217`
+and regenerated all three previews to the matched Apple hashes. Focused
+same-position no-op and inverse were byte-exact at that hash with 0/0/0/false
+diagnostics.
+
+The format implementation is five sources: public `sheet/order.rs`, transaction
+`package/sheet_order.rs`, and the frozen private
+`package/sheet_order/{error,resolve,rewrite}.rs` tuple. The exact host deletion
+removes `NumbersEditor::move_sheet` plus exclusive `sheet_index` at -58
+production lines, changes tests +2/-43, and deletes the 23-line legacy move
+example. The retained remove-sheet example migrates +2/-6 to a semantic
+selector. Sheet add/duplicate/remove and shared substrate remain.
+
+Codec/protobuf tests pass 7/7 and 132/132; Numbers passes 109/109 library, 4/4
+private sheet-order, and 1/1 public integration tests. Boundary tests pass
+165/165, Python compilation/diff are green, and live host/focused audits each
+report zero diagnostics. The full checker has only the unchanged 14 baselines:
+six missing dev-only `soapberry-zip` annotations and eight unclassified edges
+(the same six plus `litchi-odf-common -> xml-minifier` and
+`litchi-opc -> xml-minifier`). No dependency edge closes. Debt 014
+(`litchi-iwa -> litchi-keynote`) remains, with topology at 64 workspace
+packages, 235 internal declarations, 14 `litchi-iwa` declarations, and 14
+ordered debts.

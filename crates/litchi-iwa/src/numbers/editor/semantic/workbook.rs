@@ -300,36 +300,6 @@ impl NumbersEditor {
         Ok(table)
     }
 
-    /// Move a sheet to another zero-based workbook position.
-    pub fn move_sheet(&mut self, selector: SheetSelector<'_>, to: usize) -> Result<()> {
-        let from = selectors::sheet_index(self, selector)?;
-        let sheets = self.sheets()?;
-        if from >= sheets.len() || to >= sheets.len() {
-            return Err(Error::ParseError(format!(
-                "Numbers sheet move {from} -> {to} is out of range for {} sheets",
-                sheets.len()
-            )));
-        }
-        if from == to {
-            return Ok(());
-        }
-        let moved_id = sheets[from].object_id;
-        let mut staged = self.package.clone();
-        update_numbers_document(&mut staged, |document| {
-            let reference = document.sheets.remove(from);
-            document.sheets.insert(to, reference);
-            Ok(())
-        })?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
-        if verified.sheets()?.get(to).map(|sheet| sheet.object_id) != Some(moved_id) {
-            return Err(Error::InvalidFormat(
-                "Numbers sheet move failed validation".to_owned(),
-            ));
-        }
-        self.package = staged;
-        Ok(())
-    }
-
     /// Append an empty sheet to the workbook and return its allocated object ID.
     pub fn add_empty_sheet(&mut self, name: &str) -> Result<NumbersSheetInfo> {
         validate_name(name, "sheet")?;

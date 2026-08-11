@@ -1037,6 +1037,129 @@ IWA_NUMBERS_TABLE_INFO_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "model.rs"
 )
 NUMBERS_SOURCE_ROOT = Path("crates/litchi-numbers/src")
+RETIRED_IWA_NUMBERS_SHEET_ORDER_METHODS = ("move_sheet",)
+RETIRED_IWA_NUMBERS_SHEET_ORDER_METHOD_SET = frozenset(
+    RETIRED_IWA_NUMBERS_SHEET_ORDER_METHODS
+)
+RETIRED_IWA_NUMBERS_SHEET_ORDER_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/move_numbers_sheet.rs"
+)
+RETIRED_IWA_NUMBERS_SHEET_ORDER_TESTS = (
+    "reorders_and_removes_sheets_transactionally",
+    "sheet_list_crud_preserves_raw_references_and_restores_exact_component",
+    "duplicate_sheet_references_fail_transactionally",
+)
+RETIRED_IWA_NUMBERS_SHEET_ORDER_TEST_SET = frozenset(
+    RETIRED_IWA_NUMBERS_SHEET_ORDER_TESTS
+)
+IWA_NUMBERS_EDITOR_TEST_SOURCE = IWA_NUMBERS_SOURCE_ROOT / "editor" / "tests.rs"
+IWA_NUMBERS_README_SHEET_ORDER_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:numbers|numbers_editor)"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>move_sheet)\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])"
+        r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+        r"(?:r#)?NumbersEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?(?P<method>move_sheet)\b[ \t\r\n]*\("
+    ),
+)
+IWA_NUMBERS_README_SHEET_ORDER_EXAMPLE = re.compile(
+    r"(?<![A-Za-z0-9_])(?P<example>move_numbers_sheet)(?:\.rs)?"
+    r"(?![A-Za-z0-9_])"
+)
+NUMBERS_SHEET_ORDER_SEMANTIC_SOURCE = NUMBERS_SOURCE_ROOT / "sheet" / "order.rs"
+NUMBERS_SHEET_ORDER_OWNER_SOURCE = NUMBERS_SOURCE_ROOT / "package" / "sheet_order.rs"
+NUMBERS_SHEET_ORDER_OWNER_HELPER_ROOT = NUMBERS_SOURCE_ROOT / "package" / "sheet_order"
+NUMBERS_SHEET_ORDER_OWNER_HELPER_SOURCES = (
+    NUMBERS_SHEET_ORDER_OWNER_HELPER_ROOT / "error.rs",
+    NUMBERS_SHEET_ORDER_OWNER_HELPER_ROOT / "resolve.rs",
+    NUMBERS_SHEET_ORDER_OWNER_HELPER_ROOT / "rewrite.rs",
+)
+NUMBERS_SHEET_ORDER_IMPLEMENTATION_SOURCES = (
+    NUMBERS_SHEET_ORDER_SEMANTIC_SOURCE,
+    NUMBERS_SHEET_ORDER_OWNER_SOURCE,
+    *NUMBERS_SHEET_ORDER_OWNER_HELPER_SOURCES,
+)
+NUMBERS_SHEET_ORDER_EXPORT_SOURCES = (
+    NUMBERS_SOURCE_ROOT / "lib.rs",
+    NUMBERS_SOURCE_ROOT / "package.rs",
+    NUMBERS_SOURCE_ROOT / "sheet.rs",
+)
+NUMBERS_SHEET_ORDER_CANONICAL_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+)
+NUMBERS_SHEET_ORDER_SHORT_NAMES = frozenset(NUMBERS_SHEET_ORDER_CANONICAL_TYPES)
+NUMBERS_SHEET_ORDER_PACKAGE_METHODS = (
+    "edit_sheet_order",
+    "apply_sheet_order",
+)
+NUMBERS_SHEET_ORDER_FLAT_ALIASES = frozenset(
+    "SheetOrder" + suffix for suffix in NUMBERS_SHEET_ORDER_SHORT_NAMES
+)
+NUMBERS_SHEET_ORDER_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:sheet_order|sheet[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?order)"
+    r"(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_NUMBERS_PACKAGE_SHEET_ORDER_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?sheet_order\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_PACKAGE_SHEET_ORDER_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?sheet_order\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_SHEET_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?sheet\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_SHEET_ORDER_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?order\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_SHEET_ORDER_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "DocumentSnapshot",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "Resolved",
+        "SheetOrderSnapshot",
+        "SheetSnapshot",
+        "SnappyStream",
+        "SourceCatalog",
+    }
+)
+NUMBERS_SHEET_ORDER_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+NUMBERS_SHEET_ORDER_PROTO_ORIGINS = frozenset({"tn", "tsp"})
 NUMBERS_TABLE_LOCK_IMPLEMENTATION_SOURCES = (
     NUMBERS_SOURCE_ROOT / "package" / "table_lock.rs",
     NUMBERS_SOURCE_ROOT / "table" / "lock.rs",
@@ -2394,6 +2517,53 @@ def _is_numbers_names_public_declaration(
     return bool(identifiers & NUMBERS_NAMES_FLAT_ALIASES) or (
         _numbers_names_owner_declaration(declaration)
     )
+
+
+def _numbers_sheet_order_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in sheet-order APIs."""
+
+    if identifier in NUMBERS_SHEET_ORDER_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in NUMBERS_SHEET_ORDER_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in NUMBERS_SHEET_ORDER_WIRE_TYPES:
+        return "wire type"
+    reason = _iwork_public_leak(identifier)
+    if reason is not None:
+        return reason
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return None
+
+
+def _numbers_sheet_order_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return NUMBERS_SHEET_ORDER_OWNER_PATH.search(declaration) is not None or any(
+        identifier in NUMBERS_SHEET_ORDER_PACKAGE_METHODS
+        for identifier in identifiers
+    )
+
+
+def _is_numbers_sheet_order_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers & (NUMBERS_SHEET_ORDER_FLAT_ALIASES | {"order", "sheet_order"})
+    ) or _numbers_sheet_order_owner_declaration(declaration)
 
 
 def _numbers_table_header_settings_public_leak(identifier: str) -> str | None:
@@ -3973,6 +4143,263 @@ def audit_numbers_names_facade_source_topology(root: Path = ROOT) -> list[str]:
     return sorted(set(violations))
 
 
+def audit_iwa_numbers_sheet_order_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep retired Numbers sheet-order ownership out of the host facade."""
+
+    violations: list[str] = []
+    example_path = root / RETIRED_IWA_NUMBERS_SHEET_ORDER_EXAMPLE
+    if example_path.exists():
+        violations.append(
+            "retired litchi-iwa Numbers sheet-order example returned: "
+            + str(RETIRED_IWA_NUMBERS_SHEET_ORDER_EXAMPLE)
+        )
+
+    source_root = root / IWA_NUMBERS_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_NUMBERS_SHEET_ORDER_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Numbers sheet-order method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    tests_path = root / IWA_NUMBERS_EDITOR_TEST_SOURCE
+    if tests_path.is_file():
+        source = tests_path.read_text(encoding="utf-8")
+        for name, line_number in _rust_function_declarations(source):
+            if name not in RETIRED_IWA_NUMBERS_SHEET_ORDER_TEST_SET:
+                continue
+            violations.append(
+                "retired litchi-iwa Numbers sheet-order test "
+                f"{name}: {IWA_NUMBERS_EDITOR_TEST_SOURCE}:{line_number}"
+            )
+
+    readme_path = root / IWA_NUMBERS_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_NUMBERS_README_SHEET_ORDER_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Numbers sheet-order README call "
+                    f"{match.group('method')}: {IWA_NUMBERS_README}:{line_number}"
+                )
+        for match in IWA_NUMBERS_README_SHEET_ORDER_EXAMPLE.finditer(source):
+            line_number = source.count("\n", 0, match.start("example")) + 1
+            violations.append(
+                "retired litchi-iwa Numbers sheet-order README example reference "
+                f"{match.group('example')}: {IWA_NUMBERS_README}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_numbers_sheet_order_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the canonical nested, archive-free Numbers sheet-order API."""
+
+    source_root = root / NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    dedicated_sources = {
+        root / path
+        for path in NUMBERS_SHEET_ORDER_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    owner_helper_root = root / NUMBERS_SHEET_ORDER_OWNER_HELPER_ROOT
+    if owner_helper_root.is_dir():
+        dedicated_sources.update(owner_helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in NUMBERS_SHEET_ORDER_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    violations: list[str] = []
+
+    semantic_path = root / NUMBERS_SHEET_ORDER_SEMANTIC_SOURCE
+    semantic_source = (
+        semantic_path.read_text(encoding="utf-8")
+        if semantic_path.is_file()
+        else ""
+    )
+    canonical_exports = _rust_canonical_exports(
+        semantic_source, NUMBERS_SHEET_ORDER_SHORT_NAMES
+    )
+    for name in NUMBERS_SHEET_ORDER_CANONICAL_TYPES:
+        if name in canonical_exports:
+            continue
+        violations.append(
+            "focused litchi-numbers sheet-order public API is missing "
+            f"canonical sheet::order type {name}: "
+            f"{NUMBERS_SHEET_ORDER_SEMANTIC_SOURCE}"
+        )
+
+    lib_path = root / NUMBERS_SOURCE_ROOT / "lib.rs"
+    lib_source = (
+        _mask_rust_non_code(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    if PUBLIC_NUMBERS_SHEET_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-numbers sheet-order public API is missing "
+            "canonical root sheet module: "
+            f"{NUMBERS_SOURCE_ROOT / 'lib.rs'}"
+        )
+
+    sheet_path = root / NUMBERS_SOURCE_ROOT / "sheet.rs"
+    sheet_source = (
+        _mask_rust_non_code(sheet_path.read_text(encoding="utf-8"))
+        if sheet_path.is_file()
+        else ""
+    )
+    if PUBLIC_NUMBERS_SHEET_ORDER_MODULE.search(sheet_source) is None:
+        violations.append(
+            "focused litchi-numbers sheet-order public API is missing "
+            "canonical sheet::order module: "
+            f"{NUMBERS_SOURCE_ROOT / 'sheet.rs'}"
+        )
+
+    package_export = root / NUMBERS_SOURCE_ROOT / "package.rs"
+    if package_export.is_file():
+        package_source = _mask_rust_non_code(
+            package_export.read_text(encoding="utf-8")
+        )
+        if NUMBERS_PACKAGE_SHEET_ORDER_MODULE.search(package_source) is None:
+            violations.append(
+                "focused litchi-numbers sheet-order public API is missing "
+                "private package owner module: "
+                f"{package_export.relative_to(root)}"
+            )
+        for match in PUBLIC_NUMBERS_PACKAGE_SHEET_ORDER_MODULE.finditer(
+            package_source
+        ):
+            line_number = package_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-numbers sheet-order public API exposes duplicate "
+                "package::sheet_order module: "
+                f"{package_export.relative_to(root)}:{line_number}"
+            )
+    else:
+        violations.append(
+            "focused litchi-numbers sheet-order public API is missing "
+            "private package owner module: "
+            f"{NUMBERS_SOURCE_ROOT / 'package.rs'}"
+        )
+
+    owner_path = root / NUMBERS_SHEET_ORDER_OWNER_SOURCE
+    if not owner_path.is_file():
+        violations.append(
+            "focused litchi-numbers sheet-order public API is missing "
+            "private package owner source: "
+            f"{NUMBERS_SHEET_ORDER_OWNER_SOURCE}"
+        )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for (
+            declaration,
+            line_number,
+            public_declaration,
+            complete_source_scope,
+        ) in declarations:
+            if not _is_numbers_sheet_order_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            owner_declaration = _numbers_sheet_order_owner_declaration(declaration)
+            declaration_identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            public_use_or_type = declaration_identifiers[:2] in (
+                ["pub", "type"],
+                ["pub", "use"],
+            )
+            if (
+                public_declaration
+                and path in export_sources
+                and owner_declaration
+                and declaration_identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-numbers sheet-order public API retains "
+                    "root aliases via sheet::order glob: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            if (
+                public_declaration
+                and path in export_sources
+                and owner_declaration
+                and public_use_or_type
+            ):
+                violations.append(
+                    "focused litchi-numbers sheet-order public API exposes "
+                    "public sheet-order owner alias: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if (
+                    public_declaration
+                    and identifier in NUMBERS_SHEET_ORDER_FLAT_ALIASES
+                ):
+                    violations.append(
+                        "focused litchi-numbers sheet-order public API "
+                        f"retains flat alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and path in export_sources
+                    and owner_declaration
+                    and public_use_or_type
+                    and identifier in NUMBERS_SHEET_ORDER_SHORT_NAMES
+                ):
+                    violations.append(
+                        "focused litchi-numbers sheet-order public API "
+                        f"retains root alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _numbers_sheet_order_public_leak(identifier)
+                if reason is None:
+                    continue
+                violations.append(
+                    "focused litchi-numbers sheet-order public API exposes "
+                    f"{reason} {identifier}: "
+                    f"{path.relative_to(root)}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-numbers sheet-order public API exposes "
+                    f"raw byte slice {byte_slice}: "
+                    f"{path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_numbers_table_header_settings_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -4802,6 +5229,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_placeholder_visibility_facade_source_topology()
         + audit_iwa_numbers_names_source_topology()
         + audit_numbers_names_facade_source_topology()
+        + audit_iwa_numbers_sheet_order_source_topology()
+        + audit_numbers_sheet_order_facade_source_topology()
         + audit_iwa_numbers_table_header_settings_source_topology()
         + audit_numbers_table_header_settings_facade_source_topology()
         + audit_iwa_numbers_table_lock_source_topology()

@@ -24,34 +24,6 @@ pub(super) fn sheet_id(editor: &NumbersEditor, selector: SheetSelector<'_>) -> R
     }
 }
 
-/// Resolve a semantic sheet selector to its checked workbook position.
-pub(super) fn sheet_index(editor: &NumbersEditor, selector: SheetSelector<'_>) -> Result<usize> {
-    let sheets = editor.sheets()?;
-    match selector {
-        SheetSelector::Name(name) => {
-            let mut found = None;
-            for (index, sheet) in sheets.iter().enumerate() {
-                if sheet.name != name {
-                    continue;
-                }
-                if found.is_some() {
-                    return Err(Error::ParseError(format!(
-                        "Numbers sheet name {name:?} is ambiguous"
-                    )));
-                }
-                found = Some(index);
-            }
-            found
-                .ok_or_else(|| Error::ParseError(format!("Numbers sheet named {name:?} not found")))
-        },
-        SheetSelector::Index(index) => sheets.get(index).map(|_| index).ok_or_else(|| {
-            Error::ParseError(format!(
-                "Numbers sheet catalog index {index} is out of bounds"
-            ))
-        }),
-    }
-}
-
 /// Resolve a semantic table selector to its native model object identifier.
 pub(super) fn table_id(editor: &NumbersEditor, selector: TableSelector<'_>) -> Result<u64> {
     let tables = super::table_models(&editor.package)?;

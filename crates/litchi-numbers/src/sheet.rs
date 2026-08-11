@@ -1,5 +1,24 @@
 //! Dependency-free Numbers sheet semantics.
 
+/// Exact-source transactions for changing rooted sheet order.
+///
+/// This direct namespace exports [`order::Edit`], [`order::Patch`],
+/// [`order::Commit`], [`order::Diagnostics`], [`order::Error`], and
+/// [`order::LimitKind`]. Start with [`crate::Package::edit_sheet_order`] and
+/// publish with [`order::Edit::commit`].
+///
+/// A move stages one selector and one existing zero-based **final** position:
+/// remove the selected sheet, then insert it at that position. Source and
+/// final destination equality is an exact no-op. A changed move requires all
+/// three canonical root preview assets, updates both order owners, and removes
+/// those assets (three to zero); no-op moves change neither. Patches apply
+/// only to their exact retained source, and an inverse applied to the
+/// resulting package restores the original artifact and previews (zero to
+/// three).
+/// Public diagnostics and errors are content-free and do not expose retained
+/// implementation identifiers.
+pub mod order;
+
 use std::collections::HashSet;
 
 use super::selector::TableSelector;
