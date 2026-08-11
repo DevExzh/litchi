@@ -416,8 +416,11 @@ impl Presentation {
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn slide(&self, index: usize) -> Result<Option<Slide>> {
-        let slides = self.slides()?;
-        Ok(slides.into_iter().nth(index))
+        Parser::parse_slide_with_styles_at(
+            self.package.content_xml(),
+            self.package.styles_xml(),
+            index,
+        )
     }
 
     /// Read a package-contained media payload without fetching external URLs.

@@ -299,6 +299,13 @@ incomplete program and CRUD matrix.
   and uninstrumented RSS falls 10.93%. The unchanged paragraph-list p50 moves
   +0.38%; a shared-mode parser prototype that regressed listing was removed.
   See [`0047`](changes/0047-odt-indexed-paragraph-selector.md).
+- Public ODP middle-slide lookup now uses a compile-time-specialized full-EOF
+  parser projection that retains semantic text and completed shapes only for
+  the requested slide. Across 10,000 large samples, p50 falls from 1.019 to
+  0.977 ms (-4.09%), mean falls 4.20%, p95 falls 5.18%, and whole-process
+  allocation calls fall 3.86%. Tiny is neutral, medium improves 1.55% p50,
+  and the unchanged list/save guards remain within thresholds. See
+  [`0049`](changes/0049-odp-indexed-slide-selector.md).
 - The positional XLSX source record reports p50 opens of 33.881 us (tiny),
   56.493 us (medium), and 139.897 us (dense); list-after-open has zero timed
   source reads. First-cell and narrow-range operations physically overlap only

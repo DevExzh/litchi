@@ -6530,9 +6530,8 @@ fn run_semantic_odp(
             Case::OdpSemanticOneSlide => {
                 let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
                 let started = Instant::now();
-                let slides = presentation.slides()?;
-                let slide = slides
-                    .get(index)
+                let slide = presentation
+                    .slide(index)?
                     .ok_or("semantic ODP selected slide is missing")?;
                 let text = slide.all_text();
                 let duration = started.elapsed();

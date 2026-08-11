@@ -804,12 +804,29 @@ impl Parser {
         xml_content: &str,
         styles_xml: Option<&str>,
     ) -> Result<Vec<Slide>> {
-        Self::parse_pages_with_styles(
+        Self::parse_pages_with_styles::<false>(
             xml_content,
             styles_xml,
+            0,
             false,
             ShapeContainerScope::DrawPages,
         )
+    }
+
+    /// Parse one slide while retaining full-document validation semantics.
+    pub(crate) fn parse_slide_with_styles_at(
+        xml_content: &str,
+        styles_xml: Option<&str>,
+        index: usize,
+    ) -> Result<Option<Slide>> {
+        let mut slides = Self::parse_pages_with_styles::<true>(
+            xml_content,
+            styles_xml,
+            index,
+            false,
+            ShapeContainerScope::DrawPages,
+        )?;
+        Ok(slides.pop())
     }
 
     /// Parse drawing pages while retaining title and text-box frames as shapes.
@@ -818,9 +835,10 @@ impl Parser {
         xml_content: &str,
         styles_xml: Option<&str>,
     ) -> Result<Vec<Slide>> {
-        Self::parse_pages_with_styles(
+        Self::parse_pages_with_styles::<false>(
             xml_content,
             styles_xml,
+            0,
             true,
             ShapeContainerScope::DrawPages,
         )
@@ -833,18 +851,20 @@ impl Parser {
     /// inside individual table cells are not collected.
     #[allow(dead_code, reason = "reserved for the dedicated ODS facade")]
     pub(crate) fn parse_sheet_shape_tables(xml_content: &str) -> Result<Vec<Vec<Shape>>> {
-        let tables = Self::parse_pages_with_styles(
+        let tables = Self::parse_pages_with_styles::<false>(
             xml_content,
             None,
+            0,
             true,
             ShapeContainerScope::SpreadsheetTables,
         )?;
         Ok(tables.into_iter().map(|table| table.shapes).collect())
     }
 
-    pub(super) fn parse_pages_with_styles(
+    pub(super) fn parse_pages_with_styles<const SELECT_ONE: bool>(
         xml_content: &str,
         styles_xml: Option<&str>,
+        selected_index: usize,
         retain_text_shapes: bool,
         container_scope: ShapeContainerScope,
     ) -> Result<Vec<Slide>> {
@@ -915,17 +935,25 @@ impl Parser {
                     match element_type {
                         Element::Page if !sheet_scope => {
                             if in_slide {
-                                slides.push(Slide {
-                                    title: current_slide_title.take(),
-                                    text: std::mem::take(&mut current_slide_text),
-                                    index: slide_index,
-                                    notes: (!current_notes_text.is_empty())
-                                        .then(|| std::mem::take(&mut current_notes_text)),
-                                    transition: current_transition.take(),
-                                    animations: std::mem::take(&mut current_animations),
-                                    legacy_animation: current_legacy_animation.take(),
-                                    shapes: std::mem::take(&mut current_shapes),
-                                });
+                                if !SELECT_ONE || slide_index == selected_index {
+                                    slides.push(Slide {
+                                        title: current_slide_title.take(),
+                                        text: std::mem::take(&mut current_slide_text),
+                                        index: slide_index,
+                                        notes: (!current_notes_text.is_empty())
+                                            .then(|| std::mem::take(&mut current_notes_text)),
+                                        transition: current_transition.take(),
+                                        animations: std::mem::take(&mut current_animations),
+                                        legacy_animation: current_legacy_animation.take(),
+                                        shapes: std::mem::take(&mut current_shapes),
+                                    });
+                                } else {
+                                    current_slide_text.clear();
+                                    current_notes_text.clear();
+                                    current_animations.clear();
+                                    current_legacy_animation = None;
+                                    current_shapes.clear();
+                                }
                                 slide_index += 1;
                             }
                             current_slide_title = None;
@@ -1105,7 +1133,22 @@ impl Parser {
                             if current_paragraph.is_some() =>
                         {
                             if let Some(paragraph) = current_paragraph.as_mut() {
-                                Self::push_text_control(&reader, element, element_type, paragraph)?;
+                                if !SELECT_ONE || slide_index == selected_index {
+                                    Self::push_text_control(
+                                        &reader,
+                                        element,
+                                        element_type,
+                                        paragraph,
+                                    )?;
+                                } else {
+                                    let mut ignored = ParagraphText::default();
+                                    Self::push_text_control(
+                                        &reader,
+                                        element,
+                                        element_type,
+                                        &mut ignored,
+                                    )?;
+                                }
                             }
                         },
                         _ if in_notes => {},
@@ -1270,7 +1313,9 @@ impl Parser {
                 },
                 Event::Text(ref text) if current_paragraph.is_some() => {
                     let decoded = Self::decode_text(text)?;
-                    if let Some(paragraph) = current_paragraph.as_mut() {
+                    if (!SELECT_ONE || slide_index == selected_index)
+                        && let Some(paragraph) = current_paragraph.as_mut()
+                    {
                         paragraph.push_text(&decoded);
                     }
                 },
@@ -1301,7 +1346,9 @@ impl Parser {
                     let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                         Error::InvalidFormat(format!("invalid presentation CDATA: {error}"))
                     })?;
-                    if let Some(paragraph) = current_paragraph.as_mut() {
+                    if (!SELECT_ONE || slide_index == selected_index)
+                        && let Some(paragraph) = current_paragraph.as_mut()
+                    {
                         paragraph.push_text(&decoded);
                     }
                 },
@@ -1317,7 +1364,9 @@ impl Parser {
                 },
                 Event::GeneralRef(ref reference) if current_paragraph.is_some() => {
                     let text = Self::decode_reference(reference)?;
-                    if let Some(paragraph) = current_paragraph.as_mut() {
+                    if (!SELECT_ONE || slide_index == selected_index)
+                        && let Some(paragraph) = current_paragraph.as_mut()
+                    {
                         paragraph.push_text(&text);
                     }
                 },
@@ -1375,16 +1424,18 @@ impl Parser {
                                 .and_then(|name| transition_styles.get(name))
                                 .unwrap_or(&default_transition)
                                 .clone();
-                            slides.push(Slide {
-                                title: None,
-                                text: String::new(),
-                                index: slide_index,
-                                notes: None,
-                                transition: (!transition.is_empty()).then_some(transition),
-                                animations: Vec::new(),
-                                legacy_animation: None,
-                                shapes: Vec::new(),
-                            });
+                            if !SELECT_ONE || slide_index == selected_index {
+                                slides.push(Slide {
+                                    title: None,
+                                    text: String::new(),
+                                    index: slide_index,
+                                    notes: None,
+                                    transition: (!transition.is_empty()).then_some(transition),
+                                    animations: Vec::new(),
+                                    legacy_animation: None,
+                                    shapes: Vec::new(),
+                                });
+                            }
                             slide_index += 1;
                         },
                         Element::EnhancedGeometry if !shape_stack.is_empty() => {
@@ -1497,21 +1548,38 @@ impl Parser {
                             ));
                         },
                         Element::TextParagraph if in_slide => {
-                            Self::push_parsed_paragraph(
-                                "",
-                                in_notes,
-                                &mut current_notes_text,
-                                &mut current_notes_has_paragraph,
-                                shape_stack.last_mut(),
-                                &mut current_slide_text,
-                                &mut current_slide_has_segment,
-                            );
+                            if !SELECT_ONE || slide_index == selected_index {
+                                Self::push_parsed_paragraph(
+                                    "",
+                                    in_notes,
+                                    &mut current_notes_text,
+                                    &mut current_notes_has_paragraph,
+                                    shape_stack.last_mut(),
+                                    &mut current_slide_text,
+                                    &mut current_slide_has_segment,
+                                );
+                            }
                         },
                         Element::TextSpace | Element::TextTab | Element::TextLineBreak
                             if current_paragraph.is_some() =>
                         {
                             if let Some(paragraph) = current_paragraph.as_mut() {
-                                Self::push_text_control(&reader, element, element_type, paragraph)?;
+                                if !SELECT_ONE || slide_index == selected_index {
+                                    Self::push_text_control(
+                                        &reader,
+                                        element,
+                                        element_type,
+                                        paragraph,
+                                    )?;
+                                } else {
+                                    let mut ignored = ParagraphText::default();
+                                    Self::push_text_control(
+                                        &reader,
+                                        element,
+                                        element_type,
+                                        &mut ignored,
+                                    )?;
+                                }
                             }
                         },
                         _ if in_notes => {},
@@ -1656,7 +1724,9 @@ impl Parser {
                                         "3D scene children cannot be wrapped in draw:a".to_string(),
                                     ));
                                 }
-                                parent.children.push(builder.build());
+                                if !SELECT_ONE || slide_index == selected_index {
+                                    parent.children.push(builder.build());
+                                }
                             } else {
                                 if drawing_kind.is_three_dimensional()
                                     && drawing_kind != DrawingShapeKind::ThreeDimensionalScene
@@ -1666,14 +1736,16 @@ impl Parser {
                                             .to_string(),
                                     ));
                                 }
-                                Self::finish_shape(
-                                    builder,
-                                    &mut current_slide_title,
-                                    &mut current_slide_text,
-                                    &mut current_slide_has_segment,
-                                    &mut current_shapes,
-                                    retain_text_shapes,
-                                );
+                                if !SELECT_ONE || slide_index == selected_index {
+                                    Self::finish_shape(
+                                        builder,
+                                        &mut current_slide_title,
+                                        &mut current_slide_text,
+                                        &mut current_slide_has_segment,
+                                        &mut current_shapes,
+                                        retain_text_shapes,
+                                    );
+                                }
                             }
                         },
                         Element::Page
@@ -1706,16 +1778,18 @@ impl Parser {
                     if matches!(element_type, Element::TextParagraph)
                         && let Some(parsed_paragraph) = current_paragraph.take()
                     {
-                        let paragraph = parsed_paragraph.finish();
-                        Self::push_parsed_paragraph(
-                            &paragraph,
-                            in_notes,
-                            &mut current_notes_text,
-                            &mut current_notes_has_paragraph,
-                            shape_stack.last_mut(),
-                            &mut current_slide_text,
-                            &mut current_slide_has_segment,
-                        );
+                        if !SELECT_ONE || slide_index == selected_index {
+                            let paragraph = parsed_paragraph.finish();
+                            Self::push_parsed_paragraph(
+                                &paragraph,
+                                in_notes,
+                                &mut current_notes_text,
+                                &mut current_notes_has_paragraph,
+                                shape_stack.last_mut(),
+                                &mut current_slide_text,
+                                &mut current_slide_has_segment,
+                            );
+                        }
                         buf.clear();
                         continue;
                     }
@@ -1759,17 +1833,27 @@ impl Parser {
                                         "unterminated draw:a presentation hyperlink".to_string(),
                                     ));
                                 }
-                                slides.push(Slide {
-                                    title: current_slide_title.take(),
-                                    text: std::mem::take(&mut current_slide_text),
-                                    index: slide_index,
-                                    notes: (!current_notes_text.is_empty())
-                                        .then(|| std::mem::take(&mut current_notes_text)),
-                                    transition: current_transition.take(),
-                                    animations: std::mem::take(&mut current_animations),
-                                    legacy_animation: current_legacy_animation.take(),
-                                    shapes: std::mem::take(&mut current_shapes),
-                                });
+                                if !SELECT_ONE || slide_index == selected_index {
+                                    slides.push(Slide {
+                                        title: current_slide_title.take(),
+                                        text: std::mem::take(&mut current_slide_text),
+                                        index: slide_index,
+                                        notes: (!current_notes_text.is_empty())
+                                            .then(|| std::mem::take(&mut current_notes_text)),
+                                        transition: current_transition.take(),
+                                        animations: std::mem::take(&mut current_animations),
+                                        legacy_animation: current_legacy_animation.take(),
+                                        shapes: std::mem::take(&mut current_shapes),
+                                    });
+                                } else {
+                                    current_slide_title = None;
+                                    current_slide_text.clear();
+                                    current_notes_text.clear();
+                                    current_transition = None;
+                                    current_animations.clear();
+                                    current_legacy_animation = None;
+                                    current_shapes.clear();
+                                }
                                 slide_index += 1;
                             }
                             current_slide_has_segment = false;
@@ -1818,18 +1902,22 @@ impl Parser {
                         Element::Shape(_) => {
                             if let Some(builder) = shape_stack.pop() {
                                 if let Some(parent) = shape_stack.last_mut() {
-                                    parent.children.push(builder.build());
+                                    if !SELECT_ONE || slide_index == selected_index {
+                                        parent.children.push(builder.build());
+                                    }
                                     buf.clear();
                                     continue;
                                 }
-                                Self::finish_shape(
-                                    builder,
-                                    &mut current_slide_title,
-                                    &mut current_slide_text,
-                                    &mut current_slide_has_segment,
-                                    &mut current_shapes,
-                                    retain_text_shapes,
-                                );
+                                if !SELECT_ONE || slide_index == selected_index {
+                                    Self::finish_shape(
+                                        builder,
+                                        &mut current_slide_title,
+                                        &mut current_slide_text,
+                                        &mut current_slide_has_segment,
+                                        &mut current_shapes,
+                                        retain_text_shapes,
+                                    );
+                                }
                             }
                         },
                         Element::Page
