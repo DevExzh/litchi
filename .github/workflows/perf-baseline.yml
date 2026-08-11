@@ -351,6 +351,38 @@ jobs:
           assert source["source"]["ordinary_payload_materializations"] == [2]
           PY
 
+      - name: Run XLSX page-margin publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case xlsx_eager_page_margin_edit_save,xlsx_source_backed_page_margin_edit_save \
+            --json target/perf/xlsx-page-margin-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-page-margin-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_page_margin_edit_save"]
+          source = results["xlsx_source_backed_page_margin_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "2b50a470f5066dd078c0566ca9e203f26843026b58b6a7a6eca14ac8435429a7"
+              assert result["sink"]["accepted_bytes"] == 16_786_883
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 1
+              assert result["source"]["ordinary_payload_read_calls"][0] > 0
+              assert result["source"]["ordinary_payload_read_bytes"][0] > 0
+          assert eager["source"]["ordinary_payload_materializations"] == [12]
+          assert source["source"]["ordinary_payload_materializations"] == [2]
+          PY
+
       - name: Run ODP media publication smoke
         run: |
           cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
@@ -741,6 +773,37 @@ jobs:
           assert source["source"]["ordinary_payload_materializations"] == [2] * 15
           PY
 
+      - name: Run release XLSX page-margin publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case xlsx_eager_page_margin_edit_save,xlsx_source_backed_page_margin_edit_save \
+            --json target/perf/xlsx-page-margin-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-page-margin-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_page_margin_edit_save"]
+          source = results["xlsx_source_backed_page_margin_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "2b50a470f5066dd078c0566ca9e203f26843026b58b6a7a6eca14ac8435429a7"
+              assert result["sink"]["accepted_bytes"] == 16_786_883
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_calls"])
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_bytes"])
+          assert eager["source"]["ordinary_payload_materializations"] == [12] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [2] * 15
+          PY
+
       - name: Run release ODP media publication case
         run: |
           cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
@@ -864,6 +927,7 @@ jobs:
             target/perf/pptx-source-batch-baseline.json
             target/perf/xlsx-calculation-edit-baseline.json
             target/perf/xlsx-page-break-edit-baseline.json
+            target/perf/xlsx-page-margin-edit-baseline.json
             target/perf/ole2-semantic-baseline.json
             target/perf/semantic-baseline.json
             target/perf/odf-semantic-baseline.json

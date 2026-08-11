@@ -1,5 +1,13 @@
 //! Immutable worksheet page-margin metadata.
 
+mod patch;
+mod snapshot;
+mod source;
+
+pub use patch::{Commit, Diagnostics, Patch};
+pub use snapshot::Snapshot;
+pub use source::{SourceBackedEditor, SourceEdit};
+
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -349,7 +357,7 @@ fn parse_margins(element: &BytesStart<'_>, decoder: Decoder) -> Result<Margins> 
     let mut values = [None; 6];
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
-        if attribute.key.as_ref().contains(&b':') {
+        if attribute.key.as_ref().contains(&b':') || attribute.key.as_ref() == b"xmlns" {
             continue;
         }
         let slot = match attribute.key.local_name().as_ref() {
