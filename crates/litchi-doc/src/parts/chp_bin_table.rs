@@ -199,9 +199,101 @@ impl ChpBinTable {
     /// Returns an iterator to avoid unnecessary allocations.
     /// Use `.collect()` only if you need a Vec.
     pub fn runs_in_range(&self, start_cp: u32, end_cp: u32) -> impl Iterator<Item = &CharacterRun> {
-        self.runs.iter().filter(move |run| {
-            // Check if run overlaps with [start_cp, end_cp)
-            run.end_cp > start_cp && run.start_cp < end_cp
-        })
+        // Parsing sorts starts and normalizes overlaps, so retained end positions are
+        // strictly increasing too. Skip every run ending before the query in O(log n),
+        // then stop as soon as starts can no longer overlap [start_cp, end_cp).
+        let first = self.runs.partition_point(|run| run.end_cp <= start_cp);
+        self.runs[first..]
+            .iter()
+            .take_while(move |run| run.start_cp < end_cp)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CharacterRun, ChpBinTable};
+    use crate::parts::chp::CharacterProperties;
+
+    fn table(ranges: &[(u32, u32)]) -> ChpBinTable {
+        ChpBinTable {
+            runs: ranges
+                .iter()
+                .map(|&(start_cp, end_cp)| CharacterRun {
+                    start_cp,
+                    end_cp,
+                    properties: CharacterProperties::default(),
+                    direct_grpprl: Vec::new(),
+                })
+                .collect(),
+        }
+    }
+
+    fn indexed_ranges(table: &ChpBinTable, start_cp: u32, end_cp: u32) -> Vec<(u32, u32)> {
+        table
+            .runs_in_range(start_cp, end_cp)
+            .map(|run| (run.start_cp, run.end_cp))
+            .collect()
+    }
+
+    fn scalar_ranges(table: &ChpBinTable, start_cp: u32, end_cp: u32) -> Vec<(u32, u32)> {
+        table
+            .runs()
+            .iter()
+            .filter(|run| run.end_cp > start_cp && run.start_cp < end_cp)
+            .map(|run| (run.start_cp, run.end_cp))
+            .collect()
+    }
+
+    #[test]
+    fn indexed_range_query_matches_scalar_overlap_boundaries() {
+        let cases = [
+            table(&[]),
+            table(&[(0, 1)]),
+            table(&[(0, 5), (5, 10), (20, 30), (31, u32::MAX)]),
+            table(&[(0, 1), (2, 3), (4, 5), (6, 7), (8, 9)]),
+        ];
+        let queries = [
+            (0, 0),
+            (0, 1),
+            (1, 1),
+            (1, 5),
+            (5, 10),
+            (10, 5),
+            (10, 20),
+            (20, 21),
+            (30, 31),
+            (31, u32::MAX),
+            (u32::MAX, u32::MAX),
+            (0, u32::MAX),
+        ];
+
+        for table in &cases {
+            for &(start_cp, end_cp) in &queries {
+                assert_eq!(
+                    indexed_ranges(table, start_cp, end_cp),
+                    scalar_ranges(table, start_cp, end_cp),
+                    "query [{start_cp}, {end_cp})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn indexed_range_query_preserves_run_identity_and_order() {
+        let table = table(&[(0, 3), (3, 8), (12, 18), (18, 21)]);
+        let indexed: Vec<_> = table.runs_in_range(2, 19).collect();
+        let scalar: Vec<_> = table
+            .runs()
+            .iter()
+            .filter(|run| run.end_cp > 2 && run.start_cp < 19)
+            .collect();
+
+        assert_eq!(indexed.len(), scalar.len());
+        assert!(
+            indexed
+                .iter()
+                .zip(scalar)
+                .all(|(indexed, scalar)| std::ptr::eq(*indexed, scalar))
+        );
     }
 }

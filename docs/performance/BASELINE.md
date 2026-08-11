@@ -321,6 +321,13 @@ incomplete program and CRUD matrix.
   falls 4.01%. Allocation calls fall 18.61%, while peak heap and
   uninstrumented RSS remain flat. See
   [`0051`](changes/0051-doc-adjacent-style-baseline-cache.md).
+- Native DOC CHPX range queries now binary-search the first possible overlap
+  and stop after the matching slice instead of filtering every character run
+  for every paragraph. Large paragraph-list p50 falls from 454.100 to 358.414
+  us (-21.07%), mean falls 20.93%, and p95 falls 20.00%. The attributed
+  `extract_runs` self-cycle frame falls from 7.56% to 1.23%; allocation counts,
+  peak heap, and uninstrumented RSS remain flat. See
+  [`0053`](changes/0053-doc-chpx-range-index.md).
 - The positional XLSX source record reports p50 opens of 33.881 us (tiny),
   56.493 us (medium), and 139.897 us (dense); list-after-open has zero timed
   source reads. First-cell and narrow-range operations physically overlap only

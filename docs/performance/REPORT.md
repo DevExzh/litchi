@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `58dbdcc055dc8dd72961c5476f5215100b1de7be`
+Production base for the latest measured tranche: `fcc89cbeaab2c38cd11d9bb5cfb634f9f2e340f2`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -56,6 +56,7 @@ is still not broad program or CRUD coverage.
 | Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
 | Native DOC PieceTable physical index | Large open p50 **-55.91%**, mean **-55.78%**; changed edit/save p50 **-31.08%** | Private FC-ordered/prefix-max index only; exact scalar mapping, full FKP validation and strict/public reopens remain; peak heap/RSS flat |
 | Native DOC paragraph-style baseline cache | Large open p50 **-11.44%**, mean **-11.87%**; changed edit/save p50 **-4.01%** | One private resolved baseline only; direct PAPX, piece modifiers, direct style switches and complete readbacks remain; allocation calls -18.61%, peak heap/RSS flat |
+| Native DOC CHPX range index | Large paragraph-list p50 **-21.07%**, mean **-20.93%**, p95 **-20.00%** | Private monotonic slice query only; exact run identity/order, property cascading and complete readbacks remain; allocations and peak heap/RSS flat |
 | Native PPT root snapshot CFB reuse | Repeated large root open p50 **-8.78%**, mean **-10.58%**; allocation calls **-5.01%** | Reuses only the validated CFB index; independent stream/current-user/live-document, slide-order, review-history and public-reader checks remain |
 | Native PPT text-edit resolver reuse | Direct large edit/save p50 **-14.12%**, mean **-15.39%**; allocation calls **-3.53%** | Reuses the full editor preflight for persisted-record resolution; exact error precedence, fresh commit editor and complete readback remain; minor-fault increase disclosed |
 | Bounded XLSX validated-store handoff | Medium one-cell commit + first read p50 **-23.23%**, mean **-23.15%**; allocation calls **-21.01%** | At most 4,096 cells / 1 MiB XML with exact byte and lineage identity; peak heap +4.29%; unrestricted dense-wide candidate rejected at +8.99% peak heap |
@@ -463,6 +464,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | Native DOC one-paragraph edit/save after PieceTable index, 512 paragraphs | 1.379 ms | 0.950 ms | **-31.08% p50 / -31.68% mean** | Same private index accelerates mandatory candidate/public readbacks; patch/inverse and exact output checks unchanged |
 | Native DOC open after PieceTable index, 512 paragraphs | 343.503 us | 304.199 us | **-11.44% p50 / -11.87% mean** | Paragraph-style validation 4.44% -> 0.83% self cycles; allocation calls -18.61%; peak heap and uninstrumented RSS flat |
 | Native DOC one-paragraph edit/save after style cache, 512 paragraphs | 912.288 us | 875.736 us | **-4.01% p50 / -4.23% mean** | Same one-entry cache accelerates mandatory candidate/public readbacks; patch/inverse and exact output checks unchanged |
+| Native DOC paragraph list after style cache, 512 paragraphs | 454.100 us | 358.414 us | **-21.07% p50 / -20.93% mean** | CHPX range query changes from a full scan per paragraph to binary start plus matching slice; p95 -20.00%; allocations and peak heap/RSS flat |
 | Native PPT root snapshot open, 144 shapes | 37.522 us | 34.227 us | **-8.78% p50 / -10.58% mean** | Allocation calls -5.01%, temporary allocations -12.22%; peak heap and uninstrumented RSS flat |
 | Native PPT direct text edit/save, 144 shapes | 206.209 us | 177.089 us | **-14.12% p50 / -15.39% mean** | Allocation calls -3.53%, temporary allocations -6.05%; peak heap/RSS flat; minor faults +315.43% with zero major faults |
 | XLSX one-cell commit + first read, 4,096 cells | 4.431 ms | 3.402 ms | **-23.23% p50 / -23.15% mean** | Allocation calls -21.01%; peak heap +4.29%; unrestricted dense-wide retention rejected |
@@ -521,6 +523,7 @@ The underlying records are:
 - [`0050-doc-piece-table-physical-index.md`](changes/0050-doc-piece-table-physical-index.md)
 - [`0051-doc-adjacent-style-baseline-cache.md`](changes/0051-doc-adjacent-style-baseline-cache.md)
 - [`0052-odt-final-result-byte-handoff.md`](changes/0052-odt-final-result-byte-handoff.md)
+- [`0053-doc-chpx-range-index.md`](changes/0053-doc-chpx-range-index.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
