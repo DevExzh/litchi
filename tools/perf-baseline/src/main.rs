@@ -332,6 +332,7 @@ enum Case {
     OpcSourceOpenMainRead,
     OpcSourceCachedMainRead,
     OpcSourceConcurrentSamePart,
+    OpcSourceOverlayOnePartSave,
     CfbOpen,
     CfbListStreams,
     CfbReadOne,
@@ -493,6 +494,7 @@ impl Case {
             Self::OpcSourceOpenMainRead => "opc_source_open_main_read",
             Self::OpcSourceCachedMainRead => "opc_source_cached_main_read",
             Self::OpcSourceConcurrentSamePart => "opc_source_concurrent_same_part",
+            Self::OpcSourceOverlayOnePartSave => "opc_source_overlay_one_part_save",
             Self::CfbOpen => "cfb_open",
             Self::CfbListStreams => "cfb_list_streams",
             Self::CfbReadOne => "cfb_read_one",
@@ -821,6 +823,10 @@ impl Case {
     const fn is_scaling(self) -> bool {
         matches!(self, Self::OpcOpenSessionScaling | Self::CfbBulkReadScaling)
     }
+
+    const fn is_opc_source_overlay_save(self) -> bool {
+        matches!(self, Self::OpcSourceOverlayOnePartSave)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -976,6 +982,8 @@ struct CaseResult {
     source: Option<SourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     execution: Option<ExecutionSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    output_sha256: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -1646,6 +1654,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_ods_media()
                     && !case.uses_semantic_odp()
                     && !case.uses_odp_media()
+                    && !case.is_opc_source_overlay_save()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
                     cfb_corpus
@@ -1677,6 +1686,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
         }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_opc_source_overlay_save())
+    {
+        let corpus = build_opc_corpus(CorpusShape::FewLarge, PayloadKind::Incompressible)?;
+        results.push(run_opc_source_overlay_one_part_save(
+            &corpus,
+            options.warmup_iterations,
+            options.samples,
+        )?);
     }
 
     for shape in &options.writer_shapes {
@@ -2139,6 +2161,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_source_open_main_read" => Some(Case::OpcSourceOpenMainRead),
         "opc_source_cached_main_read" => Some(Case::OpcSourceCachedMainRead),
         "opc_source_concurrent_same_part" => Some(Case::OpcSourceConcurrentSamePart),
+        "opc_source_overlay_one_part_save" => Some(Case::OpcSourceOverlayOnePartSave),
         "cfb_open" => Some(Case::CfbOpen),
         "cfb_list_streams" => Some(Case::CfbListStreams),
         "cfb_read_one" => Some(Case::CfbReadOne),
@@ -2317,6 +2340,7 @@ fn print_usage() {
                                        opc_noop_save,opc_mutated_save,opc_source_open,\n\
                                        opc_source_open_main_read,opc_source_cached_main_read,\n\
                                        opc_source_concurrent_same_part,\n\
+                                       opc_source_overlay_one_part_save,\n\
                                        cfb_open,cfb_list_streams,cfb_read_one,\n\
                                        cfb_create_stream_borrowed,cfb_create_stream_owned,\n\
                                        ole_common_open,ole_common_put_stream_publish,\n\
@@ -3839,6 +3863,9 @@ fn run_case_with_config(
         },
         Case::OpcSourceConcurrentSamePart => {
             run_opc_source_concurrent_same_part(corpus, warmup_iterations, samples)
+        },
+        Case::OpcSourceOverlayOnePartSave => {
+            run_opc_source_overlay_one_part_save(corpus, warmup_iterations, samples)
         },
         Case::CfbOpen => run_cfb_open(corpus, warmup_iterations, samples),
         Case::CfbListStreams => run_cfb_list_streams(corpus, warmup_iterations, samples),
@@ -7427,6 +7454,148 @@ fn run_opc_source_concurrent_same_part(
     ))
 }
 
+fn opc_overlay_replacement_payload(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut payload = corpus.target_payload.clone();
+    let first = payload
+        .first_mut()
+        .ok_or("OPC overlay replacement target is empty")?;
+    *first ^= 0xff;
+    Ok(payload)
+}
+
+fn expected_opc_overlay_output(
+    corpus: &Corpus,
+    replacement: &[u8],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    package
+        .get_part_mut(&target_uri)?
+        .set_blob(replacement.to_vec());
+    Ok(PackageWriter::to_bytes(&package)?)
+}
+
+fn verify_opc_overlay_output(
+    corpus: &Corpus,
+    output: &[u8],
+    replacement: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let package = OpcPackage::from_bytes(output)?;
+    if package.part_count() != corpus.manifest.entry_count {
+        return Err("OPC overlay output part count differs from source corpus".into());
+    }
+    for index in 0..corpus.manifest.entry_count {
+        let name = entry_name(index);
+        let uri = PackURI::new(format!("/{name}"))?;
+        let part = package.get_part(&uri)?;
+        let expected = if name == corpus.target_name {
+            replacement.to_vec()
+        } else {
+            payload_bytes(
+                PayloadKind::Incompressible,
+                index,
+                corpus.manifest.entry_bytes,
+            )
+        };
+        if part.content_type() != CONTENT_TYPE || part.blob() != expected {
+            return Err(format!("OPC overlay output Part {name} differs from expectation").into());
+        }
+    }
+    let main = package.main_document_part()?;
+    if main.partname().membername() != corpus.target_name || main.blob() != replacement {
+        return Err("OPC overlay output main relationship or payload differs".into());
+    }
+    Ok(())
+}
+
+fn run_opc_source_overlay_one_part_save(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.shape != CorpusShape::FewLarge.name()
+        || corpus.manifest.payload_kind != PayloadKind::Incompressible.name()
+    {
+        return Err("OPC source overlay case requires few-large incompressible corpus".into());
+    }
+    let replacement = opc_overlay_replacement_payload(corpus)?;
+    let expected = expected_opc_overlay_output(corpus, &replacement)?;
+    if expected == corpus.archive {
+        return Err("OPC overlay expected output did not change source bytes".into());
+    }
+    verify_opc_overlay_output(corpus, &expected, &replacement)?;
+    let expected_digest = sha256_hex(&expected);
+    let maximum = u64::try_from(expected.len())?
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("OPC overlay sequential output ceiling overflows u64")?;
+    let cache_limits = opc_source_cache_limits(corpus)?;
+    let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut measured_digests = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let (source, _target_range) = opc_instrumented_source(corpus)?;
+        let replacement_part = replacement.clone();
+        let mut sink = CountingSink::bounded(maximum, 64 * 1024);
+        sink.reserve_budget()?;
+        let started = Instant::now();
+        let source_package =
+            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let mut package = source_package.into_opc_package()?;
+        package
+            .get_part_mut(&target_uri)?
+            .set_blob(replacement_part);
+        PackageWriter::write_to_stream(&mut sink, &package)?;
+        let duration = started.elapsed();
+        std::hint::black_box(&package);
+        drop(package);
+
+        let metrics = source.snapshot();
+        if metrics.read_calls == 0
+            || metrics.read_bytes == 0
+            || metrics.ordinary_payload_read_calls == 0
+            || metrics.ordinary_payload_read_bytes == 0
+        {
+            return Err("OPC overlay save performed no ordinary source reads".into());
+        }
+        if sink.bytes != expected {
+            return Err("OPC overlay save differs from deterministic expected output".into());
+        }
+        verify_opc_overlay_output(corpus, &sink.bytes, &replacement)?;
+        let digest = sha256_hex(&sink.bytes);
+        if digest != expected_digest {
+            return Err("OPC overlay output digest differs between iterations".into());
+        }
+        if iteration >= warmup_iterations {
+            source_summary.record_opc(metrics, corpus.manifest.entry_count as u64);
+            sink_summaries.push(sink.summary());
+            measured_digests.push(digest);
+        }
+        std::hint::black_box(&sink.bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let sink = deterministic_sink_summary(&sink_summaries, "OPC source overlay save")?;
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("OPC overlay measured output digests are not stable".into());
+    }
+    Ok(CaseResult {
+        case: Case::OpcSourceOverlayOnePartSave.name(),
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: Some(expected_digest),
+    })
+}
+
 fn run_opc_open(
     corpus: &Corpus,
     warmup_iterations: usize,
@@ -8106,6 +8275,7 @@ fn result(case: Case, corpus: &Corpus, elapsed: Vec<u64>, sink: Option<SinkSumma
         sink,
         source: None,
         execution: None,
+        output_sha256: None,
     }
 }
 
@@ -8122,6 +8292,7 @@ fn result_with_source(
         sink: None,
         source: Some(source),
         execution: None,
+        output_sha256: None,
     }
 }
 
@@ -8138,6 +8309,7 @@ fn result_with_execution(
         sink: None,
         source: None,
         execution: Some(execution),
+        output_sha256: None,
     }
 }
 
@@ -8347,8 +8519,10 @@ mod tests {
         build_ods_media_corpus, build_odt_media_corpus, build_ole_common_corpus, build_opc_corpus,
         build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
         build_semantic_odt_corpus, build_semantic_pptx_corpus, build_semantic_rtf_corpus,
-        build_writer_corpus, build_xlsx_corpus, ole_common_changed_output, payload_bytes,
-        resolve_execution_workers, run_case, run_case_with_config, run_scaling_case,
+        build_writer_corpus, build_xlsx_corpus, expected_opc_overlay_output,
+        ole_common_changed_output, opc_overlay_replacement_payload, payload_bytes,
+        resolve_execution_workers, run_case, run_case_with_config,
+        run_opc_source_overlay_one_part_save, run_scaling_case, sha256_hex,
         simulated_request_delay, statistics,
     };
 
@@ -8398,6 +8572,40 @@ mod tests {
         let writer_results = 3 * WriterShape::ALL.len();
         let xlsx_results = 15 * XlsxShape::ALL.len();
         assert_eq!(substrate_results + writer_results + xlsx_results, 198);
+        assert!(!Case::DEFAULT.contains(&Case::OpcSourceOverlayOnePartSave));
+    }
+
+    #[test]
+    fn opc_source_overlay_save_is_deterministic_and_emits_complete_evidence() {
+        let corpus = build_opc_corpus(CorpusShape::FewLarge, PayloadKind::Incompressible).unwrap();
+        let replacement = opc_overlay_replacement_payload(&corpus).unwrap();
+        let first = expected_opc_overlay_output(&corpus, &replacement).unwrap();
+        let second = expected_opc_overlay_output(&corpus, &replacement).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(
+            corpus.manifest.archive_sha256,
+            "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6"
+        );
+        assert_eq!(
+            sha256_hex(&first),
+            "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+        );
+
+        let measured = run_opc_source_overlay_one_part_save(&corpus, 0, 2).unwrap();
+        let digest = sha256_hex(&first);
+        assert_eq!(measured.case, "opc_source_overlay_one_part_save");
+        assert_eq!(measured.output_sha256.as_deref(), Some(digest.as_str()));
+        assert_eq!(measured.elapsed_ns.samples.len(), 2);
+        assert_eq!(
+            measured.sink.unwrap().accepted_bytes,
+            u64::try_from(first.len()).unwrap()
+        );
+        let source = measured.source.unwrap();
+        assert_eq!(source.read_calls.len(), 2);
+        assert!(source.read_calls.iter().all(|&calls| calls > 0));
+        assert!(source.read_calls.windows(2).all(|pair| pair[0] == pair[1]));
+        assert!(source.read_bytes.windows(2).all(|pair| pair[0] == pair[1]));
+        assert_eq!(source.ordinary_payload_materializations, Some(vec![4, 4]));
     }
 
     #[test]
