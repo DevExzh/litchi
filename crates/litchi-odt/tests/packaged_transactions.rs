@@ -1,7 +1,8 @@
+use litchi_odf_common::package::raw_identical_members;
 use litchi_odt::form::TextControl;
 use litchi_odt::{
     Document, ScriptResourceKind, ScriptResourceSpec,
-    core::{PackageWriter, Profile},
+    core::{OwnedPackage as CoreOwnedPackage, PackageWriter, Profile},
     elements::field::DynamicTextField,
     mutable::MutableDocument,
     note::{Note, NoteClass},
@@ -27,6 +28,77 @@ fn source() -> Document {
     let mut document = MutableDocument::new();
     document.add_paragraph("Unique paragraph").unwrap();
     Document::from_bytes(document.to_bytes().unwrap()).unwrap()
+}
+
+#[test]
+fn paragraph_replacement_raw_preserves_unchanged_media_and_metadata() {
+    const MEDIA_PATH: &str = "Pictures/opaque.bin";
+    let mut base = MutableDocument::new();
+    base.add_paragraph("Before").unwrap();
+    let base = CoreOwnedPackage::from_bytes(base.to_bytes().unwrap()).unwrap();
+    let package = base.package().unwrap();
+    let mut writer = PackageWriter::new();
+    writer
+        .set_mimetype("application/vnd.oasis.opendocument.text")
+        .unwrap();
+    for path in package.files().unwrap() {
+        if matches!(path.as_str(), "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
+            continue;
+        }
+        writer
+            .add_file_with_media_type(
+                &path,
+                &package.get_file(&path).unwrap(),
+                package.manifest().get_media_type(&path).unwrap_or_default(),
+            )
+            .unwrap();
+    }
+    writer.add_manifest_directory("Pictures/", "").unwrap();
+    writer
+        .add_file_with_media_type(
+            MEDIA_PATH,
+            &vec![0x5a; 1024 * 1024],
+            "application/octet-stream",
+        )
+        .unwrap();
+    let source_bytes = writer.finish_to_bytes().unwrap();
+    let source = Document::from_bytes(source_bytes.clone()).unwrap();
+    let snapshot = litchi_odt::transaction::Snapshot::from_document(&source).unwrap();
+
+    let mut edit = snapshot.edit();
+    edit.replace_paragraph(Position::new(0), "After").unwrap();
+    let commit = edit.commit().unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.snapshot().as_bytes()).unwrap();
+
+    assert!(!identical.contains("content.xml"));
+    for path in [
+        "mimetype",
+        "styles.xml",
+        "meta.xml",
+        "META-INF/manifest.xml",
+        MEDIA_PATH,
+    ] {
+        assert!(identical.contains(path), "{path}");
+    }
+    let reopened = commit.snapshot().document().unwrap();
+    assert_eq!(reopened.paragraphs().unwrap()[0].text().unwrap(), "After");
+    assert_eq!(
+        reopened.get_file(MEDIA_PATH).unwrap(),
+        vec![0x5a; 1024 * 1024]
+    );
+    assert_eq!(
+        commit.patch().apply(&snapshot).unwrap().as_bytes(),
+        commit.snapshot().as_bytes()
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        source_bytes
+    );
 }
 
 fn real_producer_source() -> Document {
