@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 
-This is a coverage map, not a completion claim. It compares the 117 selectable
+This is a coverage map, not a completion claim. It compares the 118 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -29,15 +29,16 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS-row preservation, and exact raw ODT/ODS/ODP auxiliary/media members during neighboring paragraph/cell/text-box edits; broader format-semantic extension corpora remain missing |
-| Replace one low-level Part, preserve the rest | Covered for owned same-topology OPC | Changes 0008/0021/0022 test raw framing, fallback, shared changed-payload ownership, validated local-span movement and matched save behavior; source-backed editing remains missing |
+| Replace one low-level Part, preserve the rest | Covered for owned and narrow source-backed same-topology OPC | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; change 0037 adds a consuming source-backed one-Part publisher with raw unknown-member preservation, source-version checks, signed/unsupported zero-output refusal and matched save evidence; semantic facade integration remains missing |
 
 The source/output matrix is also incomplete. Owned bytes and instrumented
 `ReadAt` exist for OPC/XLSX, and the deterministic range simulator covers
-latency/range effects. RTF and DOCX final serialization accept and test a
-forward-only non-seek sink, but this is not semantic conversion or
-memory-bounded authoring. Borrowed-byte comparisons, filesystem positional
-cold reads, atomic-save timing, PPTX facade streaming output, and non-seek
-semantic conversion remain.
+latency/range effects. The narrow source-backed OPC publisher accepts a
+forward-only sink and records complete positional input plus bounded output,
+but this is not semantic conversion or memory-bounded authoring. RTF and DOCX
+final serialization also accept and test a forward-only non-seek sink.
+Borrowed-byte comparisons, filesystem positional cold reads, atomic-save
+timing, PPTX facade streaming output, and non-seek semantic conversion remain.
 
 ## Highest-return next cases
 
@@ -55,16 +56,19 @@ semantic conversion remain.
 4. XLSX bulk update plus distinct clear/remove/hide behavior. Direct
    writer-local action regrouping was measured and rejected in change 0030;
    broader coverage must not present that immaterial prototype as a solution.
-5. Unknown OOXML extension and media preservation during a known semantic edit.
-6. Durable PPTX patch produce/encode/decode/apply/inverse/join/three-way flows,
+5. Integrate the narrow source-backed one-Part publisher into bounded
+   DOCX/PPTX/XLSX semantic transactions, with real media, extensions,
+   signatures and explicit topology-change fallback/refusal matrices.
+6. Unknown OOXML extension and media preservation during a known semantic edit.
+7. Durable PPTX patch produce/encode/decode/apply/inverse/join/three-way flows,
    including stale-base and conflict cases.
-7. PPTX dependency-closure transfer and slide split/removal with charts, media,
+8. PPTX dependency-closure transfer and slide split/removal with charts, media,
    themes and collision names.
-8. Validate/security matrix for valid, malformed-within-limits, encrypted,
+9. Validate/security matrix for valid, malformed-within-limits, encrypted,
    macro-enabled, protected and external-link fixtures.
-9. Smart detection versus prepared-source reuse. OOXML smart results retain an
+10. Smart detection versus prepared-source reuse. OOXML smart results retain an
    adoptable parsed OPC package; ODF detection/handoff remains unmeasured.
-10. Broaden ODF beyond generated text/grid/deck and accepted compact ODT/ODS/ODP
+11. Broaden ODF beyond generated text/grid/deck and accepted compact ODT/ODS/ODP
    unchanged-member publication: source-backed selectors, resource-adding and
    structural publication, 1% and bulk edits, unknown extensions, real
    producers, richer media, security and source-backed I/O.
@@ -74,7 +78,7 @@ The former first item is complete for existing-document ODT transaction
 snapshots: change 0014 removes one archive copy and two allocations per
 snapshot while retaining the exact no-op, limits, envelope, patch, and readback
 contracts. Direct byte ingress and changed publication remain covered by item
-10 rather than being implied complete.
+11 rather than being implied complete.
 
 The former native DOC/XLS/PPT baseline item is complete in change 0015. Changes
 0016 and 0017 accept the first XLS and DOC publication follow-ups without
@@ -118,7 +122,7 @@ not complete PPT anchors, broad edits, real-producer or security coverage.
 Change 0027 adds an aggregation-free public ODS cell-sweep attribution case and
 a bounded lazy facade locator for repeated queries. It does not add structural,
 bulk, source-backed, real-producer, media, security or publication coverage;
-those remain under item 10.
+those remain under item 11.
 
 Change 0029 broadens the RTF input matrix without adding or renaming timed case
 types: deterministic raw CP-1252, deterministic LZFu and a content-addressed
@@ -164,6 +168,14 @@ unchanged 4 MiB streams. It does not add semantic CRUD coverage. An inline
 recapture allocation-reuse prototype was reverted because the complete public
 operation improved only 2.61% p50/2.30% mean; the cases remain to gate a
 materially different final-publication design.
+
+Change 0037 covers the low-level source-backed replacement of one existing OPC
+Part without URI, content-type, relationship or topology changes. The matched
+case materializes only the selected Part, raw-copies all other physical
+members, preserves exact output identity, and refuses signed real changes or
+unsupported layouts before output. It does not add DOCX/PPTX/XLSX semantic
+transactions, topology changes, signature policy, real-producer/media matrices
+or atomic filesystem publication.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

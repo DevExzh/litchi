@@ -133,6 +133,19 @@ pub enum OpcError {
         actual: litchi_core::SourceVersion,
     },
 
+    /// A source-backed one-Part publisher cannot prove that the physical
+    /// source can be preserved without a full materializing rewrite.
+    #[error("source-backed OPC Part overlay is unavailable: {reason}")]
+    SourceBackedOverlayUnavailable {
+        /// Content-free reason the conservative raw-copy path refused.
+        reason: String,
+    },
+
+    /// A source-backed one-Part change would invalidate an existing signature
+    /// without an explicit strip-or-resign policy.
+    #[error("signed OPC source requires an explicit signature edit policy")]
+    SignedSourceRequiresExplicitPolicy,
+
     /// The destination was atomically replaced, but its parent directory
     /// could not be synchronized. Callers must not blindly retry as if the
     /// old destination were still present.
@@ -210,6 +223,8 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::Execution(_)
             | OpcError::ParallelRead(_)
             | OpcError::UnsupportedExecutionAffinity
+            | OpcError::SourceBackedOverlayUnavailable { .. }
+            | OpcError::SignedSourceRequiresExplicitPolicy
             | OpcError::PackageNotFound(_)
             | OpcError::InvalidPackUri(_)
             | OpcError::DuplicatePartName(_)

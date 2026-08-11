@@ -4,7 +4,7 @@
 //! The latter owns mutable parts, while this type keeps ordinary payloads in a
 //! positional source until a caller explicitly asks for one.
 
-use crate::constants::relationship_type;
+use crate::constants::{content_type, relationship_type};
 use crate::error::{OpcError, Result};
 use crate::limits::{ReadLimits, ReadResource};
 use crate::members::NonPartMember;
@@ -17,8 +17,11 @@ use litchi_core::{ReadAt, SourceVersion};
 use soapberry_zip::ReaderAt as ZipReaderAt;
 use soapberry_zip::office::{EntryId, IndexedArchive};
 use std::collections::HashMap;
+use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+
+const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
 
 /// Validation failure returned by [`SourceCacheLimits::new`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,18 +151,24 @@ struct CacheCounters {
 
 #[derive(Clone)]
 struct SourceReader {
-    source: Arc<dyn ReadAt>,
+    snapshot: SourceSnapshot,
 }
 
 impl ZipReaderAt for SourceReader {
     fn read_at(&self, output: &mut [u8], offset: u64) -> std::io::Result<usize> {
-        self.source.read_at(offset, output)
+        self.snapshot.ensure_current_io_if_monitored()?;
+        let read = self.snapshot.source.read_at(offset, output)?;
+        self.snapshot.ensure_current_io_if_monitored()?;
+        Ok(read)
     }
 }
 
+#[derive(Clone)]
 struct SourceSnapshot {
     source: Arc<dyn ReadAt>,
     version: SourceVersion,
+    length: u64,
+    monitor_reads: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl SourceSnapshot {
@@ -173,6 +182,73 @@ impl SourceSnapshot {
                 actual,
             })
         }
+    }
+
+    fn ensure_current_io_if_monitored(&self) -> std::io::Result<()> {
+        if !self.monitor_reads.load(Ordering::Acquire) {
+            return Ok(());
+        }
+        let actual = self.source.version()?;
+        if actual == self.version {
+            Ok(())
+        } else {
+            Err(std::io::Error::other(
+                "source-backed OPC source changed during publication",
+            ))
+        }
+    }
+
+    fn monitor_publication(&self) {
+        self.monitor_reads.store(true, Ordering::Release);
+    }
+}
+
+struct Counted<'count, W> {
+    inner: W,
+    written: &'count mut u64,
+}
+
+impl<W: Write> Write for Counted<'_, W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let written = self.inner.write(bytes)?;
+        *self.written = self.written.saturating_add(written as u64);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+struct SourceCheckedSink<W> {
+    inner: W,
+    snapshot: SourceSnapshot,
+}
+
+impl<W: Write> Write for SourceCheckedSink<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.snapshot.ensure_current_io_if_monitored()?;
+        self.inner.write(bytes)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.snapshot.ensure_current_io_if_monitored()?;
+        self.inner.flush()
+    }
+}
+
+struct Chunked<W> {
+    inner: W,
+}
+
+impl<W: Write> Write for Chunked<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.inner
+            .write(&bytes[..bytes.len().min(SOURCE_PUBLICATION_CHUNK_BYTES)])
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
     }
 }
 
@@ -506,9 +582,11 @@ fn remove_flight(state: &mut CacheState, entry_id: EntryId, flight: &Arc<LoadFli
 /// A structurally validated OPC package backed by an immutable positional source.
 ///
 /// Opening reads and validates ZIP metadata, content types, and relationship
-/// XML, but never reads ordinary part payloads.  The type has no mutation,
-/// writer, raw-copy, or format-migration APIs; call [`Self::into_opc_package`]
-/// when an owning mutable package is needed.
+/// XML, but never reads ordinary part payloads. The ordinary view is immutable.
+/// [`Self::write_part_overlay_to_stream`] is a narrow, consuming publisher for
+/// one same-topology Part replacement that raw-copies every other ZIP member;
+/// call [`Self::into_opc_package`] when a general owning mutable package is
+/// needed.
 pub struct SourceBackedPackage {
     source: SourceSnapshot,
     archive: IndexedArchive<SourceReader>,
@@ -565,10 +643,14 @@ impl SourceBackedPackage {
         let snapshot = SourceSnapshot {
             source: Arc::clone(&source),
             version,
+            length,
+            monitor_reads: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
         snapshot.ensure_current()?;
         let archive = IndexedArchive::from_reader_with_limits(
-            SourceReader { source },
+            SourceReader {
+                snapshot: snapshot.clone(),
+            },
             length,
             limits.zip_limits(),
         )?;
@@ -709,6 +791,277 @@ impl SourceBackedPackage {
         Ok(package)
     }
 
+    /// Replace one existing ordinary Part and publish to a sequential stream.
+    ///
+    /// This is an explicit low-level OPC operation. The Part URI, content
+    /// type, relationships, package catalog, and physical member topology are
+    /// immutable; only the selected payload may change. Every other ZIP member
+    /// is raw-copied from the positional source. Unsupported physical layouts
+    /// are refused before output instead of silently materializing the package.
+    ///
+    /// An exact payload no-op copies the complete source artifact byte for
+    /// byte, including signatures and unsupported physical details. A real
+    /// change to a signed package is refused because this operation accepts no
+    /// signature-stripping or resigning policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed source, limit, Part, signature, XML-publication, ZIP, or
+    /// sink error. If a non-atomic sink accepts bytes before failing, the error
+    /// is [`OpcError::IncompleteOutput`].
+    pub fn write_part_overlay_to_stream<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Vec<u8>,
+    ) -> Result<()> {
+        let target = self
+            .parts_by_name
+            .get(partname)
+            .copied()
+            .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
+        self.validate_overlay_limits(target, replacement.len())?;
+
+        // Reading the selected closure proves its local framing, compression,
+        // declared size and CRC before either preserving it as an exact no-op
+        // or replacing it. Unselected ordinary payloads remain unread.
+        let original = self.read_part(target)?;
+        if original.as_bytes() == replacement.as_slice() {
+            return self.write_exact_source(writer);
+        }
+
+        if self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        let target_part = &self.parts[target];
+        if xml_minifier::audit::package::is_xml_part(
+            target_part.partname.as_str(),
+            &target_part.content_type,
+        ) {
+            validate_overlay_xml(target_part.partname.as_str(), original.as_bytes())?;
+            validate_overlay_xml(target_part.partname.as_str(), &replacement)?;
+        }
+        drop(original);
+        self.write_changed_overlay(writer, target, Arc::new(replacement))
+    }
+
+    fn validate_overlay_limits(&self, target: usize, replacement_bytes: usize) -> Result<()> {
+        let replacement_bytes = replacement_bytes as u64;
+        self.limits.check(
+            ReadResource::PartBytes,
+            replacement_bytes,
+            self.limits.max_part_bytes(),
+        )?;
+        self.limits.check(
+            ReadResource::ArchiveEntryBytes,
+            replacement_bytes,
+            self.limits.max_archive_entry_bytes(),
+        )?;
+
+        let mut part_total = 0_u64;
+        let mut archive_total = 0_u64;
+        let mut target_bytes = None;
+        for (index, part) in self.parts.iter().enumerate() {
+            let bytes = self
+                .archive
+                .metadata_for(part.entry_id)?
+                .uncompressed_size();
+            part_total = checked_overlay_total(
+                part_total,
+                bytes,
+                ReadResource::TotalPartBytes,
+                self.limits.max_total_part_bytes(),
+            )?;
+            if index == target {
+                target_bytes = Some(bytes);
+            }
+        }
+        for name in self.archive.file_names() {
+            archive_total = checked_overlay_total(
+                archive_total,
+                self.archive.metadata(name)?.uncompressed_size(),
+                ReadResource::ArchiveTotalBytes,
+                self.limits.max_archive_total_bytes(),
+            )?;
+        }
+        let target_bytes =
+            target_bytes.ok_or_else(|| OpcError::PartNotFound(target.to_string()))?;
+        let adjusted_parts = adjusted_overlay_total(
+            part_total,
+            target_bytes,
+            replacement_bytes,
+            ReadResource::TotalPartBytes,
+            self.limits.max_total_part_bytes(),
+        )?;
+        self.limits.check(
+            ReadResource::TotalPartBytes,
+            adjusted_parts,
+            self.limits.max_total_part_bytes(),
+        )?;
+        let adjusted_archive = adjusted_overlay_total(
+            archive_total,
+            target_bytes,
+            replacement_bytes,
+            ReadResource::ArchiveTotalBytes,
+            self.limits.max_archive_total_bytes(),
+        )?;
+        self.limits.check(
+            ReadResource::ArchiveTotalBytes,
+            adjusted_archive,
+            self.limits.max_archive_total_bytes(),
+        )?;
+        Ok(())
+    }
+
+    fn has_signature_infrastructure(&self) -> bool {
+        self.package_relationships
+            .iter()
+            .any(|relationship| is_signature_relationship(relationship.reltype()))
+            || self.parts.iter().any(|part| {
+                is_signature_path(part.partname.as_str())
+                    || is_signature_content_type(&part.content_type)
+                    || part
+                        .relationships
+                        .iter()
+                        .any(|relationship| is_signature_relationship(relationship.reltype()))
+            })
+    }
+
+    fn write_exact_source<W: Write>(self, writer: W) -> Result<()> {
+        self.source.monitor_publication();
+        self.source.ensure_current()?;
+        let mut buffer = Vec::new();
+        buffer
+            .try_reserve_exact(SOURCE_PUBLICATION_CHUNK_BYTES)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC publication buffer",
+                source,
+            })?;
+        buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
+        let mut written = 0_u64;
+        let result = {
+            let counted = Counted {
+                inner: writer,
+                written: &mut written,
+            };
+            let mut sink = SourceCheckedSink {
+                inner: counted,
+                snapshot: self.source.clone(),
+            };
+            let mut offset = 0_u64;
+            (|| {
+                while offset < self.source.length {
+                    let remaining =
+                        usize::try_from((self.source.length - offset).min(buffer.len() as u64))
+                            .map_err(|_| {
+                                overlay_unavailable("source range does not fit this platform")
+                            })?;
+                    let read = self
+                        .source
+                        .source
+                        .read_at(offset, &mut buffer[..remaining])?;
+                    if read == 0 {
+                        return Err(OpcError::IoError(std::io::Error::new(
+                            std::io::ErrorKind::UnexpectedEof,
+                            "source-backed OPC source ended during publication",
+                        )));
+                    }
+                    self.source.ensure_current()?;
+                    sink.write_all(&buffer[..read])?;
+                    offset = offset
+                        .checked_add(read as u64)
+                        .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+                }
+                sink.flush()?;
+                Ok(())
+            })()
+        };
+        finish_source_publication(result, &self.source, written)
+    }
+
+    fn write_changed_overlay<W: Write>(
+        self,
+        writer: W,
+        target: usize,
+        replacement: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        self.source.monitor_publication();
+        self.source.ensure_current()?;
+        let mut scratch = Vec::new();
+        scratch
+            .try_reserve_exact(soapberry_zip::RECOMMENDED_BUFFER_SIZE)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC preservation index",
+                source,
+            })?;
+        scratch.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0);
+        let index = match self.archive.preservation_index(&mut scratch) {
+            Ok(index) => index,
+            Err(error) => {
+                self.source.ensure_current()?;
+                return Err(overlay_unavailable(error.to_string()));
+            },
+        };
+        self.source.ensure_current()?;
+
+        let target_name = self.parts[target].partname.membername();
+        let target_entries = index
+            .entries()
+            .iter()
+            .filter(|entry| entry.raw_name_bytes() == target_name.as_bytes())
+            .count();
+        if target_entries != 1 {
+            return Err(overlay_unavailable(
+                "selected Part does not have one canonical UTF-8 source member",
+            ));
+        }
+        let conservative_output_bound = self
+            .source
+            .length
+            .checked_add((replacement.len() as u64).saturating_mul(2))
+            .and_then(|bytes| bytes.checked_add(SOURCE_PUBLICATION_CHUNK_BYTES as u64));
+        if conservative_output_bound.is_none_or(|bytes| bytes > u64::from(u32::MAX)) {
+            return Err(overlay_unavailable(
+                "selected Part replacement may require ZIP64 output",
+            ));
+        }
+
+        let mut plan = soapberry_zip::PreservationPlan::new();
+        for entry in index.entries() {
+            if entry.raw_name_bytes() == target_name.as_bytes() {
+                plan.push(soapberry_zip::PreservationAction::Regenerate {
+                    id: entry.id(),
+                    entry: soapberry_zip::RegeneratedEntry::new_shared(
+                        target_name,
+                        Arc::clone(&replacement),
+                    )
+                    .compression_method(soapberry_zip::CompressionMethod::Deflate),
+                });
+            } else {
+                plan.push(soapberry_zip::PreservationAction::Copy(entry.id()));
+            }
+        }
+
+        self.source.ensure_current()?;
+        let mut written = 0_u64;
+        let result = {
+            let counted = Counted {
+                inner: writer,
+                written: &mut written,
+            };
+            let checked = SourceCheckedSink {
+                inner: counted,
+                snapshot: self.source.clone(),
+            };
+            let result = index.write_to(&plan, Chunked { inner: checked });
+            match result {
+                Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
+                Err(error) => Err(OpcError::ZipError(error.to_string())),
+            }
+        };
+        finish_source_publication(result, &self.source, written)
+    }
+
     fn read_part(&self, index: usize) -> Result<PartData> {
         let entry_id = self
             .parts
@@ -828,6 +1181,97 @@ fn copy_relationships(from: &Relationships, to: &mut Relationships) -> Result<()
     Ok(())
 }
 
+fn validate_overlay_xml(part: &str, bytes: &[u8]) -> Result<()> {
+    xml_minifier::audit::verify_authored(bytes, xml_minifier::audit::Limits::default())
+        .map(|_report| ())
+        .map_err(|source| OpcError::XmlPublication {
+            part: part.to_string(),
+            source,
+        })
+}
+
+fn checked_overlay_total(
+    current: u64,
+    bytes: u64,
+    resource: ReadResource,
+    maximum: u64,
+) -> Result<u64> {
+    current.checked_add(bytes).ok_or(OpcError::ReadLimit {
+        resource,
+        actual: u64::MAX,
+        maximum,
+    })
+}
+
+fn adjusted_overlay_total(
+    current: u64,
+    removed: u64,
+    added: u64,
+    resource: ReadResource,
+    maximum: u64,
+) -> Result<u64> {
+    current
+        .checked_sub(removed)
+        .and_then(|remaining| remaining.checked_add(added))
+        .ok_or(OpcError::ReadLimit {
+            resource,
+            actual: u64::MAX,
+            maximum,
+        })
+}
+
+fn overlay_unavailable(reason: impl Into<String>) -> OpcError {
+    OpcError::SourceBackedOverlayUnavailable {
+        reason: reason.into(),
+    }
+}
+
+fn finish_source_publication(
+    result: Result<()>,
+    source: &SourceSnapshot,
+    written: u64,
+) -> Result<()> {
+    let freshness = source.ensure_current();
+    let result = match (result, freshness) {
+        (_, Err(error @ OpcError::SourceChanged { .. })) => Err(error),
+        (Err(error), _) => Err(error),
+        (Ok(()), Err(error)) => Err(error),
+        (Ok(()), Ok(())) => Ok(()),
+    };
+    match result {
+        Err(source) if written != 0 => Err(OpcError::IncompleteOutput {
+            written,
+            source: Box::new(source),
+        }),
+        other => other,
+    }
+}
+
+fn is_signature_relationship(kind: &str) -> bool {
+    matches!(
+        kind,
+        relationship_type::DIGITAL_SIGNATURE_ORIGIN
+            | "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature"
+            | "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/certificate"
+    )
+}
+
+fn is_signature_path(path: &str) -> bool {
+    const DIRECTORY: &[u8] = b"/_xmlsignatures/";
+    path.as_bytes()
+        .get(..DIRECTORY.len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(DIRECTORY))
+}
+
+fn is_signature_content_type(value: &str) -> bool {
+    matches!(
+        value,
+        content_type::OPC_DIGITAL_SIGNATURE_ORIGIN
+            | content_type::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE
+            | content_type::OPC_DIGITAL_SIGNATURE_CERTIFICATE
+    )
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(
@@ -837,6 +1281,7 @@ mod tests {
     )]
 
     use super::*;
+    use std::collections::HashMap;
     use std::sync::Barrier;
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
     use std::time::Duration;
@@ -949,6 +1394,108 @@ mod tests {
 
     fn root_relationships() -> &'static [u8] {
         br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#
+    }
+
+    fn signed_root_relationships() -> &'static [u8] {
+        br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin" Target="signature/origin.xml"/></Relationships>"#
+    }
+
+    fn signed_archive(document: &[u8]) -> Vec<u8> {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored("_rels/.rels", signed_root_relationships())
+            .unwrap();
+        writer.write_stored("word/document.xml", document).unwrap();
+        writer
+            .write_stored("signature/origin.xml", b"<origin/>")
+            .unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
+    #[derive(Debug)]
+    struct RawRecord {
+        local: Vec<u8>,
+        central: Vec<u8>,
+    }
+
+    fn raw_records(data: &[u8]) -> HashMap<Vec<u8>, RawRecord> {
+        let archive = soapberry_zip::ZipArchive::from_slice(data)
+            .unwrap()
+            .into_zip_archive();
+        let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+        let index = soapberry_zip::PreservationIndex::new(&archive, &mut scratch).unwrap();
+        index
+            .entries()
+            .iter()
+            .map(|entry| {
+                let local = entry.local_span();
+                let central = entry.central_record();
+                (
+                    entry.raw_name_bytes().to_vec(),
+                    RawRecord {
+                        local: data[local.start as usize..local.end as usize].to_vec(),
+                        central: data[central.start as usize..central.end as usize].to_vec(),
+                    },
+                )
+            })
+            .collect()
+    }
+
+    fn central_without_local_offset(bytes: &[u8]) -> Vec<u8> {
+        let mut bytes = bytes.to_vec();
+        bytes[42..46].fill(0);
+        bytes
+    }
+
+    struct MutatingSink {
+        source: Arc<CountingSource>,
+        bytes: Vec<u8>,
+        change_after: usize,
+        changed: bool,
+    }
+
+    impl Write for MutatingSink {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            if !self.changed && self.bytes.len() >= self.change_after {
+                self.source.changed();
+                self.changed = true;
+            }
+            self.bytes.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct BoundedFailingSink {
+        accepted: usize,
+        limit: usize,
+        largest_write: usize,
+    }
+
+    impl Write for BoundedFailingSink {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.largest_write = self.largest_write.max(bytes.len());
+            let remaining = self.limit.saturating_sub(self.accepted);
+            if remaining == 0 {
+                return Err(std::io::Error::other("injected sink failure"));
+            }
+            let written = remaining.min(bytes.len());
+            self.accepted += written;
+            Ok(written)
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
     }
 
     #[test]
@@ -1187,5 +1734,192 @@ mod tests {
         assert_eq!(owned.part_count(), 2);
         assert_eq!(owned.non_part_members().len(), 1);
         assert_eq!(owned.main_document_part().unwrap().blob(), b"document");
+    }
+
+    #[test]
+    fn one_part_overlay_raw_copies_every_unselected_member_and_reopens() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
+        let source_raw = raw_records(&source_bytes);
+        let source = Arc::new(CountingSource::new(source_bytes));
+        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let mut output = Vec::new();
+        package
+            .write_part_overlay_to_stream(&mut output, &target, b"<after/>".to_vec())
+            .unwrap();
+
+        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        assert_eq!(reopened.get_part(&target).unwrap().blob(), b"<after/>");
+        assert_eq!(reopened.part_count(), 2);
+        assert_eq!(reopened.non_part_members().len(), 1);
+        assert_eq!(reopened.non_part_members()[0].name(), "scratch.bin");
+        let output_raw = raw_records(&output);
+        assert_eq!(output_raw.len(), source_raw.len());
+        for (name, source_record) in source_raw {
+            if name == b"word/document.xml" {
+                assert_ne!(output_raw[&name].local, source_record.local);
+            } else {
+                assert_eq!(output_raw[&name].local, source_record.local, "{name:?}");
+                assert_eq!(
+                    central_without_local_offset(&output_raw[&name].central),
+                    central_without_local_offset(&source_record.central),
+                    "{name:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn one_part_overlay_exact_noop_preserves_every_source_byte() {
+        let source_bytes = archive_bytes(root_relationships(), b"malformed but unchanged", true);
+        let source = Arc::new(CountingSource::new(source_bytes.clone()));
+        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let mut output = Vec::new();
+        package
+            .write_part_overlay_to_stream(&mut output, &target, b"malformed but unchanged".to_vec())
+            .unwrap();
+        assert_eq!(output, source_bytes);
+    }
+
+    #[test]
+    fn one_part_overlay_refuses_unsupported_physical_layout_before_output() {
+        let mut source_bytes = b"unsupported ZIP prelude".to_vec();
+        source_bytes.extend_from_slice(&archive_bytes(root_relationships(), b"<before/>", true));
+        let source = Arc::new(CountingSource::new(source_bytes));
+        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let mut output = Vec::new();
+        assert!(matches!(
+            package.write_part_overlay_to_stream(&mut output, &target, b"<after/>".to_vec()),
+            Err(OpcError::SourceBackedOverlayUnavailable { .. })
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn one_part_overlay_rejects_invalid_xml_and_signed_changes_before_output() {
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"<before/>",
+            false,
+        )));
+        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let mut output = Vec::new();
+        assert!(matches!(
+            package.write_part_overlay_to_stream(&mut output, &target, b"<broken".to_vec()),
+            Err(OpcError::XmlPublication { .. })
+        ));
+        assert!(output.is_empty());
+
+        let signed_bytes = signed_archive(b"<signed/>");
+        let signed = Arc::new(CountingSource::new(signed_bytes.clone()));
+        let package = SourceBackedPackage::from_read_at(signed).unwrap();
+        assert!(matches!(
+            package.write_part_overlay_to_stream(&mut output, &target, b"<changed/>".to_vec()),
+            Err(OpcError::SignedSourceRequiresExplicitPolicy)
+        ));
+        assert!(output.is_empty());
+
+        let signed = Arc::new(CountingSource::new(signed_bytes.clone()));
+        let package = SourceBackedPackage::from_read_at(signed).unwrap();
+        package
+            .write_part_overlay_to_stream(&mut output, &target, b"<signed/>".to_vec())
+            .unwrap();
+        assert_eq!(output, signed_bytes);
+    }
+
+    #[test]
+    fn one_part_overlay_enforces_replacement_limits_without_output() {
+        let limits = ReadLimits::builder()
+            .max_part_bytes(10)
+            .unwrap()
+            .max_total_part_bytes(19)
+            .unwrap()
+            .build()
+            .unwrap();
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"<before/>",
+            false,
+        )));
+        let package = SourceBackedPackage::from_read_at_with_limits(source, limits).unwrap();
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let mut output = Vec::new();
+        assert!(matches!(
+            package.write_part_overlay_to_stream(&mut output, &target, vec![b'x'; 11]),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::PartBytes,
+                actual: 11,
+                maximum: 10
+            })
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn one_part_overlay_reports_source_changes_before_and_during_output() {
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"<before/>",
+            true,
+        )));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        source.changed();
+        let mut output = Vec::new();
+        assert!(matches!(
+            package.write_part_overlay_to_stream(&mut output, &target, b"<after/>".to_vec()),
+            Err(OpcError::SourceChanged { .. })
+        ));
+        assert!(output.is_empty());
+
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"<before/>",
+            true,
+        )));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let mut sink = MutatingSink {
+            source,
+            bytes: Vec::new(),
+            change_after: 1,
+            changed: false,
+        };
+        let error = package
+            .write_part_overlay_to_stream(&mut sink, &target, b"<after/>".to_vec())
+            .unwrap_err();
+        match error {
+            OpcError::IncompleteOutput { written, source } => {
+                assert!(written > 0);
+                assert!(matches!(*source, OpcError::SourceChanged { .. }));
+            },
+            other => panic!("unexpected source-change error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn one_part_overlay_bounds_writes_and_reports_partial_sink_failure() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"<before/>",
+            true,
+        )));
+        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let mut sink = BoundedFailingSink {
+            accepted: 0,
+            limit: 100,
+            largest_write: 0,
+        };
+        let error = package
+            .write_part_overlay_to_stream(&mut sink, &target, b"<after/>".to_vec())
+            .unwrap_err();
+        match error {
+            OpcError::IncompleteOutput { written, .. } => assert_eq!(written, 100),
+            other => panic!("unexpected sink error: {other:?}"),
+        }
+        assert!(sink.largest_write <= SOURCE_PUBLICATION_CHUNK_BYTES);
     }
 }
