@@ -193,6 +193,15 @@ transport/producer smoke, and preserves exact no-op, opaque syntax, limits,
 patch/inverse and complete readback contracts. Formatting/media-heavy,
 malformed/security and broader real-producer edits remain open.
 
+Change 0041 removes three archive-sized copies from the existing ODT
+changed-operation compactness audit without adding a CRUD surface. The
+media-rich paragraph edit/save still parses both packages, audits compact XML,
+reopens the final document, reads back the paragraph and media, and verifies
+patch/inverse and stale-source behavior. Ordinary open/edit/no-op guards remain;
+the unchanged sub-microsecond exact no-op segment's +39 ns p50 movement is
+disclosed. Structural/resource-adding ODF edits, broader real producers and
+repeated ODT/ODP reads remain open.
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.

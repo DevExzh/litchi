@@ -1,0 +1,32 @@
+ODT compact-audit package sharing: Heaptrack summary
+
+Pinned command shape:
+  MALLOC_MMAP_THRESHOLD_=33554432 MALLOC_TRIM_THRESHOLD_=-1 \
+    taskset -c 11 heaptrack -o <state>.heaptrack <binary> \
+    --warmup 2 --samples 20 \
+    --case odt_media_paragraph_edit_save --json <state>.json
+
+Before executable:
+  calls to allocation functions: 276182
+  temporary memory allocations: 48790
+  peak heap memory consumption: 106.03M
+  peak RSS including Heaptrack overhead: 120.29M
+  total memory leaked: 1.78K
+
+After executable:
+  calls to allocation functions: 274620
+  temporary memory allocations: 48790
+  peak heap memory consumption: 106.03M
+  peak RSS including Heaptrack overhead: 120.71M
+  total memory leaked: 1.78K
+
+Delta:
+  allocation calls: -1562 (-0.5656%) across 22 complete iterations
+  temporary allocations: unchanged
+  peak heap: unchanged
+  Heaptrack RSS: +0.349% (flat)
+
+An earlier launcher-first attempt observed only /usr/bin/taskset and is not
+part of this evidence. The commands above pin Heaptrack around the benchmark
+binary directly. The allocator policy and CPU match the timing, counter and
+RSS runs described in the change record.

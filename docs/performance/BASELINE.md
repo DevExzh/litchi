@@ -362,6 +362,13 @@ incomplete program and CRUD matrix.
   moves +0.290 us/+6.41% p50 after parsing; the changed large LZFu open
   improves 19.39%. See
   [`0040`](changes/0040-rtf-byte-delimiter-scanning.md).
+- ODT changed-operation compactness audits now share the already validated
+  predecessor and candidate packages instead of allocating and copying three
+  complete archives. The fixed 16 MiB-media paragraph edit/save improves
+  30.44% p50, 31.36% mean and 32.41% p95; allocation calls fall 0.57% and peak
+  heap/RSS remain flat. A dedicated exact no-op segment, which returns before
+  the changed path, moves +39 ns p50 and is explicitly disclosed. See
+  [`0041`](changes/0041-odt-compact-audit-package-sharing.md).
 - Targeted OPC changed-Part publication now shares the Part's existing
   immutable payload with the ZIP regeneration layer. Heaptrack removes one
   4.19 MiB allocation and peak heap falls 3.42%. Few-large compressible save
