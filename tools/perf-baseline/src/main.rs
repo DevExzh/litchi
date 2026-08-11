@@ -54,6 +54,7 @@ const XLSX_CORPUS_GENERATOR: &str = "litchi-xlsx-synthetic-v1";
 const SEMANTIC_DOCX_CORPUS_GENERATOR: &str = "litchi-docx-semantic-v1";
 const SEMANTIC_PPTX_CORPUS_GENERATOR: &str = "litchi-pptx-semantic-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
+const ODT_MEDIA_CORPUS_GENERATOR: &str = "litchi-odt-media-paragraph-publication-v1";
 const SEMANTIC_ODS_CORPUS_GENERATOR: &str = "litchi-ods-semantic-v1";
 const ODS_MEDIA_CORPUS_GENERATOR: &str = "litchi-ods-media-publication-v1";
 const SEMANTIC_ODP_CORPUS_GENERATOR: &str = "litchi-odp-semantic-v1";
@@ -417,6 +418,7 @@ enum Case {
     OdtSemanticCreateSmall,
     OdtSemanticNoopEditSave,
     OdtSemanticOneEditSave,
+    OdtMediaParagraphEditSave,
     OdsSemanticOpen,
     OdsSemanticListSheets,
     OdsSemanticOneCell,
@@ -576,6 +578,7 @@ impl Case {
             Self::OdtSemanticCreateSmall => "odt_semantic_create_small",
             Self::OdtSemanticNoopEditSave => "odt_semantic_noop_edit_save",
             Self::OdtSemanticOneEditSave => "odt_semantic_one_edit_save",
+            Self::OdtMediaParagraphEditSave => "odt_media_paragraph_edit_save",
             Self::OdsSemanticOpen => "ods_semantic_open",
             Self::OdsSemanticListSheets => "ods_semantic_list_sheets",
             Self::OdsSemanticOneCell => "ods_semantic_one_cell",
@@ -754,6 +757,10 @@ impl Case {
                 | Self::OdtSemanticNoopEditSave
                 | Self::OdtSemanticOneEditSave
         )
+    }
+
+    const fn uses_odt_media(self) -> bool {
+        matches!(self, Self::OdtMediaParagraphEditSave)
     }
 
     const fn uses_semantic_ods(self) -> bool {
@@ -1625,6 +1632,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_docx()
                     && !case.uses_semantic_pptx()
                     && !case.uses_semantic_odt()
+                    && !case.uses_odt_media()
                     && !case.uses_semantic_ods()
                     && !case.uses_ods_media()
                     && !case.uses_semantic_odp()
@@ -1834,6 +1842,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                     options.range_simulation,
                 )?);
             }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_odt_media()) {
+        let corpus = build_odt_media_corpus()?;
+        for case in options.cases.iter().filter(|case| case.uses_odt_media()) {
+            results.push(run_case_with_config(
+                *case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
         }
     }
 
@@ -2197,6 +2218,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_semantic_create_small" => Some(Case::OdtSemanticCreateSmall),
         "odt_semantic_noop_edit_save" => Some(Case::OdtSemanticNoopEditSave),
         "odt_semantic_one_edit_save" => Some(Case::OdtSemanticOneEditSave),
+        "odt_media_paragraph_edit_save" => Some(Case::OdtMediaParagraphEditSave),
         "ods_semantic_open" => Some(Case::OdsSemanticOpen),
         "ods_semantic_list_sheets" => Some(Case::OdsSemanticListSheets),
         "ods_semantic_one_cell" => Some(Case::OdsSemanticOneCell),
@@ -2329,7 +2351,8 @@ fn print_usage() {
                                        odt_semantic_open,odt_semantic_list_paragraphs,\n\
                                        odt_semantic_one_paragraph,odt_semantic_full_text,\n\
                                        odt_semantic_create_small,odt_semantic_noop_edit_save,\n\
-                                       odt_semantic_one_edit_save,ods_semantic_open,\n\
+                                       odt_semantic_one_edit_save,odt_media_paragraph_edit_save,\n\
+                                       ods_semantic_open,\n\
                                        ods_semantic_list_sheets,ods_semantic_one_cell,\n\
                                        ods_semantic_cell_sweep,\n\
                                        ods_semantic_full_cell_text,ods_semantic_create_small,\n\
@@ -3005,6 +3028,44 @@ fn semantic_odt_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(builder.build()?)
 }
 
+fn odt_media_path(index: usize) -> String {
+    format!("Pictures/litchi-perf-odt-media-{index:02}.bin")
+}
+
+fn odt_media_payload(index: usize) -> Vec<u8> {
+    payload_bytes(
+        PayloadKind::Incompressible,
+        30_000 + index,
+        ODS_MEDIA_ENTRY_BYTES,
+    )
+}
+
+fn odt_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut document = litchi_odt::mutable::MutableDocument::new();
+    for index in 0..SemanticShape::Medium.docx_paragraphs() {
+        document.add_paragraph(&semantic_odt_text(index, false))?;
+    }
+    let base = document.to_bytes()?;
+    let source = ArchiveReader::new(&base)?;
+    let mut writer = litchi_odt::core::PackageWriter::new();
+    writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
+    for path in source.file_names() {
+        if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
+            continue;
+        }
+        writer.add_file(path, &source.read(path)?)?;
+    }
+    writer.add_manifest_directory("Pictures/", "")?;
+    for index in 0..ODS_MEDIA_ENTRY_COUNT {
+        writer.add_file_with_media_type(
+            &odt_media_path(index),
+            &odt_media_payload(index),
+            "application/octet-stream",
+        )?;
+    }
+    Ok(writer.finish_to_bytes()?)
+}
+
 fn semantic_ods_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut builder = litchi_ods::Builder::new();
     for sheet_index in 0..shape.ods_sheet_count() {
@@ -3161,6 +3222,53 @@ fn build_semantic_odt_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
         },
         archive,
         target_name: "paragraph:0".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn build_odt_media_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let shape = SemanticShape::Medium;
+    let archive = odt_media_archive()?;
+    verify_odt_media_archive(&archive, false)?;
+    let target = shape.docx_paragraphs() / 2;
+    let target_payload = semantic_odt_text(target, false).into_bytes();
+    let paragraph_bytes = (0..shape.docx_paragraphs()).try_fold(0usize, |total, index| {
+        total
+            .checked_add(semantic_odt_text(index, false).len())
+            .ok_or("media-rich ODT text byte count overflows usize")
+    })?;
+    let media_bytes = ODS_MEDIA_ENTRY_COUNT
+        .checked_mul(ODS_MEDIA_ENTRY_BYTES)
+        .ok_or("media-rich ODT payload byte count overflows usize")?;
+    let entry_count = shape
+        .docx_paragraphs()
+        .checked_add(ODS_MEDIA_ENTRY_COUNT)
+        .ok_or("media-rich ODT logical entry count overflows usize")?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: "odt-media-paragraph-publication".to_owned(),
+            generator: ODT_MEDIA_CORPUS_GENERATOR,
+            package_format: "ODT/ODF/ZIP",
+            shape: "media-rich",
+            payload_kind: "deterministic-incompressible-media",
+            compression: "deflate",
+            entry_count,
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: ODS_MEDIA_ENTRY_BYTES,
+            uncompressed_payload_bytes: paragraph_bytes
+                .checked_add(media_bytes)
+                .ok_or("media-rich ODT aggregate byte count overflows usize")?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: format!("paragraph:{target}"),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: format!("paragraph:{target}"),
         target_payload,
         xlsx: None,
     })
@@ -3855,6 +3963,9 @@ fn run_case_with_config(
         | Case::OdtSemanticOneEditSave => {
             run_semantic_odt(case, corpus, warmup_iterations, samples)
         },
+        Case::OdtMediaParagraphEditSave => {
+            run_odt_media_paragraph_edit_save(corpus, warmup_iterations, samples)
+        },
         Case::OdsSemanticOpen
         | Case::OdsSemanticListSheets
         | Case::OdsSemanticOneCell
@@ -4228,6 +4339,24 @@ fn verify_semantic_odt(
         .join("\n");
     if document.text()? != expected {
         return Err("semantic ODT full text differs from paragraph scan".into());
+    }
+    Ok(())
+}
+
+fn verify_odt_media_archive(bytes: &[u8], updated: bool) -> Result<(), Box<dyn Error>> {
+    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    verify_semantic_odt(&document, SemanticShape::Medium, updated)?;
+
+    let package = litchi_odf_common::core::OwnedPackage::from_bytes(bytes.to_vec())?;
+    let package = package.package()?;
+    for index in 0..ODS_MEDIA_ENTRY_COUNT {
+        let path = odt_media_path(index);
+        if package.manifest().get_media_type(&path) != Some("application/octet-stream") {
+            return Err(format!("media-rich ODT manifest entry differs for '{path}'").into());
+        }
+        if package.get_file(&path)? != odt_media_payload(index) {
+            return Err(format!("media-rich ODT payload differs for '{path}'").into());
+        }
     }
     Ok(())
 }
@@ -5595,6 +5724,57 @@ fn run_semantic_odt(
         }
     }
     Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_odt_media_paragraph_edit_save(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let target = SemanticShape::Medium.docx_paragraphs() / 2;
+    let mut expected_output_digest = None;
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let started = Instant::now();
+        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let mut edit = source.edit();
+        edit.replace_paragraph(Position::new(target), semantic_odt_text(target, true))?;
+        let commit = edit.commit()?;
+        let bytes = commit.snapshot().as_bytes().to_vec();
+        let duration = started.elapsed();
+        if bytes == corpus.archive {
+            return Err("media-rich ODT paragraph edit reported an exact no-op".into());
+        }
+
+        verify_odt_media_archive(&bytes, true)?;
+        let replayed = commit.patch().apply(&source)?;
+        if replayed.as_bytes() != bytes {
+            return Err("media-rich ODT paragraph patch replay differs from commit".into());
+        }
+        let restored = commit.patch().inverse().apply(&replayed)?;
+        if restored.as_bytes() != corpus.archive {
+            return Err("media-rich ODT paragraph inverse did not restore the source".into());
+        }
+        if commit.patch().apply(&replayed).is_ok() {
+            return Err("media-rich ODT paragraph patch accepted a stale source".into());
+        }
+        let digest = sha256_hex(&bytes);
+        if let Some(expected) = &expected_output_digest {
+            if expected != &digest {
+                return Err("media-rich ODT paragraph publication is not deterministic".into());
+            }
+        } else {
+            expected_output_digest = Some(digest);
+        }
+        std::hint::black_box(bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    Ok(result(
+        Case::OdtMediaParagraphEditSave,
+        corpus,
+        elapsed,
+        None,
+    ))
 }
 
 fn run_semantic_ods(
@@ -7988,7 +8168,7 @@ mod tests {
         Case, CorpusShape, CountingSink, InstrumentedSource, PayloadKind, RangeSimulationConfig,
         RequestSizeBuckets, RtfSemanticVariant, SemanticShape, SimulatedRangeSource,
         SourceBackedPackage, WriterShape, XlsxShape, build_cfb_corpus, build_odp_media_corpus,
-        build_ods_media_corpus, build_ole_common_corpus, build_opc_corpus,
+        build_ods_media_corpus, build_odt_media_corpus, build_ole_common_corpus, build_opc_corpus,
         build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
         build_semantic_odt_corpus, build_semantic_pptx_corpus, build_semantic_rtf_corpus,
         build_writer_corpus, build_xlsx_corpus, ole_common_changed_output, payload_bytes,
@@ -8289,6 +8469,51 @@ mod tests {
     }
 
     #[test]
+    fn media_rich_odt_corpus_is_deterministic_and_preserved_by_paragraph_edit() {
+        let first = build_odt_media_corpus().unwrap();
+        let second = build_odt_media_corpus().unwrap();
+
+        assert_eq!(first.archive, second.archive);
+        assert_eq!(
+            first.manifest.generator,
+            "litchi-odt-media-paragraph-publication-v1"
+        );
+        assert_eq!(first.manifest.shape, "media-rich");
+        assert_eq!(first.manifest.entry_count, 208);
+        assert_eq!(first.manifest.entry_bytes, 2 * 1024 * 1024);
+        let result = run_case(Case::OdtMediaParagraphEditSave, &first, 0, 1).unwrap();
+        assert_eq!(result.case, "odt_media_paragraph_edit_save");
+        assert_eq!(result.elapsed_ns.samples.len(), 1);
+
+        let source = litchi_odt::transaction::Snapshot::from_bytes(first.archive.clone()).unwrap();
+        let target = SemanticShape::Medium.docx_paragraphs() / 2;
+        let mut edit = source.edit();
+        edit.replace_paragraph(
+            litchi_odt::transaction::Position::new(target),
+            super::semantic_odt_text(target, true),
+        )
+        .unwrap();
+        let commit = edit.commit().unwrap();
+        let identical = litchi_odf_common::package::raw_identical_members(
+            &first.archive,
+            commit.snapshot().as_bytes(),
+        )
+        .unwrap();
+        assert!(!identical.contains("content.xml"));
+        for path in [
+            "mimetype",
+            "styles.xml",
+            "meta.xml",
+            "META-INF/manifest.xml",
+        ] {
+            assert!(identical.contains(path), "{path}");
+        }
+        for index in 0..super::ODS_MEDIA_ENTRY_COUNT {
+            assert!(identical.contains(&super::odt_media_path(index)));
+        }
+    }
+
+    #[test]
     fn media_rich_odp_corpus_is_deterministic_and_preserved_by_text_box_edit() {
         let first = build_odp_media_corpus().unwrap();
         let second = build_odp_media_corpus().unwrap();
@@ -8304,8 +8529,8 @@ mod tests {
         assert_eq!(result.case, "odp_media_textbox_edit_save");
         assert_eq!(result.elapsed_ns.samples.len(), 1);
 
-        let source = litchi_odp::authoring::edit::Snapshot::from_bytes(first.archive.clone())
-            .unwrap();
+        let source =
+            litchi_odp::authoring::edit::Snapshot::from_bytes(first.archive.clone()).unwrap();
         let mut transaction = source.transaction().unwrap();
         transaction
             .add_text_box(
