@@ -17,8 +17,8 @@ harness contains **120 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
-one opt-in source-backed DOCX semantic publication case, one opt-in eager
-media-rich PPTX source-edit control, one opt-in media-rich ODT
+one opt-in source-backed DOCX semantic publication case, one opt-in
+source-backed media-rich PPTX semantic publication case, one opt-in media-rich ODT
 paragraph-publication case, 16 opt-in DOCX/PPTX
 semantic cases, seven opt-in RTF semantic case names across four
 capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 24 opt-in
@@ -31,6 +31,7 @@ is still not broad program or CRUD coverage.
 | Targeted OPC raw publication | Four-cell ABBA p50 geomean **-84.98%**; few-large/incompressible **-71.70%**; matched cycles **-69.21%** | Initial peak heap **+37.18%**, one-shot RSS **+22.26%** from retained source/provenance and a changed-payload copy; the copy is removed by the shared-payload follow-up below |
 | Positional CFB/ZIP and explicit execution | Large-task p50 scaling at 12 CPUs: OPC **4.52x**, CFB **5.93x**; no hidden global Rayon | Many-small tasks regress at high worker counts; default/legacy paths remain serial |
 | Source-backed OPC and DOCX/XLSX/PPTX facades | EOCD structural-open source bytes **-73.6% to -98.5%**; ordinary payload overlap zero | No latency claim: later EntryId/cache-diagnostic changes confound comparison and some cells exceed 5% variance |
+| Source-backed PPTX selected-slide publication | Media-rich one-edit/save p50 **-97.12%** (34.71x); instructions **-67.91%**; materializations **229 -> 2**; byte-identical output | One shape-text edit in one existing slide only; MCE rewrites, multi-operation edits, topology changes and changed signed packages refuse before output |
 | Deterministic range simulation | XLSX listing has zero timed requests; selected reads have zero unselected-sheet overlap; full physical size distributions recorded | Synthetic latency model, not a cold filesystem or ambient network |
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |
 | Coalesced DOCX paragraph edits | Large 100-edit/save p50 **-94.99% (19.97x)** and mean **-95.02%**; medium two-edit/save p50 **-12.98%**; scalar one-edit guardrail neutral | Direct-body, strictly ordered paragraph text replacement; generated corpus; scalar API remains separate |
@@ -260,6 +261,15 @@ refinements, Heaptrack, `perf record`, and GNU Time summaries. The raw JSON
 digests and full rejection rationale are in
 [`change 0043`](changes/0043-rtf-decoded-body-ownership-rejected.md).
 
+The source-backed PPTX selected-slide publication evidence is
+[`before A`](results/abba-pptx-source-edit-before-a.json),
+[`after A`](results/abba-pptx-source-edit-after-a.json),
+[`after B`](results/abba-pptx-source-edit-after-b.json), and
+[`before B`](results/abba-pptx-source-edit-before-b.json). The eager semantic
+guard, CPU/allocation/RSS attribution, exact preservation/refusal matrix and
+frozen binary hashes are summarized in
+[`change 0044`](changes/0044-pptx-source-backed-semantic-publication.md).
+
 The ODT compact-audit package-sharing evidence is
 [`before A`](results/abba-odt-compact-audit-final-before-a.json),
 [`after A`](results/abba-odt-compact-audit-final-after-a.json),
@@ -437,6 +447,7 @@ The underlying records are:
 - [`0041-odt-compact-audit-package-sharing.md`](changes/0041-odt-compact-audit-package-sharing.md)
 - [`0042-odt-envelope-package-sharing.md`](changes/0042-odt-envelope-package-sharing.md)
 - [`0043-rtf-decoded-body-ownership-rejected.md`](changes/0043-rtf-decoded-body-ownership-rejected.md)
+- [`0044-pptx-source-backed-semantic-publication.md`](changes/0044-pptx-source-backed-semantic-publication.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on

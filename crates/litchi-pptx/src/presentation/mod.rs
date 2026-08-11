@@ -1,7 +1,7 @@
 //! Borrowed semantic view of one `PresentationML` package graph.
 //!
-//! The typed facade delegates XML scanning to [`codec`] and package
-//! relationship traversal to [`package`]. Embedded resources and media
+//! The typed facade delegates XML scanning to `codec` and package
+//! relationship traversal to `package`. Embedded resources and media
 //! authoring remain available through their existing child modules.
 
 mod codec;
@@ -16,4 +16,7 @@ pub mod embedded;
 pub mod media;
 
 pub use model::Presentation;
-pub use source::{SourceBackedPresentation, SourceSlide};
+pub use source::{
+    SourceBackedPresentation, SourceBackedPresentationEditor, SourceBackedSlideCommit,
+    SourceBackedSlideEdit, SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceSlide,
+};

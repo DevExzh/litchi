@@ -215,7 +215,7 @@ impl PlaceholderSpec {
     }
 }
 
-/// Identity of a slide master created by [`add_slide_master`].
+/// Identity of a slide master created by [`crate::Package::add_slide_master`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthoredSlideMaster {
     /// The `p:sldMasterId/@id` value (always ≥ [`MIN_MASTER_OR_LAYOUT_ID`]).
@@ -226,7 +226,7 @@ pub struct AuthoredSlideMaster {
     pub part_name: PackURI,
 }
 
-/// Identity of a slide layout created by [`add_slide_layout`].
+/// Identity of a slide layout created by [`crate::Package::add_slide_layout`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthoredSlideLayout {
     /// The `p:sldLayoutId/@id` value (always ≥ [`MIN_MASTER_OR_LAYOUT_ID`]).

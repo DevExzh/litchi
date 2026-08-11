@@ -21,3 +21,4 @@ pub use transaction::{Commit, Transaction};
 
 pub(crate) use model::capture;
 pub(crate) use patch::apply;
+pub(crate) use xml::rewrite_shape_text;

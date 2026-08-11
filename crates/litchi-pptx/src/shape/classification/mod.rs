@@ -11,9 +11,9 @@
 //!
 //! The owner is deliberately below [`crate::shape`]. A classification is a
 //! property of one selected shape, not a slide-wide setting. Package graph
-//! traversal and atomic publication live in [`package`], XML ranges live in
-//! [`codec`], bounded value checks live in [`validation`], and staged edits
-//! live in [`transaction`].
+//! traversal and atomic publication live in `package`, XML ranges live in
+//! `codec`, bounded value checks live in `validation`, and staged edits live
+//! in `transaction`.
 
 mod codec;
 mod model;

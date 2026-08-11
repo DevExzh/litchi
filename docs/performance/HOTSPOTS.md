@@ -3,7 +3,7 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0039`](changes/0039-docx-source-backed-semantic-publication.md)
+[`change 0044`](changes/0044-pptx-source-backed-semantic-publication.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -60,7 +60,10 @@ Current work shape:
   changes and unsupported layouts return typed zero-output refusals. DOCX now
   exposes a guarded exact-source main-document transaction over that publisher:
   raw-MCE identity and main-Part-only operations are required, transfers are
-  refused, and PPTX/XLSX facade integration remains absent.
+  refused. PPTX now exposes the analogous guarded exact-source selected-slide
+  transaction: its raw package/presentation/slide relationship closure is
+  bound into the snapshot, MCE-rewritten slides and more than one shape edit
+  are refused, and XLSX facade integration remains absent.
 - `PackageWriter` previously reconstructed generated XML and Part order during
   emission. The measured `PublicationPlan` change now constructs, audits, and
   reuses that state once. It reduced allocation calls by 37.0% in the profiled
@@ -80,7 +83,11 @@ Current work shape:
   The DOCX facade integration then removes eager ownership and recompression of
   16 unselected Parts in the media-rich one-edit/save case: p50 falls 97.43%,
   instructions 74.91%, and semantic materializations 17 -> 1 while the eager
-  DOCX guard remains neutral; see change 0039.
+  DOCX guard remains neutral; see change 0039. The PPTX facade integration
+  removes eager ownership and recompression of 227 unselected Parts in the
+  fixed media-rich one-slide edit/save case: p50 falls 97.12%, instructions
+  67.91%, and semantic materializations 229 -> 2 with byte-identical output;
+  see change 0044.
 
 ## XLSX selective read and edit path
 
@@ -159,6 +166,17 @@ now reuse the selected scene when mapping its raw span, removing one redundant
 scene parse per change. The 100-edit cell improves 9.37% p50/mean and allocation
 calls fall 11.67%; the single-edit end-to-end guardrail remains neutral because
 complete capture/commit work dominates.
+
+The additive source-backed PPTX editor instead snapshots one selected slide
+and its exact package/presentation/slide relationship closure. It applies one
+shape-text replacement to freshly version-checked raw slide XML and consumes
+the commit into the source-backed one-Part publisher. The other 199 slides,
+all eight 2 MiB media Parts, and every other unselected physical member remain
+on the raw-copy path. MCE preprocessing that changes raw slide bytes,
+multi-operation edits, stale or foreign patches, topology changes, and changed
+signed sources are refused before publication. On the fixed media-rich case,
+p50 improves 97.12% and materializations fall 229 -> 2; the existing eager
+medium one-edit path remains neutral.
 
 These paths have strong preservation and atomicity tests plus generated-text
 timing/allocation evidence. Real-producer, media/dependency, malformed,
@@ -472,7 +490,7 @@ The order below is provisional until baseline measurements are recorded.
 | Rank | Candidate | Expected CRUD reach | Risk | ADR fit |
 |---:|---|---|---|---|
 | 1 | Extend source-backed OPC from selective reads and the narrow consuming publisher to broad query/edit/patch coverage. | All OOXML selective read/query/edit paths; offsets eager full-package work. | High | Positional source/descriptors and one low-level one-Part publication path are implemented; cache Budget charging and semantic CRUD coverage remain. |
-| 2 | Integrate the accepted source-backed one-Part publisher into bounded DOCX/PPTX/XLSX transactions and real media/signature/topology matrices. | Targeted OOXML save, especially media-heavy packages; avoids eager all-Part inflate/recompression where the same-topology proof applies. | High | DOCX is accepted in change 0039. A fixed 200-slide/eight-media eager PPTX control now establishes the next identical workload; its owning one-slide editor, publisher, signature/MCE refusal gates and matched evidence remain. XLSX still requires a wider semantic closure. |
+| 2 | Integrate the accepted source-backed one-Part publisher into bounded DOCX/PPTX/XLSX transactions and real media/signature/topology matrices. | Targeted OOXML save, especially media-heavy packages; avoids eager all-Part inflate/recompression where the same-topology proof applies. | High | DOCX is accepted in change 0039 and guarded one-slide PPTX publication in change 0044. XLSX still requires a wider semantic closure; both accepted facades still need real-producer and broader topology/signature policy matrices. |
 | 3 | Tune explicit bounded-session thresholds and complete remaining I/O budget policy. | Large multi-Part open/save/validation. | Medium-high | 1/2/4/8/12 evidence exists; large tasks scale, small tasks regress; no hidden Rayon path remains. |
 | 4 | Build one validated OPC publication plan and reuse its generated XML and Part order during emission. | Every rewritten OPC save. | Low-medium | Implemented; see `changes/0001-opc-publication-plan.md`. |
 | 5 | Exact owned-source OPC no-op publication. | Owned DOCX/PPTX/XLSX open/read/no-op save. | Medium | Implemented; same-topology mutations now use targeted preservation. See changes 0004 and 0008. |

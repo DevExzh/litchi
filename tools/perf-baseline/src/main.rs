@@ -8114,23 +8114,26 @@ fn publish_pptx_source_edit<W: Write>(
     source: Arc<dyn ReadAt>,
     writer: &mut W,
 ) -> Result<usize, Box<dyn Error>> {
-    let source_package = SourceBackedPackage::from_read_at(source)?;
-    let materializations = source_package.iter_parts().count();
-    let opc = source_package.into_opc_package()?;
-    let mut package = litchi_pptx::Package::from_opc_package(opc)?;
+    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(source)?;
     let target_slide = PPTX_SOURCE_SLIDE_COUNT / 2;
-    let mut edit = package.opened_presentation_transaction()?;
-    if !edit.set_shape_text(target_slide, 0, semantic_pptx_text(target_slide, 0, true))? {
+    let mut edit = editor.edit_slide(target_slide)?;
+    if !edit.set_shape_text(0, semantic_pptx_text(target_slide, 0, true))? {
         return Err("PPTX source edit unexpectedly reported no change".into());
     }
-    let commit = edit.commit()?;
+    let commit = edit.commit();
     if !commit.is_changed() {
         return Err("PPTX source edit produced an unchanged commit".into());
     }
-    package.apply_opened_presentation_commit(commit)?;
-    let bytes = package.to_bytes()?;
-    for chunk in bytes.chunks(64 * 1024) {
-        writer.write_all(chunk)?;
+    let replayed = commit.patch().apply(commit.patch().source())?;
+    if commit.patch().inverse().apply(&replayed).is_err() {
+        return Err("PPTX source edit inverse rejected its candidate".into());
+    }
+    let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
+    let published = editor.publish_slide_commit_to_stream(writer, &commit)?;
+    if commit.patch().inverse().apply(&published).is_err()
+        || commit.patch().apply(&published).is_ok()
+    {
+        return Err("PPTX source edit published a different slide snapshot".into());
     }
     Ok(materializations)
 }
@@ -8149,8 +8152,10 @@ fn run_pptx_source_backed_one_edit_save(
     let expected_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
     let mut expected = Vec::new();
     let expected_materializations = publish_pptx_source_edit(expected_source, &mut expected)?;
-    if expected == corpus.archive || expected_materializations != corpus.manifest.entry_count {
-        return Err("PPTX source edit did not eagerly materialize every ordinary Part".into());
+    if expected == corpus.archive || expected_materializations != 2 {
+        return Err(
+            "PPTX source edit did not materialize exactly its root and selected slide".into(),
+        );
     }
     verify_pptx_source_edit_output(corpus, &expected)?;
     let expected_digest = sha256_hex(&expected);
@@ -9266,10 +9271,7 @@ mod tests {
         assert!(sink.largest_write <= 64 * 1024);
         let source = measured.source.unwrap();
         assert_eq!(source.read_calls.len(), 1);
-        assert_eq!(
-            source.ordinary_payload_materializations,
-            Some(vec![u64::try_from(corpus.manifest.entry_count).unwrap()])
-        );
+        assert_eq!(source.ordinary_payload_materializations, Some(vec![2]));
     }
 
     #[test]

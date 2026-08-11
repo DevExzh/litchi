@@ -233,6 +233,10 @@ pub enum Error {
         reason: &'static str,
     },
 
+    /// A source-backed slide patch was created against different exact slide bytes.
+    #[error("source-backed PPTX slide patch source is stale")]
+    StaleSource,
+
     /// Managed package encryption or decryption failed.
     #[cfg(feature = "encryption")]
     #[error("PPTX package encryption error: {0}")]

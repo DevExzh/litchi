@@ -1,7 +1,7 @@
 //! Layered, inert `PowerPoint` laser-trace support.
 //!
-//! The semantic point/trace values live in [`model`], XML scanning and
-//! serialization live in [`codec`], and OPC slide mutation lives in [`package`].
+//! The semantic point/trace values live in `model`, XML scanning and
+//! serialization live in `codec`, and OPC slide mutation lives in `package`.
 //! No layer replays or interprets slide-show input.
 
 mod codec;
