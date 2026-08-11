@@ -34,6 +34,189 @@ impl UuidSnapshot {
     }
 }
 
+/// Presence-preserving canonical `TSP.CFUUIDArchive` identity.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct CfuuidSnapshot<'source> {
+    uuid_bytes: Option<&'source [u8]>,
+    words: [Option<u32>; 4],
+}
+impl<'source> CfuuidSnapshot<'source> {
+    #[must_use]
+    pub const fn uuid_bytes(self) -> Option<&'source [u8]> {
+        self.uuid_bytes
+    }
+    #[must_use]
+    pub const fn words(self) -> [Option<u32>; 4] {
+        self.words
+    }
+}
+
+/// Exact optional forms of a native cell coordinate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CellCoordinateSnapshot {
+    packed_data: Option<u32>,
+    column: Option<u32>,
+    row: Option<u32>,
+}
+impl CellCoordinateSnapshot {
+    #[must_use]
+    pub const fn packed_data(self) -> Option<u32> {
+        self.packed_data
+    }
+    #[must_use]
+    pub const fn column(self) -> Option<u32> {
+        self.column
+    }
+    #[must_use]
+    pub const fn row(self) -> Option<u32> {
+        self.row
+    }
+}
+
+/// Presence-preserving rectangle size; absent dimensions have native default 1.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ColumnRowSizeSnapshot {
+    num_columns: Option<u32>,
+    num_rows: Option<u32>,
+}
+impl ColumnRowSizeSnapshot {
+    #[must_use]
+    pub const fn num_columns(self) -> Option<u32> {
+        self.num_columns
+    }
+    #[must_use]
+    pub const fn num_rows(self) -> Option<u32> {
+        self.num_rows
+    }
+}
+
+/// Typed tiled-range rectangle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CellRectSnapshot {
+    origin: CellCoordinateSnapshot,
+    size: ColumnRowSizeSnapshot,
+}
+impl CellRectSnapshot {
+    #[must_use]
+    pub const fn origin(self) -> CellCoordinateSnapshot {
+        self.origin
+    }
+    #[must_use]
+    pub const fn size(self) -> ColumnRowSizeSnapshot {
+        self.size
+    }
+}
+
+/// Exact inclusive coordinate rectangle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RangeCoordinateSnapshot {
+    top_left_column: u32,
+    top_left_row: u32,
+    bottom_right_column: u32,
+    bottom_right_row: u32,
+}
+impl RangeCoordinateSnapshot {
+    #[must_use]
+    pub const fn top_left_column(self) -> u32 {
+        self.top_left_column
+    }
+    #[must_use]
+    pub const fn top_left_row(self) -> u32 {
+        self.top_left_row
+    }
+    #[must_use]
+    pub const fn bottom_right_column(self) -> u32 {
+        self.bottom_right_column
+    }
+    #[must_use]
+    pub const fn bottom_right_row(self) -> u32 {
+        self.bottom_right_row
+    }
+}
+
+/// Table-identified range dependency.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct RangeReferenceSnapshot<'source> {
+    table_id: CfuuidSnapshot<'source>,
+    range: RangeCoordinateSnapshot,
+}
+impl<'source> RangeReferenceSnapshot<'source> {
+    #[must_use]
+    pub const fn table_id(self) -> CfuuidSnapshot<'source> {
+        self.table_id
+    }
+    #[must_use]
+    pub const fn range(self) -> RangeCoordinateSnapshot {
+        self.range
+    }
+}
+
+/// Internal-owner range dependency.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InternalRangeReferenceSnapshot {
+    owner_id: u32,
+    range: RangeCoordinateSnapshot,
+}
+impl InternalRangeReferenceSnapshot {
+    #[must_use]
+    pub const fn owner_id(self) -> u32 {
+        self.owner_id
+    }
+    #[must_use]
+    pub const fn range(self) -> RangeCoordinateSnapshot {
+        self.range
+    }
+}
+
+/// One source-ordered scalar from the five parallel expanded-edge arrays.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExpandedEdgeComponent {
+    kind: ExpandedEdgeKind,
+    index: usize,
+    value: u32,
+}
+impl ExpandedEdgeComponent {
+    #[must_use]
+    pub const fn kind(self) -> ExpandedEdgeKind {
+        self.kind
+    }
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self.index
+    }
+    #[must_use]
+    pub const fn value(self) -> u32 {
+        self.value
+    }
+}
+
+/// Canonical expanded-edge array identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExpandedEdgeKind {
+    LocalRow,
+    LocalColumn,
+    ExternalRow,
+    ExternalColumn,
+    InternalOwner,
+}
+
+/// Validated cardinalities of the parallel expanded-edge arrays.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExpandedEdgesSnapshot {
+    local: usize,
+    external: usize,
+}
+impl ExpandedEdgesSnapshot {
+    #[must_use]
+    pub const fn local(self) -> usize {
+        self.local
+    }
+    #[must_use]
+    pub const fn external(self) -> usize {
+        self.external
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct CalculationEngineSnapshot<'source> {
     base_date_1904: Option<bool>,
@@ -141,6 +324,7 @@ pub struct CellRecordSnapshot<'source> {
     is_in_a_cycle: Option<bool>,
     has_calculated_precedents: Option<bool>,
     expanded_edges: Option<&'source [u8]>,
+    expanded_edges_snapshot: Option<ExpandedEdgesSnapshot>,
 }
 impl<'source> CellRecordSnapshot<'source> {
     #[must_use]
@@ -166,6 +350,10 @@ impl<'source> CellRecordSnapshot<'source> {
     #[must_use]
     pub const fn expanded_edges(self) -> Option<&'source [u8]> {
         self.expanded_edges
+    }
+    #[must_use]
+    pub const fn expanded_edges_snapshot(self) -> Option<ExpandedEdgesSnapshot> {
+        self.expanded_edges_snapshot
     }
 }
 
@@ -196,6 +384,8 @@ pub struct RangeBackDependencySnapshot<'source> {
     cell_coord_column: u32,
     range_reference: Option<&'source [u8]>,
     internal_range_reference: Option<&'source [u8]>,
+    decoded_range_reference: Option<RangeReferenceSnapshot<'source>>,
+    decoded_internal_range_reference: Option<InternalRangeReferenceSnapshot>,
 }
 impl<'source> RangeBackDependencySnapshot<'source> {
     #[must_use]
@@ -214,6 +404,14 @@ impl<'source> RangeBackDependencySnapshot<'source> {
     pub const fn internal_range_reference(self) -> Option<&'source [u8]> {
         self.internal_range_reference
     }
+    #[must_use]
+    pub const fn decoded_range_reference(self) -> Option<RangeReferenceSnapshot<'source>> {
+        self.decoded_range_reference
+    }
+    #[must_use]
+    pub const fn decoded_internal_range_reference(self) -> Option<InternalRangeReferenceSnapshot> {
+        self.decoded_internal_range_reference
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -231,6 +429,8 @@ impl RangePrecedentsTileSnapshot {
 pub struct FromToRangeSnapshot<'source> {
     from_coord: &'source [u8],
     refers_to_rect: &'source [u8],
+    decoded_from_coord: CellCoordinateSnapshot,
+    decoded_refers_to_rect: CellRectSnapshot,
 }
 impl<'source> FromToRangeSnapshot<'source> {
     #[must_use]
@@ -240,6 +440,14 @@ impl<'source> FromToRangeSnapshot<'source> {
     #[must_use]
     pub const fn refers_to_rect(self) -> &'source [u8] {
         self.refers_to_rect
+    }
+    #[must_use]
+    pub const fn decoded_from_coord(self) -> CellCoordinateSnapshot {
+        self.decoded_from_coord
+    }
+    #[must_use]
+    pub const fn decoded_refers_to_rect(self) -> CellRectSnapshot {
+        self.decoded_refers_to_rect
     }
 }
 
@@ -254,6 +462,8 @@ macro_rules! impl_redacted_debug {
 }
 
 impl_redacted_debug!(
+    CfuuidSnapshot,
+    RangeReferenceSnapshot,
     CalculationEngineSnapshot,
     DependencyTrackerSnapshot,
     FormulaOwnerDependenciesSnapshot,
@@ -297,6 +507,12 @@ pub trait DependencyVisitor {
         Ok(())
     }
     fn visit_from_to_range(&mut self, _record: FromToRangeSnapshot<'_>) -> Result<(), DecodeError> {
+        Ok(())
+    }
+    fn visit_expanded_edge_component(
+        &mut self,
+        _component: ExpandedEdgeComponent,
+    ) -> Result<(), DecodeError> {
         Ok(())
     }
 }
@@ -617,8 +833,16 @@ pub fn decode_cell_record_with_report(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<(CellRecordSnapshot<'_>, DecodeReport), DecodeError> {
+    decode_cell_record_with_visitor(source, options, &mut ())
+}
+
+pub fn decode_cell_record_with_visitor<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    visitor: &mut dyn DependencyVisitor,
+) -> Result<(CellRecordSnapshot<'source>, DecodeReport), DecodeError> {
     let mut budget = wire::Budget::new(source, options)?;
-    let snapshot = decode_cell_record_in(source, &mut budget, 1)?;
+    let snapshot = decode_cell_record_in(source, &mut budget, 1, visitor)?;
     Ok((snapshot, budget.report()))
 }
 
@@ -626,6 +850,7 @@ fn decode_cell_record_in<'source>(
     source: &'source [u8],
     budget: &mut wire::Budget,
     depth: u32,
+    visitor: &mut dyn DependencyVisitor,
 ) -> Result<CellRecordSnapshot<'source>, DecodeError> {
     budget.message(source, depth)?;
     let child_depth = depth.checked_add(1).ok_or_else(DecodeError::invalid)?;
@@ -635,6 +860,7 @@ fn decode_cell_record_in<'source>(
     let mut cycle = None;
     let mut calculated = None;
     let mut expanded_edges = None;
+    let mut expanded_edges_snapshot = None;
     let mut remaining = source;
     while let Some(field) = wire::next_field(&mut remaining, budget, depth)? {
         match field.number {
@@ -648,7 +874,8 @@ fn decode_cell_record_in<'source>(
                 if expanded_edges.is_some() {
                     return Err(DecodeError::invalid());
                 }
-                wire::scan_opaque_message(raw, budget, child_depth)?;
+                expanded_edges_snapshot =
+                    Some(decode_expanded_edges_in(raw, budget, child_depth, visitor)?);
                 expanded_edges = Some(raw);
             },
             _ => {},
@@ -661,6 +888,7 @@ fn decode_cell_record_in<'source>(
         is_in_a_cycle: cycle,
         has_calculated_precedents: calculated,
         expanded_edges,
+        expanded_edges_snapshot,
     };
     budget.message(source, depth)?;
     let view: projection::CellRecordArchiveLazyView<'_> = budget
@@ -727,11 +955,10 @@ fn decode_cell_record_tile_in(
                 wire::canonical_u32(field.varint()?)?,
             )?,
             3 => set_once(&mut tile_row_begin, wire::canonical_u32(field.varint()?)?)?,
-            4 => visitor.visit_cell_record(decode_cell_record_in(
-                field.bytes()?,
-                budget,
-                child_depth,
-            )?)?,
+            4 => {
+                let record = decode_cell_record_in(field.bytes()?, budget, child_depth, visitor)?;
+                visitor.visit_cell_record(record)?;
+            },
             _ => {},
         }
     }
@@ -782,6 +1009,8 @@ fn decode_range_back_dependency_in<'source>(
     let mut column = None;
     let mut range_reference = None;
     let mut internal_range_reference = None;
+    let mut decoded_range_reference = None;
+    let mut decoded_internal_range_reference = None;
     let mut remaining = source;
     while let Some(field) = wire::next_field(&mut remaining, budget, depth)? {
         match field.number {
@@ -792,7 +1021,8 @@ fn decode_range_back_dependency_in<'source>(
                 if range_reference.is_some() {
                     return Err(DecodeError::invalid());
                 }
-                wire::scan_opaque_message(raw, budget, child_depth)?;
+                decoded_range_reference =
+                    Some(decode_range_reference_in(raw, budget, child_depth)?);
                 range_reference = Some(raw);
             },
             4 => {
@@ -800,7 +1030,11 @@ fn decode_range_back_dependency_in<'source>(
                 if internal_range_reference.is_some() {
                     return Err(DecodeError::invalid());
                 }
-                wire::scan_opaque_message(raw, budget, child_depth)?;
+                decoded_internal_range_reference = Some(decode_internal_range_reference_in(
+                    raw,
+                    budget,
+                    child_depth,
+                )?);
                 internal_range_reference = Some(raw);
             },
             _ => {},
@@ -811,6 +1045,8 @@ fn decode_range_back_dependency_in<'source>(
         cell_coord_column: column.ok_or_else(DecodeError::invalid)?,
         range_reference,
         internal_range_reference,
+        decoded_range_reference,
+        decoded_internal_range_reference,
     };
     budget.message(source, depth)?;
     let view: projection::RangeBackDependencyArchiveLazyView<'_> = budget
@@ -913,6 +1149,8 @@ fn decode_from_to_range_in<'source>(
     let child_depth = depth.checked_add(1).ok_or_else(DecodeError::invalid)?;
     let mut from_coord = None;
     let mut refers_to_rect = None;
+    let mut decoded_from_coord = None;
+    let mut decoded_refers_to_rect = None;
     let mut remaining = source;
     while let Some(field) = wire::next_field(&mut remaining, budget, depth)? {
         match field.number {
@@ -921,7 +1159,7 @@ fn decode_from_to_range_in<'source>(
                 if from_coord.is_some() {
                     return Err(DecodeError::invalid());
                 }
-                wire::scan_opaque_message(raw, budget, child_depth)?;
+                decoded_from_coord = Some(decode_cell_coordinate_in(raw, budget, child_depth)?);
                 from_coord = Some(raw);
             },
             2 => {
@@ -929,7 +1167,7 @@ fn decode_from_to_range_in<'source>(
                 if refers_to_rect.is_some() {
                     return Err(DecodeError::invalid());
                 }
-                wire::scan_opaque_message(raw, budget, child_depth)?;
+                decoded_refers_to_rect = Some(decode_cell_rect_in(raw, budget, child_depth)?);
                 refers_to_rect = Some(raw);
             },
             _ => {},
@@ -938,6 +1176,8 @@ fn decode_from_to_range_in<'source>(
     let snapshot = FromToRangeSnapshot {
         from_coord: from_coord.ok_or_else(DecodeError::invalid)?,
         refers_to_rect: refers_to_rect.ok_or_else(DecodeError::invalid)?,
+        decoded_from_coord: decoded_from_coord.ok_or_else(DecodeError::invalid)?,
+        decoded_refers_to_rect: decoded_refers_to_rect.ok_or_else(DecodeError::invalid)?,
     };
     budget.message(source, depth)?;
     let view: projection::FromToRangeArchiveLazyView<'_> = budget
@@ -946,6 +1186,433 @@ fn decode_from_to_range_in<'source>(
         .decode_lazy_view(source)
         .map_err(|_error| DecodeError::invalid())?;
     if view.from_coord != snapshot.from_coord || view.refers_to_rect != snapshot.refers_to_rect {
+        return Err(DecodeError::invalid());
+    }
+    Ok(snapshot)
+}
+
+pub fn decode_expanded_edges(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<ExpandedEdgesSnapshot, DecodeError> {
+    Ok(decode_expanded_edges_with_report(source, options)?.0)
+}
+
+pub fn decode_expanded_edges_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(ExpandedEdgesSnapshot, DecodeReport), DecodeError> {
+    decode_expanded_edges_with_visitor(source, options, &mut ())
+}
+
+pub fn decode_expanded_edges_with_visitor(
+    source: &[u8],
+    options: DecodeOptions,
+    visitor: &mut dyn DependencyVisitor,
+) -> Result<(ExpandedEdgesSnapshot, DecodeReport), DecodeError> {
+    let mut budget = wire::Budget::new(source, options)?;
+    let snapshot = decode_expanded_edges_in(source, &mut budget, 1, visitor)?;
+    Ok((snapshot, budget.report()))
+}
+
+fn decode_expanded_edges_in(
+    source: &[u8],
+    budget: &mut wire::Budget,
+    depth: u32,
+    visitor: &mut dyn DependencyVisitor,
+) -> Result<ExpandedEdgesSnapshot, DecodeError> {
+    budget.message(source, depth)?;
+    let mut counts = [0usize; 5];
+    let mut remaining = source;
+    while let Some(field) = wire::next_field(&mut remaining, budget, depth)? {
+        if !(1..=5).contains(&field.number) {
+            continue;
+        }
+        let index = usize::try_from(field.number - 1).map_err(|_error| DecodeError::invalid())?;
+        let kind = match field.number {
+            1 => ExpandedEdgeKind::LocalRow,
+            2 => ExpandedEdgeKind::LocalColumn,
+            3 => ExpandedEdgeKind::ExternalRow,
+            4 => ExpandedEdgeKind::ExternalColumn,
+            5 => ExpandedEdgeKind::InternalOwner,
+            _ => return Err(DecodeError::invalid()),
+        };
+        if let Ok(value) = field.varint() {
+            visit_edge_component(kind, value, &mut counts[index], visitor)?;
+        } else {
+            let mut packed = field.bytes()?;
+            while !packed.is_empty() {
+                let value = wire::take_canonical_varint(&mut packed)?;
+                visit_edge_component(kind, value, &mut counts[index], visitor)?;
+            }
+        }
+    }
+    if counts[0] != counts[1] || counts[2] != counts[3] || counts[2] != counts[4] {
+        return Err(DecodeError::invalid());
+    }
+    let snapshot = ExpandedEdgesSnapshot {
+        local: counts[0],
+        external: counts[2],
+    };
+    budget.message(source, depth)?;
+    let _view: projection::ExpandedEdgesArchiveLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| DecodeError::invalid())?;
+    Ok(snapshot)
+}
+
+fn visit_edge_component(
+    kind: ExpandedEdgeKind,
+    value: u64,
+    count: &mut usize,
+    visitor: &mut dyn DependencyVisitor,
+) -> Result<(), DecodeError> {
+    let index = *count;
+    *count = count.checked_add(1).ok_or_else(DecodeError::invalid)?;
+    visitor.visit_expanded_edge_component(ExpandedEdgeComponent {
+        kind,
+        index,
+        value: wire::canonical_u32(value)?,
+    })
+}
+
+pub fn decode_cell_coordinate(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<CellCoordinateSnapshot, DecodeError> {
+    Ok(decode_cell_coordinate_with_report(source, options)?.0)
+}
+
+pub fn decode_cell_coordinate_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(CellCoordinateSnapshot, DecodeReport), DecodeError> {
+    let mut budget = wire::Budget::new(source, options)?;
+    let snapshot = decode_cell_coordinate_in(source, &mut budget, 1)?;
+    Ok((snapshot, budget.report()))
+}
+
+fn decode_cell_coordinate_in(
+    source: &[u8],
+    budget: &mut wire::Budget,
+    depth: u32,
+) -> Result<CellCoordinateSnapshot, DecodeError> {
+    budget.message(source, depth)?;
+    let mut packed_data = None;
+    let mut column = None;
+    let mut row = None;
+    let mut remaining = source;
+    while let Some(field) = wire::next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => set_once(&mut packed_data, field.fixed32()?)?,
+            2 => set_once(&mut column, wire::canonical_u32(field.varint()?)?)?,
+            3 => set_once(&mut row, wire::canonical_u32(field.varint()?)?)?,
+            _ => {},
+        }
+    }
+    let snapshot = CellCoordinateSnapshot {
+        packed_data,
+        column,
+        row,
+    };
+    budget.message(source, depth)?;
+    let view: projection::CellCoordinateArchiveLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| DecodeError::invalid())?;
+    if view.packed_data != snapshot.packed_data
+        || view.column != snapshot.column
+        || view.row != snapshot.row
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(snapshot)
+}
+
+fn decode_column_row_size_in(
+    source: &[u8],
+    budget: &mut wire::Budget,
+    depth: u32,
+) -> Result<ColumnRowSizeSnapshot, DecodeError> {
+    budget.message(source, depth)?;
+    let mut num_columns = None;
+    let mut num_rows = None;
+    let mut remaining = source;
+    while let Some(field) = wire::next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => set_once(&mut num_columns, wire::canonical_u32(field.varint()?)?)?,
+            2 => set_once(&mut num_rows, wire::canonical_u32(field.varint()?)?)?,
+            _ => {},
+        }
+    }
+    let snapshot = ColumnRowSizeSnapshot {
+        num_columns,
+        num_rows,
+    };
+    budget.message(source, depth)?;
+    let view: projection::ColumnRowSizeLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| DecodeError::invalid())?;
+    if view.num_columns != snapshot.num_columns || view.num_rows != snapshot.num_rows {
+        return Err(DecodeError::invalid());
+    }
+    Ok(snapshot)
+}
+
+fn decode_cell_rect_in(
+    source: &[u8],
+    budget: &mut wire::Budget,
+    depth: u32,
+) -> Result<CellRectSnapshot, DecodeError> {
+    budget.message(source, depth)?;
+    let child_depth = depth.checked_add(1).ok_or_else(DecodeError::invalid)?;
+    let mut origin_raw = None;
+    let mut size_raw = None;
+    let mut origin = None;
+    let mut size = None;
+    let mut remaining = source;
+    while let Some(field) = wire::next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut origin,
+                    decode_cell_coordinate_in(raw, budget, child_depth)?,
+                )?;
+                set_once(&mut origin_raw, raw)?;
+            },
+            2 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut size,
+                    decode_column_row_size_in(raw, budget, child_depth)?,
+                )?;
+                set_once(&mut size_raw, raw)?;
+            },
+            _ => {},
+        }
+    }
+    let snapshot = CellRectSnapshot {
+        origin: origin.ok_or_else(DecodeError::invalid)?,
+        size: size.ok_or_else(DecodeError::invalid)?,
+    };
+    budget.message(source, depth)?;
+    let view: projection::CellRectArchiveLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| DecodeError::invalid())?;
+    if view.origin != origin_raw.ok_or_else(DecodeError::invalid)?
+        || view.size != size_raw.ok_or_else(DecodeError::invalid)?
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(snapshot)
+}
+
+fn decode_cfuuid_in<'source>(
+    source: &'source [u8],
+    budget: &mut wire::Budget,
+    depth: u32,
+) -> Result<CfuuidSnapshot<'source>, DecodeError> {
+    budget.message(source, depth)?;
+    let mut uuid_bytes = None;
+    let mut words = [None; 4];
+    let mut remaining = source;
+    while let Some(field) = wire::next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => set_once(&mut uuid_bytes, field.bytes()?)?,
+            2..=5 => {
+                let index =
+                    usize::try_from(field.number - 2).map_err(|_error| DecodeError::invalid())?;
+                set_once(&mut words[index], wire::canonical_u32(field.varint()?)?)?;
+            },
+            _ => {},
+        }
+    }
+    let snapshot = CfuuidSnapshot { uuid_bytes, words };
+    budget.message(source, depth)?;
+    let view: projection::CFUUIDArchiveLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| DecodeError::invalid())?;
+    if view.uuid_bytes != snapshot.uuid_bytes
+        || view.uuid_w0 != snapshot.words[0]
+        || view.uuid_w1 != snapshot.words[1]
+        || view.uuid_w2 != snapshot.words[2]
+        || view.uuid_w3 != snapshot.words[3]
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(snapshot)
+}
+
+pub fn decode_range_reference(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<RangeReferenceSnapshot<'_>, DecodeError> {
+    Ok(decode_range_reference_with_report(source, options)?.0)
+}
+
+pub fn decode_range_reference_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(RangeReferenceSnapshot<'_>, DecodeReport), DecodeError> {
+    let mut budget = wire::Budget::new(source, options)?;
+    let snapshot = decode_range_reference_in(source, &mut budget, 1)?;
+    Ok((snapshot, budget.report()))
+}
+
+fn decode_range_reference_in<'source>(
+    source: &'source [u8],
+    budget: &mut wire::Budget,
+    depth: u32,
+) -> Result<RangeReferenceSnapshot<'source>, DecodeError> {
+    budget.message(source, depth)?;
+    let child_depth = depth.checked_add(1).ok_or_else(DecodeError::invalid)?;
+    let mut table_id_raw = None;
+    let mut table_id = None;
+    let mut values = [None; 4];
+    let mut remaining = source;
+    while let Some(field) = wire::next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => {
+                let raw = field.bytes()?;
+                set_once(&mut table_id, decode_cfuuid_in(raw, budget, child_depth)?)?;
+                set_once(&mut table_id_raw, raw)?;
+            },
+            2..=5 => {
+                let index =
+                    usize::try_from(field.number - 2).map_err(|_error| DecodeError::invalid())?;
+                set_once(&mut values[index], wire::canonical_u32(field.varint()?)?)?;
+            },
+            _ => {},
+        }
+    }
+    let range = RangeCoordinateSnapshot {
+        top_left_column: values[0].ok_or_else(DecodeError::invalid)?,
+        top_left_row: values[1].ok_or_else(DecodeError::invalid)?,
+        bottom_right_column: values[2].ok_or_else(DecodeError::invalid)?,
+        bottom_right_row: values[3].ok_or_else(DecodeError::invalid)?,
+    };
+    let snapshot = RangeReferenceSnapshot {
+        table_id: table_id.ok_or_else(DecodeError::invalid)?,
+        range,
+    };
+    budget.message(source, depth)?;
+    let view: projection::RangeReferenceArchiveLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| DecodeError::invalid())?;
+    if view.table_id != table_id_raw.ok_or_else(DecodeError::invalid)?
+        || view.top_left_column != range.top_left_column
+        || view.top_left_row != range.top_left_row
+        || view.bottom_right_column != range.bottom_right_column
+        || view.bottom_right_row != range.bottom_right_row
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(snapshot)
+}
+
+fn decode_range_coordinate_in(
+    source: &[u8],
+    budget: &mut wire::Budget,
+    depth: u32,
+) -> Result<RangeCoordinateSnapshot, DecodeError> {
+    budget.message(source, depth)?;
+    let mut values = [None; 4];
+    let mut remaining = source;
+    while let Some(field) = wire::next_field(&mut remaining, budget, depth)? {
+        if (1..=4).contains(&field.number) {
+            let index =
+                usize::try_from(field.number - 1).map_err(|_error| DecodeError::invalid())?;
+            set_once(&mut values[index], wire::canonical_u32(field.varint()?)?)?;
+        }
+    }
+    let snapshot = RangeCoordinateSnapshot {
+        top_left_column: values[0].ok_or_else(DecodeError::invalid)?,
+        top_left_row: values[1].ok_or_else(DecodeError::invalid)?,
+        bottom_right_column: values[2].ok_or_else(DecodeError::invalid)?,
+        bottom_right_row: values[3].ok_or_else(DecodeError::invalid)?,
+    };
+    budget.message(source, depth)?;
+    let view: projection::RangeCoordinateArchiveLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| DecodeError::invalid())?;
+    if view.top_left_column != snapshot.top_left_column
+        || view.top_left_row != snapshot.top_left_row
+        || view.bottom_right_column != snapshot.bottom_right_column
+        || view.bottom_right_row != snapshot.bottom_right_row
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(snapshot)
+}
+
+pub fn decode_internal_range_reference(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<InternalRangeReferenceSnapshot, DecodeError> {
+    Ok(decode_internal_range_reference_with_report(source, options)?.0)
+}
+
+pub fn decode_internal_range_reference_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(InternalRangeReferenceSnapshot, DecodeReport), DecodeError> {
+    let mut budget = wire::Budget::new(source, options)?;
+    let snapshot = decode_internal_range_reference_in(source, &mut budget, 1)?;
+    Ok((snapshot, budget.report()))
+}
+
+fn decode_internal_range_reference_in(
+    source: &[u8],
+    budget: &mut wire::Budget,
+    depth: u32,
+) -> Result<InternalRangeReferenceSnapshot, DecodeError> {
+    budget.message(source, depth)?;
+    let child_depth = depth.checked_add(1).ok_or_else(DecodeError::invalid)?;
+    let mut owner_id = None;
+    let mut range_raw = None;
+    let mut range = None;
+    let mut remaining = source;
+    while let Some(field) = wire::next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => set_once(&mut owner_id, wire::canonical_u32(field.varint()?)?)?,
+            2 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut range,
+                    decode_range_coordinate_in(raw, budget, child_depth)?,
+                )?;
+                set_once(&mut range_raw, raw)?;
+            },
+            _ => {},
+        }
+    }
+    let snapshot = InternalRangeReferenceSnapshot {
+        owner_id: owner_id.ok_or_else(DecodeError::invalid)?,
+        range: range.ok_or_else(DecodeError::invalid)?,
+    };
+    budget.message(source, depth)?;
+    let view: projection::InternalRangeReferenceArchiveLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| DecodeError::invalid())?;
+    if view.owner_id != snapshot.owner_id
+        || view.range != range_raw.ok_or_else(DecodeError::invalid)?
+    {
         return Err(DecodeError::invalid());
     }
     Ok(snapshot)
@@ -984,11 +1651,8 @@ fn decode_cell_dependencies(
     let mut remaining = source;
     while let Some(field) = wire::next_field(&mut remaining, budget, depth)? {
         if field.number == 1 {
-            visitor.visit_cell_record(decode_cell_record_in(
-                field.bytes()?,
-                budget,
-                child_depth,
-            )?)?;
+            let record = decode_cell_record_in(field.bytes()?, budget, child_depth, visitor)?;
+            visitor.visit_cell_record(record)?;
         }
     }
     Ok(())
@@ -1093,6 +1757,17 @@ mod tests {
         varint(output, u64::try_from(value.len()).unwrap());
         output.extend_from_slice(value);
     }
+    fn fixed32(output: &mut Vec<u8>, field: u32, value: u32) {
+        key(output, field, 5);
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+    fn packed(output: &mut Vec<u8>, field: u32, values: &[u32]) {
+        let mut payload = Vec::new();
+        for value in values {
+            varint(&mut payload, u64::from(*value));
+        }
+        b(output, field, &payload);
+    }
     fn reference(id: u64) -> Vec<u8> {
         let mut out = Vec::new();
         v(&mut out, 1, id);
@@ -1152,6 +1827,7 @@ mod tests {
         cells: usize,
         backs: usize,
         ranges: usize,
+        edge_components: usize,
     }
     impl DependencyVisitor for Counts {
         fn visit_formula_owner_dependency(
@@ -1197,6 +1873,13 @@ mod tests {
         ) -> Result<(), DecodeError> {
             self.ranges += 1;
             assert!(record.from_coord().is_empty());
+            Ok(())
+        }
+        fn visit_expanded_edge_component(
+            &mut self,
+            _component: ExpandedEdgeComponent,
+        ) -> Result<(), DecodeError> {
+            self.edge_components += 1;
             Ok(())
         }
     }
@@ -1290,16 +1973,25 @@ mod tests {
         let mut back = Vec::new();
         v(&mut back, 1, 2);
         v(&mut back, 2, 3);
-        b(&mut back, 3, &[]);
+        let mut table_range = Vec::new();
+        b(&mut table_range, 1, &[]);
+        v(&mut table_range, 2, 1);
+        v(&mut table_range, 3, 2);
+        v(&mut table_range, 4, 3);
+        v(&mut table_range, 5, 4);
+        b(&mut back, 3, &table_range);
         assert_eq!(
             decode_range_back_dependency(&back, options(&back))
                 .unwrap()
                 .range_reference(),
-            Some(&[][..])
+            Some(table_range.as_slice())
         );
+        let mut rect = Vec::new();
+        b(&mut rect, 1, &[]);
+        b(&mut rect, 2, &[]);
         let mut pair = Vec::new();
         b(&mut pair, 1, &[]);
-        b(&mut pair, 2, &[]);
+        b(&mut pair, 2, &rect);
         let mut range_tile = Vec::new();
         v(&mut range_tile, 1, 7);
         b(&mut range_tile, 2, &pair);
@@ -1307,6 +1999,47 @@ mod tests {
             .unwrap();
         assert_eq!(counts.ranges, 1);
         assert!(decode_from_to_range(&pair, options(&pair)).is_ok());
+    }
+
+    #[test]
+    fn expanded_edges_and_typed_ranges_close_formula_cache_routes() {
+        let mut edges = Vec::new();
+        packed(&mut edges, 1, &[2, 4]);
+        v(&mut edges, 2, 3);
+        v(&mut edges, 2, 5);
+        packed(&mut edges, 3, &[6]);
+        packed(&mut edges, 4, &[7]);
+        packed(&mut edges, 5, &[8]);
+        let mut counts = Counts::default();
+        let (snapshot, report) =
+            decode_expanded_edges_with_visitor(&edges, options(&edges), &mut counts).unwrap();
+        assert_eq!((snapshot.local(), snapshot.external()), (2, 1));
+        assert_eq!(counts.edge_components, 7);
+        assert!(report.work_bytes() >= edges.len() * 2);
+
+        let mut coordinate = Vec::new();
+        fixed32(&mut coordinate, 1, 0x1234_5678);
+        v(&mut coordinate, 2, 9);
+        v(&mut coordinate, 3, 10);
+        let decoded = decode_cell_coordinate(&coordinate, options(&coordinate)).unwrap();
+        assert_eq!(decoded.packed_data(), Some(0x1234_5678));
+        assert_eq!((decoded.column(), decoded.row()), (Some(9), Some(10)));
+
+        let mut range = Vec::new();
+        v(&mut range, 1, 1);
+        v(&mut range, 2, 2);
+        v(&mut range, 3, 3);
+        v(&mut range, 4, 4);
+        let mut internal = Vec::new();
+        v(&mut internal, 1, 11);
+        b(&mut internal, 2, &range);
+        let decoded = decode_internal_range_reference(&internal, options(&internal)).unwrap();
+        assert_eq!(decoded.owner_id(), 11);
+        assert_eq!(decoded.range().bottom_right_row(), 4);
+
+        let mut mismatched = edges.clone();
+        v(&mut mismatched, 3, 99);
+        assert!(decode_expanded_edges(&mismatched, options(&mismatched)).is_err());
     }
 
     #[test]

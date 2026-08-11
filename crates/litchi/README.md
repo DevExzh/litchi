@@ -431,6 +431,59 @@ outline or explicit-false UI results. Use
 `litchi-numbers/examples/edit_table_title.rs` for synchronized,
 distinct-output, no-clobber publication via `Package::write_to`.
 
+## Focused Numbers table-cell batches
+
+With the `numbers` feature enabled, `litchi::numbers::table::cells` provides a
+selector-first atomic batch for one table. Select the sheet and its scoped
+table by exact name or checked position, then use A1 coordinates or checked
+cell positions; no native identifiers are exposed. Inputs are plain text,
+Boolean values, and finite number, date, or duration scalars. Each operation
+is an explicit set or clear.
+
+```rust,no_run
+use litchi::numbers::{Package, SheetSelector, TableSelector};
+use litchi::numbers::table::cells::Input;
+
+let package = Package::open("input.numbers")?;
+let commit = package
+    .edit_table_cells(
+        SheetSelector::name("Summary"),
+        TableSelector::name("Revenue"),
+    )?
+    .set_a1("B3", Input::number(43.0)?)?
+    .set_a1("C3", Input::text("updated")?)?
+    .clear_a1("D3")?
+    .commit()?;
+
+let restored = commit
+    .package()
+    .apply_table_cells(&commit.patch().inverse())?;
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+One batch is all-or-nothing: sparse storage, shared-string refcounts, in-place
+authored-text replacement in a uniquely owned rich backing, and the admitted
+final-overlay formula-cache subset are checked and published together.
+Unsupported rich-text ownership, formula graphs or dependencies outside that
+subset, and merges fail with typed errors rather than producing a partial edit
+or stale cache. An unchanged batch is exact no-op. A changed patch
+retains a private exact source/target package pair; apply accepts only that
+source, and its inverse restores the original package plus forward-deleted
+previews after focused storage/cache-locality verification.
+
+Numbers 14.4 native evidence covers the admitted rich-text no-impact case; it
+does not prove UI behavior for formulas affected by a changed cell. The legacy
+raw-ID migration-host cell writer has been retired. Host comment/reply APIs
+and formula authoring remain separate migration-host scope. Use
+`litchi-numbers/examples/edit_table_cells.rs` for bounded batch parsing and
+synchronized sibling-temporary, distinct-output, no-clobber publication
+through `Package::write_to`.
+
 ## Focused Numbers table-header edits
 
 Enable the `numbers` feature to use the focused immutable Numbers package API

@@ -243,6 +243,139 @@ pub(crate) fn test_table_selector(
     TableSelector::index(index)
 }
 
+#[cfg(test)]
+fn test_cell_selectors(
+    editor: &NumbersEditor,
+    native_id: u64,
+) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {
+    let owner = find_table_owner(editor.package(), native_id)?;
+    let sheet = test_sheet_selector(editor, owner.sheet_id);
+    let table_info_ids = table_models(editor.package())?
+        .into_iter()
+        .map(|table| table.table_info_id)
+        .collect::<HashSet<_>>();
+    let (_, _, native_sheet) = numbers_sheet(editor.package(), owner.sheet_id)?;
+    let table = native_sheet
+        .drawable_infos
+        .iter()
+        .filter(|drawable| table_info_ids.contains(&drawable.identifier))
+        .position(|drawable| drawable.identifier == owner.table_info_id)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table model {native_id} is missing from its focused sheet projection"
+            ))
+        })?;
+    Ok((sheet, TableSelector::index(table)))
+}
+
+#[cfg(test)]
+fn test_cell_input(value: CellValue) -> Result<Option<litchi_numbers::table::cells::Input>> {
+    use litchi_numbers::table::cells::Input;
+
+    match value {
+        CellValue::Empty => Ok(None),
+        CellValue::Text(value) => Ok(Some(Input::Text(value))),
+        CellValue::Number(value) => Ok(Some(Input::Number(value))),
+        CellValue::Boolean(value) => Ok(Some(Input::Boolean(value))),
+        CellValue::Date(value) => Ok(Some(Input::Date(value))),
+        CellValue::Duration(value) => Ok(Some(Input::Duration(value))),
+        CellValue::Formula(_) | CellValue::Error(_) => Err(Error::ParseError(
+            "formula and producer-error test setup must use their dedicated helpers".to_owned(),
+        )),
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn test_set_cells(
+    editor: &mut NumbersEditor,
+    native_id: u64,
+    updates: impl IntoIterator<Item = TableCellUpdate>,
+) -> Result<usize> {
+    use litchi_numbers::table::CellPosition;
+
+    let (sheet, table) = test_cell_selectors(editor, native_id)?;
+    let source = litchi_numbers::Package::from_bytes(&editor.to_bytes()?)
+        .map_err(|error| Error::ParseError(error.to_string()))?;
+    let mut edit = source
+        .edit_table_cells(sheet, table)
+        .map_err(|error| Error::ParseError(error.to_string()))?;
+    for update in updates {
+        let position = CellPosition::try_from_usize(update.row, update.column)
+            .map_err(|error| Error::ParseError(error.to_string()))?;
+        edit = match test_cell_input(update.value)? {
+            Some(input) => edit.set(position, input),
+            None => edit.clear(position),
+        }
+        .map_err(|error| Error::ParseError(error.to_string()))?;
+    }
+    let count = edit.len();
+    let target = edit
+        .commit()
+        .map_err(|error| Error::ParseError(error.to_string()))?
+        .into_package();
+    let mut bytes = Vec::new();
+    target
+        .write_to(&mut bytes)
+        .map_err(|error| Error::ParseError(error.to_string()))?;
+    *editor = NumbersEditor::from_bytes(&bytes)?;
+    Ok(count)
+}
+
+#[cfg(test)]
+pub(crate) fn test_set_cell(
+    editor: &mut NumbersEditor,
+    native_id: u64,
+    row: usize,
+    column: usize,
+    value: CellValue,
+) -> Result<()> {
+    test_set_cells(
+        editor,
+        native_id,
+        [TableCellUpdate::new(row, column, value)],
+    )?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn set_cell_fixture(
+    editor: &mut NumbersEditor,
+    native_id: u64,
+    row: usize,
+    column: usize,
+    value: CellValue,
+) -> Result<()> {
+    let mut staged = editor.package.clone();
+    set_table_cell_in_package(&mut staged, native_id, row, column, value)?;
+    IWorkPackage::from_bytes(&staged.to_bytes()?)?;
+    editor.package = staged;
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn apply_numbers_fixture(
+    editor: &mut NumbersEditor,
+    native_id: u64,
+    updates: impl IntoIterator<Item = TableCellUpdate>,
+) -> Result<usize> {
+    let batch = TableCellBatch::collect(updates)?;
+    if batch.is_empty() {
+        attached_table_descriptor(&editor.package, native_id)?;
+        return Ok(0);
+    }
+    let expected = batch.len();
+    let mut staged = editor.package.clone();
+    let applied = batch.apply_attached(&mut staged, native_id)?;
+    if applied != expected {
+        return Err(Error::InvalidFormat(format!(
+            "fixture table cell batch applied {applied} updates, expected {expected}"
+        )));
+    }
+    IWorkPackage::from_bytes(&staged.to_bytes()?)?;
+    editor.package = staged;
+    Ok(applied)
+}
+
 pub use semantic::*;
 pub use sheet_audio::{NumbersSheetAudioInfo, NumbersSheetAudioOptions, RemovedNumbersSheetAudio};
 pub use sheet_charts::{NumbersSheetChartInfo, RemovedNumbersSheetChart};

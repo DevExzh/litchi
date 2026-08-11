@@ -1769,3 +1769,85 @@ synthetic-test evidence only. The gates pass 114/114 Numbers library, 4/4
 public read integration, 13/13 strict codec, 163/163 full protobuf, and
 187/187 boundary tests, plus strict library/test Clippy and warning-denied
 rustdoc; the full checker has only the unchanged 14 baselines.
+
+## 2026-08-12 amendment: Numbers table-cell mutation semantics
+
+The read-only model above is extended, not replaced. The canonical namespace
+now contains `Input`, `Change`, `Edit`, `Patch`, `Commit`, `Diagnostics`, and
+`DependencyKind` beside `State`, `Storage`, `Error`, `LimitKind`, and `Path`.
+`Input` admits only finite text, number, Boolean, Apple-epoch date, and duration
+scalars. `Change` is one checked set or clear. `Package::edit_table_cells`
+selects a sheet and table before staging; the consuming edit supports single
+and iterator batches without exposing object identifiers, archive bytes,
+protobuf/Buffa values, BNC records, component paths, or native references.
+`Package::apply_table_cells` borrows the public exact patch while the private
+retained `PackagePair` remains an implementation detail.
+
+The semantic surface does not imply arbitrary cell editing. Accepted changed
+sources cover scalar writes and direct/unsegmented string-list ownership with
+exact refcounts, sparse missing-tile growth including a 513-row synthetic
+boundary for finite non-text scalars, in-place authored-text replacement in
+uniquely owned rich backing,
+and strict downstream formula-cache refresh evaluated from the complete final
+batch overlay. The rich path retains key/storage identity and releases exact
+style references. It does not construct formulas, edit formula or
+error cells, format cells, alter controls, change comments, or edit merge,
+pivot, category, spill, hidden, or conditional-style state. Header cells with
+rooted HeaderNameMgr ownership are rejected: CalculationEngine field 14 is
+projected and root-validated, but the referenced manager payload/update
+semantics are not. Sparse text-to-missing-tile changes refuse as
+`SharedString`. Segmented string lists, aliased rich text, nonempty rich
+FieldInfo reference transitions, noncanonical/ambiguous FieldInfo rich
+ownership, existing formula or error cells, and modeled unsupported reachable
+formula forms, cycles, ranges, deletion, and sparse/cache combinations fail
+with `UnsupportedDependency`. Canonical payload field-1-to-storage and storage
+field-2-to-style FieldInfo metadata may remain present and exact when no
+field-specific transition is needed. Impacted active merge, pivot,
+category, spill, hidden, or conditional-style states refuse by their matching
+dependency kind; unrelated/inert state remains exact. A modeled missing
+storage prerequisite fails as `UnsupportedDependency { CellStorage }`,
+malformed storage fails as `InvalidSource`, and an unmodeled stored BNC
+value/source kind fails as `UnsupportedSource`. Locked tables reject changed
+edits.
+
+The storage and dependency Buffa projections are strict borrowed validators,
+not public semantic owners or encoders. Their generated ratchets are
+respectively five files/465,932 bytes/SHA-256
+`1a894fd5d22b004db664bc7c348d9591a4608ab9263a8122c726c8a1ecb0c3b3`
+and five files/544,538 bytes/SHA-256
+`2fba7c22aef58ed3cfe6eba1f77e5eaf79d2597dd79966e05d20e50c0e2b33b3`,
+with zero repeated generated views in either projection. Caller-owned raw
+records remain authoritative for exact preservation and splice. The strict
+dependency-only formula projection remains five files/201,539 bytes with
+SHA-256
+`ccd972b3dcd76b6142342d36435f2f76a305c029265853ced04d64c1e2bf1752`;
+its focused codec passes 7/7 and the full protobuf suite passes 178/178.
+The PackageMetadata projection is five files/145,681 bytes with no repeated
+generated view and SHA-256
+`ee49927f75c6b632c83055f9b7e647920b389be41bec10e25871a6ef7b56ab31`;
+its focused gate passes 7/7.
+
+Changed publication verifies exact directional message and aggregate/FieldInfo
+reference deltas and exact source-to-target preview membership. The private
+source/target `PackagePair` lets exact apply and inverse reuse already reopened
+snapshots under the same read profile; it does not make `Patch` durable. Rooted
+4,096-to-8,192 transaction-work ratios are 1.1899x numeric, 1.2245x unique
+text, 1.1396x same-tile batch, and 1.8021x formula closure, with no governed
+subterm above 2.0x. Required-minus-one formula and sparse budgets refuse before
+component, reassembly, output, reopen, or locality work. No wall-clock/RSS
+claim follows.
+
+Reads and exact no-ops retain broad compatibility. A changed package without
+an exact physical `SourceCatalog`, including nested legacy layout, fails as
+`UnsupportedSource` before mutation.
+
+Native Numbers 14.4 accepts the exact numeric B3=43 scalar and unique-rich
+authored-text candidates; the rich gate proves no-impact preservation of its
+independent formula/cache,
+not impacted formula refresh. The completed cut removes the three direct
+NumbersEditor cell mutators, Numbers-only raw-ID writers and batch apply, 15
+obsolete tests, and the legacy example. Shared attached-table APIs and
+Pages/Keynote ownership remain. The new private rich-text wire implementation
+introduces `litchi-numbers -> litchi-iwa-text-wire`, raising internal
+declarations from 237 to 238 while leaving 64 packages, 14 host declarations,
+and 14 ordered debts unchanged.

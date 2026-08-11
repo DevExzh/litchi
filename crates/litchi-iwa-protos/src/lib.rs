@@ -395,6 +395,48 @@ mod buffa_numbers_table_cell_dependency_generated {
     ));
 }
 
+/// Private lazy-view roots for raw-preserving PackageMetadata publication.
+#[doc(hidden)]
+mod buffa_package_metadata_generated {
+    #![allow(
+        clippy::all,
+        clippy::pedantic,
+        clippy::arbitrary_source_item_ordering,
+        clippy::allow_attributes_without_reason,
+        clippy::module_name_repetitions,
+        clippy::shadow_same,
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        non_snake_case,
+        reason = "Private Buffa generated projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-package-metadata/iwa_package_metadata_buffa_protos.rs"
+    ));
+}
+
+/// Private scalar lazy-view parity roots for the strict formula reader.
+#[doc(hidden)]
+mod buffa_formula_generated {
+    #![allow(
+        clippy::all,
+        clippy::pedantic,
+        clippy::arbitrary_source_item_ordering,
+        clippy::allow_attributes_without_reason,
+        clippy::module_name_repetitions,
+        clippy::shadow_same,
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        non_snake_case,
+        reason = "Private Buffa generated projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-formula/iwa_formula_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for `TST.TableInfoArchive.table_model`.
 ///
 /// The required drawable base archive and all unselected table metadata remain
@@ -740,6 +782,14 @@ pub mod numbers_table_cell_storage_codec;
 /// Strict generated-free Numbers table-cell dependency/cache projection.
 #[doc(hidden)]
 pub mod numbers_table_cell_dependency_codec;
+
+/// Strict raw-preserving PackageMetadata sparse-publication codec.
+#[doc(hidden)]
+pub mod package_metadata_codec;
+
+/// Strict generated-free streaming reader for table-local scalar formulas.
+#[doc(hidden)]
+pub mod numbers_formula_codec;
 
 /// Internal Keynote slide-transition projection implemented by a private
 /// Buffa lazy-view sidecar. Generated types remain inaccessible downstream.

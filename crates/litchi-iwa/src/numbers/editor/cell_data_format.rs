@@ -1666,9 +1666,14 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(table_id, 1, 1, CellValue::Boolean(true))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::Boolean(true),
+        )
+        .unwrap();
         editor
             .set_table_cell_checkbox_format(table_id, 1, 1, Checkbox)
             .unwrap();
@@ -1741,14 +1746,14 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(
-                table_id,
-                1,
-                1,
-                CellValue::number(3.0).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::number(3.0).expect("finite test number"),
+        )
+        .unwrap();
         editor
             .set_table_cell_star_rating_format(table_id, 1, 1, StarRating)
             .unwrap();
@@ -1842,14 +1847,14 @@ mod tests {
             ThousandsSeparator::Hidden,
         );
         let number_slider = Slider::new(range, number_display.into());
-        editor
-            .set_cell(
-                table_id,
-                1,
-                1,
-                CellValue::number(25.0).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::number(25.0).expect("finite test number"),
+        )
+        .unwrap();
         editor
             .set_table_cell_slider_format(table_id, 1, 1, number_slider.clone())
             .unwrap();
@@ -1948,14 +1953,14 @@ mod tests {
             ThousandsSeparator::Hidden,
         );
         let number_stepper = Stepper::new(range, number_display.into());
-        editor
-            .set_cell(
-                table_id,
-                1,
-                1,
-                CellValue::number(25.0).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::number(25.0).expect("finite test number"),
+        )
+        .unwrap();
         editor
             .set_table_cell_stepper_format(table_id, 1, 1, number_stepper.clone())
             .unwrap();
@@ -2047,9 +2052,14 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(table_id, 1, 1, CellValue::Text("00123".to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::Text("00123".to_owned()),
+        )
+        .unwrap();
         editor.set_table_cell_text_format(table_id, 1, 1).unwrap();
         editor.set_table_cell_text_format(table_id, 1, 2).unwrap();
 
@@ -2081,14 +2091,14 @@ mod tests {
             Some(&CellValue::Empty)
         );
 
-        reopened
-            .set_cell(
-                table_id,
-                2,
-                1,
-                CellValue::number(42.0).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut reopened,
+            table_id,
+            2,
+            1,
+            CellValue::number(42.0).expect("finite test number"),
+        )
+        .unwrap();
         let before = reopened.to_bytes().unwrap();
         assert!(reopened.set_table_cell_text_format(table_id, 2, 1).is_err());
         assert_eq!(reopened.to_bytes().unwrap(), before);
@@ -2135,33 +2145,38 @@ mod tests {
         let date_time = Custom::DateTime(date_time);
         let text = Custom::Text(text);
 
-        editor
-            .set_cell(
-                table_id,
-                1,
-                1,
-                CellValue::number(-12_345.0).expect("finite test number"),
-            )
-            .unwrap();
-        editor
-            .set_cell(
-                table_id,
-                1,
-                2,
-                CellValue::number(42.0).expect("finite test number"),
-            )
-            .unwrap();
-        editor
-            .set_cell(
-                table_id,
-                2,
-                1,
-                CellValue::date(789_004_800.0).expect("finite test date"),
-            )
-            .unwrap();
-        editor
-            .set_cell(table_id, 2, 2, CellValue::Text("Invoice 001".to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::number(-12_345.0).expect("finite test number"),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            2,
+            CellValue::number(42.0).expect("finite test number"),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            2,
+            1,
+            CellValue::date(789_004_800.0).expect("finite test date"),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            2,
+            2,
+            CellValue::Text("Invoice 001".to_owned()),
+        )
+        .unwrap();
         editor
             .set_table_cell_custom_format(table_id, 1, 1, number.clone())
             .unwrap();
@@ -2283,14 +2298,14 @@ mod tests {
             document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
             Some(&CellValue::Text("Low".to_owned()))
         );
-        reopened
-            .set_cell(
-                table_id,
-                2,
-                1,
-                CellValue::number(42.0).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut reopened,
+            table_id,
+            2,
+            1,
+            CellValue::number(42.0).expect("finite test number"),
+        )
+        .unwrap();
         let before = reopened.to_bytes().unwrap();
         assert!(
             reopened
@@ -2366,22 +2381,22 @@ mod tests {
         let table_id = editor.tables().unwrap()[0].object_id;
         let range = UnitRange::hours_to_milliseconds();
         let duration = Duration::custom(Style::Abbreviated, range);
-        editor
-            .set_cell(
-                table_id,
-                1,
-                1,
-                CellValue::duration(3_723.5).expect("finite test duration"),
-            )
-            .unwrap();
-        editor
-            .set_cell(
-                table_id,
-                1,
-                2,
-                CellValue::number(1.5).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::duration(3_723.5).expect("finite test duration"),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            2,
+            CellValue::number(1.5).expect("finite test number"),
+        )
+        .unwrap();
         editor
             .set_table_cell_duration_format(table_id, 1, 1, duration)
             .unwrap();
@@ -2454,22 +2469,22 @@ mod tests {
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         let date_time = DateTime::iso_date_time_24_hour_with_seconds();
-        editor
-            .set_cell(
-                table_id,
-                1,
-                1,
-                CellValue::date(789_332_889.0).expect("finite test date"),
-            )
-            .unwrap();
-        editor
-            .set_cell(
-                table_id,
-                1,
-                2,
-                CellValue::date(789_332_889.0).expect("finite test date"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::date(789_332_889.0).expect("finite test date"),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            2,
+            CellValue::date(789_332_889.0).expect("finite test date"),
+        )
+        .unwrap();
         editor
             .set_table_cell_date_time_format(table_id, 1, 1, date_time.clone())
             .unwrap();
@@ -2528,14 +2543,14 @@ mod tests {
             NumeralSystemNegativeStyle::TwosComplement,
         )
         .unwrap();
-        editor
-            .set_cell(
-                table_id,
-                1,
-                1,
-                CellValue::number(-1_234.5).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::number(-1_234.5).expect("finite test number"),
+        )
+        .unwrap();
         editor
             .set_table_cell_numeral_system_format(table_id, 1, 1, numeral_system)
             .unwrap();
@@ -2589,14 +2604,14 @@ mod tests {
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         let fraction = Fraction::new(FractionAccuracy::Eighths);
-        editor
-            .set_cell(
-                table_id,
-                1,
-                1,
-                CellValue::number(-12.375).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::number(-12.375).expect("finite test number"),
+        )
+        .unwrap();
         editor
             .set_table_cell_fraction_format(table_id, 1, 1, fraction)
             .unwrap();
@@ -2646,14 +2661,14 @@ mod tests {
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         let scientific = Scientific::new(FixedDecimalPlaces::new(5).unwrap());
-        editor
-            .set_cell(
-                table_id,
-                1,
-                1,
-                CellValue::number(-1_234.5).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::number(-1_234.5).expect("finite test number"),
+        )
+        .unwrap();
         editor
             .set_table_cell_scientific_format(table_id, 1, 1, scientific)
             .unwrap();
@@ -2713,14 +2728,14 @@ mod tests {
             ThousandsSeparator::Shown,
             CurrencyStyle::Accounting,
         );
-        editor
-            .set_cell(
-                table_id,
-                1,
-                1,
-                CellValue::number(-1_234.5).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::number(-1_234.5).expect("finite test number"),
+        )
+        .unwrap();
         editor
             .set_table_cell_currency_format(table_id, 1, 1, currency)
             .unwrap();
@@ -2778,14 +2793,14 @@ mod tests {
             editor.table_cell_number_format(table_id, 1, 1).unwrap(),
             None
         );
-        editor
-            .set_cell(
-                table_id,
-                1,
-                1,
-                CellValue::number(1_234.5).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::number(1_234.5).expect("finite test number"),
+        )
+        .unwrap();
         editor
             .set_table_cell_number_format(table_id, 1, 1, format)
             .unwrap();
@@ -2875,14 +2890,14 @@ mod tests {
         editor
             .set_table_cell_data_format(table_id, 1, 1, number.into())
             .unwrap();
-        editor
-            .set_cell(
-                table_id,
-                1,
-                2,
-                CellValue::number(-12.345).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            2,
+            CellValue::number(-12.345).expect("finite test number"),
+        )
+        .unwrap();
         assert_eq!(
             editor.table_cell_data_format(table_id, 1, 2).unwrap(),
             DataFormat::Automatic

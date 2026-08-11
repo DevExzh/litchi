@@ -51,6 +51,9 @@ impl From<bnc::Error> for crate::Error {
         match error {
             bnc::Error::InvalidFormat(message) => Self::InvalidFormat(message),
             bnc::Error::ParseError(message) => Self::ParseError(message),
+            bnc::Error::OutputLimitExceeded { .. } | bnc::Error::Allocation { .. } => {
+                Self::ParseError(error.to_string())
+            },
         }
     }
 }

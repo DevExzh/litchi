@@ -2427,3 +2427,86 @@ library/test Clippy and warning-denied rustdoc. The full checker retains only
 14 unchanged baselines. This slice removes no host declaration, manifest edge,
 or debt: topology stays at 64 packages, 237 internal declarations, 14
 `litchi-iwa` dependency declarations, and 14 ordered debts.
+
+## 2026-08-12 amendment: Numbers table-cell mutation exit slice
+
+The physical exit has begun without invalidating the read-only history above.
+The focused Numbers owner now presents `table::cells::{Input, Change, Edit,
+Patch, Commit, Diagnostics, Error, LimitKind, Path, DependencyKind}` through
+selector-first `Package::{edit_table_cells, apply_table_cells}`. It owns one
+bounded final-overlay transaction for supported scalar/string/tile/rich/cache
+changes and exact directional publication. It does not expose or relocate the
+legacy raw-ID editor facade.
+
+The accepted slice is scalar set/clear, direct/unsegmented string-list
+ownership with exact refcounts, missing sparse-tile growth including a
+synthetic 513-row boundary for finite non-text scalars, in-place authored-text
+replacement in uniquely owned rich backing while retaining key/storage
+identity and releasing exact style references, and downstream cache refresh
+for a strict supported formula graph evaluated against the complete batch. It
+does not migrate formula compilation/AST construction, formula/error-cell mutation,
+general rich text, formats, controls, comments, table topology, or the
+Pages/Keynote attached-table paths. CalculationEngine field 14 is projected
+and its rooted HeaderNameMgr reference validated; only the referenced manager
+payload/update semantics are unprojected, so a manager-backed header change
+refuses as `HeaderNameIndex`. Sparse text to a missing tile refuses as
+`SharedString`. Segmented string lists, existing formula/error cells, shared
+rich text requiring a FieldInfo reference transition,
+noncanonical/ambiguous FieldInfo rich ownership, modeled missing storage
+prerequisites, and unsupported formula dependencies fail as
+`UnsupportedDependency` (missing
+storage as `CellStorage`). Impacted active merge, pivot, category, spill,
+hidden, or conditional-style state refuses by its matching kind while
+unrelated/inert state remains exact. Malformed routes fail as `InvalidSource`;
+an unmodeled stored BNC value/source kind fails as `UnsupportedSource`. Locks
+likewise fail typed and before publication.
+
+Canonical payload field-1-to-storage and storage field-2-to-style FieldInfo
+metadata may be present on the unique rich path and remains exact when no
+field-specific reference transition is required.
+
+The private strict storage and dependency projections are respectively five
+files/465,932 bytes/SHA-256
+`1a894fd5d22b004db664bc7c348d9591a4608ab9263a8122c726c8a1ecb0c3b3`
+and five files/544,538 bytes/SHA-256
+`2fba7c22aef58ed3cfe6eba1f77e5eaf79d2597dd79966e05d20e50c0e2b33b3`,
+with no generated repeated views. The dependency-only formula projection is
+five files/201,539 bytes/SHA-256
+`ccd972b3dcd76b6142342d36435f2f76a305c029265853ced04d64c1e2bf1752`;
+its focused codec passes 7/7 and the full protobuf suite passes 178/178. Raw
+records remain authoritative. The PackageMetadata projection is five
+files/145,681 bytes, generates no repeated view, and has SHA-256
+`ee49927f75c6b632c83055f9b7e647920b389be41bec10e25871a6ef7b56ab31`;
+its focused gate passes 7/7. Changed commits verify exact message/reference
+deltas and preview membership, then reassemble/reopen once. Exact apply borrows
+the patch and reuses a private retained source/target `PackagePair`; this
+avoids a second reopen but leaves
+process-local memory, serialization, versioning, composition, merge, and
+history debt.
+
+Reads and exact no-ops remain broad. A changed package without an exact
+physical `SourceCatalog`, including nested legacy layout, fails as
+`UnsupportedSource`.
+
+Final rooted 4,096-to-8,192 transaction-work ratios are 1.1899x numeric,
+1.2245x unique text, 1.1396x same-tile, and 1.8021x formula, with governed
+subterms no worse than 2.0x. Required-minus-one formula/sparse cases stop with
+zero component, reassembly, output, reopen, and locality work. Numbers 14.4
+passes the exact numeric B3=43 scalar and unique-rich C2 no-impact
+commit/apply/inverse and
+open/Save As/reopen gates. The latter preserves its independent formula/cache;
+it is not impacted-formula-refresh proof, and unsupported impacted formulas
+still fail as `FormulaCache`.
+
+The completed exit removes `NumbersEditor::{set_cell, set_cells, clear_cell}`,
+the Numbers-only raw-ID model set/set-batch helpers,
+`TableCellBatch::apply_numbers`, 15 obsolete direct tests, and the legacy
+example. Shared `TableCellBatch::{collect, is_empty, len, apply_attached}`,
+attached/package helpers, storage/wire/cache/formula machinery, Pages/Keynote
+paths and builders, and fixture-only test adapters remain. Numbers gates pass
+237 library tests with 4 ignored and 15/15 public cells; boundary regressions
+pass 196/196 and the host/focused source audits are empty. The focused
+implementation adds `litchi-numbers -> litchi-iwa-text-wire`; topology is 64
+packages, 238 internal declarations, 14 `litchi-iwa` declarations, and 14
+ordered debts. The Numbers host debt remains because the retained editor is
+much broader than this cell slice.

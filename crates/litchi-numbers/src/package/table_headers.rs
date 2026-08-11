@@ -9,7 +9,7 @@
 )]
 
 mod api;
-mod dependencies;
+pub(super) mod dependencies;
 mod error;
 pub(super) mod ownership;
 pub(super) mod resolve;

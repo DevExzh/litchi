@@ -1867,3 +1867,79 @@ Rust-authored UI artifact is claimed.
 No manifest edge or ordered debt changes. The inventory remains 64 workspace
 packages, 237 internal declarations, 14 `litchi-iwa` dependency declarations,
 and 14 ordered debts, including debt 017 (`litchi-iwa -> litchi-pages`).
+
+## 2026-08-12 current-status amendment: Numbers table-cell mutation
+
+The concrete Numbers package now contains the focused cell-batch owner behind
+`table::cells::{Input, Change, Edit, Patch, Commit, Diagnostics, Error,
+LimitKind, Path, DependencyKind}` and
+`Package::{edit_table_cells, apply_table_cells}`. The previously documented
+eager semantic read remains unchanged. The mutation owner adds strict raw and
+Buffa validation, physical scalar/tile and string-list planning, bounded
+non-text scalar sparse growth, in-place authored-text replacement in uniquely
+owned rich backing,
+exact style-reference release, final-overlay formula-cache refresh,
+grouped publication, exact locality, and process-local reversible patches.
+
+This is not the whole table-cell aggregate. The supported set is finite scalar
+set/clear, direct/unsegmented string-list assignment/release with exact
+refcounts, synthetic 513-row finite non-text scalar sparse growth, in-place
+authored-text replacement that retains unique rich key/storage identity, and
+strict supported cache propagation.
+Canonical payload field-1-to-storage and storage field-2-to-style FieldInfo
+metadata may be present and remains exact; a rewrite requiring any FieldInfo
+reference transition, or noncanonical/ambiguous FieldInfo rich ownership,
+refuses as `RichText`.
+Formula compilation and formula-cell construction, arbitrary rich text,
+formatting, controls, merge/pivot/category/spill/hidden/conditional state,
+comments, and Pages/Keynote attached-table mutation remain outside this owner.
+CalculationEngine field 14 is projected and its rooted HeaderNameMgr reference
+validated; only the referenced manager payload/update semantics are not, so a
+manager-backed header change refuses as `HeaderNameIndex`. Sparse text to a
+missing tile refuses as `SharedString`. Segmented string lists, existing
+formula/error cells, and modeled unsupported ownership/formula closure fail as
+`UnsupportedDependency`; impacted active merge, pivot, category, spill,
+hidden, or conditional-style state refuses by its matching kind while
+unrelated/inert state remains exact. Malformed routes fail as `InvalidSource`,
+a modeled missing storage prerequisite fails as
+`UnsupportedDependency { CellStorage }`, an unmodeled stored BNC value/source
+kind fails as `UnsupportedSource`, and locked ownership fails atomically. Reads
+and exact no-ops stay broad, while changed packages without
+an exact physical `SourceCatalog`, including nested legacy sources, fail as
+`UnsupportedSource`.
+
+Storage and dependency projections currently measure five files/465,932 bytes
+and five files/544,538 bytes, with SHA-256
+`1a894fd5d22b004db664bc7c348d9591a4608ab9263a8122c726c8a1ecb0c3b3`
+and `2fba7c22aef58ed3cfe6eba1f77e5eaf79d2597dd79966e05d20e50c0e2b33b3`;
+both generate zero repeated views. The full protobuf inventory is currently
+178/178. The strict formula projection remains five files/201,539 bytes with
+SHA-256
+`ccd972b3dcd76b6142342d36435f2f76a305c029265853ced04d64c1e2bf1752`,
+and its focused codec gate passes 7/7. Exact patches privately retain both
+verified package snapshots so apply can borrow the patch and run directional
+locality without reopening; that memory and the
+lack of durable serialization/composition/merge/history remain debt.
+The PackageMetadata projection is five files/145,681 bytes, has no repeated
+generated view, and has SHA-256
+`ee49927f75c6b632c83055f9b7e647920b389be41bec10e25871a6ef7b56ab31`;
+its focused gate passes 7/7.
+
+Final rooted transaction-work ratios are 1.1899x numeric, 1.2245x unique text,
+1.1396x same-tile, and 1.8021x formula when fixtures double 4,096-to-8,192;
+governed subterms are at most 2.0x. Required-minus-one formula/sparse cases
+reject before component, reassembly, output, reopen, or locality work. The
+numeric B3=43 scalar and unique-rich no-impact candidates pass Numbers 14.4
+open/Save As/reopen and
+exact inverse gates; the latter preserves its independent formula/cache and is
+not impacted-formula native proof.
+
+The host cut retires three direct NumbersEditor cell mutators, two Numbers-only
+raw-ID model writers, Numbers-only batch apply, 15 obsolete direct tests, and
+the legacy example. Shared attached-table APIs, lower physical machinery,
+Pages/Keynote owners, builders, and fixture-only adapters remain. Numbers
+passes 237 library tests with 4 ignored and 15/15 public cell tests; boundary
+regressions pass 196/196. The neutral private rich-text wire edge
+`litchi-numbers -> litchi-iwa-text-wire` leaves the current inventory at 64
+workspace packages, 238 internal declarations, 14 `litchi-iwa` declarations,
+and 14 ordered debts.

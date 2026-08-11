@@ -1,13 +1,15 @@
 //! Numbers semantic value models.
 //!
-//! This crate owns archive-free Numbers semantics and bounded native package
-//! reading. [`Package::document`] exposes the strict rooted workbook, while
+//! This crate owns archive-free Numbers semantics, bounded native package
+//! reading, and focused exact package transactions. [`Package::document`]
+//! exposes the strict rooted workbook, while
 //! [`compatibility_tables_from_bytes`] is an explicitly allocating global
 //! projection for historical structured-data migration, including detached
 //! table models.
 //!
-//! The native cell wire codec is intentionally excluded from the supported
-//! API. The semantic cell API remains available through [`cell`].
+//! Native cell wire records are intentionally excluded from the supported API.
+//! The selector-first semantic read and edit API is available through
+//! [`table::cells`].
 //!
 //! ```compile_fail,E0603
 //! use litchi_numbers::cell::wire::BncCell;
@@ -29,10 +31,9 @@
 //! the package's semantic materialized-cell limit, so oversized ranges fail
 //! before a partial result is returned.
 //!
-//! The read behavior is grounded in an Apple-authored Numbers workbook with
-//! materialized text and number cells. This is a read-only surface: it does
-//! not publish edits, patches, cache changes, previews, native IDs, or raw
-//! package bytes.
+//! The read behavior is grounded in Apple-authored Numbers workbooks with
+//! materialized text and number cells. Native IDs and raw archive payloads
+//! remain private implementation details.
 //!
 //! ```no_run
 //! use litchi_numbers::{CellPosition, CellRange, Package, SheetSelector, TableSelector};
@@ -51,6 +52,58 @@
 //! let range = CellRange::from_a1("B2:C3")?;
 //! let states = package.table_cells(sheet, table, range)?;
 //! assert_eq!(states.len(), 4); // Dense, row-major: B2, C2, B3, C3.
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Table-cell transactions
+//!
+//! Use [`Package::edit_table_cells`] to stage one bounded, selector-first
+//! batch. [`table::cells::Input`] accepts plain text, Boolean values, and
+//! finite number, date, and duration scalars; every [`table::cells::Change`]
+//! is an explicit set or clear. Supported changed sources include admitted
+//! sparse storage, in-place authored-text replacement in a uniquely owned
+//! rich backing, and the narrow
+//! final-overlay formula-cache subset. Formula construction and unsupported
+//! rich-text ownership, formula graphs or dependencies outside that subset,
+//! merged cells, and other dependencies fail with typed errors before
+//! publication.
+//!
+//! The complete batch is atomic: selected storage, shared-string refcounts,
+//! supported rich-text ownership, and affected final-overlay caches are
+//! validated together. An unchanged batch is an exact no-op. A changed
+//! [`table::cells::Patch`] privately retains its exact source/target package
+//! pair as a process-local capability; [`Package::apply_table_cells`] accepts
+//! it only for that exact source, and [`table::cells::Patch::inverse`] restores
+//! the original package and any stale previews deleted in the forward
+//! direction. Candidate verification proves focused storage/cache locality.
+//!
+//! Native Numbers 14.4 evidence covers the admitted rich-text no-impact case.
+//! It does not establish a UI oracle for formulas whose displayed result is
+//! affected by a cell edit. The legacy raw-ID migration-host cell writer has
+//! been retired; host comment/reply APIs and formula authoring remain separate
+//! migration-host scope.
+//!
+//! ```no_run
+//! use litchi_numbers::{Package, SheetSelector, TableSelector};
+//! use litchi_numbers::table::cells::Input;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let package = Package::open("input.numbers")?;
+//! let commit = package
+//!     .edit_table_cells(SheetSelector::name("Summary"), TableSelector::name("Revenue"))?
+//!     .set_a1("B3", Input::number(43.0)?)?
+//!     .set_a1("C3", Input::text("updated")?)?
+//!     .clear_a1("D3")?
+//!     .commit()?;
+//! let restored = commit
+//!     .package()
+//!     .apply_table_cells(&commit.patch().inverse())?;
+//! let mut source_bytes = Vec::new();
+//! package.write_to(&mut source_bytes)?;
+//! let mut restored_bytes = Vec::new();
+//! restored.package().write_to(&mut restored_bytes)?;
+//! assert_eq!(restored_bytes, source_bytes);
 //! # Ok(())
 //! # }
 //! ```

@@ -26,15 +26,6 @@ impl TableCellBatch {
         self.batch.len()
     }
 
-    pub(crate) fn apply_numbers(self, package: &mut IWorkPackage, table_id: u64) -> Result<usize> {
-        let (updates, coordinates) = self.batch.into_parts();
-        let coordinates = into_formula_cache_coordinates(coordinates)?;
-        let count = updates.len();
-        model::set_cells_in_package(package, table_id, updates.into_vec())?;
-        formula_cache::refresh_formula_caches_after_cell_writes(package, table_id, &coordinates)?;
-        Ok(count)
-    }
-
     pub(crate) fn apply_attached(self, package: &mut IWorkPackage, table_id: u64) -> Result<usize> {
         let (updates, coordinates) = self.batch.into_parts();
         let coordinates = into_formula_cache_coordinates(coordinates)?;

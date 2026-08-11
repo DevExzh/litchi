@@ -16,14 +16,6 @@ fn cell_number(value: f64) -> CellValue {
     CellValue::number(value).expect("finite test number")
 }
 
-fn cell_date(value: f64) -> CellValue {
-    CellValue::date(value).expect("finite test date")
-}
-
-fn cell_duration(value: f64) -> CellValue {
-    CellValue::duration(value).expect("finite test duration")
-}
-
 fn cached_number(value: f64) -> FormulaCachedValue {
     FormulaCachedValue::number(value).expect("finite cached test number")
 }
@@ -333,14 +325,14 @@ fn populated_sheet_duplicate_is_ordered_and_independent() {
     assert_ne!(copied_text_box.drawable_object_id, SOURCE_TEXT_BOX_ID);
     assert_eq!(copied_text_box.storage.storage.text(), "Source");
 
-    editor
-        .set_cell(
-            copied_table_id,
-            SOURCE_CELL_ROW,
-            SOURCE_CELL_COLUMN,
-            CellValue::Text("Copied cell".to_owned()),
-        )
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        copied_table_id,
+        SOURCE_CELL_ROW,
+        SOURCE_CELL_COLUMN,
+        CellValue::Text("Copied cell".to_owned()),
+    )
+    .unwrap();
     editor
         .set_sheet_text_box_text(
             created.object_id,
@@ -1116,43 +1108,6 @@ fn sparse_row_round_trip_and_wide_promotion() {
 }
 
 #[test]
-fn semantic_edits_round_trip_through_public_reader() {
-    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
-    let table = editor.tables().unwrap().remove(0);
-
-    editor
-        .set_cell(
-            table.object_id,
-            0,
-            1,
-            CellValue::Text("Updated".to_string()),
-        )
-        .unwrap();
-    editor
-        .set_cell(table.object_id, 1, 2, cell_number(12.5))
-        .unwrap();
-    editor
-        .set_cell(table.object_id, 2, 3, CellValue::Boolean(true))
-        .unwrap();
-    editor
-        .set_cell(table.object_id, 3, 0, cell_date(123_456.25))
-        .unwrap();
-    editor
-        .set_cell(table.object_id, 3, 1, cell_duration(3_600.5))
-        .unwrap();
-
-    let bytes = editor.to_bytes().unwrap();
-    let document = NumbersDocument::from_bytes(&bytes).unwrap();
-    let sheets = document.sheets().unwrap();
-    let table = &sheets[0].tables[0];
-    assert_eq!(table.get_cell(0, 1).unwrap().as_text(), "Updated");
-    assert_eq!(table.get_cell(1, 2).unwrap().as_number(), Some(12.5));
-    assert_eq!(table.get_cell(2, 3).unwrap().as_boolean(), Some(true));
-    assert_eq!(table.get_cell(3, 0), Some(&cell_date(123_456.25)));
-    assert_eq!(table.get_cell(3, 1), Some(&cell_duration(3_600.5)));
-}
-
-#[test]
 fn edit_promotes_a_complete_legacy_tile_mirror_to_bnc() {
     let mut package = test_package();
     package
@@ -1175,7 +1130,7 @@ fn edit_promotes_a_complete_legacy_tile_mirror_to_bnc() {
         .unwrap();
 
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor.set_cell(10, 0, 1, cell_number(7.5)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 0, 1, cell_number(7.5)).unwrap();
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     let tile = Tile::decode(archive.object(30).unwrap().messages[0].data.as_slice()).unwrap();
     assert_eq!(tile.last_saved_in_bnc, Some(true));
@@ -1194,169 +1149,6 @@ fn edit_promotes_a_complete_legacy_tile_mirror_to_bnc() {
             .unwrap()
             .as_number(),
         Some(7.5)
-    );
-}
-
-#[test]
-fn rich_text_cell_updates_preserve_the_payload_reference() {
-    let mut editor = NumbersEditor::from_package(test_package_with_rich_text(false)).unwrap();
-    editor
-        .set_cell(10, 0, 1, CellValue::Text("Updated 🔬".to_owned()))
-        .unwrap();
-
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(0, 1),
-        Some(&CellValue::Text("Updated 🔬".to_owned()))
-    );
-    let archive = editor.package().archive("Index/Document.iwa").unwrap();
-    let tile = Tile::decode(archive.object(30).unwrap().messages[0].data.as_slice()).unwrap();
-    let cells = split_row(&tile.row_infos[0]).unwrap();
-    assert_eq!(
-        BncCell::parse(cells[1].as_deref().unwrap())
-            .unwrap()
-            .stored_value(),
-        StoredValue::RichText(2)
-    );
-    let list =
-        TableDataList::decode(archive.object(50).unwrap().messages[0].data.as_slice()).unwrap();
-    assert_eq!(list.entries[0].key, 2);
-    assert_eq!(list.entries[0].refcount, 1);
-    assert_eq!(
-        list.entries[0]
-            .rich_text_payload
-            .as_ref()
-            .unwrap()
-            .identifier,
-        51
-    );
-    let storage =
-        tswp::StorageArchive::decode(archive.object(52).unwrap().messages[0].data.as_slice())
-            .unwrap();
-    assert_eq!(storage.text.concat(), "Updated 🔬");
-}
-
-#[test]
-fn shared_rich_text_cell_update_uses_copy_on_write() {
-    let mut editor = NumbersEditor::from_package(test_package_with_rich_text(true)).unwrap();
-    editor
-        .set_cell(10, 0, 1, CellValue::Text("Independent".to_owned()))
-        .unwrap();
-
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
-    assert_eq!(
-        table.get_cell(0, 1),
-        Some(&CellValue::Text("Independent".to_owned()))
-    );
-    assert_eq!(
-        table.get_cell(0, 2),
-        Some(&CellValue::Text("Original Rich".to_owned()))
-    );
-
-    let archive = editor.package().archive("Index/Document.iwa").unwrap();
-    let tile = Tile::decode(archive.object(30).unwrap().messages[0].data.as_slice()).unwrap();
-    let cells = split_row(&tile.row_infos[0]).unwrap();
-    assert_eq!(
-        BncCell::parse(cells[1].as_deref().unwrap())
-            .unwrap()
-            .stored_value(),
-        StoredValue::RichText(3)
-    );
-    assert_eq!(
-        BncCell::parse(cells[2].as_deref().unwrap())
-            .unwrap()
-            .stored_value(),
-        StoredValue::RichText(2)
-    );
-    let list =
-        TableDataList::decode(archive.object(50).unwrap().messages[0].data.as_slice()).unwrap();
-    assert_eq!(
-        list.entries
-            .iter()
-            .map(|entry| (
-                entry.key,
-                entry.refcount,
-                entry.rich_text_payload.as_ref().unwrap().identifier
-            ))
-            .collect::<Vec<_>>(),
-        [(2, 1, 51), (3, 1, 54)]
-    );
-    let payload = tst::RichTextPayloadArchive::decode(
-        archive.object(54).unwrap().messages[0].data.as_slice(),
-    )
-    .unwrap();
-    assert_eq!(payload.storage.identifier, 53);
-    assert_eq!(payload.cellid.packed_data, 1 << 16);
-    let storage =
-        tswp::StorageArchive::decode(archive.object(53).unwrap().messages[0].data.as_slice())
-            .unwrap();
-    assert_eq!(storage.text.concat(), "Independent");
-}
-
-#[test]
-fn replacing_rich_text_releases_list_and_payload_objects() {
-    let mut editor = NumbersEditor::from_package(test_package_with_rich_text(false)).unwrap();
-    editor.set_cell(10, 0, 1, cell_number(42.25)).unwrap();
-
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        document.sheets().unwrap()[0].tables[0]
-            .get_cell(0, 1)
-            .unwrap()
-            .as_number(),
-        Some(42.25)
-    );
-    let archive = editor.package().archive("Index/Document.iwa").unwrap();
-    let list =
-        TableDataList::decode(archive.object(50).unwrap().messages[0].data.as_slice()).unwrap();
-    assert!(list.entries.is_empty());
-    assert!(archive.object(51).is_none());
-    assert!(archive.object(52).is_none());
-}
-
-#[test]
-fn segmented_string_entries_round_trip_and_remain_interned() {
-    let mut package = test_package();
-    move_table_data_list_entries_to_segment(&mut package, 20, 60);
-    let before = NumbersDocument::from_bytes(&package.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        before.sheets().unwrap()[0].tables[0].get_cell(0, 1),
-        Some(&CellValue::Text("Original".to_owned()))
-    );
-
-    let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor
-        .set_cell(10, 0, 2, CellValue::Text("Original".to_owned()))
-        .unwrap();
-    editor
-        .set_cell(10, 0, 1, CellValue::Text("Updated".to_owned()))
-        .unwrap();
-
-    let archive = editor.package().archive("Index/Document.iwa").unwrap();
-    let root =
-        TableDataList::decode(archive.object(20).unwrap().messages[0].data.as_slice()).unwrap();
-    assert_eq!(root.segments[0].identifier, 60);
-    assert_eq!(root.entries.len(), 1);
-    assert_eq!(root.entries[0].string.as_deref(), Some("Updated"));
-    let segment =
-        TableDataListSegment::decode(archive.object(60).unwrap().messages[0].data.as_slice())
-            .unwrap();
-    assert_eq!(segment.entries.len(), 1);
-    assert_eq!(segment.entries[0].string.as_deref(), Some("Original"));
-    assert_eq!(segment.entries[0].refcount, 1);
-    assert_eq!(segment.key_range.location, 1);
-    assert_eq!(segment.key_range.length, 1);
-
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
-    assert_eq!(
-        table.get_cell(0, 1),
-        Some(&CellValue::Text("Updated".to_owned()))
-    );
-    assert_eq!(
-        table.get_cell(0, 2),
-        Some(&CellValue::Text("Original".to_owned()))
     );
 }
 
@@ -1381,7 +1173,7 @@ fn segmented_formula_entries_are_reused_and_released() {
     );
     let mut editor = NumbersEditor::from_package(package).unwrap();
     editor.set_formula(10, 1, 0, expression).unwrap();
-    editor.set_cell(10, 0, 0, cell_number(7.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 0, 0, cell_number(7.0)).unwrap();
 
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     let segment =
@@ -1399,47 +1191,6 @@ fn segmented_formula_entries_are_reused_and_released() {
 }
 
 #[test]
-fn segmented_shared_rich_text_uses_copy_on_write_and_cleans_up() {
-    let mut package = test_package_with_rich_text(true);
-    move_table_data_list_entries_to_segment(&mut package, 50, 60);
-    let document = NumbersDocument::from_bytes(&package.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(0, 1),
-        Some(&CellValue::Text("Original Rich".to_owned()))
-    );
-
-    let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor
-        .set_cell(10, 0, 1, CellValue::Text("Independent".to_owned()))
-        .unwrap();
-    let archive = editor.package().archive("Index/Document.iwa").unwrap();
-    let root =
-        TableDataList::decode(archive.object(50).unwrap().messages[0].data.as_slice()).unwrap();
-    assert_eq!(root.entries.len(), 1);
-    assert_eq!(root.entries[0].key, 3);
-    let segment =
-        TableDataListSegment::decode(archive.object(60).unwrap().messages[0].data.as_slice())
-            .unwrap();
-    assert_eq!(segment.entries[0].refcount, 1);
-
-    editor.set_cell(10, 0, 2, cell_number(9.0)).unwrap();
-    let archive = editor.package().archive("Index/Document.iwa").unwrap();
-    let root =
-        TableDataList::decode(archive.object(50).unwrap().messages[0].data.as_slice()).unwrap();
-    assert!(root.segments.is_empty());
-    assert!(archive.object(60).is_none());
-    assert!(archive.object(51).is_none());
-    assert!(archive.object(52).is_none());
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
-    assert_eq!(
-        table.get_cell(0, 1),
-        Some(&CellValue::Text("Independent".to_owned()))
-    );
-    assert_eq!(table.get_cell(0, 2).unwrap().as_number(), Some(9.0));
-}
-
-#[test]
 fn formula_error_cells_release_root_and_segmented_list_entries() {
     for segmented in [false, true] {
         let mut package = test_package_with_formula_error();
@@ -1453,7 +1204,7 @@ fn formula_error_cells_release_root_and_segmented_list_entries() {
         );
 
         let mut editor = NumbersEditor::from_package(package).unwrap();
-        editor.set_cell(10, 0, 1, cell_number(4.5)).unwrap();
+        crate::numbers::editor::set_cell_fixture(&mut editor, 10, 0, 1, cell_number(4.5)).unwrap();
         let archive = editor.package().archive("Index/Document.iwa").unwrap();
         let errors =
             TableDataList::decode(archive.object(22).unwrap().messages[0].data.as_slice()).unwrap();
@@ -1505,12 +1256,12 @@ fn cell_comment_crud_preserves_value_and_comment_metadata() {
     assert_eq!(updated.comment.creation_date_seconds, Some(123.5));
     assert_eq!(updated.comment.storage_uuid, original.comment.storage_uuid);
 
-    editor.set_cell(10, 0, 1, cell_number(8.5)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 0, 1, cell_number(8.5)).unwrap();
     assert_eq!(
         editor.cell_comment(10, 0, 1).unwrap().unwrap().comment.text,
         "Updated comment"
     );
-    editor.clear_cell(10, 0, 1).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 0, 1, CellValue::Empty).unwrap();
     assert!(editor.cell_comment(10, 0, 1).unwrap().is_some());
 
     editor.clear_cell_comment(10, 0, 1).unwrap();
@@ -1708,7 +1459,7 @@ fn creates_comment_table_and_comment_only_cell_when_missing() {
     assert_eq!(table.get_cell(1, 2), Some(&CellValue::Empty));
     assert_eq!(table.get_comment(1, 2).unwrap().text, "Created comment");
 
-    editor.set_cell(10, 1, 2, cell_number(42.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 2, cell_number(42.0)).unwrap();
     editor.clear_cell_comment(10, 1, 2).unwrap();
     assert!(editor.cell_comment(10, 1, 2).unwrap().is_none());
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1856,51 +1607,6 @@ fn public_reader_applies_tile_row_origins() {
 }
 
 #[test]
-fn cell_edits_keep_sparse_row_headers_in_lockstep() {
-    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
-
-    editor.set_cell(10, 3, 0, cell_number(1.0)).unwrap();
-    editor.set_cell(10, 3, 2, CellValue::Boolean(true)).unwrap();
-    let bucket = row_header_bucket(editor.package(), 42);
-    assert_eq!(
-        bucket
-            .headers
-            .iter()
-            .map(|header| (header.index, header.number_of_cells))
-            .collect::<Vec<_>>(),
-        [(0, 1), (3, 2)]
-    );
-
-    editor.clear_cell(10, 3, 0).unwrap();
-    let bucket = row_header_bucket(editor.package(), 42);
-    assert_eq!(bucket.headers[1].number_of_cells, 1);
-
-    editor.clear_cell(10, 3, 2).unwrap();
-    let bucket = row_header_bucket(editor.package(), 42);
-    assert_eq!(
-        bucket
-            .headers
-            .iter()
-            .map(|header| (header.index, header.number_of_cells))
-            .collect::<Vec<_>>(),
-        [(0, 1)]
-    );
-    let archive = editor.package().archive("Index/Document.iwa").unwrap();
-    let tile = Tile::decode(archive.object(30).unwrap().messages[0].data.as_slice()).unwrap();
-    assert!(tile.row_infos.iter().all(|row| row.tile_row_index != 3));
-}
-
-fn row_header_bucket(package: &IWorkPackage, identifier: u64) -> tst::HeaderStorageBucket {
-    let archive = package.archive("Index/Document.iwa").unwrap();
-    tst::HeaderStorageBucket::decode(
-        archive.object(identifier).unwrap().messages[0]
-            .data
-            .as_slice(),
-    )
-    .unwrap()
-}
-
-#[test]
 fn formula_writes_intern_validate_and_release_references() {
     let mut editor = NumbersEditor::from_package(test_package()).unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
@@ -1934,7 +1640,8 @@ fn formula_writes_intern_validate_and_release_references() {
     );
     assert_eq!(table.get_cell(1, 0), table.get_cell(0, 0));
 
-    editor.set_cell(table_id, 0, 0, cell_number(42.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, table_id, 0, 0, cell_number(42.0))
+        .unwrap();
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     let formulas =
         TableDataList::decode(archive.object(21).unwrap().messages[0].data.as_slice()).unwrap();
@@ -2075,7 +1782,8 @@ fn local_reference_formulas_write_exact_calculation_engine_edges() {
     .unwrap();
     assert_eq!(tile.cell_records[0].expanded_edges.as_ref(), Some(edges));
 
-    editor.clear_cell(table_id, 3, 2).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, table_id, 3, 2, CellValue::Empty)
+        .unwrap();
     let archive = editor
         .package()
         .archive("Index/CalculationEngine.iwa")
@@ -2099,164 +1807,10 @@ fn local_reference_formulas_write_exact_calculation_engine_edges() {
 }
 
 #[test]
-fn cell_write_refreshes_transitive_formula_caches_in_dependency_order() {
-    use crate::numbers::FormulaBinaryOperator;
-
-    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
-    editor.set_cell(10, 1, 1, cell_number(2.0)).unwrap();
-    editor
-        .set_formula_with_cached_value(
-            10,
-            1,
-            2,
-            FormulaExpression::binary(
-                FormulaBinaryOperator::Add,
-                FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 1)),
-                FormulaExpression::Number(1.0),
-            ),
-            cached_number(3.0),
-        )
-        .unwrap();
-    editor
-        .set_formula_with_cached_value(
-            10,
-            1,
-            3,
-            FormulaExpression::binary(
-                FormulaBinaryOperator::Multiply,
-                FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 2)),
-                FormulaExpression::Number(2.0),
-            ),
-            cached_number(6.0),
-        )
-        .unwrap();
-
-    editor.set_cell(10, 1, 1, cell_number(4.0)).unwrap();
-
-    assert_eq!(
-        cached_formula_scalar(&editor, 10, 1, 2),
-        cached_scalar_number(5.0)
-    );
-    assert_eq!(
-        cached_formula_scalar(&editor, 10, 1, 3),
-        cached_scalar_number(10.0)
-    );
-}
-
-#[test]
-fn cell_batch_roundtrips_mixed_values_and_clear() {
-    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
-    let applied = editor
-        .set_cells(
-            10,
-            [
-                TableCellUpdate::new(0, 0, CellValue::Text("Batch".to_owned())),
-                TableCellUpdate::new(1, 1, cell_number(42.5)),
-                TableCellUpdate::new(2, 2, CellValue::Boolean(true)),
-                TableCellUpdate::clear(0, 1),
-            ],
-        )
-        .unwrap();
-
-    assert_eq!(applied, 4);
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
-    assert_eq!(
-        table.get_cell(0, 0),
-        Some(&CellValue::Text("Batch".to_owned()))
-    );
-    assert_eq!(table.get_cell(1, 1), Some(&cell_number(42.5)));
-    assert_eq!(table.get_cell(2, 2), Some(&CellValue::Boolean(true)));
-    assert!(table.get_cell(0, 1).is_none());
-}
-
-#[test]
-fn cell_batch_refreshes_formula_chain_from_final_state() {
-    use crate::numbers::FormulaBinaryOperator;
-
-    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
-    editor.set_cell(10, 1, 1, cell_number(2.0)).unwrap();
-    editor.set_cell(10, 2, 1, cell_number(3.0)).unwrap();
-    editor
-        .set_formula_with_cached_value(
-            10,
-            1,
-            2,
-            FormulaExpression::binary(
-                FormulaBinaryOperator::Add,
-                FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 1)),
-                FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(2, 1)),
-            ),
-            cached_number(5.0),
-        )
-        .unwrap();
-    editor
-        .set_formula_with_cached_value(
-            10,
-            1,
-            3,
-            FormulaExpression::binary(
-                FormulaBinaryOperator::Multiply,
-                FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 2)),
-                FormulaExpression::Number(2.0),
-            ),
-            cached_number(10.0),
-        )
-        .unwrap();
-
-    let applied = editor
-        .set_cells(
-            10,
-            [
-                TableCellUpdate::new(1, 1, cell_number(7.0)),
-                TableCellUpdate::new(2, 1, cell_number(11.0)),
-            ],
-        )
-        .unwrap();
-
-    assert_eq!(applied, 2);
-    assert_eq!(
-        cached_formula_scalar(&editor, 10, 1, 2),
-        cached_scalar_number(18.0)
-    );
-    assert_eq!(
-        cached_formula_scalar(&editor, 10, 1, 3),
-        cached_scalar_number(36.0)
-    );
-}
-
-#[test]
-fn cell_batch_rejects_invalid_inputs_transactionally() {
-    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
-    let before = editor.to_bytes().unwrap();
-    assert!(CellValue::number(f64::NAN).is_err());
-
-    for updates in [
-        vec![
-            TableCellUpdate::new(0, 0, cell_number(1.0)),
-            TableCellUpdate::new(0, 0, cell_number(2.0)),
-        ],
-        vec![TableCellUpdate::new(4, 0, cell_number(1.0))],
-        vec![TableCellUpdate::new(
-            0,
-            0,
-            CellValue::Formula("=1".to_owned()),
-        )],
-    ] {
-        assert!(editor.set_cells(10, updates).is_err());
-        assert_eq!(editor.to_bytes().unwrap(), before);
-    }
-    assert_eq!(editor.set_cells(10, []).unwrap(), 0);
-    assert_eq!(editor.to_bytes().unwrap(), before);
-    assert!(editor.set_cells(999, []).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
-}
-
-#[test]
 fn cell_write_refreshes_aggregate_range_formula_cache() {
     let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
-    editor.set_cell(10, 1, 1, cell_number(2.0)).unwrap();
-    editor.set_cell(10, 2, 1, cell_number(3.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(2.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 2, 1, cell_number(3.0)).unwrap();
     editor
         .set_formula_with_cached_value(
             10,
@@ -2273,7 +1827,7 @@ fn cell_write_refreshes_aggregate_range_formula_cache() {
         )
         .unwrap();
 
-    editor.set_cell(10, 1, 1, cell_number(4.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(4.0)).unwrap();
 
     assert_eq!(
         cached_formula_scalar(&editor, 10, 3, 2),
@@ -2284,7 +1838,7 @@ fn cell_write_refreshes_aggregate_range_formula_cache() {
 #[test]
 fn cell_write_refreshes_typed_boolean_formula_cache() {
     let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
-    editor.set_cell(10, 1, 1, cell_number(1.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(1.0)).unwrap();
     editor
         .set_formula_with_cached_value(
             10,
@@ -2299,7 +1853,7 @@ fn cell_write_refreshes_typed_boolean_formula_cache() {
         )
         .unwrap();
 
-    editor.set_cell(10, 1, 1, cell_number(2.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(2.0)).unwrap();
 
     assert_eq!(
         cached_formula_scalar(&editor, 10, 1, 2),
@@ -2310,8 +1864,8 @@ fn cell_write_refreshes_typed_boolean_formula_cache() {
 #[test]
 fn cell_write_refreshes_all_supported_numeric_aggregates() {
     let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
-    editor.set_cell(10, 1, 1, cell_number(2.0)).unwrap();
-    editor.set_cell(10, 2, 1, cell_number(4.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(2.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 2, 1, cell_number(4.0)).unwrap();
     for (row, function, cached) in [
         (0, "AVERAGE", 3.0),
         (1, "COUNT", 2.0),
@@ -2335,7 +1889,7 @@ fn cell_write_refreshes_all_supported_numeric_aggregates() {
             .unwrap();
     }
 
-    editor.set_cell(10, 1, 1, cell_number(6.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(6.0)).unwrap();
 
     for (row, expected) in [(0, 5.0), (1, 2.0), (2, 4.0), (3, 6.0)] {
         assert_eq!(
@@ -2348,7 +1902,7 @@ fn cell_write_refreshes_all_supported_numeric_aggregates() {
 #[test]
 fn cell_write_refreshes_cross_table_formula_cache() {
     let mut editor = NumbersEditor::from_package(test_package_with_cross_table_engine()).unwrap();
-    editor.set_cell(11, 0, 1, cell_number(2.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 11, 0, 1, cell_number(2.0)).unwrap();
     editor
         .set_formula_with_cached_value(
             10,
@@ -2359,50 +1913,12 @@ fn cell_write_refreshes_cross_table_formula_cache() {
         )
         .unwrap();
 
-    editor.set_cell(11, 0, 1, cell_number(4.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 11, 0, 1, cell_number(4.0)).unwrap();
 
     assert_eq!(
         cached_formula_scalar(&editor, 10, 3, 2),
         cached_scalar_number(4.0)
     );
-}
-
-#[test]
-fn cell_write_rejects_unsupported_impacted_formula_transactionally() {
-    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
-    editor.set_cell(10, 1, 1, cell_number(0.0)).unwrap();
-    editor
-        .set_formula_with_cached_value(
-            10,
-            1,
-            2,
-            FormulaExpression::function(
-                "SIN",
-                [FormulaExpression::cell(
-                    crate::numbers::FormulaCellReference::relative(1, 1),
-                )],
-            ),
-            cached_number(0.0),
-        )
-        .unwrap();
-    let before = editor.to_bytes().unwrap();
-
-    let error = editor.set_cell(10, 1, 1, cell_number(1.0)).unwrap_err();
-
-    assert!(error.to_string().contains("SIN"));
-    assert_eq!(editor.to_bytes().unwrap(), before);
-
-    let error = editor
-        .set_cells(
-            10,
-            [
-                TableCellUpdate::new(1, 1, cell_number(2.0)),
-                TableCellUpdate::new(2, 1, cell_number(3.0)),
-            ],
-        )
-        .unwrap_err();
-    assert!(error.to_string().contains("SIN"));
-    assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 fn cached_formula_scalar(
@@ -2695,83 +2211,6 @@ fn whole_row_formula_ranges_round_trip_with_complete_external_edges() {
 }
 
 #[test]
-fn failed_edit_is_transactional() {
-    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
-    let table_id = editor.tables().unwrap()[0].object_id;
-    let before = editor.to_bytes().unwrap();
-    assert!(
-        editor
-            .set_cell(table_id, 0, 1, CellValue::Formula("1+1".to_string()))
-            .is_err()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), before);
-}
-
-#[test]
-fn formula_cells_can_be_cleared_with_refcount_cleanup() {
-    let mut package = test_package();
-    package
-        .update_archive("Index/Document.iwa", |archive| {
-            let formula_object = archive.object_mut(21).unwrap();
-            let formula_type = formula_object.messages[0].type_;
-            let mut formulas = TableDataList::decode(formula_object.messages[0].data.as_slice())?;
-            formulas.next_list_id = 2;
-            formulas.entries.push(tst::table_data_list::ListEntry {
-                key: 1,
-                refcount: 1,
-                string: None,
-                reference: None,
-                formula: Some(crate::protobuf::tsce::FormulaArchive::default()),
-                format: None,
-                custom_format: None,
-                rich_text_payload: None,
-                comment_storage: None,
-                import_warning_set: None,
-                cell_spec: None,
-            });
-            formula_object.replace_message(
-                0,
-                RawMessage {
-                    type_: formula_type,
-                    data: formulas.encode_to_vec(),
-                },
-            )?;
-
-            let tile_object = archive.object_mut(30).unwrap();
-            let tile_type = tile_object.messages[0].type_;
-            let mut tile = Tile::decode(tile_object.messages[0].data.as_slice())?;
-            let mut cells = split_row(&tile.row_infos[0])?;
-            let mut cell = BncCell::minimal();
-            cell.set_formula_reference(1);
-            cells[0] = Some(cell.encode());
-            rebuild_row(&mut tile.row_infos[0], &cells)?;
-            tile_object.replace_message(
-                0,
-                RawMessage {
-                    type_: tile_type,
-                    data: tile.encode_to_vec(),
-                },
-            )?;
-            Ok(())
-        })
-        .unwrap();
-
-    let mut editor = NumbersEditor::from_package(package).unwrap();
-    let table_id = editor.tables().unwrap()[0].object_id;
-    editor.clear_cell(table_id, 0, 0).unwrap();
-    let archive = editor.package().archive("Index/Document.iwa").unwrap();
-    let formula_object = archive.object(21).unwrap();
-    let formulas = TableDataList::decode(formula_object.messages[0].data.as_slice()).unwrap();
-    assert!(formulas.entries.is_empty());
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert!(
-        document.sheets().unwrap()[0].tables[0]
-            .get_cell(0, 0)
-            .is_none()
-    );
-}
-
-#[test]
 fn focused_table_lock_edits_round_trip_through_legacy_host_creation() {
     let editor = NumbersDocumentBuilder::new()
         .table_name("Locked Table")
@@ -2847,6 +2286,80 @@ fn focused_table_lock_edits_round_trip_through_legacy_host_creation() {
 }
 
 #[test]
+fn focused_cell_edit_round_trips_through_legacy_host_reader() {
+    let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/basic.numbers");
+    let mut editor = NumbersEditor::open(fixture).unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+
+    crate::numbers::editor::test_set_cell(
+        &mut editor,
+        table_id,
+        1,
+        2,
+        CellValue::Text("Focused host interop".to_owned()),
+    )
+    .unwrap();
+
+    assert_eq!(editor.tables().unwrap()[0].object_id, table_id);
+    let focused = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        focused
+            .table_cell(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                litchi_numbers::table::CellPosition::new(1, 2),
+            )
+            .unwrap()
+            .storage()
+            .value(),
+        Some(&CellValue::Text("Focused host interop".to_owned()))
+    );
+}
+
+#[test]
+fn builder_empty_table_accepts_focused_commit_apply_and_inverse() {
+    fn bytes(package: &FocusedNumbersPackage) -> Vec<u8> {
+        let mut output = Vec::new();
+        package.write_to(&mut output).unwrap();
+        output
+    }
+
+    let editor = NumbersDocumentBuilder::new()
+        .table_name("Focused Builder")
+        .table_dimensions(2, 3)
+        .build()
+        .unwrap();
+    let source = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let before = bytes(&source);
+    let position = litchi_numbers::table::CellPosition::new(1, 1);
+    let commit = source
+        .edit_table_cells(SheetSelector::index(0), TableSelector::index(0))
+        .unwrap()
+        .set(position, litchi_numbers::table::cells::Input::boolean(true))
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(matches!(
+        commit
+            .package()
+            .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
+            .unwrap()
+            .storage()
+            .value(),
+        Some(CellValue::Boolean(true))
+    ));
+
+    let replay = source.apply_table_cells(commit.patch()).unwrap();
+    assert_eq!(bytes(replay.package()), bytes(commit.package()));
+    let restored = commit
+        .package()
+        .apply_table_cells(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(bytes(restored.package()), before);
+}
+
+#[test]
 fn duplicates_populated_table_with_independent_storage() {
     let mut editor = NumbersEditor::from_package(test_package()).unwrap();
     let created = editor
@@ -2863,14 +2376,14 @@ fn duplicates_populated_table_with_independent_storage() {
     assert_eq!(tables[0].get_cell(0, 1).unwrap().as_text(), "Original");
     assert_eq!(tables[1].get_cell(0, 1).unwrap().as_text(), "Original");
 
-    editor
-        .set_cell(
-            created.object_id,
-            0,
-            1,
-            CellValue::Text("Independent".to_owned()),
-        )
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        created.object_id,
+        0,
+        1,
+        CellValue::Text("Independent".to_owned()),
+    )
+    .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let tables = &document.sheets().unwrap()[0].tables;
     assert_eq!(tables[0].get_cell(0, 1).unwrap().as_text(), "Original");
@@ -3428,15 +2941,20 @@ fn grows_and_truncates_blank_table_edges_with_uid_maps() {
     editor
         .resize_table(test_table_selector(&editor, 10), 6, 6)
         .unwrap();
-    editor
-        .set_cell(10, 5, 5, CellValue::Text("edge".to_owned()))
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        10,
+        5,
+        5,
+        CellValue::Text("edge".to_owned()),
+    )
+    .unwrap();
     assert!(
         editor
             .resize_table(test_table_selector(&editor, 10), 4, 4)
             .is_err()
     );
-    editor.clear_cell(10, 5, 5).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 5, 5, CellValue::Empty).unwrap();
     editor
         .resize_table(test_table_selector(&editor, 10), 3, 3)
         .unwrap();
@@ -3886,9 +3404,14 @@ fn table_column_insertion_preserves_explicit_stroke_layers_on_original_cells() {
 #[test]
 fn inserts_blank_table_row_and_shifts_cells_uids_headers_and_formulas() {
     let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
-    editor
-        .set_cell(10, 1, 1, CellValue::Text("Apples".to_owned()))
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        10,
+        1,
+        1,
+        CellValue::Text("Apples".to_owned()),
+    )
+    .unwrap();
     editor
         .set_formula(
             10,
@@ -4050,7 +3573,7 @@ fn row_insert_rejects_missing_destination_tile_transactionally() {
         })
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor.set_cell(10, 3, 0, cell_number(9.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 3, 0, cell_number(9.0)).unwrap();
     let before = editor.to_bytes().unwrap();
 
     assert!(
@@ -4375,8 +3898,8 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
     )
     .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor.set_cell(10, 1, 1, cell_number(2.0)).unwrap();
-    editor.set_cell(10, 2, 1, cell_number(3.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(2.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 2, 1, cell_number(3.0)).unwrap();
     editor
         .set_formula_with_cached_value(
             10,
@@ -4585,7 +4108,7 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
         .insert_entry(VERSIONED_ENGINE_ENTRY, engine)
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor.set_cell(10, 1, 1, cell_number(4.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(4.0)).unwrap();
     assert_eq!(
         cached_formula_scalar(&editor, 10, 3, 1),
         cached_scalar_number(7.0)
@@ -4671,9 +4194,14 @@ fn row_insert_rejects_incoming_cross_table_formula_transactionally() {
 #[test]
 fn row_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
     let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
-    editor
-        .set_cell(10, 1, 1, CellValue::Text("opaque".to_owned()))
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        10,
+        1,
+        1,
+        CellValue::Text("opaque".to_owned()),
+    )
+    .unwrap();
     editor
         .set_formula(10, 2, 2, FormulaExpression::Number(7.0))
         .unwrap();
@@ -4793,9 +4321,14 @@ fn row_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
 fn inserts_blank_table_column_and_shifts_cells_uids_headers_and_formulas() {
     let mut editor =
         NumbersEditor::from_package(test_package_with_column_headers_and_engine()).unwrap();
-    editor
-        .set_cell(10, 1, 1, CellValue::Text("Apples".to_owned()))
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        10,
+        1,
+        1,
+        CellValue::Text("Apples".to_owned()),
+    )
+    .unwrap();
     editor
         .set_formula(
             10,
@@ -5000,9 +4533,14 @@ fn column_insert_rejects_short_cell_offset_tables_transactionally() {
 fn column_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
     let mut editor =
         NumbersEditor::from_package(test_package_with_column_headers_and_engine()).unwrap();
-    editor
-        .set_cell(10, 1, 1, CellValue::Text("opaque".to_owned()))
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        10,
+        1,
+        1,
+        CellValue::Text("opaque".to_owned()),
+    )
+    .unwrap();
     editor
         .set_formula(10, 2, 2, FormulaExpression::Number(7.0))
         .unwrap();
@@ -5115,9 +4653,14 @@ fn column_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
 #[test]
 fn row_insert_then_delete_restores_exact_package_bytes() {
     let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
-    editor
-        .set_cell(10, 1, 1, CellValue::Text("Apples".to_owned()))
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        10,
+        1,
+        1,
+        CellValue::Text("Apples".to_owned()),
+    )
+    .unwrap();
     editor
         .set_formula(
             10,
@@ -5142,9 +4685,14 @@ fn row_insert_then_delete_restores_exact_package_bytes() {
 fn column_insert_then_delete_restores_exact_package_bytes() {
     let mut editor =
         NumbersEditor::from_package(test_package_with_column_headers_and_engine()).unwrap();
-    editor
-        .set_cell(10, 1, 1, CellValue::Text("Apples".to_owned()))
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        10,
+        1,
+        1,
+        CellValue::Text("Apples".to_owned()),
+    )
+    .unwrap();
     editor
         .set_formula(
             10,
@@ -5180,8 +4728,8 @@ fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
     )
     .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor.set_cell(10, 1, 1, cell_number(2.0)).unwrap();
-    editor.set_cell(10, 2, 1, cell_number(3.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(2.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 2, 1, cell_number(3.0)).unwrap();
     editor
         .set_formula(
             10,
@@ -5237,8 +4785,8 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
     )
     .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor.set_cell(10, 1, 1, cell_number(2.0)).unwrap();
-    editor.set_cell(10, 2, 1, cell_number(3.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(2.0)).unwrap();
+    crate::numbers::editor::set_cell_fixture(&mut editor, 10, 2, 1, cell_number(3.0)).unwrap();
     editor
         .set_formula(
             10,
@@ -5353,15 +4901,30 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
     )
     .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor
-        .set_cell(10, 0, 0, CellValue::Text("Header".to_owned()))
-        .unwrap();
-    editor
-        .set_cell(10, 1, 1, CellValue::Text("Body".to_owned()))
-        .unwrap();
-    editor
-        .set_cell(10, 3, 2, CellValue::Text("Footer".to_owned()))
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        10,
+        0,
+        0,
+        CellValue::Text("Header".to_owned()),
+    )
+    .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        10,
+        1,
+        1,
+        CellValue::Text("Body".to_owned()),
+    )
+    .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        10,
+        3,
+        2,
+        CellValue::Text("Footer".to_owned()),
+    )
+    .unwrap();
 
     editor
         .remove_table_row(test_table_selector(&editor, 10), RowDeletion::header(0))
@@ -5422,9 +4985,14 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
 fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
     let mut editor =
         NumbersEditor::from_package(test_package_with_column_headers_and_engine()).unwrap();
-    editor
-        .set_cell(10, 1, 1, CellValue::Text("discarded row".to_owned()))
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        10,
+        1,
+        1,
+        CellValue::Text("discarded row".to_owned()),
+    )
+    .unwrap();
     editor
         .set_formula(10, 2, 2, FormulaExpression::Number(7.0))
         .unwrap();
@@ -5441,9 +5009,14 @@ fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
         Some(&CellValue::Formula("=7".to_owned()))
     );
 
-    editor
-        .set_cell(10, 1, 1, CellValue::Text("discarded column".to_owned()))
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        10,
+        1,
+        1,
+        CellValue::Text("discarded column".to_owned()),
+    )
+    .unwrap();
     editor
         .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::body(1))
         .unwrap();
@@ -5803,91 +5376,6 @@ fn table_sort_order_rejects_malformed_nested_wire_transactionally() {
 }
 
 #[test]
-fn source_created_large_table_allocates_sparse_tiles_for_batch_writes() {
-    let mut editor = NumbersDocumentBuilder::new()
-        .table_dimensions(513, 2)
-        .build()
-        .unwrap();
-    let table_id = editor.tables().unwrap()[0].object_id;
-    let initial = attached_table_descriptor(editor.package(), table_id).unwrap();
-    assert_eq!(initial.model.base_data_store.tiles.tiles.len(), 1);
-    assert_eq!(initial.model.base_data_store.row_headers.buckets.len(), 1);
-
-    assert_eq!(
-        editor
-            .set_cells(
-                table_id,
-                [
-                    TableCellUpdate::new(512, 0, CellValue::Text("Last tile".to_owned())),
-                    TableCellUpdate::new(256, 1, CellValue::Text("Second tile".to_owned())),
-                ],
-            )
-            .unwrap(),
-        2
-    );
-
-    let descriptor = attached_table_descriptor(editor.package(), table_id).unwrap();
-    let tiles = &descriptor.model.base_data_store.tiles.tiles;
-    assert_eq!(
-        tiles.iter().map(|tile| tile.tileid).collect::<Vec<_>>(),
-        vec![0, 1, 2]
-    );
-    assert_eq!(
-        descriptor
-            .model
-            .base_data_store
-            .row_tile_tree
-            .nodes
-            .iter()
-            .map(|node| (node.key, node.value))
-            .collect::<Vec<_>>(),
-        vec![(0, 0), (256, 1), (512, 2)]
-    );
-    assert_eq!(descriptor.model.base_data_store.next_row_strip_id, 3);
-
-    let locations = object_locations(editor.package()).unwrap();
-    for tile in tiles.iter().skip(1) {
-        let archive = editor
-            .package()
-            .archive(&locations[&tile.tile.identifier])
-            .unwrap();
-        let tile = archive
-            .object(tile.tile.identifier)
-            .unwrap()
-            .messages
-            .iter()
-            .find_map(|message| Tile::decode(message.data.as_slice()).ok())
-            .unwrap();
-        assert_eq!(
-            tile.row_infos
-                .iter()
-                .map(|row| row.tile_row_index)
-                .collect::<Vec<_>>(),
-            vec![0]
-        );
-    }
-
-    let bytes = editor.to_bytes().unwrap();
-    let table = NumbersDocument::from_bytes(&bytes)
-        .unwrap()
-        .sheets()
-        .unwrap()
-        .remove(0)
-        .tables
-        .remove(0);
-    assert_eq!(
-        table.get_cell(256, 1),
-        Some(&CellValue::Text("Second tile".to_owned()))
-    );
-    assert_eq!(
-        table.get_cell(512, 0),
-        Some(&CellValue::Text("Last tile".to_owned()))
-    );
-    let reopened = NumbersEditor::from_bytes(&bytes).unwrap();
-    assert_eq!(reopened.tables().unwrap()[0].rows, 513);
-}
-
-#[test]
 fn source_created_sparse_boundary_supports_formula_and_comment_crud() {
     let mut editor = NumbersDocumentBuilder::new()
         .table_dimensions(257, 2)
@@ -5953,14 +5441,14 @@ fn source_created_large_table_allocates_header_buckets_only_when_needed() {
         .build()
         .unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
-    editor
-        .set_cell(
-            table_id,
-            SECOND_HEADER_BUCKET_ROW,
-            0,
-            CellValue::Text("Second header bucket".to_owned()),
-        )
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        table_id,
+        SECOND_HEADER_BUCKET_ROW,
+        0,
+        CellValue::Text("Second header bucket".to_owned()),
+    )
+    .unwrap();
 
     let descriptor = attached_table_descriptor(editor.package(), table_id).unwrap();
     assert_eq!(
@@ -6046,25 +5534,25 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
     )
     .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor
-        .set_cells(
-            table_id,
-            [
-                TableCellUpdate::new(0, 0, CellValue::Text("Region".to_owned())),
-                TableCellUpdate::new(0, 1, CellValue::Text("Q1".to_owned())),
-                TableCellUpdate::new(1, 0, CellValue::Text("Outside".to_owned())),
-                TableCellUpdate::new(1, 1, cell_number(50.0)),
-                TableCellUpdate::new(2, 0, CellValue::Text("South".to_owned())),
-                TableCellUpdate::new(2, 1, cell_number(98.0)),
-                TableCellUpdate::new(3, 0, CellValue::Text("Central".to_owned())),
-                TableCellUpdate::new(3, 1, cell_number(105.0)),
-                TableCellUpdate::new(4, 0, CellValue::Text("North".to_owned())),
-                TableCellUpdate::new(4, 1, cell_number(120.0)),
-                TableCellUpdate::new(5, 0, CellValue::Text("Total".to_owned())),
-                TableCellUpdate::new(5, 1, cell_number(323.0)),
-            ],
-        )
-        .unwrap();
+    crate::numbers::editor::apply_numbers_fixture(
+        &mut editor,
+        table_id,
+        [
+            TableCellUpdate::new(0, 0, CellValue::Text("Region".to_owned())),
+            TableCellUpdate::new(0, 1, CellValue::Text("Q1".to_owned())),
+            TableCellUpdate::new(1, 0, CellValue::Text("Outside".to_owned())),
+            TableCellUpdate::new(1, 1, cell_number(50.0)),
+            TableCellUpdate::new(2, 0, CellValue::Text("South".to_owned())),
+            TableCellUpdate::new(2, 1, cell_number(98.0)),
+            TableCellUpdate::new(3, 0, CellValue::Text("Central".to_owned())),
+            TableCellUpdate::new(3, 1, cell_number(105.0)),
+            TableCellUpdate::new(4, 0, CellValue::Text("North".to_owned())),
+            TableCellUpdate::new(4, 1, cell_number(120.0)),
+            TableCellUpdate::new(5, 0, CellValue::Text("Total".to_owned())),
+            TableCellUpdate::new(5, 1, cell_number(323.0)),
+        ],
+    )
+    .unwrap();
     editor
         .set_cell_comment(table_id, 2, 1, "Selected South comment")
         .unwrap();
@@ -6170,21 +5658,21 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
 #[test]
 fn table_sort_order_executes_stable_body_sort_and_remaps_row_uids() {
     let mut editor = NumbersEditor::from_package(test_package()).unwrap();
-    editor
-        .set_cells(
-            10,
-            [
-                TableCellUpdate::new(0, 0, CellValue::Text("C first".to_owned())),
-                TableCellUpdate::new(0, 1, cell_number(3.0)),
-                TableCellUpdate::new(1, 0, CellValue::Text("A".to_owned())),
-                TableCellUpdate::new(1, 1, cell_number(1.0)),
-                TableCellUpdate::new(2, 0, CellValue::Text("C second".to_owned())),
-                TableCellUpdate::new(2, 1, cell_number(3.0)),
-                TableCellUpdate::new(3, 0, CellValue::Text("B".to_owned())),
-                TableCellUpdate::new(3, 1, cell_number(2.0)),
-            ],
-        )
-        .unwrap();
+    crate::numbers::editor::apply_numbers_fixture(
+        &mut editor,
+        10,
+        [
+            TableCellUpdate::new(0, 0, CellValue::Text("C first".to_owned())),
+            TableCellUpdate::new(0, 1, cell_number(3.0)),
+            TableCellUpdate::new(1, 0, CellValue::Text("A".to_owned())),
+            TableCellUpdate::new(1, 1, cell_number(1.0)),
+            TableCellUpdate::new(2, 0, CellValue::Text("C second".to_owned())),
+            TableCellUpdate::new(2, 1, cell_number(3.0)),
+            TableCellUpdate::new(3, 0, CellValue::Text("B".to_owned())),
+            TableCellUpdate::new(3, 1, cell_number(2.0)),
+        ],
+    )
+    .unwrap();
     let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
         NumbersTableSortColumnIndex::new(1).unwrap(),
         NumbersTableSortDirection::Ascending,
@@ -6244,23 +5732,23 @@ fn source_created_table_executes_stable_plain_text_sort() {
         .build()
         .unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
-    editor
-        .set_cells(
-            table_id,
-            [
-                TableCellUpdate::new(0, 0, CellValue::Text("Name".to_owned())),
-                TableCellUpdate::new(0, 1, CellValue::Text("Marker".to_owned())),
-                TableCellUpdate::new(1, 0, CellValue::Text("zebra".to_owned())),
-                TableCellUpdate::new(1, 1, CellValue::Text("last".to_owned())),
-                TableCellUpdate::new(2, 0, CellValue::Text("apple".to_owned())),
-                TableCellUpdate::new(2, 1, CellValue::Text("first apple".to_owned())),
-                TableCellUpdate::new(3, 0, CellValue::Text("banana".to_owned())),
-                TableCellUpdate::new(3, 1, CellValue::Text("middle".to_owned())),
-                TableCellUpdate::new(4, 0, CellValue::Text("apple".to_owned())),
-                TableCellUpdate::new(4, 1, CellValue::Text("second apple".to_owned())),
-            ],
-        )
-        .unwrap();
+    crate::numbers::editor::apply_numbers_fixture(
+        &mut editor,
+        table_id,
+        [
+            TableCellUpdate::new(0, 0, CellValue::Text("Name".to_owned())),
+            TableCellUpdate::new(0, 1, CellValue::Text("Marker".to_owned())),
+            TableCellUpdate::new(1, 0, CellValue::Text("zebra".to_owned())),
+            TableCellUpdate::new(1, 1, CellValue::Text("last".to_owned())),
+            TableCellUpdate::new(2, 0, CellValue::Text("apple".to_owned())),
+            TableCellUpdate::new(2, 1, CellValue::Text("first apple".to_owned())),
+            TableCellUpdate::new(3, 0, CellValue::Text("banana".to_owned())),
+            TableCellUpdate::new(3, 1, CellValue::Text("middle".to_owned())),
+            TableCellUpdate::new(4, 0, CellValue::Text("apple".to_owned())),
+            TableCellUpdate::new(4, 1, CellValue::Text("second apple".to_owned())),
+        ],
+    )
+    .unwrap();
     let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
         NumbersTableSortColumnIndex::new(0).unwrap(),
         NumbersTableSortDirection::Ascending,
@@ -6338,17 +5826,17 @@ fn table_sort_resolves_plain_text_keys_from_segmented_string_storage() {
     const STRING_SEGMENT_ID: u64 = 60;
 
     let mut editor = NumbersEditor::from_package(test_package()).unwrap();
-    editor
-        .set_cells(
-            TABLE_ID,
-            [
-                TableCellUpdate::new(0, 0, CellValue::Text("zebra".to_owned())),
-                TableCellUpdate::new(1, 0, CellValue::Text("apple".to_owned())),
-                TableCellUpdate::new(2, 0, CellValue::Text("banana".to_owned())),
-                TableCellUpdate::new(3, 0, CellValue::Text("apple".to_owned())),
-            ],
-        )
-        .unwrap();
+    crate::numbers::editor::apply_numbers_fixture(
+        &mut editor,
+        TABLE_ID,
+        [
+            TableCellUpdate::new(0, 0, CellValue::Text("zebra".to_owned())),
+            TableCellUpdate::new(1, 0, CellValue::Text("apple".to_owned())),
+            TableCellUpdate::new(2, 0, CellValue::Text("banana".to_owned())),
+            TableCellUpdate::new(3, 0, CellValue::Text("apple".to_owned())),
+        ],
+    )
+    .unwrap();
     editor
         .set_table_sort_order(
             TableSelector::index(0),
@@ -6398,17 +5886,17 @@ fn table_sort_rejects_missing_plain_text_storage_transactionally() {
     const STRING_LIST_ID: u64 = 20;
 
     let mut editor = NumbersEditor::from_package(test_package()).unwrap();
-    editor
-        .set_cells(
-            TABLE_ID,
-            [
-                TableCellUpdate::new(0, 0, CellValue::Text("zebra".to_owned())),
-                TableCellUpdate::new(1, 0, CellValue::Text("apple".to_owned())),
-                TableCellUpdate::new(2, 0, CellValue::Text("banana".to_owned())),
-                TableCellUpdate::new(3, 0, CellValue::Text("apple".to_owned())),
-            ],
-        )
-        .unwrap();
+    crate::numbers::editor::apply_numbers_fixture(
+        &mut editor,
+        TABLE_ID,
+        [
+            TableCellUpdate::new(0, 0, CellValue::Text("zebra".to_owned())),
+            TableCellUpdate::new(1, 0, CellValue::Text("apple".to_owned())),
+            TableCellUpdate::new(2, 0, CellValue::Text("banana".to_owned())),
+            TableCellUpdate::new(3, 0, CellValue::Text("apple".to_owned())),
+        ],
+    )
+    .unwrap();
     editor
         .set_table_sort_order(
             TableSelector::index(0),
@@ -6465,23 +5953,23 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
     )
     .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor
-        .set_cells(
-            table_id,
-            [
-                TableCellUpdate::new(0, 0, CellValue::Text("Region".to_owned())),
-                TableCellUpdate::new(0, 1, CellValue::Text("Q1".to_owned())),
-                TableCellUpdate::new(1, 0, CellValue::Text("North".to_owned())),
-                TableCellUpdate::new(1, 1, cell_number(120.0)),
-                TableCellUpdate::new(2, 0, CellValue::Text("South".to_owned())),
-                TableCellUpdate::new(2, 1, cell_number(98.0)),
-                TableCellUpdate::new(3, 0, CellValue::Text("Central".to_owned())),
-                TableCellUpdate::new(3, 1, cell_number(105.0)),
-                TableCellUpdate::new(4, 0, CellValue::Text("Total".to_owned())),
-                TableCellUpdate::new(4, 1, cell_number(323.0)),
-            ],
-        )
-        .unwrap();
+    crate::numbers::editor::apply_numbers_fixture(
+        &mut editor,
+        table_id,
+        [
+            TableCellUpdate::new(0, 0, CellValue::Text("Region".to_owned())),
+            TableCellUpdate::new(0, 1, CellValue::Text("Q1".to_owned())),
+            TableCellUpdate::new(1, 0, CellValue::Text("North".to_owned())),
+            TableCellUpdate::new(1, 1, cell_number(120.0)),
+            TableCellUpdate::new(2, 0, CellValue::Text("South".to_owned())),
+            TableCellUpdate::new(2, 1, cell_number(98.0)),
+            TableCellUpdate::new(3, 0, CellValue::Text("Central".to_owned())),
+            TableCellUpdate::new(3, 1, cell_number(105.0)),
+            TableCellUpdate::new(4, 0, CellValue::Text("Total".to_owned())),
+            TableCellUpdate::new(4, 1, cell_number(323.0)),
+        ],
+    )
+    .unwrap();
     editor
         .set_cell_comment(table_id, 2, 1, "South comment follows row")
         .unwrap();
@@ -6592,23 +6080,23 @@ fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
     )
     .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor
-        .set_cells(
-            table_id,
-            [
-                TableCellUpdate::new(0, 0, CellValue::Text("Region".to_owned())),
-                TableCellUpdate::new(0, 1, CellValue::Text("Q1".to_owned())),
-                TableCellUpdate::new(1, 0, CellValue::Text("North".to_owned())),
-                TableCellUpdate::new(1, 1, cell_number(120.0)),
-                TableCellUpdate::new(2, 0, CellValue::Text("South".to_owned())),
-                TableCellUpdate::new(2, 1, cell_number(98.0)),
-                TableCellUpdate::new(3, 0, CellValue::Text("Central".to_owned())),
-                TableCellUpdate::new(3, 1, cell_number(105.0)),
-                TableCellUpdate::new(4, 0, CellValue::Text("Total".to_owned())),
-                TableCellUpdate::new(4, 1, cell_number(323.0)),
-            ],
-        )
-        .unwrap();
+    crate::numbers::editor::apply_numbers_fixture(
+        &mut editor,
+        table_id,
+        [
+            TableCellUpdate::new(0, 0, CellValue::Text("Region".to_owned())),
+            TableCellUpdate::new(0, 1, CellValue::Text("Q1".to_owned())),
+            TableCellUpdate::new(1, 0, CellValue::Text("North".to_owned())),
+            TableCellUpdate::new(1, 1, cell_number(120.0)),
+            TableCellUpdate::new(2, 0, CellValue::Text("South".to_owned())),
+            TableCellUpdate::new(2, 1, cell_number(98.0)),
+            TableCellUpdate::new(3, 0, CellValue::Text("Central".to_owned())),
+            TableCellUpdate::new(3, 1, cell_number(105.0)),
+            TableCellUpdate::new(4, 0, CellValue::Text("Total".to_owned())),
+            TableCellUpdate::new(4, 1, cell_number(323.0)),
+        ],
+    )
+    .unwrap();
     let hidden = HiddenAxes::new([AxisIndex::row(2)]).unwrap();
     editor
         .set_table_hidden_axes(test_table_selector(&editor, table_id), &hidden)
@@ -6708,17 +6196,17 @@ fn table_sort_moves_rows_across_tile_boundaries() {
         })
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor
-        .set_cells(
-            10,
-            [
-                TableCellUpdate::new(0, 0, cell_number(3.0)),
-                TableCellUpdate::new(1, 0, cell_number(2.0)),
-                TableCellUpdate::new(2, 0, cell_number(1.0)),
-                TableCellUpdate::new(3, 0, cell_number(0.0)),
-            ],
-        )
-        .unwrap();
+    crate::numbers::editor::apply_numbers_fixture(
+        &mut editor,
+        10,
+        [
+            TableCellUpdate::new(0, 0, cell_number(3.0)),
+            TableCellUpdate::new(1, 0, cell_number(2.0)),
+            TableCellUpdate::new(2, 0, cell_number(1.0)),
+            TableCellUpdate::new(3, 0, cell_number(0.0)),
+        ],
+    )
+    .unwrap();
     editor
         .set_table_sort_order(
             TableSelector::index(0),
@@ -6802,17 +6290,17 @@ fn table_sort_execution_keeps_explicit_border_layers_attached_to_cells() {
     )
     .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    editor
-        .set_cells(
-            10,
-            [
-                TableCellUpdate::new(0, 1, CellValue::Text("Q1".to_owned())),
-                TableCellUpdate::new(1, 1, cell_number(3.0)),
-                TableCellUpdate::new(2, 1, cell_number(1.0)),
-                TableCellUpdate::new(3, 1, cell_number(2.0)),
-            ],
-        )
-        .unwrap();
+    crate::numbers::editor::apply_numbers_fixture(
+        &mut editor,
+        10,
+        [
+            TableCellUpdate::new(0, 1, CellValue::Text("Q1".to_owned())),
+            TableCellUpdate::new(1, 1, cell_number(3.0)),
+            TableCellUpdate::new(2, 1, cell_number(1.0)),
+            TableCellUpdate::new(3, 1, cell_number(2.0)),
+        ],
+    )
+    .unwrap();
     editor
         .set_table_sort_order(
             TableSelector::index(0),
@@ -6876,17 +6364,17 @@ fn table_sort_distinguishes_empty_and_populated_conditional_style_storage() {
         add_test_app_native_topology_allocations(&mut package);
         add_test_conditional_style_storage(&mut package, has_entries);
         let mut editor = NumbersEditor::from_package(package).unwrap();
-        editor
-            .set_cells(
-                10,
-                [
-                    TableCellUpdate::new(0, 1, cell_number(3.0)),
-                    TableCellUpdate::new(1, 1, cell_number(1.0)),
-                    TableCellUpdate::new(2, 1, cell_number(4.0)),
-                    TableCellUpdate::new(3, 1, cell_number(2.0)),
-                ],
-            )
-            .unwrap();
+        crate::numbers::editor::apply_numbers_fixture(
+            &mut editor,
+            10,
+            [
+                TableCellUpdate::new(0, 1, cell_number(3.0)),
+                TableCellUpdate::new(1, 1, cell_number(1.0)),
+                TableCellUpdate::new(2, 1, cell_number(4.0)),
+                TableCellUpdate::new(3, 1, cell_number(2.0)),
+            ],
+        )
+        .unwrap();
         editor
             .set_table_sort_order(
                 TableSelector::index(0),
@@ -6996,17 +6484,17 @@ fn table_sort_execution_rejects_unsupported_state_transactionally() {
     let mut spill_package = test_package_with_calculation_engine();
     add_test_spill_dependency(&mut spill_package);
     let mut spill_editor = NumbersEditor::from_package(spill_package).unwrap();
-    spill_editor
-        .set_cells(
-            10,
-            [
-                TableCellUpdate::new(0, 1, cell_number(3.0)),
-                TableCellUpdate::new(1, 1, cell_number(1.0)),
-                TableCellUpdate::new(2, 1, cell_number(4.0)),
-                TableCellUpdate::new(3, 1, cell_number(2.0)),
-            ],
-        )
-        .unwrap();
+    crate::numbers::editor::apply_numbers_fixture(
+        &mut spill_editor,
+        10,
+        [
+            TableCellUpdate::new(0, 1, cell_number(3.0)),
+            TableCellUpdate::new(1, 1, cell_number(1.0)),
+            TableCellUpdate::new(2, 1, cell_number(4.0)),
+            TableCellUpdate::new(3, 1, cell_number(2.0)),
+        ],
+    )
+    .unwrap();
     spill_editor
         .set_table_sort_order(
             TableSelector::index(0),
@@ -7030,16 +6518,16 @@ fn table_sort_execution_rejects_unsupported_state_transactionally() {
     formula_editor
         .set_formula(10, 0, 1, FormulaExpression::Number(3.0))
         .unwrap();
-    formula_editor
-        .set_cells(
-            10,
-            [
-                TableCellUpdate::new(1, 1, cell_number(1.0)),
-                TableCellUpdate::new(2, 1, cell_number(4.0)),
-                TableCellUpdate::new(3, 1, cell_number(2.0)),
-            ],
-        )
-        .unwrap();
+    crate::numbers::editor::apply_numbers_fixture(
+        &mut formula_editor,
+        10,
+        [
+            TableCellUpdate::new(1, 1, cell_number(1.0)),
+            TableCellUpdate::new(2, 1, cell_number(4.0)),
+            TableCellUpdate::new(3, 1, cell_number(2.0)),
+        ],
+    )
+    .unwrap();
     formula_editor
         .set_table_sort_order(
             TableSelector::index(0),
@@ -7396,9 +6884,14 @@ fn moves_populated_table_between_sheets_losslessly() {
     assert!(table_data.ends_with(&table_unknown));
     assert!(table_data.windows(2).any(|window| window == [0x88, 0x06]));
 
-    editor
-        .set_cell(10, 0, 0, CellValue::Text("Moved cell".to_owned()))
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        10,
+        0,
+        0,
+        CellValue::Text("Moved cell".to_owned()),
+    )
+    .unwrap();
     assert_eq!(
         NumbersDocument::from_bytes(&editor.to_bytes().unwrap())
             .unwrap()
@@ -7510,7 +7003,9 @@ fn detached_table_models_are_not_exposed_or_writable() {
     assert!(editor.tables().unwrap().is_empty());
 
     let before = editor.to_bytes().unwrap();
-    assert!(editor.set_cell(10, 0, 0, cell_number(1.0)).is_err());
+    assert!(
+        crate::numbers::editor::test_set_cell(&mut editor, 10, 0, 0, cell_number(1.0)).is_err()
+    );
     assert!(
         editor
             .resize_table(test_table_selector(&editor, 10), 5, 5)
@@ -7564,14 +7059,14 @@ fn creates_independent_empty_table_on_an_existing_sheet() {
         [cloned_model.base_data_store.string_table.identifier]
     );
 
-    editor
-        .set_cell(
-            created.object_id,
-            0,
-            0,
-            CellValue::Text("Independent".to_owned()),
-        )
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        created.object_id,
+        0,
+        0,
+        CellValue::Text("Independent".to_owned()),
+    )
+    .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let sheets = document.sheets().unwrap();
     assert_eq!(
@@ -7627,14 +7122,14 @@ fn recreates_first_table_after_removing_the_last_scratch_table() {
         .unwrap();
     assert_eq!((created.rows, created.columns), (3, 2));
     assert_eq!(created.name, "First runtime");
-    editor
-        .set_cell(
-            created.object_id,
-            2,
-            1,
-            CellValue::Text("bootstrapped".to_owned()),
-        )
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        created.object_id,
+        2,
+        1,
+        CellValue::Text("bootstrapped".to_owned()),
+    )
+    .unwrap();
 
     let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap())
@@ -7911,131 +7406,6 @@ fn test_package_with_formula_error() -> IWorkPackage {
                     data: tile.encode_to_vec(),
                 },
             )?;
-            Ok(())
-        })
-        .unwrap();
-    package
-}
-
-fn test_package_with_rich_text(shared: bool) -> IWorkPackage {
-    let mut package = test_package();
-    package
-        .update_archive("Index/Document.iwa", |archive| {
-            let model_object = archive.object_mut(10).unwrap();
-            let model_type = model_object.messages[0].type_;
-            let mut model = TableModelArchive::decode(model_object.messages[0].data.as_slice())?;
-            model.base_data_store.rich_text_table = Some(Reference {
-                identifier: 50,
-                ..Default::default()
-            });
-            model_object.replace_message(
-                0,
-                RawMessage {
-                    type_: model_type,
-                    data: model.encode_to_vec(),
-                },
-            )?;
-            model_object.archive_info.message_infos[0]
-                .object_references
-                .push(50);
-
-            let tile_object = archive.object_mut(30).unwrap();
-            let tile_type = tile_object.messages[0].type_;
-            let mut tile = Tile::decode(tile_object.messages[0].data.as_slice())?;
-            let mut cells = split_row(&tile.row_infos[0])?;
-            let mut rich = BncCell::minimal();
-            rich.set_rich_text(2);
-            cells[1] = Some(rich.encode());
-            if shared {
-                cells[2] = cells[1].clone();
-            }
-            rebuild_row(&mut tile.row_infos[0], &cells)?;
-            tile.max_column = if shared { 2 } else { 1 };
-            tile.max_row = 0;
-            tile.num_cells = if shared { 2 } else { 1 };
-            tile_object.replace_message(
-                0,
-                RawMessage {
-                    type_: tile_type,
-                    data: tile.encode_to_vec(),
-                },
-            )?;
-
-            let header_object = archive.object_mut(42).unwrap();
-            let header_type = header_object.messages[0].type_;
-            let mut headers =
-                tst::HeaderStorageBucket::decode(header_object.messages[0].data.as_slice())?;
-            headers.headers[0].number_of_cells = if shared { 2 } else { 1 };
-            header_object.replace_message(
-                0,
-                RawMessage {
-                    type_: header_type,
-                    data: headers.encode_to_vec(),
-                },
-            )?;
-
-            let rich_text_list = TableDataList {
-                list_type: tst::table_data_list::ListType::RichTextPayload as i32,
-                next_list_id: 3,
-                entries: vec![tst::table_data_list::ListEntry {
-                    key: 2,
-                    refcount: if shared { 2 } else { 1 },
-                    rich_text_payload: Some(Reference {
-                        identifier: 51,
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }],
-                segments: Vec::new(),
-                is_new_for_bnc: Some(true),
-            };
-            let mut list_object = ArchiveObject::new(
-                50,
-                vec![RawMessage {
-                    type_: 6005,
-                    data: rich_text_list.encode_to_vec(),
-                }],
-            )?;
-            list_object.archive_info.message_infos[0]
-                .object_references
-                .push(51);
-            archive.insert_object(list_object)?;
-
-            let payload = tst::RichTextPayloadArchive {
-                storage: Reference {
-                    identifier: 52,
-                    ..Default::default()
-                },
-                range: None,
-                cellid: tst::CellId {
-                    packed_data: 1 << 16,
-                    expanded_coord: None,
-                },
-            };
-            let mut payload_object = ArchiveObject::new(
-                51,
-                vec![RawMessage {
-                    type_: 6218,
-                    data: payload.encode_to_vec(),
-                }],
-            )?;
-            payload_object.archive_info.message_infos[0]
-                .object_references
-                .push(52);
-            archive.insert_object(payload_object)?;
-
-            archive.insert_object(ArchiveObject::new(
-                52,
-                vec![RawMessage {
-                    type_: 2001,
-                    data: tswp::StorageArchive {
-                        kind: Some(tswp::storage_archive::KindType::Cell as i32),
-                        text: vec!["Original Rich".to_owned()],
-                        ..Default::default()
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?;
             Ok(())
         })
         .unwrap();

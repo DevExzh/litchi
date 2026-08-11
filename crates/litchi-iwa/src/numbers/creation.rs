@@ -1565,21 +1565,32 @@ mod tests {
     fn generated_table_supports_cell_crud() {
         let mut editor = NumbersEditor::create().unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(table_id, 1, 1, CellValue::Text("Litchi".to_owned()))
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::Text("Litchi".to_owned()),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            2,
+            2,
+            CellValue::number(42.5).expect("finite test number"),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            3,
+            3,
+            CellValue::Boolean(true),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(&mut editor, table_id, 3, 3, CellValue::Empty)
             .unwrap();
-        editor
-            .set_cell(
-                table_id,
-                2,
-                2,
-                CellValue::number(42.5).expect("finite test number"),
-            )
-            .unwrap();
-        editor
-            .set_cell(table_id, 3, 3, CellValue::Boolean(true))
-            .unwrap();
-        editor.clear_cell(table_id, 3, 3).unwrap();
 
         let bytes = editor.to_bytes().unwrap();
         let document = NumbersDocument::from_bytes(&bytes).unwrap();
@@ -1600,22 +1611,22 @@ mod tests {
     fn generated_table_supports_formula_crud() {
         let mut editor = NumbersEditor::create().unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(
-                table_id,
-                0,
-                0,
-                CellValue::number(40.0).expect("finite test number"),
-            )
-            .unwrap();
-        editor
-            .set_cell(
-                table_id,
-                0,
-                1,
-                CellValue::number(2.0).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            0,
+            0,
+            CellValue::number(40.0).expect("finite test number"),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            0,
+            1,
+            CellValue::number(2.0).expect("finite test number"),
+        )
+        .unwrap();
         let baseline = editor.to_bytes().unwrap();
 
         editor
@@ -1636,7 +1647,8 @@ mod tests {
             Some(&CellValue::Formula("=(A1/B1)".to_owned()))
         );
 
-        editor.clear_cell(table_id, 0, 2).unwrap();
+        crate::numbers::editor::set_cell_fixture(&mut editor, table_id, 0, 2, CellValue::Empty)
+            .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }
 
@@ -1652,22 +1664,22 @@ mod tests {
                 3,
             )
             .unwrap();
-        editor
-            .set_cell(
-                table.object_id,
-                0,
-                0,
-                CellValue::number(21.0).expect("finite test number"),
-            )
-            .unwrap();
-        editor
-            .set_cell(
-                table.object_id,
-                0,
-                1,
-                CellValue::number(2.0).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table.object_id,
+            0,
+            0,
+            CellValue::number(21.0).expect("finite test number"),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table.object_id,
+            0,
+            1,
+            CellValue::number(2.0).expect("finite test number"),
+        )
+        .unwrap();
         let baseline = editor.to_bytes().unwrap();
 
         editor
@@ -1694,7 +1706,14 @@ mod tests {
             Some(&CellValue::Formula("=(A1*B1)".to_owned()))
         );
 
-        editor.clear_cell(table.object_id, 0, 2).unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table.object_id,
+            0,
+            2,
+            CellValue::Empty,
+        )
+        .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }
 
@@ -1791,14 +1810,14 @@ mod tests {
                 2,
             )
             .unwrap();
-        editor
-            .set_cell(
-                target.object_id,
-                0,
-                0,
-                CellValue::number(7.0).expect("finite test number"),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            target.object_id,
+            0,
+            0,
+            CellValue::number(7.0).expect("finite test number"),
+        )
+        .unwrap();
         editor
             .set_formula(
                 source_table_id,

@@ -2956,3 +2956,109 @@ warning-denied rustdoc. The full checker retains only its 14 established
 dependency-policy baselines. No host surface, manifest edge, or ordered debt
 is removed: topology remains 64 workspace packages, 237 internal declarations,
 14 `litchi-iwa` dependency declarations, and 14 ordered debts.
+
+## 2026-08-12 amendment: focused Numbers table-cell mutation owner
+
+The read owner above is now the semantic front of a focused mutation owner.
+The canonical nested surface is `table::cells::{Input, Change, State, Storage,
+Edit, Patch, Commit, Diagnostics, Error, LimitKind, Path, DependencyKind}`.
+`Package::edit_table_cells` resolves one sheet-scoped table and builds a
+bounded consuming batch through `set`, `set_a1`, `clear`, `clear_a1`, `change`,
+or `extend`; `Package::apply_table_cells` applies an exact directional patch.
+Inputs are finite text, number, Boolean, date, or duration scalars. Formula and
+error construction, formatting, controls, comments, and table topology do not
+enter the public batch vocabulary.
+
+The physical owner is deliberately bounded. It supports existing scalar cells,
+direct/unsegmented string-list assignment and release with exact refcounts,
+missing sparse-tile growth for finite non-text scalars including the synthetic
+513-row boundary, in-place authored-text replacement in one uniquely owned
+rich backing, and refresh of a
+strict supported formula-cache dependency closure computed from the complete
+final batch overlay. Rich replacement requires payload and storage inbound
+counts of one, retains key/storage identity, releases exact style references,
+and preserves canonical payload field-1-to-storage and storage
+field-2-to-style FieldInfo metadata when no field-specific transition is
+needed. A rewrite requiring any FieldInfo reference transition, or with
+noncanonical/ambiguous FieldInfo ownership, fails as `RichText`. Sparse
+text-to-missing-tile changes refuse as `UnsupportedDependency { SharedString }`.
+For header coordinates, CalculationEngine field 14 is projected and its rooted
+HeaderNameMgr reference is validated; only the referenced manager payload and
+update semantics are unprojected, so a manager-backed header change fails as
+`HeaderNameIndex`. Segmented string lists, shared rich text, existing formula
+or error cells, and reachable unsupported, cyclic, range, deletion, or
+sparse-plus-cache formula ownership fail as `UnsupportedDependency`. Impacted
+active merge, pivot, category, spill, hidden, or conditional-style state
+likewise refuses by its matching dependency kind, while unrelated or inert
+state remains exact. Malformed routes fail as `InvalidSource`, a modeled
+missing storage prerequisite fails as `UnsupportedDependency { CellStorage }`,
+and an unmodeled stored BNC value/source kind fails as `UnsupportedSource`.
+Locked tables fail changed admission. Exact semantic no-ops bypass the
+changed-only ownership and dependency scans.
+
+The strict Buffa foundation remains private and non-encoding. The storage
+projection is five generated files/465,932 bytes, has no repeated generated
+view, and has aggregate SHA-256
+`1a894fd5d22b004db664bc7c348d9591a4608ab9263a8122c726c8a1ecb0c3b3`.
+The expanded dependency projection is five files/544,538 bytes, also with no
+repeated generated view, and has aggregate SHA-256
+`2fba7c22aef58ed3cfe6eba1f77e5eaf79d2597dd79966e05d20e50c0e2b33b3`.
+The strict dependency-only formula projection remains five files/201,539
+bytes with SHA-256
+`ccd972b3dcd76b6142342d36435f2f76a305c029265853ced04d64c1e2bf1752`;
+its focused codec gate passes 7/7 and the current full protobuf suite passes
+178/178.
+The PackageMetadata projection is five files/145,681 bytes with no repeated
+generated view and SHA-256
+`ee49927f75c6b632c83055f9b7e647920b389be41bec10e25871a6ef7b56ab31`;
+its focused gate passes 7/7.
+Raw selected messages remain the rewrite and preservation authority.
+
+Changed commits group exact message replacement, append, and deletion across
+the selected tile, string/rich owners, and admitted cache closure; validate
+complete aggregate and FieldInfo reference transitions; delete exactly the
+canonical source preview subset; reassemble once; reopen once; and verify
+directional locality. `Patch` retains exact source/target artifacts plus a
+private verified `PackagePair`. Apply borrows the patch, requires the retained
+directional source and read profile, performs locality verification against the
+retained target, and does not reopen it; inverse swaps the same evidence and
+restores the exact source. Reads and exact no-ops remain broad, but a changed
+source without an exact physical `SourceCatalog`, including a nested legacy
+package, fails as `UnsupportedSource`. This is a process-local capability, not
+a serialized/versioned patch, and still lacks operation serialization,
+composition, merge, and history.
+
+Final rooted performance is bounded without a latency/RSS claim. Numeric
+4,096-to-8,192 ratios are 1.9855x retained elements, 1.9820x retained bytes,
+1.2694x wire work, 1.1904x output, and 1.1899x transaction work. Unique-text
+ratios are 2.0x input, 1.9998x string work, 1.9861x retained work, 1.3213x
+output, and 1.2245x transaction work. Same-tile updates double while
+transaction work is 1.1396x, with one tile read/write and two components at
+both sizes; formula nodes, edges, hosts, and work double while transaction
+work is 1.8021x. Required-minus-one formula and sparse budgets refuse with
+zero component, reassembly, output, reopen, and locality work.
+
+Numbers 14.4 accepted the numeric B3=43 scalar and rich-text candidates
+warning-free. The
+136,357-byte source
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`
+became the Rust B3=43 candidate
+`7540c94f61d18fb4a8fe188544eef5854cdb6c06ffa6f1b8b0be1e06264f6b82`
+and inverted byte-exactly; only the selected Tile payload and three root
+previews changed before native Save As/reopen. The restored formula-rich C2
+gate likewise commits, applies, inverts, opens, saves, and reopens while its
+independent formula/cache remains exact. This is no-impact preservation proof,
+not native proof for impacted formula refresh; impacted unsupported formulas
+still fail as `FormulaCache`.
+
+The ownership cut removes `NumbersEditor::{set_cell, set_cells, clear_cell}`,
+the two Numbers raw-ID model writers, Numbers-only
+`TableCellBatch::apply_numbers`, 15 obsolete direct host tests, and the legacy
+`edit_numbers_cell` example. Shared `TableCellBatch::{collect, is_empty, len,
+apply_attached}`, attached-table writers, the package cell helper, physical
+storage/wire/cache/formula support, Pages/Keynote paths, builders, and narrow
+`cfg(test)` fixture adapters remain. Numbers gates pass 237 library tests with
+4 ignored and 15/15 public cell tests; boundary regressions pass 196/196. The
+new neutral `litchi-numbers -> litchi-iwa-text-wire` edge leaves topology at
+64 packages, 238 internal declarations, 14 `litchi-iwa` declarations, and 14
+ordered debts; no host debt closes.

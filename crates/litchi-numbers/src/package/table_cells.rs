@@ -26,16 +26,71 @@ pub enum Path {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LimitKind {
+    /// Cell changes staged by one atomic batch.
+    Updates,
     /// Elements retained by a dense result.
     RetainedElements,
     /// UTF-8 bytes owned by stored text, formula, and error results.
     OwnedValueBytes,
+    /// Strict protobuf fields inspected by the transaction.
+    WireFields,
+    /// Strict protobuf traversal work charged by the transaction.
+    WireWork,
+    /// Native objects inspected or retained by the transaction.
+    Objects,
+    /// Native object references inspected or retained by the transaction.
+    References,
+    /// Formula nodes and dependency work inspected by the transaction.
+    FormulaWork,
+    /// Bytes retained by the transaction plan or exact artifacts.
+    RetainedBytes,
+    /// Peak temporary bytes required before publication.
+    PeakScratchBytes,
+    /// Bytes in the candidate package artifact.
+    OutputBytes,
+    /// Work required to reopen and verify the candidate.
+    ReopenWork,
+    /// Aggregate deterministic transaction work.
+    TransactionWork,
 }
 
-/// Failure from a selector-first semantic table-cell read.
+/// A modeled native dependency required by a changed cell batch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum DependencyKind {
+    /// Sparse tile, row, or header storage.
+    CellStorage,
+    /// Plain string-list ownership and refcounts.
+    SharedString,
+    /// Rich-text payload, storage, style, or copy-on-write ownership.
+    RichText,
+    /// Formula or formula-error list ownership.
+    Formula,
+    /// Formula dependency and cached-result ownership.
+    FormulaCache,
+    /// Cell comment metadata preserved by a clear.
+    Comment,
+    /// Calculation-engine header-name indexes.
+    HeaderNameIndex,
+    /// Merged-cell ownership.
+    Merge,
+    /// Pivot-table ownership or derived state.
+    Pivot,
+    /// Category-table ownership or derived state.
+    Category,
+    /// Spill or array-formula ownership.
+    Spill,
+    /// Hidden-row or hidden-column formula ownership.
+    HiddenState,
+    /// Conditional-style formula ownership.
+    ConditionalStyle,
+}
+
+/// Failure from a selector-first semantic table-cell operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
+    InvalidAddress,
     SheetNotFound,
     TableNotFound,
     AmbiguousSource {
@@ -55,14 +110,32 @@ pub enum Error {
         kind: LimitKind,
         amount: usize,
     },
+    DuplicatePosition {
+        position: CellPosition,
+    },
+    InvalidSource {
+        path: Path,
+    },
+    TableLocked {
+        path: Path,
+    },
+    UnsupportedSource {
+        path: Path,
+    },
+    UnsupportedDependency {
+        path: Path,
+        kind: DependencyKind,
+    },
     Verification {
         path: Path,
     },
+    PatchConflict,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InvalidAddress => formatter.write_str("invalid Numbers cell address"),
             Self::SheetNotFound => formatter.write_str("the Numbers sheet selector did not match"),
             Self::TableNotFound => formatter.write_str("the Numbers table selector did not match"),
             Self::AmbiguousSource { .. } => {
@@ -75,14 +148,30 @@ impl fmt::Display for Error {
                 observed, maximum, ..
             } => write!(
                 formatter,
-                "Numbers table-cell read limit exceeded: observed {observed}, maximum {maximum}"
+                "Numbers table-cell operation limit exceeded: observed {observed}, maximum {maximum}"
             ),
             Self::Allocation { kind, amount } => write!(
                 formatter,
-                "could not allocate {amount} units of {kind:?} for the Numbers table-cell read"
+                "could not allocate {amount} units of {kind:?} for the Numbers table-cell operation"
             ),
+            Self::DuplicatePosition { .. } => {
+                formatter.write_str("the Numbers cell batch contains a duplicate coordinate")
+            },
+            Self::InvalidSource { .. } => {
+                formatter.write_str("the Numbers table-cell source is malformed")
+            },
+            Self::TableLocked { .. } => formatter.write_str("the selected Numbers table is locked"),
+            Self::UnsupportedSource { .. } => {
+                formatter.write_str("the Numbers table-cell source is not safely writable")
+            },
+            Self::UnsupportedDependency { .. } => {
+                formatter.write_str("the Numbers table-cell change has an unsupported dependency")
+            },
             Self::Verification { .. } => {
-                formatter.write_str("the Numbers table-cell read failed verification")
+                formatter.write_str("the Numbers table-cell operation failed verification")
+            },
+            Self::PatchConflict => {
+                formatter.write_str("the Numbers table-cell patch source conflicts")
             },
         }
     }
@@ -201,12 +290,12 @@ impl Package {
 }
 
 #[derive(Clone, Copy)]
-struct SelectedTable<'package> {
-    table: &'package Table,
-    path: Path,
+pub(super) struct SelectedTable<'package> {
+    pub(super) table: &'package Table,
+    pub(super) path: Path,
 }
 
-fn resolve_table<'package>(
+pub(super) fn resolve_table<'package>(
     source: &'package Package,
     sheet_selector: SheetSelector<'_>,
     table_selector: TableSelector<'_>,

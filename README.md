@@ -160,7 +160,9 @@ pkg.save("output.pptx")?;
 ## Installation
 
 > [!NOTE]
-> The library on the crates.io is just a placeholder right now (contains only read-only functionalities), if you want to use it, please use the development version.
+> The crates.io release may lag the focused edit and reversible-patch APIs in
+> development. Use the development version when you need those newer
+> transaction surfaces.
 
 Add to your `Cargo.toml`:
 

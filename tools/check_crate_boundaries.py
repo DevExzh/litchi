@@ -1244,6 +1244,133 @@ NUMBERS_TABLE_CELLS_WIRE_TYPES = frozenset(
         "WireView",
     }
 )
+NUMBERS_TABLE_CELLS_MUTATION_TYPES = (
+    "Input",
+    "Change",
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "DependencyKind",
+)
+NUMBERS_TABLE_CELLS_FULL_CANONICAL_TYPES = (
+    "Input",
+    "Change",
+    "State",
+    "Storage",
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Path",
+    "DependencyKind",
+)
+NUMBERS_TABLE_CELLS_MUTATION_PACKAGE_METHODS = (
+    "edit_table_cells",
+    "apply_table_cells",
+)
+NUMBERS_TABLE_CELLS_FULL_PACKAGE_METHODS = (
+    *NUMBERS_TABLE_CELLS_PACKAGE_METHODS,
+    *NUMBERS_TABLE_CELLS_MUTATION_PACKAGE_METHODS,
+)
+NUMBERS_TABLE_CELLS_MUTATION_OWNER_SOURCE = Path(
+    "crates/litchi-numbers/src/package/table_cell_edit.rs"
+)
+NUMBERS_TABLE_CELLS_MUTATION_IMPLEMENTATION_SOURCES = (
+    NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE,
+    NUMBERS_TABLE_CELLS_MUTATION_OWNER_SOURCE,
+)
+NUMBERS_TABLE_CELLS_FULL_FLAT_ALIASES = frozenset(
+    prefix + suffix
+    for prefix in NUMBERS_TABLE_CELLS_FLAT_ALIAS_PREFIXES
+    for suffix in NUMBERS_TABLE_CELLS_FULL_CANONICAL_TYPES
+)
+NUMBERS_TABLE_CELLS_MUTATION_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_cell_edit|table[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?cells)"
+    r"(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_NUMBERS_PACKAGE_TABLE_CELL_EDIT_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table_cell_edit\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_PACKAGE_TABLE_CELL_EDIT_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?table_cell_edit\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_EDITOR_SOURCE = Path(
+    "crates/litchi-iwa/src/numbers/editor/semantic/table.rs"
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_MODEL_SOURCE = Path(
+    "crates/litchi-iwa/src/numbers/editor/model.rs"
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_BATCH_SOURCE = Path(
+    "crates/litchi-iwa/src/numbers/editor/table_cells.rs"
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_TEST_SOURCE = Path(
+    "crates/litchi-iwa/src/numbers/editor/tests.rs"
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/edit_numbers_cell.rs"
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_SOURCE_INVENTORY = (
+    RETIRED_IWA_NUMBERS_TABLE_CELL_EDITOR_SOURCE,
+    RETIRED_IWA_NUMBERS_TABLE_CELL_MODEL_SOURCE,
+    RETIRED_IWA_NUMBERS_TABLE_CELL_BATCH_SOURCE,
+    RETIRED_IWA_NUMBERS_TABLE_CELL_TEST_SOURCE,
+    RETIRED_IWA_NUMBERS_TABLE_CELL_EXAMPLE,
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_METHODS = (
+    "set_cell",
+    "set_cells",
+    "clear_cell",
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_MODEL_HELPERS = (
+    "set_cell_in_package",
+    "set_cells_in_package",
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_BATCH_HELPERS = (
+    "apply_numbers",
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_TESTS = (
+    "semantic_edits_round_trip_through_public_reader",
+    "cell_batch_roundtrips_mixed_values_and_clear",
+    "cell_batch_refreshes_formula_chain_from_final_state",
+    "cell_batch_rejects_invalid_inputs_transactionally",
+    "failed_edit_is_transactional",
+    "cell_edits_keep_sparse_row_headers_in_lockstep",
+    "source_created_large_table_allocates_sparse_tiles_for_batch_writes",
+    "rich_text_cell_updates_preserve_the_payload_reference",
+    "shared_rich_text_cell_update_uses_copy_on_write",
+    "replacing_rich_text_releases_list_and_payload_objects",
+    "segmented_string_entries_round_trip_and_remain_interned",
+    "segmented_shared_rich_text_uses_copy_on_write_and_cleans_up",
+    "formula_cells_can_be_cleared_with_refcount_cleanup",
+    "cell_write_refreshes_transitive_formula_caches_in_dependency_order",
+    "cell_write_rejects_unsupported_impacted_formula_transactionally",
+)
+IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_SOURCE = Path(
+    "crates/litchi-iwa/src/numbers/editor.rs"
+)
+IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_HELPERS = (
+    "test_set_cell",
+    "test_set_cells",
+    "test_clear_cell",
+)
+IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_HELPER_SET = frozenset(
+    IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_HELPERS
+)
+IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_DECLARATION = re.compile(
+    r"#[ \t\r\n]*\[[ \t\r\n]*cfg[ \t\r\n]*\([ \t\r\n]*test"
+    r"[ \t\r\n]*\)[ \t\r\n]*\][ \t\r\n]*pub[ \t\r\n]*\("
+    r"[ \t\r\n]*crate[ \t\r\n]*\)[ \t\r\n]+fn[ \t\r\n]+"
+    r"(?:r#)?(?P<name>test_(?:set_cells?|clear_cell))\b"
+)
+IWA_NUMBERS_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_TABLE_LOCK_SOURCE = Path("crates/litchi-iwa/src/table_lock.rs")
 IWA_NUMBERS_TABLE_INFO_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "model.rs"
@@ -3065,6 +3192,31 @@ def _is_numbers_table_cells_public_declaration(
     }
     return bool(identifiers & NUMBERS_TABLE_CELLS_FLAT_ALIASES) or (
         _numbers_table_cells_owner_declaration(declaration)
+    )
+
+
+def _numbers_table_cells_mutation_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return NUMBERS_TABLE_CELLS_MUTATION_OWNER_PATH.search(
+        declaration
+    ) is not None or any(
+        identifier in NUMBERS_TABLE_CELLS_MUTATION_PACKAGE_METHODS
+        for identifier in identifiers
+    )
+
+
+def _is_numbers_table_cells_mutation_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(identifiers & NUMBERS_TABLE_CELLS_FULL_FLAT_ALIASES) or (
+        _numbers_table_cells_mutation_owner_declaration(declaration)
     )
 
 
@@ -5599,6 +5751,277 @@ def audit_numbers_table_cells_facade_source_topology(
     return sorted(set(violations))
 
 
+def audit_numbers_table_cells_mutation_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the nested, archive-free Numbers table-cell mutation API."""
+
+    source_root = root / NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    dedicated_sources = {
+        root / path
+        for path in NUMBERS_TABLE_CELLS_MUTATION_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    export_sources = {
+        root / path
+        for path in NUMBERS_TABLE_CELLS_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    violations: list[str] = []
+
+    semantic_path = root / NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+    semantic_source = (
+        semantic_path.read_text(encoding="utf-8")
+        if semantic_path.is_file()
+        else ""
+    )
+    canonical_exports = _rust_canonical_exports(
+        semantic_source, frozenset(NUMBERS_TABLE_CELLS_MUTATION_TYPES)
+    )
+    for name in NUMBERS_TABLE_CELLS_MUTATION_TYPES:
+        if name in canonical_exports:
+            continue
+        violations.append(
+            "focused litchi-numbers table-cells mutation API is missing "
+            f"canonical table::cells type {name}: "
+            f"{NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE}"
+        )
+
+    package_export = root / NUMBERS_SOURCE_ROOT / "package.rs"
+    if package_export.is_file():
+        package_source = _mask_rust_non_code(
+            package_export.read_text(encoding="utf-8")
+        )
+        if NUMBERS_PACKAGE_TABLE_CELL_EDIT_MODULE.search(package_source) is None:
+            violations.append(
+                "focused litchi-numbers table-cells mutation API is missing "
+                "private package owner module: "
+                f"{package_export.relative_to(root)}"
+            )
+        for match in PUBLIC_NUMBERS_PACKAGE_TABLE_CELL_EDIT_MODULE.finditer(
+            package_source
+        ):
+            line_number = package_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-numbers table-cells mutation API exposes "
+                "package::table_cell_edit module: "
+                f"{package_export.relative_to(root)}:{line_number}"
+            )
+    else:
+        violations.append(
+            "focused litchi-numbers table-cells mutation API is missing "
+            "private package owner module: "
+            f"{NUMBERS_SOURCE_ROOT / 'package.rs'}"
+        )
+
+    owner_path = root / NUMBERS_TABLE_CELLS_MUTATION_OWNER_SOURCE
+    if not owner_path.is_file():
+        violations.append(
+            "focused litchi-numbers table-cells mutation API is missing "
+            "private package owner source: "
+            f"{NUMBERS_TABLE_CELLS_MUTATION_OWNER_SOURCE}"
+        )
+
+    package_methods: set[str] = set()
+    if owner_path.is_file():
+        for declaration, _line_number in _rust_public_declarations(
+            owner_path.read_text(encoding="utf-8")
+        ):
+            function = RUST_FUNCTION_DECLARATION.search(declaration)
+            if function is not None:
+                package_methods.add(function.group(1))
+    for name in NUMBERS_TABLE_CELLS_MUTATION_PACKAGE_METHODS:
+        if name in package_methods:
+            continue
+        violations.append(
+            "focused litchi-numbers table-cells mutation API is missing "
+            f"canonical Package::{name} method: "
+            f"{NUMBERS_TABLE_CELLS_MUTATION_OWNER_SOURCE}"
+        )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for (
+            declaration,
+            line_number,
+            public_declaration,
+            complete_source_scope,
+        ) in declarations:
+            if not _is_numbers_table_cells_mutation_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            owner_declaration = _numbers_table_cells_mutation_owner_declaration(
+                declaration
+            )
+            declaration_identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            public_use_or_type = declaration_identifiers[:2] in (
+                ["pub", "type"],
+                ["pub", "use"],
+            )
+            flat_alias_exports = _rust_canonical_exports(
+                declaration, NUMBERS_TABLE_CELLS_FULL_FLAT_ALIASES
+            )
+            if (
+                public_declaration
+                and path in export_sources
+                and owner_declaration
+                and public_use_or_type
+            ):
+                violations.append(
+                    "focused litchi-numbers table-cells mutation API exposes "
+                    "public mutation-owner alias: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if identifier in flat_alias_exports:
+                    violations.append(
+                        "focused litchi-numbers table-cells mutation API "
+                        f"retains flat alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and path in export_sources
+                    and owner_declaration
+                    and public_use_or_type
+                    and identifier in NUMBERS_TABLE_CELLS_FULL_CANONICAL_TYPES
+                ):
+                    violations.append(
+                        "focused litchi-numbers table-cells mutation API "
+                        f"retains root alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _numbers_table_cells_public_leak(identifier)
+                if reason is None:
+                    continue
+                violations.append(
+                    "focused litchi-numbers table-cells mutation API exposes "
+                    f"{reason} {identifier}: "
+                    f"{path.relative_to(root)}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-numbers table-cells mutation API exposes "
+                    f"raw byte slice {byte_slice}: "
+                    f"{path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_numbers_table_cell_mutation_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep retired raw-ID Numbers cell writers out of their exact host scopes."""
+
+    violations: list[str] = []
+    example = root / RETIRED_IWA_NUMBERS_TABLE_CELL_EXAMPLE
+    if example.exists():
+        violations.append(
+            "retired litchi-iwa Numbers table-cell mutation example returned: "
+            + str(RETIRED_IWA_NUMBERS_TABLE_CELL_EXAMPLE)
+        )
+
+    retired_sources = (
+        (
+            RETIRED_IWA_NUMBERS_TABLE_CELL_EDITOR_SOURCE,
+            frozenset(RETIRED_IWA_NUMBERS_TABLE_CELL_METHODS),
+            "method",
+        ),
+        (
+            RETIRED_IWA_NUMBERS_TABLE_CELL_MODEL_SOURCE,
+            frozenset(RETIRED_IWA_NUMBERS_TABLE_CELL_MODEL_HELPERS),
+            "model helper",
+        ),
+        (
+            RETIRED_IWA_NUMBERS_TABLE_CELL_BATCH_SOURCE,
+            frozenset(RETIRED_IWA_NUMBERS_TABLE_CELL_BATCH_HELPERS),
+            "batch helper",
+        ),
+        (
+            RETIRED_IWA_NUMBERS_TABLE_CELL_TEST_SOURCE,
+            frozenset(RETIRED_IWA_NUMBERS_TABLE_CELL_TESTS),
+            "test",
+        ),
+    )
+    for relative_path, retired_names, description in retired_sources:
+        path = root / relative_path
+        if not path.is_file():
+            continue
+        source = path.read_text(encoding="utf-8")
+        for name, line_number in _rust_function_declarations(source):
+            if name not in retired_names:
+                continue
+            violations.append(
+                "retired litchi-iwa Numbers table-cell mutation "
+                f"{description} {name}: {relative_path}:{line_number}"
+            )
+
+    fixture_path = root / IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_SOURCE
+    if fixture_path.is_file():
+        fixture_source = _mask_rust_non_code(
+            fixture_path.read_text(encoding="utf-8")
+        )
+        gated_name_offsets = {
+            match.start("name")
+            for match in IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_DECLARATION.finditer(
+                fixture_source
+            )
+        }
+        for match in RUST_FUNCTION_DECLARATION.finditer(fixture_source):
+            name = match.group(1)
+            if (
+                name not in IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_HELPER_SET
+                or match.start(1) in gated_name_offsets
+            ):
+                continue
+            line_number = fixture_source.count("\n", 0, match.start(1)) + 1
+            violations.append(
+                "litchi-iwa Numbers table-cell test fixture helper must be "
+                f"private #[cfg(test)] {name}: "
+                f"{IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_SOURCE}:{line_number}"
+            )
+
+    example_root = root / IWA_NUMBERS_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for path in sorted(example_root.rglob("*.rs")):
+            source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+            for match in RUST_IDENTIFIER.finditer(source):
+                name = match.group(1)
+                if name not in IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_HELPER_SET:
+                    continue
+                line_number = source.count("\n", 0, match.start(1)) + 1
+                violations.append(
+                    "litchi-iwa Numbers example calls test-only table-cell fixture "
+                    f"helper {name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_numbers_table_lock_source_topology(root: Path = ROOT) -> list[str]:
     """Keep retired Numbers table-lock APIs out of their former host scopes."""
 
@@ -6475,6 +6898,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_table_title_settings_source_topology()
         + audit_numbers_table_title_settings_facade_source_topology()
         + audit_numbers_table_cells_facade_source_topology()
+        + audit_numbers_table_cells_mutation_facade_source_topology()
+        + audit_iwa_numbers_table_cell_mutation_source_topology()
         + audit_iwa_numbers_table_lock_source_topology()
         + audit_numbers_table_lock_facade_source_topology()
         + audit_iwa_pages_page_layout_source_topology()

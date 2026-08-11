@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill};
 use litchi_numbers::cell::Value as CellValue;
@@ -40,10 +40,82 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .table_dimensions(3, 3)
         .build()?;
     let table_id = editor.tables()?.remove(0).id();
-    editor.set_cell(table_id, ROW, COLUMN, CellValue::Text("Numbers".to_owned()))?;
+    set_numbers_cell(
+        &mut editor,
+        ROW,
+        COLUMN,
+        CellValue::Text("Numbers".to_owned()),
+    )?;
     editor.set_table_cell_fill(table_id, ROW, COLUMN, &fill()?)?;
     editor.save(output)?;
     Ok(())
+}
+
+fn set_numbers_cell(
+    editor: &mut NumbersEditor,
+    row: usize,
+    column: usize,
+    value: CellValue,
+) -> Result<(), Box<dyn std::error::Error>> {
+    set_numbers_cells(
+        editor,
+        [litchi_numbers::cell::Update::new(row, column, value)],
+    )
+}
+
+fn set_numbers_cells(
+    editor: &mut NumbersEditor,
+    updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let changes = updates
+        .into_iter()
+        .map(numbers_cell_change)
+        .collect::<Result<Vec<_>, _>>()?;
+    let package = litchi_numbers::Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_table_cells(
+            litchi_numbers::SheetSelector::index(0),
+            litchi_numbers::TableSelector::index(0),
+        )?
+        .extend(changes)?
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    *editor = NumbersEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
+fn numbers_cell_change(
+    update: litchi_numbers::cell::Update,
+) -> Result<litchi_numbers::table::cells::Change, Box<dyn std::error::Error>> {
+    let position = litchi_numbers::CellPosition::try_from_usize(update.row, update.column)?;
+    let change = match update.value {
+        CellValue::Empty => litchi_numbers::table::cells::Change::clear(position),
+        CellValue::Text(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::text(value)?,
+        ),
+        CellValue::Number(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::number(value.get())?,
+        ),
+        CellValue::Boolean(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::boolean(value),
+        ),
+        CellValue::Date(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::date(value.get())?,
+        ),
+        CellValue::Duration(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::duration(value.get())?,
+        ),
+        CellValue::Formula(_) | CellValue::Error(_) => {
+            return Err(std::io::Error::other("unsupported Numbers cell input").into());
+        },
+    };
+    Ok(change)
 }
 
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {

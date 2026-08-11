@@ -1222,3 +1222,81 @@ the application UI
 oracle for this transaction. The full Pages library/integration total is
 118/118, boundary regressions are 181/181, both focused facade/host audits are
 empty, and the full checker reports only the unchanged 14 baselines.
+
+## 2026-08-12 amendment: Numbers cell-batch exact patches
+
+`litchi_numbers::table::cells::Edit` is a consuming selector-first batch. It
+accepts bounded `Change` values through `set`, `set_a1`, `clear`, `clear_a1`,
+`change`, and `extend`; staging rejects invalid addresses, out-of-bounds and
+duplicate positions, update-count overflow, owned-text overflow, and fallible
+allocation before publication. `commit` sorts the final coordinate set,
+elides semantic no-ops, and gives the physical owner one immutable final
+overlay. A changed clear of an existing non-empty stored cell materializes the
+format's stored-empty state; clearing `Missing` or already-empty storage is an
+exact no-op, never a request to erase sparse presence.
+
+A changed `Patch` is an exact directional process-local capability. In
+addition to exact source/target artifacts and bounded message/reference
+evidence, it privately retains a verified source/target `PackagePair`. Forward
+apply borrows the patch, authorizes the retained source artifact and read
+profile, verifies directional locality against the retained target snapshot, and publishes that
+snapshot without a second reopen. `inverse()` swaps artifacts, snapshots,
+reference transitions, and exact preview membership in constant time. A no-op
+patch shares the source and performs no physical ownership or dependency scan.
+Conflict, malformed evidence, or directional-locality failure is atomic.
+Reads and exact no-ops remain broad; a changed source without an exact physical
+`SourceCatalog`, including a nested legacy layout, fails as `UnsupportedSource`.
+
+The accepted changed matrix is intentionally smaller than the semantic value
+model: finite scalar writes and clears; direct/unsegmented string-list
+assignment and release with exact refcounts; missing sparse-tile growth through
+the synthetic 513-row boundary for finite non-text scalars; in-place
+authored-text replacement in uniquely owned rich backing while retaining
+key/storage identity and releasing exact style references; and formula-cache refresh
+for a strict supported AST/dependency closure evaluated from the batch's final
+overlay. Sparse text-to-missing-tile changes refuse as `SharedString`.
+HeaderNameMgr-backed header cells, segmented string lists, shared/COW or
+rich text requiring any FieldInfo reference transition, noncanonical or
+ambiguous FieldInfo rich ownership, existing formula or error cells, and
+modeled unsupported/cyclic/range/deletion/sparse formula closure fail as
+`UnsupportedDependency`. Impacted active merge, pivot, category, spill,
+hidden, and conditional-style state refuses by its matching dependency kind;
+unrelated or inert state remains exact. A modeled missing storage prerequisite
+is `UnsupportedDependency { CellStorage }`, malformed storage is
+`InvalidSource`, and an unmodeled stored BNC value/source kind is
+`UnsupportedSource`. This patch does not construct formula ASTs or mutate
+format/control state.
+
+Canonical payload field-1-to-storage and storage field-2-to-style FieldInfo
+metadata may be present on the unique rich path and remains exact when no
+field-specific reference transition is required.
+
+The strict dependency-only formula projection used for the supported cache
+closure remains five generated files/201,539 bytes with SHA-256
+`ccd972b3dcd76b6142342d36435f2f76a305c029265853ced04d64c1e2bf1752`.
+Its focused codec gate passes 7/7 and the current full protobuf suite passes
+178/178.
+The adjacent PackageMetadata projection is five files/145,681 bytes with zero
+repeated generated views and SHA-256
+`ee49927f75c6b632c83055f9b7e647920b389be41bec10e25871a6ef7b56ab31`;
+its focused gate passes 7/7.
+
+The transaction charges staging first, passes a remaining allowance through
+sequential strict leaf reports, reserves each component before output, charges
+exact component costs, and retains publication/locality work through the final
+verification. Numeric, unique-text, same-tile, and formula 4,096-to-8,192
+transaction-work ratios are respectively 1.1899x, 1.2245x, 1.1396x, and
+1.8021x; every governed subterm is at most 2.0x. Required-minus-one formula and
+sparse limits reject with zero component, reassembly, output, reopen, and
+locality work. These are deterministic counters, not latency or RSS evidence.
+
+The retained `PackagePair` reduces apply to bounded locality verification but
+is also explicit process-local memory and durability debt: serialization,
+versioning, operation encoding, composition, merge, and history remain absent.
+Native numeric B3=43 scalar and no-impact rich-text commit/apply/inverse gates
+pass; the
+latter preserves its independent formula/cache and is not impacted-formula
+refresh proof. The completed host cut retires the three direct
+`NumbersEditor` cell writers, two raw-ID model writers,
+`TableCellBatch::apply_numbers`, 15 obsolete direct tests, and the legacy
+example while retaining shared attached-table and fixture-only adapters.

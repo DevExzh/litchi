@@ -1993,6 +1993,10 @@ fn take_varint(source: &mut &[u8]) -> Result<u64, DecodeError> {
     Err(DecodeError::invalid())
 }
 
+pub(crate) fn take_canonical_varint(source: &mut &[u8]) -> Result<u64, DecodeError> {
+    take_varint(source)
+}
+
 const fn encoded_varint_len(value: u64) -> usize {
     if value == 0 {
         1

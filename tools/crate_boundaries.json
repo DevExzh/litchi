@@ -143,6 +143,7 @@
       "litchi-iwa-core",
       "litchi-iwa-detect",
       "litchi-iwa-protos",
+      "litchi-iwa-text-wire",
       "litchi-numbers-wire"
     ],
     "litchi-numbers-wire": [

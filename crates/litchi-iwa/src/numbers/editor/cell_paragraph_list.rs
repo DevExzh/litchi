@@ -1204,9 +1204,14 @@ mod tests {
             .build()
             .unwrap();
         let numbers_table = numbers.tables().unwrap()[0].object_id;
-        numbers
-            .set_cell(numbers_table, ROW, COLUMN, CellValue::Text(TEXT.to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut numbers,
+            numbers_table,
+            ROW,
+            COLUMN,
+            CellValue::Text(TEXT.to_owned()),
+        )
+        .unwrap();
         assert_eq!(
             numbers
                 .table_cell_paragraph_list(numbers_table, ROW, COLUMN)
@@ -1303,9 +1308,14 @@ mod tests {
             .build()
             .unwrap();
         let source = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(source, ROW, COLUMN, CellValue::Text(TEXT.to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            source,
+            ROW,
+            COLUMN,
+            CellValue::Text(TEXT.to_owned()),
+        )
+        .unwrap();
         editor
             .set_table_cell_paragraph_list(source, ROW, COLUMN, ParagraphList::Bullet)
             .unwrap();
@@ -1338,14 +1348,14 @@ mod tests {
             .build()
             .unwrap();
         let numbers_table = numbers.tables().unwrap()[0].object_id;
-        numbers
-            .set_cell(
-                numbers_table,
-                ROW,
-                COLUMN,
-                CellValue::Text(MIXED_TEXT.to_owned()),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut numbers,
+            numbers_table,
+            ROW,
+            COLUMN,
+            CellValue::Text(MIXED_TEXT.to_owned()),
+        )
+        .unwrap();
         numbers
             .set_table_cell_paragraph_lists(numbers_table, ROW, COLUMN, &expected)
             .unwrap();
@@ -1435,14 +1445,14 @@ mod tests {
             .build()
             .unwrap();
         let numbers_table = numbers.tables().unwrap()[0].object_id;
-        numbers
-            .set_cell(
-                numbers_table,
-                ROW,
-                COLUMN,
-                CellValue::Text(MIXED_TEXT.to_owned()),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut numbers,
+            numbers_table,
+            ROW,
+            COLUMN,
+            CellValue::Text(MIXED_TEXT.to_owned()),
+        )
+        .unwrap();
         numbers
             .set_table_cell_paragraph_lists(numbers_table, ROW, COLUMN, &mixed_lists())
             .unwrap();
@@ -1718,9 +1728,14 @@ mod tests {
             .build()
             .unwrap();
         let source = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(source, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            source,
+            ROW,
+            COLUMN,
+            CellValue::Text(MIXED_TEXT.to_owned()),
+        )
+        .unwrap();
         editor
             .set_table_cell_paragraph_lists(source, ROW, COLUMN, &mixed_lists())
             .unwrap();
@@ -1786,9 +1801,14 @@ mod tests {
             .build()
             .unwrap();
         let source = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(source, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            source,
+            ROW,
+            COLUMN,
+            CellValue::Text(MIXED_TEXT.to_owned()),
+        )
+        .unwrap();
         editor
             .set_table_cell_paragraph_lists(source, ROW, COLUMN, &mixed_lists())
             .unwrap();
@@ -1824,9 +1844,14 @@ mod tests {
             .build()
             .unwrap();
         let table = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(table, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table,
+            ROW,
+            COLUMN,
+            CellValue::Text(MIXED_TEXT.to_owned()),
+        )
+        .unwrap();
         let before = editor.to_bytes().unwrap();
         let invalid = [
             ParagraphListPlacement::new(TextPosition::ZERO, ParagraphList::None),
@@ -1852,14 +1877,14 @@ mod tests {
             .build()
             .unwrap();
         let numbers_table = numbers.tables().unwrap()[0].object_id;
-        numbers
-            .set_cell(
-                numbers_table,
-                ROW,
-                COLUMN,
-                CellValue::Text(MIXED_TEXT.to_owned()),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut numbers,
+            numbers_table,
+            ROW,
+            COLUMN,
+            CellValue::Text(MIXED_TEXT.to_owned()),
+        )
+        .unwrap();
         numbers
             .set_table_cell_paragraph_lists(numbers_table, ROW, COLUMN, &mixed_lists())
             .unwrap();
@@ -1986,14 +2011,14 @@ mod tests {
             .build()
             .unwrap();
         let numbers_table = numbers.tables().unwrap()[0].object_id;
-        numbers
-            .set_cell(
-                numbers_table,
-                ROW,
-                COLUMN,
-                CellValue::Text(MIXED_TEXT.to_owned()),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut numbers,
+            numbers_table,
+            ROW,
+            COLUMN,
+            CellValue::Text(MIXED_TEXT.to_owned()),
+        )
+        .unwrap();
         numbers
             .set_table_cell_paragraph_lists(numbers_table, ROW, COLUMN, &mixed_lists())
             .unwrap();
@@ -2117,9 +2142,14 @@ mod tests {
             .build()
             .unwrap();
         let source = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(source, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            source,
+            ROW,
+            COLUMN,
+            CellValue::Text(MIXED_TEXT.to_owned()),
+        )
+        .unwrap();
         editor
             .set_table_cell_paragraph_lists(source, ROW, COLUMN, &mixed_lists())
             .unwrap();
@@ -2178,9 +2208,14 @@ mod tests {
             .build()
             .unwrap();
         let source = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(source, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            source,
+            ROW,
+            COLUMN,
+            CellValue::Text(MIXED_TEXT.to_owned()),
+        )
+        .unwrap();
         editor
             .set_table_cell_paragraph_lists(source, ROW, COLUMN, &mixed_lists())
             .unwrap();
@@ -2257,9 +2292,14 @@ mod tests {
             .build()
             .unwrap();
         let table = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(table, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table,
+            ROW,
+            COLUMN,
+            CellValue::Text(MIXED_TEXT.to_owned()),
+        )
+        .unwrap();
         let before = editor.to_bytes().unwrap();
 
         editor
@@ -2335,9 +2375,14 @@ mod tests {
             .build()
             .unwrap();
         let table = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(table, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table,
+            ROW,
+            COLUMN,
+            CellValue::Text(MIXED_TEXT.to_owned()),
+        )
+        .unwrap();
         let before = editor.to_bytes().unwrap();
         assert!(
             editor

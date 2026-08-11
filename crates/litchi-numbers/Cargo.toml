@@ -18,6 +18,7 @@ litchi-iwa-common  = { workspace = true }
 litchi-iwa-core    = { workspace = true }
 litchi-iwa-detect  = { workspace = true }
 litchi-iwa-protos  = { workspace = true }
+litchi-iwa-text-wire = { workspace = true }
 litchi-numbers-wire = { workspace = true }
 phf                = { workspace = true }
 prost              = { workspace = true }

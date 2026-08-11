@@ -289,6 +289,34 @@ def add_numbers_table_cells_read_scaffold(root: Path) -> None:
     table_export.write_text("pub mod cells;\n", encoding="utf-8")
 
 
+def add_numbers_table_cells_mutation_scaffold(root: Path) -> None:
+    add_numbers_table_cells_read_scaffold(root)
+    semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+    semantic.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_CELLS_FULL_CANONICAL_TYPES
+        ),
+        encoding="utf-8",
+    )
+    owner = root / boundaries.NUMBERS_TABLE_CELLS_MUTATION_OWNER_SOURCE
+    owner.write_text(
+        "impl Package {\n"
+        + "".join(
+            f"pub fn {name}() {{}}\n"
+            for name in boundaries.NUMBERS_TABLE_CELLS_MUTATION_PACKAGE_METHODS
+        )
+        + "}\n",
+        encoding="utf-8",
+    )
+    package_export = root / boundaries.NUMBERS_TABLE_CELLS_EXPORT_SOURCES[1]
+    package_export.write_text(
+        package_export.read_text(encoding="utf-8")
+        + "pub(crate) mod table_cell_edit;\n",
+        encoding="utf-8",
+    )
+
+
 def add_pages_section_settings_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -9235,6 +9263,416 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_numbers_table_cells_facade_source_topology(root),
                 [],
+            )
+
+    def test_numbers_table_cells_mutation_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELLS_MUTATION_TYPES,
+            (
+                "Input",
+                "Change",
+                "Edit",
+                "Patch",
+                "Commit",
+                "Diagnostics",
+                "DependencyKind",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELLS_FULL_CANONICAL_TYPES,
+            (
+                "Input",
+                "Change",
+                "State",
+                "Storage",
+                "Edit",
+                "Patch",
+                "Commit",
+                "Diagnostics",
+                "Error",
+                "LimitKind",
+                "Path",
+                "DependencyKind",
+            ),
+        )
+        self.assertNotIn("Plan", boundaries.NUMBERS_TABLE_CELLS_FULL_CANONICAL_TYPES)
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELLS_MUTATION_PACKAGE_METHODS,
+            ("edit_table_cells", "apply_table_cells"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELLS_FULL_PACKAGE_METHODS,
+            ("table_cell", "table_cells", "edit_table_cells", "apply_table_cells"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELLS_MUTATION_OWNER_SOURCE,
+            Path("crates/litchi-numbers/src/package/table_cell_edit.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_SOURCE_INVENTORY,
+            (
+                Path("crates/litchi-iwa/src/numbers/editor/semantic/table.rs"),
+                Path("crates/litchi-iwa/src/numbers/editor/model.rs"),
+                Path("crates/litchi-iwa/src/numbers/editor/table_cells.rs"),
+                Path("crates/litchi-iwa/src/numbers/editor/tests.rs"),
+                Path("crates/litchi-iwa/examples/edit_numbers_cell.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_METHODS,
+            ("set_cell", "set_cells", "clear_cell"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_MODEL_HELPERS,
+            ("set_cell_in_package", "set_cells_in_package"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_BATCH_HELPERS,
+            ("apply_numbers",),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TESTS,
+            (
+                "semantic_edits_round_trip_through_public_reader",
+                "cell_batch_roundtrips_mixed_values_and_clear",
+                "cell_batch_refreshes_formula_chain_from_final_state",
+                "cell_batch_rejects_invalid_inputs_transactionally",
+                "failed_edit_is_transactional",
+                "cell_edits_keep_sparse_row_headers_in_lockstep",
+                "source_created_large_table_allocates_sparse_tiles_for_batch_writes",
+                "rich_text_cell_updates_preserve_the_payload_reference",
+                "shared_rich_text_cell_update_uses_copy_on_write",
+                "replacing_rich_text_releases_list_and_payload_objects",
+                "segmented_string_entries_round_trip_and_remain_interned",
+                "segmented_shared_rich_text_uses_copy_on_write_and_cleans_up",
+                "formula_cells_can_be_cleared_with_refcount_cleanup",
+                "cell_write_refreshes_transitive_formula_caches_in_dependency_order",
+                "cell_write_rejects_unsupported_impacted_formula_transactionally",
+            ),
+        )
+        self.assertEqual(
+            boundaries.IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_SOURCE,
+            Path("crates/litchi-iwa/src/numbers/editor.rs"),
+        )
+        self.assertEqual(
+            boundaries.IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_HELPERS,
+            ("test_set_cell", "test_set_cells", "test_clear_cell"),
+        )
+
+    def test_focused_numbers_table_cells_mutation_requires_each_type(self) -> None:
+        for missing in boundaries.NUMBERS_TABLE_CELLS_MUTATION_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_table_cells_mutation_scaffold(root)
+                    semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.NUMBERS_TABLE_CELLS_FULL_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_cells_mutation_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-cells mutation API is missing "
+                            f"canonical table::cells type {missing}: "
+                            "crates/litchi-numbers/src/table/cells.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_table_cells_mutation_requires_each_package_method(
+        self,
+    ) -> None:
+        for missing in boundaries.NUMBERS_TABLE_CELLS_MUTATION_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_table_cells_mutation_scaffold(root)
+                    owner = root / boundaries.NUMBERS_TABLE_CELLS_MUTATION_OWNER_SOURCE
+                    owner.write_text(
+                        "impl Package {\n"
+                        + "".join(
+                            f"pub fn {name}() {{}}\n"
+                            for name in (
+                                boundaries.NUMBERS_TABLE_CELLS_MUTATION_PACKAGE_METHODS
+                            )
+                            if name != missing
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_cells_mutation_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-cells mutation API is missing "
+                            f"canonical Package::{missing} method: "
+                            "crates/litchi-numbers/src/package/table_cell_edit.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_table_cells_mutation_requires_private_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_mutation_scaffold(root)
+            package = root / boundaries.NUMBERS_TABLE_CELLS_EXPORT_SOURCES[1]
+            package.write_text(
+                "pub(crate) mod table_cells;\npub mod table_cell_edit;\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_table_cells_mutation_facade_source_topology(
+                    root
+                )
+            )
+
+            self.assertEqual(len(violations), 1)
+            self.assertIn("exposes package::table_cell_edit module", violations[0])
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_mutation_scaffold(root)
+            (root / boundaries.NUMBERS_TABLE_CELLS_MUTATION_OWNER_SOURCE).unlink()
+            violations = (
+                boundaries.audit_numbers_table_cells_mutation_facade_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("missing private package owner source" in item for item in violations)
+            )
+            self.assertEqual(
+                sum("canonical Package::" in item for item in violations),
+                2,
+            )
+
+    def test_focused_numbers_table_cells_mutation_rejects_public_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_mutation_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "pub type TableCellEdit = Edit;\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.NUMBERS_TABLE_CELLS_MUTATION_OWNER_SOURCE
+            owner.write_text(
+                "impl Package {\n"
+                "pub fn edit_table_cells(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, bnc: BncCell, codec: NumbersTableCellStorageCodec, "
+                "buffa: BuffaCellView, generated: GeneratedProjection, "
+                "prost: prost_types::MessageInfo) {}\n"
+                "pub fn apply_table_cells() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_CELLS_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use crate::table::cells::{Edit, Patch, Commit};\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_table_cells_mutation_facade_source_topology(
+                    root
+                )
+            )
+
+            for fragment in (
+                "retains flat alias TableCellEdit",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire/BNC type WireView",
+                "exposes wire/BNC type BncCell",
+                "exposes protobuf type NumbersTableCellStorageCodec",
+                "exposes protobuf type BuffaCellView",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes public mutation-owner alias",
+                "retains root alias Edit",
+                "retains root alias Patch",
+                "retains root alias Commit",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_table_cells_mutation_allows_private_plan_and_variants(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_mutation_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub struct Input;\npub struct Change;\n"
+                "pub struct State;\npub struct Storage;\n"
+                "pub struct Edit;\npub struct Patch;\npub struct Commit;\n"
+                "pub struct Diagnostics;\npub struct Error;\n"
+                "pub struct LimitKind;\npub struct Path;\n"
+                "pub enum DependencyKind { CellStorage, FormulaCache }\n"
+                "pub(crate) struct Plan;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_cells_mutation_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_table_cell_mutation_rejects_exact_retired_surface(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sources = {
+                boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_EDITOR_SOURCE: (
+                    boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_METHODS
+                ),
+                boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_MODEL_SOURCE: (
+                    boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_MODEL_HELPERS
+                ),
+                boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_BATCH_SOURCE: (
+                    boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_BATCH_HELPERS
+                ),
+                boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TEST_SOURCE: (
+                    boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TESTS
+                ),
+            }
+            for path, names in sources.items():
+                source = root / path
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_text(
+                    "".join(f"fn {name}() {{}}\n" for name in names),
+                    encoding="utf-8",
+                )
+            example = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_EXAMPLE
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+
+            violations = (
+                boundaries.audit_iwa_numbers_table_cell_mutation_source_topology(root)
+            )
+
+            self.assertEqual(len(violations), 22)
+            for name in (
+                *boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_METHODS,
+                *boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_MODEL_HELPERS,
+                *boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_BATCH_HELPERS,
+                *boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TESTS,
+            ):
+                self.assertTrue(
+                    any(f" {name}:" in violation for violation in violations),
+                    msg=f"missing retirement violation for {name!r}: {violations!r}",
+                )
+            self.assertTrue(any("example returned" in item for item in violations))
+
+    def test_iwa_numbers_table_cell_mutation_allows_retained_host_helpers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            retained_sources = {
+                boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_EDITOR_SOURCE: (
+                    "set_cell_comment",
+                    "clear_cell_comment",
+                    "set_cell_conditional_highlighting",
+                ),
+                boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_MODEL_SOURCE: (
+                    "set_attached_cell_in_package",
+                    "set_attached_cells_in_package",
+                ),
+                boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_BATCH_SOURCE: (
+                    "is_empty",
+                    "len",
+                    "collect",
+                    "apply_attached",
+                    "into_formula_cache_coordinates",
+                ),
+                boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TEST_SOURCE: (
+                    "retained_table_cell_formula_cache_test",
+                ),
+                Path("crates/litchi-iwa/src/pages/editor/tables/semantic.rs"): (
+                    "set_cell",
+                    "set_cells",
+                ),
+                Path("crates/litchi-iwa/src/keynote/editor/slide_tables.rs"): (
+                    "clear_cell",
+                    "apply_numbers",
+                ),
+                Path("crates/litchi-iwa/src/numbers/editor/package.rs"): (
+                    "set_table_cell_in_package",
+                ),
+            }
+            for path, names in retained_sources.items():
+                source = root / path
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_text(
+                    "".join(f"fn {name}() {{}}\n" for name in names),
+                    encoding="utf-8",
+                )
+            fixture = root / boundaries.IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_SOURCE
+            fixture.parent.mkdir(parents=True, exist_ok=True)
+            fixture.write_text(
+                "".join(
+                    f"#[cfg(test)]\npub(crate) fn {name}() {{}}\n"
+                    for name in boundaries.IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_HELPERS
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_mutation_source_topology(root),
+                [],
+            )
+
+    def test_iwa_numbers_table_cell_fixture_helpers_stay_test_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = root / boundaries.IWA_NUMBERS_TABLE_CELL_TEST_FIXTURE_SOURCE
+            fixture.parent.mkdir(parents=True, exist_ok=True)
+            fixture.write_text(
+                "pub(crate) fn test_set_cell() {}\n"
+                "#[cfg(test)]\npub fn test_set_cells() {}\n"
+                "#[cfg(test)]\npub(crate) fn test_clear_cell() {}\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.IWA_NUMBERS_EXAMPLE_ROOT / "fixture_leak.rs"
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn main() { crate::numbers::editor::test_clear_cell(); }\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_iwa_numbers_table_cell_mutation_source_topology(root)
+            )
+
+            self.assertEqual(len(violations), 3)
+            self.assertTrue(
+                any("private #[cfg(test)] test_set_cell:" in item for item in violations)
+            )
+            self.assertTrue(
+                any("private #[cfg(test)] test_set_cells:" in item for item in violations)
+            )
+            self.assertTrue(
+                any("example calls test-only" in item for item in violations)
             )
 
 
