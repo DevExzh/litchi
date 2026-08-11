@@ -193,6 +193,12 @@ transport/producer smoke, and preserves exact no-op, opaque syntax, limits,
 patch/inverse and complete readback contracts. Formatting/media-heavy,
 malformed/security and broader real-producer edits remain open.
 
+Change 0043 measures and fully reverts direct RTF decoded-body ownership. It
+adds no CRUD surface and keeps the existing parser/model handoff. The retained
+test covers a lossy incomplete Shift-JIS body byte plus byte-exact immutable
+publication; the broad prototype's plain/LZFu regression and the owned-only
+variants' sub-threshold instability are negative evidence, not support claims.
+
 Change 0041 removes three archive-sized copies from the existing ODT
 changed-operation compactness audit without adding a CRUD surface. The
 media-rich paragraph edit/save still parses both packages, audits compact XML,

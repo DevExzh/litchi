@@ -418,6 +418,14 @@ spans. Large open p50 improves 17.23%, one-edit/save 14.65%, instructions fall
 and LZFu opens all improve; the prepared LZFu no-op microsegment exception is
 disclosed in change 0040.
 
+A follow-up attempted to move decoded block ownership directly into the final
+document. The broad version removed 20.15% of process allocation calls and
+improved raw CP-1252 open 3.08% p50, but moved ordinary ASCII allocation into
+the parser loop and regressed plain large open 25.53% p50. Owned-only variants
+measured -1.41% and +1.02% p50 across separate 4,000-sample/state runs. The
+production parser was restored exactly; do not revisit this copy in isolation.
+See change 0043.
+
 Formatting/media, malformed/security, broader real-producer, cold-source,
 broad edit and conversion matrices remain missing. Compressed LZFu and raw
 CP-1252 open/read/no-op coverage is now measured but remains narrow.
