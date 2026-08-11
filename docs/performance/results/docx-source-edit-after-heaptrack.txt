@@ -1,0 +1,1725 @@
+reading file "target/perf/docx-source-edit/heap-after2.zst" - please wait, this might take some time...
+Debuggee command was: target/perf/docx-source-edit/after --warmup 0 --samples 10 --case docx_source_backed_one_edit_save --json target/perf/docx-source-edit/heap-after2.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+150128 calls to allocation functions with 0B peak consumption from
+litchi_docx::document::transaction::scan_document::hd1e35ba3cda2fd05
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+17060 calls with 0B peak consumption from:
+    litchi_docx::document::transaction::Snapshot::from_shared_xml::hf23ce77110edc0b9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::main_document_snapshot::hbeb9c47abfba2967
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::edit_document::h198b4f73d5ab3c93
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+17060 calls with 0B peak consumption from:
+    litchi_docx::document::transaction::Snapshot::from_shared_xml::hf23ce77110edc0b9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::main_document_snapshot::hbeb9c47abfba2967
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::edit_document::h198b4f73d5ab3c93
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+17060 calls with 0B peak consumption from:
+    litchi_docx::document::transaction::Snapshot::from_xml::hc3468b71ff1121af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Edit::replace_paragraph_text::ha32d3fc37de5b9ba
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+17060 calls with 0B peak consumption from:
+    litchi_docx::document::transaction::Snapshot::from_xml::hc3468b71ff1121af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Edit::replace_paragraph_text::ha32d3fc37de5b9ba
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+17060 calls with 0B peak consumption from:
+    litchi_docx::document::transaction::Snapshot::from_xml::haf0a10400f16e539
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Edit::commit::h4bc68945c1f00e3d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+  and 64828 from 11 other places
+
+75123 calls to allocation functions with 0B peak consumption from
+quick_xml::events::Event::into_owned::h66cdc02723ba981e
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+9070 calls with 0B peak consumption from:
+    litchi_docx::document::transaction::scan_document::hd1e35ba3cda2fd05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Snapshot::from_xml::haf0a10400f16e539
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Edit::commit::h4bc68945c1f00e3d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+9070 calls with 0B peak consumption from:
+    litchi_docx::document::transaction::scan_document::hd1e35ba3cda2fd05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Snapshot::from_xml::hc3468b71ff1121af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Edit::replace_paragraph_text::ha32d3fc37de5b9ba
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+9070 calls with 0B peak consumption from:
+    litchi_docx::document::transaction::scan_document::hd1e35ba3cda2fd05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Snapshot::from_shared_xml::hf23ce77110edc0b9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::main_document_snapshot::hbeb9c47abfba2967
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::edit_document::h198b4f73d5ab3c93
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+9070 calls with 0B peak consumption from:
+    litchi_docx::document::transaction::scan_document::hd1e35ba3cda2fd05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Snapshot::from_shared_xml::hf23ce77110edc0b9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::main_document_snapshot::hbeb9c47abfba2967
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::publish_document_commit_to_stream::hce8cc68ac951eaec
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+7980 calls with 0B peak consumption from:
+    litchi_docx::document::transaction::scan_document::hd1e35ba3cda2fd05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Snapshot::from_shared_xml::hf23ce77110edc0b9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::main_document_snapshot::hbeb9c47abfba2967
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::publish_document_commit_to_stream::hce8cc68ac951eaec
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+  and 30863 from 19 other places
+
+36884 calls to allocation functions with 0B peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+2410 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    xml_minifier::audit::inspect_attributes::h21503e799ad44cc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    xml_minifier::audit::verify_with_policy::hf92fea616437bc28
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    xml_minifier::audit::verify_authored::h7669e88e64eefaaf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::validate_overlay_xml::h18fe422d82698931
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::write_part_overlay_to_stream::haff537ef0843775b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::publish_document_commit_to_stream::hce8cc68ac951eaec
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+2400 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::writer::doc::codec::element_preserves_space::h703a8942ac844241
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::writer::doc::codec::compact_changed_document_xml::h68c154fc7534cfd9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Edit::commit::h4bc68945c1f00e3d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+2400 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    xml_minifier::audit::inspect_attributes::h21503e799ad44cc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    xml_minifier::audit::verify_with_policy::hf92fea616437bc28
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    xml_minifier::audit::verify_authored::h7669e88e64eefaaf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::validate_overlay_xml::h18fe422d82698931
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::write_part_overlay_to_stream::haff537ef0843775b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::publish_document_commit_to_stream::hce8cc68ac951eaec
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+2400 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::writer::doc::codec::write_compact_start::h3ab0ce8e46a25a26
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::writer::doc::codec::compact_changed_document_xml::h68c154fc7534cfd9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Edit::commit::h4bc68945c1f00e3d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+2240 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hdc0f06912ecfb720
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::reader::state::ReaderState::emit_start::hbb4dc0a782ce0536
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h668f6553452a571e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::extract_word_text::hc2b43588ec2c064f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::_$LT$impl$u20$litchi_docx..paragraph..model..Paragraph$GT$::text::h8fa50206911dfb72
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_semantic_docx::h016db36c905d3600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+  and 25034 from 597 other places
+
+15588 calls to allocation functions with 0B peak consumption from
+quick_xml::name::NamespaceResolver::resolve_prefix::h6d8b38468b368ba6
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+6320 calls with 0B peak consumption from:
+    quick_xml::name::NamespaceResolver::resolve_event::h75c4f0f985c8ef3f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::extract_word_text::hc2b43588ec2c064f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::_$LT$impl$u20$litchi_docx..paragraph..model..Paragraph$GT$::text::h8fa50206911dfb72
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_semantic_docx::h016db36c905d3600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+6320 calls with 0B peak consumption from:
+    quick_xml::name::NamespaceResolver::resolve_event::h75c4f0f985c8ef3f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::extract_word_text::hc2b43588ec2c064f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::_$LT$impl$u20$litchi_docx..paragraph..model..Paragraph$GT$::text::h8fa50206911dfb72
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_semantic_docx::h016db36c905d3600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+632 calls with 0B peak consumption from:
+    quick_xml::name::NamespaceResolver::resolve_event::h75c4f0f985c8ef3f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::extract_word_text::hc2b43588ec2c064f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::_$LT$impl$u20$litchi_docx..paragraph..model..Paragraph$GT$::text::h8fa50206911dfb72
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_semantic_docx::h016db36c905d3600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+632 calls with 0B peak consumption from:
+    quick_xml::name::NamespaceResolver::resolve_event::h75c4f0f985c8ef3f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::extract_word_text::hc2b43588ec2c064f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::_$LT$impl$u20$litchi_docx..paragraph..model..Paragraph$GT$::text::h8fa50206911dfb72
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_semantic_docx::h016db36c905d3600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+632 calls with 0B peak consumption from:
+    quick_xml::name::NamespaceResolver::resolve_event::h75c4f0f985c8ef3f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::extract_word_text::hc2b43588ec2c064f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::_$LT$impl$u20$litchi_docx..paragraph..model..Paragraph$GT$::text::h8fa50206911dfb72
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_semantic_docx::h016db36c905d3600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+  and 1052 from 12 other places
+
+9943 calls to allocation functions with 2.57K peak consumption from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+290 calls with 58B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::members::PartNameIndex::insert::hae28886b2006ad35
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+290 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::members::PartNameIndex::insert::hae28886b2006ad35
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_owned_phys_reader::h19e4b88ede9eb3e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+290 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::members::PartNameIndex::insert::hae28886b2006ad35
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_part_catalog::h13ec6b013727a596
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::source_catalog::h972042d4a26731ff
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::from_read_at_with_limits_and_cache_limits::h07d8a4d773f8c458
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::from_read_at::ha2cc9e6a4a81973c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::from_read_at::haaeea723cc262e6c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+290 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::members::PartNameIndex::insert::hae28886b2006ad35
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+190 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::members::part_name_for_member::h08d6ab848b9e2cb3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_part_catalog::h13ec6b013727a596
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::source_catalog::h972042d4a26731ff
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::from_read_at_with_limits_and_cache_limits::h07d8a4d773f8c458
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::from_read_at::ha2cc9e6a4a81973c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::from_read_at::haaeea723cc262e6c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+  and 8593 from 213 other places
+
+
+PEAK MEMORY CONSUMERS
+104.86M peak memory consumed over 220 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h836e52d404a057c4E.llvm.7931907252697084499
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+33.65M consumed over 10 calls from:
+    litchi_perf_baseline::CountingSink::reserve_budget::h611ca28811a70706
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+33.55M consumed over 120 calls from:
+    litchi_opc::phys_pkg::OwnedPhysPkgReader::from_reader_with_limits::haa2d53e34acc7bac
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+18.84M consumed over 10 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hbdba30fdf16bd945
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    flate2::zio::Writer$LT$W$C$D$GT$::write_with_status::haa57b72da1dfa2f8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    soapberry_zip::office::StreamingArchiveWriter$LT$W$GT$::write_deflated::hc716360bd1fdc59a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::phys_pkg::PhysPkgWriter$LT$W$GT$::write::hffd3e55ba6c5b2e5
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgwriter::PackageWriter::write_to_stream::h00ae668fc0442de0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN11litchi_docx7package5codec54_$LT$impl$u20$litchi_docx..package..model..Package$GT$11write_plain28_$u7b$$u7b$closure$u7d$$u7d$17hb609ff540fea4911E.llvm.6957043278238636640
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::package::codec::_$LT$impl$u20$litchi_docx..package..model..Package$GT$::write_plain::h475d0915628266b6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+18.82M consumed over 13 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hbdba30fdf16bd945
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::io::Write::write_all::ha7e38f273b49b767
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    soapberry_zip::preserve::PreservationIndex$LT$R$GT$::write_to::ha76494c0b4debb97
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::write_part_overlay_to_stream::hf6561a139cd42714
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::publish_document_commit_to_stream::he31de61d9b876489
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+  and 0B from 20 other places
+
+50.50M peak memory consumed over 700 calls from
+soapberry_zip::office::LazyArchiveReader::read::hfc7ee63bd5f1c527
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+16.83M consumed over 170 calls from:
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h90a84887f8d064a6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+16.83M consumed over 170 calls from:
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h90a84887f8d064a6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_owned_phys_reader::h19e4b88ede9eb3e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+16.83M consumed over 170 calls from:
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h90a84887f8d064a6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+1.49K consumed over 10 calls from:
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+  and 0B from 27 other places
+
+16.84M peak memory consumed over 1980 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h18e8a990a47f3bd7E.llvm.4082306042956547542
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+16.83M consumed over 170 calls from:
+    soapberry_zip::office::ArchiveReader::read::h8531ee47df9ec671
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    soapberry_zip::office::LazyArchiveReader::read_shared::h51aaff5b91657f5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    soapberry_zip::office::LazyArchiveReader::read::hfc7ee63bd5f1c527
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h90a84887f8d064a6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+2.06K consumed over 10 calls from:
+    soapberry_zip::office::ArchiveReader::read::h8531ee47df9ec671
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    soapberry_zip::office::LazyArchiveReader::read_shared::h51aaff5b91657f5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    soapberry_zip::office::LazyArchiveReader::read::hfc7ee63bd5f1c527
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_rels_lazy::hf98259cd75a0c553
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::walk_relationship_graph::hc7d25275359f685c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+1.49K consumed over 10 calls from:
+    soapberry_zip::office::ArchiveReader::read::h8531ee47df9ec671
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    soapberry_zip::office::LazyArchiveReader::read_shared::h51aaff5b91657f5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    soapberry_zip::office::LazyArchiveReader::read::hfc7ee63bd5f1c527
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+588B consumed over 10 calls from:
+    soapberry_zip::office::ArchiveReader::read::h8531ee47df9ec671
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    soapberry_zip::office::LazyArchiveReader::read_shared::h51aaff5b91657f5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    soapberry_zip::office::LazyArchiveReader::read::hfc7ee63bd5f1c527
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_rels_lazy::hf98259cd75a0c553
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+  and 0B from 139 other places
+
+16.79M peak memory consumed over 10 calls from
+_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h8b11bda09882c5b9
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+16.79M consumed over 10 calls from:
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+
+73.73K peak memory consumed over 1 calls from
+0x7e62330b738e
+  in /lib/x86_64-linux-gnu/libstdc++.so.6
+73.73K consumed over 1 calls from:
+    call_init
+      at ./elf/dl-init.c:74
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init::call_init
+      at ./elf/dl-init.c:120
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init
+      at ./elf/./elf/dl-init.c:121
+    _dl_start_user
+      in /lib64/ld-linux-x86-64.so.2
+
+
+MOST TEMPORARY ALLOCATIONS
+20655 temporary allocations of 36884 allocations in total (56.00%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+2410 temporary allocations of 2410 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    xml_minifier::audit::inspect_attributes::h21503e799ad44cc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    xml_minifier::audit::verify_with_policy::hf92fea616437bc28
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    xml_minifier::audit::verify_authored::h7669e88e64eefaaf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::validate_overlay_xml::h18fe422d82698931
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::write_part_overlay_to_stream::haff537ef0843775b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::publish_document_commit_to_stream::hce8cc68ac951eaec
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+2400 temporary allocations of 2400 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::writer::doc::codec::element_preserves_space::h703a8942ac844241
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::writer::doc::codec::compact_changed_document_xml::h68c154fc7534cfd9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Edit::commit::h4bc68945c1f00e3d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+2400 temporary allocations of 2400 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    xml_minifier::audit::inspect_attributes::h21503e799ad44cc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    xml_minifier::audit::verify_with_policy::hf92fea616437bc28
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    xml_minifier::audit::verify_authored::h7669e88e64eefaaf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::validate_overlay_xml::h18fe422d82698931
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::write_part_overlay_to_stream::haff537ef0843775b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::publish_document_commit_to_stream::hce8cc68ac951eaec
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+2400 temporary allocations of 2400 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::writer::doc::codec::write_compact_start::h3ab0ce8e46a25a26
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::writer::doc::codec::compact_changed_document_xml::h68c154fc7534cfd9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::document::transaction::Edit::commit::h4bc68945c1f00e3d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+2000 temporary allocations of 2000 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hdc0f06912ecfb720
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _$LT$quick_xml..name..NamespaceResolver$u20$as$u20$core..default..Default$GT$::default::h67088fe58058db28
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::extract_word_text::hc2b43588ec2c064f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::_$LT$impl$u20$litchi_docx..paragraph..model..Paragraph$GT$::text::h8fa50206911dfb72
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_semantic_docx::h016db36c905d3600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+  and 9.04K from 597 other places
+
+13111 temporary allocations of 15588 allocations in total (84.11%) from
+quick_xml::name::NamespaceResolver::resolve_prefix::h6d8b38468b368ba6
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+6320 temporary allocations of 6320 allocations in total (100.00%) from:
+    quick_xml::name::NamespaceResolver::resolve_event::h75c4f0f985c8ef3f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::extract_word_text::hc2b43588ec2c064f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::_$LT$impl$u20$litchi_docx..paragraph..model..Paragraph$GT$::text::h8fa50206911dfb72
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_semantic_docx::h016db36c905d3600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+4320 temporary allocations of 6320 allocations in total (68.35%) from:
+    quick_xml::name::NamespaceResolver::resolve_event::h75c4f0f985c8ef3f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::extract_word_text::hc2b43588ec2c064f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::_$LT$impl$u20$litchi_docx..paragraph..model..Paragraph$GT$::text::h8fa50206911dfb72
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_semantic_docx::h016db36c905d3600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+632 temporary allocations of 632 allocations in total (100.00%) from:
+    quick_xml::name::NamespaceResolver::resolve_event::h75c4f0f985c8ef3f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::extract_word_text::hc2b43588ec2c064f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::_$LT$impl$u20$litchi_docx..paragraph..model..Paragraph$GT$::text::h8fa50206911dfb72
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_semantic_docx::h016db36c905d3600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+632 temporary allocations of 632 allocations in total (100.00%) from:
+    quick_xml::name::NamespaceResolver::resolve_event::h75c4f0f985c8ef3f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::extract_word_text::hc2b43588ec2c064f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::_$LT$impl$u20$litchi_docx..paragraph..model..Paragraph$GT$::text::h8fa50206911dfb72
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_semantic_docx::h016db36c905d3600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+432 temporary allocations of 632 allocations in total (68.35%) from:
+    quick_xml::name::NamespaceResolver::resolve_event::h75c4f0f985c8ef3f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::extract_word_text::hc2b43588ec2c064f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::paragraph::codec::text::_$LT$impl$u20$litchi_docx..paragraph..model..Paragraph$GT$::text::h8fa50206911dfb72
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_semantic_docx::h016db36c905d3600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+  and 775B from 12 other places
+
+3469 temporary allocations of 9943 allocations in total (34.89%) from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+170 temporary allocations of 170 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::packuri::PackURI::rels_uri::h12a2aad81da76eac
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_rels_lazy::hf98259cd75a0c553
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::walk_relationship_graph::hc7d25275359f685c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+170 temporary allocations of 170 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::packuri::PackURI::rels_uri::h12a2aad81da76eac
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_rels_lazy::hf98259cd75a0c553
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::walk_relationship_graph::hc7d25275359f685c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+170 temporary allocations of 170 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::packuri::PackURI::rels_uri::h12a2aad81da76eac
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_rels_lazy::hf98259cd75a0c553
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::walk_relationship_graph::hc7d25275359f685c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+170 temporary allocations of 170 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::packuri::PackURI::rels_uri::h12a2aad81da76eac
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_rels_lazy::h8ae1f1ec6d7e8eb9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_part_catalog::h13ec6b013727a596
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::source_catalog::h972042d4a26731ff
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::from_read_at_with_limits_and_cache_limits::h07d8a4d773f8c458
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::from_read_at::ha2cc9e6a4a81973c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::from_read_at::haaeea723cc262e6c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+170 temporary allocations of 170 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::packuri::PackURI::rels_uri::h12a2aad81da76eac
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::authorize_owned_source::h86ad7f2641d1401d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_owned_phys_reader::h19e4b88ede9eb3e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+  and 2.62K from 213 other places
+
+741 temporary allocations of 3318 allocations in total (22.33%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hf908cd9dd0991aeeE.llvm.5398751506054170894
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+160 temporary allocations of 170 allocations in total (94.12%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h054da4c67337ac1f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_part_catalog::h13ec6b013727a596
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::source_catalog::h972042d4a26731ff
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::from_read_at_with_limits_and_cache_limits::h07d8a4d773f8c458
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::from_read_at::ha2cc9e6a4a81973c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::from_read_at::haaeea723cc262e6c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+160 temporary allocations of 170 allocations in total (94.12%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h054da4c67337ac1f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::walk_relationship_graph::hc7d25275359f685c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_owned_phys_reader::h19e4b88ede9eb3e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+160 temporary allocations of 170 allocations in total (94.12%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h054da4c67337ac1f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::walk_relationship_graph::hc7d25275359f685c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+160 temporary allocations of 170 allocations in total (94.12%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h054da4c67337ac1f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::walk_relationship_graph::hc7d25275359f685c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+16 temporary allocations of 17 allocations in total (94.12%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h054da4c67337ac1f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::walk_relationship_graph::hc7d25275359f685c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+  and 85B from 160 other places
+
+460 temporary allocations of 2208 allocations in total (20.83%) from
+litchi_opc::content_type::ContentTypeMap::get::hdbb3ba28cd4033f0
+  in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+80 temporary allocations of 170 allocations in total (47.06%) from:
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_owned_phys_reader::h19e4b88ede9eb3e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+80 temporary allocations of 170 allocations in total (47.06%) from:
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+80 temporary allocations of 170 allocations in total (47.06%) from:
+    litchi_opc::pkgreader::PackageReader::load_part_catalog::h13ec6b013727a596
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::source_catalog::h972042d4a26731ff
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::from_read_at_with_limits_and_cache_limits::h07d8a4d773f8c458
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::from_read_at::ha2cc9e6a4a81973c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::from_read_at::haaeea723cc262e6c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+80 temporary allocations of 170 allocations in total (47.06%) from:
+    litchi_opc::pkgreader::PackageReader::load_parts_lazy::hc4970927c8151e8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::from_phys_reader::he24920aaeb86d6ee
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes_with_limits::h3d69431e04748399
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::package::OpcPackage::from_bytes::h4351e64b01cbf001
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::verify_docx_source_edit_output::h3e155a491a72c0f1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    litchi_opc::pkgreader::PackageReader::relationship_part_content_type::hffff95f5e0bac218
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::load_part_catalog::h13ec6b013727a596
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::pkgreader::PackageReader::source_catalog::h972042d4a26731ff
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::from_read_at_with_limits_and_cache_limits::h07d8a4d773f8c458
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_opc::source_backed::SourceBackedPackage::from_read_at::ha2cc9e6a4a81973c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_docx::source_backed::Package::from_read_at::haaeea723cc262e6c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::publish_docx_source_edit::hdd1ce4257bd37ef6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::run_docx_source_backed_one_edit_save::h5361c343f20c114c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.14510361386454702572
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/docx-source-edit/after
+  and 120B from 65 other places
+
+
+total runtime: 1.19s.
+calls to allocation functions: 337965 (284482/s)
+temporary memory allocations: 39751 (33460/s)
+peak heap memory consumption: 189.39M
+peak RSS (including heaptrack overhead): 169.73M
+total memory leaked: 1.78K

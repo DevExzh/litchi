@@ -22,11 +22,12 @@ default 36 cases / 198 records.
 
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
-range cases, two execution-scaling cases, one source-overlay save case, one
-XLSX commit/read attribution case,
+range cases, two execution-scaling cases, one low-level source-overlay save
+case, one source-backed DOCX semantic publication case, one XLSX commit/read
+attribution case,
 four opaque-heavy common OLE2 stage/edit-save cases, 20 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, seven RTF semantic cases, and 25 ODF semantic cases
-are opt-in, for 118 selectable cases in total:
+are opt-in, for 119 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -438,9 +439,9 @@ remain distinguishable.
   reported; exact bytes, every reopened Part, and output digest are verified
   after timing.
 - `docx_source_backed_one_edit_save`: on a fixed 200-paragraph DOCX with eight
-  incompressible 2 MiB images, time positional open, the current all-Part
-  source-backed-to-owned bridge, one paragraph transaction, and sequential
-  save. The control reports 17 semantic Part materializations per sample;
+  incompressible 2 MiB images, time positional open, one source-backed
+  main-document transaction, and its guarded one-Part overlay save. The path
+  reports one semantic Part materialization per sample;
   complete paragraph/media/topology and reversible-patch checks remain
   untimed.
 - `cfb_open`: parse the complete generated container into `litchi_cfb::OleFile`.
@@ -714,9 +715,10 @@ selected original Part is validated, while every unselected member is copied
 physically without semantic materialization.
 
 `docx_source_backed_one_edit_save` also emits `output_sha256`, source/sink
-distributions, and `ordinary_payload_materializations`. The baseline value is
-the complete 17-Part catalog because the only currently available semantic
-route first converts the source-backed package into an eager `OpcPackage`.
+distributions, and `ordinary_payload_materializations`. Its value is exactly
+one per sample: the raw main document is loaded for semantic selection while
+the eight media payloads and every other unselected member remain physically
+source-backed through publication.
 
 ## External profiling
 

@@ -1,9 +1,11 @@
 use std::io;
+use std::io::Write;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
-use litchi_core::{ReadAt, SourceVersion};
-use litchi_docx::{Error, ReadLimits, source_backed};
+use litchi_core::{Position, ReadAt, SourceVersion};
+use litchi_docx::document::{Snapshot, TransactionError};
+use litchi_docx::{Error, Package, ReadLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
 
@@ -126,16 +128,17 @@ fn incompressible_bytes() -> Vec<u8> {
         .collect()
 }
 
-fn fixture() -> (Vec<u8>, std::ops::Range<usize>, std::ops::Range<usize>) {
+fn fixture_for_document(
+    document: Vec<u8>,
+    main_relationship: &str,
+    signed: bool,
+) -> (Vec<u8>, std::ops::Range<usize>, std::ops::Range<usize>) {
     let mut package = OpcPackage::new();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new(format!("/{MAIN_DOCUMENT}")).unwrap(),
             ct::WML_DOCUMENT_MAIN.to_string(),
-            format!(
-                r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>alpha</w:t></w:r></w:p><w:p><w:r><w:t>beta</w:t></w:r></w:p></w:body></w:document>"#
-            )
-            .into_bytes(),
+            document,
         )))
         .unwrap();
     package
@@ -152,11 +155,52 @@ fn fixture() -> (Vec<u8>, std::ops::Range<usize>, std::ops::Range<usize>) {
             incompressible_bytes(),
         )))
         .unwrap();
-    package.relate_to(MAIN_DOCUMENT, rt::OFFICE_DOCUMENT);
+    package.relate_to(MAIN_DOCUMENT, main_relationship);
+    if signed {
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+                ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_string(),
+                b"<origin/>".to_vec(),
+            )))
+            .unwrap();
+        package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+    }
     let zip = PackageWriter::to_bytes(&package).unwrap();
     let main = payload_range(&zip, MAIN_DOCUMENT);
     let unused = payload_range(&zip, UNUSED_PART);
     (zip, main, unused)
+}
+
+fn fixture() -> (Vec<u8>, std::ops::Range<usize>, std::ops::Range<usize>) {
+    fixture_for_document(
+        format!(
+            r#"<w:document xmlns:w="{W}" xmlns:x="urn:litchi:test"><w:body><w:p><w:r><w:t>alpha</w:t><x:opaque value="preserve"/></w:r></w:p><w:p><w:r><w:t>beta</w:t></w:r></w:p></w:body></w:document>"#
+        )
+        .into_bytes(),
+        rt::OFFICE_DOCUMENT,
+        false,
+    )
+}
+
+struct FailingSink {
+    accepted: usize,
+    limit: usize,
+}
+
+impl Write for FailingSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.accepted >= self.limit {
+            return Err(io::Error::other("injected sink failure"));
+        }
+        let count = bytes.len().min(self.limit - self.accepted);
+        self.accepted += count;
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 #[test]
@@ -213,4 +257,229 @@ fn read_limits_are_returned_as_the_original_opc_error() {
         source_backed::Package::from_read_at_with_limits(read_at, limits),
         Err(Error::Opc(OpcError::ReadLimit { .. }))
     ));
+}
+
+#[test]
+fn document_commit_edits_only_the_main_part_and_reopens() {
+    let (source_bytes, main, unused) = fixture();
+    let trailing = payload_range(&source_bytes, TRAILING_PART);
+    let source = Arc::new(ObservedSource::new(
+        source_bytes.clone(),
+        main,
+        unused.clone(),
+    ));
+    let read_at: Arc<dyn ReadAt> = source.clone();
+    let package = source_backed::Package::from_read_at(read_at).unwrap();
+    let mut edit = package.edit_document().unwrap();
+    edit.replace_paragraph_text(Position::new(1), "edited")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    let published = package
+        .publish_document_commit_to_stream(&mut output, &commit)
+        .unwrap();
+
+    assert_eq!(published.xml_bytes(), commit.snapshot().xml_bytes());
+    assert_eq!(
+        &output[payload_range(&output, UNUSED_PART)],
+        &source_bytes[unused]
+    );
+    assert_eq!(
+        &output[payload_range(&output, TRAILING_PART)],
+        &source_bytes[trailing]
+    );
+    let reopened = Package::from_reader(io::Cursor::new(output)).unwrap();
+    let snapshot = reopened.document_snapshot().unwrap();
+    assert_eq!(snapshot.paragraph_count(), 2);
+    assert_eq!(
+        snapshot
+            .paragraph(Position::new(0))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "alpha"
+    );
+    assert_eq!(
+        snapshot
+            .paragraph(Position::new(1))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "edited"
+    );
+    assert!(
+        std::str::from_utf8(snapshot.xml_bytes())
+            .unwrap()
+            .contains("<x:opaque value=\"preserve\"/>")
+    );
+}
+
+#[test]
+fn exact_noop_reproduces_every_source_byte() {
+    let (source_bytes, main, unused) = fixture();
+    let source = Arc::new(ObservedSource::new(source_bytes.clone(), main, unused));
+    let read_at: Arc<dyn ReadAt> = source;
+    let package = source_backed::Package::from_read_at(read_at).unwrap();
+    let commit = package.edit_document().unwrap().commit().unwrap();
+    let mut output = Vec::new();
+
+    package
+        .publish_document_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, source_bytes);
+}
+
+#[test]
+fn stale_commit_and_changed_source_fail_before_output() {
+    let (source_bytes, main, unused) = fixture();
+    let source = Arc::new(ObservedSource::new(source_bytes, main, unused));
+    let read_at: Arc<dyn ReadAt> = source.clone();
+    let package = source_backed::Package::from_read_at(read_at).unwrap();
+    let mut edit = package.edit_document().unwrap();
+    edit.replace_paragraph_text(Position::new(1), "edited")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    source.changed();
+    let mut output = Vec::new();
+    assert!(matches!(
+        package.publish_document_commit_to_stream(&mut output, &commit),
+        Err(TransactionError::Document(Error::Opc(
+            OpcError::SourceChanged { .. }
+        )))
+    ));
+    assert!(output.is_empty());
+
+    let stale_document = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>different</w:t></w:r></w:p></w:body></w:document>"#
+    )
+    .into_bytes();
+    let (stale_bytes, stale_main, stale_unused) =
+        fixture_for_document(stale_document, rt::OFFICE_DOCUMENT, false);
+    let stale_source = Arc::new(ObservedSource::new(stale_bytes, stale_main, stale_unused));
+    let stale_read_at: Arc<dyn ReadAt> = stale_source;
+    let stale_package = source_backed::Package::from_read_at(stale_read_at).unwrap();
+    assert!(matches!(
+        stale_package.publish_document_commit_to_stream(&mut output, &commit),
+        Err(TransactionError::StaleSource)
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn markup_compatibility_branch_selection_is_refused_before_output() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><w:body><mc:AlternateContent><mc:Choice Requires="x"><w:p><w:r><w:t>choice</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>fallback</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:body></w:document>"#
+    )
+    .into_bytes();
+    let commit = Snapshot::from_xml(document.clone())
+        .unwrap()
+        .edit()
+        .commit()
+        .unwrap();
+    let (bytes, main, unused) = fixture_for_document(document, rt::OFFICE_DOCUMENT, false);
+    let source = Arc::new(ObservedSource::new(bytes, main, unused));
+    let read_at: Arc<dyn ReadAt> = source;
+    let package = source_backed::Package::from_read_at(read_at).unwrap();
+    let mut output = Vec::new();
+
+    assert!(matches!(
+        package.publish_document_commit_to_stream(&mut output, &commit),
+        Err(TransactionError::Document(Error::UnsafeEdit { .. }))
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn signed_changes_are_refused_but_signed_noops_are_exact() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>signed</w:t></w:r></w:p></w:body></w:document>"#
+    )
+    .into_bytes();
+    let (signed_bytes, main, unused) = fixture_for_document(document, rt::OFFICE_DOCUMENT, true);
+    let source = Arc::new(ObservedSource::new(
+        signed_bytes.clone(),
+        main.clone(),
+        unused.clone(),
+    ));
+    let read_at: Arc<dyn ReadAt> = source;
+    let package = source_backed::Package::from_read_at(read_at).unwrap();
+    let noop = package.edit_document().unwrap().commit().unwrap();
+    let mut output = Vec::new();
+    package
+        .publish_document_commit_to_stream(&mut output, &noop)
+        .unwrap();
+    assert_eq!(output, signed_bytes);
+
+    let source = Arc::new(ObservedSource::new(signed_bytes, main, unused));
+    let read_at: Arc<dyn ReadAt> = source;
+    let package = source_backed::Package::from_read_at(read_at).unwrap();
+    let mut edit = package.edit_document().unwrap();
+    edit.replace_paragraph_text(Position::new(0), "changed")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    output.clear();
+    assert!(matches!(
+        package.publish_document_commit_to_stream(&mut output, &commit),
+        Err(TransactionError::Document(Error::Opc(
+            OpcError::SignedSourceRequiresExplicitPolicy
+        )))
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn sequential_sink_failure_is_typed_as_incomplete_output() {
+    let (bytes, main, unused) = fixture();
+    let source = Arc::new(ObservedSource::new(bytes, main, unused));
+    let read_at: Arc<dyn ReadAt> = source;
+    let package = source_backed::Package::from_read_at(read_at).unwrap();
+    let mut edit = package.edit_document().unwrap();
+    edit.replace_paragraph_text(Position::new(1), "edited")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut sink = FailingSink {
+        accepted: 0,
+        limit: 128,
+    };
+
+    assert!(matches!(
+        package.publish_document_commit_to_stream(&mut sink, &commit),
+        Err(TransactionError::Document(Error::Opc(
+            OpcError::IncompleteOutput { .. }
+        )))
+    ));
+    assert_eq!(sink.accepted, 128);
+}
+
+#[test]
+fn strict_main_document_relationship_uses_the_same_overlay_contract() {
+    const STRICT_W: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
+    let document = format!(
+        r#"<w:document xmlns:w="{STRICT_W}"><w:body><w:p><w:r><w:t>strict</w:t></w:r></w:p></w:body></w:document>"#
+    )
+    .into_bytes();
+    let (bytes, main, unused) = fixture_for_document(document, rt::STRICT_OFFICE_DOCUMENT, false);
+    let source = Arc::new(ObservedSource::new(bytes, main, unused));
+    let read_at: Arc<dyn ReadAt> = source;
+    let package = source_backed::Package::from_read_at(read_at).unwrap();
+    let mut edit = package.edit_document().unwrap();
+    edit.replace_paragraph_text(Position::new(0), "strict edited")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    package
+        .publish_document_commit_to_stream(&mut output, &commit)
+        .unwrap();
+
+    let reopened = Package::from_reader(io::Cursor::new(output)).unwrap();
+    assert_eq!(
+        reopened
+            .document_snapshot()
+            .unwrap()
+            .paragraph(Position::new(0))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "strict edited"
+    );
 }

@@ -203,6 +203,33 @@ jobs:
           assert len(result["elapsed_ns"]["samples"]) == 1
           PY
 
+      - name: Run source-backed DOCX semantic publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case docx_source_backed_one_edit_save \
+            --json target/perf/docx-source-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/docx-source-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "docx_source_backed_one_edit_save"
+          assert result["corpus"]["archive_sha256"] == "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4"
+          assert result["corpus"]["entry_count"] == 17
+          assert result["corpus"]["archive_member_count"] == 20
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_833_643
+          assert result["output_sha256"] == "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795"
+          assert result["source"]["ordinary_payload_materializations"] == [1]
+          assert result["sink"]["accepted_bytes"] == 16_793_048
+          assert result["sink"]["largest_write"] <= 65_536
+          assert len(result["elapsed_ns"]["samples"]) == 1
+          PY
+
       - name: Run ODP media publication smoke
         run: |
           cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
@@ -450,6 +477,32 @@ jobs:
           assert len(result["elapsed_ns"]["samples"]) == 15
           PY
 
+      - name: Run release source-backed DOCX semantic publication case
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case docx_source_backed_one_edit_save \
+            --json target/perf/docx-source-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/docx-source-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "docx_source_backed_one_edit_save"
+          assert result["corpus"]["archive_sha256"] == "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4"
+          assert result["corpus"]["entry_count"] == 17
+          assert result["corpus"]["archive_member_count"] == 20
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_833_643
+          assert result["output_sha256"] == "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795"
+          assert result["source"]["ordinary_payload_materializations"] == [1] * 15
+          assert result["sink"]["accepted_bytes"] == 16_793_048
+          assert result["sink"]["largest_write"] <= 65_536
+          assert len(result["elapsed_ns"]["samples"]) == 15
+          PY
+
       - name: Run release ODP media publication case
         run: |
           cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
@@ -568,6 +621,7 @@ jobs:
             target/perf/container-baseline.json
             target/perf/xlsx-commit-read-baseline.json
             target/perf/opc-source-overlay-baseline.json
+            target/perf/docx-source-edit-baseline.json
             target/perf/ole2-semantic-baseline.json
             target/perf/semantic-baseline.json
             target/perf/odf-semantic-baseline.json

@@ -1,0 +1,9 @@
+# started on Tue Aug 11 14:22:15 2026
+
+1124.77,msec,task-clock,0.38%,1117216711,100.00,1.003,CPUs utilized
+5448560637,,cycles,0.47%,1117216711,100.00,4.844,GHz
+10548459801,,instructions,0.26%,1117216711,100.00,1.94,insn per cycle
+1445553796,,branches,0.33%,1117216711,100.00,1.285,G/sec
+14833669,,branch-misses,0.08%,1117216711,100.00,1.03,of all branches
+388295119,,cache-references,1.17%,1117216711,100.00,345.222,M/sec
+19248109,,cache-misses,2.98%,1117216711,100.00,4.96,of all cache refs

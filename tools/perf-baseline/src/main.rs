@@ -7771,23 +7771,23 @@ fn verify_docx_source_edit_output(corpus: &Corpus, output: &[u8]) -> Result<(), 
     Ok(())
 }
 
-fn publish_docx_source_edit_control<W: Write>(
+fn publish_docx_source_edit<W: Write>(
     source: Arc<dyn ReadAt>,
     writer: W,
 ) -> Result<(usize, litchi_docx::document::Commit), Box<dyn Error>> {
-    let source_package = SourceBackedPackage::from_read_at(source)?;
-    let materializations = source_package.iter_parts().count();
-    let opc = source_package.into_opc_package()?;
-    let mut package = litchi_docx::Package::from_opc_package(opc)?;
+    let package = litchi_docx::source_backed::Package::from_read_at(source)?;
     let target = SemanticShape::Medium.docx_paragraphs() / 2;
     let mut edit = package.edit_document()?;
     edit.replace_paragraph_text(Position::new(target), semantic_docx_text(target, true))?;
     let commit = edit.commit()?;
     if !commit.patch().changed() || commit.diagnostics().operations() != 1 {
-        return Err("DOCX source-edit control produced unexpected commit diagnostics".into());
+        return Err("DOCX source edit produced unexpected commit diagnostics".into());
     }
-    package.publish_document_commit(commit.clone())?;
-    package.to_stream(writer)?;
+    let materializations = usize::try_from(package.cache_diagnostics().successful_loads)?;
+    let published = package.publish_document_commit_to_stream(writer, &commit)?;
+    if published.xml_bytes() != commit.snapshot().xml_bytes() {
+        return Err("DOCX source edit published a different snapshot".into());
+    }
     Ok((materializations, commit))
 }
 
@@ -7802,12 +7802,12 @@ fn run_docx_source_backed_one_edit_save(
     let expected_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
     let mut expected = Vec::new();
     let (expected_materializations, expected_commit) =
-        publish_docx_source_edit_control(expected_source, &mut expected)?;
+        publish_docx_source_edit(expected_source, &mut expected)?;
     if expected == corpus.archive
-        || expected_materializations != corpus.manifest.entry_count
+        || expected_materializations != 1
         || expected_commit.diagnostics().operations() != 1
     {
-        return Err("DOCX source-edit control does not exercise all-Part publication".into());
+        return Err("DOCX source edit did not materialize exactly its main Part".into());
     }
     verify_docx_source_edit_output(corpus, &expected)?;
     let expected_digest = sha256_hex(&expected);
@@ -7830,11 +7830,11 @@ fn run_docx_source_backed_one_edit_save(
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let started = Instant::now();
-        let (materializations, commit) = publish_docx_source_edit_control(read_at, &mut sink)?;
+        let (materializations, commit) = publish_docx_source_edit(read_at, &mut sink)?;
         let duration = started.elapsed();
 
         if materializations != expected_materializations || sink.bytes != expected {
-            return Err("DOCX source-edit control differs between iterations".into());
+            return Err("DOCX source edit differs between iterations".into());
         }
         let replayed = commit.patch().apply(commit.patch().source())?;
         if replayed.xml_bytes() != commit.snapshot().xml_bytes() {
@@ -7854,7 +7854,7 @@ fn run_docx_source_backed_one_edit_save(
         }
         let metrics = source.snapshot();
         if metrics.ordinary_payload_read_calls == 0 || metrics.ordinary_payload_read_bytes == 0 {
-            return Err("DOCX source-edit control performed no ordinary source reads".into());
+            return Err("DOCX source edit performed no ordinary source reads".into());
         }
         if iteration >= warmup_iterations {
             source_summary.record_opc(metrics, u64::try_from(materializations)?);
@@ -8898,7 +8898,7 @@ mod tests {
     }
 
     #[test]
-    fn docx_source_edit_control_is_deterministic_and_emits_complete_evidence() {
+    fn docx_source_edit_is_deterministic_and_emits_complete_evidence() {
         let corpus = build_docx_source_edit_corpus().unwrap();
         let again = build_docx_source_edit_corpus().unwrap();
         assert_eq!(corpus.archive, again.archive);
@@ -8912,10 +8912,7 @@ mod tests {
         assert!(measured.output_sha256.is_some());
         let source = measured.source.unwrap();
         assert_eq!(source.read_calls.len(), 1);
-        assert_eq!(
-            source.ordinary_payload_materializations,
-            Some(vec![u64::try_from(corpus.manifest.entry_count).unwrap()])
-        );
+        assert_eq!(source.ordinary_payload_materializations, Some(vec![1]));
     }
 
     #[test]
