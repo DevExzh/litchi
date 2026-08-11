@@ -111,6 +111,19 @@ impl TextPiece {
 pub struct PieceTable {
     /// All text pieces, sorted by CP
     pieces: Vec<TextPiece>,
+    /// The same pieces ordered by physical FC, with a prefix maximum end.
+    ///
+    /// Fast-save documents may place logical pieces out of physical order and
+    /// may contain overlapping physical intervals. The prefix maximum lets a
+    /// range lookup skip every earlier piece that cannot overlap without
+    /// assuming that physical intervals are disjoint.
+    physical_index: Vec<PhysicalPiece>,
+}
+
+#[derive(Debug, Clone)]
+struct PhysicalPiece {
+    piece_index: usize,
+    prefix_max_end_fc: u32,
 }
 
 impl PieceTable {
@@ -229,7 +242,12 @@ impl PieceTable {
         // Sort pieces by CP (should already be sorted, but ensure it)
         pieces.sort_by_key(|p| p.cp_start);
 
-        Some(Self { pieces })
+        let physical_index = Self::build_physical_index(&pieces);
+
+        Some(Self {
+            pieces,
+            physical_index,
+        })
     }
 
     /// Get all text pieces.
@@ -237,6 +255,32 @@ impl PieceTable {
     #[must_use]
     pub fn pieces(&self) -> &[TextPiece] {
         &self.pieces
+    }
+
+    fn build_physical_index(pieces: &[TextPiece]) -> Vec<PhysicalPiece> {
+        let mut physical_index: Vec<_> = (0..pieces.len())
+            .map(|piece_index| PhysicalPiece {
+                piece_index,
+                prefix_max_end_fc: 0,
+            })
+            .collect();
+        physical_index.sort_unstable_by_key(|entry| {
+            let piece = &pieces[entry.piece_index];
+            (
+                piece.fc,
+                piece.fc_end(),
+                piece.cp_start,
+                piece.cp_end,
+                entry.piece_index,
+            )
+        });
+
+        let mut prefix_max_end_fc = 0;
+        for entry in &mut physical_index {
+            prefix_max_end_fc = prefix_max_end_fc.max(pieces[entry.piece_index].fc_end());
+            entry.prefix_max_end_fc = prefix_max_end_fc;
+        }
+        physical_index
     }
 
     /// Find the text piece containing a given CP.
@@ -356,8 +400,16 @@ impl PieceTable {
             return Vec::new();
         }
 
+        let first_possible = self
+            .physical_index
+            .partition_point(|entry| entry.prefix_max_end_fc <= start_fc);
+        let after_last_possible = self
+            .physical_index
+            .partition_point(|entry| self.pieces[entry.piece_index].fc < end_fc);
+
         let mut ranges = Vec::new();
-        for piece in &self.pieces {
+        for entry in &self.physical_index[first_possible..after_last_possible] {
+            let piece = &self.pieces[entry.piece_index];
             let intersection_start = start_fc.max(piece.fc);
             let intersection_end = end_fc.min(piece.fc_end());
             if intersection_start >= intersection_end {
@@ -389,6 +441,45 @@ impl PieceTable {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn table_from_pieces(mut pieces: Vec<TextPiece>) -> PieceTable {
+        pieces.sort_by_key(|piece| piece.cp_start);
+        let physical_index = PieceTable::build_physical_index(&pieces);
+        PieceTable {
+            pieces,
+            physical_index,
+        }
+    }
+
+    fn scalar_fc_range_to_cp_ranges(
+        table: &PieceTable,
+        start_fc: u32,
+        end_fc: u32,
+    ) -> Vec<(u32, u32)> {
+        if start_fc >= end_fc {
+            return Vec::new();
+        }
+
+        let mut ranges = Vec::new();
+        for piece in &table.pieces {
+            let intersection_start = start_fc.max(piece.fc);
+            let intersection_end = end_fc.min(piece.fc_end());
+            if intersection_start >= intersection_end {
+                continue;
+            }
+            let Some(start_cp) = piece.fc_to_cp(intersection_start) else {
+                continue;
+            };
+            let Some(end_cp) = piece.fc_to_cp(intersection_end) else {
+                continue;
+            };
+            if start_cp < end_cp {
+                ranges.push((start_cp, end_cp));
+            }
+        }
+        ranges.sort_unstable();
+        ranges
+    }
 
     #[test]
     fn test_text_piece_cp_to_fc() {
@@ -434,27 +525,122 @@ mod tests {
 
     #[test]
     fn maps_fkp_ranges_across_discontiguous_text_pieces() {
-        let table = PieceTable {
-            pieces: vec![
-                TextPiece {
-                    cp_start: 0,
-                    cp_end: 3,
-                    fc: 100,
-                    is_unicode: false,
-                    property_modifier: Vec::new(),
-                },
-                TextPiece {
-                    cp_start: 3,
-                    cp_end: 5,
-                    fc: 200,
-                    is_unicode: true,
-                    property_modifier: Vec::new(),
-                },
-            ],
-        };
+        let table = table_from_pieces(vec![
+            TextPiece {
+                cp_start: 0,
+                cp_end: 3,
+                fc: 100,
+                is_unicode: false,
+                property_modifier: Vec::new(),
+            },
+            TextPiece {
+                cp_start: 3,
+                cp_end: 5,
+                fc: 200,
+                is_unicode: true,
+                property_modifier: Vec::new(),
+            },
+        ]);
 
         assert_eq!(table.fc_range_to_cp_ranges(101, 204), vec![(1, 3), (3, 5)]);
         assert!(table.fc_range_to_cp_ranges(150, 180).is_empty());
+    }
+
+    #[test]
+    fn indexed_ranges_match_scalar_for_overlapping_and_numeric_edge_intervals() {
+        let table = table_from_pieces(vec![
+            TextPiece {
+                cp_start: 0,
+                cp_end: 10,
+                fc: 100,
+                is_unicode: false,
+                property_modifier: Vec::new(),
+            },
+            TextPiece {
+                cp_start: 10,
+                cp_end: 20,
+                fc: 105,
+                is_unicode: false,
+                property_modifier: Vec::new(),
+            },
+            TextPiece {
+                cp_start: 20,
+                cp_end: 25,
+                fc: 102,
+                is_unicode: true,
+                property_modifier: Vec::new(),
+            },
+            TextPiece {
+                cp_start: 25,
+                cp_end: 27,
+                fc: u32::MAX - 2,
+                is_unicode: true,
+                property_modifier: Vec::new(),
+            },
+            TextPiece {
+                cp_start: 27,
+                cp_end: 27,
+                fc: 0,
+                is_unicode: false,
+                property_modifier: Vec::new(),
+            },
+        ]);
+
+        for (start_fc, end_fc) in [
+            (0, 0),
+            (0, 1),
+            (101, 112),
+            (103, 104),
+            (104, 113),
+            (115, 1_000),
+            (u32::MAX - 3, u32::MAX),
+        ] {
+            assert_eq!(
+                table.fc_range_to_cp_ranges(start_fc, end_fc),
+                scalar_fc_range_to_cp_ranges(&table, start_fc, end_fc),
+                "query [{start_fc}, {end_fc})",
+            );
+        }
+    }
+
+    #[test]
+    fn indexed_ranges_match_scalar_for_adversarial_piece_orders() {
+        let mut state = 0x91e1_0da5_u32;
+        let mut next = || {
+            state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            state
+        };
+        let mut cp_start = 0_u32;
+        let mut pieces = Vec::new();
+        for index in 0..256_u32 {
+            let length = next() % 32 + 1;
+            let fc = if index.is_multiple_of(17) {
+                128
+            } else {
+                next() % 2_048
+            };
+            pieces.push(TextPiece {
+                cp_start,
+                cp_end: cp_start + length,
+                fc,
+                is_unicode: next() & 1 == 0,
+                property_modifier: Vec::new(),
+            });
+            cp_start += length;
+        }
+        let table = table_from_pieces(pieces);
+
+        for _ in 0..1_024 {
+            let left = next() % 2_500;
+            let right = next() % 2_500;
+            let start_fc = left.min(right);
+            let end_fc = left.max(right);
+            assert_eq!(
+                table.fc_range_to_cp_ranges(start_fc, end_fc),
+                scalar_fc_range_to_cp_ranges(&table, start_fc, end_fc),
+                "query [{start_fc}, {end_fc})",
+            );
+        }
     }
 
     #[test]

@@ -45,7 +45,9 @@ conversion remain.
 
 1. Attribute remaining final owner/public-reader work after the accepted native
    XLS editor reuse, DOC batched stream publication, PPT root-open reuse and
-   direct PPT text-edit resolver reuse;
+   direct PPT text-edit resolver reuse. Change 0050 removes the newly
+   attributed repeated DOC PieceTable physical-range scan but retains the
+   complete owner and public-reader validation layers;
    preserve exact-source patch/inverse and the rejected DOC move as independent
    guardrails.
 2. Extend native RTF beyond the new raw CP-1252, LZFu and watermark read/no-op
@@ -221,6 +223,13 @@ resolving all transition styles and validating content through EOF. It proves
 public/full-list parity, out-of-range behavior, late semantic failure and style
 inheritance failure. It does not provide positional ZIP/XML I/O, early
 termination, repeated-query caching, or broader real-producer/media selection.
+
+Change 0050 leaves native DOC CRUD and publication semantics unchanged while
+indexing the private CLX PieceTable for repeated PAPX/CHPX physical-range
+queries. Scalar differential tests cover overlapping fast-save intervals,
+ANSI/UTF-16 boundaries and numeric limits; the complete final snapshot and
+public DOC reopens remain. This does not add repair, security, real-producer,
+streaming-output, or new edit coverage.
 
 Change 0040 removes repeated UTF-8 scalar decoding from ordinary RTF text
 delimiter discovery without changing the existing CRUD surface. It measures

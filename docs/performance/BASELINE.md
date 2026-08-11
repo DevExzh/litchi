@@ -306,6 +306,13 @@ incomplete program and CRUD matrix.
   allocation calls fall 3.86%. Tiny is neutral, medium improves 1.55% p50,
   and the unchanged list/save guards remain within thresholds. See
   [`0049`](changes/0049-odp-indexed-slide-selector.md).
+- Native DOC now indexes CLX pieces by physical FC with prefix maximum ends,
+  so repeated PAPX/CHPX FKP range mapping skips non-overlapping pieces without
+  assuming fast-save intervals are disjoint. Large public open p50 falls from
+  790.727 to 348.679 us (-55.91%), changed one-paragraph edit/save falls
+  31.08%, and the former 36.89% self-cycle range-scan frame falls to 4.17%.
+  Peak heap and uninstrumented RSS remain flat. See
+  [`0050`](changes/0050-doc-piece-table-physical-index.md).
 - The positional XLSX source record reports p50 opens of 33.881 us (tiny),
   56.493 us (medium), and 139.897 us (dense); list-after-open has zero timed
   source reads. First-cell and narrow-range operations physically overlap only
