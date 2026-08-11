@@ -869,7 +869,7 @@ impl Edit {
                 source,
             })?;
         for operation in &self.operations {
-            let before_operation = copy_bytes(document.original_bytes())?;
+            let before_operation = document.transaction_package().clone();
             #[allow(
                 deprecated,
                 reason = "only this dispatch expression still reaches validated legacy codecs"
@@ -1331,7 +1331,7 @@ impl Edit {
                     OperationResult::Unit
                 },
             };
-            audit_changed_xml_is_compact(&before_operation, document.original_bytes())?;
+            audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
             results.push(result);
         }
         let bytes = copy_bytes(document.original_bytes())?;
@@ -4595,10 +4595,11 @@ fn resolve_paragraph(document: &Document, selector: &ParagraphSelector) -> Resul
     }
 }
 
-fn audit_changed_xml_is_compact(source: &[u8], candidate: &[u8]) -> Result<()> {
-    let source = crate::core::OwnedPackage::from_bytes(copy_bytes(source)?)?;
+fn audit_changed_xml_is_compact(
+    source: &crate::core::OwnedPackage,
+    candidate: &crate::core::OwnedPackage,
+) -> Result<()> {
     let source_archive = source.package()?;
-    let candidate = crate::core::OwnedPackage::from_bytes(copy_bytes(candidate)?)?;
     let archive = candidate.package()?;
     for path in archive.files()? {
         let xml_media_type = archive
@@ -4751,6 +4752,25 @@ mod tests {
         assert_eq!(snapshot.as_bytes().as_ptr(), source_pointer);
         assert!(Arc::ptr_eq(&snapshot.bytes, &document_bytes));
         assert_eq!(snapshot.as_bytes(), document.original_bytes());
+        Ok(())
+    }
+
+    #[test]
+    fn compact_audit_shares_the_validated_predecessor_package() -> Result<()> {
+        let mut mutable = MutableDocument::new();
+        mutable.add_paragraph("before compact audit")?;
+        let source = Document::from_bytes(mutable.to_bytes()?)?;
+        let source_bytes = source.transaction_package().shared_bytes();
+        let predecessor = source.transaction_package().clone();
+
+        assert!(Arc::ptr_eq(&source_bytes, &predecessor.shared_bytes()));
+
+        let mut mutable = MutableDocument::from_document(source)?;
+        mutable.replace_semantic_paragraph(0, "after compact audit")?;
+        let candidate = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+
+        audit_changed_xml_is_compact(&predecessor, candidate.transaction_package())?;
+        assert!(Arc::ptr_eq(&source_bytes, &predecessor.shared_bytes()));
         Ok(())
     }
 }

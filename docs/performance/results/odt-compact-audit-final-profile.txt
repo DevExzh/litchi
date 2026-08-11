@@ -1,0 +1,30 @@
+ODT compact-audit package sharing: sampled profile summary
+
+Command shape:
+  MALLOC_MMAP_THRESHOLD_=33554432 MALLOC_TRIM_THRESHOLD_=-1 \
+    taskset -c 11 perf record -F 999 -g --call-graph dwarf \
+    -o <state>.perf.data -- <binary> --warmup 3 --samples 30 \
+    --case odt_media_paragraph_edit_save --json <state>.json
+
+Before:
+  approximate event count: 8,508,607,403
+  __memmove_avx512_unaligned_erms: 18.48% exclusive
+  resolved memmove callers include result materialization (3.29%), the final
+  retained transaction copy (3.11%), complete verification (2.78%), compact
+  audit package construction under Edit::commit (2.72%), preservation write
+  (2.55%), and envelope classification (1.48%).
+
+After:
+  approximate event count: 8,174,100,366
+  __memmove_avx512_unaligned_erms: 14.96% exclusive
+
+The absolute sampled event count falls 3.93%, while memmove's exclusive share
+falls 19.05% relative. The removed compact-audit predecessor/candidate package
+constructors are absent; complete verification, final transaction
+materialization, preservation write and envelope classification deliberately
+remain. The after call graph was not expanded into stable per-caller shares,
+so the matched perf-stat ABBA counters are the quantitative whole-process
+attribution record.
+
+Kernel symbols were restricted on this host. No samples were lost. The matched
+perf-stat ABBA counters are the quantitative whole-process attribution record.

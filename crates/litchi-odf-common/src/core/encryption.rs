@@ -358,7 +358,8 @@ fn encrypt_blowfish_cfb8(plaintext: &[u8], key: &[u8], iv: [u8; 8]) -> Result<Ve
     let mut feedback = iv;
     let mut ciphertext = Vec::with_capacity(plaintext.len());
     for &byte in plaintext {
-        let mut block = Block::<Blowfish>::clone_from_slice(&feedback);
+        let mut block = Block::<Blowfish>::default();
+        block.copy_from_slice(&feedback);
         cipher.encrypt_block(&mut block);
         let encrypted = byte ^ block[0];
         ciphertext.push(encrypted);
@@ -540,7 +541,8 @@ fn decrypt_blowfish_cfb8(ciphertext: &[u8], key: &[u8], iv: [u8; 8]) -> Result<V
         .try_reserve_exact(ciphertext.len())
         .map_err(encryption_failure_from)?;
     for &ciphertext_byte in ciphertext {
-        let mut block = Block::<Blowfish>::clone_from_slice(&feedback);
+        let mut block = Block::<Blowfish>::default();
+        block.copy_from_slice(&feedback);
         cipher.encrypt_block(&mut block);
         plaintext.push(ciphertext_byte ^ block[0]);
         feedback.copy_within(1.., 0);
