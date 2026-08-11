@@ -1,0 +1,1138 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "f7e102ace3c19bcf71f31514ef134f3ec2145ca6",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 12,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1"
+  },
+  "configuration": {
+    "samples_per_case": 1,
+    "warmup_iterations_per_case": 0,
+    "cases": [
+      "rtf_semantic_open",
+      "rtf_semantic_list_paragraphs",
+      "rtf_semantic_one_paragraph",
+      "rtf_semantic_full_text",
+      "rtf_semantic_stream_save",
+      "rtf_semantic_noop_edit_save",
+      "rtf_semantic_one_edit_save"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "semantic_shapes": [
+      "tiny"
+    ],
+    "rtf_variants": [
+      "plain",
+      "byte1252",
+      "lzfu",
+      "watermark"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1,
+      2,
+      4,
+      8,
+      12
+    ]
+  },
+  "results": [
+    {
+      "case": "rtf_semantic_open",
+      "corpus": {
+        "name": "rtf-semantic-plain-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 1347,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "plain",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          15501
+        ],
+        "min": 15501,
+        "p50": 15501,
+        "p95": 15501,
+        "p99": 15501,
+        "max": 15501,
+        "mean": 15501.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 15501.0,
+          "upper": 15501.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_list_paragraphs",
+      "corpus": {
+        "name": "rtf-semantic-plain-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 1347,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "plain",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          190
+        ],
+        "min": 190,
+        "p50": 190,
+        "p95": 190,
+        "p99": 190,
+        "max": 190,
+        "mean": 190.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 190.0,
+          "upper": 190.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_one_paragraph",
+      "corpus": {
+        "name": "rtf-semantic-plain-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 1347,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "plain",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          240
+        ],
+        "min": 240,
+        "p50": 240,
+        "p95": 240,
+        "p99": 240,
+        "max": 240,
+        "mean": 240.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 240.0,
+          "upper": 240.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_full_text",
+      "corpus": {
+        "name": "rtf-semantic-plain-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 1347,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "plain",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          171
+        ],
+        "min": 171,
+        "p50": 171,
+        "p95": 171,
+        "p99": 171,
+        "max": 171,
+        "mean": 171.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 171.0,
+          "upper": 171.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_stream_save",
+      "corpus": {
+        "name": "rtf-semantic-plain-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 1347,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "plain",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          1552
+        ],
+        "min": 1552,
+        "p50": 1552,
+        "p95": 1552,
+        "p99": 1552,
+        "max": 1552,
+        "mean": 1552.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 1552.0,
+          "upper": 1552.0
+        }
+      },
+      "sink": {
+        "accepted_bytes": 1347,
+        "write_calls": 1,
+        "largest_write": 1347
+      }
+    },
+    {
+      "case": "rtf_semantic_noop_edit_save",
+      "corpus": {
+        "name": "rtf-semantic-plain-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 1347,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "plain",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          1342
+        ],
+        "min": 1342,
+        "p50": 1342,
+        "p95": 1342,
+        "p99": 1342,
+        "max": 1342,
+        "mean": 1342.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 1342.0,
+          "upper": 1342.0
+        }
+      },
+      "sink": {
+        "accepted_bytes": 1347,
+        "write_calls": 1,
+        "largest_write": 1347
+      }
+    },
+    {
+      "case": "rtf_semantic_one_edit_save",
+      "corpus": {
+        "name": "rtf-semantic-plain-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 1347,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "plain",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          15521
+        ],
+        "min": 15521,
+        "p50": 15521,
+        "p95": 15521,
+        "p99": 15521,
+        "max": 15521,
+        "mean": 15521.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 15521.0,
+          "upper": 15521.0
+        }
+      },
+      "sink": {
+        "accepted_bytes": 1348,
+        "write_calls": 1,
+        "largest_write": 1348
+      }
+    },
+    {
+      "case": "rtf_semantic_open",
+      "corpus": {
+        "name": "rtf-semantic-byte1252-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-byte1252-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 52,
+        "uncompressed_payload_bytes": 1271,
+        "archive_bytes": 1407,
+        "archive_sha256": "47a20904dfb8107bb1cd9ad099decfed13c76cbde993fdd93eda3d919a9bb1aa",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 52,
+        "target_payload_sha256": "ae385f7d12653f0d5ed6b339e703455c26734e40b3dd604564d08f2d650e43a9",
+        "rtf_variant": "byte1252",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          11565
+        ],
+        "min": 11565,
+        "p50": 11565,
+        "p95": 11565,
+        "p99": 11565,
+        "max": 11565,
+        "mean": 11565.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 11565.0,
+          "upper": 11565.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_list_paragraphs",
+      "corpus": {
+        "name": "rtf-semantic-byte1252-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-byte1252-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 52,
+        "uncompressed_payload_bytes": 1271,
+        "archive_bytes": 1407,
+        "archive_sha256": "47a20904dfb8107bb1cd9ad099decfed13c76cbde993fdd93eda3d919a9bb1aa",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 52,
+        "target_payload_sha256": "ae385f7d12653f0d5ed6b339e703455c26734e40b3dd604564d08f2d650e43a9",
+        "rtf_variant": "byte1252",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          230
+        ],
+        "min": 230,
+        "p50": 230,
+        "p95": 230,
+        "p99": 230,
+        "max": 230,
+        "mean": 230.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 230.0,
+          "upper": 230.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_one_paragraph",
+      "corpus": {
+        "name": "rtf-semantic-byte1252-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-byte1252-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 52,
+        "uncompressed_payload_bytes": 1271,
+        "archive_bytes": 1407,
+        "archive_sha256": "47a20904dfb8107bb1cd9ad099decfed13c76cbde993fdd93eda3d919a9bb1aa",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 52,
+        "target_payload_sha256": "ae385f7d12653f0d5ed6b339e703455c26734e40b3dd604564d08f2d650e43a9",
+        "rtf_variant": "byte1252",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          160
+        ],
+        "min": 160,
+        "p50": 160,
+        "p95": 160,
+        "p99": 160,
+        "max": 160,
+        "mean": 160.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 160.0,
+          "upper": 160.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_full_text",
+      "corpus": {
+        "name": "rtf-semantic-byte1252-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-byte1252-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 52,
+        "uncompressed_payload_bytes": 1271,
+        "archive_bytes": 1407,
+        "archive_sha256": "47a20904dfb8107bb1cd9ad099decfed13c76cbde993fdd93eda3d919a9bb1aa",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 52,
+        "target_payload_sha256": "ae385f7d12653f0d5ed6b339e703455c26734e40b3dd604564d08f2d650e43a9",
+        "rtf_variant": "byte1252",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          90
+        ],
+        "min": 90,
+        "p50": 90,
+        "p95": 90,
+        "p99": 90,
+        "max": 90,
+        "mean": 90.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 90.0,
+          "upper": 90.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_stream_save",
+      "corpus": {
+        "name": "rtf-semantic-byte1252-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-byte1252-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 52,
+        "uncompressed_payload_bytes": 1271,
+        "archive_bytes": 1407,
+        "archive_sha256": "47a20904dfb8107bb1cd9ad099decfed13c76cbde993fdd93eda3d919a9bb1aa",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 52,
+        "target_payload_sha256": "ae385f7d12653f0d5ed6b339e703455c26734e40b3dd604564d08f2d650e43a9",
+        "rtf_variant": "byte1252",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          51
+        ],
+        "min": 51,
+        "p50": 51,
+        "p95": 51,
+        "p99": 51,
+        "max": 51,
+        "mean": 51.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 51.0,
+          "upper": 51.0
+        }
+      },
+      "sink": {
+        "accepted_bytes": 1407,
+        "write_calls": 1,
+        "largest_write": 1407
+      }
+    },
+    {
+      "case": "rtf_semantic_noop_edit_save",
+      "corpus": {
+        "name": "rtf-semantic-byte1252-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-byte1252-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 52,
+        "uncompressed_payload_bytes": 1271,
+        "archive_bytes": 1407,
+        "archive_sha256": "47a20904dfb8107bb1cd9ad099decfed13c76cbde993fdd93eda3d919a9bb1aa",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 52,
+        "target_payload_sha256": "ae385f7d12653f0d5ed6b339e703455c26734e40b3dd604564d08f2d650e43a9",
+        "rtf_variant": "byte1252",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          80
+        ],
+        "min": 80,
+        "p50": 80,
+        "p95": 80,
+        "p99": 80,
+        "max": 80,
+        "mean": 80.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 80.0,
+          "upper": 80.0
+        }
+      },
+      "sink": {
+        "accepted_bytes": 1407,
+        "write_calls": 1,
+        "largest_write": 1407
+      }
+    },
+    {
+      "case": "rtf_semantic_open",
+      "corpus": {
+        "name": "rtf-semantic-lzfu-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "lzfu",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 294,
+        "archive_sha256": "bf755db7d4afc26a66ffab476884431e6e585f3259df5b6469e2d4fadfc51baf",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "lzfu",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          9683
+        ],
+        "min": 9683,
+        "p50": 9683,
+        "p95": 9683,
+        "p99": 9683,
+        "max": 9683,
+        "mean": 9683.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 9683.0,
+          "upper": 9683.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_list_paragraphs",
+      "corpus": {
+        "name": "rtf-semantic-lzfu-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "lzfu",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 294,
+        "archive_sha256": "bf755db7d4afc26a66ffab476884431e6e585f3259df5b6469e2d4fadfc51baf",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "lzfu",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          110
+        ],
+        "min": 110,
+        "p50": 110,
+        "p95": 110,
+        "p99": 110,
+        "max": 110,
+        "mean": 110.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 110.0,
+          "upper": 110.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_one_paragraph",
+      "corpus": {
+        "name": "rtf-semantic-lzfu-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "lzfu",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 294,
+        "archive_sha256": "bf755db7d4afc26a66ffab476884431e6e585f3259df5b6469e2d4fadfc51baf",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "lzfu",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          141
+        ],
+        "min": 141,
+        "p50": 141,
+        "p95": 141,
+        "p99": 141,
+        "max": 141,
+        "mean": 141.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 141.0,
+          "upper": 141.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_full_text",
+      "corpus": {
+        "name": "rtf-semantic-lzfu-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "lzfu",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 294,
+        "archive_sha256": "bf755db7d4afc26a66ffab476884431e6e585f3259df5b6469e2d4fadfc51baf",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "lzfu",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          110
+        ],
+        "min": 110,
+        "p50": 110,
+        "p95": 110,
+        "p99": 110,
+        "max": 110,
+        "mean": 110.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 110.0,
+          "upper": 110.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_stream_save",
+      "corpus": {
+        "name": "rtf-semantic-lzfu-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "lzfu",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 294,
+        "archive_sha256": "bf755db7d4afc26a66ffab476884431e6e585f3259df5b6469e2d4fadfc51baf",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "lzfu",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          70
+        ],
+        "min": 70,
+        "p50": 70,
+        "p95": 70,
+        "p99": 70,
+        "max": 70,
+        "mean": 70.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 70.0,
+          "upper": 70.0
+        }
+      },
+      "sink": {
+        "accepted_bytes": 294,
+        "write_calls": 1,
+        "largest_write": 294
+      }
+    },
+    {
+      "case": "rtf_semantic_noop_edit_save",
+      "corpus": {
+        "name": "rtf-semantic-lzfu-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "lzfu",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 294,
+        "archive_sha256": "bf755db7d4afc26a66ffab476884431e6e585f3259df5b6469e2d4fadfc51baf",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "lzfu",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          70
+        ],
+        "min": 70,
+        "p50": 70,
+        "p95": 70,
+        "p99": 70,
+        "max": 70,
+        "mean": 70.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 70.0,
+          "upper": 70.0
+        }
+      },
+      "sink": {
+        "accepted_bytes": 294,
+        "write_calls": 1,
+        "largest_write": 294
+      }
+    },
+    {
+      "case": "rtf_semantic_open",
+      "corpus": {
+        "name": "rtf-semantic-watermark",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "producer-watermark-drawing",
+        "compression": "none",
+        "entry_count": 1,
+        "archive_member_count": 1,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 1,
+        "archive_bytes": 69471,
+        "archive_sha256": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 0,
+        "target_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rtf_variant": "watermark",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          890811
+        ],
+        "min": 890811,
+        "p50": 890811,
+        "p95": 890811,
+        "p99": 890811,
+        "max": 890811,
+        "mean": 890811.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 890811.0,
+          "upper": 890811.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_list_paragraphs",
+      "corpus": {
+        "name": "rtf-semantic-watermark",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "producer-watermark-drawing",
+        "compression": "none",
+        "entry_count": 1,
+        "archive_member_count": 1,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 1,
+        "archive_bytes": 69471,
+        "archive_sha256": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 0,
+        "target_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rtf_variant": "watermark",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          330
+        ],
+        "min": 330,
+        "p50": 330,
+        "p95": 330,
+        "p99": 330,
+        "max": 330,
+        "mean": 330.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 330.0,
+          "upper": 330.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_one_paragraph",
+      "corpus": {
+        "name": "rtf-semantic-watermark",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "producer-watermark-drawing",
+        "compression": "none",
+        "entry_count": 1,
+        "archive_member_count": 1,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 1,
+        "archive_bytes": 69471,
+        "archive_sha256": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 0,
+        "target_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rtf_variant": "watermark",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          280
+        ],
+        "min": 280,
+        "p50": 280,
+        "p95": 280,
+        "p99": 280,
+        "max": 280,
+        "mean": 280.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 280.0,
+          "upper": 280.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_full_text",
+      "corpus": {
+        "name": "rtf-semantic-watermark",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "producer-watermark-drawing",
+        "compression": "none",
+        "entry_count": 1,
+        "archive_member_count": 1,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 1,
+        "archive_bytes": 69471,
+        "archive_sha256": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 0,
+        "target_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rtf_variant": "watermark",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          120
+        ],
+        "min": 120,
+        "p50": 120,
+        "p95": 120,
+        "p99": 120,
+        "max": 120,
+        "mean": 120.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 120.0,
+          "upper": 120.0
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "rtf_semantic_stream_save",
+      "corpus": {
+        "name": "rtf-semantic-watermark",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "producer-watermark-drawing",
+        "compression": "none",
+        "entry_count": 1,
+        "archive_member_count": 1,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 1,
+        "archive_bytes": 69471,
+        "archive_sha256": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 0,
+        "target_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rtf_variant": "watermark",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          2354
+        ],
+        "min": 2354,
+        "p50": 2354,
+        "p95": 2354,
+        "p99": 2354,
+        "max": 2354,
+        "mean": 2354.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 2354.0,
+          "upper": 2354.0
+        }
+      },
+      "sink": {
+        "accepted_bytes": 69471,
+        "write_calls": 1,
+        "largest_write": 69471
+      }
+    },
+    {
+      "case": "rtf_semantic_noop_edit_save",
+      "corpus": {
+        "name": "rtf-semantic-watermark",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "producer-watermark-drawing",
+        "compression": "none",
+        "entry_count": 1,
+        "archive_member_count": 1,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 1,
+        "archive_bytes": 69471,
+        "archive_sha256": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 0,
+        "target_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rtf_variant": "watermark",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          3625
+        ],
+        "min": 3625,
+        "p50": 3625,
+        "p95": 3625,
+        "p99": 3625,
+        "max": 3625,
+        "mean": 3625.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 3625.0,
+          "upper": 3625.0
+        }
+      },
+      "sink": {
+        "accepted_bytes": 69471,
+        "write_calls": 1,
+        "largest_write": 69471
+      }
+    }
+  ]
+}

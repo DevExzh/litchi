@@ -16,7 +16,8 @@ The original stage-1 results below remain historical evidence. The current
 harness contains **110 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, 16
-opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic cases, 22 opt-in
+opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic case names across
+four capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 22 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
 is still not broad program or CRUD coverage.
 
@@ -407,7 +408,9 @@ ZIP layouts use the fully validated rewrite path before any sink output.
 The standalone harness provides 110 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
-semantic corpora.
+semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus
+a content-addressed producer watermark; its separate native `relsize` chain is
+an offline correctness gate rather than a timed paragraph case.
 It records
 p50/p95/p99, raw samples, mean, sample deviation, Student's-t 95% mean interval,
 corpus/output hashes, environment, bounded sequential-write behavior,

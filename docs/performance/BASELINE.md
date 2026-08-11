@@ -224,7 +224,8 @@ The stage-1 records above are retained unchanged. The current harness has **110
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, 16 opt-in
-DOCX/PPTX semantic cases, seven opt-in RTF semantic cases, and 22 opt-in
+DOCX/PPTX semantic cases, seven opt-in RTF semantic case names across four
+capability-bounded variants (25 tiny / 44 tiny-plus-large rows), and 22 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
 remains an incomplete program and CRUD matrix.
 

@@ -101,13 +101,25 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/semantic-odf-smoke.json
 ```
 
-Run the complete tiny semantic RTF smoke matrix (seven records):
+Run the backward-compatible plain tiny semantic RTF smoke matrix (seven
+records):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 --semantic-shape tiny \
   --case rtf_semantic_open,rtf_semantic_list_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save \
   --json target/perf/semantic-rtf-smoke.json
+```
+
+Select all transport and producer variants for the complete tiny RTF coverage
+matrix (25 records):
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 0 --samples 1 --semantic-shape tiny \
+  --rtf-variant plain,byte1252,lzfu,watermark \
+  --case rtf_semantic_open,rtf_semantic_list_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save \
+  --json target/perf/semantic-rtf-variants-smoke.json
 ```
 
 Exercise deterministic high-latency, range-bounded positional I/O without a
@@ -218,13 +230,24 @@ rather than claiming unobservable write behavior.
 
 ## Opt-in RTF semantic corpus matrix
 
-The RTF cases use deterministic direct ASCII RTF source with the same
-paragraph counts as DOCX. They exercise only the ordinary native
-`litchi_rtf::Document` facade: owned-byte open, lazy paragraph enumeration,
-one middle paragraph, first complete-text materialization, exact source
-streaming, exact empty-edit publication, and one checked paragraph edit/save.
+The RTF cases exercise only the ordinary native `litchi_rtf::Document` facade:
+owned-byte open, lazy paragraph enumeration, one middle paragraph, first
+complete-text materialization, exact source streaming, exact empty-edit
+publication, and capability-bounded paragraph edit/save. `--rtf-variant`
+defaults to `plain`, preserving the historical seven-row commands.
+
+| Variant | Source | Shapes | Supported cases |
+|---|---|---|---|
+| `plain` | Deterministic direct ASCII RTF | tiny, medium, large | All seven |
+| `byte1252` | Deterministic raw CP-1252 bytes containing literal `0xe9` | tiny, medium, large | Open/read/stream/no-op; changed splice is excluded because candidate validation refuses this byte layout |
+| `lzfu` | Deterministic LZFu compression of the plain bytes | tiny, medium, large | Open/read/stream/no-op; changed transport rewrites are explicitly unsupported |
+| `watermark` | Content-addressed real-producer `test-data/rtf/watermark.rtf` | tiny selector only | Open/read/stream/no-op; its meaningful content is header drawing metadata rather than editable body text |
+
 Every save uses the native forward-only `Write` contract and every output is
-reopened and fully verified.
+reopened and fully verified. The watermark verifier additionally requires the
+three public header shapes and `gtextUNICODE=ASAP` metadata. LZFu generation
+checks deterministic compression and exact decompression; byte-1252 generation
+uses raw high-bit bytes rather than RTF hex escapes.
 
 | Shape | Paragraphs | Source bytes | Text bytes |
 |---|---:|---:|---:|
@@ -232,12 +255,12 @@ reopened and fully verified.
 | `medium` | 200 | 10,851 | 9,999 |
 | `large` | 10,000 | 540,051 | 499,999 |
 
-The exact stream-save and no-op cases preserve the generated input byte for
-byte and emit it as one sequential write. The one-edit case stages the middle
-paragraph through `replace_paragraph_text`, commits with source and semantic
-readback checks, streams the changed snapshot, and verifies every paragraph
-after reopen. Corpus creation, expected-output construction, and input cloning
-remain outside the timed interval.
+The exact stream-save and no-op cases preserve every selected input byte for
+byte and emit it as one sequential write. The one-edit case is limited to the
+plain variant: it stages the middle paragraph through `replace_paragraph_text`,
+commits with source and semantic readback checks, streams the changed snapshot,
+and verifies every paragraph after reopen. Corpus creation, expected-output
+construction, and input cloning remain outside the timed interval.
 
 ## Opt-in ODF semantic corpus matrix
 
@@ -539,6 +562,11 @@ schema-v1 fields. `corpus.xlsx` records sheet dimensions, the exact
 deterministic ~1% update count, and `source_members`: the workbook, worksheet,
 shared-string, and style ZIP member names whose exact compressed ranges feed
 the positional counters. Existing non-XLSX corpus records keep it null.
+
+`configuration.rtf_variants` and the optional `corpus.rtf_variant` field are
+additive schema-v1 identifiers for the selected RTF input capabilities.
+Non-RTF corpus records omit `rtf_variant`. Corpus names include the variant so
+repeated case names remain unambiguous in multi-variant reports.
 
 `configuration.range_simulation` records fixed latency, request overhead,
 bandwidth, and maximum physical range. `configuration.execution_workers`

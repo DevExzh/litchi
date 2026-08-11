@@ -8,17 +8,17 @@ substrate measurements do not certify format-semantic CRUD behavior.
 
 | Required scenario | Current status | Measured coverage |
 |---|---|---|
-| Open and identify format | Partial | ZIP/OPC/CFB plus owned DOC/XLS/PPT/RTF/XLSX and source-backed XLSX open; the public PPT root slide-order snapshot has its own measured validation path; no smart-detection handoff case |
+| Open and identify format | Partial | ZIP/OPC/CFB plus owned DOC/XLS/PPT/RTF/XLSX and source-backed XLSX open; RTF now covers plain, raw CP-1252, LZFu and a real-producer watermark input; the public PPT root slide-order snapshot has its own measured validation path; no smart-detection handoff case |
 | List semantic children without payloads | Partial | XLS/XLSX/ODS sheets, DOC/RTF/DOCX/ODT paragraphs and PPT/PPTX/ODP slides; DOCX section listing remains missing |
 | Query one property or named object | Partial | XLS/XLSX/ODS cells, one DOC/RTF/DOCX/ODT paragraph, one PPT shape and one PPTX/ODP slide; broader properties/images remain missing |
 | Read one cell/paragraph/slide/image/Part | Partial | XLS/XLSX/ODS cells, DOC/RTF/DOCX/ODT paragraphs, PPT/PPTX/ODP text objects and generic OPC Part; semantic image selection remains missing |
 | Scan all cells/paragraphs/slides | Covered for generated native/OOXML/RTF/ODF text corpora | XLS/XLSX/ODS cell scans, including the isolated ODS public-cell sweep; DOC/RTF/DOCX/ODT paragraph enumeration and PPT/PPTX/ODP slide/text enumeration |
-| Full text extraction | Covered for generated DOC/PPT/RTF/DOCX/PPTX/ODT/ODS/ODP | Complete deterministic text or row-major cell text is checked; ODT consuming block ownership is measured in change 0023; real-producer/media-heavy corpora remain missing |
+| Full text extraction | Covered for generated DOC/PPT/RTF/DOCX/PPTX/ODT/ODS/ODP | Complete deterministic text or row-major cell text is checked; RTF additionally verifies raw CP-1252/LZFu text and the body plus public header-shape projection of a real-producer watermark; ODT consuming block ownership is measured in change 0023; broader real-producer/media-heavy corpora remain missing |
 | Semantic conversion to sequential sink | Missing | Package serialization exists; semantic export/conversion does not |
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring; large/streaming creation remains missing |
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
-| Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; signed/extension corpora remain missing |
-| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen |
+| Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication; signed/extension corpora remain missing |
+| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
 | About 1% semantic update and save | Covered for XLSX/DOCX/PPTX generated corpora | Deterministic evenly spaced cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch and reopens the package |
 | Bulk update matching objects | Missing | No semantic end-to-end case |
 | Clear/remove/hide/detach/GC distinctions | Missing | No complete matrix |
@@ -46,10 +46,10 @@ semantic conversion remain.
    direct PPT text-edit resolver reuse;
    preserve exact-source patch/inverse and the rejected DOC move as independent
    guardrails.
-2. Extend native RTF coverage beyond the accepted ordinary parser-state and
-   ASCII transport batching changes to formatting/media, compressed and
-   legacy-code-page input, malformed/security cases, real producers and broad
-   edits.
+2. Extend native RTF beyond the new raw CP-1252, LZFu and watermark read/no-op
+   matrix plus the narrow real-producer shape-text native chain: formatting and
+   media semantics, malformed/security cases, more producers and broad edits
+   remain open.
 3. Separate logical authoring/append time from final serialization and reopen
    for DOCX, PPTX and XLSX.
 4. XLSX bulk update plus distinct clear/remove/hide behavior.
@@ -116,6 +116,13 @@ Change 0027 adds an aggregation-free public ODS cell-sweep attribution case and
 a bounded lazy facade locator for repeated queries. It does not add structural,
 bulk, source-backed, real-producer, media, security or unchanged-ZIP-member
 coverage; those remain under item 10.
+
+Change 0029 broadens the RTF input matrix without adding or renaming timed case
+types: deterministic raw CP-1252, deterministic LZFu and a content-addressed
+producer watermark join the plain corpus under explicit capability filters.
+It also gates the checked `relsize` source/Litchi/LibreOffice semantic chain.
+This is coverage evidence, not an optimization result; formatted/media-heavy,
+malformed/security and broad real-producer edits remain open.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
