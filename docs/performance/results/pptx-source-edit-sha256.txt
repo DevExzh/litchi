@@ -1,0 +1,11 @@
+64bd5b3e4fe24abaeb44c8442edd06557055e5952859dc8cfeb815cb8e6fab98  target/perf/pptx-source-edit-control-before
+835910a8c38d7d26381cdbfe43d39437b51dd52edda2b2e538afec8612a8d9e8  target/perf/pptx-source-edit-candidate-after
+70c6fcd6be989547d2cdb2ff14d6a021cbf8792aa4774e56a825cd27f6128e85  docs/performance/results/abba-pptx-source-edit-after-a.json
+928106aa759ff1a40e817b365c3b4e2e8fde49ad443fb5aad884ba4541cdcf95  docs/performance/results/abba-pptx-source-edit-after-b.json
+a317fc6dbd13964438e028aba8620376ac2b692d9428a7f5996e0101c2a02e62  docs/performance/results/abba-pptx-source-edit-before-a.json
+d4ef6e9d4e5eac83141a855ac835e5b24383b6c0c91ad3dbf31f392c231139b5  docs/performance/results/abba-pptx-source-edit-before-b.json
+9ee9f49e50d2866081209eadd708f22fb12075ea7cfe806ec5a3c3efa06b7bc0  docs/performance/results/abba-pptx-source-edit-guard-after-a.json
+0b76b4c8c177501d0d3211b6e9ab89a8136bfeecb9f18e83895caa4fa3159276  docs/performance/results/abba-pptx-source-edit-guard-after-b.json
+4eb8242b28bc40d7855b6839ba1cbb8a9ba8aa429d41fa283f523d1a323d5386  docs/performance/results/abba-pptx-source-edit-guard-before-a.json
+873a6ef1b770df108d3ad288752991a5581c787fec28cfe646e03f684fca0e81  docs/performance/results/abba-pptx-source-edit-guard-before-b.json
+15ecf1535bf03a1c011d2bfb5ce7124187e67cca7befe484f9b087d8c35e1f95  docs/performance/results/pptx-source-edit-profile.txt

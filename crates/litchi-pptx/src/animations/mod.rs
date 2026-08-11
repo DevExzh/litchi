@@ -1,8 +1,8 @@
 //! Layered animation support for `PowerPoint` presentations.
 //!
-//! The owner is split by responsibility: [`model`] contains the typed timing
-//! vocabulary, [`codec`] contains bounded `PresentationML` XML parsing and
-//! writing, [`package`] validates package relationships, and [`tests`] keeps
+//! The owner is split by responsibility: `model` contains the typed timing
+//! vocabulary, `codec` contains bounded `PresentationML` XML parsing and
+//! writing, `package` validates package relationships, and `tests` keeps
 //! the conformance and resource-limit coverage beside the owner.
 
 use crate::Error;

@@ -4,11 +4,14 @@
 //! OPC catalog and mandatory presentation root, then resolves only slide
 //! metadata. A slide body is loaded when a selected [`SourceSlide`] is read.
 
+use std::io::Write;
 use std::sync::{Arc, OnceLock};
 
 use litchi_core::ReadAt;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, PackURI, Part, PartData, PartView, ReadLimits, SourceBackedPackage};
+use litchi_opc::{
+    BlobPart, PackURI, Part, PartData, PartView, ReadLimits, SourceBackedPackage, TargetMode,
+};
 
 use crate::parts::{PresentationPart, SlidePart, SlideReference};
 use crate::{Error, Result};
@@ -16,6 +19,7 @@ use crate::{Error, Result};
 struct SourceSlideData {
     position: usize,
     part_uri: PackURI,
+    binding: SlideBinding,
     part: OnceLock<BlobPart>,
 }
 
@@ -24,6 +28,44 @@ struct SourceInner {
     // Retain the pinned mandatory root without relying on the OPC payload cache.
     _presentation: BlobPart,
     slides: Box<[Arc<SourceSlideData>]>,
+}
+
+struct SourceCatalog {
+    presentation: BlobPart,
+    package_relationships: Box<[RelationshipBinding]>,
+    presentation_binding: PartBinding,
+    presentation_xml: Arc<Vec<u8>>,
+    slides: Box<[Arc<SourceSlideData>]>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct RelationshipBinding {
+    id: String,
+    kind: String,
+    target: String,
+    mode: TargetMode,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct PartBinding {
+    uri: PackURI,
+    content_type: String,
+    relationships: Box<[RelationshipBinding]>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct SlideBinding {
+    slide_reference_id: String,
+    presentation_relationship: RelationshipBinding,
+    slide: PartBinding,
+}
+
+#[derive(Clone)]
+struct SlideClosure {
+    package_relationships: Box<[RelationshipBinding]>,
+    presentation: PartBinding,
+    presentation_xml: Arc<Vec<u8>>,
+    slide: SlideBinding,
 }
 
 /// Read-only PPTX catalog and selected-slide access over a positional source.
@@ -43,6 +85,47 @@ pub struct SourceBackedPresentation {
 pub struct SourceSlide {
     owner: Arc<SourceInner>,
     data: Arc<SourceSlideData>,
+}
+
+/// An owning, source-backed editor for one existing slide's shape text.
+///
+/// Unlike [`SourceBackedPresentation`], this type is intentionally not
+/// cloneable: publishing consumes its deferred OPC source to ensure that the
+/// exact source checked during editing is the source raw-copied to output.
+/// It supports no package topology or relationship changes.
+pub struct SourceBackedPresentationEditor {
+    package: SourceBackedPackage,
+    _presentation: BlobPart,
+    slides: Box<[Arc<SourceSlideData>]>,
+}
+
+/// An immutable exact-source snapshot of one slide XML part.
+#[derive(Clone)]
+pub struct SourceBackedSlideSnapshot {
+    position: usize,
+    part_uri: PackURI,
+    xml: Arc<Vec<u8>>,
+    closure: SlideClosure,
+}
+
+/// An isolated edit of one exact-source slide snapshot.
+pub struct SourceBackedSlideEdit {
+    source: SourceBackedSlideSnapshot,
+    working: Arc<Vec<u8>>,
+    operation_used: bool,
+}
+
+/// A reversible, exact-source-checked one-slide XML patch.
+#[derive(Clone)]
+pub struct SourceBackedSlidePatch {
+    before: SourceBackedSlideSnapshot,
+    after: SourceBackedSlideSnapshot,
+}
+
+/// A checked source-backed slide edit ready for publication.
+pub struct SourceBackedSlideCommit {
+    snapshot: SourceBackedSlideSnapshot,
+    patch: SourceBackedSlidePatch,
 }
 
 impl SourceBackedPresentation {
@@ -77,19 +160,13 @@ impl SourceBackedPresentation {
     /// Returns an error when the main part or its ordered slide graph is not a
     /// coherent PresentationML presentation.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        let (presentation, slides) = {
-            let view = package.main_document_part()?;
-            let presentation = owned_part(&view, view.data()?)?;
-            let references = PresentationPart::from_part(&presentation)?.slide_references()?;
-            let slides = validate_slide_graph(&package, &view, &references)?;
-            (presentation, slides)
-        };
+        let catalog = source_catalog(&package)?;
 
         Ok(Self {
             inner: Arc::new(SourceInner {
                 package,
-                _presentation: presentation,
-                slides,
+                _presentation: catalog.presentation,
+                slides: catalog.slides,
             }),
         })
     }
@@ -117,6 +194,295 @@ impl SourceBackedPresentation {
             owner: Arc::clone(&self.inner),
             data,
         })
+    }
+}
+
+impl SourceBackedPresentationEditor {
+    /// Open an ordinary PPTX source for a bounded one-slide text edit.
+    ///
+    /// Opening validates the OPC catalog, presentation root, and slide graph
+    /// without materializing ordinary slide payloads.
+    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
+        Self::from_read_at_with_limits(source, ReadLimits::default())
+    }
+
+    /// Open an ordinary PPTX source with explicit OPC resource limits.
+    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
+        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
+            source, limits,
+        )?)
+    }
+
+    /// Build an owning editor from a validated deferred OPC package.
+    fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
+        let catalog = source_catalog(&package)?;
+        Ok(Self {
+            package,
+            _presentation: catalog.presentation,
+            slides: catalog.slides,
+        })
+    }
+
+    /// Number of logical slides in presentation order.
+    #[must_use]
+    pub fn slide_count(&self) -> usize {
+        self.slides.len()
+    }
+
+    /// Return content-free payload-cache activity for this deferred editor.
+    ///
+    /// Opening loads the presentation root; capturing one slide loads that
+    /// selected slide only. The diagnostic exposes no member identities.
+    #[must_use]
+    pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
+        self.package.cache_diagnostics()
+    }
+
+    /// Capture the exact raw XML of one existing slide.
+    ///
+    /// Source-backed slide edits refuse markup-compatibility branch selection:
+    /// semantic shape offsets must describe the same bytes that will later be
+    /// published.
+    pub fn slide_snapshot(&self, position: usize) -> Result<SourceBackedSlideSnapshot> {
+        self.slide_snapshot_for(position, "slide_snapshot")
+    }
+
+    /// Begin an isolated shape-text-only edit of one existing slide.
+    pub fn edit_slide(&self, position: usize) -> Result<SourceBackedSlideEdit> {
+        Ok(self.slide_snapshot_for(position, "edit_slide")?.edit())
+    }
+
+    /// Publish one exact-source-checked slide commit to a sequential stream.
+    ///
+    /// The publisher replaces only the selected existing slide XML part and
+    /// raw-copies every other source ZIP member. A no-op reproduces the whole
+    /// source artifact byte for byte; changed signed sources are refused by
+    /// the underlying OPC publisher.
+    pub fn publish_slide_commit_to_stream<W: Write>(
+        self,
+        writer: W,
+        commit: &SourceBackedSlideCommit,
+    ) -> Result<SourceBackedSlideSnapshot> {
+        let current = self.slide_snapshot_for(
+            commit.patch.source().position,
+            "publish_slide_commit_to_stream",
+        )?;
+        let target = commit.patch.apply(&current)?;
+        self.package.write_part_overlay_to_stream(
+            writer,
+            &current.part_uri,
+            target.xml.as_ref().clone(),
+        )?;
+        Ok(target)
+    }
+
+    fn slide_snapshot_for(
+        &self,
+        position: usize,
+        operation: &'static str,
+    ) -> Result<SourceBackedSlideSnapshot> {
+        let catalog = source_catalog(&self.package)?;
+        let data = catalog
+            .slides
+            .get(position)
+            .ok_or(Error::SlideIndexOutOfBounds {
+                index: position,
+                len: catalog.slides.len(),
+            })?;
+        let view = self.package.part(&data.part_uri)?;
+        let raw = view.data()?.into_arc();
+        let part = owned_part_shared(&view, Arc::clone(&raw))?;
+        SlidePart::from_part(&part)?;
+        let scene = crate::shape::Scene::read(raw.as_slice())?;
+        if scene.is_rewritten() {
+            return Err(Error::UnsafeEdit {
+                operation,
+                reason: "source-backed slide edits do not support markup-compatibility branch selection",
+            });
+        }
+        Ok(SourceBackedSlideSnapshot {
+            position,
+            part_uri: data.part_uri.clone(),
+            xml: raw,
+            closure: SlideClosure {
+                package_relationships: catalog.package_relationships,
+                presentation: catalog.presentation_binding,
+                presentation_xml: catalog.presentation_xml,
+                slide: data.binding.clone(),
+            },
+        })
+    }
+}
+
+impl SourceBackedSlideSnapshot {
+    /// Checked zero-based slide position in the presentation catalog.
+    #[must_use]
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Start an isolated text-only edit from this exact source snapshot.
+    #[must_use]
+    pub fn edit(&self) -> SourceBackedSlideEdit {
+        SourceBackedSlideEdit {
+            source: self.clone(),
+            working: Arc::clone(&self.xml),
+            operation_used: false,
+        }
+    }
+
+    fn same_source(&self, other: &Self) -> bool {
+        self.position == other.position
+            && self.part_uri == other.part_uri
+            && self.xml == other.xml
+            && self.closure.package_relationships == other.closure.package_relationships
+            && self.closure.presentation == other.closure.presentation
+            && self.closure.presentation_xml == other.closure.presentation_xml
+            && self.closure.slide == other.closure.slide
+    }
+}
+
+impl SourceBackedSlideEdit {
+    /// Exact immutable slide snapshot against which this edit was created.
+    #[must_use]
+    pub const fn source(&self) -> &SourceBackedSlideSnapshot {
+        &self.source
+    }
+
+    /// Replace all visible DrawingML text runs in one existing shape.
+    ///
+    /// Structure, formatting, opaque XML, relationships, and every other ZIP
+    /// member remain outside this edit's closure.
+    pub fn set_shape_text<'k>(
+        &mut self,
+        shape: impl Into<crate::shape::Key<'k>>,
+        text: impl AsRef<str>,
+    ) -> Result<bool> {
+        let key = shape.into();
+        let text = text.as_ref();
+        if self.operation_used {
+            return Err(Error::UnsafeEdit {
+                operation: "set_shape_text",
+                reason: "source-backed slide edits support one shape text operation",
+            });
+        }
+        let scene = crate::shape::Scene::read(self.working.as_slice())?;
+        if scene.is_rewritten() {
+            return Err(Error::UnsafeEdit {
+                operation: "set_shape_text",
+                reason: "source-backed slide edits do not support markup-compatibility branch selection",
+            });
+        }
+        let selected = scene.shape(key)?;
+        if selected.common().text() == Some(text) {
+            self.operation_used = true;
+            return Ok(false);
+        }
+        if selected.common().text().is_none() {
+            return Err(Error::Invalid(
+                "source-backed selected shape has no text body".to_string(),
+            ));
+        }
+        let span = crate::tag::shape::selected_raw_span_for_shape(
+            self.working.as_slice(),
+            selected,
+            scene.len(),
+        )?;
+        let xml = crate::opened::rewrite_shape_text(
+            self.working.as_slice(),
+            span,
+            text,
+            crate::opened::Limits::default().max_text_bytes(),
+        )?;
+        let staged = crate::shape::Scene::read(&xml)?;
+        if staged.is_rewritten()
+            || staged.shape(key)?.common().text() != Some(text)
+            || staged.len() != scene.len()
+        {
+            return Err(Error::Invalid(
+                "source-backed shape text did not round-trip semantically".to_string(),
+            ));
+        }
+        self.working = Arc::new(xml);
+        self.operation_used = true;
+        Ok(true)
+    }
+
+    /// Validate and freeze this isolated edit for source-backed publication.
+    #[must_use]
+    pub fn commit(self) -> SourceBackedSlideCommit {
+        let snapshot = SourceBackedSlideSnapshot {
+            position: self.source.position,
+            part_uri: self.source.part_uri.clone(),
+            xml: self.working,
+            closure: self.source.closure.clone(),
+        };
+        let patch = SourceBackedSlidePatch {
+            before: self.source,
+            after: snapshot.clone(),
+        };
+        SourceBackedSlideCommit { snapshot, patch }
+    }
+}
+
+impl SourceBackedSlidePatch {
+    /// Exact immutable source required by this patch.
+    #[must_use]
+    pub const fn source(&self) -> &SourceBackedSlideSnapshot {
+        &self.before
+    }
+
+    /// Exact immutable target produced by this patch.
+    #[must_use]
+    pub const fn target(&self) -> &SourceBackedSlideSnapshot {
+        &self.after
+    }
+
+    /// Whether this patch changes the selected slide XML bytes.
+    #[must_use]
+    pub fn is_changed(&self) -> bool {
+        !self.before.same_source(&self.after)
+    }
+
+    /// Return the exact inverse slide patch.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: self.after.clone(),
+            after: self.before.clone(),
+        }
+    }
+
+    /// Apply only to the exact raw slide source captured by this patch.
+    pub fn apply(&self, source: &SourceBackedSlideSnapshot) -> Result<SourceBackedSlideSnapshot> {
+        if !source.same_source(&self.before) {
+            return Err(Error::StaleSource);
+        }
+        Ok(if self.is_changed() {
+            self.after.clone()
+        } else {
+            source.clone()
+        })
+    }
+}
+
+impl SourceBackedSlideCommit {
+    /// Candidate snapshot after this edit.
+    #[must_use]
+    pub const fn snapshot(&self) -> &SourceBackedSlideSnapshot {
+        &self.snapshot
+    }
+
+    /// Exact-source slide patch for this edit.
+    #[must_use]
+    pub const fn patch(&self) -> &SourceBackedSlidePatch {
+        &self.patch
+    }
+
+    /// Whether the selected slide XML changes.
+    #[must_use]
+    pub fn is_changed(&self) -> bool {
+        self.patch.is_changed()
     }
 }
 
@@ -200,18 +566,43 @@ fn validate_slide_graph(
         }
         slides.push(Arc::new(SourceSlideData {
             position,
-            part_uri,
+            part_uri: part_uri.clone(),
+            binding: SlideBinding {
+                slide_reference_id: reference.relationship_id().to_string(),
+                presentation_relationship: relationship_binding(relationship),
+                slide: part_binding(&slide),
+            },
             part: OnceLock::new(),
         }));
     }
     Ok(slides.into_boxed_slice())
 }
 
+fn source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalog> {
+    let view = package.main_document_part()?;
+    let presentation = owned_part(&view, view.data()?)?;
+    let presentation_xml = presentation.blob_arc();
+    let presentation_binding = part_binding(&view);
+    let references = PresentationPart::from_part(&presentation)?.slide_references()?;
+    let slides = validate_slide_graph(package, &view, &references)?;
+    Ok(SourceCatalog {
+        presentation,
+        package_relationships: relationship_bindings(package.rels()),
+        presentation_binding,
+        presentation_xml,
+        slides,
+    })
+}
+
 fn owned_part(view: &PartView<'_>, data: PartData) -> Result<BlobPart> {
+    owned_part_shared(view, data.into_arc())
+}
+
+fn owned_part_shared(view: &PartView<'_>, bytes: Arc<Vec<u8>>) -> Result<BlobPart> {
     let mut part = BlobPart::new_shared(
         view.partname().clone(),
         view.content_type().to_string(),
-        data.into_arc(),
+        bytes,
     );
     for relationship in view.rels().iter() {
         part.rels_mut().try_add_relationship(
@@ -222,6 +613,32 @@ fn owned_part(view: &PartView<'_>, data: PartData) -> Result<BlobPart> {
         )?;
     }
     Ok(part)
+}
+
+fn part_binding(view: &PartView<'_>) -> PartBinding {
+    PartBinding {
+        uri: view.partname().clone(),
+        content_type: view.content_type().to_string(),
+        relationships: relationship_bindings(view.rels()),
+    }
+}
+
+fn relationship_bindings(relationships: &litchi_opc::Relationships) -> Box<[RelationshipBinding]> {
+    let mut bindings = relationships
+        .iter()
+        .map(relationship_binding)
+        .collect::<Vec<_>>();
+    bindings.sort_unstable_by(|left, right| left.id.cmp(&right.id));
+    bindings.into_boxed_slice()
+}
+
+fn relationship_binding(relationship: &litchi_opc::Relationship) -> RelationshipBinding {
+    RelationshipBinding {
+        id: relationship.r_id().to_string(),
+        kind: relationship.reltype().to_string(),
+        target: relationship.target_ref().to_string(),
+        mode: relationship.target_mode(),
+    }
 }
 
 #[cfg(test)]

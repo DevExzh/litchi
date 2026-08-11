@@ -1,0 +1,55 @@
+PPTX source-backed selected-slide publication profile summary
+Date: 2026-08-11
+Host scope: taskset CPU 11 where supported; Rust system allocator
+Source corpus: 61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757
+
+perf stat
+---------
+Command shape: perf stat -r 3 -x ';' -e task-clock,context-switches,
+cpu-migrations,page-faults,cycles,instructions,branches,branch-misses,
+cache-references,cache-misses -- taskset -c 11 BINARY --warmup 0 --samples 10
+--case pptx_source_backed_one_edit_save
+
+The process scope includes corpus construction and untimed output verification.
+
+metric                 eager control       source-backed       delta
+task-clock (ms)        4,816.10            1,600.91            -66.76%
+page faults            373,765             250,414             -33.00%
+cycles                 23,732,479,047      7,769,406,661       -67.26%
+instructions           60,936,287,396      19,556,277,694      -67.91%
+branches               10,678,486,594      3,311,819,772       -68.99%
+branch misses          160,542,197         19,288,749          -87.99%
+cache references       1,428,557,028       453,351,674         -68.27%
+cache misses           33,841,996          20,350,375          -39.87%
+
+Heaptrack
+---------
+Command shape: heaptrack BINARY --warmup 0 --samples 1
+--case pptx_source_backed_one_edit_save
+
+The process scope includes corpus construction and complete untimed verification.
+Peak RSS includes Heaptrack overhead.
+
+metric                 eager control       source-backed       delta
+allocation calls       2,709,030           1,938,513           -28.44%
+temporary allocations  462,895             196,378             -57.58%
+peak heap              175.13 MiB          159.49 MiB          -8.93%
+peak RSS               154.52 MiB          154.75 MiB          no claim
+
+GNU Time
+--------
+Command shape: /usr/bin/time -v taskset -c 11 BINARY --warmup 0 --samples 10
+--case pptx_source_backed_one_edit_save
+
+metric                 eager control       source-backed       delta
+wall time              4.82 s              1.64 s              -65.98%
+maximum RSS            146,868 KiB         147,420 KiB         +0.38% (flat)
+minor page faults      378,906             271,689             -28.30%
+major page faults      0                   0                   unchanged
+
+Interpretation
+--------------
+The CPU/allocation reductions agree with removing eager logical ownership and
+recompression of 227 unselected Parts. Complete archive bytes still cross the
+source and sink, and corpus construction/output verification keep process peak
+RSS flat, so no RSS reduction is claimed.
