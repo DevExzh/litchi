@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `442d46c5d200c3bf1af58dc46fa4cf4c3e3b7240`
+Production base for the latest measured tranche: `4abe2e0197df0fb8075d973b84b9463863938a52`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,14 +13,14 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **124 selectable cases**: 36 default cases and 198 default
+harness contains **126 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in
 source-backed media-rich PPTX semantic publication case, one opt-in media-rich ODT
-paragraph-publication case, two opt-in matched XLSX calculation-metadata
-publication cases, 16 opt-in DOCX/PPTX
+paragraph-publication case, four opt-in matched XLSX
+calculation-metadata/page-break publication cases, 16 opt-in DOCX/PPTX
 semantic cases, seven opt-in RTF semantic case names across four
 capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 23
 shape-selected ODT/ODS/ODP semantic cases, three fixed media-rich ODF cases,
@@ -35,6 +35,7 @@ is still not broad program or CRUD coverage.
 | Source-backed OPC and DOCX/XLSX/PPTX facades | EOCD structural-open source bytes **-73.6% to -98.5%**; ordinary payload overlap zero | No latency claim: later EntryId/cache-diagnostic changes confound comparison and some cells exceed 5% variance |
 | Source-backed PPTX selected-slide publication | Media-rich one-edit/save p50 **-97.12%** (34.71x); instructions **-67.91%**; materializations **229 -> 2**; byte-identical output | One shape-text edit in one existing slide only; MCE rewrites, multi-operation edits, topology changes and changed signed packages refuse before output |
 | Source-backed XLSX calculation-metadata publication | Media-rich one-edit/save p50 **-99.2519%** (133.67x), mean **-99.2507%**; instructions **-77.78%**; materializations **12 -> 1**; byte-identical output | Existing `xl/workbook.xml` calculation properties/features only; cells, formulas, cached results, chains, relationships and topology remain outside the capability |
+| Source-backed XLSX page-break publication | Media-rich one-edit/save p50 **-97.86%** (46.65x), mean **-97.86%**; materializations **12 -> 2**; byte-identical output | One existing normal worksheet's page-break collections only; cells, formulas, styles, relationships, topology, and changed signed sources remain outside the capability |
 | Deterministic range simulation | XLSX listing has zero timed requests; selected reads have zero unselected-sheet overlap; full physical size distributions recorded | Synthetic latency model, not a cold filesystem or ambient network |
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |
 | Coalesced DOCX paragraph edits | Large 100-edit/save p50 **-94.99% (19.97x)** and mean **-95.02%**; medium two-edit/save p50 **-12.98%**; scalar one-edit guardrail neutral | Direct-body, strictly ordered paragraph text replacement; generated corpus; scalar API remains separate |
@@ -60,6 +61,7 @@ is still not broad program or CRUD coverage.
 | Native DOC CHPX range index | Large paragraph-list p50 **-21.07%**, mean **-20.93%**, p95 **-20.00%** | Private monotonic slice query only; exact run identity/order, property cascading and complete readbacks remain; allocations and peak heap/RSS flat |
 | Native PPT root snapshot CFB reuse | Repeated large root open p50 **-8.78%**, mean **-10.58%**; allocation calls **-5.01%** | Reuses only the validated CFB index; independent stream/current-user/live-document, slide-order, review-history and public-reader checks remain |
 | Native PPT text-edit resolver reuse | Direct large edit/save p50 **-14.12%**, mean **-15.39%**; allocation calls **-3.53%** | Reuses the full editor preflight for persisted-record resolution; exact error precedence, fresh commit editor and complete readback remain; minor-fault increase disclosed |
+| Native PPT root text-publication adoption | Large root one-shape edit/save p50 **-18.59%**, mean **-17.83%**, p95 **-16.58%**; allocation calls **-6.54%** | Exact source and selected-slide persist identity gate a private output-Arc handoff; custom limits and structural edits retain complete root reopen; peak heap/RSS flat |
 | Bounded XLSX validated-store handoff | Medium one-cell commit + first read p50 **-23.23%**, mean **-23.15%**; allocation calls **-21.01%** | At most 4,096 cells / 1 MiB XML with exact byte and lineage identity; peak heap +4.29%; unrestricted dense-wide candidate rejected at +8.99% peak heap |
 | Rejected direct XLSX action-plan flattening | Best formal p50 **-1.61%**; dense commit **-0.27%** p50 with mean interval crossing zero | Fully reverted; process allocation calls -0.0623%, peak heap flat, medium commit p99 +4.33% |
 | XLSX no-extension worksheet scan | Medium commit/save p50 **-19.31% to -20.74%**; cold reads about **-35%**; dense 1% commit p50 **-19.62%** | `dyDescent`-free success path only; rejected inputs rerun the original collector for error precedence; allocation calls -25.24%, peak heap flat |
@@ -182,6 +184,10 @@ under `results/abba-ppt-slide-order-root-repeat-*.json`. Reader/edit guards,
 allocation attribution, RSS, counters, the disclosed initial selected-shape
 tail and its neutral repeat are summarized in
 [`change 0024`](changes/0024-ppt-slide-order-open-reuse.md).
+
+The later native PPT root text-publication adoption is summarized in
+[`change 0062`](changes/0062-ppt-root-text-publication-adoption.md), with exact
+pooled latency, guard, allocation, RSS, and counter values in its linked JSON.
 
 The bounded XLSX commit/read evidence is retained under
 `results/abba-xlsx-store-handoff-*.json`; the exact identity gates, primary
@@ -524,10 +530,12 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | Native DOC one-paragraph edit/save after PAPX containment index | 888.602 us | 817.424 us | **-8.01% p50 / -7.88% mean** | p95 -7.71%, p99 -8.37%; patch/inverse, candidate owner and independent public readback unchanged |
 | Native PPT root snapshot open, 144 shapes | 37.522 us | 34.227 us | **-8.78% p50 / -10.58% mean** | Allocation calls -5.01%, temporary allocations -12.22%; peak heap and uninstrumented RSS flat |
 | Native PPT direct text edit/save, 144 shapes | 206.209 us | 177.089 us | **-14.12% p50 / -15.39% mean** | Allocation calls -3.53%, temporary allocations -6.05%; peak heap/RSS flat; minor faults +315.43% with zero major faults |
+| Native PPT root text edit/save, 144 shapes | 352.306 us | 286.805 us | **-18.59% p50 / -17.83% mean** | p95 -16.58%; allocation calls -6.54%; peak heap and uninstrumented RSS flat; custom limits retain full reopen |
 | XLSX one-cell commit + first read, 4,096 cells | 4.431 ms | 3.402 ms | **-23.23% p50 / -23.15% mean** | Allocation calls -21.01%; peak heap +4.29%; unrestricted dense-wide retention rejected |
 | Rejected XLSX 1% commit + save, 4,096 cells | 15.235 ms | 14.990 ms | -1.61% p50 / -1.26% mean | Fully reverted as immaterial; p99 +0.18%, peak heap flat |
 | Rejected XLSX 1% commit + save, 131,072 cells | 514.926 ms | 511.407 ms | -0.68% p50 / -0.66% mean | Fully reverted as immaterial; process allocation calls -0.0623% |
 | Source-backed XLSX calculation-metadata publication, 12 Parts + 16 MiB media | 215.457 ms | 1.612 ms | **-99.2519% p50 (133.67x) / -99.2507% mean** | Materializations 12 -> 1; allocation calls -10.81%; peak heap flat; uninstrumented RSS -1.20% |
+| Source-backed XLSX page-break publication, 12 Parts + 16 MiB media | 216.789 ms | 4.647 ms | **-97.86% p50 (46.65x) / -97.86% mean** | Materializations 12 -> 2; allocation calls -15.95%; peak heap and uninstrumented RSS flat |
 
 The underlying records are:
 
@@ -588,6 +596,8 @@ The underlying records are:
 - [`0058-ods-exact-noop-handoff.md`](changes/0058-ods-exact-noop-handoff.md)
 - [`0059-xls-fixed-numeric-inventory-carry.md`](changes/0059-xls-fixed-numeric-inventory-carry.md)
 - [`0060-odp-snapshot-slide-projection-reuse.md`](changes/0060-odp-snapshot-slide-projection-reuse.md)
+- [`0061-xlsx-source-backed-page-break-publication.md`](changes/0061-xlsx-source-backed-page-break-publication.md)
+- [`0062-ppt-root-text-publication-adoption.md`](changes/0062-ppt-root-text-publication-adoption.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -721,7 +731,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 124 selectable cases and a 198-record default
+The standalone harness provides 126 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus
@@ -790,6 +800,10 @@ task clock 3.60%, allocation calls 3.53% and temporary allocations 6.05%.
 Peak heap and uninstrumented RSS remain flat. Its +315.43% minor-fault trigger
 has zero major faults and is disclosed rather than presented as a
 memory-locality improvement.
+The PPT root text-publication handoff removes the immediate second root reopen
+after the validated text owner: scoped p50 falls 18.59%, task clock 8.76%,
+instructions 6.75%, and allocation calls 6.54%. Peak heap and uninstrumented
+RSS remain flat; nondefault limits retain the prior complete reopen.
 The ODS cell-locator follow-up reduces the large public sweep's p50 81.74% and
 the full-text aggregate's p50 52.65%. Matched sweep-process task clock falls
 10.28%, cycles 9.74%, instructions 6.72% and cache misses 7.90%; peak heap,
@@ -827,8 +841,9 @@ and broad format-semantic CRUD coverage beyond the generated text/grid slices
 (bulk action distinctions, dependency-copy, merge/split, patch timing, repair,
 security, malformed and real-producer corpora, plus broader ODF and RTF
 coverage). Native DOC/XLS/PPT semantic baselines now have accepted XLS
-editor-reuse, DOC batched-publication, PPT root-open reuse and direct PPT
-text-edit resolver reuse follow-ups. Native DOC also indexes physical
+editor-reuse, DOC batched-publication, PPT root-open reuse, direct PPT
+text-edit resolver reuse, and checked PPT root text-publication adoption.
+Native DOC also indexes physical
 PieceTable intervals and reuses one resolved PAPX initial-style baseline after
 distinct profiles attributed 36.89% of large-open self cycles to scalar FKP
 range mapping and 6.94% to repeated style resolution/validation; full
