@@ -1,0 +1,10 @@
+reading file "target/perf/odt-shared-snapshot/before.heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: target/perf/odt-shared-snapshot/before --warmup 0 --samples 10 --case odt_media_paragraph_edit_save --json target/perf/odt-shared-snapshot/before-heap.json
+finished reading file, now analyzing data:
+
+total runtime: 1.237000s.
+calls to allocation functions: 129341 (104560/s)
+temporary memory allocations: 22817 (18445/s)
+peak heap memory consumption: 106.03M
+peak RSS (including heaptrack overhead): 117.72M
+total memory leaked: 1.78K

@@ -1,0 +1,23 @@
+	Command being timed: "taskset -c 2 target/perf/odt-shared-snapshot/before --warmup 5 --samples 50 --case odt_media_paragraph_edit_save --json target/perf/odt-shared-snapshot/before-rss.json"
+	User time (seconds): 2.83
+	System time (seconds): 0.15
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:02.99
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 109720
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 134751
+	Voluntary context switches: 25
+	Involuntary context switches: 31
+	Swaps: 0
+	File system inputs: 840
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
