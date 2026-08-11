@@ -1,0 +1,10 @@
+reading file "/tmp/xlsx-action-before-real.ht.zst.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-perf-xlsx-action-before --warmup 0 --samples 1 --case xlsx_one_percent_commit --xlsx-shape dense-wide --json /tmp/xlsx-action-heap-before-real.json
+finished reading file, now analyzing data:
+
+total runtime: 10.002000s.
+calls to allocation functions: 35577673 (3557055/s)
+temporary memory allocations: 5877353 (587617/s)
+peak heap memory consumption: 91.79M
+peak RSS (including heaptrack overhead): 94.61M
+total memory leaked: 1.78K
