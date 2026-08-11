@@ -433,12 +433,12 @@ impl SourceInner {
     }
 }
 
-struct SheetPart {
-    kind: WorksheetKind,
-    uri: PackURI,
+pub(crate) struct SheetPart {
+    pub(crate) kind: WorksheetKind,
+    pub(crate) uri: PackURI,
 }
 
-fn validate_sheet_graph(
+pub(crate) fn validate_sheet_graph(
     package: &SourceBackedPackage,
     workbook: &PartView<'_>,
     sheets: &[raw::Sheet],

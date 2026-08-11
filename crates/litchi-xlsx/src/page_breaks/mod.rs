@@ -9,6 +9,7 @@ mod model;
 mod package;
 mod patch;
 mod snapshot;
+mod source;
 mod transaction;
 
 pub use codec::{parse, replace, write};
@@ -16,6 +17,7 @@ pub use model::{Axis, Break, Collection, MAX_HORIZONTAL_BREAKS, MAX_VERTICAL_BRE
 pub use package::{apply_patch, edit, load};
 pub use patch::{Commit, Diagnostics, Patch};
 pub use snapshot::Snapshot;
+pub use source::{SourceBackedEditor, SourceEdit};
 pub use transaction::Transaction;
 
 #[cfg(test)]

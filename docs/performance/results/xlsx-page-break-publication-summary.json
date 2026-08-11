@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-12",
+  "production_base": "eefad744a1e626a9abbf3ac12d5d11b61fb2e46f",
+  "binary_sha256": "6acb71f5e4ec5366aaf31233b3ab9877d7b39f5a339bd18f504e88ac336075ea",
+  "environment": {
+    "cpu": "AMD EPYC 9575F VM",
+    "cpu_affinity": 2,
+    "kernel": "Linux 6.8.0-101-generic x86_64",
+    "rustc": "1.95.0 (59807616e 2026-04-14)",
+    "llvm": "22.1.2",
+    "allocator": "Rust system allocator"
+  },
+  "corpus": {
+    "generator": "litchi-xlsx-page-break-source-edit-media-v1",
+    "archive_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+    "archive_bytes": 16786830,
+    "logical_part_bytes": 16782412,
+    "ordinary_parts": 12,
+    "zip_members": 17,
+    "output_sha256": "1e3b7a9f763feaed4ad4888aa8aa0cd3773cdb9fd9f12e16f3c05b7fd0cd95b3",
+    "output_bytes": 16786878
+  },
+  "protocol": {
+    "order": ["eager_a", "source_a", "source_b", "eager_b"],
+    "warmups_per_leg": 20,
+    "samples_per_leg": 100
+  },
+  "legs_ns": {
+    "eager_a": {"p50": 217363821, "mean": 217666065.73},
+    "source_a": {"p50": 4638398, "mean": 4622853.35},
+    "source_b": {"p50": 4672265, "mean": 4676913.53},
+    "eager_b": {"p50": 216425516, "mean": 217365844.54}
+  },
+  "pooled_ns": {
+    "eager": {
+      "samples": 200,
+      "p50": 216789359,
+      "mean": 217515955.135,
+      "mean_ci95": [217103377.37153, 217928532.89846998],
+      "p95": 222424512,
+      "p99": 227706846
+    },
+    "source_backed": {
+      "samples": 200,
+      "p50": 4647479,
+      "mean": 4649883.44,
+      "mean_ci95": [4621162.91432601, 4678603.965673991],
+      "p95": 4937780,
+      "p99": 5100022
+    }
+  },
+  "publication_evidence": {
+    "ordinary_part_materializations": {"eager": 12, "source_backed": 2},
+    "source_read_calls": {"eager": 600, "source_backed": 602},
+    "source_read_bytes": {"eager": 16786522, "source_backed": 16791244},
+    "sink_write_calls": {"eager": 630, "source_backed": 547},
+    "largest_sink_write": 32768
+  },
+  "heaptrack_one_sample": {
+    "allocation_calls": {"eager": 15054, "source_backed": 12653},
+    "temporary_allocations": {"eager": 1700, "source_backed": 1530},
+    "peak_heap_mib": {"eager": 152.83, "source_backed": 152.80},
+    "peak_rss_mib": {"eager": 146.80, "source_backed": 150.64},
+    "leaked_kib": {"eager": 1.78, "source_backed": 1.78}
+  },
+  "gnu_time_four_process_mean_max_rss_kib": {
+    "eager": 142435,
+    "source_backed": 142587
+  },
+  "perf_stat_two_warmups_ten_samples": {
+    "eager": {
+      "task_clock_ms": 3958.54,
+      "cpu_migrations": 0,
+      "page_faults": 306161,
+      "cycles": 19442260049,
+      "instructions": 48477572481,
+      "branches": 8221714438,
+      "branch_misses": 176209474,
+      "cache_references": 1378887830,
+      "cache_misses": 26743607
+    },
+    "source_backed": {
+      "task_clock_ms": 1089.88,
+      "cpu_migrations": 0,
+      "page_faults": 207834,
+      "cycles": 5415678608,
+      "instructions": 10469096282,
+      "branches": 1353952553,
+      "branch_misses": 14276283,
+      "cache_references": 410339170,
+      "cache_misses": 21577299
+    }
+  }
+}
