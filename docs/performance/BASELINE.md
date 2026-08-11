@@ -362,6 +362,13 @@ incomplete program and CRUD matrix.
   moves +0.290 us/+6.41% p50 after parsing; the changed large LZFu open
   improves 19.39%. See
   [`0040`](changes/0040-rtf-byte-delimiter-scanning.md).
+- Direct RTF decoded-body ownership was measured and fully reverted. The broad
+  prototype improved large raw CP-1252 open 3.08% p50 and removed 20.15% of
+  process allocation calls, but regressed ordinary plain large open 25.53%
+  p50/22.45% mean. Owned-only refinements were compiler-layout sensitive at
+  -1.41% and +1.02% p50. Only a malformed multibyte-tail exact-preservation
+  regression remains. See
+  [`0043`](changes/0043-rtf-decoded-body-ownership-rejected.md).
 - ODT changed-operation compactness audits now share the already validated
   predecessor and candidate packages instead of allocating and copying three
   complete archives. The fixed 16 MiB-media paragraph edit/save improves

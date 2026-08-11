@@ -58,6 +58,7 @@ is still not broad program or CRUD coverage.
 | RTF parser-state specialization | Large open p50 **-20.09%**; large/medium one-edit-save **-11.54% / -14.16%**; cycles **-10.50%** | Ordinary body text only; insertion/deletion metadata retains the full state; allocation count, peak heap and RSS flat |
 | RTF ASCII transport batching | Large open p50 **-26.67%**; large/medium one-edit-save **-6.26% / -10.07%**; instructions **-18.40%** | ASCII source tokens only; byte-valued non-ASCII and invalid-Unicode fallback unchanged; allocation count, peak heap and RSS flat |
 | RTF byte delimiter scanning | Large open p50 **-17.23%**, mean **-17.99%**; one-edit/save p50 **-14.65%**, mean **-14.84%**; instructions **-21.27%** | Ordinary-text lexer only; plain/CP-1252/LZFu opens improve; prepared LZFu no-op segment +0.290 us/+6.41% p50 is disclosed while complete open improves 19.39%; peak heap/RSS flat |
+| Rejected RTF decoded-body ownership | Broad raw CP-1252 open **-3.08% p50 / -3.28% mean**; allocation calls **-20.15%** | Fully reverted: plain large open **+25.53% p50 / +22.45% mean**; owned-only variants were compiler-layout sensitive at -1.41% and +1.02% p50 |
 | OPC shared changed-Part payload | Few-large compressible targeted save **-20.73%** p50 / **-18.49%** mean; cache misses **-31.12%** | Removes one 4.19 MiB handoff copy; peak heap -3.42%, uninstrumented RSS +0.22% (flat); the remaining local-span copy is removed by the follow-up below |
 | ZIP generated local-span move | Few-large compressible/incompressible targeted save **-4.09% / -2.70%** p50; means **-4.08% / -2.25%** | Removes the separate 4.20 MiB post-validation local-span copy; peak heap -3.20%, uninstrumented RSS -0.10% (flat); required compressor/archive buffer remains |
 | Source-backed OPC one-Part publication | Fixed four-Part save p50 **-73.12%**, mean **-73.58%**; semantic materializations **4 -> 1**; instructions **-65.42%** | Low-level consuming same-topology replacement only; raw-copies all unselected ZIP members; signed real changes and unsupported layouts refuse before output; complete physical input/output bytes remain |
@@ -252,6 +253,12 @@ CP-1252 and LZFu guards, the prepared LZFu no-op disclosure, profiles,
 counters, memory and complete correctness gates are summarized in
 [`change 0040`](changes/0040-rtf-byte-delimiter-scanning.md).
 
+The rejected RTF decoded-body ownership evidence includes two broad-prototype
+ABBA cycles, plain/CP-1252/LZFu and prepared-operation guards, two owned-only
+refinements, Heaptrack, `perf record`, and GNU Time summaries. The raw JSON
+digests and full rejection rationale are in
+[`change 0043`](changes/0043-rtf-decoded-body-ownership-rejected.md).
+
 The ODT compact-audit package-sharing evidence is
 [`before A`](results/abba-odt-compact-audit-final-before-a.json),
 [`after A`](results/abba-odt-compact-audit-final-after-a.json),
@@ -428,6 +435,7 @@ The underlying records are:
 - [`0040-rtf-byte-delimiter-scanning.md`](changes/0040-rtf-byte-delimiter-scanning.md)
 - [`0041-odt-compact-audit-package-sharing.md`](changes/0041-odt-compact-audit-package-sharing.md)
 - [`0042-odt-envelope-package-sharing.md`](changes/0042-odt-envelope-package-sharing.md)
+- [`0043-rtf-decoded-body-ownership-rejected.md`](changes/0043-rtf-decoded-body-ownership-rejected.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on

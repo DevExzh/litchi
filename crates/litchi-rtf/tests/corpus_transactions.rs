@@ -67,6 +67,17 @@ fn hostile_large_corpus_is_bounded_and_never_normalized_on_open() {
 }
 
 #[test]
+fn lossy_multibyte_tail_retains_text_and_exact_transport() {
+    let mut source = br"{\rtf1\ansi\ansicpg932 ordinary ".to_vec();
+    source.push(0x82);
+    source.push(b'}');
+
+    let document = Document::from_bytes(&source).unwrap();
+    assert_eq!(document.text(), "ordinary \u{fffd}");
+    assert_eq!(document.to_bytes().unwrap(), source);
+}
+
+#[test]
 fn hostile_operation_fanout_stops_at_the_caller_bound() {
     let body = "x".repeat(600);
     let source = Document::parse(&format!(r"{{\rtf1\ansi {body}}}")).unwrap();

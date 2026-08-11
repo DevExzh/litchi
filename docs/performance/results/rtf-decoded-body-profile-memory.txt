@@ -1,0 +1,52 @@
+RTF decoded-body ownership rejected prototype profile and memory summary
+Date: 2026-08-11
+
+Environment:
+  release Rust 1.95.0 (59807616e 2026-04-14)
+  Linux 6.8.0-101-generic x86_64, AMD EPYC 9575F VM
+  CPU 11 pinned with taskset
+  MALLOC_MMAP_THRESHOLD_=33554432
+  MALLOC_TRIM_THRESHOLD_=-1
+
+Executables:
+  before SHA-256:    671c9dcab035382fe23c8383a6c2cc50019d8204842069cac9ce6b0cfbb4335f
+  broad prototype:   7281698e703f295ba6649e45f1342bfe36632c29d6d31fae08924fa6a425d033
+  owned/double test: 00190584bd158f93e4a6fc2bd1070ea4468390aac4f0f65048dd440a30828467
+  owned/single test: cd09012677bac87a542ef0b40c2578cf49b1e83b9900930752862620721eec2f
+
+Heaptrack command shape (run once per before/broad executable):
+  heaptrack -o /tmp/rtf-decoded-body-STATE.heaptrack EXECUTABLE \
+    --warmup 2 --samples 20 --case rtf_semantic_open \
+    --semantic-shape large --rtf-variant byte1252 --json /tmp/STATE.json
+
+Heaptrack summary:
+  metric                         before        broad prototype       delta
+  allocation calls              1,192,140       951,876             -20.15%
+  temporary allocations           479,524       240,052             -49.94%
+  peak heap                       22.95 MiB      21.92 MiB            -4.49%
+  heaptrack RSS                   32.77 MiB      40.83 MiB           +24.59%
+  leaked bytes                         544 B          544 B           flat
+
+Uninstrumented GNU Time A-B-B-A, 20 warmups and 200 samples per leg:
+  maximum RSS before A/B: 30,848 / 30,720 KiB
+  maximum RSS broad A/B:  30,848 / 30,976 KiB
+  pooled average:         30,784 -> 30,912 KiB (+0.42%, flat)
+  no major faults or swaps occurred
+
+Perf record command shape (run once per before/broad executable):
+  perf record -F 999 -g -o /tmp/STATE.perf.data -- taskset -c 11 EXECUTABLE \
+    --warmup 10 --samples 120 --case rtf_semantic_open \
+    --semantic-shape large --rtf-variant byte1252 --json /tmp/STATE.json
+
+Perf record summary:
+  before: 699 samples, approximate event count 3,308,430,135
+  broad:  684 samples, approximate event count 3,241,277,701
+  total lost samples: zero in both profiles
+  flush_text_buffer exclusive: 2.19% -> below the 0.5% report cutoff
+  __memmove_avx512_unaligned_erms: 13.17% -> 13.23% (flat)
+  SmallVec::extend exclusive: 17.71% -> 14.35%
+  kernel symbols were restricted; no kernel-symbol claim is made
+
+All Heaptrack and perf.data files were temporary local profiler artifacts. The
+committed raw timing evidence is the content-addressed JSON set listed in
+rtf-decoded-body-sha256.txt.
