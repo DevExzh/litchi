@@ -27,6 +27,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_sheet_order_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_header_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_title_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_cell_storage_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_document_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_page_layout_codec.rs");
@@ -77,6 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_table_title_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_table_cell_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_body_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_section_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_table_info_projection_provenance(proto_directory, buffa_projection_directory)?;
@@ -262,6 +265,43 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_table_title_projection_budget(&buffa_table_title_out_directory)?;
+
+    // Scalar-cell edits traverse several collection-heavy native archives.
+    // Project only singular envelopes and scalars; the generated-free codec
+    // streams repeated tiles, rows, headers, strings, and dependency records.
+    let buffa_table_cell_storage_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-cell-storage");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSTTableCellStorageArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_table_cell_storage_out_directory)
+        .include_file("iwa_numbers_table_cell_storage_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_table_cell_storage_projection_budget(&buffa_table_cell_storage_out_directory)?;
+
+    let buffa_table_cell_dependency_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-cell-dependency");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSCETableCellDependenciesArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_table_cell_dependency_out_directory)
+        .include_file("iwa_numbers_table_cell_dependency_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_table_cell_dependency_projection_budget(&buffa_table_cell_dependency_out_directory)?;
 
     // Keynote's show reader projects only scalar settings, required direct
     // references, and presentation size. The repeated slide tree is routed by
@@ -949,6 +989,249 @@ optional bool table_name_border_enabled = 37;\n\
         || production_codec.contains(".encode(")
     {
         return Err("Numbers table-title projection/codec drifted from the exact TST/TSP scalar routes, lost its private generated boundary or shared reference lazy view, introduced generated repeated storage, or added Prost/production encoding".into());
+    }
+    Ok(())
+}
+
+fn enforce_table_cell_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const REQUIRED_CANONICAL: [&str; 18] = [
+        "message TileRowInfo {",
+        "message TileStorage {",
+        "message TableDataList {",
+        "message TableDataListSegment {",
+        "message HeaderStorageBucket {",
+        "message HeaderStorage {",
+        "message DataStore {",
+        "message TableModelArchive {",
+        "message CellRecordExpandedArchive {",
+        "message CellRecordTileArchive {",
+        "message RangeBackDependencyArchive {",
+        "message RangePrecedentsTileArchive {",
+        "message FormulaOwnerDependenciesArchive {",
+        "message DependencyTrackerArchive {",
+        "message CalculationEngineArchive {",
+        "repeated .TST.TileRowInfo rowInfos = 5;",
+        "repeated .TSP.Reference formula_owner_dependencies = 6;",
+        "required .TSCE.DependencyTrackerArchive dependency_tracker = 2;",
+    ];
+    const STORAGE_CANONICAL_FIELDS: &[&str] = &[
+        "required string table_id = 1;",
+        "required .TST.DataStore base_data_store = 4;",
+        "required uint32 number_of_rows = 6;",
+        "required uint32 number_of_columns = 7;",
+        "optional .TSP.Reference hidden_state_formula_owner_for_columns = 34;",
+        "optional .TSP.Reference hidden_state_formula_owner_for_rows = 35;",
+        "optional .TSP.CFUUIDArchive conditional_style_formula_owner_id = 39;",
+        "optional .TSP.Reference pivot_owner = 85;",
+        "optional .TSP.Reference category_owner = 86;",
+        "optional .TSCE.SpillOwnerArchive spill_owner = 93;",
+        "required .TST.HeaderStorage rowHeaders = 1;",
+        "required .TSP.Reference columnHeaders = 2;",
+        "required .TST.TileStorage tiles = 3;",
+        "required .TSP.Reference stringTable = 4;",
+        "required .TSP.Reference styleTable = 5;",
+        "required .TSP.Reference formula_table = 6;",
+        "required uint32 nextRowStripID = 7;",
+        "required uint32 nextColumnStripID = 8;",
+        "required .TST.TableRBTree rowTileTree = 9;",
+        "required .TST.TableRBTree columnTileTree = 10;",
+        "required .TSP.Reference format_table_pre_bnc = 11;",
+        "optional .TSP.Reference formulaErrorTable = 12;",
+        "optional .TSP.Reference merge_region_map = 13;",
+        "optional uint32 storage_version_pre_bnc = 14;",
+        "optional .TSP.Reference deprecated_custom_format_table = 15;",
+        "optional .TSP.Reference multipleChoiceListFormatTable = 16;",
+        "optional .TSP.Reference rich_text_table = 17;",
+        "optional .TSP.Reference conditionalstyletable = 18;",
+        "optional .TSP.Reference commentStorageTable = 19;",
+        "optional .TSP.Reference importWarningSetTable = 20;",
+        "optional .TSP.Reference control_cell_spec_table = 21;",
+        "optional .TSP.Reference format_table = 22;",
+        "repeated .TST.TileStorage.Tile tiles = 1;",
+        "required uint32 tileid = 1;",
+        "required .TSP.Reference tile = 2;",
+        "optional uint32 tile_size = 2;",
+        "optional bool should_use_wide_rows = 3;",
+        "required uint32 maxColumn = 1;",
+        "required uint32 maxRow = 2;",
+        "required uint32 numCells = 3;",
+        "required uint32 numrows = 4;",
+        "repeated .TST.TileRowInfo rowInfos = 5;",
+        "optional uint32 storage_version = 6;",
+        "optional bool last_saved_in_BNC = 7;",
+        "optional bool should_use_wide_rows = 8;",
+        "required uint32 tile_row_index = 1;",
+        "required uint32 cell_count = 2;",
+        "required bytes cell_storage_buffer_pre_bnc = 3;",
+        "required bytes cell_offsets_pre_bnc = 4;",
+        "optional uint32 storage_version = 5;",
+        "optional bytes cell_storage_buffer = 6;",
+        "optional bytes cell_offsets = 7;",
+        "optional bool has_wide_offsets = 8;",
+        "required uint32 bucketHashFunction = 1;",
+        "repeated .TSP.Reference buckets = 2;",
+        "repeated .TST.HeaderStorageBucket.Header headers = 2;",
+        "required uint32 index = 1;",
+        "required float size = 2;",
+        "required uint32 hidingState = 3;",
+        "required uint32 numberOfCells = 4;",
+        "optional .TSP.Reference cell_style = 5;",
+        "optional .TSP.Reference text_style = 6;",
+        "required .TST.TableDataList.ListType listType = 1;",
+        "required uint32 nextListID = 2;",
+        "repeated .TST.TableDataList.ListEntry entries = 3;",
+        "repeated .TSP.Reference segments = 4;",
+        "optional bool is_new_for_bnc = 5;",
+        "required uint32 key = 1;",
+        "required uint32 refcount = 2;",
+        "optional string string = 3;",
+        "optional .TSP.Reference reference = 4;",
+        "optional .TSCE.FormulaArchive formula = 5;",
+        "optional .TSK.FormatStructArchive format = 6;",
+        "optional .TSK.CustomFormatArchive custom_format = 8;",
+        "optional .TSP.Reference rich_text_payload = 9;",
+        "optional .TSP.Reference comment_storage = 10;",
+        "optional .TST.ImportWarningSetArchive import_warning_set = 11;",
+        "optional .TST.CellSpecArchive cell_spec = 12;",
+        "required .TST.TableDataList.ListType list_type = 1;",
+        "required .TSP.Range key_range = 2;",
+    ];
+    const DEPENDENCY_CANONICAL_FIELDS: &[&str] = &[
+        "optional bool base_date_1904 = 1;",
+        "required .TSCE.DependencyTrackerArchive dependency_tracker = 2;",
+        "optional .TSP.Reference named_reference_manager = 3;",
+        "optional .TSP.Reference remote_data_store = 12;",
+        "optional .TSP.Reference header_name_manager = 14;",
+        "optional .TSP.Reference refs_to_dirty = 15;",
+        "optional .TSCE.OwnerIDMapArchive owner_id_map = 3;",
+        "optional uint64 number_of_formulas = 5;",
+        "repeated .TSP.Reference formula_owner_dependencies = 6;",
+        "required .TSP.UUID formula_owner_uid = 1;",
+        "required uint32 internal_formula_owner_id = 2;",
+        "optional uint32 owner_kind = 3 [default = 0];",
+        "optional .TSCE.CellDependenciesExpandedArchive cell_dependencies = 4;",
+        "optional .TSCE.RangeDependenciesArchive range_dependencies = 5;",
+        "optional .TSCE.VolatileDependenciesExpandedArchive volatile_dependencies = 6;",
+        "optional .TSCE.SpanningDependenciesExpandedArchive spanning_column_dependencies = 7;",
+        "optional .TSCE.SpanningDependenciesExpandedArchive spanning_row_dependencies = 8;",
+        "optional .TSCE.WholeOwnerDependenciesExpandedArchive whole_owner_dependencies = 9;",
+        "optional .TSCE.CellErrorsArchive cell_errors = 10;",
+        "optional .TSP.Reference formula_owner = 11;",
+        "optional .TSP.UUID base_owner_uid = 12;",
+        "optional .TSCE.CellDependenciesTiledArchive tiled_cell_dependencies = 13;",
+        "optional .TSCE.UuidReferencesArchive uuid_references = 14;",
+        "optional .TSCE.RangeDependenciesTiledArchive tiled_range_dependencies = 15;",
+        "optional .TSCE.CellSpillSizesArchive spill_range_sizes = 16;",
+        "required uint32 column = 1;",
+        "required uint32 row = 2;",
+        "optional uint64 dirty_self_plus_precedents_count = 3 [default = 0];",
+        "optional bool is_in_a_cycle = 4 [default = false];",
+        "optional bool has_calculated_precedents = 5 [default = false];",
+        "optional .TSCE.ExpandedEdgesArchive expanded_edges = 6;",
+        "repeated .TSCE.CellRecordExpandedArchive cell_record = 1;",
+        "repeated .TSCE.RangeBackDependencyArchive back_dependency = 2;",
+        "required uint32 internal_owner_id = 1;",
+        "required uint32 tile_column_begin = 2;",
+        "required uint32 tile_row_begin = 3;",
+        "repeated .TSCE.CellRecordExpandedArchive cell_records = 4;",
+        "required uint32 cell_coord_row = 1;",
+        "required uint32 cell_coord_column = 2;",
+        "optional .TSCE.RangeReferenceArchive range_reference = 3;",
+        "optional .TSCE.InternalRangeReferenceArchive internal_range_reference = 4;",
+        "required uint32 to_owner_id = 1;",
+        "repeated .TSCE.RangePrecedentsTileArchive.FromToRangeArchive from_to_range = 2;",
+        "required .TSCE.CellCoordinateArchive from_coord = 1;",
+        "required .TSCE.CellRectArchive refers_to_rect = 2;",
+        "repeated .TSP.Reference cell_record_tiles = 1;",
+        "repeated .TSP.Reference range_precedents_tile = 1;",
+    ];
+    const TSP_CANONICAL_FIELDS: &[&str] = &[
+        "required uint64 identifier = 1;",
+        "optional int32 deprecated_type = 2;",
+        "optional bool deprecated_is_external = 3;",
+        "required uint32 location = 1;",
+        "required uint32 length = 2;",
+        "required uint64 lower = 1;",
+        "required uint64 upper = 2;",
+    ];
+    const ROUTER_SYMBOLS: &[&str] = &[
+        "pub fn decode_table_model(",
+        "pub fn decode_data_store(",
+        "pub fn decode_tile_storage(",
+        "pub fn decode_tile(",
+        "pub fn decode_tile_row_info(",
+        "pub fn decode_header_storage(",
+        "pub fn decode_header_storage_bucket(",
+        "pub fn decode_header(",
+        "pub fn decode_table_data_list(",
+        "pub fn decode_table_data_list_entry(",
+        "pub fn decode_table_data_list_segment(",
+        "pub fn decode_calculation_engine(",
+        "pub fn decode_dependency_tracker(",
+        "pub fn decode_formula_owner_dependencies(",
+        "pub fn decode_cell_record(",
+        "pub fn decode_cell_record_tile(",
+        "pub fn decode_range_back_dependency(",
+        "pub fn decode_range_precedents_tile(",
+        "pub fn decode_from_to_range(",
+        "pub trait StorageVisitor",
+        "pub trait DependencyVisitor",
+        "if snapshot.deprecated_is_external == Some(true)",
+        "payloads: <redacted>",
+    ];
+    let tst = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
+    let tsce = fs::read_to_string(proto_directory.join("TSCEArchives.proto"))?;
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let canonical = format!("{tst}\n{tsce}");
+    let storage =
+        fs::read_to_string(projection_directory.join("TSTTableCellStorageArchive.proto"))?;
+    let dependency =
+        fs::read_to_string(projection_directory.join("TSCETableCellDependenciesArchive.proto"))?;
+    let storage_codec = fs::read_to_string("src/numbers_table_cell_storage_codec.rs")?;
+    let dependency_codec = fs::read_to_string("src/numbers_table_cell_dependency_codec.rs")?;
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let production = [storage_codec.as_str(), dependency_codec.as_str()]
+        .into_iter()
+        .map(|codec| {
+            codec
+                .split_once("#[cfg(test)]")
+                .map_or(codec, |split| split.0)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !REQUIRED_CANONICAL
+        .iter()
+        .all(|declaration| canonical.contains(declaration))
+        || !STORAGE_CANONICAL_FIELDS
+            .iter()
+            .all(|field| tst.contains(field))
+        || !DEPENDENCY_CANONICAL_FIELDS
+            .iter()
+            .all(|field| tsce.contains(field))
+        || !TSP_CANONICAL_FIELDS.iter().all(|field| tsp.contains(field))
+        || !ROUTER_SYMBOLS
+            .iter()
+            .all(|symbol| production.contains(symbol))
+        || storage.contains("repeated ")
+        || dependency.contains("repeated ")
+        || storage.len() > 5 * 1024
+        || dependency.len() > 3 * 1024
+        || !lib.contains("mod buffa_numbers_table_cell_storage_generated {")
+        || !lib.contains("mod buffa_numbers_table_cell_dependency_generated {")
+        || !lib.contains("pub mod numbers_table_cell_storage_codec;")
+        || !lib.contains("pub mod numbers_table_cell_dependency_codec;")
+        || production.contains("RepeatedView")
+        || production.contains("LazyRepeatedView")
+        || production.contains("prost::")
+        || production.contains("to_owned_message")
+        || production.contains("encode_to_vec")
+        || production.contains("try_encode")
+        || production.contains(".encode(")
+    {
+        return Err("Numbers table-cell projections/codecs drifted from canonical TST/TSCE envelopes, exceeded source budgets, exposed repeated generated storage, or introduced production encoding".into());
     }
     Ok(())
 }
@@ -1991,6 +2274,96 @@ fn enforce_table_title_projection_budget(directory: &Path) -> Result<(), Box<dyn
     {
         return Err(format!(
             "Numbers table-title projection generated {names:?}/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions/digest {aggregate_digest}; expected {EXPECTED_FILES:?}, at most {MAX_GENERATED_BYTES} bytes, zero repeated views, and digest {EXPECTED_DIGEST}"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_table_cell_storage_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: &[&str] = &[
+        "LitchiIwaTableCellProjection.mod.rs",
+        "TSTTableCellStorageArchive.__lazy_view.rs",
+        "TSTTableCellStorageArchive.__view.rs",
+        "TSTTableCellStorageArchive.rs",
+        "iwa_numbers_table_cell_storage_buffa_protos.rs",
+    ];
+    enforce_table_cell_exact_budget(
+        directory,
+        "Numbers table-cell storage",
+        EXPECTED_FILES,
+        465_932,
+        "1a894fd5d22b004db664bc7c348d9591a4608ab9263a8122c726c8a1ecb0c3b3",
+    )
+}
+
+fn enforce_table_cell_dependency_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: &[&str] = &[
+        "LitchiIwaTableCellDependencyProjection.mod.rs",
+        "TSCETableCellDependenciesArchive.__lazy_view.rs",
+        "TSCETableCellDependenciesArchive.__view.rs",
+        "TSCETableCellDependenciesArchive.rs",
+        "iwa_numbers_table_cell_dependency_buffa_protos.rs",
+    ];
+    enforce_table_cell_exact_budget(
+        directory,
+        "Numbers table-cell dependency",
+        EXPECTED_FILES,
+        303_245,
+        "21be31cf344b0c77e876d045ac6afc70c2c60f08f622c8c86bdf3fd6335e8acf",
+    )
+}
+
+fn enforce_table_cell_exact_budget(
+    directory: &Path,
+    label: &str,
+    expected_files: &[&str],
+    expected_bytes: u64,
+    expected_digest: &str,
+) -> Result<(), Box<dyn Error>> {
+    let mut entries = fs::read_dir(directory)?
+        .map(|result| result.map(|entry| (entry.file_name(), entry.path(), entry.file_type())))
+        .collect::<Result<Vec<_>, _>>()?;
+    entries.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut files = Vec::new();
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    let mut digest = Sha256::new();
+    for (name, path, file_type) in entries {
+        if !file_type?.is_file() {
+            continue;
+        }
+        files.push(
+            name.into_string()
+                .map_err(|_name| "table-cell projection generated a non-UTF-8 filename")?,
+        );
+        let generated = fs::read(path)?;
+        bytes = bytes
+            .checked_add(u64::try_from(generated.len())?)
+            .ok_or("generated byte count overflow")?;
+        let text = std::str::from_utf8(&generated)?;
+        repeated_views = repeated_views
+            .checked_add(text.matches("RepeatedView").count())
+            .ok_or("generated repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(text.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy-repeated-view count overflow")?;
+        digest.update(generated);
+    }
+    let aggregate_digest = digest
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    if files.iter().map(String::as_str).collect::<Vec<_>>() != expected_files
+        || bytes != expected_bytes
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+        || aggregate_digest != expected_digest
+    {
+        return Err(format!(
+            "{label} projection generated {files:?}/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions/digest {aggregate_digest}; expected exactly {expected_files:?}/{expected_bytes} bytes/zero repeated views/digest {expected_digest}"
         )
         .into());
     }

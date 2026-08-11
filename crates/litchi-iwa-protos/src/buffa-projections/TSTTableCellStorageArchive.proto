@@ -1,0 +1,114 @@
+// Read-only wire projections for the Numbers scalar-cell transaction.
+//
+// Embedded canonical messages are deliberately represented as bytes.  The
+// generated lazy views therefore borrow every envelope, while the handwritten
+// codec performs the canonical recursive preflight and streams repeated
+// records without materialising input-width vectors.
+syntax = "proto2";
+package LitchiIwaTableCellProjection;
+
+message TableModelArchive {
+  required string table_id = 1;
+  required bytes base_data_store = 4;
+  required uint32 number_of_rows = 6;
+  required uint32 number_of_columns = 7;
+  optional bytes hidden_state_formula_owner_for_columns = 34;
+  optional bytes hidden_state_formula_owner_for_rows = 35;
+  optional bytes conditional_style_formula_owner_id = 39;
+  optional bytes pivot_owner = 85;
+  optional bytes category_owner = 86;
+  optional bytes spill_owner = 93;
+}
+
+message DataStoreArchive {
+  required bytes row_headers = 1;
+  required bytes column_headers = 2;
+  required bytes tiles = 3;
+  required bytes string_table = 4;
+  required bytes style_table = 5;
+  required bytes formula_table = 6;
+  required uint32 next_row_strip_id = 7;
+  required uint32 next_column_strip_id = 8;
+  required bytes row_tile_tree = 9;
+  required bytes column_tile_tree = 10;
+  required bytes format_table_pre_bnc = 11;
+  optional bytes formula_error_table = 12;
+  optional bytes merge_region_map = 13;
+  optional uint32 storage_version_pre_bnc = 14;
+  optional bytes deprecated_custom_format_table = 15;
+  optional bytes multiple_choice_list_format_table = 16;
+  optional bytes rich_text_table = 17;
+  optional bytes conditional_style_table = 18;
+  optional bytes comment_storage_table = 19;
+  optional bytes import_warning_set_table = 20;
+  optional bytes control_cell_spec_table = 21;
+  optional bytes format_table = 22;
+}
+
+message TileStorageArchive {
+  optional uint32 tile_size = 2;
+  optional bool should_use_wide_rows = 3;
+}
+
+message TileArchive {
+  required uint32 max_column = 1;
+  required uint32 max_row = 2;
+  required uint32 num_cells = 3;
+  required uint32 num_rows = 4;
+  optional uint32 storage_version = 6;
+  optional bool last_saved_in_bnc = 7;
+  optional bool should_use_wide_rows = 8;
+}
+
+message TileRowInfoArchive {
+  required uint32 tile_row_index = 1;
+  required uint32 cell_count = 2;
+  required bytes cell_storage_buffer_pre_bnc = 3;
+  required bytes cell_offsets_pre_bnc = 4;
+  optional uint32 storage_version = 5;
+  optional bytes cell_storage_buffer = 6;
+  optional bytes cell_offsets = 7;
+  optional bool has_wide_offsets = 8;
+}
+
+message HeaderStorageArchive {
+  required uint32 bucket_hash_function = 1;
+}
+
+message HeaderStorageBucketArchive {
+  required uint32 bucket_hash_function = 1;
+}
+
+message HeaderArchive {
+  required uint32 index = 1;
+  required fixed32 size_bits = 2;
+  required uint32 hiding_state = 3;
+  required uint32 number_of_cells = 4;
+  optional bytes cell_style = 5;
+  optional bytes text_style = 6;
+}
+
+message TableDataListArchive {
+  required int32 list_type = 1;
+  required uint32 next_list_id = 2;
+  optional bool is_new_for_bnc = 5;
+}
+
+message TableDataListEntryArchive {
+  required uint32 key = 1;
+  required uint32 ref_count = 2;
+  optional string string_value = 3;
+  optional bytes reference = 4;
+  optional bytes formula = 5;
+  optional bytes format = 6;
+  optional bytes custom_format = 8;
+  optional bytes rich_text_payload = 9;
+  optional bytes comment_storage = 10;
+  optional bytes import_warning_set = 11;
+  optional bytes cell_spec = 12;
+}
+
+message TableDataListSegmentArchive {
+  required int32 list_type = 1;
+  required bytes key_range = 2;
+}
