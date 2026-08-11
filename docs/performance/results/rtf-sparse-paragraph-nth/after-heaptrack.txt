@@ -1,0 +1,10 @@
+reading file "target/perf/rtf-nth/candidate.heaptrack.zst.zst" - please wait, this might take some time...
+Debuggee command was: target/perf/rtf-nth/candidate/litchi-perf-baseline --warmup 0 --samples 100 --case rtf_semantic_one_paragraph --semantic-shape large --rtf-variant plain --json target/perf/rtf-nth/heaptrack-candidate.json
+finished reading file, now analyzing data:
+
+total runtime: 1.027000s.
+calls to allocation functions: 4087326 (3979869/s)
+temporary memory allocations: 1020512 (993682/s)
+peak heap memory consumption: 14.30M
+peak RSS (including heaptrack overhead): 25.69M
+total memory leaked: 544B

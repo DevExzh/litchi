@@ -337,6 +337,28 @@ impl<'a> Iterator for Paragraphs<'a> {
         None
     }
 
+    fn nth(&mut self, mut n: usize) -> Option<Self::Item> {
+        if self.finished {
+            return None;
+        }
+        while let Some(boundary) = self.story.boundaries.get(self.boundary).copied() {
+            self.boundary = self.boundary.saturating_add(1);
+            if boundary.kind != Break::Paragraph {
+                continue;
+            }
+            if n == 0 {
+                return self.make_paragraph(boundary.position, true);
+            }
+            n = n.saturating_sub(1);
+            self.start = boundary.position.saturating_add(1);
+        }
+        if self.start < self.text_len && n == 0 {
+            return self.make_paragraph(self.text_len, false);
+        }
+        self.finished = true;
+        None
+    }
+
     fn size_hint(&self) -> (usize, Option<usize>) {
         if self.finished {
             return (0, Some(0));
