@@ -191,6 +191,11 @@ impl Snapshot {
         })
     }
 
+    pub(crate) fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self> {
+        let _ = presentation_shared(bytes.clone())?;
+        Ok(Self { bytes })
+    }
+
     /// Exact bytes of the complete source or committed package artifact.
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
@@ -366,6 +371,7 @@ impl Transaction {
             return Ok(Commit {
                 snapshot: self.source,
                 patch,
+                replaced_slide_persist_id: None,
             });
         }
 
@@ -406,7 +412,11 @@ impl Transaction {
             after_text: replacement,
         };
         let patch = Patch::new(self.source, snapshot.clone(), Some(change));
-        Ok(Commit { snapshot, patch })
+        Ok(Commit {
+            snapshot,
+            patch,
+            replaced_slide_persist_id: Some(self.resolved.slide_persist_id),
+        })
     }
 
     /// Discards this candidate without changing the source snapshot.
@@ -421,6 +431,7 @@ impl Transaction {
 pub struct Commit {
     snapshot: Snapshot,
     patch: Patch,
+    replaced_slide_persist_id: Option<u32>,
 }
 
 impl Commit {
@@ -440,6 +451,35 @@ impl Commit {
     #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
+    }
+
+    pub(crate) fn into_root_publication(self) -> Option<RootPublication> {
+        let replaced_slide_persist_id = self.replaced_slide_persist_id?;
+        Some(RootPublication {
+            source: self.patch.before.bytes,
+            output: self.snapshot.bytes,
+            replaced_slide_persist_id,
+        })
+    }
+}
+
+pub(crate) struct RootPublication {
+    source: Arc<[u8]>,
+    output: Arc<[u8]>,
+    replaced_slide_persist_id: u32,
+}
+
+impl RootPublication {
+    pub(crate) fn source(&self) -> &[u8] {
+        &self.source
+    }
+
+    pub(crate) const fn replaced_slide_persist_id(&self) -> u32 {
+        self.replaced_slide_persist_id
+    }
+
+    pub(crate) fn into_output(self) -> Arc<[u8]> {
+        self.output
     }
 }
 
@@ -634,6 +674,11 @@ enum TextKind {
 
 fn presentation(bytes: &[u8]) -> PackageResult<Presentation> {
     let mut package = Package::from_reader(Cursor::new(bytes.to_vec()))?;
+    package.presentation()
+}
+
+fn presentation_shared(bytes: Arc<[u8]>) -> PackageResult<Presentation> {
+    let mut package = Package::from_reader(Cursor::new(bytes))?;
     package.presentation()
 }
 

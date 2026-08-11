@@ -446,6 +446,54 @@ impl Snapshot {
         })
     }
 
+    fn adopt_text_edit_publication(
+        &self,
+        publication: crate::text_edit::RootPublication,
+        expected_slide_persist_id: u32,
+    ) -> Result<Self> {
+        if publication.source() != self.bytes() {
+            return Err(PackageError::Corrupted(
+                "PPT root text publication source changed before adoption".into(),
+            )
+            .into());
+        }
+        let replaced_slide_persist_id = publication.replaced_slide_persist_id();
+        if replaced_slide_persist_id == self.document_persist_id
+            || expected_slide_persist_id == self.document_persist_id
+        {
+            return Err(PackageError::Corrupted(
+                "PPT root text publication targeted the live document record".into(),
+            )
+            .into());
+        }
+        if replaced_slide_persist_id != expected_slide_persist_id {
+            return Err(PackageError::Corrupted(
+                "PPT root text publication targeted an unexpected slide record".into(),
+            )
+            .into());
+        }
+
+        let bytes = publication.into_output();
+        if self.limits != RecordLimits::default() {
+            return Self::from_bytes_with_limits(bytes.to_vec(), self.limits);
+        }
+        if bytes.len() > self.limits.max_package_bytes {
+            return Err(PackageError::ResourceLimit(format!(
+                "PPT slide-order source size {} exceeds limit {}",
+                bytes.len(),
+                self.limits.max_package_bytes
+            ))
+            .into());
+        }
+        Ok(Self {
+            bytes,
+            document: self.document.clone(),
+            document_persist_id: self.document_persist_id,
+            limits: self.limits,
+            has_review_history: self.has_review_history,
+        })
+    }
+
     /// Exact bytes of the complete source or committed artifact.
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
@@ -1410,7 +1458,8 @@ impl Transaction {
             .map(Position::new)
             .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
         let source_target = crate::text_edit::Target::new(source_position, target.shape());
-        let text_snapshot = crate::text_edit::Snapshot::from_bytes(self.working.bytes().to_vec())?;
+        let text_snapshot =
+            crate::text_edit::Snapshot::from_shared_bytes(self.working.bytes.clone())?;
         let mut text_edit = text_snapshot.edit_text(source_target)?;
         let before = text_edit.text().to_string();
         let after = value.into();
@@ -1419,10 +1468,12 @@ impl Transaction {
         if commit.patch().is_empty() {
             return Ok(());
         }
-        self.working = Snapshot::from_bytes_with_limits(
-            commit.snapshot().bytes().to_vec(),
-            self.source.limits,
-        )?;
+        let publication = commit.into_root_publication().ok_or_else(|| {
+            PackageError::Corrupted("changed PPT text commit lacks publication identity".into())
+        })?;
+        self.working = self
+            .working
+            .adopt_text_edit_publication(publication, persist_id)?;
         let change = ShapeTextChange {
             target: source_target,
             before,
@@ -6072,6 +6123,121 @@ mod tests {
             review_bound.edit().unwrap_err(),
             Error::Refused(Refusal::ReviewHistoryDependency)
         ));
+    }
+
+    fn root_text_publication(
+        source: &Snapshot,
+        target: crate::text_edit::Target,
+        replacement: &str,
+    ) -> crate::text_edit::RootPublication {
+        let text_source =
+            crate::text_edit::Snapshot::from_shared_bytes(source.bytes.clone()).unwrap();
+        let mut edit = text_source.edit_text(target).unwrap();
+        edit.set_text(replacement).unwrap();
+        let commit = edit.commit().unwrap();
+        assert!(!commit.patch().is_empty());
+        commit.into_root_publication().unwrap()
+    }
+
+    #[test]
+    fn root_text_publication_adoption_matches_complete_reopen() {
+        let source = Snapshot::from_bytes(authored_fixture()).unwrap();
+        let target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let persist_id = source.document.slides()[0].persist_id();
+        let adopted = source
+            .adopt_text_edit_publication(
+                root_text_publication(&source, target, "adopted root text"),
+                persist_id,
+            )
+            .unwrap();
+        let reopened = Snapshot::from_bytes(adopted.bytes().to_vec()).unwrap();
+
+        assert_eq!(adopted, reopened);
+        assert_eq!(adopted.document_persist_id, source.document_persist_id);
+        assert_eq!(adopted.document, source.document);
+        assert_eq!(adopted.has_review_history, source.has_review_history);
+        assert_eq!(adopted.limits, source.limits);
+        crate::font::validate_unrelated_streams(source.bytes(), adopted.bytes()).unwrap();
+    }
+
+    #[test]
+    fn root_text_publication_adoption_rejects_wrong_lineage_and_persist_identity() {
+        let source = Snapshot::from_bytes(authored_fixture()).unwrap();
+        let target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let expected = source.document.slides()[0].persist_id();
+        let wrong_slide = source.document.slides()[1].persist_id();
+        let foreign = Snapshot::from_bytes(fixture("basic_test_ppt_file.ppt")).unwrap();
+
+        let error = foreign
+            .adopt_text_edit_publication(
+                root_text_publication(&source, target, "foreign root text"),
+                expected,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Package(PackageError::Corrupted(message))
+                if message.contains("source changed before adoption")
+        ));
+
+        let error = source
+            .adopt_text_edit_publication(
+                root_text_publication(&source, target, "wrong slide text"),
+                wrong_slide,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Package(PackageError::Corrupted(message))
+                if message.contains("unexpected slide record")
+        ));
+
+        let error = source
+            .adopt_text_edit_publication(
+                root_text_publication(&source, target, "document record text"),
+                source.document_persist_id,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Package(PackageError::Corrupted(message))
+                if message.contains("live document record")
+        ));
+    }
+
+    #[test]
+    fn root_text_publication_with_custom_limits_retains_complete_reopen() {
+        let bytes = authored_fixture();
+        let mut limits = RecordLimits::default();
+        limits.max_records -= 1;
+        let source = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
+        let target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let mut edit = source.edit().unwrap();
+        edit.set_shape_text(target, "custom limits root text")
+            .unwrap();
+        let committed = edit.commit().unwrap().snapshot().clone();
+        let reopened =
+            Snapshot::from_bytes_with_limits(committed.bytes().to_vec(), limits).unwrap();
+
+        assert_eq!(committed, reopened);
+        assert_eq!(committed.limits(), limits);
+    }
+
+    #[test]
+    fn root_transaction_supports_consecutive_adopted_text_publications() {
+        let source = Snapshot::from_bytes(authored_fixture()).unwrap();
+        let first = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let second = crate::text_edit::Target::new(Position::new(1), Position::new(0));
+        let mut edit = source.edit().unwrap();
+        edit.set_shape_text(first, "first adopted text").unwrap();
+        edit.set_shape_text(second, "second adopted text").unwrap();
+        let commit = edit.commit().unwrap();
+        let reopened = Snapshot::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+
+        assert_eq!(commit.snapshot(), &reopened);
+        assert_eq!(commit.patch().shape_text_changes().len(), 2);
+        assert!(slide_texts(reopened.bytes())[0].contains("first adopted text"));
+        assert!(slide_texts(reopened.bytes())[1].contains("second adopted text"));
     }
 
     #[test]

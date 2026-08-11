@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-12",
+  "production_base": "4abe2e0197df0fb8075d973b84b9463863938a52",
+  "binaries": {
+    "before_sha256": "6acb71f5e4ec5366aaf31233b3ab9877d7b39f5a339bd18f504e88ac336075ea",
+    "after_sha256": "718297e1e86e716284d82f233ab09fd143d07e4bc6ad04c477f6d62b4f07344a",
+    "before_bytes": 29601008,
+    "after_bytes": 29615384
+  },
+  "environment": {
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "cpu_affinity": 2,
+    "kernel": "Linux 6.8.0-101-generic x86_64",
+    "rustc": "1.95.0 (59807616e 2026-04-14)",
+    "llvm": "22.1.2",
+    "allocator": "Rust system allocator"
+  },
+  "corpus": {
+    "generator": "litchi-legacy-writer-v1",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52",
+    "archive_bytes": 40960,
+    "cfb_streams": 4,
+    "text_boxes": 144,
+    "logical_text_bytes": 9072,
+    "powerpoint_document_bytes": 37385,
+    "powerpoint_document_sha256": "bef446ada643821b87531c06be7564b7ff8ca5539bb6a39766fbd28c11f65523"
+  },
+  "primary_protocol": {
+    "case": "ppt_semantic_one_edit_save",
+    "shape": "large",
+    "order": ["before_a", "after_a", "after_b", "before_b"],
+    "warmups_per_leg": 50,
+    "samples_per_leg": 1000
+  },
+  "primary_pooled_ns": {
+    "before": {
+      "samples": 2000,
+      "p50": 352306,
+      "mean": 355365.414,
+      "mean_ci95": [354595.93094830104, 356134.89705169894],
+      "p95": 386252,
+      "p99": 409916
+    },
+    "after": {
+      "samples": 2000,
+      "p50": 286805,
+      "mean": 292011.61,
+      "mean_ci95": [291062.9447147466, 292960.27528525336],
+      "p95": 322213,
+      "p99": 374435
+    },
+    "delta_percent": {
+      "p50": -18.59207620647959,
+      "mean": -17.82779119861113,
+      "p95": -16.579590526392096,
+      "p99": -8.655675796992558
+    }
+  },
+  "guard_pooled_ns": {
+    "direct_text_edit": {
+      "before_p50": 188239,
+      "after_p50": 190021,
+      "before_mean": 192228.8565,
+      "after_mean": 193435.179
+    },
+    "semantic_noop_edit_save": {
+      "before_p50": 59763,
+      "after_p50": 59511,
+      "before_mean": 61118.478,
+      "after_mean": 60480.8315
+    },
+    "semantic_open": {
+      "before_p50": 18205,
+      "after_p50": 18345,
+      "before_mean": 18658.0435,
+      "after_mean": 18703.124
+    },
+    "root_snapshot_open_repeat": {
+      "samples_per_state": 8000,
+      "before_p50": 34006,
+      "after_p50": 34066,
+      "before_mean": 35447.724,
+      "after_mean": 35529.166625,
+      "before_p95": 44751,
+      "after_p95": 45042,
+      "before_p99": 52512,
+      "after_p99": 51501
+    },
+    "tiny_root_edit": {
+      "before_p50": 136108,
+      "after_p50": 113547,
+      "before_mean": 139318.9905,
+      "after_mean": 115209.568
+    }
+  },
+  "heaptrack_1000_samples": {
+    "allocation_calls": {"before": 12283120, "after": 11479317},
+    "temporary_allocations": {"before": 1356122, "after": 1301067},
+    "peak_heap_kib": {"before": 941.22, "after": 938.00},
+    "peak_rss_mib": {"before": 12.55, "after": 12.56},
+    "leaked_bytes": {"before": 544, "after": 544}
+  },
+  "gnu_time_10000_samples": {
+    "mean_max_rss_kib": {"before": 30912, "after": 30912}
+  },
+  "perf_stat_10000_samples_per_leg": {
+    "before": {
+      "task_clock_ms": 15426.4,
+      "context_switches": 257,
+      "cpu_migrations": 2,
+      "page_faults": 648986,
+      "cycles": 75976515568,
+      "instructions": 232190037982,
+      "branches": 41913349582,
+      "branch_misses": 420082675,
+      "cache_references": 6731357865,
+      "cache_misses": 634705445
+    },
+    "after": {
+      "task_clock_ms": 14075.6,
+      "context_switches": 187,
+      "cpu_migrations": 2,
+      "page_faults": 112097,
+      "cycles": 69128849909,
+      "instructions": 216510247802,
+      "branches": 38888479258,
+      "branch_misses": 367248940,
+      "cache_references": 6231170047,
+      "cache_misses": 578468053
+    }
+  }
+}

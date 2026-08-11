@@ -220,14 +220,14 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **124
+The stage-1 records above are retained unchanged. The current harness has **126
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
 PPTX semantic publication case, one opt-in media-rich ODT
-paragraph-publication case, two opt-in matched XLSX calculation-metadata
+paragraph-publication case, four opt-in matched XLSX calculation-metadata/page-break
 publication cases, 16 opt-in DOCX/PPTX semantic
 cases, seven opt-in RTF semantic case names across four capability-bounded
 variants (25 tiny / 44 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
@@ -287,6 +287,13 @@ incomplete program and CRUD matrix.
   before output. Cells, formulas, cached results and calculation-chain
   ownership are deliberately outside this capability. See
   [`0046`](changes/0046-xlsx-source-backed-calculation-metadata-publication.md).
+- The guarded XLSX page-break editor applies the same publisher to one selected
+  normal worksheet after exact workbook-relationship closure checks. On that
+  media-rich corpus, pooled p50 falls from 216.789 to 4.647 ms (-97.86%,
+  46.65x), and semantic materializations fall 12 -> 2 with byte-identical
+  output. MCE projection, relationship retargeting, changed signed sources,
+  and topology changes refuse before output. See
+  [`0061`](changes/0061-xlsx-source-backed-page-break-publication.md).
 - Consecutive packaged ODT plain-text replacements now share one mutable
   candidate, content publication, reopen and compact audit while retaining
   ordinary scalar durable operations. The large 100-edit/save p50 falls from
@@ -549,6 +556,12 @@ incomplete program and CRUD matrix.
   fall 3.53%, peak heap/RSS remain flat, and the minor-fault increase is
   disclosed. See
   [`0026`](changes/0026-ppt-text-edit-resolver-reuse.md).
+- The PPT root transaction now accepts a private text publication only after
+  exact working-source, selected-slide persist-ID, and non-document-record
+  checks. Large root one-shape edit/save improves 18.59% p50 and 17.83% mean;
+  allocation calls fall 6.54%, peak heap/RSS remain flat, and custom limits
+  retain the original complete root reopen. See
+  [`0062`](changes/0062-ppt-root-text-publication-adoption.md).
 - Repeated public ODS cell lookup now builds a private bounded locator only on
   the 64th successful query. Large cell-sweep p50 improves 81.74% and full-cell
   text p50 improves 52.65%; the dense locator requests 3,216 bytes, while peak
