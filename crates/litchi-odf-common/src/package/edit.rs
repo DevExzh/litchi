@@ -1,15 +1,29 @@
 //! Bounded package reconstruction primitives shared by ODF family editors.
 
-use std::collections::HashSet;
+use std::{
+    collections::{BTreeMap, BTreeSet, HashSet},
+    ops::Range,
+};
 
 use crate::constants;
 use crate::core::{
     AuthoredXmlFragment, OwnedPackage, PackageWriter, XmlSourcePart, XmlSplicePublication,
 };
 use litchi_core::{Error, Result};
+use soapberry_zip::{
+    CompressionMethod, PreservationAction, PreservationIndex, PreservationPlan, RegeneratedEntry,
+    ZipArchive,
+};
 
 const MAX_CONTENT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_ADDITION_BYTES: usize = 64 * 1024 * 1024;
+const CENTRAL_LOCAL_HEADER_OFFSET: Range<usize> = 42..46;
+
+#[derive(Clone, Debug)]
+struct RawMemberRanges {
+    local: Range<usize>,
+    central: Range<usize>,
+}
 
 /// One validated package member to add during an atomic rebuild.
 #[derive(Debug, Clone)]
@@ -17,6 +31,176 @@ pub struct Addition {
     pub path: String,
     pub bytes: Vec<u8>,
     pub media_type: String,
+}
+
+/// Identify members with an exact physical representation in two ordinary ZIP archives.
+///
+/// Local-member bytes must match exactly. Central-directory records must also match except for
+/// the local-header offset that necessarily changes when an earlier member changes length. The
+/// result is an optimization hint for callers that retain a logical comparison fallback; `None`
+/// means either archive has an unsupported layout, unsafe or duplicate paths, or invalid ranges.
+/// Member bodies are never decompressed.
+#[must_use]
+pub fn raw_identical_members(source: &[u8], target: &[u8]) -> Option<BTreeSet<String>> {
+    let source_members = raw_member_ranges(source)?;
+    let target_members = raw_member_ranges(target)?;
+    Some(
+        source_members
+            .iter()
+            .filter_map(|(name, source_member)| {
+                let target_member = target_members.get(name)?;
+                raw_member_is_identical(source, source_member, target, target_member)
+                    .then(|| name.clone())
+            })
+            .collect(),
+    )
+}
+
+fn raw_member_ranges(bytes: &[u8]) -> Option<BTreeMap<String, RawMemberRanges>> {
+    let archive = ZipArchive::from_slice(bytes).ok()?.into_zip_archive();
+    let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+    let index = PreservationIndex::new(&archive, &mut buffer).ok()?;
+    let mut records = archive.entries(&mut buffer);
+    let mut members = BTreeMap::new();
+    for preserved in index.entries() {
+        let record = records.next_entry().ok()??;
+        let normalized = record.file_path().try_normalize().ok()?;
+        let ranges = RawMemberRanges {
+            local: checked_range(preserved.local_span(), bytes.len())?,
+            central: checked_range(preserved.central_record(), bytes.len())?,
+        };
+        if members
+            .insert(normalized.as_ref().to_string(), ranges)
+            .is_some()
+        {
+            return None;
+        }
+    }
+    if records.next_entry().ok()?.is_some() {
+        return None;
+    }
+    Some(members)
+}
+
+fn checked_range(range: Range<u64>, length: usize) -> Option<Range<usize>> {
+    let start = usize::try_from(range.start).ok()?;
+    let end = usize::try_from(range.end).ok()?;
+    (start <= end && end <= length).then_some(start..end)
+}
+
+fn raw_member_is_identical(
+    source: &[u8],
+    source_member: &RawMemberRanges,
+    target: &[u8],
+    target_member: &RawMemberRanges,
+) -> bool {
+    if source[source_member.local.clone()] != target[target_member.local.clone()] {
+        return false;
+    }
+    let source_central = &source[source_member.central.clone()];
+    let target_central = &target[target_member.central.clone()];
+    source_central.len() == target_central.len()
+        && source_central.len() >= CENTRAL_LOCAL_HEADER_OFFSET.end
+        && source_central[..CENTRAL_LOCAL_HEADER_OFFSET.start]
+            == target_central[..CENTRAL_LOCAL_HEADER_OFFSET.start]
+        && source_central[CENTRAL_LOCAL_HEADER_OFFSET.end..]
+            == target_central[CENTRAL_LOCAL_HEADER_OFFSET.end..]
+}
+
+/// Replace only `content.xml`, raw-copying every other source ZIP member when
+/// the exact package layout and manifest make that preservation safe.
+///
+/// Unsupported physical layouts, signatures, encryption, and size-bearing
+/// content manifest entries use the established logical rebuild instead. An
+/// exact semantic no-op returns the accepted source bytes unchanged.
+///
+/// # Errors
+///
+/// Returns an error when the replacement is oversized, invalid XML, or cannot
+/// be published through either the preserving or established rebuild path.
+pub fn replace_content_xml(source: &OwnedPackage, content: &str) -> Result<Vec<u8>> {
+    if content.len() > MAX_CONTENT_BYTES {
+        return invalid("outer content.xml exceeds package mutation limit");
+    }
+    if source.get_file(constants::ODF_CONTENT)? == content.as_bytes() {
+        return Ok(source.as_bytes().to_vec());
+    }
+
+    if let Ok(publication) = content_splice_publication(source, content) {
+        let (path, replacement, _media_type) = publication.assemble()?;
+        if path != constants::ODF_CONTENT || replacement != content.as_bytes() {
+            return invalid("checked content.xml splice assembled unexpected bytes");
+        }
+        if let Some(bytes) = try_preserve_content_replacement(source, replacement) {
+            return Ok(bytes);
+        }
+    }
+
+    rebuild_package(
+        source,
+        content,
+        Vec::new(),
+        Vec::new(),
+        Vec::<String>::new(),
+        Vec::<String>::new(),
+    )
+}
+
+fn try_preserve_content_replacement(
+    source: &OwnedPackage,
+    replacement: Vec<u8>,
+) -> Option<Vec<u8>> {
+    let mut replacement = Some(replacement);
+    let package = source.package().ok()?;
+    if package.manifest().has_encrypted_entries()
+        || package
+            .manifest()
+            .get_entry(constants::ODF_CONTENT)
+            .is_some_and(|entry| entry.size.is_some())
+        || package
+            .files()
+            .ok()?
+            .iter()
+            .any(|path| path.starts_with("META-INF/") && path.ends_with("signatures.xml"))
+    {
+        return None;
+    }
+
+    let archive = ZipArchive::from_slice(source.as_bytes())
+        .ok()?
+        .into_zip_archive();
+    let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+    let index = PreservationIndex::new(&archive, &mut buffer).ok()?;
+    let mut records = archive.entries(&mut buffer);
+    let mut plan = PreservationPlan::new();
+    let mut replaced = false;
+    for preserved in index.entries() {
+        let record = records.next_entry().ok()??;
+        let normalized = record.file_path().try_normalize().ok()?;
+        let name = normalized.as_ref();
+        if name == constants::ODF_CONTENT {
+            if replaced || record.is_dir() {
+                return None;
+            }
+            let compression = match record.compression_method() {
+                CompressionMethod::Store => CompressionMethod::Store,
+                CompressionMethod::Deflate => CompressionMethod::Deflate,
+                _ => return None,
+            };
+            plan.push(PreservationAction::Regenerate {
+                id: preserved.id(),
+                entry: RegeneratedEntry::new(name, replacement.take()?)
+                    .compression_method(compression),
+            });
+            replaced = true;
+        } else {
+            plan.push(PreservationAction::Copy(preserved.id()));
+        }
+    }
+    if records.next_entry().ok()?.is_some() || !replaced {
+        return None;
+    }
+    index.write_to(&plan, Vec::new()).ok()
 }
 
 /// Rebuild an ODF package while replacing only the requested semantic parts.

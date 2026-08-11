@@ -644,21 +644,20 @@ fn validate_flat_xml(xml: &str) -> Result<()> {
                 return Err(invalid("flat ODS XML document types are not accepted"));
             },
             Event::GeneralRef(reference) => {
+                let reference: &[u8] = reference.as_ref();
                 if !root_seen
                     || root_closed
-                    || !matches!(
-                        reference.as_ref(),
-                        b"amp" | b"lt" | b"gt" | b"apos" | b"quot"
-                    )
+                    || !matches!(reference, b"amp" | b"lt" | b"gt" | b"apos" | b"quot")
                 {
                     return Err(invalid("flat ODS XML contains an unsupported entity"));
                 }
             },
             Event::Text(text) => {
+                let text: &[u8] = text.as_ref();
                 if root_closed {
                     return Err(invalid("flat ODS XML has trailing text after its root"));
                 }
-                if !root_seen && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
+                if !root_seen && text.iter().any(|byte| !byte.is_ascii_whitespace()) {
                     return Err(invalid("flat ODS XML has text before its root"));
                 }
             },

@@ -220,12 +220,12 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **110
+The stage-1 records above are retained unchanged. The current harness has **111
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, 16 opt-in
 DOCX/PPTX semantic cases, seven opt-in RTF semantic case names across four
-capability-bounded variants (25 tiny / 44 tiny-plus-large rows), and 22 opt-in
+capability-bounded variants (25 tiny / 44 tiny-plus-large rows), and 23 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
 remains an incomplete program and CRUD matrix.
 
@@ -391,6 +391,15 @@ remains an incomplete program and CRUD matrix.
   0.27%/0.68%, process allocation calls fell 0.0623%, and peak heap was flat.
   The writer's larger scan/emission/parse/readback boundary still dominates.
   See [`0030`](changes/0030-xlsx-action-plan-flattening-rejected.md).
+- A new media-rich ODS case attributes unchanged package-member work with
+  eight 2 MiB incompressible resources. Eligible compact `content.xml` edits
+  now raw-copy other validated members, and exact physical comparison skips
+  their six former semantic-diff inflations only while the manifest is exact.
+  Media-rich one-cell edit/save improves 4.73% p50, 5.73% mean and 7.65% p95;
+  peak heap falls 8.78%, while the existing medium no-media p50 improves 0.77%.
+  Unsupported layouts and every unproved member retain established logical
+  fallback. See
+  [`0031`](changes/0031-ods-unchanged-media-preservation.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and

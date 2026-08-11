@@ -22,7 +22,7 @@ use litchi_core::{
 };
 use litchi_odf_common::{
     core::{PackageWriter, Profile, XmlSourcePart, XmlSplicePublication},
-    package::{Addition, rebuild_package},
+    package::{Addition, raw_identical_members, rebuild_package},
 };
 use serde_json::{Value, json};
 
@@ -2137,15 +2137,9 @@ impl History {
 }
 
 fn changed_effects(source: &[u8], target: &[u8]) -> Result<Vec<String>> {
-    let source_files = package_files(source)?;
-    let target_files = package_files(target)?;
-    let mut paths = BTreeSet::new();
-    paths.extend(source_files.keys().cloned());
-    paths.extend(target_files.keys().cloned());
-    Ok(paths
+    Ok(changed_package_files(source, target)?
         .into_iter()
-        .filter(|path| source_files.get(path) != target_files.get(path))
-        .map(|path| format!("part:{path}"))
+        .map(|(path, _target)| format!("part:{path}"))
         .collect())
 }
 
@@ -2267,6 +2261,53 @@ fn package_files(bytes: &[u8]) -> Result<BTreeMap<String, File>> {
         files.insert(path, File { bytes, media_type });
     }
     Ok(files)
+}
+
+fn changed_package_files(source: &[u8], target: &[u8]) -> Result<Vec<(String, Option<File>)>> {
+    let raw_identical = raw_identical_members(source, target)
+        .filter(|paths| paths.contains("META-INF/manifest.xml"));
+    let source_package = Package::from_bytes(source.to_vec())?;
+    let target_package = Package::from_bytes(target.to_vec())?;
+    let source_reader = source_package.package().package()?;
+    let target_reader = target_package.package().package()?;
+    let mut paths = BTreeSet::new();
+    paths.extend(source_reader.files()?);
+    paths.extend(target_reader.files()?);
+    let mut changed = Vec::new();
+    for path in paths {
+        if matches!(path.as_str(), "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
+            continue;
+        }
+        if raw_identical
+            .as_ref()
+            .is_some_and(|identical| identical.contains(&path))
+        {
+            continue;
+        }
+        let source_file = package_file(&source_reader, &path)?;
+        let target_file = package_file(&target_reader, &path)?;
+        if source_file != target_file {
+            changed.push((path, target_file));
+        }
+    }
+    Ok(changed)
+}
+
+fn package_file(
+    package: &litchi_odf_common::core::package::Package<'_>,
+    path: &str,
+) -> Result<Option<File>> {
+    if !package.has_file(path) {
+        return Ok(None);
+    }
+    Ok(Some(File {
+        bytes: package.get_file(path)?,
+        media_type: package
+            .manifest()
+            .get_media_type(path)
+            .unwrap_or("application/octet-stream")
+            .to_string(),
+    }))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2548,13 +2589,11 @@ fn validate_authored_parts(
     target: &[u8],
     provenance_spliced: &BTreeSet<String>,
 ) -> Result<()> {
-    let source_files = package_files(source)?;
-    let target_files = package_files(target)?;
-    for (path, file) in &target_files {
-        if source_files.get(path) != Some(file)
-            && is_xml_media_type(&file.media_type)
-            && !provenance_spliced.contains(path)
-        {
+    for (path, target_file) in changed_package_files(source, target)? {
+        let Some(file) = target_file else {
+            continue;
+        };
+        if is_xml_media_type(&file.media_type) && !provenance_spliced.contains(&path) {
             litchi_odf_common::compact_xml::validate(&file.bytes).map_err(Error::from)?;
         }
     }
@@ -2644,4 +2683,83 @@ fn validate_xml_resource(media_type: &str, bytes: &[u8]) -> Result<()> {
         litchi_odf_common::compact_xml::validate(bytes).map_err(Error::from)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod raw_package_diff_tests {
+    #![allow(
+        clippy::unwrap_used,
+        reason = "fixed in-memory ZIP fixtures keep physical-diff assertions concise"
+    )]
+
+    use std::io::{Cursor, Write};
+
+    use super::changed_effects;
+
+    const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xml="http://www.w3.org/XML/1998/namespace" office:version="1.3"><office:body><office:spreadsheet><table:table xml:id="sheet" table:name="Sheet1"/></office:spreadsheet></office:body></office:document-content>"#;
+    const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
+
+    fn raw_package(
+        compression: zip::CompressionMethod,
+        resource_media_type: &str,
+        resource: &[u8],
+    ) -> Vec<u8> {
+        let manifest = format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.3"><manifest:file-entry manifest:full-path="/" manifest:media-type="{MIMETYPE}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="Pictures/opaque.bin" manifest:media-type="{resource_media_type}"/></manifest:manifest>"#
+        );
+        let mut output = Cursor::new(Vec::new());
+        {
+            let mut archive = zip::ZipWriter::new(&mut output);
+            let stored = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            let selected = zip::write::SimpleFileOptions::default().compression_method(compression);
+            archive.start_file("mimetype", stored).unwrap();
+            archive.write_all(MIMETYPE.as_bytes()).unwrap();
+            for (path, bytes) in [
+                ("META-INF/manifest.xml", manifest.as_bytes()),
+                ("content.xml", CONTENT.as_bytes()),
+                ("Pictures/opaque.bin", resource),
+            ] {
+                archive.start_file(path, selected).unwrap();
+                archive.write_all(bytes).unwrap();
+            }
+            archive.finish().unwrap();
+        }
+        output.into_inner()
+    }
+
+    #[test]
+    fn raw_fast_path_retains_logical_fallback_semantics() {
+        let source = raw_package(
+            zip::CompressionMethod::Stored,
+            "application/octet-stream",
+            b"same logical payload",
+        );
+        let recompressed = raw_package(
+            zip::CompressionMethod::Deflated,
+            "application/octet-stream",
+            b"same logical payload",
+        );
+        assert!(changed_effects(&source, &recompressed).unwrap().is_empty());
+
+        let changed_media_type = raw_package(
+            zip::CompressionMethod::Deflated,
+            "image/png",
+            b"same logical payload",
+        );
+        assert_eq!(
+            changed_effects(&source, &changed_media_type).unwrap(),
+            ["part:Pictures/opaque.bin"]
+        );
+
+        let changed_payload = raw_package(
+            zip::CompressionMethod::Deflated,
+            "application/octet-stream",
+            b"different logical payload",
+        );
+        assert_eq!(
+            changed_effects(&source, &changed_payload).unwrap(),
+            ["part:Pictures/opaque.bin"]
+        );
+    }
 }
