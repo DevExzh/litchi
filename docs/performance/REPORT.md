@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest tranche: `1214a63b4`
+Production base for the latest measured tranche: `70e1b96fc`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,10 +13,10 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **113 selectable cases**: 36 default cases and 198 default
+harness contains **114 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, one opt-in opaque-heavy common OLE2
-publication case, 16
+publication case, one opt-in media-rich ODT paragraph-publication case, 16
 opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic case names across
 four capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 24 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
@@ -31,10 +31,11 @@ is still not broad program or CRUD coverage.
 | Deterministic range simulation | XLSX listing has zero timed requests; selected reads have zero unselected-sheet overlap; full physical size distributions recorded | Synthetic latency model, not a cold filesystem or ambient network |
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |
 | Coalesced DOCX paragraph edits | Large 100-edit/save p50 **-94.99% (19.97x)** and mean **-95.02%**; medium two-edit/save p50 **-12.98%**; scalar one-edit guardrail neutral | Direct-body, strictly ordered paragraph text replacement; generated corpus; scalar API remains separate |
-| ODF semantic baselines and ODS snapshot reuse | Medium/large ODS no-op edit-save p50 **-7.45% / -11.78%**; one-cell edit-save **-3.57% / -2.06%** | Generated ODT/ODS/ODP corpora; ODP is coverage-only and ODT has the focused follow-up below; changed ODS publication still rewrites the package |
+| ODF semantic baselines and ODS snapshot reuse | Medium/large ODS no-op edit-save p50 **-7.45% / -11.78%**; one-cell edit-save **-3.57% / -2.06%** | Generated ODT/ODS/ODP baseline corpora; focused ODP/ODT publication follow-ups are listed below |
 | RTF semantic baseline and text paths | Medium/large full-text p50 **-38.39% / -27.08%**; one-edit/save **-33.40% / -25.79%** | Generated native RTF text corpus; open guard +0.96% / +3.41%; formatting/media/security matrices remain missing |
 | ODT shared transaction bytes | Medium/large no-op edit-save p50 **-27.05% / -18.51%**; exactly two allocations and one archive copy removed per snapshot | Existing-document snapshot handoff only; changed edit/save and open guardrails remain within 3%; changed publication still rewrites the package |
 | ODT consuming full-text blocks | Repeated large full-text p50 **-3.25%**, mean **-4.81%**; allocation calls **-15.48%**, temporary allocations **-45.52%** | Private full-text mode only; structured queries remain near neutral; unchanged open +3.94% p50/+4.17% mean and +10.95% p99 disclosed |
+| ODT content-only unchanged-media publication | Media-rich paragraph edit/save p50 **-95.58%**, mean **-95.63%**, p95 **-95.43%**; allocation calls **-6.71%**; peak heap flat and RSS **-0.59%** | Exactly one paragraph in a fixed 16 MiB-media package; structural/mixed operations and regenerated content over the common 16 MiB limit retain the established rebuild |
 | Native DOC/XLS/PPT semantic baseline | Large one-edit/save p50: XLS **1.722 ms**, DOC **1.416 ms**, PPT **0.357 ms**; large XLS open **1.383 ms** | Generated writer corpora; accepted XLS and DOC follow-ups are listed below |
 | Native XLS validated-editor reuse | Large one-cell edit/save p50 **-7.72%**, mean **-7.90%** | Final exact owner parse, public Workbook reopen and typed readback remain; peak heap/RSS flat |
 | Rejected XLS terminal-render handoff | Tiny changed save p50 **-7.55%**; large changed save **-0.39%** (neutral) | Fully reverted: repeated large exact no-op p50 **+22.00%**, mean **+16.69%** |
@@ -109,6 +110,15 @@ The ODT shared-snapshot raw evidence is
 [`before B`](results/abba-odt-shared-before-b.json). Allocation attribution,
 pooled statistics, open/changed-publication guardrails, and RSS evidence are in
 [`change 0014`](changes/0014-odt-shared-snapshot-bytes.md).
+
+The ODT media-publication raw evidence is
+[`before A`](results/abba-odt-media-paragraph-before-a.json),
+[`after A`](results/abba-odt-media-paragraph-after-a.json),
+[`after B`](results/abba-odt-media-paragraph-after-b.json), and
+[`before B`](results/abba-odt-media-paragraph-before-b.json). The ordinary ODT
+guard ABBA, allocation/RSS/counter profiles, binary identity and common-limit
+fallback proof are indexed in
+[`change 0035`](changes/0035-odt-content-only-paragraph-publication.md).
 
 The native OLE2 semantic baseline is
 [`ole2-semantic-baseline-a57506d23-2026-08-11.json`](results/ole2-semantic-baseline-a57506d23-2026-08-11.json).
@@ -306,6 +316,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | RTF transport batching, one paragraph edit/save, 10,000 paragraphs | 7.795 ms | 7.307 ms | **-6.26% p50 / -5.73% mean** | Instructions -18.40%; allocation count, peak heap and RSS flat |
 | ODT no-op edit/save, 10,000 paragraphs | 3.950 us | 3.219 us | -18.51% p50 / -29.58% mean | Exactly two allocations and one 28.42 KiB archive copy removed per snapshot; peak heap/RSS flat |
 | ODT full text, 10,000 blocks | 4.127 ms | 3.993 ms | **-3.25% p50 / -4.81% mean** | Allocation calls -15.48%, temporary allocations -45.52%; peak heap/RSS flat; open guard disclosed |
+| ODT media-rich paragraph edit/save, 200 paragraphs + 16 MiB media | 249.177 ms | 11.001 ms | **-95.58% p50 / -95.63% mean** | p95 -95.43%; allocation calls -6.71%; peak heap flat; RSS -0.59% |
 | Native XLS one-cell edit/save, 8,192 cells | 1.777 ms | 1.639 ms | **-7.72% p50 / -7.90% mean** | Allocation calls -1.19%; peak heap and uninstrumented RSS flat |
 | Native DOC one-paragraph edit/save, 512 paragraphs | 1.506 ms | 1.348 ms | **-10.52% p50 / -10.48% mean** | Duplicate publication-site allocations nearly halved; peak heap and uninstrumented RSS flat |
 | Native PPT root snapshot open, 144 shapes | 37.522 us | 34.227 us | **-8.78% p50 / -10.58% mean** | Allocation calls -5.01%, temporary allocations -12.22%; peak heap and uninstrumented RSS flat |
@@ -347,6 +358,7 @@ The underlying records are:
 - [`0032-xlsx-no-extension-scan.md`](changes/0032-xlsx-no-extension-scan.md)
 - [`0033-ole-common-publication-handoffs-rejected.md`](changes/0033-ole-common-publication-handoffs-rejected.md)
 - [`0034-odp-unchanged-media-preservation.md`](changes/0034-odp-unchanged-media-preservation.md)
+- [`0035-odt-content-only-paragraph-publication.md`](changes/0035-odt-content-only-paragraph-publication.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -464,7 +476,7 @@ ZIP layouts use the fully validated rewrite path before any sink output.
 
 ## Evidence and verification
 
-The standalone harness provides 113 selectable cases and a 198-record default
+The standalone harness provides 114 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus
@@ -568,8 +580,8 @@ common OLE2 case also rejects direct shared writer payloads (+32.02% p50) and
 an editor-wide validated-render cache: its heavy path improved 34.06%, but DOC
 open regressed 21.64% and DOC edit/save 9.08%. ODT full-text block
 ownership is accepted, and repeated ODS facade cell lookup now has a bounded
-lazy index. Compact ODS and content-only ODP edits now preserve unchanged ZIP
-members, but broader ODF source-backed reads, repeated ODT/ODP semantic scans,
+lazy index. Compact ODS and content-only ODP/ODT edits now preserve unchanged
+ZIP members, but broader ODF source-backed reads, repeated ODT/ODP semantic scans,
 resource-adding/structural publications, package-parse reuse and structural-edit
 profiles remain open.
 XLSX changed-sheet validation can now seed a bounded first-read cache. Direct

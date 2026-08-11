@@ -1,0 +1,10 @@
+reading file "target/perf/odt-media-paragraph/heap-before-final.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-odt-before-0035/tools/perf-baseline/target/release/litchi-perf-baseline --warmup 0 --samples 1 --case odt_media_paragraph_edit_save --json target/perf/odt-media-paragraph/heap-before-final.json
+finished reading file, now analyzing data:
+
+total runtime: 0.703000s.
+calls to allocation functions: 20458 (29100/s)
+temporary memory allocations: 3855 (5483/s)
+peak heap memory consumption: 106.03M
+peak RSS (including heaptrack overhead): 119.19M
+total memory leaked: 1.78K
