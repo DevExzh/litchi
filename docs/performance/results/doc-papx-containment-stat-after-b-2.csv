@@ -1,0 +1,8 @@
+# started on Wed Aug 12 01:26:20 2026
+
+3493327840,,cycles,710585232,100.00,,
+15938651609,,instructions,710585232,100.00,4.56,insn per cycle
+3614291878,,branches,710585232,100.00,,
+4665066,,branch-misses,710585232,100.00,0.13,of all branches
+123986625,,cache-references,710585232,100.00,,
+6089686,,cache-misses,710585232,100.00,4.91,of all cache refs

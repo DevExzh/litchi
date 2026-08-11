@@ -1,8 +1,8 @@
 # Performance program phase report
 
-Date: 2026-08-11
+Date: 2026-08-12
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `3afe6c9610e01b56c385b92e41582f5ca7a9b9d5`
+Production base for the latest measured tranche: `1198544231fc2b5be8fc251510d42a26a0df81f0`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,7 +13,7 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **123 selectable cases**: 36 default cases and 198 default
+harness contains **124 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
@@ -24,7 +24,7 @@ publication cases, 16 opt-in DOCX/PPTX
 semantic cases, seven opt-in RTF semantic case names across four
 capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 23
 shape-selected ODT/ODS/ODP semantic cases, three fixed media-rich ODF cases,
-and 20 opt-in native DOC/XLS/PPT semantic cases. It
+and 21 opt-in native DOC/XLS/PPT semantic cases. It
 is still not broad program or CRUD coverage.
 
 | Change | Current evidence | Scope / limitation |
@@ -392,6 +392,15 @@ covers plain, raw CP-1252 and LZFu with the same six-pair protocol. Allocation,
 RSS, profile, counter, tiny-variant and binary-provenance artifacts are indexed
 in [`change 0055`](changes/0055-rtf-body-block-reservation.md).
 
+The DOC PAPX-containment evidence pools five balanced pairs for both the
+already-open snapshot paragraph list and complete one-edit/save path, retaining
+every sample in the
+[`primary summary`](results/doc-papx-containment-primary-summary.json).
+Ordinary-reader/no-op and tiny direct distributions are retained in the
+[`guard summary`](results/doc-papx-containment-guards-summary.json); profiles,
+counters, Heaptrack and GNU Time artifacts are indexed in
+[`change 0056`](changes/0056-doc-papx-containment-index.md).
+
 Source-backed cache bytes are bounded by `SourceCacheLimits` but are not yet
 charged to hierarchical `Budget`. Raw ZIP preservation is integrated for owned
 same-topology OPC mutations and the narrow consuming source-backed one-Part
@@ -484,6 +493,8 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | Native DOC open after PieceTable index, 512 paragraphs | 343.503 us | 304.199 us | **-11.44% p50 / -11.87% mean** | Paragraph-style validation 4.44% -> 0.83% self cycles; allocation calls -18.61%; peak heap and uninstrumented RSS flat |
 | Native DOC one-paragraph edit/save after style cache, 512 paragraphs | 912.288 us | 875.736 us | **-4.01% p50 / -4.23% mean** | Same one-entry cache accelerates mandatory candidate/public readbacks; patch/inverse and exact output checks unchanged |
 | Native DOC paragraph list after style cache, 512 paragraphs | 454.100 us | 358.414 us | **-21.07% p50 / -20.93% mean** | CHPX range query changes from a full scan per paragraph to binary start plus matching slice; p95 -20.00%; allocations and peak heap/RSS flat |
+| Native DOC exact-source paragraph list after CHPX index, 512 paragraphs | 206.644 us | 168.142 us | **-18.63% p50 / -19.04% mean** | Ordered piece/PAPX containment uses predecessor binary search; instructions -26.13%; allocations and peak heap flat |
+| Native DOC one-paragraph edit/save after PAPX containment index | 888.602 us | 817.424 us | **-8.01% p50 / -7.88% mean** | p95 -7.71%, p99 -8.37%; patch/inverse, candidate owner and independent public readback unchanged |
 | Native PPT root snapshot open, 144 shapes | 37.522 us | 34.227 us | **-8.78% p50 / -10.58% mean** | Allocation calls -5.01%, temporary allocations -12.22%; peak heap and uninstrumented RSS flat |
 | Native PPT direct text edit/save, 144 shapes | 206.209 us | 177.089 us | **-14.12% p50 / -15.39% mean** | Allocation calls -3.53%, temporary allocations -6.05%; peak heap/RSS flat; minor faults +315.43% with zero major faults |
 | XLSX one-cell commit + first read, 4,096 cells | 4.431 ms | 3.402 ms | **-23.23% p50 / -23.15% mean** | Allocation calls -21.01%; peak heap +4.29%; unrestricted dense-wide retention rejected |
@@ -545,6 +556,7 @@ The underlying records are:
 - [`0053-doc-chpx-range-index.md`](changes/0053-doc-chpx-range-index.md)
 - [`0054-ods-shared-durable-patch-blobs.md`](changes/0054-ods-shared-durable-patch-blobs.md)
 - [`0055-rtf-body-block-reservation.md`](changes/0055-rtf-body-block-reservation.md)
+- [`0056-doc-papx-containment-index.md`](changes/0056-doc-papx-containment-index.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -674,7 +686,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 123 selectable cases and a 198-record default
+The standalone harness provides 124 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus

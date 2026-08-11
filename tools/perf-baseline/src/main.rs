@@ -371,6 +371,7 @@ enum Case {
     DocSemanticFullText,
     DocSemanticNoopEditSave,
     DocSemanticOneEditSave,
+    DocBodySnapshotListParagraphs,
     XlsSemanticOpen,
     XlsSemanticListWorksheets,
     XlsSemanticOneCell,
@@ -542,6 +543,7 @@ impl Case {
             Self::DocSemanticFullText => "doc_semantic_full_text",
             Self::DocSemanticNoopEditSave => "doc_semantic_noop_edit_save",
             Self::DocSemanticOneEditSave => "doc_semantic_one_edit_save",
+            Self::DocBodySnapshotListParagraphs => "doc_body_snapshot_list_paragraphs",
             Self::XlsSemanticOpen => "xls_semantic_open",
             Self::XlsSemanticListWorksheets => "xls_semantic_list_worksheets",
             Self::XlsSemanticOneCell => "xls_semantic_one_cell",
@@ -688,6 +690,7 @@ impl Case {
                 | Self::DocSemanticFullText
                 | Self::DocSemanticNoopEditSave
                 | Self::DocSemanticOneEditSave
+                | Self::DocBodySnapshotListParagraphs
         )
     }
 
@@ -2284,6 +2287,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "doc_semantic_full_text" => Some(Case::DocSemanticFullText),
         "doc_semantic_noop_edit_save" => Some(Case::DocSemanticNoopEditSave),
         "doc_semantic_one_edit_save" => Some(Case::DocSemanticOneEditSave),
+        "doc_body_snapshot_list_paragraphs" => Some(Case::DocBodySnapshotListParagraphs),
         "xls_semantic_open" => Some(Case::XlsSemanticOpen),
         "xls_semantic_list_worksheets" => Some(Case::XlsSemanticListWorksheets),
         "xls_semantic_one_cell" => Some(Case::XlsSemanticOneCell),
@@ -2458,6 +2462,7 @@ fn print_usage() {
                                        doc_semantic_open,doc_semantic_list_paragraphs,\n\
                                        doc_semantic_one_paragraph,doc_semantic_full_text,\n\
                                        doc_semantic_noop_edit_save,doc_semantic_one_edit_save,\n\
+                                       doc_body_snapshot_list_paragraphs,\n\
                                        xls_semantic_open,xls_semantic_list_worksheets,\n\
                                        xls_semantic_one_cell,xls_semantic_full_cell_scan,\n\
                                        xls_semantic_noop_edit_save,xls_semantic_one_edit_save,\n\
@@ -4315,6 +4320,9 @@ fn run_case_with_config(
         | Case::DocSemanticOneEditSave => {
             run_semantic_doc(case, corpus, warmup_iterations, samples)
         },
+        Case::DocBodySnapshotListParagraphs => {
+            run_doc_body_snapshot_list_paragraphs(corpus, warmup_iterations, samples)
+        },
         Case::XlsSemanticOpen
         | Case::XlsSemanticListWorksheets
         | Case::XlsSemanticOneCell
@@ -5154,6 +5162,45 @@ fn verify_semantic_doc(
         return Err("semantic DOC full text differs from writer specification".into());
     }
     Ok(())
+}
+
+fn run_doc_body_snapshot_list_paragraphs(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    use litchi_doc::body_text::{Projection, Snapshot};
+
+    let shape = writer_shape(corpus)?;
+    if shape == WriterShape::PayloadHeavy {
+        return Err("payload-heavy DOC corpus is excluded from semantic cases".into());
+    }
+    let snapshot = Snapshot::from_bytes(corpus.archive.clone())?;
+    let count = shape.doc_paragraph_count();
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let started = Instant::now();
+        let paragraphs = snapshot.paragraphs(Projection::All)?;
+        let duration = started.elapsed();
+        if paragraphs.len() != count {
+            return Err("DOC body snapshot paragraph count differs from specification".into());
+        }
+        for (index, paragraph) in paragraphs.iter().enumerate() {
+            if paragraph.position() != Position::new(index)
+                || paragraph.text() != writer_text("doc", 0, index, 0)
+            {
+                return Err("DOC body snapshot paragraph differs from specification".into());
+            }
+        }
+        std::hint::black_box(paragraphs);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    Ok(result(
+        Case::DocBodySnapshotListParagraphs,
+        corpus,
+        elapsed,
+        None,
+    ))
 }
 
 fn run_semantic_doc(
@@ -9788,6 +9835,15 @@ mod tests {
             assert_eq!(measured.elapsed_ns.samples.len(), 1);
             assert!(measured.sink.is_none());
         }
+    }
+
+    #[test]
+    fn doc_body_snapshot_case_is_deterministic_and_semantic() {
+        let corpus = build_writer_corpus(Case::DocFreshWriteTo, WriterShape::Tiny).unwrap();
+        let measured = run_case(Case::DocBodySnapshotListParagraphs, &corpus, 0, 2).unwrap();
+        assert_eq!(measured.case, "doc_body_snapshot_list_paragraphs");
+        assert_eq!(measured.elapsed_ns.samples.len(), 2);
+        assert!(measured.sink.is_none());
     }
 
     #[test]

@@ -220,7 +220,7 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **123
+The stage-1 records above are retained unchanged. The current harness has **124
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
@@ -231,7 +231,7 @@ paragraph-publication case, two opt-in matched XLSX calculation-metadata
 publication cases, 16 opt-in DOCX/PPTX semantic
 cases, seven opt-in RTF semantic case names across four capability-bounded
 variants (25 tiny / 44 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
-semantic cases, three fixed media-rich ODF cases, and 20 opt-in native
+semantic cases, three fixed media-rich ODF cases, and 21 opt-in native
 DOC/XLS/PPT semantic cases. It remains an
 incomplete program and CRUD matrix.
 
@@ -328,6 +328,13 @@ incomplete program and CRUD matrix.
   `extract_runs` self-cycle frame falls from 7.56% to 1.23%; allocation counts,
   peak heap, and uninstrumented RSS remain flat. See
   [`0053`](changes/0053-doc-chpx-range-index.md).
+- Native DOC exact-source paragraph enumeration now resolves its ordered CLX
+  piece and PAPX containment tables with predecessor binary searches instead
+  of two fresh linear scans per paragraph terminator. The already-open
+  512-paragraph snapshot list falls from 206.644 to 168.142 us p50 (-18.63%);
+  one-edit/save falls from 888.602 to 817.424 us (-8.01%). Instructions fall
+  26.13%, while allocation calls and peak heap remain flat. See
+  [`0056`](changes/0056-doc-papx-containment-index.md).
 - ODS durable-patch construction now retains its already owned immutable
   source and target package allocations in the semantic blob bundles and
   reuses their content addresses for operation preconditions. On the fixed

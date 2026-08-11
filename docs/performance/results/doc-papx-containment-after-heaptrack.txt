@@ -1,0 +1,10 @@
+reading file "/tmp/litchi-doc-papx-control.jvLPeJ/after-target.heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-doc-papx-control.jvLPeJ/candidate --warmup 20 --samples 200 --case doc_body_snapshot_list_paragraphs --writer-shape large --json /tmp/litchi-doc-papx-control.jvLPeJ/after-target-heaptrack-run.json
+finished reading file, now analyzing data:
+
+total runtime: 0.476000s.
+calls to allocation functions: 1296614 (2723978/s)
+temporary memory allocations: 796717 (1673775/s)
+peak heap memory consumption: 2.11M
+peak RSS (including heaptrack overhead): 12.00M
+total memory leaked: 544B
