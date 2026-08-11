@@ -584,6 +584,9 @@ impl Edit {
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit()?;
+        if !commit.changed() {
+            return Ok(());
+        }
         let candidate = commit.snapshot().as_bytes().to_vec();
         if commit.content_provenance_spliced() {
             self.stage_spliced("worksheet.edit", "worksheets", candidate)
@@ -1666,6 +1669,30 @@ impl Patch {
         mut steps: Vec<Step>,
         limits: Limits,
     ) -> Result<Self> {
+        if steps.is_empty() {
+            if source != target {
+                return invalid("ODS package changed without a semantic owner operation");
+            }
+            let mut blobs = BlobBundle::new(limits.patch.blobs());
+            let _source_id = blobs
+                .insert_shared(Arc::clone(&source))
+                .map_err(patch_error)?;
+            let semantic = CorePatch::<Reversible>::new(
+                limits.patch,
+                FORMAT,
+                Vec::<ReversibleOperation>::new(),
+                blobs.clone(),
+                blobs,
+            )
+            .map_err(patch_error)?;
+            return Ok(Self {
+                source,
+                target,
+                semantic,
+                steps,
+                limits,
+            });
+        }
         let actual_effects = changed_effects(&source, &target)?
             .into_iter()
             .collect::<BTreeSet<_>>();
@@ -2823,6 +2850,57 @@ mod raw_package_diff_tests {
         assert_eq!(
             patch.operations()[0].preconditions.get("target_sha256"),
             Some(&serde_json::json!(target_hash))
+        );
+    }
+
+    #[test]
+    fn exact_noop_patch_reuses_one_shared_allocation_in_both_directions() {
+        let source: Arc<[u8]> = Arc::from(raw_package(
+            zip::CompressionMethod::Stored,
+            "application/octet-stream",
+            b"unchanged payload",
+        ));
+        let source_pointer = source.as_ptr();
+        let source_hash = DiagnosticFingerprint::of(&source).as_hex();
+
+        let patch = Patch::build(
+            Arc::clone(&source),
+            Arc::clone(&source),
+            Vec::new(),
+            Limits::default(),
+        )
+        .unwrap();
+
+        assert!(!patch.changed());
+        assert!(patch.operations().is_empty());
+        assert!(patch.steps.is_empty());
+        assert_eq!(patch.semantic.blobs().len(), 1);
+        let target_id = patch.semantic.blobs().ids().next().unwrap();
+        assert_eq!(target_id.as_hex(), source_hash);
+        assert_eq!(
+            patch.semantic.blobs().get(target_id).map(<[u8]>::as_ptr),
+            Some(source_pointer)
+        );
+        let inverse = patch.inverse();
+        assert_eq!(inverse.semantic.blobs().len(), 1);
+        let source_id = inverse.semantic.blobs().ids().next().unwrap();
+        assert_eq!(
+            inverse.semantic.blobs().get(source_id).map(<[u8]>::as_ptr),
+            Some(source_pointer)
+        );
+        assert_eq!(
+            patch.to_deterministic_json().unwrap(),
+            inverse.to_deterministic_json().unwrap()
+        );
+
+        let changed: Arc<[u8]> = Arc::from(raw_package(
+            zip::CompressionMethod::Stored,
+            "application/octet-stream",
+            b"changed without an owner",
+        ));
+        assert!(
+            Patch::build(source, changed, Vec::new(), Limits::default()).is_err(),
+            "changed packages still require a semantic owner operation"
         );
     }
 }
