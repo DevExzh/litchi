@@ -2904,3 +2904,55 @@ normalizing `set_section_name` writer. No manifest edge or ordered debt closes:
 the topology remains 64 workspace packages, 237 internal declarations, 14
 `litchi-iwa` dependency declarations, and 14 ordered debts, including debt 017
 (`litchi-iwa -> litchi-pages`).
+
+## 2026-08-11 amendment: selector-first Numbers table-cell reads
+
+The first table-cell package slice is read-only. `litchi-numbers` now owns the
+canonical `table::cells::{State, Storage, Error, LimitKind, Path}` surface and
+`Package::{table_cell, table_cells}`. Both entry points select a sheet and
+table semantically. A single-cell read checks its coordinate; a range read is
+half-open, bounded, dense, and row-major. `Storage::Missing` remains distinct
+from `Storage::Stored(Value::Empty)`, so physical presence is not inferred
+from an empty-looking semantic value. Public diagnostics carry compact paths
+and counts rather than authored cell or selector content.
+
+This ownership transfer is deliberately narrower than a physical cell-codec
+or mutation transfer. The current methods read the already-eager immutable
+semantic `Table` produced by `litchi-numbers::package::extractor`; they do not
+decode the package through the new strict table-cell storage and dependency
+Buffa projections. Those committed codecs are preparatory private seams, not
+the implementation or preservation authority for this read API. This
+supersedes earlier wording that left all BNC-backed semantic cell reads in
+`litchi-iwa`. It does not move cell mutation, formula compilation, formula AST
+ownership, calculation-engine mutation, or cache refresh. The existing
+`NumbersEditor` cell methods and their private host machinery remain.
+
+For range area `A`, selected-row-span materialized cells `K`, selected owned
+string bytes `B`, selected owned strings `T`, and table materialized-cell count
+`M`, a non-empty read performs `A + 2K + 2*O(log M)` size-sensitive work,
+retains one `A`-element state vector, and makes `T` fallible string allocations
+covering `B` bytes. An empty range scans and allocates nothing. Applying this
+formula to paired 4,096/8,192 shapes keeps every size-sensitive term at or
+below 2.0x and keeps the result allocation at one; element and text ceilings
+fail before that result allocation. These are analytical counters, not
+wall-clock or RSS evidence.
+
+The native read oracle is `basic.numbers` (136,357 bytes, SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`):
+Sheet 1/Table 1 is 22x7, B2 is stored text `Litchi native Numbers fixture`, B3
+is stored number 42, A1 is missing, A1:C3 reads densely in row-major order,
+and A23 is out of bounds. The separate formula/rich-text oracle (140,498
+bytes, SHA-256
+`80deb7b87df27f58b26e6f247acee9d1fc6dcd3d268e85046c3efc16070b2edf`)
+confirms formula and rich-text-backed semantic reads. Neither native artifact
+contains a stored empty cell; that distinction is covered only by a synthetic
+unit test and is not claimed as native proof. This is read evidence only, not
+a Save, mutation, cache, preview, or publication oracle.
+
+Final gates pass 114/114 Numbers library tests, 4/4 public read integration
+tests, 13/13 strict preparatory codec tests, 163/163 full protobuf tests, and
+187/187 boundary regressions, together with strict library/test Clippy and
+warning-denied rustdoc. The full checker retains only its 14 established
+dependency-policy baselines. No host surface, manifest edge, or ordered debt
+is removed: topology remains 64 workspace packages, 237 internal declarations,
+14 `litchi-iwa` dependency declarations, and 14 ordered debts.

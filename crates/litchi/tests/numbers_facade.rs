@@ -167,6 +167,62 @@ fn table_header_transaction_reaches_numbers_facade() -> Result<(), Box<dyn std::
 }
 
 #[test]
+fn table_cell_reads_reach_numbers_facade() -> Result<(), Box<dyn std::error::Error>> {
+    use litchi::numbers::table::{
+        CellPosition, CellRange,
+        cells::{Error, LimitKind, Path, State, Storage},
+    };
+
+    assert_send_sync::<State>();
+    assert_send_sync::<Storage>();
+    assert_send_sync::<Error>();
+    assert_send_sync::<LimitKind>();
+    assert_send_sync::<Path>();
+
+    let package = Package::open(fixture_path())?;
+    let b2 = CellPosition::from_a1("B2")?;
+    let text_by_index = package.table_cell(SheetSelector::index(0), TableSelector::index(0), b2)?;
+    let text_by_name = package.table_cell(
+        SheetSelector::name("Sheet 1"),
+        TableSelector::name("Table 1"),
+        b2,
+    )?;
+    assert_eq!(text_by_name, text_by_index);
+    assert_eq!(text_by_index.position(), b2);
+    assert!(matches!(text_by_index.storage(), Storage::Stored(_)));
+    assert!(text_by_index.storage().value().is_some());
+
+    let range = package.table_cells(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        CellRange::from_a1("B2:B3")?,
+    )?;
+    assert_eq!(range.len(), 2);
+    assert_eq!(range[0], text_by_index);
+    assert_eq!(range[1].position(), CellPosition::from_a1("B3")?);
+    assert!(matches!(range[1].storage(), Storage::Stored(_)));
+
+    let state_debug = format!("{text_by_index:?}");
+    assert!(state_debug.contains("Storage::Stored"));
+    assert!(!state_debug.contains("Litchi native Numbers fixture"));
+    assert!(!state_debug.contains("Index/"));
+    assert!(!state_debug.contains(".iwa"));
+
+    let error = package
+        .table_cell(
+            "private missing sheet selector",
+            TableSelector::index(0),
+            CellPosition::new(0, 0),
+        )
+        .expect_err("a missing selector must fail without exposing its text");
+    assert!(matches!(error, Error::SheetNotFound));
+    let error_debug = format!("{error:?}");
+    assert!(!error_debug.contains("private missing sheet selector"));
+    assert!(!error_debug.contains("identifier"));
+    Ok(())
+}
+
+#[test]
 fn table_title_transaction_reaches_numbers_facade() -> Result<(), Box<dyn std::error::Error>> {
     use litchi::numbers::table::title::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Settings,

@@ -1169,6 +1169,81 @@ NUMBERS_TABLE_TITLE_SETTINGS_WIRE_TYPES = frozenset(
 NUMBERS_TABLE_TITLE_SETTINGS_PROTO_ORIGINS = frozenset(
     {"buffa", "prost", "prost_types", "tn", "tsp", "tswp"}
 )
+NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE = Path(
+    "crates/litchi-numbers/src/table/cells.rs"
+)
+NUMBERS_TABLE_CELLS_OWNER_SOURCE = Path(
+    "crates/litchi-numbers/src/package/table_cells.rs"
+)
+NUMBERS_TABLE_CELLS_IMPLEMENTATION_SOURCES = (
+    NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE,
+    NUMBERS_TABLE_CELLS_OWNER_SOURCE,
+)
+NUMBERS_TABLE_CELLS_EXPORT_SOURCES = (
+    Path("crates/litchi-numbers/src/lib.rs"),
+    Path("crates/litchi-numbers/src/package.rs"),
+    Path("crates/litchi-numbers/src/table.rs"),
+)
+NUMBERS_TABLE_CELLS_CANONICAL_TYPES = (
+    "State",
+    "Storage",
+    "Error",
+    "LimitKind",
+    "Path",
+)
+NUMBERS_TABLE_CELLS_SHORT_NAMES = frozenset(
+    NUMBERS_TABLE_CELLS_CANONICAL_TYPES
+)
+NUMBERS_TABLE_CELLS_PACKAGE_METHODS = (
+    "table_cell",
+    "table_cells",
+)
+NUMBERS_TABLE_CELLS_FLAT_ALIAS_PREFIXES = (
+    "Cell",
+    "Cells",
+    "TableCell",
+    "TableCells",
+)
+NUMBERS_TABLE_CELLS_FLAT_ALIASES = frozenset(
+    prefix + suffix
+    for prefix in NUMBERS_TABLE_CELLS_FLAT_ALIAS_PREFIXES
+    for suffix in NUMBERS_TABLE_CELLS_SHORT_NAMES
+)
+NUMBERS_TABLE_CELLS_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_cells|table[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?cells)"
+    r"(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_NUMBERS_PACKAGE_TABLE_CELLS_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table_cells\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_PACKAGE_TABLE_CELLS_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?table_cells\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_TABLE_CELLS_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?cells\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_TABLE_CELLS_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tn", "tsp", "tst", "tswp"}
+)
+NUMBERS_TABLE_CELLS_WIRE_TYPES = frozenset(
+    {
+        "BncCell",
+        "BncCellView",
+        "DecodeOptions",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
 IWA_TABLE_LOCK_SOURCE = Path("crates/litchi-iwa/src/table_lock.rs")
 IWA_NUMBERS_TABLE_INFO_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "model.rs"
@@ -2952,6 +3027,44 @@ def _is_numbers_table_title_settings_public_declaration(
     }
     return bool(identifiers & NUMBERS_TABLE_TITLE_SETTINGS_FLAT_ALIASES) or (
         _numbers_table_title_settings_owner_declaration(declaration)
+    )
+
+
+def _numbers_table_cells_public_leak(identifier: str) -> str | None:
+    """Classify physical vocabulary forbidden in table-cell read APIs."""
+
+    if identifier in NUMBERS_TABLE_CELLS_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier == "wire" or identifier in NUMBERS_TABLE_CELLS_WIRE_TYPES:
+        return "wire/BNC type"
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"bnc", "buffa", "codec", "prost"} for word in words):
+        return "protobuf type"
+    return _iwork_public_leak(identifier)
+
+
+def _numbers_table_cells_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return NUMBERS_TABLE_CELLS_OWNER_PATH.search(declaration) is not None or any(
+        identifier in NUMBERS_TABLE_CELLS_PACKAGE_METHODS
+        for identifier in identifiers
+    )
+
+
+def _is_numbers_table_cells_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(identifiers & NUMBERS_TABLE_CELLS_FLAT_ALIASES) or (
+        _numbers_table_cells_owner_declaration(declaration)
     )
 
 
@@ -5283,6 +5396,209 @@ def audit_numbers_table_title_settings_facade_source_topology(
     return sorted(set(violations))
 
 
+def audit_numbers_table_cells_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Numbers table-cell read API."""
+
+    source_root = root / NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    dedicated_sources = {
+        root / path
+        for path in NUMBERS_TABLE_CELLS_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    export_sources = {
+        root / path
+        for path in NUMBERS_TABLE_CELLS_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    violations: list[str] = []
+
+    semantic_path = root / NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+    semantic_source = (
+        semantic_path.read_text(encoding="utf-8")
+        if semantic_path.is_file()
+        else ""
+    )
+    canonical_exports = _rust_canonical_exports(
+        semantic_source, NUMBERS_TABLE_CELLS_SHORT_NAMES
+    )
+    for name in NUMBERS_TABLE_CELLS_CANONICAL_TYPES:
+        if name in canonical_exports:
+            continue
+        violations.append(
+            "focused litchi-numbers table-cells read API is missing "
+            f"canonical table::cells type {name}: "
+            f"{NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE}"
+        )
+
+    lib_path = root / NUMBERS_SOURCE_ROOT / "lib.rs"
+    lib_source = (
+        _mask_rust_non_code(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    if PUBLIC_NUMBERS_TABLE_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-numbers table-cells read API is missing "
+            "canonical root table module: "
+            f"{NUMBERS_SOURCE_ROOT / 'lib.rs'}"
+        )
+
+    table_path = root / NUMBERS_SOURCE_ROOT / "table.rs"
+    table_source = (
+        _mask_rust_non_code(table_path.read_text(encoding="utf-8"))
+        if table_path.is_file()
+        else ""
+    )
+    if PUBLIC_NUMBERS_TABLE_CELLS_MODULE.search(table_source) is None:
+        violations.append(
+            "focused litchi-numbers table-cells read API is missing "
+            "canonical table::cells module: "
+            f"{NUMBERS_SOURCE_ROOT / 'table.rs'}"
+        )
+
+    package_export = root / NUMBERS_SOURCE_ROOT / "package.rs"
+    if package_export.is_file():
+        package_source = _mask_rust_non_code(
+            package_export.read_text(encoding="utf-8")
+        )
+        if NUMBERS_PACKAGE_TABLE_CELLS_MODULE.search(package_source) is None:
+            violations.append(
+                "focused litchi-numbers table-cells read API is missing "
+                "private package owner module: "
+                f"{package_export.relative_to(root)}"
+            )
+        for match in PUBLIC_NUMBERS_PACKAGE_TABLE_CELLS_MODULE.finditer(package_source):
+            line_number = package_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-numbers table-cells read API exposes "
+                "duplicate package::table_cells module: "
+                f"{package_export.relative_to(root)}:{line_number}"
+            )
+    else:
+        violations.append(
+            "focused litchi-numbers table-cells read API is missing "
+            "private package owner module: "
+            f"{NUMBERS_SOURCE_ROOT / 'package.rs'}"
+        )
+
+    owner_path = root / NUMBERS_TABLE_CELLS_OWNER_SOURCE
+    if not owner_path.is_file():
+        violations.append(
+            "focused litchi-numbers table-cells read API is missing "
+            "private package owner source: "
+            f"{NUMBERS_TABLE_CELLS_OWNER_SOURCE}"
+        )
+
+    package_methods: set[str] = set()
+    if owner_path.is_file():
+        for declaration, _line_number in _rust_public_declarations(
+            owner_path.read_text(encoding="utf-8")
+        ):
+            function = RUST_FUNCTION_DECLARATION.search(declaration)
+            if function is not None:
+                package_methods.add(function.group(1))
+    for name in NUMBERS_TABLE_CELLS_PACKAGE_METHODS:
+        if name in package_methods:
+            continue
+        violations.append(
+            "focused litchi-numbers table-cells read API is missing "
+            f"canonical Package::{name} method: "
+            f"{NUMBERS_TABLE_CELLS_OWNER_SOURCE}"
+        )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for (
+            declaration,
+            line_number,
+            public_declaration,
+            complete_source_scope,
+        ) in declarations:
+            if not _is_numbers_table_cells_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            owner_declaration = _numbers_table_cells_owner_declaration(declaration)
+            declaration_identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            public_use_or_type = declaration_identifiers[:2] in (
+                ["pub", "type"],
+                ["pub", "use"],
+            )
+            flat_alias_exports = _rust_canonical_exports(
+                declaration, NUMBERS_TABLE_CELLS_FLAT_ALIASES
+            )
+            if (
+                public_declaration
+                and path in export_sources
+                and owner_declaration
+                and public_use_or_type
+            ):
+                violations.append(
+                    "focused litchi-numbers table-cells read API exposes "
+                    "public table-cells owner alias: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if identifier in flat_alias_exports:
+                    violations.append(
+                        "focused litchi-numbers table-cells read API "
+                        f"retains flat alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and path in export_sources
+                    and owner_declaration
+                    and public_use_or_type
+                    and identifier in NUMBERS_TABLE_CELLS_SHORT_NAMES
+                ):
+                    violations.append(
+                        "focused litchi-numbers table-cells read API "
+                        f"retains root alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _numbers_table_cells_public_leak(identifier)
+                if reason is None:
+                    continue
+                violations.append(
+                    "focused litchi-numbers table-cells read API exposes "
+                    f"{reason} {identifier}: "
+                    f"{path.relative_to(root)}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-numbers table-cells read API exposes "
+                    f"raw byte slice {byte_slice}: "
+                    f"{path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_numbers_table_lock_source_topology(root: Path = ROOT) -> list[str]:
     """Keep retired Numbers table-lock APIs out of their former host scopes."""
 
@@ -6158,6 +6474,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_table_header_settings_facade_source_topology()
         + audit_iwa_numbers_table_title_settings_source_topology()
         + audit_numbers_table_title_settings_facade_source_topology()
+        + audit_numbers_table_cells_facade_source_topology()
         + audit_iwa_numbers_table_lock_source_topology()
         + audit_numbers_table_lock_facade_source_topology()
         + audit_iwa_pages_page_layout_source_topology()

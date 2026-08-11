@@ -261,6 +261,34 @@ def add_numbers_table_title_settings_canonical_scaffold(root: Path) -> None:
     table_export.write_text("pub mod title;\n", encoding="utf-8")
 
 
+def add_numbers_table_cells_read_scaffold(root: Path) -> None:
+    semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub struct State;\n"
+        "pub enum Storage { Empty, Stored }\n"
+        "pub struct Error;\n"
+        "pub struct LimitKind;\n"
+        "pub struct Path;\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.NUMBERS_TABLE_CELLS_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "impl Package {\n"
+        "pub fn table_cell() {}\n"
+        "pub fn table_cells() {}\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    lib_export, package_export, table_export = (
+        root / path for path in boundaries.NUMBERS_TABLE_CELLS_EXPORT_SOURCES
+    )
+    lib_export.write_text("pub mod table;\n", encoding="utf-8")
+    package_export.write_text("pub(crate) mod table_cells;\n", encoding="utf-8")
+    table_export.write_text("pub mod cells;\n", encoding="utf-8")
+
+
 def add_pages_section_settings_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -9000,6 +9028,213 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(
                 boundaries.audit_pages_section_settings_facade_source_topology(root), []
+            )
+
+
+    def test_numbers_table_cells_read_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE,
+            Path("crates/litchi-numbers/src/table/cells.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELLS_OWNER_SOURCE,
+            Path("crates/litchi-numbers/src/package/table_cells.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELLS_CANONICAL_TYPES,
+            ("State", "Storage", "Error", "LimitKind", "Path"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELLS_PACKAGE_METHODS,
+            ("table_cell", "table_cells"),
+        )
+        for deferred in (
+            "Input",
+            "Change",
+            "Edit",
+            "Patch",
+            "Commit",
+            "Diagnostics",
+            "DependencyKind",
+        ):
+            self.assertNotIn(deferred, boundaries.NUMBERS_TABLE_CELLS_CANONICAL_TYPES)
+        for deferred in ("edit_table_cells", "apply_table_cells"):
+            self.assertNotIn(deferred, boundaries.NUMBERS_TABLE_CELLS_PACKAGE_METHODS)
+
+    def test_focused_numbers_table_cells_read_requires_each_type(self) -> None:
+        for missing in boundaries.NUMBERS_TABLE_CELLS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_table_cells_read_scaffold(root)
+                    semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+                    retained = [
+                        name
+                        for name in boundaries.NUMBERS_TABLE_CELLS_CANONICAL_TYPES
+                        if name != missing
+                    ]
+                    semantic.write_text(
+                        "".join(f"pub struct {name};\n" for name in retained),
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_cells_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-cells read API is missing "
+                            f"canonical table::cells type {missing}: "
+                            "crates/litchi-numbers/src/table/cells.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_table_cells_read_requires_each_package_method(
+        self,
+    ) -> None:
+        for missing in boundaries.NUMBERS_TABLE_CELLS_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_table_cells_read_scaffold(root)
+                    owner = root / boundaries.NUMBERS_TABLE_CELLS_OWNER_SOURCE
+                    owner.write_text(
+                        "impl Package {\n"
+                        + "".join(
+                            f"pub fn {name}() {{}}\n"
+                            for name in boundaries.NUMBERS_TABLE_CELLS_PACKAGE_METHODS
+                            if name != missing
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_cells_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-cells read API is missing "
+                            f"canonical Package::{missing} method: "
+                            "crates/litchi-numbers/src/package/table_cells.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_table_cells_read_requires_private_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_read_scaffold(root)
+            package = root / boundaries.NUMBERS_TABLE_CELLS_EXPORT_SOURCES[1]
+            package.write_text("pub mod table_cells;\n", encoding="utf-8")
+            table = root / boundaries.NUMBERS_TABLE_CELLS_EXPORT_SOURCES[2]
+            table.write_text("mod cells;\n", encoding="utf-8")
+
+            violations = boundaries.audit_numbers_table_cells_facade_source_topology(
+                root
+            )
+
+            self.assertTrue(
+                any("missing canonical table::cells module" in item for item in violations)
+            )
+            self.assertTrue(
+                any(
+                    "exposes duplicate package::table_cells module" in item
+                    for item in violations
+                )
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_read_scaffold(root)
+            (root / boundaries.NUMBERS_TABLE_CELLS_OWNER_SOURCE).unlink()
+            violations = boundaries.audit_numbers_table_cells_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing private package owner source" in item for item in violations)
+            )
+            self.assertEqual(
+                sum("canonical Package::" in item for item in violations),
+                2,
+            )
+
+    def test_focused_numbers_table_cells_read_rejects_aliases_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_read_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "pub type TableCellState = State;\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.NUMBERS_TABLE_CELLS_OWNER_SOURCE
+            owner.write_text(
+                "impl Package {\n"
+                "pub fn table_cell(object_id: u64, source_bytes: &[u8], "
+                "bnc: BncCell, codec: NumbersTableCellStorageCodec, "
+                "buffa: BuffaCellView, generated: GeneratedProjection, "
+                "prost: prost_types::MessageInfo) {}\n"
+                "pub fn table_cells() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_CELLS_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use crate::table::cells::{State, Storage};\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_table_cells_facade_source_topology(
+                root
+            )
+
+            for fragment in (
+                "retains flat alias TableCellState",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire/BNC type BncCell",
+                "exposes protobuf type NumbersTableCellStorageCodec",
+                "exposes protobuf type BuffaCellView",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes public table-cells owner alias",
+                "retains root alias State",
+                "retains root alias Storage",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_table_cells_read_allows_semantic_variants_and_types(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_read_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use crate::cell::{FiniteF64, Value};\n"
+                "pub use crate::cell::data_format::DataFormat;\n"
+                "pub use crate::table::{CellPosition, CellRange, Dimensions};\n"
+                "pub struct State;\n"
+                "pub enum Storage { Empty, Stored }\n"
+                "pub struct Error;\n"
+                "pub struct LimitKind;\n"
+                "pub struct Path;\n"
+                "pub enum SemanticDependency { CellStorage, FormulaCache }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_cells_facade_source_topology(root),
+                [],
             )
 
 

@@ -146,7 +146,7 @@ fn parse_count(
     arguments: &mut impl Iterator<Item = OsString>,
     label: &'static str,
 ) -> Result<Option<Count>, Box<dyn Error>> {
-    let value = required_text(arguments, &format!("missing {label}"))?;
+    let value = required_text(arguments, format!("missing {label}"))?;
     if value == "unset" {
         return Ok(None);
     }
@@ -168,7 +168,7 @@ fn parse_optional_bool(
     arguments: &mut impl Iterator<Item = OsString>,
     label: &'static str,
 ) -> Result<Option<bool>, Box<dyn Error>> {
-    match required_text(arguments, &format!("missing {label}"))?.as_str() {
+    match required_text(arguments, format!("missing {label}"))?.as_str() {
         "unset" => Ok(None),
         "true" => Ok(Some(true)),
         "false" => Ok(Some(false)),
