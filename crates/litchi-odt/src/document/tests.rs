@@ -25,6 +25,10 @@ fn text_model_accepts_arbitrary_prefixes_and_decodes_mixed_text() {
     let paragraph = document.paragraphs().unwrap().remove(0);
     assert_eq!(paragraph.style_name(), Some("Body"));
     assert_eq!(paragraph.text().unwrap(), "ABC  D!");
+    let paragraph = document.paragraph(0).unwrap().unwrap();
+    assert_eq!(paragraph.style_name(), Some("Body"));
+    assert_eq!(paragraph.text().unwrap(), "ABC  D!");
+    assert!(document.paragraph(1).unwrap().is_none());
 
     let elements = document.elements().unwrap();
     assert_eq!(elements.len(), 2);
@@ -37,6 +41,14 @@ fn text_model_accepts_arbitrary_prefixes_and_decodes_mixed_text() {
         panic!("second document element is not a paragraph");
     };
     assert_eq!(paragraph.text().unwrap(), "ABC  D!");
+}
+
+#[test]
+fn indexed_paragraph_lookup_validates_content_after_the_match() {
+    let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:body><o:text><t:p>Selected</t:p><t:p><t:s t:c="1000001"/></t:p></o:text></o:body></o:document-content>"#;
+    let document = document(content);
+
+    assert!(document.paragraph(0).is_err());
 }
 
 #[test]

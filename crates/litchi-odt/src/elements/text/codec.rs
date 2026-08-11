@@ -6,7 +6,7 @@
 //! semantic [`Block`] model without coupling to parser state or wire details.
 
 use super::model::Block;
-use super::{Heading, Paragraph, parse_text_blocks, parse_text_blocks_owned};
+use super::{Heading, Paragraph, parse_paragraph_at, parse_text_blocks, parse_text_blocks_owned};
 use litchi_core::Result;
 
 /// Collection of typed text-element codec operations.
@@ -31,6 +31,14 @@ impl Elements {
                 .filter_map(Block::into_paragraph)
                 .collect()
         })
+    }
+
+    /// Decode the paragraph at `index` without retaining the other text blocks.
+    ///
+    /// The decoder still scans the complete input and applies the same XML and
+    /// resource-limit validation as [`Self::parse_paragraphs`].
+    pub fn parse_paragraph_at(xml_content: &str, index: usize) -> Result<Option<Paragraph>> {
+        parse_paragraph_at(xml_content, index)
     }
 
     /// Decode all headings from XML content.
