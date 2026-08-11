@@ -149,6 +149,7 @@ impl Document {
         crate::text::Story::new(
             self.inner.model.retained_blocks(),
             self.inner.model.body_boundaries(),
+            self.inner.model.retained_text_len(),
             self.fonts(),
             self.colors(),
         )

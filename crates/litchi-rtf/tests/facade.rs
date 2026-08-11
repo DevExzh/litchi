@@ -188,6 +188,8 @@ fn streaming_facade_propagates_partial_sink_failure_without_mutating_snapshot() 
 #[test]
 fn story_lazily_distinguishes_lines_paragraphs_and_empty_paragraphs() {
     let document = Document::parse(r"{\rtf1\ansi\qc\b one\line two\par\par three}").unwrap();
+    assert_eq!(document.body().len(), document.text().len());
+    assert_eq!(document.body().is_empty(), document.text().is_empty());
     let paragraphs: Vec<_> = document.body().paragraphs().collect();
 
     assert_eq!(document.paragraph_count(), 3);
@@ -225,6 +227,32 @@ fn story_lazily_distinguishes_lines_paragraphs_and_empty_paragraphs() {
     ));
     assert!(matches!(inlines.next(), Some(Inline::Text(run)) if run.text() == "two"));
     assert!(inlines.next().is_none());
+}
+
+#[test]
+fn story_retains_exact_text_length_across_fragmentation_and_edits() {
+    for source in [
+        r"{\rtf1\ansi}",
+        r"{\rtf1\ansi A{\b B}{\i C}\par D}",
+        r"{\rtf1\ansi first\par\par trailing}",
+        r"{\rtf1\ansi A\u10?B}",
+    ] {
+        let document = Document::parse(source).unwrap();
+        assert_eq!(document.body().len(), document.text().len());
+        assert_eq!(document.body().is_empty(), document.text().is_empty());
+    }
+
+    let source = Document::parse(r"{\rtf1\ansi old\par retained}").unwrap();
+    let source_len = source.body().len();
+    let mut edit = source.edit();
+    edit.replace_paragraph_text(0, "a longer replacement")
+        .unwrap();
+    let changed = edit.commit().unwrap().snapshot().clone();
+
+    assert_eq!(source.body().len(), source_len);
+    assert_eq!(source.body().len(), source.text().len());
+    assert_eq!(changed.body().len(), changed.text().len());
+    assert_ne!(changed.body().len(), source.body().len());
 }
 
 #[test]

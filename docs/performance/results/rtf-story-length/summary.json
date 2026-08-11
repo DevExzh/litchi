@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "status": "accepted",
+  "production_base": "761b88bdc2218e419cde8cba7acb96f5645a1b5c",
+  "control_binary_sha256": "3f4aea56e8c1921072afed0e2c2d21f87472eb4480babfee50e3f18354f4ef0e",
+  "candidate_binary_sha256": "748ae86dc8d8981c04d95c9228f80b798e7d8677b36bc2fdbc76d146272926db",
+  "environment": {
+    "os": "Linux 6.8.0-101-generic x86_64",
+    "cpu": "AMD EPYC 9575F",
+    "cpu_affinity": 2,
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "perf_event_paranoid": 1
+  },
+  "corpus": {
+    "name": "rtf-semantic-plain-large",
+    "generator": "litchi-rtf-semantic-v2",
+    "paragraphs": 10000,
+    "archive_bytes": 540051,
+    "visible_text_bytes": 499999,
+    "archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e"
+  },
+  "primary_protocol": {
+    "order": ["before-a", "after-a", "after-b", "before-b"],
+    "warmups_per_leg": 100,
+    "samples_per_leg": 1000,
+    "pooled_samples_per_state": 2000
+  },
+  "primary": {
+    "rtf_semantic_list_paragraphs": {
+      "before_ns": {"p50": 29692, "mean": 31115.8585, "p95": 39624, "p99": 55146},
+      "after_ns": {"p50": 25225, "mean": 26851.0995, "p95": 36199, "p99": 44501},
+      "delta_percent": {"p50": -15.0445, "mean": -13.7061, "p95": -8.6438, "p99": -19.3033}
+    },
+    "rtf_semantic_one_paragraph": {
+      "before_ns": {"p50": 18926, "mean": 19665.2745, "p95": 24383, "p99": 31994},
+      "after_ns": {"p50": 13780, "mean": 14704.576, "p95": 20858, "p99": 26386},
+      "delta_percent": {"p50": -27.1901, "mean": -25.2257, "p95": -14.4568, "p99": -17.5283}
+    }
+  },
+  "guard_protocol": {
+    "order": ["after-a", "before-a", "before-b", "after-b"],
+    "warmups_per_leg": 100,
+    "samples_per_leg": 1000,
+    "pooled_samples_per_state": 2000
+  },
+  "guards": {
+    "rtf_semantic_open": {"p50_delta_percent": 3.4272, "mean_delta_percent": 2.6170, "p95_delta_percent": 1.5844},
+    "rtf_semantic_full_text": {"p50_delta_percent": 3.9921, "mean_delta_percent": 4.1523, "p95_delta_percent": 2.1201},
+    "rtf_semantic_stream_save": {"p50_delta_percent": 0.6850, "mean_delta_percent": 0.6461, "p95_delta_percent": 1.8796},
+    "rtf_semantic_noop_edit_save": {"p50_delta_percent": 3.5633, "mean_delta_percent": 2.1927, "p95_delta_percent": -4.4349}
+  },
+  "memory": {
+    "heaptrack_allocation_calls_before": 4488027,
+    "heaptrack_allocation_calls_after": 4488027,
+    "heaptrack_temporary_allocations_before": 1120562,
+    "heaptrack_temporary_allocations_after": 1120562,
+    "heaptrack_peak_heap_before_mb": 14.30,
+    "heaptrack_peak_heap_after_mb": 14.30,
+    "gnu_time_max_rss_kib_before": [30976, 30848],
+    "gnu_time_max_rss_kib_after": [30976, 30848]
+  },
+  "process_wide_perf_stat": {
+    "scope": "three complete 1100-iteration processes per state; deterministic corpus construction and untimed full verification included",
+    "before": {"task_clock_ms": 3302.41, "cycles": 16235634619, "instructions": 74432035570},
+    "after": {"task_clock_ms": 3374.86, "cycles": 16646324248, "instructions": 74300196777}
+  }
+}
