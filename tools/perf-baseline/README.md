@@ -4,7 +4,8 @@
 ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
 public-API XLSX snapshot/edit/save flows, and opt-in DOC/XLS/PPT,
 DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows. It creates every corpus in memory; it also exercises
-source-backed XLSX catalog and worksheet reads over positional I/O. It does not
+source-backed XLSX catalog, worksheet reads, and guarded calculation-metadata
+publication over positional I/O. It does not
 depend on untracked office files, network state, or randomness. ODP builder
 timestamps are replaced with fixed metadata before measurement. The JSON
 report contains the generator parameters and SHA-256 hashes for the generated
@@ -25,9 +26,10 @@ substrate records, nine writer records, and 45 XLSX records). The six simulated
 range cases, two execution-scaling cases, one low-level source-overlay save
 case, one source-backed DOCX semantic publication case, one source-backed
 media-rich PPTX semantic publication case, one XLSX commit/read attribution case,
+two matched XLSX calculation-metadata publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 20 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, seven RTF semantic cases, and 26 ODF semantic cases
-are opt-in, for 121 selectable cases in total:
+are opt-in, for 123 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -109,6 +111,23 @@ case times positional open, one guarded source-backed slide shape-text edit,
 and one-Part overlay publication into a bounded sequential sink. Full PPTX semantic
 readback plus exact Part topology, relationships, content types, unselected
 payload/media, source/output hashes, and source/sink checks remain untimed.
+
+Measure the matched XLSX calculation-metadata publication controls:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 \
+  --case xlsx_eager_calculation_metadata_edit_save,xlsx_source_backed_calculation_metadata_edit_save \
+  --json target/perf/xlsx-calculation-edit.json
+```
+
+Both cases change only `calcPr` in `xl/workbook.xml` on the same workbook with
+one worksheet, one DrawingML drawing, and eight referenced incompressible 2 MiB
+PNG payloads. The eager control materializes all twelve ordinary Parts and
+uses the owning XLSX writer. The source-backed case materializes only the
+workbook Part and consumes the guarded one-Part OPC overlay. Complete package,
+relationship, calculation-metadata, drawing/media, output-hash, and bounded
+sequential-sink verification remains outside timing.
 
 For just the end-to-end legacy writer packaging runs:
 
@@ -469,6 +488,14 @@ remain distinguishable.
   overlay publication through a bounded sequential sink. The path reports two
   semantic Part materializations per sample; full PPTX readback and exact topology,
   relationship, content-type, unselected-Part, and media checks remain untimed.
+- `xlsx_eager_calculation_metadata_edit_save`: on the fixed media-rich XLSX
+  corpus, time positional open, eager ownership of all twelve ordinary Parts,
+  one calculation-properties transaction, and full sequential publication.
+  It is the matched semantic control for the source-backed case.
+- `xlsx_source_backed_calculation_metadata_edit_save`: perform the same
+  `calcPr` edit while materializing only `xl/workbook.xml` and raw-copying all
+  eleven unselected Parts. Both paths emit byte-identical output and run the
+  same complete untimed semantic and preservation verification.
 - `cfb_open`: parse the complete generated container into `litchi_cfb::OleFile`.
 - `cfb_list_streams`: enumerate and materialize all stream paths from an
   already-open CFB container.
@@ -701,7 +728,7 @@ bandwidth, and maximum physical range. `configuration.execution_workers`
 records the resolved, capped, deduplicated scaling points in deterministic
 ascending order.
 
-The nineteen positional cases add a `source` object; older cases omit it. Its
+The twenty-one positional cases add a `source` object; older cases omit it. Its
 arrays contain one value for every measured iteration and record `read_calls`,
 `read_bytes`, compressed ordinary-OPC-payload range overlap, and
 `max_in_flight_reads`. Applicable OPC cases also record a semantic per-sample
@@ -732,9 +759,9 @@ order. Those fields and the elapsed samples are sufficient to compute
 throughput, speedup, scaling efficiency, and an Amdahl serial-fraction estimate
 outside the harness.
 
-`opc_source_overlay_one_part_save` additionally emits `output_sha256`. The
-field is omitted from every other result, preserving existing JSON consumers
-while independently identifying the deterministic changed archive. Its
+Publication cases may additionally emit `output_sha256`, independently
+identifying the deterministic changed archive without changing schema v1. For
+`opc_source_overlay_one_part_save`, its
 `ordinary_payload_materializations` value is exactly one per sample: the
 selected original Part is validated, while every unselected member is copied
 physically without semantic materialization.
@@ -750,6 +777,11 @@ source/sink distributions, and `ordinary_payload_materializations`. Its value
 is exactly two per sample: the mandatory presentation root and selected slide
 are loaded for semantic validation, while every other slide and all eight media
 payloads remain source-backed through physical raw-copy publication.
+
+The two XLSX calculation-metadata publication cases also emit deterministic
+`output_sha256`, complete source/sink distributions, and semantic
+materialization counts. The eager control reports twelve Parts per sample; the
+source-backed path reports one. Their output hashes are required to match.
 
 ## External profiling
 

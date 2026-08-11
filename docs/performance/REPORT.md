@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `a9bc0eb0d`
+Production base for the latest measured tranche: `c60a72b1681c2dbbe575f74179de092add8fb8f0`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,13 +13,14 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **121 selectable cases**: 36 default cases and 198 default
+harness contains **123 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in
 source-backed media-rich PPTX semantic publication case, one opt-in media-rich ODT
-paragraph-publication case, 16 opt-in DOCX/PPTX
+paragraph-publication case, two opt-in matched XLSX calculation-metadata
+publication cases, 16 opt-in DOCX/PPTX
 semantic cases, seven opt-in RTF semantic case names across four
 capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 23
 shape-selected ODT/ODS/ODP semantic cases, three fixed media-rich ODF cases,
@@ -33,6 +34,7 @@ is still not broad program or CRUD coverage.
 | Positional CFB/ZIP and explicit execution | Large-task p50 scaling at 12 CPUs: OPC **4.52x**, CFB **5.93x**; no hidden global Rayon | Many-small tasks regress at high worker counts; default/legacy paths remain serial |
 | Source-backed OPC and DOCX/XLSX/PPTX facades | EOCD structural-open source bytes **-73.6% to -98.5%**; ordinary payload overlap zero | No latency claim: later EntryId/cache-diagnostic changes confound comparison and some cells exceed 5% variance |
 | Source-backed PPTX selected-slide publication | Media-rich one-edit/save p50 **-97.12%** (34.71x); instructions **-67.91%**; materializations **229 -> 2**; byte-identical output | One shape-text edit in one existing slide only; MCE rewrites, multi-operation edits, topology changes and changed signed packages refuse before output |
+| Source-backed XLSX calculation-metadata publication | Media-rich one-edit/save p50 **-99.2519%** (133.67x), mean **-99.2507%**; instructions **-77.78%**; materializations **12 -> 1**; byte-identical output | Existing `xl/workbook.xml` calculation properties/features only; cells, formulas, cached results, chains, relationships and topology remain outside the capability |
 | Deterministic range simulation | XLSX listing has zero timed requests; selected reads have zero unselected-sheet overlap; full physical size distributions recorded | Synthetic latency model, not a cold filesystem or ambient network |
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |
 | Coalesced DOCX paragraph edits | Large 100-edit/save p50 **-94.99% (19.97x)** and mean **-95.02%**; medium two-edit/save p50 **-12.98%**; scalar one-edit guardrail neutral | Direct-body, strictly ordered paragraph text replacement; generated corpus; scalar API remains separate |
@@ -272,6 +274,15 @@ guard, CPU/allocation/RSS attribution, exact preservation/refusal matrix and
 frozen binary hashes are summarized in
 [`change 0044`](changes/0044-pptx-source-backed-semantic-publication.md).
 
+The source-backed XLSX calculation-metadata publication evidence is
+[`before A`](results/abba-xlsx-calculation-metadata-edit-before-a.json),
+[`after A`](results/abba-xlsx-calculation-metadata-edit-after-a.json),
+[`after B`](results/abba-xlsx-calculation-metadata-edit-after-b.json), and
+[`before B`](results/abba-xlsx-calculation-metadata-edit-before-b.json).
+Counters, allocation/RSS attribution, exact workbook/media preservation,
+refusal coverage and frozen binary/input/output hashes are summarized in
+[`change 0046`](changes/0046-xlsx-source-backed-calculation-metadata-publication.md).
+
 The coalesced ODT paragraph-publication evidence is
 [`before A`](results/abba-odt-paragraph-batch-before-a.json),
 [`after A`](results/abba-odt-paragraph-batch-after-a.json),
@@ -361,11 +372,14 @@ See [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0025`](changes/0025-xlsx-validated-store-handoff.md).
 
 Consolidated changed-crate tests passed, along with focused changed-crate
-warning-denied Clippy, rustdoc and formatter checks. The ODT tranche compiled
-the ODF fuzz target offline; the latest PPT tranche has no dedicated fuzz
-target in the current tree. A workspace all-target/all-feature gate was not
-rerun because iWork was explicitly excluded while its crates are changing
-independently.
+warning-denied Clippy and formatter checks. The latest XLSX batch passes 732
+unit tests, all integration suites, two doctests and the 32-test harness.
+Warning-denied public rustdoc remains blocked by pre-existing broken/private
+links, and all-target XLSX Clippy retains the three unrelated findings named in
+change 0046. The broad crate-boundary checker likewise retains existing
+unclassified workspace edges; no manifest or dependency edge changed. A
+workspace all-target/all-feature gate was not run because iWork was explicitly
+excluded while its crates are changing independently.
 
 ## Accepted results
 
@@ -416,6 +430,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | XLSX one-cell commit + first read, 4,096 cells | 4.431 ms | 3.402 ms | **-23.23% p50 / -23.15% mean** | Allocation calls -21.01%; peak heap +4.29%; unrestricted dense-wide retention rejected |
 | Rejected XLSX 1% commit + save, 4,096 cells | 15.235 ms | 14.990 ms | -1.61% p50 / -1.26% mean | Fully reverted as immaterial; p99 +0.18%, peak heap flat |
 | Rejected XLSX 1% commit + save, 131,072 cells | 514.926 ms | 511.407 ms | -0.68% p50 / -0.66% mean | Fully reverted as immaterial; process allocation calls -0.0623% |
+| Source-backed XLSX calculation-metadata publication, 12 Parts + 16 MiB media | 215.457 ms | 1.612 ms | **-99.2519% p50 (133.67x) / -99.2507% mean** | Materializations 12 -> 1; allocation calls -10.81%; peak heap flat; uninstrumented RSS -1.20% |
 
 The underlying records are:
 
@@ -461,6 +476,7 @@ The underlying records are:
 - [`0043-rtf-decoded-body-ownership-rejected.md`](changes/0043-rtf-decoded-body-ownership-rejected.md)
 - [`0044-pptx-source-backed-semantic-publication.md`](changes/0044-pptx-source-backed-semantic-publication.md)
 - [`0045-odt-coalesced-paragraph-publication.md`](changes/0045-odt-coalesced-paragraph-publication.md)
+- [`0046-xlsx-source-backed-calculation-metadata-publication.md`](changes/0046-xlsx-source-backed-calculation-metadata-publication.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -583,7 +599,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 121 selectable cases and a 198-record default
+The standalone harness provides 123 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus

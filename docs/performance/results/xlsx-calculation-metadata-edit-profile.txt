@@ -1,0 +1,110 @@
+XLSX calculation-metadata source-backed publication profile summary
+===================================================================
+
+Date: 2026-08-11
+Production base: c60a72b1681c2dbbe575f74179de092add8fb8f0
+Harness binary SHA-256: 2f4ad1f6d30950e3445d2f468927b8505602720fff5945c036852996705a68c4
+CPU: AMD EPYC 9575F, taskset CPU 2
+Toolchain: rustc 1.95.0 (59807616e 2026-04-14)
+Kernel: Linux 6.8.0-101-generic x86_64
+
+Matched cases
+-------------
+
+Control: xlsx_eager_calculation_metadata_edit_save
+Candidate: xlsx_source_backed_calculation_metadata_edit_save
+Corpus: c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c
+Output: 96f60a09a8e87204a533e178bdda115b0202e8aa8ac4fe5673a881f981d3e98d
+Ordinary Parts: 12
+Semantic materializations: 12 -> 1
+Output bytes: 16,786,830 -> 16,786,830
+Sequential writes: 630 -> 547
+Largest write: 32,768 -> 32,768 bytes
+
+Balanced ABBA
+-------------
+
+Protocol: control A, candidate A, candidate B, control B; each leg used ten
+warmups and 100 measured samples on CPU 2. The first exploratory cycle was
+discarded before reporting because candidate code-page/process warmup drift
+exceeded 5%; the retained complete cycle is represented by the four checked-in
+JSON files.
+
+Pooled control (n=200):
+  p50 215.456869 ms
+  mean 216.098239 ms; 95% t interval 215.555146..216.641332 ms
+  p95 222.657959 ms
+  p99 227.428911 ms
+
+Pooled candidate (n=200):
+  p50 1.611870 ms
+  mean 1.619241 ms; 95% t interval 1.603506..1.634976 ms
+  p95 1.803250 ms
+  p99 1.913619 ms
+
+Delta:
+  p50 -99.2519% (133.67x)
+  mean -99.2507% (133.46x)
+  p95 -99.1901% (123.48x)
+  p99 -99.1586% (118.85x)
+
+Independent retained legs:
+  control A p50/mean 213.406694/214.279856 ms
+  control B p50/mean 217.276524/217.916622 ms
+  candidate A p50/mean 1.573577/1.582436 ms
+  candidate B p50/mean 1.639578/1.656047 ms
+
+perf stat
+---------
+
+Three process repeats per state, each with two warmups and ten samples:
+  task-clock: 3,896.15 -> 1,113.51 ms (-71.42%)
+  cycles: 19,226,776,745 -> 5,457,630,415 (-71.61%)
+  instructions: 48,123,852,095 -> 10,691,537,042 (-77.78%)
+  branches: 8,161,172,031 -> 1,394,202,313 (-82.92%)
+  branch misses: 176,646,559 -> 14,474,400 (-91.81%)
+  cache references: 1,373,621,717 -> 404,548,650 (-70.55%)
+  cache misses: 27,636,957 -> 18,863,350 (-31.75%)
+  CPU migrations: 0 -> 0
+
+The whole-process counters include deterministic corpus construction and
+untimed semantic/output verification. They therefore understate the timed
+interval improvement but still attribute the removed owning publication work.
+
+perf record
+-----------
+
+Both profiles used two warmups and ten samples at 999 Hz. No samples were lost.
+The control recorded about 3,000 cycles samples; zlib-rs deflate_medium and
+longest_match held 52.69% and 17.25% exclusive overhead. The candidate recorded
+about 1,000 samples; those frames fell to 13.17% and 3.68%. Its remaining top
+frame was the deterministic payload generator (26.42%), which is corpus setup
+outside the benchmark timer. Kernel symbols were restricted, as recorded by
+perf; user-space symbols resolved.
+
+Heaptrack and GNU Time
+----------------------
+
+One cold measured sample per state:
+  allocation calls: 12,439 -> 11,094 (-10.81%)
+  temporary allocations: 1,484 -> 1,366 (-7.95%)
+  peak heap: 152.83 -> 152.80 MiB (flat)
+  leaked bytes: 1.78 KiB -> 1.78 KiB
+  Heaptrack process RSS: 148.41 -> 150.34 MiB (+1.30%, informational)
+
+Uninstrumented GNU Time, two warmups plus ten samples:
+  elapsed: 3.97 -> 1.09 s (-72.54%)
+  maximum RSS: 143,148 -> 141,436 KiB (-1.20%)
+  major faults: 0 -> 0
+
+Scope
+-----
+
+The candidate changes only existing workbook calculation metadata. It does not
+support cell/formula/result edits, calculation-chain creation/removal, Part or
+relationship topology changes, signature stripping, or general XLSX output.
+The physical archive must satisfy the existing source-backed one-Part overlay
+contract. Source read bytes remain archive-sized because unchanged compressed
+members are copied to the output; the removed work is semantic materialization,
+logical-byte ownership, validation of unrelated Part payloads, and
+decompression/recompression of eleven untouched Parts.
