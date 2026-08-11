@@ -6,6 +6,8 @@
 //! tables retain one immutable boxed slice. No dense grid is allocated by the
 //! semantic model.
 
+/// Presence-preserving semantic cell reads.
+pub mod cells;
 /// Compact, archive-free cell coordinates and A1 selectors.
 pub mod coordinate;
 /// Checked row, column, and point-size values.
@@ -509,9 +511,11 @@ impl Table {
         let first = self
             .cells
             .partition_point(|cell| cell.position() < checked_range.start);
+        let non_empty = !checked_range.is_empty();
         Ok(self.cells[first..]
             .iter()
-            .take_while(move |cell| checked_range.contains(cell.position())))
+            .take_while(move |cell| non_empty && cell.position().row() < checked_range.end().row())
+            .filter(move |cell| checked_range.contains(cell.position())))
     }
 
     /// Iterates over sparse cells selected by a checked A1 range.
@@ -983,6 +987,45 @@ mod tests {
         assert_eq!(
             table.iter_cells().map(Cell::position).collect::<Vec<_>>(),
             positions
+        );
+    }
+
+    #[test]
+    fn rectangular_sparse_cells_skip_off_column_values_without_stopping() {
+        let mut builder = Builder::new("Test", Dimensions::new(4, 5));
+        assert!(builder.set(Position::new(0, 1), number(1.0)).is_ok());
+        assert!(builder.set(Position::new(0, 4), number(2.0)).is_ok());
+        assert!(builder.set(Position::new(1, 1), number(3.0)).is_ok());
+        assert!(builder.set(Position::new(2, 2), number(4.0)).is_ok());
+        let table = builder
+            .finish()
+            .unwrap_or_else(|error| panic!("unexpected table error: {error}"));
+        let range = Range::new(Position::new(0, 1), Position::new(3, 3))
+            .unwrap_or_else(|error| panic!("unexpected range error: {error}"));
+
+        let positions = table
+            .cells(range)
+            .unwrap_or_else(|error| panic!("unexpected cells error: {error}"))
+            .map(Cell::position)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            positions,
+            [
+                Position::new(0, 1),
+                Position::new(1, 1),
+                Position::new(2, 2)
+            ]
+        );
+
+        let empty = Range::new(Position::new(0, 2), Position::new(3, 2))
+            .unwrap_or_else(|error| panic!("unexpected empty range error: {error}"));
+        assert_eq!(
+            table
+                .cells(empty)
+                .unwrap_or_else(|error| panic!("unexpected empty cells error: {error}"))
+                .count(),
+            0
         );
     }
 

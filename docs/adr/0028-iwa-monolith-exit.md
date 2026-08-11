@@ -2380,3 +2380,50 @@ declarations, and 14 ordered debts, including debt 017. Remaining Pages
 editors, examples/tests/fuzz ownership, durable patch serialization, atomic
 filesystem publication, shared aggregate memory/work completion, remaining
 Buffa conversion, and the other host debts continue to block monolith deletion.
+
+## 2026-08-11 amendment: Numbers table-cell read owner
+
+The monolith exit now includes one narrowly completed read seam.
+`litchi-numbers` owns `table::cells::{State, Storage, Error, LimitKind, Path}`
+and selector-first `Package::{table_cell, table_cells}`. One coordinate is
+checked directly; a half-open range returns a bounded, fallibly allocated,
+dense row-major result. `Storage::Missing` and
+`Storage::Stored(Value::Empty)` are separate semantic states, and name
+ambiguity, bounds, element limits, text limits, and allocation failures are
+typed without exposing authored content or native identifiers.
+
+This is not yet the physical table-cell exit. The methods consume the
+already-eager semantic `Table` built by `litchi-numbers::package::extractor`
+through the existing BNC/protobuf decoder. The new strict storage/dependency
+Buffa codecs are preparatory and do not power this read path. Earlier text that
+assigned all BNC-backed semantic cell reads to `litchi-iwa` is superseded, but
+the host retains its cell mutators and helpers, formula compiler and AST wire
+handling, calculation-engine mutation, downstream cache updates, and
+publication. Consequently no legacy editor method, test, example, module, or
+source file is retired here.
+
+The range algorithm is bounded analytically: for area `A`, selected-row-span
+materialized cells `K`, selected owned-string bytes `B`, selected strings `T`,
+and table materialized-cell count `M`, non-empty work is
+`A + 2K + 2*O(log M)`, with one `A`-state vector and `T` fallible string
+allocations totaling `B`. Empty ranges perform no scan or allocation.
+4,096-to-8,192 paired cases keep size-sensitive terms at or below 2.0x and
+result allocations at one; element/text over-limit cases fail before the
+result allocation. This is not latency or RSS evidence.
+
+The 136,357-byte native `basic.numbers` oracle, SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`,
+establishes Sheet 1/Table 1 dimensions 22x7, stored text at B2, stored number
+42 at B3, missing A1, dense row-major A1:C3, and out-of-bounds A23. The
+140,498-byte formula/rich-text oracle, SHA-256
+`80deb7b87df27f58b26e6f247acee9d1fc6dcd3d268e85046c3efc16070b2edf`,
+adds formula and rich-text-backed reads. Neither proves native stored-empty
+presence; that distinction is synthetic-test evidence. No native write,
+cache, preview, reassembly, or Save claim follows.
+
+Gates pass 114/114 Numbers library, 4/4 public read integration, 13/13 strict
+codec, 163/163 full protobuf, and 187/187 boundary tests, plus strict
+library/test Clippy and warning-denied rustdoc. The full checker retains only
+14 unchanged baselines. This slice removes no host declaration, manifest edge,
+or debt: topology stays at 64 packages, 237 internal declarations, 14
+`litchi-iwa` dependency declarations, and 14 ordered debts.

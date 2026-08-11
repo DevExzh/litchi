@@ -20,7 +20,7 @@ pub const APPLE_EPOCH_UNIX_OFFSET_SECONDS: f64 = 978_307_200.0;
 /// A typed value stored in a Numbers cell.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub enum Value {
-    /// No materialized value.
+    /// An empty semantic value; physical presence is represented separately.
     #[default]
     Empty,
     /// User-entered text.
@@ -198,7 +198,7 @@ impl fmt::Display for Value {
 /// The semantic kind of a Numbers cell value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Type {
-    /// No materialized value.
+    /// An empty semantic value; physical presence is represented separately.
     Empty,
     /// User-entered text.
     Text,

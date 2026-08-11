@@ -1723,3 +1723,49 @@ linear transaction behavior, not latency or RSS performance. The full Pages
 library/integration gate passes 118/118, boundary regressions pass 181/181,
 focused facade and host audits are empty, and the live checker retains only its
 14 established dependency-policy baselines.
+
+## 2026-08-11 amendment: Numbers table-cell read semantics
+
+`litchi_numbers::table::cells` now defines the read-only semantic result:
+`State` pairs a checked `CellPosition` with `Storage`, and `Storage` preserves
+the difference between `Missing` and `Stored(Value)`, including
+`Stored(Value::Empty)`. `Error`, `LimitKind`, and `Path` are typed and
+content-free. `Package::table_cell` reads one checked coordinate;
+`Package::table_cells` returns a fallibly allocated dense row-major `Vec<State>`
+for a checked half-open `CellRange`. Exact name selectors reject duplicates,
+index selectors are checked, and bounds, retained-element, and owned-text
+limits reject before a partial result can escape.
+
+The implementation projects from the package's already-eager semantic
+`Table`, built by `litchi-numbers::package::extractor` through its existing
+BNC/protobuf path. It does not call the newly committed strict table-cell
+storage or dependency Buffa codecs. Those projections prepare a later
+physical owner and are not a second public model, a current read dependency,
+or an encoder. This amendment narrowly supersedes the earlier claim that the
+monolith alone owns BNC-backed semantic decoding. It leaves `litchi-iwa` in
+charge of existing cell mutation, formula compilation and AST wire handling,
+calculation-engine mutation, and formula-cache changes. No edit, patch, cache,
+preview, source-byte, or output API is implied by this read surface.
+
+For range area `A`, materialized cells encountered across the selected row
+span `K`, selected owned-string bytes `B`, selected owned strings `T`, and
+table materialized-cell count `M`, the non-empty path has
+`A + 2K + 2*O(log M)` size-sensitive work, one fallible `A`-state allocation,
+and `T` fallible string allocations totaling `B` bytes. Empty ranges scan and
+allocate nothing. Applying these formulas to paired 4,096/8,192 shapes keeps
+size-sensitive terms at or below 2.0x and the result-allocation count at one;
+element and text over-limit cases reject before that allocation. These
+governed counters establish the shape of the algorithm, not elapsed-time or
+resident-memory performance.
+
+The native `basic.numbers` read oracle is 136,357 bytes with SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`.
+It establishes a 22x7 Sheet 1/Table 1, stored text at B2, stored number 42 at
+B3, a missing A1, dense row-major A1:C3 behavior, and an out-of-bounds A23.
+The 140,498-byte formula/rich-text oracle, SHA-256
+`80deb7b87df27f58b26e6f247acee9d1fc6dcd3d268e85046c3efc16070b2edf`,
+adds formula and rich-text-backed read coverage. Stored-empty presence is
+synthetic-test evidence only. The gates pass 114/114 Numbers library, 4/4
+public read integration, 13/13 strict codec, 163/163 full protobuf, and
+187/187 boundary tests, plus strict library/test Clippy and warning-denied
+rustdoc; the full checker has only the unchanged 14 baselines.

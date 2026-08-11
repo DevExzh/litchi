@@ -9810,3 +9810,54 @@ This cut changes no manifest edge. Current topology before the cut is 64
 packages, 237 internal declarations, 14 `litchi-iwa` dependency declarations,
 and 14 ordered debts; the final verification must confirm that unchanged
 inventory rather than copy historical Pages counts.
+
+## 2026-08-11 amendment: Numbers table-cell read cutover
+
+The first table-cell cutover transfers semantic reads, not mutation.
+`litchi-numbers::table::cells::{State, Storage, Error, LimitKind, Path}` and
+`Package::{table_cell, table_cells}` are now the canonical selector-first API.
+The single-cell path checks one coordinate. The range path checks a half-open
+range, applies retained-element and owned-string-byte limits, then publishes a
+fallibly allocated dense row-major result. Missing coordinates are explicit;
+a materialized `Value::Empty` remains `Storage::Stored`.
+
+Migration verification must distinguish the current eager semantic read path
+from the preparatory physical seam. `Package` reads the immutable semantic
+table already produced by `litchi-numbers::package::extractor` and its existing
+BNC/protobuf decode. The committed strict table-cell storage and dependency
+Buffa codecs pass their own gates but are not invoked by these methods and do
+not encode or preserve the source. This supersedes monolith-only BNC/read
+wording in this ADR only to that extent. All existing `litchi-iwa` cell
+mutators, formula/compiler and AST wire work, calculation-engine mutation,
+cache refresh, previews, and publication remain unmigrated; there is no host
+cut in this slice.
+
+The performance gate uses analytical counts. With range area `A`, selected
+row-span materialized cells `K`, selected owned-string bytes `B`, selected
+owned strings `T`, and total materialized cells `M`, a non-empty range costs
+`A + 2K + 2*O(log M)` in size-sensitive work, allocates one `A`-element result
+vector, and performs `T` fallible string allocations totaling `B` bytes. Empty
+ranges scan and allocate nothing. For paired shapes that double from 4,096 to
+8,192, every size-sensitive term remains at or below 2.0x and the result
+allocation remains one. Maximum-minus-one element and text limits reject
+before result allocation. No wall-clock or RSS conclusion is drawn.
+
+Native read evidence is deliberately non-mutating. The 136,357-byte
+`basic.numbers` fixture has SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`.
+Numbers 14.4 and the focused reader agree that Sheet 1/Table 1 is 22x7, B2 is
+stored text `Litchi native Numbers fixture`, B3 is stored number 42, A1 is
+missing, A1:C3 is dense row-major, and A23 is out of bounds. The 140,498-byte
+formula/rich-text oracle, SHA-256
+`80deb7b87df27f58b26e6f247acee9d1fc6dcd3d268e85046c3efc16070b2edf`,
+covers formula and rich-text-backed semantic values. Neither file contains an
+explicit stored empty cell, so `Stored(Value::Empty)` versus `Missing` is
+synthetic unit evidence only. These checks authorize no write or Save claim.
+
+Final verification passes 114/114 Numbers library tests, 4/4 public read
+integration tests, 13/13 strict preparatory codec tests, 163/163 full protobuf
+tests, and 187/187 boundary regressions. Strict library/test Clippy and
+warning-denied rustdoc are green; the full checker reports only 14 unchanged
+dependency-policy baselines. No manifest edge or ordered debt changes, and
+the inventory remains 64 packages, 237 internal declarations, 14
+`litchi-iwa` dependency declarations, and 14 ordered debts.
