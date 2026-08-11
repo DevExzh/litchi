@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 
-This is a coverage map, not a completion claim. It compares the 121 selectable
+This is a coverage map, not a completion claim. It compares the 123 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -18,7 +18,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring; large/streaming creation remains missing |
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
 | Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication; signed/extension corpora remain missing |
-| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT, ODS and ODP verify eight exact 2 MiB resources and manifest media types, while source-backed DOCX and PPTX publication verify eight exact 2 MiB media Parts after one semantic edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
+| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT, ODS and ODP verify eight exact 2 MiB resources and manifest media types, while source-backed DOCX/PPTX and narrow XLSX calculation-metadata publication verify eight exact 2 MiB media Parts after one semantic edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
 | About 1% semantic update and save | Covered for XLSX/DOCX/PPTX/ODT generated corpora | Deterministic evenly spaced cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch, while ODT coalesces ordinary scalar durable replacements internally; both reopen the package |
 | Bulk update matching objects | Missing | No semantic end-to-end case |
 | Clear/remove/hide/detach/GC distinctions | Missing | No complete matrix |
@@ -29,7 +29,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS-row preservation, and exact raw ODT/ODS/ODP auxiliary/media members during neighboring paragraph/cell/text-box edits; broader format-semantic extension corpora remain missing |
-| Replace one low-level Part, preserve the rest | Covered for owned OPC, narrow source-backed OPC, guarded DOCX main-document semantics, and guarded PPTX selected-slide semantics | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; change 0037 adds the consuming source-backed one-Part publisher; changes 0039 and 0044 integrate exact-source DOCX and PPTX transactions while refusing unsafe MCE, signature, transfer/multi-operation and topology cases before output; XLSX semantic integration remains missing |
+| Replace one low-level Part, preserve the rest | Covered for owned OPC, narrow source-backed OPC, guarded DOCX main-document semantics, guarded PPTX selected-slide semantics, and XLSX calculation metadata | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; change 0037 adds the consuming source-backed one-Part publisher; changes 0039, 0044 and 0046 integrate exact-source DOCX, PPTX and XLSX calculation-metadata transactions while refusing unsafe MCE, signature, transfer/multi-operation, stale/foreign and topology cases before output; general XLSX cell/formula editing remains outside the one-Part closure |
 
 The source/output matrix is also incomplete. Owned bytes and instrumented
 `ReadAt` exist for OPC/XLSX, and the deterministic range simulator covers
@@ -57,10 +57,12 @@ conversion remain.
 4. XLSX bulk update plus distinct clear/remove/hide behavior. Direct
    writer-local action regrouping was measured and rejected in change 0030;
    broader coverage must not present that immaterial prototype as a solution.
-5. Integrate the narrow source-backed one-Part publisher into bounded XLSX
-   semantic transactions, and broaden DOCX/PPTX beyond changes 0039/0044 with
-   real producers, MCE-aware editing, dependency transfers and explicit
-   topology/signature fallback or refusal matrices.
+5. Broaden the accepted narrow XLSX calculation-metadata source transaction
+   beyond change 0046 only where a complete one-Part semantic closure can be
+   proved; general cell/formula/chains still need a wider publication design.
+   Broaden DOCX/PPTX beyond changes 0039/0044 with real producers, MCE-aware
+   editing, dependency transfers and explicit topology/signature fallback or
+   refusal matrices.
 6. Unknown OOXML extension and media preservation during a known semantic edit.
 7. Durable PPTX patch produce/encode/decode/apply/inverse/join/three-way flows,
    including stale-base and conflict cases.
@@ -197,6 +199,15 @@ media payload, and retains byte-exact no-op/signature/source-version behavior.
 MCE-normalized slides, more than one edit operation, topology changes,
 real-producer matrices, encrypted input and atomic filesystem publication
 remain deliberately outside the contract.
+
+Change 0046 integrates the publisher with an exact-source XLSX
+calculation-metadata transaction over a fixed 12-Part, eight-media package. It
+materializes only `xl/workbook.xml`, raw-copies the other 11 Parts, fully
+reopens the result, verifies the typed calculation state, and preserves every
+untouched Part and media payload. MCE projection, changed signed sources,
+stale/foreign workbook closures, topology changes and partial sinks retain
+typed refusals. Cells, formulas, cached results, styles, shared strings,
+relationships and calculation-chain ownership remain outside the capability.
 
 Change 0040 removes repeated UTF-8 scalar decoding from ordinary RTF text
 delimiter discovery without changing the existing CRUD surface. It measures

@@ -32,7 +32,8 @@ use litchi_ole_common::object::{
 };
 use litchi_opc::{
     BlobPart, OpcPackage, OpenSession, PackURI, PackageWriter, ReadLimits, Relationships,
-    SourceBackedPackage, SourceCacheLimits, TargetMode, constants::relationship_type,
+    SourceBackedPackage, SourceCacheLimits, TargetMode,
+    constants::{content_type as opc_content_type, relationship_type},
 };
 use litchi_xlsx::{Cell as XlsxCell, SourceBackedWorkbook, Value as XlsxValue, Workbook};
 use serde::Serialize;
@@ -55,6 +56,8 @@ const SEMANTIC_DOCX_CORPUS_GENERATOR: &str = "litchi-docx-semantic-v1";
 const DOCX_SOURCE_EDIT_CORPUS_GENERATOR: &str = "litchi-docx-source-edit-media-v1";
 const SEMANTIC_PPTX_CORPUS_GENERATOR: &str = "litchi-pptx-semantic-v1";
 const PPTX_SOURCE_EDIT_CORPUS_GENERATOR: &str = "litchi-pptx-source-edit-media-v1";
+const XLSX_CALC_SOURCE_EDIT_CORPUS_GENERATOR: &str =
+    "litchi-xlsx-calculation-metadata-source-edit-media-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
 const ODT_MEDIA_CORPUS_GENERATOR: &str = "litchi-odt-media-paragraph-publication-v1";
 const SEMANTIC_ODS_CORPUS_GENERATOR: &str = "litchi-ods-semantic-v1";
@@ -70,6 +73,8 @@ const PPTX_SOURCE_MEDIA_ENTRY_COUNT: usize = 8;
 const PPTX_SOURCE_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const PPTX_SOURCE_SLIDE_COUNT: usize = 200;
 const PPTX_SOURCE_TEXT_BOXES_PER_SLIDE: usize = 8;
+const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
+const XLSX_CALC_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const ODP_MEDIA_TEXT_BOX_NAME: &str = "litchi-perf-media-text-box";
 const OLE_COMMON_CORPUS_GENERATOR: &str = "litchi-ole-common-copy-elision-v1";
 const OLE_COMMON_TARGET: &str = "ole_common_edit_target.bin";
@@ -343,6 +348,8 @@ enum Case {
     OpcSourceOverlayOnePartSave,
     DocxSourceBackedOneEditSave,
     PptxSourceBackedOneEditSave,
+    XlsxEagerCalculationMetadataEditSave,
+    XlsxSourceBackedCalculationMetadataEditSave,
     CfbOpen,
     CfbListStreams,
     CfbReadOne,
@@ -508,6 +515,12 @@ impl Case {
             Self::OpcSourceOverlayOnePartSave => "opc_source_overlay_one_part_save",
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
+            Self::XlsxEagerCalculationMetadataEditSave => {
+                "xlsx_eager_calculation_metadata_edit_save"
+            },
+            Self::XlsxSourceBackedCalculationMetadataEditSave => {
+                "xlsx_source_backed_calculation_metadata_edit_save"
+            },
             Self::CfbOpen => "cfb_open",
             Self::CfbListStreams => "cfb_list_streams",
             Self::CfbReadOne => "cfb_read_one",
@@ -849,6 +862,14 @@ impl Case {
 
     const fn is_pptx_source_edit_save(self) -> bool {
         matches!(self, Self::PptxSourceBackedOneEditSave)
+    }
+
+    const fn is_xlsx_calculation_metadata_edit_save(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxEagerCalculationMetadataEditSave
+                | Self::XlsxSourceBackedCalculationMetadataEditSave
+        )
     }
 }
 
@@ -1680,6 +1701,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_opc_source_overlay_save()
                     && !case.is_docx_source_edit_save()
                     && !case.is_pptx_source_edit_save()
+                    && !case.is_xlsx_calculation_metadata_edit_save()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
                     cfb_corpus
@@ -1750,6 +1772,26 @@ fn main() -> Result<(), Box<dyn Error>> {
             options.warmup_iterations,
             options.samples,
         )?);
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_xlsx_calculation_metadata_edit_save())
+    {
+        let corpus = build_xlsx_calculation_metadata_edit_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .filter(|case| case.is_xlsx_calculation_metadata_edit_save())
+        {
+            results.push(run_xlsx_calculation_metadata_edit_save(
+                *case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
     }
 
     for shape in &options.writer_shapes {
@@ -2215,6 +2257,12 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_source_overlay_one_part_save" => Some(Case::OpcSourceOverlayOnePartSave),
         "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
         "pptx_source_backed_one_edit_save" => Some(Case::PptxSourceBackedOneEditSave),
+        "xlsx_eager_calculation_metadata_edit_save" => {
+            Some(Case::XlsxEagerCalculationMetadataEditSave)
+        },
+        "xlsx_source_backed_calculation_metadata_edit_save" => {
+            Some(Case::XlsxSourceBackedCalculationMetadataEditSave)
+        },
         "cfb_open" => Some(Case::CfbOpen),
         "cfb_list_streams" => Some(Case::CfbListStreams),
         "cfb_read_one" => Some(Case::CfbReadOne),
@@ -2397,6 +2445,8 @@ fn print_usage() {
                                        opc_source_overlay_one_part_save,\n\
                                        docx_source_backed_one_edit_save,\n\
                                        pptx_source_backed_one_edit_save,\n\
+                                       xlsx_eager_calculation_metadata_edit_save,\n\
+                                       xlsx_source_backed_calculation_metadata_edit_save,\n\
                                        cfb_open,cfb_list_streams,cfb_read_one,\n\
                                        cfb_create_stream_borrowed,cfb_create_stream_owned,\n\
                                        ole_common_open,ole_common_put_stream_publish,\n\
@@ -3239,6 +3289,131 @@ fn build_pptx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
         },
         archive,
         target_name: format!("ppt/slides/slide{}.xml", target_slide + 1),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn xlsx_calculation_media_payload(index: usize) -> Vec<u8> {
+    let mut bytes = payload_bytes(
+        PayloadKind::Incompressible,
+        60_000 + index,
+        XLSX_CALC_MEDIA_ENTRY_BYTES,
+    );
+    bytes[..8].copy_from_slice(b"\x89PNG\r\n\x1a\n");
+    bytes
+}
+
+fn xlsx_calculation_metadata_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut package = litchi_xlsx::Package::create()?;
+    let mut edit = package.edit_calculation_metadata()?;
+    edit.set_properties(
+        litchi_xlsx::calculation_properties::Properties::new().with_calculation_id(Some(7)),
+    );
+    edit.commit()?;
+    let mut opc = package.into_plain_opc();
+    let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    opc.get_part_mut(&worksheet_uri)?.set_blob(
+        br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetData/><drawing r:id="rIdDrawing"/></worksheet>"#.to_vec(),
+    );
+
+    let drawing_uri = PackURI::new("/xl/drawings/drawing1.xml")?;
+    let mut drawing_xml = String::from(
+        r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#,
+    );
+    for index in 0..XLSX_CALC_MEDIA_ENTRY_COUNT {
+        use std::fmt::Write as _;
+        write!(
+            drawing_xml,
+            r#"<xdr:twoCellAnchor><xdr:from><xdr:col>{index}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>{}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="{}" name="Picture {}"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rIdImage{index}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr/></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>"#,
+            index + 1,
+            index + 1,
+            index + 1,
+        )?;
+    }
+    drawing_xml.push_str("</xdr:wsDr>");
+    opc.try_add_part(Box::new(BlobPart::new(
+        drawing_uri.clone(),
+        opc_content_type::OFC_DRAWING.to_owned(),
+        drawing_xml.into_bytes(),
+    )))?;
+    for index in 0..XLSX_CALC_MEDIA_ENTRY_COUNT {
+        let media_uri = PackURI::new(format!("/xl/media/image{}.png", index + 1))?;
+        opc.try_add_part(Box::new(BlobPart::new(
+            media_uri,
+            opc_content_type::PNG.to_owned(),
+            xlsx_calculation_media_payload(index),
+        )))?;
+        opc.get_part_mut(&drawing_uri)?
+            .rels_mut()
+            .try_add_relationship(
+                relationship_type::IMAGE.to_owned(),
+                format!("../media/image{}.png", index + 1),
+                format!("rIdImage{index}"),
+                TargetMode::Internal,
+            )?;
+    }
+    opc.get_part_mut(&worksheet_uri)?
+        .rels_mut()
+        .try_add_relationship(
+            relationship_type::DRAWING.to_owned(),
+            "../drawings/drawing1.xml".to_owned(),
+            "rIdDrawing".to_owned(),
+            TargetMode::Internal,
+        )?;
+    let package = litchi_xlsx::Package::from_opc(opc)?;
+    package.to_bytes().map_err(Into::into)
+}
+
+fn build_xlsx_calculation_metadata_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let archive = xlsx_calculation_metadata_edit_bytes()?;
+    let package = litchi_xlsx::Package::from_slice(&archive)?;
+    if package
+        .calculation_metadata()?
+        .properties()
+        .ok_or("XLSX calculation corpus has no calcPr")?
+        .calculation_id()
+        != 7
+    {
+        return Err("XLSX calculation corpus has unexpected calculation ID".into());
+    }
+    let opc = OpcPackage::from_bytes(&archive)?;
+    for index in 0..XLSX_CALC_MEDIA_ENTRY_COUNT {
+        let uri = PackURI::new(format!("/xl/media/image{}.png", index + 1))?;
+        if opc.get_part(&uri)?.blob() != xlsx_calculation_media_payload(index) {
+            return Err("XLSX calculation corpus media differs from specification".into());
+        }
+    }
+    let target_uri = PackURI::new("/xl/workbook.xml")?;
+    let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
+    let entry_count = opc.part_count();
+    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
+        total
+            .checked_add(part.blob().len())
+            .ok_or("XLSX calculation corpus logical byte count overflows usize")
+    })?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: "xlsx-calculation-metadata-media".to_owned(),
+            generator: XLSX_CALC_SOURCE_EDIT_CORPUS_GENERATOR,
+            package_format: "XLSX/OPC/ZIP",
+            shape: "media-rich",
+            payload_kind: "deterministic-incompressible-media",
+            compression: "deflate",
+            entry_count,
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: XLSX_CALC_MEDIA_ENTRY_BYTES,
+            uncompressed_payload_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "workbook:calculation-metadata".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "xl/workbook.xml".to_owned(),
         target_payload,
         xlsx: None,
     })
@@ -4100,6 +4275,10 @@ fn run_case_with_config(
         },
         Case::PptxSourceBackedOneEditSave => {
             run_pptx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
+        },
+        Case::XlsxEagerCalculationMetadataEditSave
+        | Case::XlsxSourceBackedCalculationMetadataEditSave => {
+            run_xlsx_calculation_metadata_edit_save(case, corpus, warmup_iterations, samples)
         },
         Case::CfbOpen => run_cfb_open(corpus, warmup_iterations, samples),
         Case::CfbListStreams => run_cfb_list_streams(corpus, warmup_iterations, samples),
@@ -7424,6 +7603,19 @@ fn pptx_source_payload_ranges(corpus: &Corpus) -> Result<Vec<Range<u64>>, Box<dy
     Ok(ordinary)
 }
 
+fn xlsx_calculation_payload_ranges(corpus: &Corpus) -> Result<Vec<Range<u64>>, Box<dyn Error>> {
+    let ordinary = zip_member_ranges(&corpus.archive)?
+        .into_iter()
+        .filter_map(|(name, range)| {
+            (name != "[Content_Types].xml" && !name.ends_with(".rels")).then_some(range)
+        })
+        .collect::<Vec<_>>();
+    if ordinary.len() != corpus.manifest.entry_count {
+        return Err("XLSX calculation-edit payload count differs from corpus manifest".into());
+    }
+    Ok(ordinary)
+}
+
 fn xlsx_source_layout(
     bytes: &[u8],
     expected_sheet_count: usize,
@@ -8231,6 +8423,190 @@ fn run_pptx_source_backed_one_edit_save(
     }
     Ok(CaseResult {
         case: Case::PptxSourceBackedOneEditSave.name(),
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: Some(expected_digest),
+    })
+}
+
+fn verify_xlsx_calculation_metadata_edit_output(
+    corpus: &Corpus,
+    output: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let reopened = litchi_xlsx::Package::from_slice(output)?;
+    if reopened
+        .calculation_metadata()?
+        .properties()
+        .ok_or("XLSX calculation-edit output has no calcPr")?
+        .calculation_id()
+        != 91
+    {
+        return Err("XLSX calculation-edit output has unexpected calculation ID".into());
+    }
+
+    let source = OpcPackage::from_bytes(&corpus.archive)?;
+    let candidate = OpcPackage::from_bytes(output)?;
+    if source.part_count() != corpus.manifest.entry_count
+        || candidate.part_count() != source.part_count()
+        || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
+    {
+        return Err("XLSX calculation-edit package topology differs from source".into());
+    }
+    let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
+    for source_part in source.iter_parts() {
+        let candidate_part = candidate.get_part(source_part.partname())?;
+        if candidate_part.content_type() != source_part.content_type()
+            || relationship_signatures(candidate_part.rels())
+                != relationship_signatures(source_part.rels())
+        {
+            return Err("XLSX calculation-edit Part metadata differs from source".into());
+        }
+        if source_part.partname() == &target_uri {
+            if source_part.blob() == candidate_part.blob() {
+                return Err("XLSX calculation-edit workbook XML did not change".into());
+            }
+        } else if source_part.blob() != candidate_part.blob() {
+            return Err("XLSX calculation-edit changed an unselected Part payload".into());
+        }
+    }
+    for index in 0..XLSX_CALC_MEDIA_ENTRY_COUNT {
+        let uri = PackURI::new(format!("/xl/media/image{}.png", index + 1))?;
+        if candidate.get_part(&uri)?.blob() != xlsx_calculation_media_payload(index) {
+            return Err("XLSX calculation-edit media readback differs from specification".into());
+        }
+    }
+    Ok(())
+}
+
+fn publish_xlsx_calculation_metadata_edit<W: Write>(
+    source: Arc<dyn ReadAt>,
+    writer: W,
+    source_backed: bool,
+) -> Result<usize, Box<dyn Error>> {
+    let properties =
+        litchi_xlsx::calculation_properties::Properties::new().with_calculation_id(Some(91));
+    if source_backed {
+        let editor = litchi_xlsx::calculation_properties::SourceBackedEditor::from_read_at(source)?;
+        let mut edit = editor.edit();
+        if !edit.set_properties(properties) {
+            return Err("XLSX source-backed calculation edit reported an exact no-op".into());
+        }
+        let commit = edit.commit()?;
+        if !commit.changed()
+            || commit.patch().is_empty()
+            || commit.patch().inverse().after() != commit.patch().before()
+        {
+            return Err("XLSX source-backed calculation edit produced an invalid patch".into());
+        }
+        let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
+        let published = editor.publish_commit_to_stream(writer, &commit)?;
+        if published != *commit.snapshot() {
+            return Err("XLSX source-backed calculation edit published another snapshot".into());
+        }
+        Ok(materializations)
+    } else {
+        let package = SourceBackedPackage::from_read_at(source)?;
+        let opc = package.into_opc_package()?;
+        let materializations = opc.part_count();
+        let mut package = litchi_xlsx::Package::from_opc(opc)?;
+        let mut edit = package.edit_calculation_metadata()?;
+        if !edit.set_properties(properties) {
+            return Err("XLSX eager calculation edit reported an exact no-op".into());
+        }
+        let commit = edit.commit()?;
+        if !commit.changed() || commit.patch().is_empty() {
+            return Err("XLSX eager calculation edit produced an invalid patch".into());
+        }
+        package.write_to(writer)?;
+        Ok(materializations)
+    }
+}
+
+fn run_xlsx_calculation_metadata_edit_save(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != XLSX_CALC_SOURCE_EDIT_CORPUS_GENERATOR
+        || !case.is_xlsx_calculation_metadata_edit_save()
+    {
+        return Err("XLSX calculation-edit case requires its fixed media-rich corpus".into());
+    }
+    let source_backed = case == Case::XlsxSourceBackedCalculationMetadataEditSave;
+    let expected_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+    let mut expected = Vec::new();
+    let expected_materializations =
+        publish_xlsx_calculation_metadata_edit(expected_source, &mut expected, source_backed)?;
+    let required_materializations = if source_backed {
+        1
+    } else {
+        corpus.manifest.entry_count
+    };
+    if expected == corpus.archive || expected_materializations != required_materializations {
+        return Err("XLSX calculation edit materialized an unexpected Part count".into());
+    }
+    verify_xlsx_calculation_metadata_edit_output(corpus, &expected)?;
+    let expected_digest = sha256_hex(&expected);
+    let maximum = u64::try_from(expected.len())?
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("XLSX calculation-edit sequential output ceiling overflows u64")?;
+    let payload_ranges = xlsx_calculation_payload_ranges(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut measured_digests = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = Arc::new(InstrumentedSource::new(
+            corpus.archive.clone(),
+            payload_ranges.clone(),
+        ));
+        let read_at: Arc<dyn ReadAt> = source.clone();
+        let mut sink = CountingSink::bounded(maximum, 64 * 1024);
+        sink.reserve_budget()?;
+        let started = Instant::now();
+        let materializations =
+            publish_xlsx_calculation_metadata_edit(read_at, &mut sink, source_backed)?;
+        let duration = started.elapsed();
+
+        if materializations != expected_materializations || sink.bytes != expected {
+            return Err("XLSX calculation edit differs between iterations".into());
+        }
+        if sink.summary().largest_write > 64 * 1024 {
+            return Err("XLSX calculation edit exceeded the sequential sink write bound".into());
+        }
+        verify_xlsx_calculation_metadata_edit_output(corpus, &sink.bytes)?;
+        let digest = sha256_hex(&sink.bytes);
+        if digest != expected_digest {
+            return Err("XLSX calculation-edit output digest differs from expected output".into());
+        }
+        let metrics = source.snapshot();
+        if metrics.ordinary_payload_read_calls == 0 || metrics.ordinary_payload_read_bytes == 0 {
+            return Err("XLSX calculation edit performed no ordinary source reads".into());
+        }
+        if iteration >= warmup_iterations {
+            source_summary.record_opc(metrics, u64::try_from(materializations)?);
+            sink_summaries.push(sink.summary());
+            measured_digests.push(digest);
+        }
+        std::hint::black_box(&sink.bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let sink = deterministic_sink_summary(&sink_summaries, case.name())?;
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("XLSX calculation-edit measured output digests are not stable".into());
+    }
+    Ok(CaseResult {
+        case: case.name(),
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -9164,12 +9540,13 @@ mod tests {
         build_odt_media_corpus, build_ole_common_corpus, build_opc_corpus,
         build_pptx_source_edit_corpus, build_semantic_docx_corpus, build_semantic_odp_corpus,
         build_semantic_ods_corpus, build_semantic_odt_corpus, build_semantic_pptx_corpus,
-        build_semantic_rtf_corpus, build_writer_corpus, build_xlsx_corpus,
+        build_semantic_rtf_corpus, build_writer_corpus,
+        build_xlsx_calculation_metadata_edit_corpus, build_xlsx_corpus,
         expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
         payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
         run_docx_source_backed_one_edit_save, run_opc_source_overlay_one_part_save,
-        run_pptx_source_backed_one_edit_save, run_scaling_case, sha256_hex,
-        simulated_request_delay, statistics,
+        run_pptx_source_backed_one_edit_save, run_scaling_case,
+        run_xlsx_calculation_metadata_edit_save, sha256_hex, simulated_request_delay, statistics,
     };
 
     #[test]
@@ -9221,6 +9598,8 @@ mod tests {
         assert!(!Case::DEFAULT.contains(&Case::OpcSourceOverlayOnePartSave));
         assert!(!Case::DEFAULT.contains(&Case::DocxSourceBackedOneEditSave));
         assert!(!Case::DEFAULT.contains(&Case::PptxSourceBackedOneEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsxEagerCalculationMetadataEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedCalculationMetadataEditSave));
     }
 
     #[test]
@@ -9289,6 +9668,49 @@ mod tests {
         let source = measured.source.unwrap();
         assert_eq!(source.read_calls.len(), 1);
         assert_eq!(source.ordinary_payload_materializations, Some(vec![2]));
+    }
+
+    #[test]
+    fn xlsx_calculation_edit_controls_are_deterministic_and_equivalent() {
+        let corpus = build_xlsx_calculation_metadata_edit_corpus().unwrap();
+        let again = build_xlsx_calculation_metadata_edit_corpus().unwrap();
+        assert_eq!(corpus.archive, again.archive);
+        assert_eq!(corpus.manifest.archive_sha256, sha256_hex(&corpus.archive));
+
+        let eager = run_xlsx_calculation_metadata_edit_save(
+            Case::XlsxEagerCalculationMetadataEditSave,
+            &corpus,
+            0,
+            1,
+        )
+        .unwrap();
+        let source_backed = run_xlsx_calculation_metadata_edit_save(
+            Case::XlsxSourceBackedCalculationMetadataEditSave,
+            &corpus,
+            0,
+            1,
+        )
+        .unwrap();
+        assert_eq!(eager.case, "xlsx_eager_calculation_metadata_edit_save");
+        assert_eq!(
+            source_backed.case,
+            "xlsx_source_backed_calculation_metadata_edit_save"
+        );
+        assert_eq!(eager.elapsed_ns.samples.len(), 1);
+        assert_eq!(source_backed.elapsed_ns.samples.len(), 1);
+        assert!(eager.output_sha256.is_some());
+        assert!(source_backed.output_sha256.is_some());
+        assert_eq!(
+            eager.source.unwrap().ordinary_payload_materializations,
+            Some(vec![corpus.manifest.entry_count as u64])
+        );
+        assert_eq!(
+            source_backed
+                .source
+                .unwrap()
+                .ordinary_payload_materializations,
+            Some(vec![1])
+        );
     }
 
     #[test]

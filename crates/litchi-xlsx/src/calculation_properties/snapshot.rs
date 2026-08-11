@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::constants::relationship_type as rt;
-use litchi_opc::{OpcPackage, PackURI, Part, TargetMode};
+use litchi_opc::{OpcPackage, PackURI, Part, PartView, SourceBackedPackage, TargetMode};
 
 use super::{Features, Limits, Properties, inspect};
 use crate::error::{Error, Result, invalid};
@@ -45,6 +45,51 @@ impl Snapshot {
             features,
             source,
             limits: *limits,
+        })
+    }
+
+    pub(super) fn load_source_backed_with_limits(
+        package: &SourceBackedPackage,
+        limits: &Limits,
+    ) -> Result<Self> {
+        let workbook = package.main_document_part()?;
+        require_workbook_content_type(workbook.content_type())?;
+        let bytes = workbook.data()?.into_arc();
+        if bytes.len() > limits.max_raw_bytes() {
+            return Err(invalid(
+                "workbook calculation metadata exceeds raw byte limit",
+            ));
+        }
+        let (properties, features) = {
+            let inspection = inspect(bytes.as_slice(), limits)?;
+            (inspection.properties, inspection.features)
+        };
+        let source = SourceState::capture_source_backed(package, &workbook, bytes)?;
+        Ok(Self {
+            properties,
+            features,
+            source,
+            limits: *limits,
+        })
+    }
+
+    pub(super) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
+        if bytes.len() > source.limits.max_raw_bytes() {
+            return Err(invalid(
+                "workbook calculation metadata exceeds raw byte limit",
+            ));
+        }
+        let (properties, features) = {
+            let inspection = inspect(bytes.as_slice(), &source.limits)?;
+            (inspection.properties, inspection.features)
+        };
+        let mut state = source.source.clone();
+        state.bytes = Arc::new(bytes);
+        Ok(Self {
+            properties,
+            features,
+            source: state,
+            limits: source.limits,
         })
     }
 
@@ -112,7 +157,7 @@ impl Snapshot {
         workbook.partname() == &self.source.part_name
             && workbook.content_type() == self.source.content_type
             && workbook.blob() == self.source.bytes.as_slice()
-            && current_owner_relationship(package)
+            && current_owner_relationship(package.rels())
                 .is_some_and(|relationship| self.source.owner_relationship.matches(relationship))
     }
 
@@ -151,7 +196,26 @@ impl SourceState {
             )?,
             bytes: workbook.blob_arc(),
             owner_relationship: SourceRelationship::capture(
-                current_owner_relationship(package)
+                current_owner_relationship(package.rels())
+                    .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?,
+            )?,
+        })
+    }
+
+    fn capture_source_backed(
+        package: &SourceBackedPackage,
+        workbook: &PartView<'_>,
+        bytes: Arc<Vec<u8>>,
+    ) -> Result<Self> {
+        Ok(Self {
+            part_name: workbook.partname().clone(),
+            content_type: copy_string(
+                workbook.content_type(),
+                "calculation metadata workbook content type",
+            )?,
+            bytes,
+            owner_relationship: SourceRelationship::capture(
+                current_owner_relationship(package.rels())
                     .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?,
             )?,
         })
@@ -193,8 +257,10 @@ impl SourceRelationship {
     }
 }
 
-fn current_owner_relationship(package: &OpcPackage) -> Option<&litchi_opc::Relationship> {
-    let mut owners = package.rels().iter().filter(|relationship| {
+fn current_owner_relationship(
+    relationships: &litchi_opc::Relationships,
+) -> Option<&litchi_opc::Relationship> {
+    let mut owners = relationships.iter().filter(|relationship| {
         matches!(
             relationship.reltype(),
             rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT

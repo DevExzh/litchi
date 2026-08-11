@@ -16,6 +16,7 @@ mod patch;
 )]
 mod rewriter;
 mod snapshot;
+mod source;
 mod transaction;
 
 #[cfg(test)]
@@ -28,6 +29,7 @@ pub use model::{Builder, Mode, Properties, ReferenceMode, Specified};
 pub use package::{apply_patch, edit, edit_with_limits, load, load_with_limits};
 pub use patch::{Commit, Patch};
 pub use snapshot::Snapshot;
+pub use source::{SourceBackedEditor, SourceEdit};
 pub use transaction::Transaction;
 
 #[allow(

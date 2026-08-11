@@ -220,14 +220,15 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **121
+The stage-1 records above are retained unchanged. The current harness has **123
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
 PPTX semantic publication case, one opt-in media-rich ODT
-paragraph-publication case, 16 opt-in DOCX/PPTX semantic
+paragraph-publication case, two opt-in matched XLSX calculation-metadata
+publication cases, 16 opt-in DOCX/PPTX semantic
 cases, seven opt-in RTF semantic case names across four capability-bounded
 variants (25 tiny / 44 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
 semantic cases, three fixed media-rich ODF cases, and 20 opt-in native
@@ -277,6 +278,15 @@ incomplete program and CRUD matrix.
   edits, topology changes and changed signed sources refuse before output; the
   unchanged eager PPTX guard is neutral. See
   [`0044`](changes/0044-pptx-source-backed-semantic-publication.md).
+- The guarded XLSX calculation-metadata editor now carries exact raw
+  `xl/workbook.xml` transactions through the one-Part publisher. On the fixed
+  12-Part, eight-media corpus, pooled p50 falls from 215.457 to 1.612 ms
+  (-99.2519%, 133.67x), instructions fall 77.78%, and semantic
+  materializations fall 12 -> 1 with byte-identical output. MCE projection,
+  changed signed sources, stale/foreign closures and topology changes refuse
+  before output. Cells, formulas, cached results and calculation-chain
+  ownership are deliberately outside this capability. See
+  [`0046`](changes/0046-xlsx-source-backed-calculation-metadata-publication.md).
 - Consecutive packaged ODT plain-text replacements now share one mutable
   candidate, content publication, reopen and compact audit while retaining
   ordinary scalar durable operations. The large 100-edit/save p50 falls from
