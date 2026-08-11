@@ -27,6 +27,26 @@ fn presentation_facade_reports_empty_packages_without_slides() {
 }
 
 #[test]
+fn presentation_slide_matches_the_full_slide_list() {
+    let mut builder = Builder::new();
+    for index in 0..3 {
+        builder
+            .add_slide_with_title(&format!("Title {index}"), &format!("Body {index}"))
+            .unwrap();
+    }
+    let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
+    let slides = presentation.slides().unwrap();
+
+    for index in 0..=slides.len() {
+        assert_eq!(
+            presentation.slide(index).unwrap(),
+            slides.get(index).cloned()
+        );
+    }
+    assert_eq!(presentation.slide(usize::MAX).unwrap(), None);
+}
+
+#[test]
 fn semantic_page_and_layout_facades_round_trip() {
     let measure =
         litchi_odp::layout::Measure::new(1.0, litchi_odp::layout::Unit::Centimeter).unwrap();

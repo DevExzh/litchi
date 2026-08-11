@@ -1,0 +1,2617 @@
+reading file "target/perf/odp-slide-selector/after-heap.zst" - please wait, this might take some time...
+Debuggee command was: target/perf/odp-slide-selector/after --warmup 0 --samples 20 --case odp_semantic_one_slide --semantic-shape large --json target/perf/odp-slide-selector/after-heap.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+323173 calls to allocation functions with 0B peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 303173 from 530 other places
+
+93124 calls to allocation functions with 0B peak consumption from
+alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h943de259559b3452
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 73124 from 45 other places
+
+60549 calls to allocation functions with 51.13K peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd12329f143ae49b8E.llvm.11498457496735407577
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+12000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hf6abd1309808670c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::model::ParagraphText::push_text::h561594bdcfc4a87d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+12000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hf6abd1309808670c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::model::ParagraphText::push_text::h561594bdcfc4a87d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hdfea59aaa92b16c5
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::drawing_attributes::h6e529dda2450d280
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hf6abd1309808670c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::push_parsed_paragraph::he30580d1bc59b7da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hf6abd1309808670c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::model::ParagraphText::push_text::h561594bdcfc4a87d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 24549 from 84 other places
+
+24800 calls to allocation functions with 0B peak consumption from
+litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::drawing_attributes::h6e529dda2450d280
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 4800 from 5 other places
+
+12400 calls to allocation functions with 0B peak consumption from
+litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::decode_text::h745ecc734b9915cf
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 calls with 0B peak consumption from:
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+200 calls with 0B peak consumption from:
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+200 calls with 0B peak consumption from:
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+
+6944 calls to allocation functions with 820B peak consumption from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+2000 calls with 0B peak consumption from:
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+2000 calls with 0B peak consumption from:
+    _$LT$core..iter..adapters..chain..Chain$LT$A$C$B$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::h39a2e9c705ca1edc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h7730327f57ded5f8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+2000 calls with 0B peak consumption from:
+    _$LT$core..iter..adapters..chain..Chain$LT$A$C$B$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::h39a2e9c705ca1edc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h7730327f57ded5f8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 calls with 0B peak consumption from:
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 calls with 0B peak consumption from:
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 744 from 14 other places
+
+4701 calls to allocation functions with 143.25K peak consumption from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+2000 calls with 0B peak consumption from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$core..iter..adapters..chain..Chain$LT$A$C$B$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::h39a2e9c705ca1edc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h7730327f57ded5f8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+2000 calls with 0B peak consumption from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$core..iter..adapters..chain..Chain$LT$A$C$B$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::h39a2e9c705ca1edc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h7730327f57ded5f8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 calls with 0B peak consumption from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$core..iter..adapters..chain..Chain$LT$A$C$B$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::h39a2e9c705ca1edc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h7730327f57ded5f8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 calls with 0B peak consumption from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$core..iter..adapters..chain..Chain$LT$A$C$B$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::h39a2e9c705ca1edc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h7730327f57ded5f8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 calls with 0B peak consumption from:
+    _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h471df3dd485ba5a0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_transition_style_definitions::h099e5836554360a9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::resolved_transition_styles::hc7e873f909b8e856
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 481 from 44 other places
+
+4220 calls to allocation functions with 0B peak consumption from
+alloc::str::join_generic_copy::he3f2d0d3260b6621
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+2000 calls with 0B peak consumption from:
+    litchi_odp::model::slide::Slide::all_text::h88e61a7ead3ae600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+2000 calls with 0B peak consumption from:
+    litchi_odp::model::slide::Slide::all_text::h88e61a7ead3ae600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 calls with 0B peak consumption from:
+    litchi_odp::model::slide::Slide::all_text::h88e61a7ead3ae600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 calls with 0B peak consumption from:
+    litchi_odp::model::slide::Slide::all_text::h88e61a7ead3ae600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 calls with 0B peak consumption from:
+    litchi_odp::model::slide::Slide::all_text::h88e61a7ead3ae600
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+
+4220 calls to allocation functions with 0B peak consumption from
+litchi_odp::model::slide::Slide::all_text::h88e61a7ead3ae600
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+2000 calls with 0B peak consumption from:
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+2000 calls with 0B peak consumption from:
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 calls with 0B peak consumption from:
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 calls with 0B peak consumption from:
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 calls with 0B peak consumption from:
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+
+2449 calls to allocation functions with 0B peak consumption from
+_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 calls with 0B peak consumption from:
+    soapberry_zip::office::ArchiveReader::new_with_limits::h58b01f1ce0b7d090
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new::hb2dd6d910cb16f8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::new::hfd7a834d39b91fd3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::get_file::hf727a1e6450330bf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 calls with 0B peak consumption from:
+    soapberry_zip::office::ArchiveReader::new_with_limits::h58b01f1ce0b7d090
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new::hb2dd6d910cb16f8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::new::hfd7a834d39b91fd3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::get_file::hf727a1e6450330bf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 calls with 0B peak consumption from:
+    soapberry_zip::office::ArchiveReader::new_with_limits::h58b01f1ce0b7d090
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new::hb2dd6d910cb16f8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::new::hfd7a834d39b91fd3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::has_file::he10f973ada03b57c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 calls with 0B peak consumption from:
+    soapberry_zip::office::ArchiveReader::new_with_limits::h58b01f1ce0b7d090
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new::hb2dd6d910cb16f8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::new::hfd7a834d39b91fd3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::has_file::he10f973ada03b57c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 calls with 0B peak consumption from:
+    soapberry_zip::office::ArchiveReader::new_with_limits::h58b01f1ce0b7d090
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new::hb2dd6d910cb16f8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::new::hfd7a834d39b91fd3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::get_file::hf727a1e6450330bf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 1949 from 68 other places
+
+
+PEAK MEMORY CONSUMERS
+380.03K peak memory consumed over 199 calls from
+_RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+380.03K consumed over 1 calls from:
+    _ZN7zlib_rs7deflate4init17h630bfcc691e0d14bE.llvm.6877377404663027520
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    zlib_rs::stable::Deflate::new::h30ba8ee184977b98
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    flate2::mem::Compress::new::h855eed87141415af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::StreamingArchiveWriter$LT$W$GT$::write_deflated::h815696326ff65e81
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::writer::PackageWriter::finish::h97b4578a483498d4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 0B from 23 other places
+
+143.25K peak memory consumed over 4701 calls from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+143.25K consumed over 1 calls from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::generate_content_xml::hcb71267d330e68c1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 0B from 44 other places
+
+73.73K peak memory consumed over 1 calls from
+0x7b288b6b738e
+  in /lib/x86_64-linux-gnu/libstdc++.so.6
+73.73K consumed over 1 calls from:
+    call_init
+      at ./elf/dl-init.c:74
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init::call_init
+      at ./elf/dl-init.c:120
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init
+      at ./elf/./elf/dl-init.c:121
+    _dl_start_user
+      in /lib64/ld-linux-x86-64.so.2
+
+51.13K peak memory consumed over 60549 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd12329f143ae49b8E.llvm.11498457496735407577
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+47.10K consumed over 5 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::haf43f8d67ba221be
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::add_slide_with_title::h050dcf9c82d1a154
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4.03K consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hf6abd1309808670c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    flate2::zio::Writer$LT$W$C$D$GT$::finish::h6151ade47d599634
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::StreamingArchiveWriter$LT$W$GT$::write_deflated::h1b45f5a7d1d226cf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17h1b8f46aac4bcef41E.llvm.5340113258779842934
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 0B from 84 other places
+
+32.77K peak memory consumed over 2 calls from
+soapberry_zip::office::StreamingArchiveWriter$LT$W$GT$::write_deflated::h815696326ff65e81
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+32.77K consumed over 1 calls from:
+    litchi_odf_common::core::writer::PackageWriter::finish::h97b4578a483498d4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+
+8.70K peak memory consumed over 200 calls from
+litchi_odp::authoring::builder::Builder::add_slide_with_title::h050dcf9c82d1a154
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4.40K consumed over 100 calls from:
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4.30K consumed over 100 calls from:
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+
+1.96K peak memory consumed over 1 calls from
+litchi_odf_common::core::writer::Structure::default_styles_xml::h8ab8716f5835b25d
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+1.96K consumed over 1 calls from:
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+
+1.29K peak memory consumed over 848 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hcf10125882f716a2E.llvm.17475570438763808224
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+640B consumed over 1 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h5ba5f05bc8167a9e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::set_mimetype::h3b2400d6dae8a649
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+572B consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h59317b588070fe7f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::writer::PackageWriter::finish::h97b4578a483498d4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+76B consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h59317b588070fe7f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::writer::ZipFileBuilder$LT$W$GT$::start::h105971d931219ba1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::StreamingArchiveWriter$LT$W$GT$::write_deflated::h815696326ff65e81
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::writer::PackageWriter::finish::h97b4578a483498d4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 0B from 59 other places
+
+820B peak memory consumed over 6944 calls from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+820B consumed over 1 calls from:
+    litchi_odp::authoring::builder::Builder::generate_meta_xml::h4b601c202dc6b8a9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 0B from 14 other places
+
+596B peak memory consumed over 2 calls from
+aho_corasick::dfa::Builder::build_from_noncontiguous::h286c925d056fc7b4
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+576B consumed over 1 calls from:
+    aho_corasick::ahocorasick::AhoCorasickBuilder::build_auto::he280e58918e4cc21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    aho_corasick::ahocorasick::AhoCorasickBuilder::build::h6b304e82be87dbb7
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    core::ops::function::FnOnce::call_once::h55470a003ba6a19d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sync::once::Once::call_once_force::_$u7b$$u7b$closure$u7d$$u7d$::hb3376cd100cf86cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::model::page_metadata::write_attribute::h00606751102b217f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::model::page_metadata::write_page_attributes::h3195fbc388ba8479
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::generate_content_xml::hcb71267d330e68c1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20B consumed over 1 calls from:
+    aho_corasick::ahocorasick::AhoCorasickBuilder::build_auto::he280e58918e4cc21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    aho_corasick::ahocorasick::AhoCorasickBuilder::build::h6b304e82be87dbb7
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    core::ops::function::FnOnce::call_once::h55470a003ba6a19d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sync::once::Once::call_once_force::_$u7b$$u7b$closure$u7d$$u7d$::hb3376cd100cf86cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::model::page_metadata::write_attribute::h00606751102b217f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::model::page_metadata::write_page_attributes::h3195fbc388ba8479
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::generate_content_xml::hcb71267d330e68c1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+
+
+MOST TEMPORARY ALLOCATIONS
+213567 temporary allocations of 323173 allocations in total (66.08%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 temporary allocations of 4000 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 temporary allocations of 4000 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 temporary allocations of 4000 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 temporary allocations of 4000 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 temporary allocations of 4000 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::validation::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::get_attr::h57344b2c1b9a10fc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::shape_builder::had4763c95117b835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 193.57K from 530 other places
+
+26109 temporary allocations of 60549 allocations in total (43.12%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd12329f143ae49b8E.llvm.11498457496735407577
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+8000 temporary allocations of 12000 allocations in total (66.67%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hf6abd1309808670c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::model::ParagraphText::push_text::h561594bdcfc4a87d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+8000 temporary allocations of 12000 allocations in total (66.67%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hf6abd1309808670c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::model::ParagraphText::push_text::h561594bdcfc4a87d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 temporary allocations of 4000 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hf6abd1309808670c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::model::ParagraphText::push_text::h561594bdcfc4a87d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4000 temporary allocations of 4000 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hf6abd1309808670c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::model::ParagraphText::push_text::h561594bdcfc4a87d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+400 temporary allocations of 600 allocations in total (66.67%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hf6abd1309808670c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::model::ParagraphText::push_text::h561594bdcfc4a87d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::slides::h761441c4d2299ea0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 1.71K from 84 other places
+
+3960 temporary allocations of 12400 allocations in total (31.94%) from
+litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::decode_text::h745ecc734b9915cf
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+3960 temporary allocations of 4000 allocations in total (99.00%) from:
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+
+2580 temporary allocations of 4701 allocations in total (54.88%) from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+2000 temporary allocations of 2000 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$core..iter..adapters..chain..Chain$LT$A$C$B$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::h39a2e9c705ca1edc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h7730327f57ded5f8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 temporary allocations of 100 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$core..iter..adapters..chain..Chain$LT$A$C$B$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::h39a2e9c705ca1edc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h7730327f57ded5f8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h471df3dd485ba5a0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_transition_style_definitions::h099e5836554360a9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::resolved_transition_styles::hc7e873f909b8e856
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::text::h789aad0ef7a07d79
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h51e629eb6e1bcaf9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::package::codec::parse_manifest::h275bceaefa078e7e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::manifest::Manifest::parse::h9ad08303d71d15c6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::get_file::hf727a1e6450330bf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h471df3dd485ba5a0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_transition_style_definitions::h099e5836554360a9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::semantic::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::resolved_transition_styles::hc7e873f909b8e856
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17hd81c0a9fb8751aceE.llvm.4165376561976870151
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_slide_with_styles_at::h88ba358ee7e21451
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 420B from 44 other places
+
+2201 temporary allocations of 6944 allocations in total (31.70%) from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+2000 temporary allocations of 2000 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 temporary allocations of 100 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 temporary allocations of 100 allocations in total (100.00%) from:
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    litchi_odp::authoring::builder::Builder::generate_content_xml::hcb71267d330e68c1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 0B from 14 other places
+
+500 temporary allocations of 700 allocations in total (71.43%) from
+aho_corasick::automaton::Automaton::try_replace_all::had02761b69302e7e
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 temporary allocations of 100 allocations in total (100.00%) from:
+    litchi_odp::model::page_metadata::write_attribute::h00606751102b217f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::model::page_metadata::write_page_attributes::h3195fbc388ba8479
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::generate_content_xml::hcb71267d330e68c1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 temporary allocations of 100 allocations in total (100.00%) from:
+    litchi_odp::model::page_metadata::write_attribute::h00606751102b217f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::model::page_metadata::write_page_attributes::h3195fbc388ba8479
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::generate_content_xml::hcb71267d330e68c1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 temporary allocations of 100 allocations in total (100.00%) from:
+    litchi_odp::model::page_metadata::write_attribute::h00606751102b217f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::model::page_metadata::write_page_attributes::h3195fbc388ba8479
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::generate_content_xml::hcb71267d330e68c1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 temporary allocations of 100 allocations in total (100.00%) from:
+    litchi_odp::authoring::builder::xml::encode_text_content::flush_plain::hbb15587a80046d99
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::xml::generate_text_paragraphs::hea53beafb759cdc3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::generate_content_xml::hcb71267d330e68c1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+100 temporary allocations of 100 allocations in total (100.00%) from:
+    litchi_odp::authoring::builder::xml::encode_text_content::flush_plain::hbb15587a80046d99
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::xml::generate_text_paragraphs::hea53beafb759cdc3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::generate_content_xml::hcb71267d330e68c1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 0B from 2 other places
+
+399 temporary allocations of 848 allocations in total (47.05%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hcf10125882f716a2E.llvm.17475570438763808224
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 40 allocations in total (50.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h59317b588070fe7f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::reader::buffered_reader::_$LT$impl$u20$quick_xml..reader..XmlSource$LT$$RF$mut$u20$alloc..vec..Vec$LT$u8$GT$$GT$$u20$for$u20$R$GT$::read_with::hbfee7859059318a7
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h51e629eb6e1bcaf9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::manifest::Manifest::parse::h9ad08303d71d15c6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::has_file::he10f973ada03b57c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h59317b588070fe7f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h51e629eb6e1bcaf9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::manifest::Manifest::parse::h9ad08303d71d15c6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::get_file::hf727a1e6450330bf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h59317b588070fe7f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h51e629eb6e1bcaf9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::package::codec::parse_manifest::h275bceaefa078e7e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::manifest::Manifest::parse::h9ad08303d71d15c6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::get_file::hf727a1e6450330bf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 40 allocations in total (50.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h59317b588070fe7f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::reader::buffered_reader::_$LT$impl$u20$quick_xml..reader..XmlSource$LT$$RF$mut$u20$alloc..vec..Vec$LT$u8$GT$$GT$$u20$for$u20$R$GT$::read_with::hbfee7859059318a7
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h51e629eb6e1bcaf9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::manifest::Manifest::parse::h9ad08303d71d15c6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::get_file::hf727a1e6450330bf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h59317b588070fe7f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h51e629eb6e1bcaf9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::package::codec::parse_manifest::h275bceaefa078e7e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::manifest::Manifest::parse::h9ad08303d71d15c6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::has_file::he10f973ada03b57c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 299B from 59 other places
+
+151 temporary allocations of 493 allocations in total (30.63%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h18e8a990a47f3bd7E.llvm.4082306042956547542
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hf00fc70d07fa045f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new_with_limits::h58b01f1ce0b7d090
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new::hb2dd6d910cb16f8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::new::hfd7a834d39b91fd3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::get_file::hf727a1e6450330bf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hf00fc70d07fa045f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new_with_limits::h58b01f1ce0b7d090
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new::hb2dd6d910cb16f8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::new::hfd7a834d39b91fd3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::has_file::he10f973ada03b57c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hf00fc70d07fa045f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new_with_limits::h58b01f1ce0b7d090
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new::hb2dd6d910cb16f8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::new::hfd7a834d39b91fd3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::get_file::hf727a1e6450330bf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hf00fc70d07fa045f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new_with_limits::h58b01f1ce0b7d090
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new::hb2dd6d910cb16f8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::new::hfd7a834d39b91fd3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::has_file::he10f973ada03b57c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hf00fc70d07fa045f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new_with_limits::h58b01f1ce0b7d090
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    soapberry_zip::office::ArchiveReader::new::hb2dd6d910cb16f8e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::new::hfd7a834d39b91fd3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.17475570438763808224
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::package::OwnedPackage::get_file::hf727a1e6450330bf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::package::presentation::Presentation::from_bytes::hc9763f22fa4aa23a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+  and 51B from 51 other places
+
+21 temporary allocations of 21 allocations in total (100.00%) from
+alloc::str::join_generic_copy::he90a27a502420d20
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_semantic_odp::h9335d6a9fbd0d65d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+
+16 temporary allocations of 16 allocations in total (100.00%) from
+aho_corasick::automaton::Automaton::try_replace_all::h5313b969515a9f8f
+  in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4 temporary allocations of 4 allocations in total (100.00%) from:
+    litchi_odf_common::core::writer::PackageWriter::finish::h97b4578a483498d4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4 temporary allocations of 4 allocations in total (100.00%) from:
+    litchi_odf_common::core::writer::PackageWriter::finish::h97b4578a483498d4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::package::build::hdfebb9fc5701c41c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_odp::authoring::builder::Builder::build::h0aaf695a298938a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4 temporary allocations of 4 allocations in total (100.00%) from:
+    litchi_odf_common::core::writer::PackageWriter::finish::h97b4578a483498d4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+4 temporary allocations of 4 allocations in total (100.00%) from:
+    litchi_odf_common::core::writer::PackageWriter::finish::h97b4578a483498d4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::semantic_odp_bytes::h2cf25ac02639819a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::build_semantic_odp_corpus::h05174b36e5435164
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/odp-slide-selector/after
+
+
+total runtime: 0.28s.
+calls to allocation functions: 545364 (1940797/s)
+temporary memory allocations: 249538 (888035/s)
+peak heap memory consumption: 696.21K
+peak RSS (including heaptrack overhead): 12.23M
+total memory leaked: 1.78K

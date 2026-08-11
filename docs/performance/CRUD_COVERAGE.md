@@ -215,6 +215,13 @@ scanning and validating the complete XML, including malformed trailing input
 and all resource limits. It does not provide positional source I/O, early XML
 termination, an ODP selector, or broader real-producer/media query coverage.
 
+Change 0049 makes the existing ODP one-slide benchmark a direct public indexed
+query. It retains completed semantic content only for the requested slide while
+resolving all transition styles and validating content through EOF. It proves
+public/full-list parity, out-of-range behavior, late semantic failure and style
+inheritance failure. It does not provide positional ZIP/XML I/O, early
+termination, repeated-query caching, or broader real-producer/media selection.
+
 Change 0040 removes repeated UTF-8 scalar decoding from ordinary RTF text
 delimiter discovery without changing the existing CRUD surface. It measures
 plain, raw CP-1252 and LZFu opens at medium and large, retains the 25-row

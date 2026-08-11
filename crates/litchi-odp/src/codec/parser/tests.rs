@@ -283,6 +283,42 @@ fn test_parse_slides() {
 }
 
 #[test]
+fn indexed_slide_parser_matches_full_parser() {
+    let slides = Parser::parse_slides(TEST_PRESENTATION_XML).unwrap();
+    for index in 0..=slides.len() {
+        assert_eq!(
+            Parser::parse_slide_with_styles_at(TEST_PRESENTATION_XML, None, index).unwrap(),
+            slides.get(index).cloned()
+        );
+    }
+    assert_eq!(
+        Parser::parse_slide_with_styles_at(TEST_PRESENTATION_XML, None, usize::MAX).unwrap(),
+        None
+    );
+    assert_eq!(
+        Parser::parse_slide_with_styles_at(TEST_EMPTY_PRESENTATION, None, 0).unwrap(),
+        None
+    );
+}
+
+#[test]
+fn indexed_slide_parser_validates_pages_after_the_selection() {
+    let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:presentation><draw:page><text:p>selected</text:p></draw:page><draw:page><text:p><text:s text:c="1000001"/></text:p></draw:page></office:presentation></office:body></office:document-content>"#;
+
+    let full_error = Parser::parse_slides(xml).unwrap_err();
+    let indexed_error = Parser::parse_slide_with_styles_at(xml, None, 0).unwrap_err();
+    assert_eq!(indexed_error.to_string(), full_error.to_string());
+}
+
+#[test]
+fn indexed_slide_parser_rejects_malformed_xml_after_the_selection() {
+    let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page/><draw:page></office:presentation></office:body></office:document-content>"#;
+
+    assert!(Parser::parse_slides(xml).is_err());
+    assert!(Parser::parse_slide_with_styles_at(xml, None, 0).is_err());
+}
+
+#[test]
 fn test_parse_empty_presentation() {
     let slides = Parser::parse_slides(TEST_EMPTY_PRESENTATION).unwrap();
     assert!(slides.is_empty());
@@ -611,6 +647,8 @@ fn rejects_cyclic_transition_style_inheritance() {
     let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><o:automatic-styles><s:style s:name="A" s:family="drawing-page" s:parent-style-name="B"/><s:style s:name="B" s:family="drawing-page" s:parent-style-name="A"/></o:automatic-styles><o:body><o:presentation><d:page d:style-name="A"/></o:presentation></o:body></o:document-content>"#;
     let error = Parser::parse_slides_with_styles(content, None).unwrap_err();
     assert!(error.to_string().contains("cyclic"));
+    let indexed_error = Parser::parse_slide_with_styles_at(content, None, 0).unwrap_err();
+    assert!(indexed_error.to_string().contains("cyclic"));
 }
 
 #[test]
