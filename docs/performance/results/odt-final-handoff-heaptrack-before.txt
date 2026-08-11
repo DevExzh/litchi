@@ -1,0 +1,10 @@
+reading file "/tmp/odt-final-handoff-heap-before.zst.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055 --warmup 0 --samples 10 --case odt_media_paragraph_edit_save --json /tmp/odt-final-handoff-heap-before.json
+finished reading file, now analyzing data:
+
+total runtime: 0.839000s.
+calls to allocation functions: 128535 (153200/s)
+temporary memory allocations: 22821 (27200/s)
+peak heap memory consumption: 106.03M
+peak RSS (including heaptrack overhead): 121.65M
+total memory leaked: 1.78K

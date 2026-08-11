@@ -1,0 +1,58 @@
+reading file "/tmp/odt-final-handoff-heap-before.zst.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055 --warmup 0 --samples 10 --case odt_media_paragraph_edit_save --json /tmp/odt-final-handoff-heap-before.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+10 calls to allocation functions with 16.79M peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hb2219e590dfba0f6E.llvm.2026315629123584572
+  in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+10 calls with 16.79M peak consumption from:
+    litchi_odt::transaction::copy_bytes::he158f8711d0c713d
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    litchi_odt::transaction::Edit::commit::hcf4ff2e3a7fa1b7a
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    litchi_perf_baseline::run_odt_media_paragraph_edit_save::h75abf4bb27315c04
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    main
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+
+
+PEAK MEMORY CONSUMERS
+16.79M peak memory consumed over 10 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hb2219e590dfba0f6E.llvm.2026315629123584572
+  in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+16.79M consumed over 10 calls from:
+    litchi_odt::transaction::copy_bytes::he158f8711d0c713d
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    litchi_odt::transaction::Edit::commit::hcf4ff2e3a7fa1b7a
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    litchi_perf_baseline::run_odt_media_paragraph_edit_save::h75abf4bb27315c04
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.6312076938221301636
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+    main
+      in /tmp/litchi-perf-odt-final-handoff-before-58dbdcc055
+
+
+MOST TEMPORARY ALLOCATIONS
+
+total runtime: 0.84s.
+calls to allocation functions: 128535 (153200/s)
+temporary memory allocations: 22821 (27200/s)
+peak heap memory consumption: 106.03M
+peak RSS (including heaptrack overhead): 121.65M
+total memory leaked: 1.78K

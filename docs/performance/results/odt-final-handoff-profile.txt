@@ -1,0 +1,28 @@
+ODT final changed-result byte-handoff profile summary
+
+Command shape:
+  MALLOC_MMAP_THRESHOLD_=33554432 MALLOC_TRIM_THRESHOLD_=-1 \
+    taskset -c 11 perf record -F 999 -g --call-graph dwarf \
+    -o <state>.perf.data -- <binary> --warmup 3 --samples 30 \
+    --case odt_media_paragraph_edit_save --json <state>.json
+
+Before:
+  samples: 1,739
+  approximate event count: 8,228,597,655
+  __memmove_avx512_unaligned_erms: 13.62% exclusive
+  litchi_odt::transaction::copy_bytes beneath Edit::commit: 1.27%
+
+After:
+  samples: 1,684
+  approximate event count: 8,017,979,190
+  __memmove_avx512_unaligned_erms: 11.98% exclusive
+  litchi_odt::transaction::copy_bytes beneath Edit::commit: absent
+
+The approximate sampled event count falls 2.56%. The main memmove frame falls
+1.64 percentage points, or 12.04% relative. The removed final-result copy is
+visible as a before-only caller; other media verification, hashing,
+publication and validation copies deliberately remain.
+
+Kernel symbols were restricted on this host. Both reports recorded zero lost
+samples. Matched perf-stat ABBA counters are the quantitative whole-process
+attribution record.
