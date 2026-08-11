@@ -1,7 +1,9 @@
 //! Create a source-built Numbers workbook with cells across sparse tile boundaries.
 
-use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
+use litchi_numbers::table::CellPosition;
+use litchi_numbers::table::cells::{Change, Input};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
@@ -11,15 +13,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Sparse inventory")
         .table_dimensions(257, 2)
         .build()?;
-    let table_id = editor.tables()?.remove(0).id();
-    editor.set_cells(
-        table_id,
+    editor = set_focused_table_cells(
+        editor,
+        [Change::set(
+            CellPosition::new(256, 1),
+            Input::number(257.0)?,
+        )],
+    )?;
+    editor = set_focused_table_cells(
+        editor,
         [
-            TableCellUpdate::new(0, 0, CellValue::Text("First tile".to_owned())),
-            TableCellUpdate::new(256, 0, CellValue::Text("Boundary".to_owned())),
-            TableCellUpdate::new(256, 1, CellValue::number(257.0)?),
+            Change::set(CellPosition::new(0, 0), Input::text("First tile")?),
+            Change::set(CellPosition::new(256, 0), Input::text("Boundary")?),
         ],
     )?;
     editor.save(output)?;
     Ok(())
+}
+
+fn set_focused_table_cells(
+    editor: NumbersEditor,
+    changes: impl IntoIterator<Item = Change>,
+) -> Result<NumbersEditor, Box<dyn std::error::Error>> {
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_table_cells(SheetSelector::index(0), TableSelector::index(0))?
+        .extend(changes)?
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(NumbersEditor::from_bytes(&bytes)?)
 }

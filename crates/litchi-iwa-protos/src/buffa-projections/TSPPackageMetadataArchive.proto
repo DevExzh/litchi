@@ -1,0 +1,31 @@
+// Read-only scalar roots for the raw-preserving PackageMetadata batch writer.
+// Repeated components and registry records remain on the handwritten strict
+// streaming path, so generated code never owns input-width collections.
+syntax = "proto2";
+package LitchiIwaPackageMetadataProjection;
+
+message PackageMetadataArchive {
+  required uint64 last_object_identifier = 1;
+}
+
+message ComponentInfoArchive {
+  required uint64 identifier = 1;
+  required string preferred_locator = 2;
+  optional string locator = 3;
+}
+
+message ComponentExternalReferenceArchive {
+  required uint64 component_identifier = 1;
+  optional uint64 object_identifier = 2;
+  optional bool is_weak = 3;
+}
+
+message ObjectUUIDMapEntryArchive {
+  required uint64 identifier = 1;
+  required bytes uuid = 2;
+}
+
+message UUIDArchive {
+  required uint64 lower = 1;
+  required uint64 upper = 2;
+}

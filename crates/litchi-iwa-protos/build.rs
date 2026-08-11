@@ -29,6 +29,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_table_title_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");
+    println!("cargo:rerun-if-changed=src/package_metadata_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_formula_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_document_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_page_layout_codec.rs");
@@ -80,6 +82,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     enforce_table_title_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_table_cell_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_package_metadata_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_formula_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_body_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_section_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_table_info_projection_provenance(proto_directory, buffa_projection_directory)?;
@@ -127,6 +131,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .reflect_mode(buffa_build::ReflectMode::Off)
         .idiomatic_field_names(true)
         .compile()?;
+
     enforce_text_projection_budget(&buffa_text_out_directory)?;
 
     // Group-by category labels need only a zero-field GroupNode envelope plus
@@ -302,6 +307,42 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_table_cell_dependency_projection_budget(&buffa_table_cell_dependency_out_directory)?;
+
+    // PackageMetadata publication edits only one scalar plus selected nested
+    // registry records. Repeated components and records stay on the strict
+    // handwritten streaming path to keep the generated closure width-free.
+    let buffa_package_metadata_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-package-metadata");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSPPackageMetadataArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_package_metadata_out_directory)
+        .include_file("iwa_package_metadata_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_package_metadata_projection_budget(&buffa_package_metadata_out_directory)?;
+
+    let buffa_formula_out_directory = PathBuf::from(env::var("OUT_DIR")?).join("buffa-formula");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSCEFormulaArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_formula_out_directory)
+        .include_file("iwa_formula_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_formula_projection_budget(&buffa_formula_out_directory)?;
 
     // Keynote's show reader projects only scalar settings, required direct
     // references, and presentation size. The repeated slide tree is routed by
@@ -1147,6 +1188,16 @@ fn enforce_table_cell_projection_provenance(
         "required .TSCE.CellRectArchive refers_to_rect = 2;",
         "repeated .TSP.Reference cell_record_tiles = 1;",
         "repeated .TSP.Reference range_precedents_tile = 1;",
+        "repeated uint32 edge_without_owner_rows = 1;",
+        "repeated uint32 edge_without_owner_columns = 2;",
+        "repeated uint32 edge_with_owner_rows = 3;",
+        "repeated uint32 edge_with_owner_columns = 4;",
+        "repeated uint32 internal_owner_id_for_edge = 5;",
+        "optional fixed32 packedData = 1;",
+        "required .TSCE.CellCoordinateArchive origin = 1;",
+        "required .TSCE.ColumnRowSize size = 2;",
+        "required .TSP.CFUUIDArchive table_id = 1;",
+        "required .TSCE.RangeCoordinateArchive range = 2;",
     ];
     const TSP_CANONICAL_FIELDS: &[&str] = &[
         "required uint64 identifier = 1;",
@@ -1156,6 +1207,21 @@ fn enforce_table_cell_projection_provenance(
         "required uint32 length = 2;",
         "required uint64 lower = 1;",
         "required uint64 upper = 2;",
+        "optional bytes uuid_bytes = 1;",
+        "optional uint32 uuid_w0 = 2;",
+        "optional uint32 uuid_w1 = 3;",
+        "optional uint32 uuid_w2 = 4;",
+        "optional uint32 uuid_w3 = 5;",
+    ];
+    const DEPENDENCY_PROJECTION_MESSAGES: &[&str] = &[
+        "message ExpandedEdgesArchive {}",
+        "message CellCoordinateArchive {\n  optional fixed32 packed_data = 1;\n  optional uint32 column = 2;\n  optional uint32 row = 3;\n}",
+        "message ColumnRowSize {\n  optional uint32 num_columns = 1;\n  optional uint32 num_rows = 2;\n}",
+        "message CellRectArchive {\n  required bytes origin = 1;\n  required bytes size = 2;\n}",
+        "message CFUUIDArchive {\n  optional bytes uuid_bytes = 1;\n  optional uint32 uuid_w0 = 2;\n  optional uint32 uuid_w1 = 3;\n  optional uint32 uuid_w2 = 4;\n  optional uint32 uuid_w3 = 5;\n}",
+        "message RangeReferenceArchive {\n  required bytes table_id = 1;\n  required uint32 top_left_column = 2;\n  required uint32 top_left_row = 3;\n  required uint32 bottom_right_column = 4;\n  required uint32 bottom_right_row = 5;\n}",
+        "message RangeCoordinateArchive {\n  required uint32 top_left_column = 1;\n  required uint32 top_left_row = 2;\n  required uint32 bottom_right_column = 3;\n  required uint32 bottom_right_row = 4;\n}",
+        "message InternalRangeReferenceArchive {\n  required uint32 owner_id = 1;\n  required bytes range = 2;\n}",
     ];
     const ROUTER_SYMBOLS: &[&str] = &[
         "pub fn decode_table_model(",
@@ -1177,6 +1243,10 @@ fn enforce_table_cell_projection_provenance(
         "pub fn decode_range_back_dependency(",
         "pub fn decode_range_precedents_tile(",
         "pub fn decode_from_to_range(",
+        "pub fn decode_expanded_edges(",
+        "pub fn decode_cell_coordinate(",
+        "pub fn decode_range_reference(",
+        "pub fn decode_internal_range_reference(",
         "pub trait StorageVisitor",
         "pub trait DependencyVisitor",
         "if snapshot.deprecated_is_external == Some(true)",
@@ -1212,13 +1282,16 @@ fn enforce_table_cell_projection_provenance(
             .iter()
             .all(|field| tsce.contains(field))
         || !TSP_CANONICAL_FIELDS.iter().all(|field| tsp.contains(field))
+        || !DEPENDENCY_PROJECTION_MESSAGES
+            .iter()
+            .all(|message| dependency.matches(message).count() == 1)
         || !ROUTER_SYMBOLS
             .iter()
             .all(|symbol| production.contains(symbol))
         || storage.contains("repeated ")
         || dependency.contains("repeated ")
         || storage.len() > 5 * 1024
-        || dependency.len() > 3 * 1024
+        || dependency.len() > 5 * 1024
         || !lib.contains("mod buffa_numbers_table_cell_storage_generated {")
         || !lib.contains("mod buffa_numbers_table_cell_dependency_generated {")
         || !lib.contains("pub mod numbers_table_cell_storage_codec;")
@@ -1232,6 +1305,229 @@ fn enforce_table_cell_projection_provenance(
         || production.contains(".encode(")
     {
         return Err("Numbers table-cell projections/codecs drifted from canonical TST/TSCE envelopes, exceeded source budgets, exposed repeated generated storage, or introduced production encoding".into());
+    }
+    Ok(())
+}
+
+fn enforce_package_metadata_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const CANONICAL: &[&str] = &[
+        "message PackageMetadata {",
+        "required uint64 last_object_identifier = 1;",
+        "repeated .TSP.ComponentInfo components = 3;",
+        "repeated .TSP.ComponentInfo versioned_components = 11;",
+        "message ComponentInfo {",
+        "required uint64 identifier = 1;",
+        "required string preferred_locator = 2;",
+        "optional string locator = 3;",
+        "repeated .TSP.ComponentExternalReference external_references = 6;",
+        "repeated .TSP.ObjectUUIDMapEntry object_uuid_map_entries = 11;",
+        "repeated .TSP.ComponentExternalReference versioned_external_references = 18;",
+        "message ComponentExternalReference {",
+        "required uint64 component_identifier = 1;",
+        "optional uint64 object_identifier = 2;",
+        "optional bool is_weak = 3;",
+        "message ObjectUUIDMapEntry {",
+        "required uint64 identifier = 1;",
+        "required .TSP.UUID uuid = 2;",
+        "message UUID {",
+        "required uint64 lower = 1;",
+        "required uint64 upper = 2;",
+    ];
+    let canonical = fs::read_to_string(proto_directory.join("TSPArchiveMessages.proto"))?;
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSPPackageMetadataArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    const EXPECTED_PROJECTION_SCHEMA: &str = r#"syntax = "proto2";
+package LitchiIwaPackageMetadataProjection;
+message PackageMetadataArchive {
+required uint64 last_object_identifier = 1;
+}
+message ComponentInfoArchive {
+required uint64 identifier = 1;
+required string preferred_locator = 2;
+optional string locator = 3;
+}
+message ComponentExternalReferenceArchive {
+required uint64 component_identifier = 1;
+optional uint64 object_identifier = 2;
+optional bool is_weak = 3;
+}
+message ObjectUUIDMapEntryArchive {
+required uint64 identifier = 1;
+required bytes uuid = 2;
+}
+message UUIDArchive {
+required uint64 lower = 1;
+required uint64 upper = 2;
+}"#;
+    const CODEC_SYMBOLS: &[&str] = &[
+        "pub struct RewriteOptions",
+        "pub struct ComponentSelector",
+        "pub struct ObjectUuidAddition",
+        "pub struct ExternalReferenceAddition",
+        "pub struct Batch",
+        "pub struct ComponentDescriptor",
+        "pub struct ObjectUuidDescriptor",
+        "pub struct ExternalReferenceDescriptor",
+        "pub trait PackageMetadataVisitor",
+        "pub fn inspect_package_metadata_with_visitor",
+        "pub fn rewrite_package_metadata",
+        "precharge_rewrite_and_verification",
+        "try_reserve_exact",
+    ];
+    let codec = fs::read_to_string("src/package_metadata_codec.rs")?;
+    let production = codec.as_str();
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if !CANONICAL
+        .iter()
+        .all(|declaration| canonical.contains(declaration) || tsp.contains(declaration))
+        || projection_schema != EXPECTED_PROJECTION_SCHEMA
+        || projection.contains("repeated ")
+        || projection.len() > 2 * 1024
+        || lib
+            .matches("mod buffa_package_metadata_generated {")
+            .count()
+            != 1
+        || lib.matches("pub mod package_metadata_codec;").count() != 1
+        || lib.contains("pub mod buffa_package_metadata_generated")
+        || !CODEC_SYMBOLS
+            .iter()
+            .all(|symbol| production.contains(symbol))
+        || production.contains("RepeatedView")
+        || production.contains("LazyRepeatedView")
+        || production.contains("prost::")
+        || production.contains("to_owned_message")
+        || production.contains("encode_to_vec")
+        || production.contains("try_encode")
+        || production.contains(".encode(")
+    {
+        return Err("PackageMetadata projection/codec drifted from canonical TSP registry fields, exceeded its source budget, exposed generated repeated storage, or introduced generated/Prost encoding".into());
+    }
+    Ok(())
+}
+
+fn enforce_formula_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const CANONICAL: &[&str] = &[
+        "message FormulaArchive {",
+        "required .TSCE.ASTNodeArrayArchive AST_node_array = 1;",
+        "optional uint32 host_column = 2;",
+        "optional uint32 host_row = 3;",
+        "message ASTNodeArrayArchive {",
+        "repeated .TSCE.ASTNodeArrayArchive.ASTNodeArchive AST_node = 1;",
+        "message ASTNodeArchive {",
+        "required .TSCE.ASTNodeArrayArchive.ASTNodeType AST_node_type = 1;",
+        "optional uint32 AST_function_node_index = 2;",
+        "optional uint32 AST_function_node_numArgs = 3;",
+        "optional double AST_number_node_number = 4;",
+        "optional bool AST_boolean_node_boolean = 5;",
+        "optional bool AST_token_node_boolean = 10;",
+        "optional .TSCE.ASTNodeArrayArchive.ASTLocalCellReferenceNodeArchive AST_local_cell_reference_node_reference = 15;",
+        "optional .TSCE.ASTNodeArrayArchive.ASTColumnCoordinateArchive AST_column = 26;",
+        "optional .TSCE.ASTNodeArrayArchive.ASTRowCoordinateArchive AST_row = 27;",
+        "message ASTLocalCellReferenceNodeArchive {",
+        "required uint32 row_handle = 1;",
+        "required uint32 column_handle = 2;",
+        "message ASTColumnCoordinateArchive {",
+        "required sint32 column = 1;",
+        "message ASTRowCoordinateArchive {",
+        "required sint32 row = 1;",
+    ];
+    const SYMBOLS: &[&str] = &[
+        "pub struct DecodeOptions",
+        "pub struct FormulaContext",
+        "pub enum FormulaNode",
+        "pub struct LocalPrecedent",
+        "pub struct UnsupportedLocal",
+        "pub trait FormulaVisitor",
+        "pub trait FormulaDependencyVisitor",
+        "pub struct DecodeReport",
+        "pub fn inspect_formula_archive",
+        "pub fn inspect_formula_dependencies_with_visitor",
+        "pub fn decode_formula_archive_with_visitor",
+        "preflight_callback_pass",
+    ];
+    let canonical = fs::read_to_string(proto_directory.join("TSCEArchives.proto"))?;
+    let projection = fs::read_to_string(projection_directory.join("TSCEFormulaArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    const EXPECTED_SCHEMA: &str = r#"syntax = "proto2";
+package LitchiIwaFormulaProjection;
+message FormulaArchive {
+required bytes ast_node_array = 1;
+optional uint32 host_column = 2;
+optional uint32 host_row = 3;
+optional bool host_column_is_negative = 4 [default = false];
+optional bool host_row_is_negative = 5 [default = false];
+optional bytes translation_flags = 6;
+optional bytes host_table_uid = 7;
+optional bytes host_column_uid = 8;
+optional bytes host_row_uid = 9;
+}
+message ASTNodeArchive {
+required int32 node_type = 1;
+optional uint32 function_index = 2;
+optional uint32 function_num_args = 3;
+optional double number = 4;
+optional bool boolean = 5;
+optional bool token_boolean = 10;
+optional bytes thunk_array = 14;
+optional bytes local_cell_reference = 15;
+optional bytes cross_table_cell_reference = 16;
+optional string whitespace = 25;
+optional bytes column = 26;
+optional bytes row = 27;
+optional bytes cross_table_extra = 28;
+optional bytes uid_coordinate = 30;
+optional bytes tract_list = 38;
+}
+message LocalCellReferenceArchive {
+required uint32 row_handle = 1;
+required uint32 column_handle = 2;
+required uint32 row_is_sticky = 3;
+required uint32 column_is_sticky = 4;
+}
+message ColumnCoordinateArchive {
+required sint32 column = 1;
+optional bool absolute = 2 [default = false];
+}
+message RowCoordinateArchive {
+required sint32 row = 1;
+optional bool absolute = 2 [default = false];
+}"#;
+    let codec = fs::read_to_string("src/numbers_formula_codec.rs")?;
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if !CANONICAL.iter().all(|item| canonical.contains(item))
+        || projection_schema != EXPECTED_SCHEMA
+        || projection.contains("repeated ")
+        || projection.len() > 4 * 1024
+        || lib.matches("mod buffa_formula_generated {").count() != 1
+        || lib.matches("pub mod numbers_formula_codec;").count() != 1
+        || lib.contains("pub mod buffa_formula_generated")
+        || !SYMBOLS.iter().all(|symbol| codec.contains(symbol))
+        || codec.contains("prost::")
+        || codec.contains("to_owned_message")
+        || codec.contains("encode_to_vec")
+        || codec.contains("try_encode")
+        || codec.contains("RepeatedView")
+        || codec.contains("LazyRepeatedView")
+    {
+        return Err("FormulaArchive projection/codec drifted from canonical TSCE fields, exposed generated repeated storage, or introduced owned/generated decoding".into());
     }
     Ok(())
 }
@@ -2309,8 +2605,42 @@ fn enforce_table_cell_dependency_projection_budget(directory: &Path) -> Result<(
         directory,
         "Numbers table-cell dependency",
         EXPECTED_FILES,
-        303_245,
-        "21be31cf344b0c77e876d045ac6afc70c2c60f08f622c8c86bdf3fd6335e8acf",
+        544_538,
+        "2fba7c22aef58ed3cfe6eba1f77e5eaf79d2597dd79966e05d20e50c0e2b33b3",
+    )
+}
+
+fn enforce_package_metadata_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: &[&str] = &[
+        "LitchiIwaPackageMetadataProjection.mod.rs",
+        "TSPPackageMetadataArchive.__lazy_view.rs",
+        "TSPPackageMetadataArchive.__view.rs",
+        "TSPPackageMetadataArchive.rs",
+        "iwa_package_metadata_buffa_protos.rs",
+    ];
+    enforce_table_cell_exact_budget(
+        directory,
+        "PackageMetadata",
+        EXPECTED_FILES,
+        145_681,
+        "ee49927f75c6b632c83055f9b7e647920b389be41bec10e25871a6ef7b56ab31",
+    )
+}
+
+fn enforce_formula_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: &[&str] = &[
+        "LitchiIwaFormulaProjection.mod.rs",
+        "TSCEFormulaArchive.__lazy_view.rs",
+        "TSCEFormulaArchive.__view.rs",
+        "TSCEFormulaArchive.rs",
+        "iwa_formula_buffa_protos.rs",
+    ];
+    enforce_table_cell_exact_budget(
+        directory,
+        "FormulaArchive",
+        EXPECTED_FILES,
+        201_539,
+        "ccd972b3dcd76b6142342d36435f2f76a305c029265853ced04d64c1e2bf1752",
     )
 }
 

@@ -1,11 +1,12 @@
 //! Create and physically sort a plain-text Numbers table without an input document.
 
 use litchi_iwa::numbers::{
-    NumbersDocumentBuilder, NumbersTableSortColumnIndex, NumbersTableSortDirection,
+    NumbersDocumentBuilder, NumbersEditor, NumbersTableSortColumnIndex, NumbersTableSortDirection,
     NumbersTableSortOrder, NumbersTableSortRule,
 };
-use litchi_numbers::TableSelector;
-use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
+use litchi_numbers::table::CellPosition;
+use litchi_numbers::table::cells::{Change, Input};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
@@ -15,25 +16,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Cities")
         .table_dimensions(5, 2)
         .build()?;
-    let table_id = editor
-        .tables()?
-        .first()
-        .ok_or("the document has no tables")?
-        .id();
     let table = TableSelector::index(0);
-    editor.set_cells(
-        table_id,
+    editor = set_focused_table_cells(
+        editor,
         [
-            TableCellUpdate::new(0, 0, CellValue::Text("Name".to_owned())),
-            TableCellUpdate::new(0, 1, CellValue::Text("Marker".to_owned())),
-            TableCellUpdate::new(1, 0, CellValue::Text("zebra".to_owned())),
-            TableCellUpdate::new(1, 1, CellValue::Text("last".to_owned())),
-            TableCellUpdate::new(2, 0, CellValue::Text("apple".to_owned())),
-            TableCellUpdate::new(2, 1, CellValue::Text("first apple".to_owned())),
-            TableCellUpdate::new(3, 0, CellValue::Text("banana".to_owned())),
-            TableCellUpdate::new(3, 1, CellValue::Text("middle".to_owned())),
-            TableCellUpdate::new(4, 0, CellValue::Text("apple".to_owned())),
-            TableCellUpdate::new(4, 1, CellValue::Text("second apple".to_owned())),
+            Change::set(CellPosition::new(0, 0), Input::text("Name")?),
+            Change::set(CellPosition::new(0, 1), Input::text("Marker")?),
+            Change::set(CellPosition::new(1, 0), Input::text("zebra")?),
+            Change::set(CellPosition::new(1, 1), Input::text("last")?),
+            Change::set(CellPosition::new(2, 0), Input::text("apple")?),
+            Change::set(CellPosition::new(2, 1), Input::text("first apple")?),
+            Change::set(CellPosition::new(3, 0), Input::text("banana")?),
+            Change::set(CellPosition::new(3, 1), Input::text("middle")?),
+            Change::set(CellPosition::new(4, 0), Input::text("apple")?),
+            Change::set(CellPosition::new(4, 1), Input::text("second apple")?),
         ],
     )?;
     editor.set_table_sort_order(
@@ -48,4 +44,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.save(output)?;
     Ok(())
+}
+
+fn set_focused_table_cells(
+    editor: NumbersEditor,
+    changes: impl IntoIterator<Item = Change>,
+) -> Result<NumbersEditor, Box<dyn std::error::Error>> {
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_table_cells(SheetSelector::index(0), TableSelector::index(0))?
+        .extend(changes)?
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(NumbersEditor::from_bytes(&bytes)?)
 }

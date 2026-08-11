@@ -517,9 +517,14 @@ mod tests {
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         let region = Region::new(1, 1, 3, 3).unwrap();
-        editor
-            .set_cell(table_id, 1, 1, CellValue::Text("Merged".to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::Text("Merged".to_owned()),
+        )
+        .unwrap();
         editor
             .set_cell_comment(table_id, 1, 1, "Merged anchor")
             .unwrap();
@@ -595,9 +600,14 @@ mod tests {
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         let region = Region::new(1, 1, 2, 2).unwrap();
-        editor
-            .set_cell(table_id, 3, 4, CellValue::number(7.0).unwrap())
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            3,
+            4,
+            CellValue::number(7.0).unwrap(),
+        )
+        .unwrap();
         editor
             .set_formula_with_cached_value(
                 table_id,
@@ -634,9 +644,14 @@ mod tests {
             document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
             Some(&CellValue::Formula("=D3".to_owned()))
         );
-        editor
-            .set_cell(table_id, 2, 3, CellValue::number(11.0).unwrap())
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            2,
+            3,
+            CellValue::number(11.0).unwrap(),
+        )
+        .unwrap();
         assert_eq!(cached_formula_number(&editor, table_id, 1, 1), 11.0);
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(reopened.table_cell_merges(table_id).unwrap().is_empty());
@@ -654,14 +669,14 @@ mod tests {
             .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
         let region = Region::new(1, 1, 2, 2).unwrap();
-        editor
-            .set_cell(
-                target_table.object_id,
-                1,
-                0,
-                CellValue::number(7.0).unwrap(),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            target_table.object_id,
+            1,
+            0,
+            CellValue::number(7.0).unwrap(),
+        )
+        .unwrap();
         editor
             .set_formula_with_cached_value(
                 source_table_id,
@@ -677,7 +692,7 @@ mod tests {
         editor.merge_cells(source_table_id, region).unwrap();
 
         let mut package = editor.into_package();
-        install_uuid_host_references(&mut package, region.row() as u32, region.column() as u32);
+        install_uuid_host_references(&mut package, region.row(), region.column());
         let mut editor = NumbersEditor::from_package(package).unwrap();
         let external_owner_id = formula_owner_at_host(&editor, 1, 1)
             .cell_dependencies
@@ -742,22 +757,22 @@ mod tests {
             .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
         let region = Region::new(1, 1, 2, 2).unwrap();
-        editor
-            .set_cell(
-                target_table.object_id,
-                1,
-                0,
-                CellValue::number(7.0).unwrap(),
-            )
-            .unwrap();
-        editor
-            .set_cell(
-                target_table.object_id,
-                2,
-                0,
-                CellValue::number(3.0).unwrap(),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            target_table.object_id,
+            1,
+            0,
+            CellValue::number(7.0).unwrap(),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            target_table.object_id,
+            2,
+            0,
+            CellValue::number(3.0).unwrap(),
+        )
+        .unwrap();
         editor
             .set_formula_with_cached_value(
                 source_table_id,
@@ -776,7 +791,7 @@ mod tests {
             .unwrap();
         editor.merge_cells(source_table_id, region).unwrap();
         let mut package = editor.into_package();
-        install_uuid_host_references(&mut package, region.row() as u32, region.column() as u32);
+        install_uuid_host_references(&mut package, region.row(), region.column());
         let mut editor = NumbersEditor::from_package(package).unwrap();
         let external_owner_id = formula_owner_at_host(&editor, 1, 1)
             .cell_dependencies
@@ -835,22 +850,22 @@ mod tests {
             .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
         let region = Region::new(1, 1, 2, 2).unwrap();
-        editor
-            .set_cell(
-                target_table.object_id,
-                1,
-                0,
-                CellValue::number(7.0).unwrap(),
-            )
-            .unwrap();
-        editor
-            .set_cell(
-                target_table.object_id,
-                2,
-                0,
-                CellValue::number(3.0).unwrap(),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            target_table.object_id,
+            1,
+            0,
+            CellValue::number(7.0).unwrap(),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            target_table.object_id,
+            2,
+            0,
+            CellValue::number(3.0).unwrap(),
+        )
+        .unwrap();
         editor
             .set_formula_with_cached_value(
                 source_table_id,
@@ -870,11 +885,11 @@ mod tests {
         editor.merge_cells(source_table_id, region).unwrap();
 
         let mut package = editor.into_package();
-        install_uuid_host_references(&mut package, region.row() as u32, region.column() as u32);
+        install_uuid_host_references(&mut package, region.row(), region.column());
         let dependency_ids = install_native_cross_table_range_dependencies(
             &mut package,
-            region.row() as u32,
-            region.column() as u32,
+            region.row(),
+            region.column(),
             TestRangeBounds::new(1, 0, 2, 0),
         );
         let proxy = install_native_merge_range_proxy(
@@ -961,22 +976,22 @@ mod tests {
             .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
         let region = Region::new(1, 1, 2, 2).unwrap();
-        editor
-            .set_cell(
-                target_table.object_id,
-                1,
-                0,
-                CellValue::number(7.0).unwrap(),
-            )
-            .unwrap();
-        editor
-            .set_cell(
-                target_table.object_id,
-                2,
-                0,
-                CellValue::number(3.0).unwrap(),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            target_table.object_id,
+            1,
+            0,
+            CellValue::number(7.0).unwrap(),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            target_table.object_id,
+            2,
+            0,
+            CellValue::number(3.0).unwrap(),
+        )
+        .unwrap();
         editor
             .set_formula_with_cached_value(
                 source_table_id,
@@ -996,7 +1011,7 @@ mod tests {
         editor.merge_cells(source_table_id, region).unwrap();
 
         let mut package = editor.into_package();
-        install_uuid_host_references(&mut package, region.row() as u32, region.column() as u32);
+        install_uuid_host_references(&mut package, region.row(), region.column());
         let mut editor = NumbersEditor::from_package(package).unwrap();
         let external_owner_id = formula_owner_at_host(&editor, 1, 1)
             .cell_dependencies
@@ -1059,22 +1074,22 @@ mod tests {
             .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
         let region = Region::new(1, 1, 2, 2).unwrap();
-        editor
-            .set_cell(
-                target_table.object_id,
-                0,
-                1,
-                CellValue::number(7.0).unwrap(),
-            )
-            .unwrap();
-        editor
-            .set_cell(
-                target_table.object_id,
-                0,
-                2,
-                CellValue::number(3.0).unwrap(),
-            )
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            target_table.object_id,
+            0,
+            1,
+            CellValue::number(7.0).unwrap(),
+        )
+        .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            target_table.object_id,
+            0,
+            2,
+            CellValue::number(3.0).unwrap(),
+        )
+        .unwrap();
         editor
             .set_formula_with_cached_value(
                 source_table_id,
@@ -1094,11 +1109,11 @@ mod tests {
         editor.merge_cells(source_table_id, region).unwrap();
 
         let mut package = editor.into_package();
-        install_uuid_host_references(&mut package, region.row() as u32, region.column() as u32);
+        install_uuid_host_references(&mut package, region.row(), region.column());
         let dependency_ids = install_native_cross_table_range_dependencies(
             &mut package,
-            region.row() as u32,
-            region.column() as u32,
+            region.row(),
+            region.column(),
             TestRangeBounds::new(0, 1, 4, 2),
         );
         let proxy = install_native_merge_range_proxy(

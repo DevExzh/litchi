@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_numbers::cell::Value as CellValue;
@@ -170,30 +170,85 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .table_dimensions(3, 18)
         .build()?;
     let table_id = editor.tables()?.remove(0).id();
-    editor.set_cell(
-        table_id,
-        ROW,
-        NUMBER_COLUMN,
-        CellValue::number(NUMBER_VALUE)?,
+    set_numbers_cells(
+        &mut editor,
+        [
+            litchi_numbers::cell::Update::new(ROW, NUMBER_COLUMN, CellValue::number(NUMBER_VALUE)?),
+            litchi_numbers::cell::Update::new(
+                ROW,
+                PERCENTAGE_COLUMN,
+                CellValue::number(PERCENTAGE_VALUE)?,
+            ),
+            litchi_numbers::cell::Update::new(
+                ROW,
+                CURRENCY_COLUMN,
+                CellValue::number(CURRENCY_VALUE)?,
+            ),
+            litchi_numbers::cell::Update::new(
+                ROW,
+                SCIENTIFIC_COLUMN,
+                CellValue::number(SCIENTIFIC_VALUE)?,
+            ),
+            litchi_numbers::cell::Update::new(
+                ROW,
+                FRACTION_COLUMN,
+                CellValue::number(FRACTION_VALUE)?,
+            ),
+            litchi_numbers::cell::Update::new(
+                ROW,
+                NUMERAL_SYSTEM_COLUMN,
+                CellValue::number(NUMERAL_SYSTEM_VALUE)?,
+            ),
+            litchi_numbers::cell::Update::new(
+                ROW,
+                DATE_TIME_COLUMN,
+                CellValue::date(DATE_TIME_VALUE)?,
+            ),
+            litchi_numbers::cell::Update::new(
+                ROW,
+                DURATION_COLUMN,
+                CellValue::duration(DURATION_VALUE)?,
+            ),
+            litchi_numbers::cell::Update::new(ROW, CHECKBOX_COLUMN, CellValue::Boolean(true)),
+            litchi_numbers::cell::Update::new(
+                ROW,
+                STAR_RATING_COLUMN,
+                CellValue::number(STAR_RATING_VALUE)?,
+            ),
+            litchi_numbers::cell::Update::new(ROW, SLIDER_COLUMN, CellValue::number(SLIDER_VALUE)?),
+            litchi_numbers::cell::Update::new(
+                ROW,
+                STEPPER_COLUMN,
+                CellValue::number(STEPPER_VALUE)?,
+            ),
+            litchi_numbers::cell::Update::new(
+                ROW,
+                TEXT_COLUMN,
+                CellValue::Text("Invoice 001".to_owned()),
+            ),
+            litchi_numbers::cell::Update::new(
+                ROW,
+                CUSTOM_NUMBER_COLUMN,
+                CellValue::number(NUMBER_VALUE)?,
+            ),
+            litchi_numbers::cell::Update::new(
+                ROW,
+                CUSTOM_DATE_TIME_COLUMN,
+                CellValue::date(DATE_TIME_VALUE)?,
+            ),
+            litchi_numbers::cell::Update::new(
+                ROW,
+                CUSTOM_TEXT_COLUMN,
+                CellValue::Text("Invoice 001".to_owned()),
+            ),
+        ],
     )?;
     editor.set_table_cell_number_format(table_id, ROW, NUMBER_COLUMN, numbers_format()?)?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        PERCENTAGE_COLUMN,
-        CellValue::number(PERCENTAGE_VALUE)?,
-    )?;
     editor.set_table_cell_percentage_format(
         table_id,
         ROW,
         PERCENTAGE_COLUMN,
         numbers_percentage_format()?,
-    )?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        CURRENCY_COLUMN,
-        CellValue::number(CURRENCY_VALUE)?,
     )?;
     editor.set_table_cell_currency_format(
         table_id,
@@ -201,23 +256,11 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         CURRENCY_COLUMN,
         numbers_currency_format()?,
     )?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        SCIENTIFIC_COLUMN,
-        CellValue::number(SCIENTIFIC_VALUE)?,
-    )?;
     editor.set_table_cell_scientific_format(
         table_id,
         ROW,
         SCIENTIFIC_COLUMN,
         numbers_scientific_format()?,
-    )?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        FRACTION_COLUMN,
-        CellValue::number(FRACTION_VALUE)?,
     )?;
     editor.set_table_cell_fraction_format(
         table_id,
@@ -225,23 +268,11 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         FRACTION_COLUMN,
         numbers_fraction_format(),
     )?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        NUMERAL_SYSTEM_COLUMN,
-        CellValue::number(NUMERAL_SYSTEM_VALUE)?,
-    )?;
     editor.set_table_cell_numeral_system_format(
         table_id,
         ROW,
         NUMERAL_SYSTEM_COLUMN,
         numbers_numeral_system_format()?,
-    )?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        DATE_TIME_COLUMN,
-        CellValue::date(DATE_TIME_VALUE)?,
     )?;
     editor.set_table_cell_date_time_format(
         table_id,
@@ -249,40 +280,15 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         DATE_TIME_COLUMN,
         numbers_date_time_format(),
     )?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        DURATION_COLUMN,
-        CellValue::duration(DURATION_VALUE)?,
-    )?;
     editor.set_table_cell_duration_format(
         table_id,
         ROW,
         DURATION_COLUMN,
         numbers_duration_format(),
     )?;
-    editor.set_cell(table_id, ROW, CHECKBOX_COLUMN, CellValue::Boolean(true))?;
     editor.set_table_cell_checkbox_format(table_id, ROW, CHECKBOX_COLUMN, Checkbox)?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        STAR_RATING_COLUMN,
-        CellValue::number(STAR_RATING_VALUE)?,
-    )?;
     editor.set_table_cell_star_rating_format(table_id, ROW, STAR_RATING_COLUMN, StarRating)?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        SLIDER_COLUMN,
-        CellValue::number(SLIDER_VALUE)?,
-    )?;
     editor.set_table_cell_slider_format(table_id, ROW, SLIDER_COLUMN, numbers_slider_format()?)?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        STEPPER_COLUMN,
-        CellValue::number(STEPPER_VALUE)?,
-    )?;
     editor.set_table_cell_stepper_format(
         table_id,
         ROW,
@@ -295,42 +301,18 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         POP_UP_MENU_COLUMN,
         numbers_pop_up_menu_format()?,
     )?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        TEXT_COLUMN,
-        CellValue::Text("Invoice 001".to_owned()),
-    )?;
     editor.set_table_cell_text_format(table_id, ROW, TEXT_COLUMN)?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        CUSTOM_NUMBER_COLUMN,
-        CellValue::number(NUMBER_VALUE)?,
-    )?;
     editor.set_table_cell_custom_format(
         table_id,
         ROW,
         CUSTOM_NUMBER_COLUMN,
         numbers_custom_number_format()?,
     )?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        CUSTOM_DATE_TIME_COLUMN,
-        CellValue::date(DATE_TIME_VALUE)?,
-    )?;
     editor.set_table_cell_custom_format(
         table_id,
         ROW,
         CUSTOM_DATE_TIME_COLUMN,
         numbers_custom_date_time_format()?,
-    )?;
-    editor.set_cell(
-        table_id,
-        ROW,
-        CUSTOM_TEXT_COLUMN,
-        CellValue::Text("Invoice 001".to_owned()),
     )?;
     editor.set_table_cell_custom_format(
         table_id,
@@ -740,4 +722,59 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.save(output)?;
     Ok(())
+}
+
+fn set_numbers_cells(
+    editor: &mut NumbersEditor,
+    updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let changes = updates
+        .into_iter()
+        .map(numbers_cell_change)
+        .collect::<Result<Vec<_>, _>>()?;
+    let package = litchi_numbers::Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_table_cells(
+            litchi_numbers::SheetSelector::index(0),
+            litchi_numbers::TableSelector::index(0),
+        )?
+        .extend(changes)?
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    *editor = NumbersEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
+fn numbers_cell_change(
+    update: litchi_numbers::cell::Update,
+) -> Result<litchi_numbers::table::cells::Change, Box<dyn std::error::Error>> {
+    let position = litchi_numbers::CellPosition::try_from_usize(update.row, update.column)?;
+    let change = match update.value {
+        CellValue::Empty => litchi_numbers::table::cells::Change::clear(position),
+        CellValue::Text(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::text(value)?,
+        ),
+        CellValue::Number(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::number(value.get())?,
+        ),
+        CellValue::Boolean(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::boolean(value),
+        ),
+        CellValue::Date(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::date(value.get())?,
+        ),
+        CellValue::Duration(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::duration(value.get())?,
+        ),
+        CellValue::Formula(_) | CellValue::Error(_) => {
+            return Err(std::io::Error::other("unsupported Numbers cell input").into());
+        },
+    };
+    Ok(change)
 }

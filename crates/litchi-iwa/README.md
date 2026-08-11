@@ -1031,14 +1031,50 @@ round-trip.
 
 ### Edit existing documents through the migration host
 
-This compatibility example intentionally uses `KeynoteEditor` only for
-unmigrated operations and an ordinary `TextBox`. It does not demonstrate
-title, body, or speaker-notes editing: those semantic operations are owned by
+This compatibility example uses host APIs only for operations that have not
+yet moved to a concrete package owner. It does not demonstrate Keynote title,
+body, or speaker-notes editing: those semantic operations are owned by
 `litchi-keynote`.
+
+Numbers scalar cell writes are selector-first `litchi-numbers` package
+transactions, not `NumbersEditor` raw-ID calls. They stage a complete batch
+before publication, so any rejected coordinate, dependency, or cache update
+leaves the package unchanged:
+
+```rust,no_run
+use litchi_numbers::{Package, SheetSelector, TableSelector};
+use litchi_numbers::table::cells::Input;
+
+let package = Package::open("input.numbers")?;
+let commit = package
+    .edit_table_cells(
+        SheetSelector::name("Summary"),
+        TableSelector::name("Revenue"),
+    )?
+    .set_a1("B3", Input::number(42.0)?)?
+    .set_a1("C3", Input::text("Revised")?)?
+    .clear_a1("D3")?
+    .commit()?;
+
+let restored = commit
+    .package()
+    .apply_table_cells(&commit.patch().inverse())?;
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+See `litchi-numbers/examples/edit_table_cells.rs` for bounded batch parsing
+and synchronized sibling-temporary, distinct-output, no-clobber publication.
+Cell comments and replies remain separate migration-host APIs in the
+compatibility example below.
 
 ```rust
 use litchi_iwa::numbers::{
-    CellValue, FormulaAxisReference, FormulaCellReference, FormulaExpression, NumbersEditor,
+    FormulaAxisReference, FormulaCellReference, FormulaExpression, NumbersEditor,
 };
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
@@ -1053,10 +1089,6 @@ use litchi_iwa::keynote::{
 
 let mut numbers = NumbersEditor::open("input.numbers")?;
 let table = numbers.tables()?.remove(0);
-numbers.set_cell(table.id(), 1, 2, CellValue::Number(42.0))?;
-// Existing rich-text cells use the same call. Their TSWP formatting storage is
-// retained, and shared payloads are isolated with copy-on-write.
-numbers.set_cell(table.id(), 1, 3, CellValue::Text("Revised".into()))?;
 numbers.set_cell_comment(table.id(), 1, 3, "Check this value")?;
 let _comment = numbers.cell_comment(table.id(), 1, 3)?;
 let reply_id = numbers.add_cell_comment_reply(table.id(), 1, 3, "Looks good")?;

@@ -1,0 +1,51 @@
+// Scalar-only parity roots for the strict streaming formula reader. Repeated
+// AST nodes remain on the handwritten path and are never materialized.
+syntax = "proto2";
+package LitchiIwaFormulaProjection;
+
+message FormulaArchive {
+  required bytes ast_node_array = 1;
+  optional uint32 host_column = 2;
+  optional uint32 host_row = 3;
+  optional bool host_column_is_negative = 4 [default = false];
+  optional bool host_row_is_negative = 5 [default = false];
+  optional bytes translation_flags = 6;
+  optional bytes host_table_uid = 7;
+  optional bytes host_column_uid = 8;
+  optional bytes host_row_uid = 9;
+}
+
+message ASTNodeArchive {
+  required int32 node_type = 1;
+  optional uint32 function_index = 2;
+  optional uint32 function_num_args = 3;
+  optional double number = 4;
+  optional bool boolean = 5;
+  optional bool token_boolean = 10;
+  optional bytes thunk_array = 14;
+  optional bytes local_cell_reference = 15;
+  optional bytes cross_table_cell_reference = 16;
+  optional string whitespace = 25;
+  optional bytes column = 26;
+  optional bytes row = 27;
+  optional bytes cross_table_extra = 28;
+  optional bytes uid_coordinate = 30;
+  optional bytes tract_list = 38;
+}
+
+message LocalCellReferenceArchive {
+  required uint32 row_handle = 1;
+  required uint32 column_handle = 2;
+  required uint32 row_is_sticky = 3;
+  required uint32 column_is_sticky = 4;
+}
+
+message ColumnCoordinateArchive {
+  required sint32 column = 1;
+  optional bool absolute = 2 [default = false];
+}
+
+message RowCoordinateArchive {
+  required sint32 row = 1;
+  optional bool absolute = 2 [default = false];
+}

@@ -65,23 +65,25 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .table_dimensions(3, 3)
         .build()?;
     let table_id = editor.tables()?.remove(0).id();
-    editor.set_cell(
-        table_id,
-        HIGHLIGHT_ROW,
-        HIGHLIGHT_COLUMN,
-        CellValue::Text("Organic Grain".to_owned()),
-    )?;
-    editor.set_cell(
-        table_id,
-        SIGN_HIGHLIGHT_ROW,
-        POSITIVE_HIGHLIGHT_COLUMN,
-        CellValue::number(POSITIVE_VALUE)?,
-    )?;
-    editor.set_cell(
-        table_id,
-        SIGN_HIGHLIGHT_ROW,
-        NEGATIVE_HIGHLIGHT_COLUMN,
-        CellValue::number(NEGATIVE_VALUE)?,
+    set_numbers_cells(
+        &mut editor,
+        [
+            litchi_numbers::cell::Update::new(
+                HIGHLIGHT_ROW,
+                HIGHLIGHT_COLUMN,
+                CellValue::Text("Organic Grain".to_owned()),
+            ),
+            litchi_numbers::cell::Update::new(
+                SIGN_HIGHLIGHT_ROW,
+                POSITIVE_HIGHLIGHT_COLUMN,
+                CellValue::number(POSITIVE_VALUE)?,
+            ),
+            litchi_numbers::cell::Update::new(
+                SIGN_HIGHLIGHT_ROW,
+                NEGATIVE_HIGHLIGHT_COLUMN,
+                CellValue::number(NEGATIVE_VALUE)?,
+            ),
+        ],
     )?;
     let rules = highlight_rules()?;
     editor.set_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN, &rules)?;
@@ -125,6 +127,61 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         Some(vec![negative_rule])
     );
     Ok(())
+}
+
+fn set_numbers_cells(
+    editor: &mut NumbersEditor,
+    updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let changes = updates
+        .into_iter()
+        .map(numbers_cell_change)
+        .collect::<Result<Vec<_>, _>>()?;
+    let package = litchi_numbers::Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_table_cells(
+            litchi_numbers::SheetSelector::index(0),
+            litchi_numbers::TableSelector::index(0),
+        )?
+        .extend(changes)?
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    *editor = NumbersEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
+fn numbers_cell_change(
+    update: litchi_numbers::cell::Update,
+) -> Result<litchi_numbers::table::cells::Change, Box<dyn std::error::Error>> {
+    let position = litchi_numbers::CellPosition::try_from_usize(update.row, update.column)?;
+    let change = match update.value {
+        CellValue::Empty => litchi_numbers::table::cells::Change::clear(position),
+        CellValue::Text(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::text(value)?,
+        ),
+        CellValue::Number(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::number(value.get())?,
+        ),
+        CellValue::Boolean(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::boolean(value),
+        ),
+        CellValue::Date(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::date(value.get())?,
+        ),
+        CellValue::Duration(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::duration(value.get())?,
+        ),
+        CellValue::Formula(_) | CellValue::Error(_) => {
+            return Err(std::io::Error::other("unsupported Numbers cell input").into());
+        },
+    };
+    Ok(change)
 }
 
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {

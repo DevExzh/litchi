@@ -36,63 +36,6 @@ impl NumbersEditor {
         Ok(categories)
     }
 
-    /// Set or clear a cell in a table identified by its IWA object ID.
-    ///
-    /// Cached results of dependent numeric/Boolean formulas are refreshed in
-    /// dependency order. If an impacted formula is outside the strict local
-    /// evaluator subset, the entire edit is rejected without changing the
-    /// package rather than persisting a stale displayed result.
-    pub fn set_cell(
-        &mut self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-        value: CellValue,
-    ) -> Result<()> {
-        let mut staged = self.package.clone();
-        set_cell_in_package(&mut staged, table_id, row, column, value)?;
-        formula_cache::refresh_formula_caches_after_cell_write(&mut staged, table_id, row, column)?;
-        // Exercise every serialization boundary before committing the edit.
-        let bytes = staged.to_bytes()?;
-        IWorkPackage::from_bytes(&bytes)?;
-        self.package = staged;
-        Ok(())
-    }
-
-    /// Set several cells in one table as one transaction.
-    ///
-    /// The batch must contain unique coordinates. It clones and serializes the
-    /// package once, reuses one table/object lookup context for every cell, and
-    /// refreshes all impacted formula caches from the final batch state in one
-    /// dependency pass. The returned count equals the number of applied cells.
-    pub fn set_cells(
-        &mut self,
-        table_id: u64,
-        updates: impl IntoIterator<Item = TableCellUpdate>,
-    ) -> Result<usize> {
-        let batch = table_cells::TableCellBatch::collect(updates)?;
-        if batch.is_empty() {
-            attached_table_descriptor(&self.package, table_id)?;
-            return Ok(0);
-        }
-        let expected = batch.len();
-        let mut staged = self.package.clone();
-        let applied = batch.apply_numbers(&mut staged, table_id)?;
-        if applied != expected {
-            return Err(Error::InvalidFormat(format!(
-                "Table cell batch applied {applied} updates, expected {expected}"
-            )));
-        }
-        let bytes = staged.to_bytes()?;
-        IWorkPackage::from_bytes(&bytes)?;
-        self.package = staged;
-        Ok(applied)
-    }
-
-    pub fn clear_cell(&mut self, table_id: u64, row: usize, column: usize) -> Result<()> {
-        self.set_cell(table_id, row, column, CellValue::Empty)
-    }
-
     /// Read the explicit data format for one zero-based table cell.
     pub fn table_cell_data_format(
         &self,

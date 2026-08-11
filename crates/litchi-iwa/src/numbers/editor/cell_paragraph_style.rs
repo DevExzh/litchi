@@ -1606,9 +1606,14 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(table_id, 1, 1, CellValue::Text("Aligned".to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::Text("Aligned".to_owned()),
+        )
+        .unwrap();
         assert_eq!(
             editor.table_cell_text_alignment(table_id, 1, 1).unwrap(),
             Alignment::Natural
@@ -1671,14 +1676,14 @@ mod tests {
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         for column in 1..=2 {
-            editor
-                .set_cell(
-                    table_id,
-                    1,
-                    column,
-                    CellValue::Text(format!("Column {column}")),
-                )
-                .unwrap();
+            crate::numbers::editor::set_cell_fixture(
+                &mut editor,
+                table_id,
+                1,
+                column,
+                CellValue::Text(format!("Column {column}")),
+            )
+            .unwrap();
         }
         editor
             .set_table_cell_text_alignment(table_id, 1, 1, Alignment::Center)
@@ -1758,9 +1763,14 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        editor
-            .set_cell(table_id, 1, 1, CellValue::Text("Styled".to_owned()))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            1,
+            CellValue::Text("Styled".to_owned()),
+        )
+        .unwrap();
         editor
             .set_table_cell_text_alignment(table_id, 1, 1, Alignment::Center)
             .unwrap();
@@ -2061,14 +2071,14 @@ mod tests {
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         for column in 1..=2 {
-            editor
-                .set_cell(
-                    table_id,
-                    1,
-                    column,
-                    CellValue::Text(format!("Column {column}")),
-                )
-                .unwrap();
+            crate::numbers::editor::set_cell_fixture(
+                &mut editor,
+                table_id,
+                1,
+                column,
+                CellValue::Text(format!("Column {column}")),
+            )
+            .unwrap();
         }
         editor
             .set_table_cell_text_alignment(table_id, 1, 1, Alignment::Center)
@@ -2290,14 +2300,14 @@ mod tests {
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         for column in 1..=2 {
-            editor
-                .set_cell(
-                    table_id,
-                    1,
-                    column,
-                    CellValue::Text(format!("Column {column}")),
-                )
-                .unwrap();
+            crate::numbers::editor::set_cell_fixture(
+                &mut editor,
+                table_id,
+                1,
+                column,
+                CellValue::Text(format!("Column {column}")),
+            )
+            .unwrap();
         }
         editor
             .set_table_cell_text_alignment(table_id, 1, 1, Alignment::Center)

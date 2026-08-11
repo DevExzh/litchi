@@ -568,9 +568,14 @@ fn blank_predicates_round_trip_and_apply_to_empty_and_populated_cells() {
         .build()
         .unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
-    editor
-        .set_cell(table_id, 1, 2, CellValue::Text("occupied".to_owned()))
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        table_id,
+        1,
+        2,
+        CellValue::Text("occupied".to_owned()),
+    )
+    .unwrap();
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
     let rules = [
@@ -622,13 +627,23 @@ fn relative_date_predicates_round_trip_apply_and_observe_day_boundaries() {
         (2, today - SECONDS_PER_DAY + midday),
         (3, today + SECONDS_PER_DAY + midday),
     ] {
-        editor
-            .set_cell(table_id, 1, column, CellValue::date(value).unwrap())
-            .unwrap();
-    }
-    editor
-        .set_cell(table_id, 1, 4, CellValue::number(today + midday).unwrap())
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            column,
+            CellValue::date(value).unwrap(),
+        )
         .unwrap();
+    }
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        table_id,
+        1,
+        4,
+        CellValue::number(today + midday).unwrap(),
+    )
+    .unwrap();
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
     let blue = RgbaColor::new(0.1, 0.2, 0.9, 1.0, RgbColorSpace::Srgb).unwrap();
@@ -1133,32 +1148,37 @@ fn fixed_date_predicates_round_trip_apply_and_preserve_native_graphs() {
         (2, lower.apple_seconds() + midday),
         (3, upper.apple_seconds() + midday),
     ] {
-        editor
-            .set_cell(table_id, 1, column, CellValue::date(value).unwrap())
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            column,
+            CellValue::date(value).unwrap(),
+        )
+        .unwrap();
         editor
             .set_cell_conditional_highlighting(table_id, 1, column, &rules)
             .unwrap();
     }
-    editor
-        .set_cell(
-            table_id,
-            1,
-            4,
-            CellValue::date(exact.apple_seconds() + midday).unwrap(),
-        )
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        table_id,
+        1,
+        4,
+        CellValue::date(exact.apple_seconds() + midday).unwrap(),
+    )
+    .unwrap();
     editor
         .set_cell_conditional_highlighting(table_id, 1, 4, &rules[3..])
         .unwrap();
-    editor
-        .set_cell(
-            table_id,
-            1,
-            5,
-            CellValue::number(exact.apple_seconds() + midday).unwrap(),
-        )
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        table_id,
+        1,
+        5,
+        CellValue::number(exact.apple_seconds() + midday).unwrap(),
+    )
+    .unwrap();
     editor
         .set_cell_conditional_highlighting(table_id, 1, 5, &rules)
         .unwrap();
@@ -1324,9 +1344,14 @@ fn numeric_sign_predicates_round_trip_and_exclude_zero_and_non_numbers() {
         .unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
     for (column, value) in [(1, 3.0), (2, -3.0), (3, 0.0)] {
-        editor
-            .set_cell(table_id, 1, column, CellValue::number(value).unwrap())
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            column,
+            CellValue::number(value).unwrap(),
+        )
+        .unwrap();
     }
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
@@ -1423,7 +1448,7 @@ fn boolean_predicates_round_trip_and_match_only_the_exact_boolean() {
         (3, CellValue::number(1.0).unwrap()),
         (4, CellValue::Text("TRUE".to_owned())),
     ] {
-        editor.set_cell(table_id, 1, column, value).unwrap();
+        crate::numbers::editor::set_cell_fixture(&mut editor, table_id, 1, column, value).unwrap();
     }
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
@@ -1527,9 +1552,14 @@ fn checkbox_predicates_round_trip_and_require_native_checkbox_format() {
         .unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
     for (column, value) in [(1, true), (2, false), (3, true), (4, false)] {
-        editor
-            .set_cell(table_id, 1, column, CellValue::Boolean(value))
-            .unwrap();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            1,
+            column,
+            CellValue::Boolean(value),
+        )
+        .unwrap();
     }
     for column in [1, 2] {
         editor
@@ -1701,9 +1731,14 @@ fn text_predicates_are_case_insensitive_and_round_trip_from_scratch() {
         .build()
         .unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
-    editor
-        .set_cell(table_id, 1, 1, CellValue::Text("Organic Grain".to_owned()))
-        .unwrap();
+    crate::numbers::editor::set_cell_fixture(
+        &mut editor,
+        table_id,
+        1,
+        1,
+        CellValue::Text("Organic Grain".to_owned()),
+    )
+    .unwrap();
     let text = |value| Text::new(value).unwrap();
     let condition_cases = [
         (Condition::TextEqualTo(text("organic grain")), "Dairy"),

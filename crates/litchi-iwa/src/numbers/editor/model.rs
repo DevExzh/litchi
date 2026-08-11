@@ -3438,18 +3438,6 @@ pub(super) fn resize_attached_table_in_package(
     })
 }
 
-pub(super) fn set_cell_in_package(
-    package: &mut IWorkPackage,
-    table_id: u64,
-    row: usize,
-    column: usize,
-    value: CellValue,
-) -> Result<()> {
-    table_sparse_storage::ensure_cell_storage(package, table_id, row, column)?;
-    let location = locate_cell(package, table_id, row, column)?;
-    set_cell_at_location(package, location, row, column, value)
-}
-
 pub(super) fn set_attached_cell_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
@@ -3574,24 +3562,6 @@ pub(super) fn relocate_attached_cell_in_package(
         source_count,
     )?;
     Ok(true)
-}
-
-pub(super) fn set_cells_in_package(
-    package: &mut IWorkPackage,
-    table_id: u64,
-    updates: Vec<TableCellUpdate>,
-) -> Result<()> {
-    validate_batch_values(&updates)?;
-    let coordinates = updates
-        .iter()
-        .map(|update| (update.row, update.column))
-        .collect::<Vec<_>>();
-    table_sparse_storage::ensure_cells_storage(package, table_id, &coordinates)?;
-    let descriptor = table_models(package)?
-        .into_iter()
-        .find(|table| table.object_id == table_id)
-        .ok_or_else(|| Error::ParseError(format!("Numbers table object {table_id} not found")))?;
-    set_cells_for_descriptor(package, descriptor, updates)
 }
 
 pub(super) fn set_attached_cells_in_package(

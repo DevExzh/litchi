@@ -75,6 +75,8 @@ const VALUE_FLAGS: u32 = DECIMAL_FLAG
     | RICH_TEXT_FLAG
     | FORMULA_FLAG
     | FORMULA_ERROR_FLAG;
+const FORMULA_CACHE_FLAGS: u32 =
+    DECIMAL_FLAG | NUMBER_FLAG | DATE_FLAG | STRING_FLAG | RICH_TEXT_FLAG;
 
 pub(crate) const FIELD_LAYOUT: &[(u32, usize)] = &[
     (0x0000_0001, 16),
@@ -105,6 +107,18 @@ const FIELD_COUNT: usize = FIELD_LAYOUT.len();
 pub enum Error {
     InvalidFormat(String),
     ParseError(String),
+    /// A bounded encoder's exact output would exceed its caller-selected cap.
+    OutputLimitExceeded {
+        /// Exact bytes required by the encoded cell.
+        observed: usize,
+        /// Maximum bytes authorized by the caller.
+        maximum: usize,
+    },
+    /// A bounded encoder could not reserve its exact output allocation.
+    Allocation {
+        /// Exact bytes requested for the encoded cell.
+        requested: usize,
+    },
 }
 
 impl fmt::Display for Error {
@@ -112,6 +126,16 @@ impl fmt::Display for Error {
         match self {
             Self::InvalidFormat(message) | Self::ParseError(message) => {
                 formatter.write_str(message)
+            },
+            Self::OutputLimitExceeded { observed, maximum } => write!(
+                formatter,
+                "Numbers BNC output limit exceeded: observed {observed}, maximum {maximum}"
+            ),
+            Self::Allocation { requested } => {
+                write!(
+                    formatter,
+                    "Could not allocate {requested} Numbers BNC bytes"
+                )
             },
         }
     }
@@ -145,6 +169,8 @@ pub struct BncCell {
 
 /// Allocation-free semantic view over one encoded BNC cell.
 pub struct BncCellView<'a> {
+    prefix: &'a [u8],
+    flags: u32,
     cell_type: u8,
     fields: [Option<&'a [u8]>; FIELD_COUNT],
     cached_scalar: Option<CachedScalar>,
@@ -156,6 +182,13 @@ struct DecodedScalarFields {
     decimal: Option<FiniteF64>,
     number: Option<FiniteF64>,
     date: Option<FiniteF64>,
+}
+
+struct EncodedScalar {
+    cell_type: u8,
+    flag: u32,
+    bytes: [u8; 16],
+    length: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,6 +212,31 @@ pub enum CachedScalar {
     Date(FiniteF64),
     Duration(FiniteF64),
     Unsupported(u8),
+}
+
+/// One scalar value accepted by the bounded raw BNC rewrite primitive.
+///
+/// `Number` follows Numbers' format-aware behavior: duration-formatted cells
+/// convert spreadsheet days to seconds, while currency and date/time formats
+/// retain their native numeric cell types.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ScalarValue {
+    String(u32),
+    RichText(u32),
+    Number(FiniteF64),
+    Boolean(bool),
+    Date(FiniteF64),
+    Duration(FiniteF64),
+}
+
+/// Result of clearing the value-bearing fields from one raw BNC cell.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClearValue {
+    /// The cleared bytes are exactly the canonical minimal empty cell, so the
+    /// enclosing sparse slot may be deleted.
+    Delete,
+    /// Non-value prefix metadata, fields, or opaque tail bytes remain.
+    Retain(Vec<u8>),
 }
 
 impl BncCell {
@@ -816,6 +874,52 @@ impl BncCell {
         output
     }
 
+    /// Encode this owned cell with an exact, fallible output allocation.
+    ///
+    /// The complete encoded length is checked before allocation. This method
+    /// retains the byte ordering and output of [`Self::encode`] while making
+    /// output-limit and allocation failures explicit.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::OutputLimitExceeded`] when the exact output exceeds
+    /// `max_output_bytes`, [`Error::Allocation`] when its allocation fails, or
+    /// [`Error::ParseError`] if stored field lengths overflow `usize`.
+    pub fn try_encode_with_limit(&self, max_output_bytes: usize) -> Result<Vec<u8>> {
+        let mut output_len = BNC_HEADER_LEN;
+        for value in self.fields.values() {
+            output_len = output_len.checked_add(value.len()).ok_or_else(|| {
+                Error::ParseError("Numbers BNC encoded length overflow".to_owned())
+            })?;
+        }
+        output_len = output_len
+            .checked_add(self.tail.len())
+            .ok_or_else(|| Error::ParseError("Numbers BNC encoded length overflow".to_owned()))?;
+        check_output_limit(output_len, max_output_bytes)?;
+
+        let flags = self.fields.keys().fold(0u32, |mask, flag| mask | flag);
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(output_len)
+            .map_err(|_error| Error::Allocation {
+                requested: output_len,
+            })?;
+        output.extend_from_slice(&self.prefix);
+        output.extend_from_slice(&flags.to_le_bytes());
+        for (flag, _) in FIELD_LAYOUT {
+            if let Some(value) = self.fields.get(flag) {
+                output.extend_from_slice(value);
+            }
+        }
+        output.extend_from_slice(&self.tail);
+        if output.len() != output_len {
+            return Err(Error::ParseError(
+                "Numbers BNC encoded length changed during publication".to_owned(),
+            ));
+        }
+        Ok(output)
+    }
+
     fn replace_value(&mut self, cell_type: u8, flag: u32, value: Vec<u8>) {
         self.prefix[1] = cell_type;
         self.fields.retain(|field, _| VALUE_FLAGS & field == 0);
@@ -885,6 +989,8 @@ impl<'a> BncCellView<'a> {
 
         let decoded_scalar_fields = decode_scalar_fields(|flag| field_from_layout(&fields, flag))?;
         Ok(Self {
+            prefix: &data[..BNC_PREFIX_LEN],
+            flags,
             cell_type: data[1],
             fields,
             cached_scalar: cached_scalar_from(data[1], decoded_scalar_fields),
@@ -904,6 +1010,163 @@ impl<'a> BncCellView<'a> {
         self.cached_scalar
     }
 
+    /// Return whether applying one scalar replacement would leave the public
+    /// stored value unchanged.
+    ///
+    /// This comparison is allocation-free and follows the same format-aware
+    /// number conversion as [`Self::rewrite_scalar_with_limit`]. It compares
+    /// semantic scalar state only; retained styles, formats, comments, and the
+    /// opaque tail do not affect the result.
+    #[must_use]
+    pub fn scalar_equals(&self, expected: ScalarValue) -> bool {
+        match expected {
+            ScalarValue::String(identifier) => self.stored_value() == StoredValue::Text(identifier),
+            ScalarValue::RichText(identifier) => {
+                self.stored_value() == StoredValue::RichText(identifier)
+            },
+            ScalarValue::Number(value)
+                if self.u32_field(CELL_FORMAT_KIND_FLAG) == Some(DURATION_CELL_FORMAT_KIND) =>
+            {
+                let Ok(seconds) = finite_spreadsheet_days_to_seconds(value) else {
+                    return false;
+                };
+                self.stored_value() == StoredValue::Duration
+                    && self.cached_scalar == Some(CachedScalar::Duration(seconds))
+            },
+            ScalarValue::Number(value) => {
+                self.stored_value() == StoredValue::Number
+                    && self.cached_scalar == Some(CachedScalar::Number(value))
+            },
+            ScalarValue::Boolean(value) => {
+                self.stored_value() == StoredValue::Boolean
+                    && self.cached_scalar == Some(CachedScalar::Boolean(value))
+            },
+            ScalarValue::Date(value) => {
+                self.stored_value() == StoredValue::Date
+                    && self.cached_scalar == Some(CachedScalar::Date(value))
+            },
+            ScalarValue::Duration(value) => {
+                self.stored_value() == StoredValue::Duration
+                    && self.cached_scalar == Some(CachedScalar::Duration(value))
+            },
+        }
+    }
+
+    /// Replace all value-bearing fields in the raw cell with one scalar.
+    ///
+    /// Prefix bytes other than the cell type, every non-value field byte, and
+    /// the opaque tail are retained exactly. Formula and formula-error fields
+    /// are value-bearing and are therefore removed. The exact encoded length
+    /// is checked before one fallible output allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a format-aware number conversion or decimal128
+    /// encoding fails, the exact output exceeds `max_output_bytes`, encoded
+    /// length arithmetic overflows, or the output allocation fails.
+    pub fn rewrite_scalar_with_limit(
+        &self,
+        value: ScalarValue,
+        max_output_bytes: usize,
+    ) -> Result<Vec<u8>> {
+        let encoded = self.encode_scalar(value)?;
+        self.rewrite_value_fields(
+            encoded.cell_type,
+            Some((encoded.flag, &encoded.bytes[..encoded.length])),
+            max_output_bytes,
+        )
+    }
+
+    /// Remove all value-bearing fields while retaining raw metadata and tail
+    /// bytes exactly.
+    ///
+    /// The minimal empty BNC representation returns [`ClearValue::Delete`]
+    /// without allocating. Otherwise the retained representation uses one
+    /// exact fallible allocation bounded by `max_output_bytes`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the retained output exceeds `max_output_bytes`,
+    /// encoded length arithmetic overflows, or allocation fails.
+    pub fn clear_value_with_limit(&self, max_output_bytes: usize) -> Result<ClearValue> {
+        let retained_flags = self.flags & !VALUE_FLAGS;
+        if retained_flags == 0
+            && self.tail.is_empty()
+            && self.prefix[0] == BNC_VERSION
+            && self.prefix[2..].iter().all(|byte| *byte == 0)
+        {
+            return Ok(ClearValue::Delete);
+        }
+        self.rewrite_value_fields(CELL_TYPE_EMPTY, None, max_output_bytes)
+            .map(ClearValue::Retain)
+    }
+
+    /// Return whether a formula cell already carries the requested supported
+    /// display cache.
+    ///
+    /// Only numeric and Boolean cache values are writable by the bounded raw
+    /// cache path. Other cached scalar kinds return `false`.
+    #[must_use]
+    pub fn formula_cache_equals(&self, expected: CachedScalar) -> bool {
+        matches!(self.stored_value(), StoredValue::Formula(_))
+            && matches!(expected, CachedScalar::Number(_) | CachedScalar::Boolean(_))
+            && self.cached_scalar == Some(expected)
+    }
+
+    /// Replace only a formula cell's supported display-cache fields.
+    ///
+    /// The formula and formula-error identifiers, format/style/comment fields,
+    /// prefix bytes other than the cache type, and opaque tail are retained
+    /// exactly. The exact encoded length is checked before one fallible output
+    /// allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target is not a formula cell, the requested
+    /// cache is not numeric or Boolean, encoding fails, the exact output
+    /// exceeds `max_output_bytes`, or allocation fails.
+    pub fn rewrite_formula_cache_with_limit(
+        &self,
+        value: CachedScalar,
+        max_output_bytes: usize,
+    ) -> Result<Vec<u8>> {
+        if !matches!(self.stored_value(), StoredValue::Formula(_)) {
+            return Err(Error::InvalidFormat(
+                "Numbers formula cache update targeted a cell without a formula".to_owned(),
+            ));
+        }
+        let scalar = match value {
+            CachedScalar::Number(value) => ScalarValue::Number(value),
+            CachedScalar::Boolean(value) => ScalarValue::Boolean(value),
+            CachedScalar::Date(_) | CachedScalar::Duration(_) | CachedScalar::Unsupported(_) => {
+                return Err(Error::InvalidFormat(
+                    "Numbers formula cache update supports only number and Boolean values"
+                        .to_owned(),
+                ));
+            },
+        };
+        let encoded = self.encode_scalar(scalar)?;
+        if !matches!(
+            cached_scalar_from(
+                encoded.cell_type,
+                decode_scalar_fields(|flag| {
+                    (flag == encoded.flag).then_some(&encoded.bytes[..encoded.length])
+                })?,
+            ),
+            Some(CachedScalar::Number(_) | CachedScalar::Boolean(_))
+        ) {
+            return Err(Error::InvalidFormat(
+                "Numbers formula cache encoding changed the supported cache kind".to_owned(),
+            ));
+        }
+        self.rewrite_selected_fields(
+            encoded.cell_type,
+            FORMULA_CACHE_FLAGS,
+            Some((encoded.flag, &encoded.bytes[..encoded.length])),
+            max_output_bytes,
+        )
+    }
+
     /// Returns the native formula-error table identifier when present.
     #[must_use]
     pub fn formula_error_identifier(&self) -> Option<u32> {
@@ -914,6 +1177,141 @@ impl<'a> BncCellView<'a> {
     #[must_use]
     pub fn comment_identifier(&self) -> Option<u32> {
         self.u32_field(COMMENT_FLAG)
+    }
+
+    fn encode_scalar(&self, value: ScalarValue) -> Result<EncodedScalar> {
+        let mut encoded = EncodedScalar {
+            cell_type: CELL_TYPE_EMPTY,
+            flag: 0,
+            bytes: [0; 16],
+            length: 0,
+        };
+        match value {
+            ScalarValue::String(identifier) => {
+                encoded.cell_type = CELL_TYPE_TEXT;
+                encoded.flag = STRING_FLAG;
+                encoded.bytes[..4].copy_from_slice(&identifier.to_le_bytes());
+                encoded.length = 4;
+            },
+            ScalarValue::RichText(identifier) => {
+                encoded.cell_type = CELL_TYPE_RICH_TEXT_OR_NUMBER;
+                encoded.flag = RICH_TEXT_FLAG;
+                encoded.bytes[..4].copy_from_slice(&identifier.to_le_bytes());
+                encoded.length = 4;
+            },
+            ScalarValue::Number(value)
+                if self.u32_field(CELL_FORMAT_KIND_FLAG) == Some(DURATION_CELL_FORMAT_KIND) =>
+            {
+                encoded.cell_type = CELL_TYPE_DURATION;
+                encoded.flag = NUMBER_FLAG;
+                encoded.bytes[..8].copy_from_slice(
+                    &finite_spreadsheet_days_to_seconds(value)?
+                        .get()
+                        .to_le_bytes(),
+                );
+                encoded.length = 8;
+            },
+            ScalarValue::Number(value) => {
+                encoded.cell_type = match self.u32_field(CELL_FORMAT_KIND_FLAG) {
+                    Some(CURRENCY_CELL_FORMAT_KIND) => CELL_TYPE_ALTERNATE_NUMBER,
+                    Some(DATE_TIME_CELL_FORMAT_KIND) => CELL_TYPE_RICH_TEXT_OR_NUMBER,
+                    _ => CELL_TYPE_NUMBER,
+                };
+                encoded.flag = DECIMAL_FLAG;
+                encoded.bytes = decimal128_le(value.get())?;
+                encoded.length = 16;
+            },
+            ScalarValue::Boolean(value) => {
+                encoded.cell_type = CELL_TYPE_BOOLEAN;
+                encoded.flag = NUMBER_FLAG;
+                encoded.bytes[..8]
+                    .copy_from_slice(&(if value { 1.0f64 } else { 0.0f64 }).to_le_bytes());
+                encoded.length = 8;
+            },
+            ScalarValue::Date(value) => {
+                encoded.cell_type = CELL_TYPE_DATE;
+                encoded.flag = DATE_FLAG;
+                encoded.bytes[..8].copy_from_slice(&value.get().to_le_bytes());
+                encoded.length = 8;
+            },
+            ScalarValue::Duration(value) => {
+                encoded.cell_type = CELL_TYPE_DURATION;
+                encoded.flag = NUMBER_FLAG;
+                encoded.bytes[..8].copy_from_slice(&value.get().to_le_bytes());
+                encoded.length = 8;
+            },
+        }
+        Ok(encoded)
+    }
+
+    fn rewrite_value_fields(
+        &self,
+        cell_type: u8,
+        replacement: Option<(u32, &[u8])>,
+        max_output_bytes: usize,
+    ) -> Result<Vec<u8>> {
+        self.rewrite_selected_fields(cell_type, VALUE_FLAGS, replacement, max_output_bytes)
+    }
+
+    fn rewrite_selected_fields(
+        &self,
+        cell_type: u8,
+        removed_flags: u32,
+        replacement: Option<(u32, &[u8])>,
+        max_output_bytes: usize,
+    ) -> Result<Vec<u8>> {
+        let retained_flags = self.flags & !removed_flags;
+        let output_flags =
+            replacement.map_or(retained_flags, |(flag, _bytes)| retained_flags | flag);
+        let mut output_len = BNC_HEADER_LEN;
+        for (flag, size) in FIELD_LAYOUT {
+            if output_flags & flag == 0 {
+                continue;
+            }
+            let field_len = replacement
+                .filter(|(replacement_flag, _bytes)| replacement_flag == flag)
+                .map_or(*size, |(_replacement_flag, bytes)| bytes.len());
+            if field_len != *size {
+                return Err(Error::ParseError(
+                    "Numbers BNC replacement field has an invalid width".to_owned(),
+                ));
+            }
+            output_len = output_len.checked_add(field_len).ok_or_else(|| {
+                Error::ParseError("Numbers BNC encoded length overflow".to_owned())
+            })?;
+        }
+        output_len = output_len
+            .checked_add(self.tail.len())
+            .ok_or_else(|| Error::ParseError("Numbers BNC encoded length overflow".to_owned()))?;
+        check_output_limit(output_len, max_output_bytes)?;
+
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(output_len)
+            .map_err(|_error| Error::Allocation {
+                requested: output_len,
+            })?;
+        output.extend_from_slice(self.prefix);
+        output[1] = cell_type;
+        output.extend_from_slice(&output_flags.to_le_bytes());
+        for (flag, _size) in FIELD_LAYOUT {
+            if let Some((_replacement_flag, bytes)) =
+                replacement.filter(|(replacement_flag, _bytes)| replacement_flag == flag)
+            {
+                output.extend_from_slice(bytes);
+            } else if retained_flags & flag != 0 {
+                output.extend_from_slice(self.field(*flag).ok_or_else(|| {
+                    Error::ParseError("Numbers BNC retained field is missing".to_owned())
+                })?);
+            }
+        }
+        output.extend_from_slice(self.tail);
+        if output.len() != output_len {
+            return Err(Error::ParseError(
+                "Numbers BNC encoded length changed during publication".to_owned(),
+            ));
+        }
+        Ok(output)
     }
 
     fn field(&self, requested_flag: u32) -> Option<&'a [u8]> {
@@ -935,6 +1333,13 @@ fn field_from_layout<'a>(
         .get(index)
         .filter(|(flag, _size)| *flag == requested_flag)?;
     fields.get(index).copied().flatten()
+}
+
+fn check_output_limit(observed: usize, maximum: usize) -> Result<()> {
+    if observed > maximum {
+        return Err(Error::OutputLimitExceeded { observed, maximum });
+    }
+    Ok(())
 }
 
 fn stored_value_from(cell_type: u8, mut u32_field: impl FnMut(u32) -> Option<u32>) -> StoredValue {
@@ -1017,6 +1422,12 @@ fn spreadsheet_days_to_seconds(days: f64) -> Result<f64> {
     Ok(seconds)
 }
 
+fn finite_spreadsheet_days_to_seconds(days: FiniteF64) -> Result<FiniteF64> {
+    FiniteF64::new(spreadsheet_days_to_seconds(days.get())?).map_err(|_error| {
+        Error::ParseError("Numbers duration conversion exceeds the finite f64 range".to_owned())
+    })
+}
+
 /// Decodes a little-endian IEEE 754 decimal128 value from a Numbers field.
 ///
 /// # Errors
@@ -1065,14 +1476,15 @@ pub fn decimal128_le(value: f64) -> Result<[u8; 16]> {
     }
     let negative = value.is_sign_negative();
     let magnitude = value.abs();
+    let mut formatting_buffer = ryu::Buffer::new();
     let spelling = if magnitude == 0.0 {
-        "0".to_owned()
+        "0"
     } else {
-        magnitude.to_string()
+        formatting_buffer.format_finite(magnitude)
     };
     let (mantissa, explicit_exponent) = spelling
         .split_once(['e', 'E'])
-        .map_or((spelling.as_str(), 0), |(mantissa, exponent)| {
+        .map_or((spelling, 0), |(mantissa, exponent)| {
             (mantissa, exponent.parse::<i32>().unwrap_or(i32::MIN))
         });
     if explicit_exponent == i32::MIN {
@@ -1083,24 +1495,50 @@ pub fn decimal128_le(value: f64) -> Result<[u8; 16]> {
     let fractional_digit_count = mantissa
         .split_once('.')
         .map_or(0usize, |(_, fraction)| fraction.len());
-    let mut digit_bytes = mantissa
-        .bytes()
-        .filter(|byte| *byte != b'.')
-        .collect::<Vec<_>>();
-    while digit_bytes.len() > 1 && digit_bytes.first() == Some(&b'0') {
-        digit_bytes.remove(0);
-    }
+    let mut coefficient = 0u128;
+    let mut digit_count = 0usize;
     let mut trailing_zeroes = 0i32;
-    while digit_bytes.len() > 1 && digit_bytes.last() == Some(&b'0') {
-        digit_bytes.pop();
-        trailing_zeroes += 1;
+    for byte in mantissa.bytes() {
+        if byte == b'.' {
+            continue;
+        }
+        let digit = byte
+            .checked_sub(b'0')
+            .filter(|digit| *digit <= 9)
+            .ok_or_else(|| {
+                Error::ParseError(format!("Could not encode Numbers decimal {spelling:?}"))
+            })?;
+        coefficient = coefficient
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(u128::from(digit)))
+            .ok_or_else(|| {
+                Error::ParseError(format!("Could not encode Numbers decimal {spelling:?}"))
+            })?;
+        digit_count = digit_count
+            .checked_add(1)
+            .ok_or_else(|| Error::ParseError("Numbers decimal digit count overflow".to_owned()))?;
+        trailing_zeroes = if digit == 0 {
+            trailing_zeroes.checked_add(1).ok_or_else(|| {
+                Error::ParseError("Numbers decimal trailing-zero count overflow".to_owned())
+            })?
+        } else {
+            0
+        };
     }
-    let digit_text = std::str::from_utf8(&digit_bytes).map_err(|_error| {
-        Error::ParseError(format!("Could not encode Numbers decimal {spelling:?}"))
-    })?;
-    let coefficient = digit_text.parse::<u128>().map_err(|_error| {
-        Error::ParseError(format!("Could not encode Numbers decimal {spelling:?}"))
-    })?;
+    if digit_count == 0 {
+        return Err(Error::ParseError(format!(
+            "Could not encode Numbers decimal {spelling:?}"
+        )));
+    }
+    if coefficient == 0 {
+        trailing_zeroes = 0;
+    } else {
+        let mut remaining_zeroes = trailing_zeroes;
+        while remaining_zeroes > 0 {
+            coefficient /= 10;
+            remaining_zeroes -= 1;
+        }
+    }
     if coefficient >= (1u128 << DECIMAL128_COEFFICIENT_BITS) {
         return Err(Error::ParseError(
             "Numbers decimal coefficient exceeds 113 bits".to_owned(),
@@ -1160,6 +1598,142 @@ mod tests {
         assert_eq!(reparsed.fields[&0x0000_1000], 5u32.to_le_bytes());
         assert_eq!(reparsed.fields[&0x0002_0000], 1u32.to_le_bytes());
         assert_eq!(reparsed.fields[&DECIMAL_FLAG], decimal128_le(42.5).unwrap());
+    }
+
+    #[test]
+    fn raw_scalar_rewrite_matches_owned_codec_and_preserves_non_value_bytes() {
+        let mut source = BncCell::minimal();
+        source.prefix[2..].copy_from_slice(&[0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6]);
+        source.set_string(17);
+        source.set_style_identifier(Some(23));
+        source.set_comment_identifier(Some(29));
+        source.set_formula_reference(31);
+        source
+            .fields
+            .insert(FORMULA_ERROR_FLAG, 37u32.to_le_bytes().to_vec());
+        source.tail.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
+        let source_bytes = source.encode();
+        let view = BncCellView::parse(&source_bytes).unwrap();
+
+        for scalar in [
+            ScalarValue::String(41),
+            ScalarValue::RichText(43),
+            ScalarValue::Number(finite(47.5)),
+            ScalarValue::Boolean(true),
+            ScalarValue::Date(finite(53.25)),
+            ScalarValue::Duration(finite(59.75)),
+        ] {
+            let rewritten = view.rewrite_scalar_with_limit(scalar, usize::MAX).unwrap();
+            let mut expected = source.clone();
+            match scalar {
+                ScalarValue::String(identifier) => expected.set_string(identifier),
+                ScalarValue::RichText(identifier) => expected.set_rich_text(identifier),
+                ScalarValue::Number(value) => expected.set_number(value.get()).unwrap(),
+                ScalarValue::Boolean(value) => expected.set_boolean(value),
+                ScalarValue::Date(value) => expected.set_date(value.get()).unwrap(),
+                ScalarValue::Duration(value) => expected.set_duration(value.get()).unwrap(),
+            }
+            assert_eq!(rewritten, expected.encode());
+            assert_eq!(&rewritten[..1], &source_bytes[..1]);
+            assert_eq!(
+                &rewritten[2..BNC_PREFIX_LEN],
+                &source_bytes[2..BNC_PREFIX_LEN]
+            );
+            assert!(rewritten.ends_with(&source.tail));
+        }
+
+        let rewritten = view
+            .rewrite_scalar_with_limit(ScalarValue::Boolean(true), usize::MAX)
+            .unwrap();
+        let reparsed = BncCell::parse(&rewritten).unwrap();
+        assert_eq!(reparsed.stored_value(), StoredValue::Boolean);
+        assert_eq!(
+            reparsed.cached_scalar().unwrap(),
+            Some(CachedScalar::Boolean(true))
+        );
+        assert_eq!(reparsed.style_identifier(), Some(23));
+        assert_eq!(reparsed.comment_identifier(), Some(29));
+        assert_eq!(reparsed.formula_error_identifier(), None);
+    }
+
+    #[test]
+    fn raw_scalar_semantic_equality_is_allocation_free_and_format_aware() {
+        let mut cell = BncCell::minimal();
+        cell.set_data_format_identifier(7, CellDataFormatKind::Duration, None)
+            .unwrap();
+        cell.set_number(2.0).unwrap();
+        let bytes = cell.encode();
+        let view = BncCellView::parse(&bytes).unwrap();
+        assert!(view.scalar_equals(ScalarValue::Number(finite(2.0))));
+        assert!(view.scalar_equals(ScalarValue::Duration(finite(172_800.0))));
+        assert!(!view.scalar_equals(ScalarValue::Number(finite(3.0))));
+        assert!(!view.scalar_equals(ScalarValue::Boolean(true)));
+
+        let rewritten = view
+            .rewrite_scalar_with_limit(ScalarValue::Number(finite(3.0)), usize::MAX)
+            .unwrap();
+        let rewritten = BncCellView::parse(&rewritten).unwrap();
+        assert_eq!(rewritten.stored_value(), StoredValue::Duration);
+        assert_eq!(
+            rewritten.cached_scalar(),
+            Some(CachedScalar::Duration(finite(259_200.0)))
+        );
+    }
+
+    #[test]
+    fn raw_clear_distinguishes_deleted_and_retained_cells() {
+        let minimal = BncCell::minimal().encode();
+        let view = BncCellView::parse(&minimal).unwrap();
+        assert_eq!(view.clear_value_with_limit(0).unwrap(), ClearValue::Delete);
+
+        let mut retained = BncCell::minimal();
+        retained.set_number(42.0).unwrap();
+        retained.set_comment_identifier(Some(9));
+        retained.tail.extend_from_slice(&[0xca, 0xfe]);
+        let retained_bytes = retained.encode();
+        let view = BncCellView::parse(&retained_bytes).unwrap();
+        let cleared = match view.clear_value_with_limit(usize::MAX).unwrap() {
+            ClearValue::Delete => panic!("metadata-bearing cell was deleted"),
+            ClearValue::Retain(bytes) => bytes,
+        };
+        let parsed = BncCell::parse(&cleared).unwrap();
+        assert_eq!(parsed.stored_value(), StoredValue::Empty);
+        assert_eq!(parsed.comment_identifier(), Some(9));
+        assert_eq!(parsed.tail, [0xca, 0xfe]);
+    }
+
+    #[test]
+    fn bounded_raw_and_owned_encoding_use_exact_limits() {
+        let mut cell = BncCell::minimal();
+        cell.set_string(11);
+        cell.set_style_identifier(Some(13));
+        cell.tail.extend_from_slice(&[1, 2, 3]);
+        let encoded = cell.encode();
+        assert_eq!(cell.try_encode_with_limit(encoded.len()).unwrap(), encoded);
+        assert!(matches!(
+            cell.try_encode_with_limit(encoded.len() - 1),
+            Err(Error::OutputLimitExceeded {
+                observed,
+                maximum
+            }) if observed == encoded.len() && maximum + 1 == observed
+        ));
+
+        let view = BncCellView::parse(&encoded).unwrap();
+        let expected = view
+            .rewrite_scalar_with_limit(ScalarValue::RichText(17), usize::MAX)
+            .unwrap();
+        assert_eq!(
+            view.rewrite_scalar_with_limit(ScalarValue::RichText(17), expected.len())
+                .unwrap(),
+            expected
+        );
+        assert!(matches!(
+            view.rewrite_scalar_with_limit(ScalarValue::RichText(17), expected.len() - 1),
+            Err(Error::OutputLimitExceeded {
+                observed,
+                maximum
+            }) if observed == expected.len() && maximum + 1 == observed
+        ));
     }
 
     #[test]
@@ -1240,6 +1814,58 @@ mod tests {
         assert_eq!(cell.fields[&0x0000_1000], 5u32.to_le_bytes());
 
         assert!(BncCell::minimal().set_formula_cached_number(1.0).is_err());
+    }
+
+    #[test]
+    fn raw_formula_cache_rewrite_preserves_non_cache_bytes_and_is_bounded() {
+        let mut cell = BncCell::minimal();
+        cell.prefix[2] = 0x5a;
+        cell.set_comment_identifier(Some(9));
+        cell.fields.insert(STYLE_FLAG, 5u32.to_le_bytes().to_vec());
+        cell.set_number(323.0).unwrap();
+        cell.set_formula_reference(17);
+        cell.fields
+            .insert(FORMULA_ERROR_FLAG, 23u32.to_le_bytes().to_vec());
+        cell.tail.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
+        let original = cell.encode();
+        let view = BncCellView::parse(&original).unwrap();
+        let expected = CachedScalar::Number(finite(324.0));
+        assert!(!view.formula_cache_equals(expected));
+
+        let rewritten = view
+            .rewrite_formula_cache_with_limit(expected, usize::MAX)
+            .unwrap();
+        let reparsed = BncCellView::parse(&rewritten).unwrap();
+        assert!(reparsed.formula_cache_equals(expected));
+        assert_eq!(reparsed.stored_value(), StoredValue::Formula(17));
+        assert_eq!(reparsed.formula_error_identifier(), Some(23));
+        assert_eq!(reparsed.comment_identifier(), Some(9));
+
+        let before = BncCell::parse(&original).unwrap();
+        let after = BncCell::parse(&rewritten).unwrap();
+        assert_eq!(before.prefix[0], after.prefix[0]);
+        assert_eq!(&before.prefix[2..], &after.prefix[2..]);
+        assert_eq!(before.tail, after.tail);
+        for (flag, bytes) in &before.fields {
+            if FORMULA_CACHE_FLAGS & flag == 0 {
+                assert_eq!(after.fields.get(flag), Some(bytes));
+            }
+        }
+
+        assert!(matches!(
+            view.rewrite_formula_cache_with_limit(expected, rewritten.len() - 1),
+            Err(Error::OutputLimitExceeded { observed, maximum })
+                if observed == rewritten.len() && maximum == rewritten.len() - 1
+        ));
+        let boolean = BncCellView::parse(&rewritten)
+            .unwrap()
+            .rewrite_formula_cache_with_limit(CachedScalar::Boolean(true), usize::MAX)
+            .unwrap();
+        let boolean = BncCellView::parse(&boolean).unwrap();
+        assert!(boolean.formula_cache_equals(CachedScalar::Boolean(true)));
+        assert_eq!(boolean.stored_value(), StoredValue::Formula(17));
+        assert_eq!(boolean.formula_error_identifier(), Some(23));
+        assert_eq!(boolean.comment_identifier(), Some(9));
     }
 
     #[test]

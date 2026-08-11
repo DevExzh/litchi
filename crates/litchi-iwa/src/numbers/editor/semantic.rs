@@ -10,8 +10,8 @@ use super::table_duplicate::{
 use super::{
     DOCUMENT_COMPONENT_IDENTIFIER, EMPTY_TABLE_POSITION_OFFSET, SHAPE_INFO_MESSAGE_TYPE,
     TABLE_DUPLICATE_OFFSET, cell_data_format, cell_fill, cell_layout, cell_merge,
-    cell_paragraph_list, cell_paragraph_style, conditional_highlight, formula_cache, stroke_layers,
-    table_bootstrap, table_cells, table_create, table_formula,
+    cell_paragraph_list, cell_paragraph_style, conditional_highlight, stroke_layers,
+    table_bootstrap, table_create, table_formula,
 };
 
 use std::collections::{HashMap, HashSet};
@@ -20,7 +20,6 @@ use std::path::Path;
 
 use prost::Message;
 
-use super::super::cell::{CellValue, TableCellUpdate};
 use super::super::formula::{FormulaCachedValue, FormulaExpression, FormulaPivotCategoryReference};
 use crate::archive::RawMessage;
 use crate::comments::IWorkDrawableCommentEditor;

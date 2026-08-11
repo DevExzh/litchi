@@ -41,7 +41,6 @@ fn create_numbers(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
         .table_name("Section CRUD")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
-    let table_id = editor.tables()?.remove(0).id();
     let table = TableSelector::index(0);
     editor = set_focused_table_headers(
         editor,
@@ -55,7 +54,7 @@ fn create_numbers(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
     editor.insert_table_row(table, RowInsertion::header(1))?;
     editor.insert_table_row(table, RowInsertion::footer(0))?;
     editor.insert_table_column(table, ColumnInsertion::header(1))?;
-    editor.set_cells(table_id, section_values())?;
+    set_numbers_cells(&mut editor, section_values())?;
     editor.save(insertions)?;
     editor.remove_table_row(table, RowDeletion::header(0))?;
     editor.remove_table_row(table, RowDeletion::footer(1))?;
@@ -155,4 +154,59 @@ fn section_values() -> Vec<TableCellUpdate> {
         TableCellUpdate::new(row, column, CellValue::Text(value.to_owned()))
     })
     .collect()
+}
+
+fn set_numbers_cells(
+    editor: &mut NumbersEditor,
+    updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let changes = updates
+        .into_iter()
+        .map(numbers_cell_change)
+        .collect::<Result<Vec<_>, _>>()?;
+    let package = litchi_numbers::Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_table_cells(
+            litchi_numbers::SheetSelector::index(0),
+            litchi_numbers::TableSelector::index(0),
+        )?
+        .extend(changes)?
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    *editor = NumbersEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
+fn numbers_cell_change(
+    update: litchi_numbers::cell::Update,
+) -> Result<litchi_numbers::table::cells::Change, Box<dyn std::error::Error>> {
+    let position = litchi_numbers::CellPosition::try_from_usize(update.row, update.column)?;
+    let change = match update.value {
+        CellValue::Empty => litchi_numbers::table::cells::Change::clear(position),
+        CellValue::Text(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::text(value)?,
+        ),
+        CellValue::Number(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::number(value.get())?,
+        ),
+        CellValue::Boolean(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::boolean(value),
+        ),
+        CellValue::Date(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::date(value.get())?,
+        ),
+        CellValue::Duration(value) => litchi_numbers::table::cells::Change::set(
+            position,
+            litchi_numbers::table::cells::Input::duration(value.get())?,
+        ),
+        CellValue::Formula(_) | CellValue::Error(_) => {
+            return Err(std::io::Error::other("unsupported Numbers cell input").into());
+        },
+    };
+    Ok(change)
 }
