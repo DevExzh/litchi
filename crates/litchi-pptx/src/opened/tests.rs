@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use litchi_opc::{BlobPart, PackURI, TargetMode};
 
-use super::{History, Limits, Patch, Resolution};
+use super::{History, Limits, Patch, Resolution, ShapeTextReplacement};
 use crate::{Error, Package, Result};
 
 fn opened_two_slide_package() -> Result<Package> {
@@ -206,6 +206,33 @@ fn composes_order_shape_and_notes_in_one_durable_inverse_commit() -> Result<()> 
     let restored = reopened.apply_opened_presentation_patch(&inverse)?;
     assert_eq!(restored.revision(), source_revision);
     assert_eq!(part_states(&reopened), before);
+    Ok(())
+}
+
+#[test]
+fn atomic_shape_text_batch_composes_in_one_opened_transaction() -> Result<()> {
+    let mut package = opened_two_slide_package()?;
+    let source = package.opened_presentation()?;
+    let mut edit = source.edit();
+    assert_eq!(
+        edit.set_shape_texts(
+            0_usize,
+            &[
+                ShapeTextReplacement::at(1, "Batch body & <changed>"),
+                ShapeTextReplacement::at(0, "Batch title"),
+            ],
+        )?,
+        2
+    );
+    let commit = edit.commit()?;
+    package.apply_opened_presentation_patch(commit.patch())?;
+    let slide = package
+        .presentation()?
+        .slide(0)?
+        .ok_or_else(|| Error::Invalid("batch slide disappeared".into()))?;
+    let scene = slide.shapes()?;
+    assert_eq!(scene.at(0)?.common().text(), Some("Batch title"));
+    assert_eq!(scene.at(1)?.common().text(), Some("Batch body & <changed>"));
     Ok(())
 }
 

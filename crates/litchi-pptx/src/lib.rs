@@ -151,6 +151,7 @@ pub use media_parts::{
     load_slide_media, parse_slide_media, store_slide_media, write_slide_media_pictures,
 };
 pub use modern_comments::*;
+pub use opened::{MAX_SHAPE_TEXT_REPLACEMENTS, ShapeTextReplacement};
 pub use package::Package;
 pub use presentation::{
     Presentation, SourceBackedPresentation, SourceBackedPresentationEditor,

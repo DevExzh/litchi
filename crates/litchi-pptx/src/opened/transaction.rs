@@ -219,6 +219,38 @@ impl Transaction {
         Ok(true)
     }
 
+    /// Atomically replace visible text in a bounded set of shapes on one slide.
+    ///
+    /// Every selector is resolved against the same immutable staged slide.
+    /// Duplicate or overlapping selections are refused, caller order does not
+    /// affect output bytes, and no package state changes unless the complete
+    /// batch reparses and reads back exactly.
+    ///
+    /// The return value is the number of shapes whose text changed. At most
+    /// 256 selector/value pairs and at most the transaction's aggregate text
+    /// byte limit are accepted.
+    pub fn set_shape_texts<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        replacements: &[super::ShapeTextReplacement<'_>],
+    ) -> Result<usize> {
+        let selected_slide = self.resolve_slide(slide.into())?;
+        let owner = self.working.get_part(&selected_slide.part_name)?;
+        crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
+        let (xml, changed) = super::xml::stage_shape_texts(
+            owner.blob(),
+            replacements,
+            self.source.limits.max_text_bytes(),
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )?;
+        if let Some(xml) = xml {
+            self.working
+                .get_part_mut(&selected_slide.part_name)?
+                .set_blob(xml);
+        }
+        Ok(changed)
+    }
+
     /// Add a plain `DrawingML` text box without rebuilding the surrounding slide.
     ///
     /// # Errors

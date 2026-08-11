@@ -15,10 +15,10 @@ mod xml;
 #[cfg(test)]
 mod tests;
 
-pub use model::{Limits, Slide, Snapshot};
+pub use model::{Limits, MAX_SHAPE_TEXT_REPLACEMENTS, ShapeTextReplacement, Slide, Snapshot};
 pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
 pub use transaction::{Commit, Transaction};
 
 pub(crate) use model::capture;
 pub(crate) use patch::apply;
-pub(crate) use xml::rewrite_shape_text;
+pub(crate) use xml::stage_shape_texts;

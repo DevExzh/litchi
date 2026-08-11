@@ -234,6 +234,13 @@ struct TextElement {
     empty_name: Option<Vec<u8>>,
 }
 
+struct ShapeTextEdit<'a> {
+    index: usize,
+    shape: Range<usize>,
+    text: &'a str,
+    changed: bool,
+}
+
 pub(crate) fn reorder_slides(xml: &[u8], current: &[Slide], ordered: &[u32]) -> Result<Vec<u8>> {
     if ordered.len() != current.len() {
         return Err(invalid(
@@ -341,64 +348,289 @@ pub(crate) fn rewrite_shape_text(
     text: &str,
     max_text_bytes: usize,
 ) -> Result<Vec<u8>> {
-    if text.len() > max_text_bytes {
+    let edits = [ShapeTextEdit {
+        index: 0,
+        shape,
+        text,
+        changed: true,
+    }];
+    rewrite_shape_texts(
+        xml,
+        &edits,
+        max_text_bytes,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )?
+    .ok_or_else(|| invalid("opened-presentation shape text rewrite disappeared"))
+}
+
+pub(crate) fn stage_shape_texts(
+    xml: &[u8],
+    replacements: &[super::ShapeTextReplacement<'_>],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+) -> Result<(Option<Vec<u8>>, usize)> {
+    if replacements.is_empty() {
+        return Ok((None, 0));
+    }
+    if replacements.len() > super::MAX_SHAPE_TEXT_REPLACEMENTS {
         return Err(Error::Limit {
-            resource: "opened-presentation shape text bytes",
+            resource: "opened-presentation shape text replacements",
+            limit: super::MAX_SHAPE_TEXT_REPLACEMENTS,
+        });
+    }
+    let aggregate_text_bytes = replacements.iter().try_fold(0usize, |total, replacement| {
+        total
+            .checked_add(replacement.text().len())
+            .ok_or_else(|| invalid("opened-presentation aggregate shape text size overflow"))
+    })?;
+    if aggregate_text_bytes > max_text_bytes {
+        return Err(Error::Limit {
+            resource: "opened-presentation aggregate shape text bytes",
             limit: max_text_bytes,
         });
     }
-    if !text.chars().all(is_xml_char) {
+
+    let scene = crate::shape::Scene::read(xml)?;
+    if scene.is_rewritten() {
+        return Err(Error::UnsafeEdit {
+            operation: "set_shape_texts",
+            reason: "atomic shape text batches do not support markup-compatibility branch selection",
+        });
+    }
+    if replacements.len() > scene.len() {
+        return Err(Error::Limit {
+            resource: "opened-presentation selected shape texts",
+            limit: scene.len(),
+        });
+    }
+    let mut selected = HashSet::new();
+    selected
+        .try_reserve(replacements.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation shape text identities",
+            source,
+        })?;
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(replacements.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation shape text edit plan",
+            source,
+        })?;
+    for replacement in replacements {
+        let shape = scene.shape(replacement.selector())?;
+        let index = shape.common().index();
+        if !selected.insert(index) {
+            return Err(Error::DuplicateShapeTextSelection { index });
+        }
+        let current = shape
+            .common()
+            .text()
+            .ok_or_else(|| invalid("opened-presentation selected shape has no text body"))?;
+        edits.push(ShapeTextEdit {
+            index,
+            shape: shape.common().span()?.range(xml.len())?,
+            text: replacement.text(),
+            changed: current != replacement.text(),
+        });
+    }
+    edits.sort_unstable_by_key(|edit| (edit.shape.start, edit.shape.end));
+    for pair in edits.windows(2) {
+        if pair[0].shape.end > pair[1].shape.start {
+            return Err(invalid("opened-presentation shape text selections overlap"));
+        }
+    }
+    let changed = edits.iter().filter(|edit| edit.changed).count();
+    let staged = rewrite_shape_texts(xml, &edits, max_text_bytes, max_output_bytes)?;
+    let Some(candidate) = staged.as_deref() else {
+        return Ok((None, 0));
+    };
+    let published = crate::shape::Scene::read(candidate)?;
+    if published.is_rewritten() || published.len() != scene.len() {
         return Err(invalid(
-            "opened-presentation shape text contains an invalid XML character",
+            "opened-presentation shape text batch changed the semantic shape graph",
         ));
     }
-    if shape.start >= shape.end || shape.end > xml.len() {
-        return Err(invalid("opened-presentation shape range is invalid"));
+    for edit in &edits {
+        if published.at(edit.index)?.common().text() != Some(edit.text) {
+            return Err(invalid(
+                "opened-presentation shape text batch did not round-trip semantically",
+            ));
+        }
     }
-    let spans = drawing_text_elements(xml, &shape)?;
-    if spans.is_empty() {
+    Ok((staged, changed))
+}
+
+fn rewrite_shape_texts(
+    xml: &[u8],
+    edits: &[ShapeTextEdit<'_>],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+) -> Result<Option<Vec<u8>>> {
+    for edit in edits {
+        if edit.text.len() > max_text_bytes {
+            return Err(Error::Limit {
+                resource: "opened-presentation shape text bytes",
+                limit: max_text_bytes,
+            });
+        }
+        if !edit.text.chars().all(is_xml_char) {
+            return Err(invalid(
+                "opened-presentation shape text contains an invalid XML character",
+            ));
+        }
+        if edit.shape.start >= edit.shape.end || edit.shape.end > xml.len() {
+            return Err(invalid("opened-presentation shape range is invalid"));
+        }
+    }
+    let mut owners = Vec::new();
+    owners
+        .try_reserve_exact(edits.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation shape text owner ranges",
+            source,
+        })?;
+    owners.extend(edits.iter().map(|edit| edit.shape.clone()));
+    let elements = drawing_text_elements_for_owners(xml, &owners)?;
+    if elements.iter().any(Vec::is_empty) {
         return Err(invalid(
             "opened-presentation selected shape has no DrawingML text run",
         ));
     }
-    let escaped = quick_xml::escape::escape(text);
+    if !edits.iter().any(|edit| edit.changed) {
+        return Ok(None);
+    }
+    let mut escaped = Vec::new();
+    escaped
+        .try_reserve_exact(edits.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation escaped shape texts",
+            source,
+        })?;
+    escaped.extend(
+        edits
+            .iter()
+            .map(|edit| quick_xml::escape::escape(edit.text)),
+    );
+    let mut removed = 0usize;
+    let mut emitted = 0usize;
+    for ((edit, spans), replacement) in edits.iter().zip(&elements).zip(&escaped) {
+        if !edit.changed {
+            continue;
+        }
+        for (position, span) in spans.iter().enumerate() {
+            removed = removed
+                .checked_add(span.span.len())
+                .ok_or_else(|| invalid("opened-presentation shape text size overflow"))?;
+            emitted = emitted
+                .checked_add(text_element_output_len(
+                    xml,
+                    span,
+                    position,
+                    replacement.len(),
+                )?)
+                .ok_or_else(|| invalid("opened-presentation shape text size overflow"))?;
+        }
+    }
+    let output_len = xml
+        .len()
+        .checked_sub(removed)
+        .and_then(|length| length.checked_add(emitted))
+        .ok_or_else(|| invalid("opened-presentation shape text output size overflow"))?;
+    if output_len > max_output_bytes {
+        return Err(Error::Limit {
+            resource: "opened-presentation shape text output bytes",
+            limit: max_output_bytes,
+        });
+    }
     let mut output = Vec::new();
     output
-        .try_reserve(xml.len().saturating_add(escaped.len()))
+        .try_reserve_exact(output_len)
         .map_err(|source| Error::Allocation {
             resource: "opened-presentation shape text XML",
             source,
         })?;
     let mut cursor = 0usize;
-    for (index, span) in spans.iter().enumerate() {
-        output.extend_from_slice(&xml[cursor..span.span.start]);
-        if index == 0 {
-            if let Some(name) = &span.empty_name {
-                let raw = &xml[span.span.clone()];
-                let slash = raw
-                    .iter()
-                    .rposition(|byte| *byte == b'/')
-                    .ok_or_else(|| invalid("opened-presentation empty text tag is malformed"))?;
-                let mut open_end = slash;
-                while open_end > 0 && raw[open_end - 1].is_ascii_whitespace() {
-                    open_end -= 1;
-                }
-                output.extend_from_slice(&raw[..open_end]);
-                output.push(b'>');
-                output.extend_from_slice(escaped.as_bytes());
-                output.extend_from_slice(b"</");
-                output.extend_from_slice(name);
-                output.push(b'>');
-            } else {
-                output.extend_from_slice(escaped.as_bytes());
-            }
-        } else if span.empty_name.is_some() {
-            output.extend_from_slice(&xml[span.span.clone()]);
+    for ((edit, spans), replacement) in edits.iter().zip(&elements).zip(&escaped) {
+        if !edit.changed {
+            continue;
         }
-        cursor = span.span.end;
+        for (position, span) in spans.iter().enumerate() {
+            output.extend_from_slice(&xml[cursor..span.span.start]);
+            write_text_element(&mut output, xml, span, position, replacement.as_bytes())?;
+            cursor = span.span.end;
+        }
     }
     output.extend_from_slice(&xml[cursor..]);
-    Ok(output)
+    if output.len() != output_len {
+        return Err(invalid(
+            "opened-presentation shape text output length changed during emission",
+        ));
+    }
+    Ok(Some(output))
+}
+
+fn text_element_output_len(
+    xml: &[u8],
+    element: &TextElement,
+    position: usize,
+    escaped_len: usize,
+) -> Result<usize> {
+    if position != 0 {
+        return Ok(element
+            .empty_name
+            .as_ref()
+            .map_or(0, |_| element.span.len()));
+    }
+    let Some(name) = &element.empty_name else {
+        return Ok(escaped_len);
+    };
+    let open_end = empty_text_open_end(&xml[element.span.clone()])?;
+    open_end
+        .checked_add(escaped_len)
+        .and_then(|length| length.checked_add(name.len()))
+        .and_then(|length| length.checked_add(4))
+        .ok_or_else(|| invalid("opened-presentation empty text expansion size overflow"))
+}
+
+fn write_text_element(
+    output: &mut Vec<u8>,
+    xml: &[u8],
+    element: &TextElement,
+    position: usize,
+    escaped: &[u8],
+) -> Result<()> {
+    if position != 0 {
+        if element.empty_name.is_some() {
+            output.extend_from_slice(&xml[element.span.clone()]);
+        }
+        return Ok(());
+    }
+    let Some(name) = &element.empty_name else {
+        output.extend_from_slice(escaped);
+        return Ok(());
+    };
+    let raw = &xml[element.span.clone()];
+    let open_end = empty_text_open_end(raw)?;
+    output.extend_from_slice(&raw[..open_end]);
+    output.push(b'>');
+    output.extend_from_slice(escaped);
+    output.extend_from_slice(b"</");
+    output.extend_from_slice(name);
+    output.push(b'>');
+    Ok(())
+}
+
+fn empty_text_open_end(raw: &[u8]) -> Result<usize> {
+    let slash = raw
+        .iter()
+        .rposition(|byte| *byte == b'/')
+        .ok_or_else(|| invalid("opened-presentation empty text tag is malformed"))?;
+    let mut open_end = slash;
+    while open_end > 0 && raw[open_end - 1].is_ascii_whitespace() {
+        open_end -= 1;
+    }
+    Ok(open_end)
 }
 
 pub(crate) fn append_shape(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
@@ -911,11 +1143,22 @@ fn parse_slide_id(element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Result<
     Ok((id, relationship_id))
 }
 
-fn drawing_text_elements(xml: &[u8], owner: &Range<usize>) -> Result<Vec<TextElement>> {
+fn drawing_text_elements_for_owners(
+    xml: &[u8],
+    owners: &[Range<usize>],
+) -> Result<Vec<Vec<TextElement>>> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut spans = Vec::new();
-    let mut active: Option<(usize, usize)> = None;
+    spans
+        .try_reserve_exact(owners.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation shape text span groups",
+            source,
+        })?;
+    spans.resize_with(owners.len(), Vec::new);
+    let mut active: Option<(usize, usize, usize)> = None;
+    let mut owner_position = 0usize;
     let mut depth = 0usize;
     let mut nodes = 0usize;
     loop {
@@ -937,11 +1180,17 @@ fn drawing_text_elements(xml: &[u8], owner: &Range<usize>) -> Result<Vec<TextEle
                     });
                 }
                 depth += 1;
-                if owner.contains(&start)
-                    && drawing_namespace
-                    && element.local_name().as_ref() == b"t"
+                while owners
+                    .get(owner_position)
+                    .is_some_and(|owner| start >= owner.end)
                 {
-                    if active.replace((end, depth)).is_some() {
+                    owner_position += 1;
+                }
+                let owner = owners
+                    .get(owner_position)
+                    .filter(|owner| owner.contains(&start));
+                if owner.is_some() && drawing_namespace && element.local_name().as_ref() == b"t" {
+                    if active.replace((end, depth, owner_position)).is_some() {
                         return Err(invalid(
                             "opened-presentation DrawingML text elements overlap",
                         ));
@@ -954,11 +1203,24 @@ fn drawing_text_elements(xml: &[u8], owner: &Range<usize>) -> Result<Vec<TextEle
             },
             Event::Empty(element) => {
                 bump(&mut nodes)?;
-                if owner.contains(&start)
-                    && drawing_namespace
-                    && element.local_name().as_ref() == b"t"
+                while owners
+                    .get(owner_position)
+                    .is_some_and(|owner| start >= owner.end)
                 {
-                    spans.push(TextElement {
+                    owner_position += 1;
+                }
+                let owner = owners
+                    .get(owner_position)
+                    .filter(|owner| owner.contains(&start));
+                if owner.is_some() && drawing_namespace && element.local_name().as_ref() == b"t" {
+                    let group = spans.get_mut(owner_position).ok_or_else(|| {
+                        invalid("opened-presentation shape text span owner disappeared")
+                    })?;
+                    group.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "opened-presentation shape text spans",
+                        source,
+                    })?;
+                    group.push(TextElement {
                         span: start..end,
                         empty_name: Some(element.name().as_ref().to_vec()),
                     });
@@ -969,12 +1231,19 @@ fn drawing_text_elements(xml: &[u8], owner: &Range<usize>) -> Result<Vec<TextEle
                 }
             },
             Event::End(element) => {
-                if let Some((content_start, active_depth)) = active
+                if let Some((content_start, active_depth, owner)) = active
                     && active_depth == depth
                     && drawing_namespace
                     && element.local_name().as_ref() == b"t"
                 {
-                    spans.push(TextElement {
+                    let group = spans.get_mut(owner).ok_or_else(|| {
+                        invalid("opened-presentation shape text span owner disappeared")
+                    })?;
+                    group.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "opened-presentation shape text spans",
+                        source,
+                    })?;
+                    group.push(TextElement {
                         span: content_start..start,
                         empty_name: None,
                     });

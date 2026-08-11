@@ -274,10 +274,14 @@ incomplete program and CRUD matrix.
   through the same consuming publisher. On the fixed 229-Part, 200-slide,
   eight-media corpus, pooled p50 falls from 296.590 to 8.545 ms (-97.12%,
   34.71x), instructions fall 67.91%, semantic materializations fall 229 -> 2,
-  and output remains byte-identical. MCE-normalized slides, multi-operation
-  edits, topology changes and changed signed sources refuse before output; the
-  unchanged eager PPTX guard is neutral. See
-  [`0044`](changes/0044-pptx-source-backed-semantic-publication.md).
+  and output remains byte-identical. Its bounded atomic same-slide extension
+  replaces eight unique shape texts in one scan/emission: matched p50/mean fall
+  97.45%, allocation calls fall 39.80%, and materializations remain 229 -> 2.
+  MCE-normalized slides, duplicate/overlapping batch selectors, topology
+  changes and changed signed sources refuse before output; the unchanged eager
+  PPTX guard is neutral. See
+  [`0044`](changes/0044-pptx-source-backed-semantic-publication.md) and
+  [`0063`](changes/0063-pptx-atomic-source-backed-shape-text-batch.md).
 - The guarded XLSX calculation-metadata editor now carries exact raw
   `xl/workbook.xml` transactions through the one-Part publisher. On the fixed
   12-Part, eight-media corpus, pooled p50 falls from 215.457 to 1.612 ms

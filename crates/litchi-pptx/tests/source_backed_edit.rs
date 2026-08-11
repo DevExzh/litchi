@@ -6,7 +6,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
-use litchi_pptx::{Error, ReadLimits, SourceBackedPresentation, SourceBackedPresentationEditor};
+use litchi_pptx::{
+    Error, MAX_SHAPE_TEXT_REPLACEMENTS, ReadLimits, ShapeTextReplacement, SourceBackedPresentation,
+    SourceBackedPresentationEditor,
+};
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
@@ -224,6 +227,174 @@ fn changed_edit_reopens_and_changes_only_the_selected_logical_part() {
     let reopened =
         SourceBackedPresentation::from_read_at(Arc::new(VersionedSource::new(output))).unwrap();
     assert_eq!(reopened.slide(0).unwrap().text().unwrap(), "after\nstable");
+}
+
+fn publish_batch(
+    source: &[u8],
+    replacements: &[ShapeTextReplacement<'_>],
+) -> (Vec<u8>, usize, u64) {
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source.to_vec(),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    let changed = edit.set_shape_texts(replacements).unwrap();
+    let commit = edit.commit();
+    let materializations = editor.cache_diagnostics().successful_loads;
+    let mut output = Vec::new();
+    editor
+        .publish_slide_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    (output, changed, materializations)
+}
+
+#[test]
+fn atomic_batch_is_order_independent_and_changes_two_shapes_in_one_part() {
+    let source = fixture("", shape_xml(PML, "before"), false);
+    let forward = [
+        ShapeTextReplacement::named("Title", "after & <title>"),
+        ShapeTextReplacement::at(1, "after other"),
+    ];
+    let reverse = [forward[1], forward[0]];
+    let (first, changed, materializations) = publish_batch(&source, &forward);
+    let (second, reverse_changed, reverse_materializations) = publish_batch(&source, &reverse);
+    assert_eq!(changed, 2);
+    assert_eq!(reverse_changed, 2);
+    assert_eq!(materializations, 2);
+    assert_eq!(reverse_materializations, 2);
+    assert_eq!(first, second);
+
+    let before = OpcPackage::from_bytes(&source).unwrap();
+    let after = OpcPackage::from_bytes(&first).unwrap();
+    for part in before.iter_parts() {
+        let candidate = after.get_part(part.partname()).unwrap();
+        assert_eq!(part.content_type(), candidate.content_type());
+        assert_eq!(
+            relationship_signatures(part.rels()),
+            relationship_signatures(candidate.rels())
+        );
+        if part.partname().as_str() == SLIDE {
+            let scene = litchi_pptx::shape::read(candidate.blob()).unwrap();
+            assert_eq!(
+                scene.shape("Title").unwrap().common().text(),
+                Some("after & <title>")
+            );
+            assert_eq!(
+                scene.shape("Other").unwrap().common().text(),
+                Some("after other")
+            );
+            let restored = std::str::from_utf8(candidate.blob())
+                .unwrap()
+                .replacen("after &amp; &lt;title&gt;", "before", 1)
+                .replacen("after other", "stable", 1);
+            assert_eq!(restored.as_bytes(), part.blob());
+        } else {
+            assert_eq!(part.blob(), candidate.blob());
+        }
+    }
+}
+
+#[test]
+fn batch_preflight_is_atomic_and_duplicate_identity_is_typed() {
+    let source = fixture("", shape_xml(PML, "before"), false);
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+            .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    let over_limit =
+        vec![ShapeTextReplacement::named("Title", "bounded"); MAX_SHAPE_TEXT_REPLACEMENTS + 1];
+    assert!(matches!(
+        edit.set_shape_texts(&over_limit),
+        Err(Error::Limit { .. })
+    ));
+    assert!(matches!(
+        edit.set_shape_texts(&[
+            ShapeTextReplacement::named("Title", "first"),
+            ShapeTextReplacement::at(0, "second"),
+        ]),
+        Err(Error::DuplicateShapeTextSelection { index: 0 })
+    ));
+    assert!(
+        edit.set_shape_texts(&[
+            ShapeTextReplacement::named("Title", "valid"),
+            ShapeTextReplacement::named("Other", "bad\0text"),
+        ])
+        .is_err()
+    );
+    assert_eq!(
+        edit.set_shape_texts(&[
+            ShapeTextReplacement::named("Title", "valid"),
+            ShapeTextReplacement::named("Other", "also valid"),
+        ])
+        .unwrap(),
+        2
+    );
+    assert!(matches!(
+        edit.set_shape_texts(&[ShapeTextReplacement::at(0, "again")]),
+        Err(Error::UnsafeEdit { .. })
+    ));
+}
+
+#[test]
+fn batch_expansion_honors_the_source_part_limit_before_allocation() {
+    let source = fixture("", shape_xml(PML, "before"), false);
+    let limits = ReadLimits::builder()
+        .max_part_bytes(4096)
+        .unwrap()
+        .build()
+        .unwrap();
+    let editor = SourceBackedPresentationEditor::from_read_at_with_limits(
+        Arc::new(VersionedSource::new(source)),
+        limits,
+    )
+    .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    let oversized = "x".repeat(5000);
+    assert!(matches!(
+        edit.set_shape_texts(&[
+            ShapeTextReplacement::named("Title", &oversized),
+            ShapeTextReplacement::named("Other", "another replacement"),
+        ]),
+        Err(Error::Limit { .. })
+    ));
+    assert_eq!(
+        edit.set_shape_texts(&[
+            ShapeTextReplacement::named("Title", "short"),
+            ShapeTextReplacement::named("Other", "tiny"),
+        ])
+        .unwrap(),
+        2
+    );
+}
+
+#[test]
+fn empty_and_all_equal_batch_preserve_signed_source_exactly() {
+    let source = fixture("", shape_xml(PML, "before"), true);
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source.clone(),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    assert_eq!(edit.set_shape_texts(&[]).unwrap(), 0);
+    assert_eq!(
+        edit.set_shape_texts(&[
+            ShapeTextReplacement::named("Title", "before"),
+            ShapeTextReplacement::named("Other", "stable"),
+        ])
+        .unwrap(),
+        0
+    );
+    assert!(matches!(
+        edit.set_shape_text("Title", "changed"),
+        Err(Error::UnsafeEdit { .. })
+    ));
+    let commit = edit.commit();
+    assert!(!commit.is_changed());
+    let mut output = Vec::new();
+    editor
+        .publish_slide_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, source);
 }
 
 #[test]

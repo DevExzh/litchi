@@ -10,6 +10,48 @@ use sha2::{Digest, Sha256};
 use crate::parts::PresentationPart;
 use crate::{Error, Result};
 
+/// Maximum selector/value pairs in one atomic same-slide text batch.
+pub const MAX_SHAPE_TEXT_REPLACEMENTS: usize = 256;
+
+/// One borrowed selector/value pair in an atomic same-slide text batch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShapeTextReplacement<'a> {
+    selector: crate::shape::Key<'a>,
+    text: &'a str,
+}
+
+impl<'a> ShapeTextReplacement<'a> {
+    /// Build a replacement from an exact semantic selector.
+    #[must_use]
+    pub const fn new(selector: crate::shape::Key<'a>, text: &'a str) -> Self {
+        Self { selector, text }
+    }
+
+    /// Select a shape by exact producer-visible name.
+    #[must_use]
+    pub const fn named(name: &'a str, text: &'a str) -> Self {
+        Self::new(crate::shape::Key::Name(name), text)
+    }
+
+    /// Select a shape by checked zero-based pre-order position.
+    #[must_use]
+    pub const fn at(index: usize, text: &'a str) -> Self {
+        Self::new(crate::shape::Key::Index(index), text)
+    }
+
+    /// Exact semantic selector for this replacement.
+    #[must_use]
+    pub const fn selector(self) -> crate::shape::Key<'a> {
+        self.selector
+    }
+
+    /// Borrowed replacement text.
+    #[must_use]
+    pub const fn text(self) -> &'a str {
+        self.text
+    }
+}
+
 /// Finite limits for opened-presentation transactions and durable patches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
