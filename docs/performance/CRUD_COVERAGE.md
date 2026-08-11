@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 
-This is a coverage map, not a completion claim. It compares the 114 selectable
+This is a coverage map, not a completion claim. It compares the 117 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -157,6 +157,13 @@ readback and patch/inverse/stale behavior. Regenerated `content.xml` above the
 common 16 MiB optimization limit explicitly returns to the established ODT
 rebuild. Structural/bulk edits, repeated queries, real-producer media and
 source-backed positional I/O remain open.
+
+Change 0036 separates the common OLE2 one-stream edit into editor-open,
+candidate-publication, final-render and end-to-end attribution cases over four
+unchanged 4 MiB streams. It does not add semantic CRUD coverage. An inline
+recapture allocation-reuse prototype was reverted because the complete public
+operation improved only 2.61% p50/2.30% mean; the cases remain to gate a
+materially different final-publication design.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
