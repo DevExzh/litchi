@@ -1188,6 +1188,7 @@ dependencies = [
  "litchi-core",
  "litchi-doc",
  "litchi-docx",
+ "litchi-odf-common",
  "litchi-odp",
  "litchi-ods",
  "litchi-odt",

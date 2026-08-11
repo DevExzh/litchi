@@ -101,6 +101,15 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/semantic-odf-smoke.json
 ```
 
+Run the fixed medium ODS publication case with eight 2 MiB incompressible
+opaque resources:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 --case ods_media_one_edit_save \
+  --json target/perf/ods-media-publication.json
+```
+
 Run the backward-compatible plain tiny semantic RTF smoke matrix (seven
 records):
 
@@ -294,6 +303,13 @@ observation. `ods_semantic_cell_sweep` isolates repeated public lookup cost
 without cloning cell text, while `ods_semantic_full_cell_text` retains the
 end-to-end aggregate because the facade exposes cells rather than a single
 full-text method.
+
+`ods_media_one_edit_save` is a separate fixed-medium corpus: 2,048 cells plus
+eight deterministic 2 MiB resources under `Pictures/`. It times public unified
+snapshot open, one middle-cell edit, commit and output materialization. Outside
+timing it reopens the complete grid and verifies every resource path, manifest
+media type, exact payload and deterministic output. This case does not vary
+with `--semantic-shape` and is not part of the 22-record tiny ODF smoke matrix.
 
 Each ODP batch uses `Builder`, `Presentation::from_bytes`, `slides()`,
 `Presentation::text`, source snapshots, and public presentation transactions.

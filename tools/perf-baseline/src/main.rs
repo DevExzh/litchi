@@ -52,8 +52,11 @@ const SEMANTIC_DOCX_CORPUS_GENERATOR: &str = "litchi-docx-semantic-v1";
 const SEMANTIC_PPTX_CORPUS_GENERATOR: &str = "litchi-pptx-semantic-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
 const SEMANTIC_ODS_CORPUS_GENERATOR: &str = "litchi-ods-semantic-v1";
+const ODS_MEDIA_CORPUS_GENERATOR: &str = "litchi-ods-media-publication-v1";
 const SEMANTIC_ODP_CORPUS_GENERATOR: &str = "litchi-odp-semantic-v1";
 const SEMANTIC_RTF_CORPUS_GENERATOR: &str = "litchi-rtf-semantic-v2";
+const ODS_MEDIA_ENTRY_COUNT: usize = 8;
+const ODS_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 static NEXT_INSTRUMENTED_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -412,6 +415,7 @@ enum Case {
     OdsSemanticCreateSmall,
     OdsSemanticNoopEditSave,
     OdsSemanticOneEditSave,
+    OdsMediaOneEditSave,
     OdpSemanticOpen,
     OdpSemanticListSlides,
     OdpSemanticOneSlide,
@@ -568,6 +572,7 @@ impl Case {
             Self::OdsSemanticCreateSmall => "ods_semantic_create_small",
             Self::OdsSemanticNoopEditSave => "ods_semantic_noop_edit_save",
             Self::OdsSemanticOneEditSave => "ods_semantic_one_edit_save",
+            Self::OdsMediaOneEditSave => "ods_media_one_edit_save",
             Self::OdpSemanticOpen => "odp_semantic_open",
             Self::OdpSemanticListSlides => "odp_semantic_list_slides",
             Self::OdpSemanticOneSlide => "odp_semantic_one_slide",
@@ -762,6 +767,10 @@ impl Case {
                 | Self::OdpSemanticNoopEditSave
                 | Self::OdpSemanticOneEditSave
         )
+    }
+
+    const fn uses_ods_media(self) -> bool {
+        matches!(self, Self::OdsMediaOneEditSave)
     }
 
     const fn is_semantic_create_small(self) -> bool {
@@ -1599,6 +1608,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_pptx()
                     && !case.uses_semantic_odt()
                     && !case.uses_semantic_ods()
+                    && !case.uses_ods_media()
                     && !case.uses_semantic_odp()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
@@ -1805,6 +1815,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                     options.range_simulation,
                 )?);
             }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_ods_media()) {
+        let corpus = build_ods_media_corpus()?;
+        for case in options.cases.iter().filter(|case| case.uses_ods_media()) {
+            results.push(run_case_with_config(
+                *case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
         }
     }
 
@@ -2149,6 +2172,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_semantic_create_small" => Some(Case::OdsSemanticCreateSmall),
         "ods_semantic_noop_edit_save" => Some(Case::OdsSemanticNoopEditSave),
         "ods_semantic_one_edit_save" => Some(Case::OdsSemanticOneEditSave),
+        "ods_media_one_edit_save" => Some(Case::OdsMediaOneEditSave),
         "odp_semantic_open" => Some(Case::OdpSemanticOpen),
         "odp_semantic_list_slides" => Some(Case::OdpSemanticListSlides),
         "odp_semantic_one_slide" => Some(Case::OdpSemanticOneSlide),
@@ -2275,6 +2299,7 @@ fn print_usage() {
                                        ods_semantic_cell_sweep,\n\
                                        ods_semantic_full_cell_text,ods_semantic_create_small,\n\
                                        ods_semantic_noop_edit_save,ods_semantic_one_edit_save,\n\
+                                       ods_media_one_edit_save,\n\
                                        odp_semantic_open,odp_semantic_list_slides,\n\
                                        odp_semantic_one_slide,odp_semantic_full_text,\n\
                                        odp_semantic_create_small,odp_semantic_noop_edit_save,\n\
@@ -2912,6 +2937,40 @@ fn semantic_ods_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(builder.build()?)
 }
 
+fn ods_media_path(index: usize) -> String {
+    format!("Pictures/litchi-perf-media-{index:02}.bin")
+}
+
+fn ods_media_payload(index: usize) -> Vec<u8> {
+    payload_bytes(
+        PayloadKind::Incompressible,
+        10_000 + index,
+        ODS_MEDIA_ENTRY_BYTES,
+    )
+}
+
+fn ods_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
+    let base = semantic_ods_bytes(SemanticShape::Medium)?;
+    let source = ArchiveReader::new(&base)?;
+    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    writer.set_mimetype("application/vnd.oasis.opendocument.spreadsheet")?;
+    for path in source.file_names() {
+        if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
+            continue;
+        }
+        writer.add_file(path, &source.read(path)?)?;
+    }
+    writer.add_manifest_directory("Pictures/", "")?;
+    for index in 0..ODS_MEDIA_ENTRY_COUNT {
+        writer.add_file_with_media_type(
+            &ods_media_path(index),
+            &ods_media_payload(index),
+            "application/octet-stream",
+        )?;
+    }
+    Ok(writer.finish_to_bytes()?)
+}
+
 fn semantic_odp_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut builder = litchi_odp::Builder::new();
     for index in 0..shape.pptx_slides() {
@@ -3012,6 +3071,56 @@ fn build_semantic_ods_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
         },
         archive,
         target_name: "Sheet 0!R0C0".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn build_ods_media_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let shape = SemanticShape::Medium;
+    let archive = ods_media_archive()?;
+    verify_ods_media_archive(&archive, false)?;
+    let target_payload = semantic_ods_text(0, 0, 0, false).into_bytes();
+    let cell_bytes = (0..shape.ods_sheet_count()).try_fold(0usize, |total, sheet| {
+        (0..shape.ods_rows_per_sheet()).try_fold(total, |total, row| {
+            (0..shape.ods_columns_per_sheet()).try_fold(total, |total, column| {
+                total
+                    .checked_add(semantic_ods_text(sheet, row, column, false).len())
+                    .ok_or("media-rich ODS text byte count overflows usize")
+            })
+        })
+    })?;
+    let media_bytes = ODS_MEDIA_ENTRY_COUNT
+        .checked_mul(ODS_MEDIA_ENTRY_BYTES)
+        .ok_or("media-rich ODS payload byte count overflows usize")?;
+    let entry_count = shape
+        .ods_cell_count()
+        .checked_add(ODS_MEDIA_ENTRY_COUNT)
+        .ok_or("media-rich ODS logical entry count overflows usize")?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: "ods-media-publication".to_owned(),
+            generator: ODS_MEDIA_CORPUS_GENERATOR,
+            package_format: "ODS/ODF/ZIP",
+            shape: "media-rich",
+            payload_kind: "deterministic-incompressible-media",
+            compression: "deflate",
+            entry_count,
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: ODS_MEDIA_ENTRY_BYTES,
+            uncompressed_payload_bytes: cell_bytes
+                .checked_add(media_bytes)
+                .ok_or("media-rich ODS aggregate byte count overflows usize")?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "Sheet 1!R16C16".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "Sheet 1!R16C16".to_owned(),
         target_payload,
         xlsx: None,
     })
@@ -3575,6 +3684,9 @@ fn run_case_with_config(
         | Case::OdsSemanticOneEditSave => {
             run_semantic_ods(case, corpus, warmup_iterations, samples)
         },
+        Case::OdsMediaOneEditSave => {
+            run_ods_media_one_edit_save(corpus, warmup_iterations, samples)
+        },
         Case::OdpSemanticOpen
         | Case::OdpSemanticListSlides
         | Case::OdpSemanticOneSlide
@@ -4049,6 +4161,24 @@ fn verify_semantic_ods(
         != expected_semantic_ods_full_cell_text(shape, updated)
     {
         return Err("semantic ODS full cell text differs from specification".into());
+    }
+    Ok(())
+}
+
+fn verify_ods_media_archive(bytes: &[u8], updated: bool) -> Result<(), Box<dyn Error>> {
+    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(bytes.to_vec())?;
+    verify_semantic_ods(&spreadsheet, SemanticShape::Medium, updated)?;
+
+    let package = litchi_odf_common::core::OwnedPackage::from_bytes(bytes.to_vec())?;
+    let package = package.package()?;
+    for index in 0..ODS_MEDIA_ENTRY_COUNT {
+        let path = ods_media_path(index);
+        if package.manifest().get_media_type(&path) != Some("application/octet-stream") {
+            return Err(format!("media-rich ODS manifest entry differs for '{path}'").into());
+        }
+        if package.get_file(&path)? != ods_media_payload(index) {
+            return Err(format!("media-rich ODS payload differs for '{path}'").into());
+        }
     }
     Ok(())
 }
@@ -5357,6 +5487,60 @@ fn run_semantic_ods(
         }
     }
     Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_ods_media_one_edit_save(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = SemanticShape::Medium;
+    let sheet = shape.ods_sheet_count() / 2;
+    let row = shape.ods_rows_per_sheet() / 2;
+    let column = shape.ods_columns_per_sheet() / 2;
+    let sheet_name = semantic_ods_sheet_name(sheet);
+    let mut expected_output_digest = None;
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let started = Instant::now();
+        let snapshot = litchi_ods::document::Snapshot::from_bytes(corpus.archive.clone())?;
+        let mut edit = snapshot.edit();
+        let text = semantic_ods_text(sheet, row, column, true);
+        edit.worksheets(|worksheets| {
+            worksheets
+                .set_cell(
+                    sheet_name.as_str(),
+                    row,
+                    column,
+                    litchi_ods::Cell::new(litchi_ods::CellValue::Text(text.clone()), text),
+                )?
+                .ok_or_else(|| {
+                    litchi_core::Error::InvalidFormat(
+                        "media-rich ODS selected sheet is missing".to_owned(),
+                    )
+                })?;
+            Ok(())
+        })?;
+        let commit = edit.commit()?;
+        let bytes = commit.snapshot().as_bytes().to_vec();
+        let duration = started.elapsed();
+        if !commit.changed() || bytes == corpus.archive {
+            return Err("media-rich ODS one-cell edit reported an exact no-op".into());
+        }
+
+        verify_ods_media_archive(&bytes, true)?;
+        let digest = sha256_hex(&bytes);
+        if let Some(expected) = &expected_output_digest {
+            if expected != &digest {
+                return Err("media-rich ODS publication is not deterministic".into());
+            }
+        } else {
+            expected_output_digest = Some(digest);
+        }
+        std::hint::black_box(bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    Ok(result(Case::OdsMediaOneEditSave, corpus, elapsed, None))
 }
 
 fn run_semantic_odp(
@@ -7420,11 +7604,12 @@ mod tests {
     use super::{
         Case, CorpusShape, CountingSink, InstrumentedSource, PayloadKind, RangeSimulationConfig,
         RequestSizeBuckets, RtfSemanticVariant, SemanticShape, SimulatedRangeSource,
-        SourceBackedPackage, WriterShape, XlsxShape, build_cfb_corpus, build_opc_corpus,
-        build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
-        build_semantic_odt_corpus, build_semantic_pptx_corpus, build_semantic_rtf_corpus,
-        build_writer_corpus, build_xlsx_corpus, payload_bytes, resolve_execution_workers, run_case,
-        run_case_with_config, run_scaling_case, simulated_request_delay, statistics,
+        SourceBackedPackage, WriterShape, XlsxShape, build_cfb_corpus, build_ods_media_corpus,
+        build_opc_corpus, build_semantic_docx_corpus, build_semantic_odp_corpus,
+        build_semantic_ods_corpus, build_semantic_odt_corpus, build_semantic_pptx_corpus,
+        build_semantic_rtf_corpus, build_writer_corpus, build_xlsx_corpus, payload_bytes,
+        resolve_execution_workers, run_case, run_case_with_config, run_scaling_case,
+        simulated_request_delay, statistics,
     };
 
     #[test]
@@ -7672,6 +7857,51 @@ mod tests {
         );
         assert_eq!(odp.manifest.entry_count, 3);
         run_case(Case::OdpSemanticOneEditSave, &odp, 0, 1).unwrap();
+    }
+
+    #[test]
+    fn media_rich_ods_corpus_is_deterministic_and_preserved_by_one_cell_edit() {
+        let first = build_ods_media_corpus().unwrap();
+        let second = build_ods_media_corpus().unwrap();
+
+        assert_eq!(first.archive, second.archive);
+        assert_eq!(first.manifest.generator, "litchi-ods-media-publication-v1");
+        assert_eq!(first.manifest.shape, "media-rich");
+        assert_eq!(first.manifest.entry_bytes, 2 * 1024 * 1024);
+        let result = run_case(Case::OdsMediaOneEditSave, &first, 0, 1).unwrap();
+        assert_eq!(result.case, "ods_media_one_edit_save");
+        assert_eq!(result.elapsed_ns.samples.len(), 1);
+
+        let snapshot = litchi_ods::document::Snapshot::from_bytes(first.archive.clone()).unwrap();
+        let mut edit = snapshot.edit();
+        edit.worksheets(|worksheets| {
+            let text = super::semantic_ods_text(1, 16, 16, true);
+            worksheets
+                .set_cell(
+                    "Sheet 1",
+                    16,
+                    16,
+                    litchi_ods::Cell::new(litchi_ods::CellValue::Text(text.clone()), text),
+                )?
+                .ok_or_else(|| {
+                    litchi_core::Error::InvalidFormat(
+                        "media-rich ODS test sheet is missing".to_owned(),
+                    )
+                })?;
+            Ok(())
+        })
+        .unwrap();
+        let output = edit.commit().unwrap();
+        let identical = litchi_odf_common::package::raw_identical_members(
+            &first.archive,
+            output.snapshot().as_bytes(),
+        )
+        .unwrap();
+        assert!(!identical.contains("content.xml"));
+        assert!(identical.contains("META-INF/manifest.xml"));
+        for index in 0..super::ODS_MEDIA_ENTRY_COUNT {
+            assert!(identical.contains(&super::ods_media_path(index)));
+        }
     }
 
     #[test]

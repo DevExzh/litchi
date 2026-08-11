@@ -1,0 +1,1568 @@
+reading file "docs/performance/results/heaptrack-ods-media-preservation-before.gz.zst" - please wait, this might take some time...
+Debuggee command was: target/perf/frozen-ods-media/before --case ods_media_one_edit_save --warmup 0 --samples 1 --json docs/performance/results/heaptrack-ods-media-preservation-before.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+145319 calls to allocation functions with 0B peak consumption from
+quick_xml::events::Event::into_owned::h66cdc02723ba981e
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+9321 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+6251 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+6213 calls with 0B peak consumption from:
+    litchi_ods::settings::codec::locate::h53a21a74a89035cf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::settings::model::Snapshot::from_content_xml::h1153bd22a6e9ea05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::package::document::Package::calculation_settings::h64b28e24f2b57c9b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::facade::Spreadsheet::from_package::h4281d2c4140e236b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::facade::Spreadsheet::from_bytes::hf6f6953a01054541
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::verify_ods_media_archive::h5250ccf9b4527e0c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 123534 from 25 other places
+
+39194 calls to allocation functions with 222.07K peak consumption from
+_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+3072 calls with 0B peak consumption from:
+    litchi_ods::worksheet::codec::Attributes::cell::h8ce3b8442539f40f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2048 calls with 110.59K peak consumption from:
+    litchi_ods::worksheet::codec::Attributes::cell::h8ce3b8442539f40f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet8snapshot8Snapshot8from_arc17h1f7eb122ec7f8934E.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Snapshot::from_bytes::h9014af82270e81cf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2048 calls with 110.59K peak consumption from:
+    litchi_ods::worksheet::codec::Attributes::cell::h8ce3b8442539f40f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet8snapshot8Snapshot8from_arc17h1f7eb122ec7f8934E.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Snapshot::from_bytes::h9014af82270e81cf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Edit::commit::h0c376cb75b4574a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 32026 from 517 other places
+
+37963 calls to allocation functions with 0B peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+3072 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::codec::Attributes::from_element::h52803476486005ac
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2052 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::compact_xml::xml_space::h1d333ab0ceedf332
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::compact_xml::validate_with_limits::h079a03a4ea881e26
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Edit::commit::h0c376cb75b4574a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2052 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::compact_xml::xml_space::h1d333ab0ceedf332
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::compact_xml::validate_with_limits::h079a03a4ea881e26
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit_with_security::h958ec6bfc098d182
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit::hb0f0e8dade142800
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 30787 from 1942 other places
+
+37026 calls to allocation functions with 28B peak consumption from
+litchi_ods::worksheet::codec::Attributes::from_element::h52803476486005ac
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+3072 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+3072 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2048 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::facade::Spreadsheet::from_package::h4281d2c4140e236b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Snapshot::from_arc::h31ec9b370dbc7a18
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit_with_security::h958ec6bfc098d182
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit::hb0f0e8dade142800
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 28834 from 39 other places
+
+21115 calls to allocation functions with 854.02K peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd46f5c1bce89aab0E.llvm.1556917701816027536
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+3072 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h992984fb6abf73c9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2048 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h992984fb6abf73c9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::facade::Spreadsheet::from_package::h4281d2c4140e236b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Snapshot::from_arc::h31ec9b370dbc7a18
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit_with_security::h958ec6bfc098d182
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit::hb0f0e8dade142800
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2048 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h992984fb6abf73c9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::build::h4b141d68408101cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 13947 from 212 other places
+
+18958 calls to allocation functions with 0B peak consumption from
+litchi_ods::worksheet::package::decode::he26db1b2692db6bf
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+4165 calls with 0B peak consumption from:
+    litchi_ods::worksheet::package::resolve_namespace::h89adb3384f311485
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::scan::hf4d0abea5d1fa443
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet7package25replace_changed_rows_impl17h599783f4a50e1aedE.llvm.1023080978683894039
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::try_replace_changed_rows::h6de7a14b9706ea00
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Edit::commit::h0c376cb75b4574a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+4165 calls with 0B peak consumption from:
+    litchi_ods::worksheet::package::scan::hf4d0abea5d1fa443
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet7package25replace_changed_rows_impl17h599783f4a50e1aedE.llvm.1023080978683894039
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::try_replace_changed_rows::h6de7a14b9706ea00
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Edit::commit::h0c376cb75b4574a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+4165 calls with 0B peak consumption from:
+    litchi_ods::worksheet::package::scan::hf4d0abea5d1fa443
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet7package25replace_changed_rows_impl17h599783f4a50e1aedE.llvm.1023080978683894039
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::try_replace_changed_rows::h6de7a14b9706ea00
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Edit::commit::h0c376cb75b4574a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 6463 from 10 other places
+
+18432 calls to allocation functions with 0B peak consumption from
+quick_xml::encoding::Decoder::content::hcfe33b836fbead5c
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+3072 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2048 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::build::h4b141d68408101cb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2048 calls with 0B peak consumption from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::facade::Spreadsheet::from_package::h4281d2c4140e236b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::facade::Spreadsheet::from_bytes::hf6f6953a01054541
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::verify_ods_media_archive::h5250ccf9b4527e0c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 11264 from 6 other places
+
+16660 calls to allocation functions with 0B peak consumption from
+litchi_ods::settings::codec::locate::h53a21a74a89035cf
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+4165 calls with 0B peak consumption from:
+    litchi_ods::settings::model::Snapshot::from_content_xml::h1153bd22a6e9ea05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::package::document::Package::calculation_settings::h64b28e24f2b57c9b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::facade::Spreadsheet::from_package::h4281d2c4140e236b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::facade::Spreadsheet::from_bytes::hf6f6953a01054541
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::verify_ods_media_archive::h5250ccf9b4527e0c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+4165 calls with 0B peak consumption from:
+    litchi_ods::settings::model::Snapshot::from_content_xml::h1153bd22a6e9ea05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::package::document::Package::calculation_settings::h64b28e24f2b57c9b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::facade::Spreadsheet::from_package::h4281d2c4140e236b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Snapshot::from_arc::h31ec9b370dbc7a18
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Snapshot::from_bytes_with::h94dc25211391027d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Snapshot::from_bytes::h6075be8c1c9c89a7
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+4165 calls with 0B peak consumption from:
+    litchi_ods::settings::model::Snapshot::from_content_xml::h1153bd22a6e9ea05
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::package::document::Package::calculation_settings::h64b28e24f2b57c9b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::facade::Spreadsheet::from_package::h4281d2c4140e236b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Snapshot::from_arc::h31ec9b370dbc7a18
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit_with_security::h958ec6bfc098d182
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit::hb0f0e8dade142800
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 4165 from 1 other places
+
+
+PEAK MEMORY CONSUMERS
+34.11M peak memory consumed over 526 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h18e8a990a47f3bd7E.llvm.13464582180606492273
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+17.06M consumed over 9 calls from:
+    soapberry_zip::office::ArchiveReader::read::h8531ee47df9ec671
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::read::h84bc11384231ec70
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::core::package::Package::get_file::hca07352a3aab7df3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::package_files::ha2527057a4c42463
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::changed_effects::hc0112b57fd673d6c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::stage::hbe17ad02d4df83c9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+17.06M consumed over 9 calls from:
+    soapberry_zip::office::ArchiveReader::read::h8531ee47df9ec671
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::read::h84bc11384231ec70
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::core::package::Package::get_file::hca07352a3aab7df3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::package_files::ha2527057a4c42463
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::changed_effects::hc0112b57fd673d6c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::stage::hbe17ad02d4df83c9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 0B from 343 other places
+
+33.58M peak memory consumed over 2 calls from
+litchi_ods::worksheet::snapshot::Snapshot::from_bytes::h9014af82270e81cf
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+16.79M consumed over 1 calls from:
+    litchi_ods::worksheet::snapshot::Edit::commit::h0c376cb75b4574a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+16.79M consumed over 1 calls from:
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+
+20.15M peak memory consumed over 23 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h1e7c86c18b5beaa9E.llvm.17660769488418513137
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+20.15M consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hb3425dfe550197c0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    soapberry_zip::office::StreamingArchiveWriter$LT$W$GT$::write_deflated::hac141c6a3db43da4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17h6768b159dd7c61cdE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::add_file_with_media_type::h7b532ffa75e6cc19
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 0B from 14 other places
+
+16.79M peak memory consumed over 60 calls from
+litchi_ods::document::package_files::ha2527057a4c42463
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+16.79M consumed over 1 calls from:
+    litchi_ods::document::changed_effects::hc0112b57fd673d6c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::stage::hbe17ad02d4df83c9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+200B consumed over 9 calls from:
+    litchi_ods::document::changed_effects::hc0112b57fd673d6c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::stage::hbe17ad02d4df83c9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+176B consumed over 9 calls from:
+    litchi_ods::document::changed_effects::hc0112b57fd673d6c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::stage::hbe17ad02d4df83c9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 0B from 9 other places
+
+16.79M peak memory consumed over 2 calls from
+litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+16.79M consumed over 1 calls from:
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+
+16.79M peak memory consumed over 1 calls from
+litchi_ods::document::Snapshot::from_bytes_with::h94dc25211391027d
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+16.79M consumed over 1 calls from:
+    litchi_ods::document::Snapshot::from_bytes::h6075be8c1c9c89a7
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+
+16.79M peak memory consumed over 1 calls from
+litchi_ods::document::Snapshot::edit::h65852fb45a53508d
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+16.79M consumed over 1 calls from:
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+
+854.02K peak memory consumed over 21115 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd46f5c1bce89aab0E.llvm.1556917701816027536
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+311.30K consumed over 192 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h2cba367e1be258d7
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet8snapshot8Snapshot8from_arc17h1f7eb122ec7f8934E.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Snapshot::from_bytes::h9014af82270e81cf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+311.30K consumed over 192 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h2cba367e1be258d7
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet8snapshot8Snapshot8from_arc17h1f7eb122ec7f8934E.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Snapshot::from_bytes::h9014af82270e81cf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Edit::commit::h0c376cb75b4574a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+110.59K consumed over 2048 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h992984fb6abf73c9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet8snapshot8Snapshot8from_arc17h1f7eb122ec7f8934E.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Snapshot::from_bytes::h9014af82270e81cf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Edit::commit::h0c376cb75b4574a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 120.83K from 212 other places
+
+
+MOST TEMPORARY ALLOCATIONS
+48263 temporary allocations of 145319 allocations in total (33.21%) from
+quick_xml::events::Event::into_owned::h66cdc02723ba981e
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+3174 temporary allocations of 6251 allocations in total (50.78%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+3163 temporary allocations of 9321 allocations in total (33.93%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2115 temporary allocations of 4166 allocations in total (50.77%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet8snapshot8Snapshot8from_arc17h1f7eb122ec7f8934E.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Snapshot::from_bytes::h9014af82270e81cf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 39.81K from 25 other places
+
+18513 temporary allocations of 37026 allocations in total (50.00%) from
+litchi_ods::worksheet::codec::Attributes::from_element::h52803476486005ac
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+3072 temporary allocations of 3072 allocations in total (100.00%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2048 temporary allocations of 2048 allocations in total (100.00%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::facade::Spreadsheet::from_package::h4281d2c4140e236b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Snapshot::from_arc::h31ec9b370dbc7a18
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit_with_security::h958ec6bfc098d182
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit::hb0f0e8dade142800
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2048 temporary allocations of 2048 allocations in total (100.00%) from:
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet8snapshot8Snapshot8from_arc17h1f7eb122ec7f8934E.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Snapshot::from_bytes::h9014af82270e81cf
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 11.35K from 39 other places
+
+12910 temporary allocations of 37963 allocations in total (34.01%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2052 temporary allocations of 2052 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::compact_xml::xml_space::h1d333ab0ceedf332
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::compact_xml::validate_with_limits::h079a03a4ea881e26
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Edit::commit::h0c376cb75b4574a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2052 temporary allocations of 2052 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::compact_xml::xml_space::h1d333ab0ceedf332
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::compact_xml::validate_with_limits::h079a03a4ea881e26
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit_with_security::h958ec6bfc098d182
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit::hb0f0e8dade142800
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2052 temporary allocations of 2052 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::compact_xml::xml_space::h1d333ab0ceedf332
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::compact_xml::validate_with_limits::h079a03a4ea881e26
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Edit::commit::h0c376cb75b4574a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 6.75K from 1942 other places
+
+6148 temporary allocations of 12329 allocations in total (49.87%) from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2048 temporary allocations of 2048 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_semantic_ods::h92f27ed459282940
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::verify_ods_media_archive::h5250ccf9b4527e0c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2048 temporary allocations of 2048 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_semantic_ods::h92f27ed459282940
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::verify_ods_media_archive::h5250ccf9b4527e0c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+1024 temporary allocations of 1024 allocations in total (100.00%) from:
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 1.03K from 27 other places
+
+3085 temporary allocations of 3107 allocations in total (99.29%) from
+aho_corasick::automaton::Automaton::try_replace_all::hd61848cda2b64a69
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+3054 temporary allocations of 3072 allocations in total (99.41%) from:
+    _ZN10litchi_ods9worksheet5codec16write_cell_inner17ha2c1d38e0033c813E.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::codec::write_sheet::h794e6bed411f3329
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+28 temporary allocations of 32 allocations in total (87.50%) from:
+    litchi_core::xml::escape::escape_xml::h9889bc1ce9835b60
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::codec::write_rows_bounded::h4d93ed1643ff2158
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet7package25replace_changed_rows_impl17h599783f4a50e1aedE.llvm.1023080978683894039
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::try_replace_changed_rows::h6de7a14b9706ea00
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Edit::commit::h0c376cb75b4574a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+3 temporary allocations of 3 allocations in total (100.00%) from:
+    litchi_ods::worksheet::codec::write_sheet::h794e6bed411f3329
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+
+275 temporary allocations of 576 allocations in total (47.74%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hcf10125882f716a2E.llvm.10925179669559085424
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+1 temporary allocations of 2 allocations in total (50.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h59317b588070fe7f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::reader::buffered_reader::_$LT$impl$u20$quick_xml..reader..XmlSource$LT$$RF$mut$u20$alloc..vec..Vec$LT$u8$GT$$GT$$u20$for$u20$R$GT$::read_with::hbfee7859059318a7
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h51e629eb6e1bcaf9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::core::manifest::Manifest::parse::h9ad08303d71d15c6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.9018366497655871252
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::core::package::OwnedPackage::package::h5a1e567a40390b2d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::enforce_security_policy::h70ab8363f53f7a7d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit_with_security::h958ec6bfc098d182
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit::hb0f0e8dade142800
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h59317b588070fe7f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h51e629eb6e1bcaf9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::package::codec::parse_manifest::h275bceaefa078e7e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::core::manifest::Manifest::parse::h9ad08303d71d15c6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.9018366497655871252
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::core::package::OwnedPackage::has_file::he10f973ada03b57c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::package::document::Package::from_bytes::h27ae8810f5901835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::package_files::ha2527057a4c42463
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit_with_security::h958ec6bfc098d182
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit::hb0f0e8dade142800
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+1 temporary allocations of 2 allocations in total (50.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h59317b588070fe7f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::reader::buffered_reader::_$LT$impl$u20$quick_xml..reader..XmlSource$LT$$RF$mut$u20$alloc..vec..Vec$LT$u8$GT$$GT$$u20$for$u20$R$GT$::read_with::hbfee7859059318a7
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h51e629eb6e1bcaf9
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::core::manifest::Manifest::parse::h9ad08303d71d15c6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN17litchi_odf_common4core7package7Package17new_with_password17hd1f79a5bde6c332dE.llvm.9018366497655871252
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::core::package::OwnedPackage::has_file::he10f973ada03b57c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::core::family::Package::from_owned_package::hd9b164590831d968
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_odf_common::core::family::Package::from_bytes::h83a0ed3b0597563f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::package::document::Package::from_bytes::h27ae8810f5901835
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::package_files::ha2527057a4c42463
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit_with_security::h958ec6bfc098d182
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::commit::hb0f0e8dade142800
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 272B from 386 other places
+
+231 temporary allocations of 241 allocations in total (95.85%) from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2 temporary allocations of 2 allocations in total (100.00%) from:
+    _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::hc980964b60a376d2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::reader::ns_reader::NsReader$LT$R$GT$::read_event_impl::h040ae2cbab3cd548
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::scan::hf4d0abea5d1fa443
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2 temporary allocations of 2 allocations in total (100.00%) from:
+    _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::hc980964b60a376d2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::reader::ns_reader::NsReader$LT$R$GT$::read_event_impl::h040ae2cbab3cd548
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::validate_content_xml::h598155d26d8093cc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+2 temporary allocations of 2 allocations in total (100.00%) from:
+    _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::hc980964b60a376d2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    quick_xml::reader::ns_reader::NsReader$LT$R$GT$::read_event_impl::h040ae2cbab3cd548
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet5codec10parse_impl17ha28640d17f9e4e8fE.llvm.17466193481540382730
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::replace_tables::haf1fc6cb5519524c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::set_sheets::h45e1f60262eaf0f4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::authoring::builder::Builder::add_sheet::h4ffb136a6611bba2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::semantic_ods_bytes::h75d7a05e72cbbbc1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::build_ods_media_corpus::h79ebb6b19b97029f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 225B from 231 other places
+
+69 temporary allocations of 18958 allocations in total (0.36%) from
+litchi_ods::worksheet::package::decode::he26db1b2692db6bf
+  in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+37 temporary allocations of 69 allocations in total (53.62%) from:
+    _ZN10litchi_ods9worksheet7package25replace_changed_rows_impl17h599783f4a50e1aedE.llvm.1023080978683894039
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::try_replace_changed_rows::h6de7a14b9706ea00
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Edit::commit::h0c376cb75b4574a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+32 temporary allocations of 32 allocations in total (100.00%) from:
+    litchi_ods::worksheet::package::validate_modeled_attributes::h402bafdd6d87574f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN10litchi_ods9worksheet7package25replace_changed_rows_impl17h599783f4a50e1aedE.llvm.1023080978683894039
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::package::try_replace_changed_rows::h6de7a14b9706ea00
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::worksheet::snapshot::Edit::commit::h0c376cb75b4574a2
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_ods::document::Edit::worksheets::ha266f98c846fd874
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::run_ods_media_one_edit_save::h90bd00dde10d1b5e
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    litchi_perf_baseline::main::h684023c279bd27fb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    std::sys::backtrace::__rust_begin_short_backtrace::h7362f4606a2d55db
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h5cc199c0bbba01daE.llvm.11406988498986724961
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/frozen-ods-media/before
+  and 0B from 10 other places
+
+
+total runtime: 0.93s.
+calls to allocation functions: 387014 (414361/s)
+temporary memory allocations: 89726 (96066/s)
+peak heap memory consumption: 156.53M
+peak RSS (including heaptrack overhead): 165.83M
+total memory leaked: 1.78K
