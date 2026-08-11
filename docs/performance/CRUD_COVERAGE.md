@@ -25,7 +25,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Sanitization and irreversible redaction | Missing | No complete matrix |
 | Copy object with dependency closure | Missing | No measured format case |
 | Merge and split | Missing | No measured format case |
-| Patch encode/apply/invert/merge | Partial | DOCX and ODT coalesced replacement correctness covers deterministic durable encode/decode/apply/inverse, but no durable lifecycle timing; broader formats/merge remain missing |
+| Patch encode/apply/invert/merge | Partial | DOCX and ODT coalesced replacement correctness covers deterministic durable encode/decode/apply/inverse; ODS one-edit timing includes shared reversible-patch construction and tests exact wire/inverse BlobIds, but not encode/apply lifecycle timing; broader formats/merge remain missing |
 | Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS-row preservation, and exact raw ODT/ODS/ODP auxiliary/media members during neighboring paragraph/cell/text-box edits; broader format-semantic extension corpora remain missing |
@@ -252,6 +252,14 @@ and preserve exact run identity/order. Formatting cascading, fields/pictures,
 comments, glossary parsing, patches, inverse, final snapshot and independent
 public DOC readback remain. No new repair, security, producer, streaming or
 edit capability is claimed.
+
+Change 0054 leaves the ODS CRUD and publication surface unchanged. It shares
+the already retained exact source and target package allocations with the
+forward/reverse semantic blob bundles and reuses their BlobIds for existing
+operation preconditions. Focused tests preserve deterministic reversible wire,
+limit/error precedence, allocation identity and source/target direction; the
+complete ODS package/media reopen remains. It adds no patch encode/apply
+timing, structural/bulk edit, producer, security or source-backed I/O coverage.
 
 Change 0040 removes repeated UTF-8 scalar decoding from ordinary RTF text
 delimiter discovery without changing the existing CRUD surface. It measures

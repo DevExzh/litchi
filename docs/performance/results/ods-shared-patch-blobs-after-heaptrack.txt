@@ -1,0 +1,15 @@
+reading file "/tmp/ods-shared-patch-blobs-after.heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-perf-0054-after-ods-shared-blobs --warmup 0 --samples 3 --case ods_media_one_edit_save --json /tmp/ods-shared-patch-blobs-after-heaptrack.json
+finished reading file, now analyzing data:
+
+The former 33.58M `BlobBundle::insert -> ODS Patch::build` payload-copy
+consumer is absent. `insert_shared` retains the existing immutable package
+allocations and only the small content-address map nodes remain attributable
+to patch construction.
+
+total runtime: 1.62s.
+calls to allocation functions: 890177 (550852/s)
+temporary memory allocations: 191981 (118800/s)
+peak heap memory consumption: 140.05M
+peak RSS (including heaptrack overhead): 164.38M
+total memory leaked: 1.78K

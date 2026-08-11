@@ -263,6 +263,34 @@ impl BlobBundle {
         Ok(id)
     }
 
+    /// Retains shared bytes once and returns their content address.
+    ///
+    /// Re-inserting an identical blob is a no-op and does not consume another
+    /// count or byte allowance. The supplied immutable allocation is retained
+    /// directly when the blob is new.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PatchError::BlobLimit`] when a finite bound would be exceeded.
+    pub fn insert_shared(&mut self, source: Arc<[u8]>) -> Result<BlobId, PatchError> {
+        self.ensure_blob_size(source.len())?;
+        let id = BlobId::of(&source);
+        if self.entries.contains_key(&id) {
+            return Ok(id);
+        }
+        self.ensure_room(source.len())?;
+        self.bytes = self
+            .bytes
+            .checked_add(source.len())
+            .ok_or(PatchError::BlobLimit {
+                kind: BlobLimitKind::TotalBytes,
+                observed: usize::MAX,
+                limit: self.limits.total_bytes,
+            })?;
+        self.entries.insert(id.clone(), source);
+        Ok(id)
+    }
+
     /// Returns one payload by its content address.
     #[must_use]
     pub fn get(&self, id: &BlobId) -> Option<&[u8]> {
@@ -2878,6 +2906,127 @@ mod tests {
             })
         ));
         assert_eq!(bundle.get(&first), Some(&b"abc"[..]));
+    }
+
+    #[test]
+    fn shared_blobs_retain_the_allocation_and_preserve_borrowed_wire() {
+        let source: Arc<[u8]> = Arc::from(&b"shared patch bytes"[..]);
+        let reverse_source: Arc<[u8]> = Arc::from(&b"previous patch bytes"[..]);
+        let source_pointer = source.as_ptr();
+        let reverse_source_pointer = reverse_source.as_ptr();
+
+        let mut borrowed_forward = BlobBundle::new(limits());
+        let borrowed_id = borrowed_forward
+            .insert(&source)
+            .expect("borrowed blob fits");
+        let mut borrowed_reverse = BlobBundle::new(limits());
+        let borrowed_reverse_id = borrowed_reverse
+            .insert(&reverse_source)
+            .expect("borrowed reverse blob fits");
+        let mut shared_forward = BlobBundle::new(limits());
+        let shared_id = shared_forward
+            .insert_shared(Arc::clone(&source))
+            .expect("shared blob fits");
+        let mut shared_reverse = BlobBundle::new(limits());
+        let shared_reverse_id = shared_reverse
+            .insert_shared(Arc::clone(&reverse_source))
+            .expect("shared reverse blob fits");
+
+        assert_eq!(shared_id, borrowed_id);
+        assert_eq!(shared_reverse_id, borrowed_reverse_id);
+        assert_eq!(
+            shared_forward.get(&shared_id).map(<[u8]>::as_ptr),
+            Some(source_pointer)
+        );
+        assert_eq!(
+            shared_reverse.get(&shared_reverse_id).map(<[u8]>::as_ptr),
+            Some(reverse_source_pointer)
+        );
+        let operations = || {
+            [ReversibleOperation::new(
+                operation("blob.set", "item:one", json!(borrowed_id.as_hex())),
+                operation("blob.set", "item:one", json!(borrowed_reverse_id.as_hex())),
+            )]
+        };
+        let borrowed_patch = Patch::<Reversible>::new(
+            patch_limits(),
+            "org.litchi.shared-test",
+            operations(),
+            borrowed_forward,
+            borrowed_reverse,
+        )
+        .expect("borrowed patch is valid");
+        let shared_patch = Patch::<Reversible>::new(
+            patch_limits(),
+            "org.litchi.shared-test",
+            operations(),
+            shared_forward,
+            shared_reverse,
+        )
+        .expect("shared patch is valid");
+        assert_eq!(
+            shared_patch
+                .to_deterministic_json()
+                .expect("serialize shared patch"),
+            borrowed_patch
+                .to_deterministic_json()
+                .expect("serialize borrowed patch")
+        );
+    }
+
+    #[test]
+    fn shared_blob_limit_failures_leave_the_bundle_unchanged() {
+        let mut count_limited = BlobBundle::new(BlobLimits::new(1, 3, 3));
+        let original: Arc<[u8]> = Arc::from(&b"abc"[..]);
+        let original_pointer = original.as_ptr();
+        let retained = count_limited
+            .insert_shared(original)
+            .expect("first shared blob fits");
+        assert_eq!(
+            count_limited
+                .insert_shared(Arc::from(&b"abc"[..]))
+                .expect("duplicate bypasses saturated bounds"),
+            retained
+        );
+        assert_eq!(
+            count_limited.get(&retained).map(<[u8]>::as_ptr),
+            Some(original_pointer)
+        );
+        assert!(matches!(
+            count_limited.insert_shared(Arc::from(&b"d"[..])),
+            Err(PatchError::BlobLimit {
+                kind: BlobLimitKind::Count,
+                observed: 2,
+                limit: 1,
+            })
+        ));
+        assert_eq!(count_limited.len(), 1);
+        assert_eq!(count_limited.bytes_len(), 3);
+        assert_eq!(count_limited.get(&retained), Some(&b"abc"[..]));
+
+        let mut bytes_limited = BlobBundle::new(BlobLimits::new(2, 3, 3));
+        let retained = bytes_limited
+            .insert_shared(Arc::from(&b"ab"[..]))
+            .expect("first shared blob fits");
+        assert!(matches!(
+            bytes_limited.insert_shared(Arc::from(&b"cd"[..])),
+            Err(PatchError::BlobLimit {
+                kind: BlobLimitKind::TotalBytes,
+                observed: 4,
+                limit: 3,
+            })
+        ));
+        assert!(matches!(
+            bytes_limited.insert_shared(Arc::from(&b"abcd"[..])),
+            Err(PatchError::BlobLimit {
+                kind: BlobLimitKind::BlobBytes,
+                observed: 4,
+                limit: 3,
+            })
+        ));
+        assert_eq!(bytes_limited.len(), 1);
+        assert_eq!(bytes_limited.bytes_len(), 2);
+        assert_eq!(bytes_limited.get(&retained), Some(&b"ab"[..]));
     }
 
     #[test]

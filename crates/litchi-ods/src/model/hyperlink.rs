@@ -127,7 +127,7 @@ impl Link {
     /// Return the UTF-8 byte range this anchor occupies in its parent cell.
     ///
     /// A range can be empty for a zero-width `text:a` anchor. The range is
-    /// meaningful together with [`Cell::text`](super::Cell::text), not as an
+    /// meaningful together with the parent cell's `text` field, not as an
     /// offset into the hyperlink's own text.
     #[must_use]
     pub fn range(&self) -> Range<usize> {

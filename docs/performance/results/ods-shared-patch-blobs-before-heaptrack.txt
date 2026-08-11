@@ -1,0 +1,18 @@
+reading file "/tmp/ods-shared-patch-blobs-before.heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-perf-0054-before-df8398132 --warmup 0 --samples 3 --case ods_media_one_edit_save --json /tmp/ods-shared-patch-blobs-before-heaptrack.json
+finished reading file, now analyzing data:
+
+33.58M peak memory consumed over 6 calls from
+litchi_core::patch::BlobBundle::insert
+  in /tmp/litchi-perf-0054-before-df8398132
+16.79M consumed over 3 calls from:
+    litchi_ods::document::Patch::build
+16.79M consumed over 3 calls from:
+    litchi_ods::document::Patch::build
+
+total runtime: 1.70s.
+calls to allocation functions: 890189 (522718/s)
+temporary memory allocations: 191981 (112731/s)
+peak heap memory consumption: 142.79M
+peak RSS (including heaptrack overhead): 165.83M
+total memory leaked: 1.78K
