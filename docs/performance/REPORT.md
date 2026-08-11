@@ -13,12 +13,13 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **119 selectable cases**: 36 default cases and 198 default
+harness contains **120 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
-one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
-ODT paragraph-publication case, 16 opt-in DOCX/PPTX
+one opt-in source-backed DOCX semantic publication case, one opt-in eager
+media-rich PPTX source-edit control, one opt-in media-rich ODT
+paragraph-publication case, 16 opt-in DOCX/PPTX
 semantic cases, seven opt-in RTF semantic case names across four
 capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 24 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
@@ -558,7 +559,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 119 selectable cases and a 198-record default
+The standalone harness provides 120 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus
