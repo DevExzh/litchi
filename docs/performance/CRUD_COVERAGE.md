@@ -202,6 +202,15 @@ the unchanged sub-microsecond exact no-op segment's +39 ns p50 movement is
 disclosed. Structural/resource-adding ODF edits, broader real producers and
 repeated ODT/ODP reads remain open.
 
+Change 0042 removes the remaining archive-sized envelope-classification copy
+from changed ODT commits without adding a CRUD surface. The media-rich
+paragraph edit/save still validates the ZIP, parses the manifest, classifies
+encryption/signature state, audits compact XML, reopens the final document,
+reads back paragraph/media content, and verifies patch/inverse and stale-source
+behavior. Open/no-op/edit guards remain; the untouched large exact no-op
+segment's +152 ns p50 movement is disclosed. Broader structural/resource edits,
+real producers and repeated ODT/ODP reads remain open.
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.

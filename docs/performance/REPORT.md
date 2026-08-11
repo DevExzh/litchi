@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `f6db7e2c5`
+Production base for the latest measured tranche: `1194fbc7f`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -40,6 +40,7 @@ is still not broad program or CRUD coverage.
 | ODT content-only unchanged-media publication | Media-rich paragraph edit/save p50 **-95.58%**, mean **-95.63%**, p95 **-95.43%**; allocation calls **-6.71%**; peak heap flat and RSS **-0.59%** | Exactly one paragraph in a fixed 16 MiB-media package; structural/mixed operations and regenerated content over the common 16 MiB limit retain the established rebuild |
 | ODT direct snapshot byte sharing | Media-rich direct paragraph edit/save p50 **-75.84%**, mean **-73.84%**, p95 **-75.41%**; peak heap/RSS flat | Removes two 16 MiB archive copies from direct snapshot validation/rehydration; complete XML parsing, publication, reopen/readback, patch and inverse remain |
 | ODT compact-audit package sharing | Media-rich paragraph edit/save p50 **-30.44%**, mean **-31.36%**, p95 **-32.41%**; allocations **-0.57%**, peak heap/RSS flat | Removes three archive-sized audit copies (50.36 MB/operation); compact validation, final materialization and readback remain; exact no-op +39 ns p50 is disclosed |
+| ODT envelope-classification package sharing | Media-rich paragraph edit/save p50 **-11.40%**, mean **-11.95%**, p95 **-12.19%**; two allocations/commit removed, peak heap/RSS flat | Removes one 16.79 MB envelope copy; archive/manifest and signed/encrypted classification remain; large exact no-op +152 ns p50 is disclosed |
 | Native DOC/XLS/PPT semantic baseline | Large one-edit/save p50: XLS **1.722 ms**, DOC **1.416 ms**, PPT **0.357 ms**; large XLS open **1.383 ms** | Generated writer corpora; accepted XLS and DOC follow-ups are listed below |
 | Native XLS validated-editor reuse | Large one-cell edit/save p50 **-7.72%**, mean **-7.90%** | Final exact owner parse, public Workbook reopen and typed readback remain; peak heap/RSS flat |
 | Rejected XLS terminal-render handoff | Tiny changed save p50 **-7.55%**; large changed save **-0.39%** (neutral) | Fully reverted: repeated large exact no-op p50 **+22.00%**, mean **+16.69%** |
@@ -261,6 +262,16 @@ profiles, counters, memory, allocator policy and complete correctness gates are
 summarized in
 [`change 0041`](changes/0041-odt-compact-audit-package-sharing.md).
 
+The ODT envelope-sharing evidence comprises two balanced ABBA cycles:
+[`cycle 1 before A`](results/abba-odt-envelope-sharing-rerun-before-a.json),
+[`after A`](results/abba-odt-envelope-sharing-rerun-after-a.json),
+[`after B`](results/abba-odt-envelope-sharing-rerun-after-b.json),
+[`before B`](results/abba-odt-envelope-sharing-rerun-before-b.json), plus the
+four matching `final2` reports. Ordinary edit/open/no-op guards, the discarded
+exploratory run, profiles, counters, memory and complete correctness gates are
+summarized in
+[`change 0042`](changes/0042-odt-envelope-package-sharing.md).
+
 The OPC shared-payload evidence is
 [`before A`](results/abba-opc-shared-regeneration-primary-before-a.json),
 [`after A`](results/abba-opc-shared-regeneration-primary-after-a.json),
@@ -367,6 +378,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | ODT media-rich paragraph edit/save, 200 paragraphs + 16 MiB media | 249.177 ms | 11.001 ms | **-95.58% p50 / -95.63% mean** | p95 -95.43%; allocation calls -6.71%; peak heap flat; RSS -0.59% |
 | ODT direct snapshot sharing, 200 paragraphs + 16 MiB media | 32.270 ms | 7.798 ms | **-75.84% p50 / -73.84% mean** | Two archive-sized copies removed; p95 -75.41%; peak heap/RSS flat |
 | ODT compact-audit package sharing, 200 paragraphs + 16 MiB media | 7.773 ms | 5.407 ms | **-30.44% p50 / -31.36% mean** | Three archive-sized audit copies removed; p95 -32.41%; allocations -0.57%; peak heap/RSS flat; exact no-op +39 ns disclosed |
+| ODT envelope-classification sharing, 200 paragraphs + 16 MiB media | 5.555 ms | 4.921 ms | **-11.40% p50 / -11.95% mean** | One archive-sized envelope copy and two allocations/commit removed; p95 -12.19%; peak heap/RSS flat; large exact no-op +152 ns disclosed |
 | Native XLS one-cell edit/save, 8,192 cells | 1.777 ms | 1.639 ms | **-7.72% p50 / -7.90% mean** | Allocation calls -1.19%; peak heap and uninstrumented RSS flat |
 | Native DOC one-paragraph edit/save, 512 paragraphs | 1.506 ms | 1.348 ms | **-10.52% p50 / -10.48% mean** | Duplicate publication-site allocations nearly halved; peak heap and uninstrumented RSS flat |
 | Native PPT root snapshot open, 144 shapes | 37.522 us | 34.227 us | **-8.78% p50 / -10.58% mean** | Allocation calls -5.01%, temporary allocations -12.22%; peak heap and uninstrumented RSS flat |
@@ -415,6 +427,7 @@ The underlying records are:
 - [`0039-docx-source-backed-semantic-publication.md`](changes/0039-docx-source-backed-semantic-publication.md)
 - [`0040-rtf-byte-delimiter-scanning.md`](changes/0040-rtf-byte-delimiter-scanning.md)
 - [`0041-odt-compact-audit-package-sharing.md`](changes/0041-odt-compact-audit-package-sharing.md)
+- [`0042-odt-envelope-package-sharing.md`](changes/0042-odt-envelope-package-sharing.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on

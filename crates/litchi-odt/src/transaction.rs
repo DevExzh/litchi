@@ -4521,7 +4521,7 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
 }
 
 fn envelope_kind(snapshot: &Snapshot) -> Result<EnvelopeKind> {
-    let package = crate::core::OwnedPackage::from_bytes(copy_bytes(snapshot.as_bytes())?)?;
+    let package = envelope_package(snapshot)?;
     let archive = package.package()?;
     if archive
         .manifest()
@@ -4537,6 +4537,11 @@ fn envelope_kind(snapshot: &Snapshot) -> Result<EnvelopeKind> {
         return Ok(EnvelopeKind::Signed);
     }
     Ok(EnvelopeKind::Plain)
+}
+
+fn envelope_package(snapshot: &Snapshot) -> Result<crate::core::OwnedPackage> {
+    ensure_package_size(snapshot.as_bytes().len(), "ODT transaction package")?;
+    crate::core::OwnedPackage::from_shared_bytes(Arc::clone(&snapshot.bytes))
 }
 
 fn copy_bytes(source: &[u8]) -> Result<Vec<u8>> {
@@ -4752,6 +4757,19 @@ mod tests {
         assert_eq!(snapshot.as_bytes().as_ptr(), source_pointer);
         assert!(Arc::ptr_eq(&snapshot.bytes, &document_bytes));
         assert_eq!(snapshot.as_bytes(), document.original_bytes());
+        Ok(())
+    }
+
+    #[test]
+    fn envelope_classification_shares_the_snapshot_package_allocation() -> Result<()> {
+        let mut mutable = MutableDocument::new();
+        mutable.add_paragraph("shared envelope classification")?;
+        let snapshot = Snapshot::from_bytes(mutable.to_bytes()?)?;
+
+        let package = envelope_package(&snapshot)?;
+
+        assert!(Arc::ptr_eq(&snapshot.bytes, &package.shared_bytes()));
+        assert_eq!(envelope_kind(&snapshot)?, EnvelopeKind::Plain);
         Ok(())
     }
 
