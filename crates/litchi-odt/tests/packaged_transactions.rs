@@ -66,7 +66,10 @@ fn paragraph_replacement_raw_preserves_unchanged_media_and_metadata() {
     let snapshot = litchi_odt::transaction::Snapshot::from_document(&source).unwrap();
 
     let mut edit = snapshot.edit();
-    edit.replace_paragraph(Position::new(0), "After").unwrap();
+    edit.replace_paragraph(Position::new(0), "Interim")
+        .unwrap()
+        .replace_paragraph(Position::new(0), "After")
+        .unwrap();
     let commit = edit.commit().unwrap();
     let identical = raw_identical_members(&source_bytes, commit.snapshot().as_bytes()).unwrap();
 
@@ -102,6 +105,108 @@ fn paragraph_replacement_raw_preserves_unchanged_media_and_metadata() {
 }
 
 #[test]
+fn consecutive_paragraph_replacements_match_scalar_publication_and_durable_replay() {
+    let mut document = MutableDocument::new();
+    for text in ["zero", "one", "two", "three"] {
+        document.add_paragraph(text).unwrap();
+    }
+    let snapshot = Document::from_bytes(document.to_bytes().unwrap())
+        .unwrap()
+        .snapshot()
+        .unwrap();
+
+    let mut edit = snapshot.edit();
+    edit.replace_paragraph(Position::new(0), "ZERO")
+        .unwrap()
+        .replace_paragraph(Position::new(2), "TWO")
+        .unwrap()
+        .replace_paragraph(Position::new(2), "two-final")
+        .unwrap()
+        .replace_paragraph(Position::new(3), "THREE")
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    assert_eq!(committed.results().len(), 4);
+
+    let mut scalar = snapshot.clone();
+    for (index, text) in [(0, "ZERO"), (2, "TWO"), (2, "two-final"), (3, "THREE")] {
+        let mut edit = scalar.edit();
+        edit.replace_paragraph(Position::new(index), text).unwrap();
+        scalar = edit.commit().unwrap().into_snapshot();
+    }
+    assert_eq!(committed.snapshot().as_bytes(), scalar.as_bytes());
+    let paragraphs = committed
+        .snapshot()
+        .document()
+        .unwrap()
+        .paragraphs()
+        .unwrap();
+    assert_eq!(paragraphs[0].text().unwrap(), "ZERO");
+    assert_eq!(paragraphs[1].text().unwrap(), "one");
+    assert_eq!(paragraphs[2].text().unwrap(), "two-final");
+    assert_eq!(paragraphs[3].text().unwrap(), "THREE");
+
+    let durable = committed.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    assert_eq!(
+        wire.windows(b"paragraph.replace".len())
+            .filter(|window| *window == b"paragraph.replace")
+            .count(),
+        4
+    );
+    let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    let replayed = decoded.apply(&snapshot).unwrap();
+    assert_eq!(replayed.as_bytes(), committed.snapshot().as_bytes());
+    assert_eq!(
+        decoded.inverse().apply(&replayed).unwrap().as_bytes(),
+        snapshot.as_bytes()
+    );
+}
+
+#[test]
+fn consecutive_paragraph_replacements_refuse_late_invalid_position_atomically() {
+    let source = source().snapshot().unwrap();
+    let source_bytes = source.as_bytes().to_vec();
+    let mut edit = source.edit();
+    edit.replace_paragraph(Position::new(0), "changed")
+        .unwrap()
+        .replace_paragraph(Position::new(1), "missing")
+        .unwrap();
+
+    assert!(edit.commit().is_err());
+    assert_eq!(source.as_bytes(), source_bytes);
+    assert_eq!(
+        source.document().unwrap().text().unwrap(),
+        "Unique paragraph"
+    );
+}
+
+#[test]
+fn non_replacement_operation_ends_paragraph_replacement_run() {
+    let mut document = MutableDocument::new();
+    document.add_paragraph("zero").unwrap();
+    document.add_paragraph("one").unwrap();
+    document.add_paragraph("two").unwrap();
+    let snapshot = Document::from_bytes(document.to_bytes().unwrap())
+        .unwrap()
+        .snapshot()
+        .unwrap();
+    let mut edit = snapshot.edit();
+    edit.replace_paragraph(Position::new(0), "ZERO")
+        .unwrap()
+        .replace_paragraph(Position::new(1), "ONE")
+        .unwrap()
+        .append_run(Position::new(1), "!", None)
+        .unwrap();
+
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.results().len(), 3);
+    assert_eq!(
+        commit.snapshot().document().unwrap().text().unwrap(),
+        "ZERO\nONE!\ntwo"
+    );
+}
+
+#[test]
 fn paragraph_replacement_above_common_raw_limit_uses_existing_rebuild_path() {
     const PARAGRAPH_COUNT: usize = 16_120;
     const TARGET: usize = PARAGRAPH_COUNT / 2;
@@ -119,6 +224,8 @@ fn paragraph_replacement_above_common_raw_limit_uses_existing_rebuild_path() {
 
     let mut edit = snapshot.edit();
     edit.replace_paragraph(Position::new(TARGET), "fallback replacement")
+        .unwrap()
+        .replace_paragraph(Position::new(TARGET + 1), "second fallback replacement")
         .unwrap();
     let commit = edit.commit().unwrap();
     let reopened = commit.snapshot().document().unwrap();
@@ -127,7 +234,11 @@ fn paragraph_replacement_above_common_raw_limit_uses_existing_rebuild_path() {
     assert_eq!(paragraphs.len(), PARAGRAPH_COUNT);
     assert_eq!(paragraphs[TARGET].text().unwrap(), "fallback replacement");
     assert_eq!(paragraphs[TARGET - 1].text().unwrap(), text);
-    assert_eq!(paragraphs[TARGET + 1].text().unwrap(), text);
+    assert_eq!(
+        paragraphs[TARGET + 1].text().unwrap(),
+        "second fallback replacement"
+    );
+    assert_eq!(paragraphs[TARGET + 2].text().unwrap(), text);
 }
 
 fn real_producer_source() -> Document {

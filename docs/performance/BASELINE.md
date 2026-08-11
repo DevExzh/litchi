@@ -220,7 +220,7 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **120
+The stage-1 records above are retained unchanged. The current harness has **121
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
@@ -229,8 +229,9 @@ one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
 PPTX semantic publication case, one opt-in media-rich ODT
 paragraph-publication case, 16 opt-in DOCX/PPTX semantic
 cases, seven opt-in RTF semantic case names across four capability-bounded
-variants (25 tiny / 44 tiny-plus-large rows), 24 opt-in ODT/ODS/ODP semantic
-cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It remains an
+variants (25 tiny / 44 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
+semantic cases, three fixed media-rich ODF cases, and 20 opt-in native
+DOC/XLS/PPT semantic cases. It remains an
 incomplete program and CRUD matrix.
 
 - The XLSX row-start index is accepted for the narrow-range case: ABBA p50
@@ -276,6 +277,12 @@ incomplete program and CRUD matrix.
   edits, topology changes and changed signed sources refuse before output; the
   unchanged eager PPTX guard is neutral. See
   [`0044`](changes/0044-pptx-source-backed-semantic-publication.md).
+- Consecutive packaged ODT plain-text replacements now share one mutable
+  candidate, content publication, reopen and compact audit while retaining
+  ordinary scalar durable operations. The large 100-edit/save p50 falls from
+  906.439 to 15.615 ms (-98.28%, 58.05x), allocation calls fall 96.13%, and
+  scalar one-edit guards remain neutral. See
+  [`0045`](changes/0045-odt-coalesced-paragraph-publication.md).
 - The positional XLSX source record reports p50 opens of 33.881 us (tiny),
   56.493 us (medium), and 139.897 us (dense); list-after-open has zero timed
   source reads. First-cell and narrow-range operations physically overlap only

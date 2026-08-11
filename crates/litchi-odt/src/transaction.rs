@@ -868,8 +868,33 @@ impl Edit {
                 resource: "ODT transaction results",
                 source,
             })?;
-        for operation in &self.operations {
+        let mut operation_index = 0;
+        while operation_index < self.operations.len() {
+            let operation = &self.operations[operation_index];
             let before_operation = document.transaction_package().clone();
+            if matches!(operation, Operation::ReplaceParagraph { .. })
+                && matches!(
+                    self.operations.get(operation_index + 1),
+                    Some(Operation::ReplaceParagraph { .. })
+                )
+            {
+                // Plain-text replacement cannot change paragraph topology, so
+                // consecutive operations retain their scalar position and
+                // last-write ordering when applied to one mutable candidate.
+                // Publish and audit only that candidate: no intermediate
+                // package is observable through the transaction API.
+                let mut mutable = MutableDocument::from_document(document)?;
+                while let Some(Operation::ReplaceParagraph { index, text }) =
+                    self.operations.get(operation_index)
+                {
+                    mutable.replace_semantic_paragraph(*index, text)?;
+                    results.push(OperationResult::Unit);
+                    operation_index += 1;
+                }
+                document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
+                continue;
+            }
             #[allow(
                 deprecated,
                 reason = "only this dispatch expression still reaches validated legacy codecs"
@@ -1333,6 +1358,7 @@ impl Edit {
             };
             audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
             results.push(result);
+            operation_index += 1;
         }
         let bytes = copy_bytes(document.original_bytes())?;
         ensure_package_size(bytes.len(), "ODT transaction output")?;
