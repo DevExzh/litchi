@@ -1,0 +1,49 @@
+{
+  "case": "odp_semantic_noop_edit_save",
+  "shape": "large",
+  "base_revision": "442d46c5d200c3bf1af58dc46fa4cf4c3e3b7240",
+  "control_binary_sha256": "955dad8ec0d12103b63dc677a2eeab8c9c61351f285225a7fcd6fa4289d9cee1",
+  "candidate_binary_sha256": "22175370a69e22986e3ac2c1e813ae54524da27b1e51b2be4baa080dba33b911",
+  "orders": [
+    "before-A, after-A, after-B, before-B",
+    "after-C, before-C, before-D, after-D"
+  ],
+  "warmups_per_leg": 50,
+  "samples_per_leg": 1000,
+  "before": {
+    "samples": 4000,
+    "min_ns": 1647227,
+    "p50_ns": 1728214,
+    "p95_ns": 1864988,
+    "p99_ns": 2066914,
+    "max_ns": 3054034,
+    "mean_ns": 1748347.9585,
+    "standard_deviation_ns": 91837.08055928821,
+    "confidence_interval_95": {
+      "method": "normal approximation for pooled mean",
+      "lower_ns": 1745501.8978873682,
+      "upper_ns": 1751194.0191126317
+    }
+  },
+  "after": {
+    "samples": 4000,
+    "min_ns": 655632,
+    "p50_ns": 692022,
+    "p95_ns": 756270,
+    "p99_ns": 867494,
+    "max_ns": 1286179,
+    "mean_ns": 700784.96,
+    "standard_deviation_ns": 44910.55618501192,
+    "confidence_interval_95": {
+      "method": "normal approximation for pooled mean",
+      "lower_ns": 699393.1674444099,
+      "upper_ns": 702176.75255559
+    }
+  },
+  "delta_percent": {
+    "p50": -59.957389536249565,
+    "mean": -59.91730612931077,
+    "p95": -59.44906884119361,
+    "p99": -58.029506791284014
+  }
+}
