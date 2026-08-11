@@ -23,8 +23,9 @@ default 36 cases / 198 records.
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
 range cases, two execution-scaling cases, one XLSX commit/read attribution case,
-20 native OLE2 semantic cases, 16 DOCX/PPTX semantic cases, seven RTF semantic
-cases, and 22 ODF semantic cases are opt-in, for 110 selectable cases in total:
+one opaque-heavy common OLE2 edit/save case, 20 native OLE2 semantic cases, 16
+DOCX/PPTX semantic cases, seven RTF semantic cases, and 23 ODF semantic cases
+are opt-in, for 112 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -46,6 +47,19 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --samples 30 --case cfb_open,cfb_list_streams,cfb_read_one --shape wide-root \
   --payload incompressible --json target/perf/wide-root.json
 ```
+
+Measure the common OLE2 transactional publication path with four unchanged 4
+MiB regular streams and one tiny edited MiniFAT stream:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 --case ole_common_one_edit_save \
+  --shape few-large --payload incompressible --json target/perf/ole-common.json
+```
+
+The case times public editor open, one root-stream replacement, validation and
+finish. Exact deterministic output comparison and a complete public CFB reopen
+of all five streams remain outside the timed interval.
 
 For just the end-to-end legacy writer packaging runs:
 

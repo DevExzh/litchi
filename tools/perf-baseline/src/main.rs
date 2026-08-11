@@ -27,6 +27,9 @@ use litchi_core::Position;
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, SourceVersion,
 };
+use litchi_ole_common::object::{
+    Editor as OleObjectEditor, Limits as OleObjectLimits, Targets as OleObjectTargets,
+};
 use litchi_opc::{
     BlobPart, OpcPackage, OpenSession, PackURI, PackageWriter, ReadLimits, SourceBackedPackage,
     SourceCacheLimits, TargetMode, constants::relationship_type,
@@ -57,6 +60,10 @@ const SEMANTIC_ODP_CORPUS_GENERATOR: &str = "litchi-odp-semantic-v1";
 const SEMANTIC_RTF_CORPUS_GENERATOR: &str = "litchi-rtf-semantic-v2";
 const ODS_MEDIA_ENTRY_COUNT: usize = 8;
 const ODS_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
+const OLE_COMMON_CORPUS_GENERATOR: &str = "litchi-ole-common-copy-elision-v1";
+const OLE_COMMON_TARGET: &str = "ole_common_edit_target.bin";
+const OLE_COMMON_ORIGINAL: &[u8] = b"litchi-ole-common-original-stream-v1";
+const OLE_COMMON_REPLACEMENT: &[u8] = b"litchi-ole-common-edited-stream-v1";
 static NEXT_INSTRUMENTED_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -327,6 +334,7 @@ enum Case {
     CfbReadOne,
     CfbCreateStreamBorrowed,
     CfbCreateStreamOwned,
+    OleCommonOneEditSave,
     CfbSharedOpen,
     CfbSharedReadOne,
     CfbSharedConcurrentReads,
@@ -482,6 +490,7 @@ impl Case {
             Self::CfbReadOne => "cfb_read_one",
             Self::CfbCreateStreamBorrowed => "cfb_create_stream_borrowed",
             Self::CfbCreateStreamOwned => "cfb_create_stream_owned",
+            Self::OleCommonOneEditSave => "ole_common_one_edit_save",
             Self::CfbSharedOpen => "cfb_shared_open",
             Self::CfbSharedReadOne => "cfb_shared_read_one",
             Self::CfbSharedConcurrentReads => "cfb_shared_concurrent_reads",
@@ -591,6 +600,7 @@ impl Case {
                 | Self::CfbReadOne
                 | Self::CfbCreateStreamBorrowed
                 | Self::CfbCreateStreamOwned
+                | Self::OleCommonOneEditSave
                 | Self::CfbSharedOpen
                 | Self::CfbSharedReadOne
                 | Self::CfbSharedConcurrentReads
@@ -2082,6 +2092,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "cfb_read_one" => Some(Case::CfbReadOne),
         "cfb_create_stream_borrowed" => Some(Case::CfbCreateStreamBorrowed),
         "cfb_create_stream_owned" => Some(Case::CfbCreateStreamOwned),
+        "ole_common_one_edit_save" => Some(Case::OleCommonOneEditSave),
         "cfb_shared_open" => Some(Case::CfbSharedOpen),
         "cfb_shared_read_one" => Some(Case::CfbSharedReadOne),
         "cfb_shared_concurrent_reads" => Some(Case::CfbSharedConcurrentReads),
@@ -2251,6 +2262,7 @@ fn print_usage() {
                                        opc_source_concurrent_same_part,\n\
                                        cfb_open,cfb_list_streams,cfb_read_one,\n\
                                        cfb_create_stream_borrowed,cfb_create_stream_owned,\n\
+                                       ole_common_one_edit_save,\n\
                                        cfb_shared_open,cfb_shared_read_one,\n\
                                        cfb_shared_concurrent_reads,\n\
                                        doc_fresh_write_to,xls_fresh_write_to,ppt_fresh_write_to,\n\
@@ -2448,6 +2460,64 @@ fn build_cfb_corpus(
         archive,
         target_name,
         target_payload,
+        xlsx: None,
+    })
+}
+
+fn build_ole_common_corpus(base: &Corpus) -> Result<Corpus, Box<dyn Error>> {
+    let kind = corpus_payload_kind(base)?;
+    let unchanged_stream_count = base.manifest.entry_count;
+    let entry_count = unchanged_stream_count
+        .checked_add(1)
+        .ok_or("OLE common corpus stream count overflow")?;
+    let uncompressed_payload_bytes = base
+        .manifest
+        .uncompressed_payload_bytes
+        .checked_add(OLE_COMMON_ORIGINAL.len())
+        .ok_or("OLE common corpus payload byte count overflow")?;
+    let mut writer = OleWriter::new();
+    for index in 0..unchanged_stream_count {
+        let name = cfb_entry_name(index);
+        writer.create_stream_owned(
+            &[name.as_str()],
+            payload_bytes(kind, index, base.manifest.entry_bytes),
+        )?;
+    }
+    writer.create_stream(&[OLE_COMMON_TARGET], OLE_COMMON_ORIGINAL)?;
+
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output)?;
+    let archive = output.into_inner();
+    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    if parsed.list_streams().len() != entry_count
+        || parsed.open_stream(&[OLE_COMMON_TARGET])? != OLE_COMMON_ORIGINAL
+    {
+        return Err("OLE common corpus differs from its specification".into());
+    }
+
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("ole-common-{}-{}", base.manifest.shape, kind.name()),
+            generator: OLE_COMMON_CORPUS_GENERATOR,
+            package_format: "CFB/OLE2",
+            shape: base.manifest.shape,
+            payload_kind: kind.name(),
+            compression: "none",
+            entry_count,
+            archive_member_count: entry_count,
+            entry_bytes: base.manifest.entry_bytes,
+            uncompressed_payload_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: OLE_COMMON_TARGET.to_owned(),
+            target_payload_bytes: OLE_COMMON_ORIGINAL.len(),
+            target_payload_sha256: sha256_hex(OLE_COMMON_ORIGINAL),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: OLE_COMMON_TARGET.to_owned(),
+        target_payload: OLE_COMMON_ORIGINAL.to_vec(),
         xlsx: None,
     })
 }
@@ -3548,6 +3618,9 @@ fn run_case_with_config(
         },
         Case::CfbCreateStreamOwned => {
             run_cfb_create_stream(corpus, warmup_iterations, samples, true)
+        },
+        Case::OleCommonOneEditSave => {
+            run_ole_common_one_edit_save(corpus, warmup_iterations, samples)
         },
         Case::CfbSharedOpen => run_cfb_shared_open(corpus, warmup_iterations, samples),
         Case::CfbSharedReadOne => run_cfb_shared_read_one(corpus, warmup_iterations, samples),
@@ -7321,6 +7394,101 @@ fn run_cfb_create_stream(
     Ok(result(case, corpus, elapsed, None))
 }
 
+fn run_ole_common_one_edit_save(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let corpus = build_ole_common_corpus(corpus)?;
+    let expected = ole_common_changed_output(&corpus)?;
+    let path = vec![corpus.target_name.clone()];
+    let targets = OleObjectTargets::default();
+    let limits = ole_common_limits(&corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut final_output = None;
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = corpus.archive.clone();
+        let replacement = OLE_COMMON_REPLACEMENT.to_vec();
+        let targets = targets.clone();
+        let started = Instant::now();
+        let mut editor = OleObjectEditor::open(source, targets, limits)?;
+        editor.put_stream(&path, replacement)?;
+        let output = editor.finish()?;
+        let duration = started.elapsed();
+        if output != expected {
+            return Err("OLE common edit/save output is not deterministic".into());
+        }
+        std::hint::black_box(&output);
+        final_output = Some(output);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    verify_ole_common_changed_output(
+        &corpus,
+        final_output
+            .as_deref()
+            .ok_or("OLE common edit/save produced no final output")?,
+    )?;
+    Ok(result(Case::OleCommonOneEditSave, &corpus, elapsed, None))
+}
+
+fn ole_common_changed_output(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn Error>> {
+    let path = vec![corpus.target_name.clone()];
+    let mut editor = OleObjectEditor::open(
+        corpus.archive.clone(),
+        OleObjectTargets::default(),
+        ole_common_limits(corpus)?,
+    )?;
+    editor.put_stream(&path, OLE_COMMON_REPLACEMENT.to_vec())?;
+    let output = editor.finish()?;
+    verify_ole_common_changed_output(corpus, &output)?;
+    Ok(output)
+}
+
+fn ole_common_limits(corpus: &Corpus) -> Result<OleObjectLimits, Box<dyn Error>> {
+    Ok(OleObjectLimits {
+        max_objects: 1,
+        max_storage_depth: 1,
+        max_streams_per_object: 1,
+        max_streams: corpus.manifest.entry_count,
+        max_stream_size: u64::try_from(
+            corpus
+                .manifest
+                .entry_bytes
+                .max(OLE_COMMON_ORIGINAL.len())
+                .max(OLE_COMMON_REPLACEMENT.len()),
+        )?,
+        max_object_size: 1,
+        max_total_size: u64::try_from(corpus.manifest.uncompressed_payload_bytes)?,
+    })
+}
+
+fn verify_ole_common_changed_output(corpus: &Corpus, output: &[u8]) -> Result<(), Box<dyn Error>> {
+    let kind = corpus_payload_kind(corpus)?;
+    let mut ole = OleFile::open(Cursor::new(output))?;
+    let streams = ole.list_streams();
+    if streams.len() != corpus.manifest.entry_count {
+        return Err("OLE common output stream count differs from its corpus".into());
+    }
+    let unchanged_stream_count = corpus
+        .manifest
+        .entry_count
+        .checked_sub(1)
+        .ok_or("OLE common corpus has no edit target")?;
+    for index in 0..unchanged_stream_count {
+        let name = cfb_entry_name(index);
+        let actual = ole.open_stream(&[name.as_str()])?;
+        if actual != payload_bytes(kind, index, corpus.manifest.entry_bytes) {
+            return Err("OLE common edit changed an untouched stream".into());
+        }
+    }
+    if ole.open_stream(&[corpus.target_name.as_str()])? != OLE_COMMON_REPLACEMENT {
+        return Err("OLE common changed stream differs from its replacement".into());
+    }
+    Ok(())
+}
+
 fn run_fresh_writer(
     case: Case,
     corpus: &Corpus,
@@ -7605,11 +7773,11 @@ mod tests {
         Case, CorpusShape, CountingSink, InstrumentedSource, PayloadKind, RangeSimulationConfig,
         RequestSizeBuckets, RtfSemanticVariant, SemanticShape, SimulatedRangeSource,
         SourceBackedPackage, WriterShape, XlsxShape, build_cfb_corpus, build_ods_media_corpus,
-        build_opc_corpus, build_semantic_docx_corpus, build_semantic_odp_corpus,
-        build_semantic_ods_corpus, build_semantic_odt_corpus, build_semantic_pptx_corpus,
-        build_semantic_rtf_corpus, build_writer_corpus, build_xlsx_corpus, payload_bytes,
-        resolve_execution_workers, run_case, run_case_with_config, run_scaling_case,
-        simulated_request_delay, statistics,
+        build_ole_common_corpus, build_opc_corpus, build_semantic_docx_corpus,
+        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
+        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_writer_corpus,
+        build_xlsx_corpus, ole_common_changed_output, payload_bytes, resolve_execution_workers,
+        run_case, run_case_with_config, run_scaling_case, simulated_request_delay, statistics,
     };
 
     #[test]
@@ -7944,6 +8112,31 @@ mod tests {
                 assert_eq!(measured.source.as_ref().unwrap().read_calls.len(), 1);
             }
         }
+    }
+
+    #[test]
+    fn ole_common_heavy_edit_is_deterministic_and_preserves_unchanged_streams() {
+        let base = build_cfb_corpus(CorpusShape::FewLarge, PayloadKind::Incompressible).unwrap();
+        let corpus = build_ole_common_corpus(&base).unwrap();
+        assert_eq!(corpus.manifest.entry_count, 5);
+        assert_eq!(corpus.manifest.entry_bytes, 4 * 1024 * 1024);
+        assert_eq!(
+            corpus.manifest.archive_sha256,
+            "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+        );
+
+        let first = ole_common_changed_output(&corpus).unwrap();
+        let second = ole_common_changed_output(&corpus).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(
+            super::sha256_hex(&first),
+            "b9323eeace80e2c9c88801879265bfdfac83690bb2550880f5ef6bf87b48d131"
+        );
+
+        let measured = run_case(Case::OleCommonOneEditSave, &base, 0, 1).unwrap();
+        assert_eq!(measured.case, Case::OleCommonOneEditSave.name());
+        assert_eq!(measured.corpus.entry_count, 5);
+        assert_eq!(measured.elapsed_ns.samples.len(), 1);
     }
 
     #[test]

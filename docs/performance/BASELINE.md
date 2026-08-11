@@ -220,10 +220,11 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **111
+The stage-1 records above are retained unchanged. The current harness has **112
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
-commit/read attribution case, 16 opt-in
+commit/read attribution case, one opt-in opaque-heavy common OLE2 publication
+case, 16 opt-in
 DOCX/PPTX semantic cases, seven opt-in RTF semantic case names across four
 capability-bounded variants (25 tiny / 44 tiny-plus-large rows), and 23 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
@@ -406,6 +407,13 @@ remains an incomplete program and CRUD matrix.
   cells improve about 19-21% p50/mean, cold reads improve about 35%, dense-wide
   1% commit improves 19.62% p50, allocation calls fall 25.24%, and peak heap is
   flat. See [`0032`](changes/0032-xlsx-no-extension-scan.md).
+- A deterministic common OLE2 publication case now edits one tiny MiniFAT
+  stream while preserving four exact 4 MiB regular streams. A shared-payload
+  writer prototype regressed the end-to-end p50 32.02%. Retaining the first
+  fully validated render improved the heavy path 34.06%, but regressed large
+  DOC open 21.64% and DOC one-edit/save 9.08%; both production prototypes were
+  fully reverted. See
+  [`0033`](changes/0033-ole-common-publication-handoffs-rejected.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and

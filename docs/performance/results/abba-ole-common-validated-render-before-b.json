@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "e0434ae15b1502e5f0a2832cb40153c901ec11bc",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1"
+  },
+  "configuration": {
+    "samples_per_case": 100,
+    "warmup_iterations_per_case": 10,
+    "cases": [
+      "ole_common_one_edit_save"
+    ],
+    "corpus_shapes": [
+      "few-large"
+    ],
+    "payload_kinds": [
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ]
+  },
+  "results": [
+    {
+      "case": "ole_common_one_edit_save",
+      "corpus": {
+        "name": "ole-common-few-large-incompressible",
+        "generator": "litchi-ole-common-copy-elision-v1",
+        "package_format": "CFB/OLE2",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "none",
+        "entry_count": 5,
+        "archive_member_count": 5,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777252,
+        "archive_bytes": 16913408,
+        "archive_sha256": "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d",
+        "target_entry": "ole_common_edit_target.bin",
+        "target_payload_bytes": 36,
+        "target_payload_sha256": "3990bc3981e10c1664838dfc414cf68631cae7cb25581585590b068b374296d0",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          17488736,
+          17547197,
+          17740764,
+          17742836,
+          17797652,
+          17825150,
+          17857473,
+          17890479,
+          17895106,
+          17912981,
+          17922293,
+          17953707,
+          17968818,
+          17972934,
+          17985259,
+          17989144,
+          18000530,
+          18002084,
+          18004246,
+          18031865,
+          18056609,
+          18057129,
+          18057500,
+          18058690,
+          18073702,
+          18108199,
+          18112606,
+          18172048,
+          18184073,
+          18186367,
+          18188890,
+          18196051,
+          18215556,
+          18242173,
+          18247262,
+          18247932,
+          18254251,
+          18257586,
+          18259968,
+          18275290,
+          18276002,
+          18279074,
+          18298912,
+          18313702,
+          18323867,
+          18326741,
+          18342823,
+          18347930,
+          18352635,
+          18371332,
+          18389017,
+          18395955,
+          18402224,
+          18434398,
+          18443872,
+          18474565,
+          18483316,
+          18483577,
+          18491348,
+          18492539,
+          18524072,
+          18527737,
+          18537190,
+          18537752,
+          18540816,
+          18546312,
+          18553883,
+          18556118,
+          18559160,
+          18559852,
+          18561383,
+          18561574,
+          18567573,
+          18583063,
+          18601318,
+          18620785,
+          18648202,
+          18657567,
+          18680588,
+          18680848,
+          18706253,
+          18732360,
+          18795326,
+          18882255,
+          18945261,
+          18965139,
+          18965281,
+          19008630,
+          19045129,
+          19052861,
+          19102088,
+          19106545,
+          19112503,
+          19161631,
+          19295554,
+          19524960,
+          19590390,
+          19735270,
+          19739356,
+          19785660
+        ],
+        "min": 17488736,
+        "p50": 18380174,
+        "p95": 19295554,
+        "p99": 19739356,
+        "max": 19785660,
+        "mean": 18435632.099999994,
+        "standard_deviation": 466539.8732820516,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 18343060.4682599,
+          "upper": 18528203.731740087
+        }
+      },
+      "sink": null
+    }
+  ]
+}

@@ -1192,6 +1192,7 @@ dependencies = [
  "litchi-odp",
  "litchi-ods",
  "litchi-odt",
+ "litchi-ole-common",
  "litchi-opc",
  "litchi-ppt",
  "litchi-pptx",
