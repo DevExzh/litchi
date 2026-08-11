@@ -24,8 +24,8 @@ Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
 range cases, two execution-scaling cases, one XLSX commit/read attribution case,
 one opaque-heavy common OLE2 edit/save case, 20 native OLE2 semantic cases, 16
-DOCX/PPTX semantic cases, seven RTF semantic cases, and 24 ODF semantic cases
-are opt-in, for 113 selectable cases in total:
+DOCX/PPTX semantic cases, seven RTF semantic cases, and 25 ODF semantic cases
+are opt-in, for 114 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -122,6 +122,15 @@ opaque resources:
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 3 --samples 30 --case ods_media_one_edit_save \
   --json target/perf/ods-media-publication.json
+```
+
+Run the fixed medium ODT paragraph publication case with eight 2 MiB
+incompressible opaque resources:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 --case odt_media_paragraph_edit_save \
+  --json target/perf/odt-media-paragraph-publication.json
 ```
 
 Run the backward-compatible plain tiny semantic RTF smoke matrix (seven
@@ -324,6 +333,16 @@ snapshot open, one middle-cell edit, commit and output materialization. Outside
 timing it reopens the complete grid and verifies every resource path, manifest
 media type, exact payload and deterministic output. This case does not vary
 with `--semantic-shape` and is not part of the 22-record tiny ODF smoke matrix.
+
+`odt_media_paragraph_edit_save` is a separate fixed-medium corpus: 200
+paragraphs plus eight deterministic 2 MiB resources under `Pictures/`. It
+times public snapshot open, replacement of the middle paragraph, commit, and
+output materialization. Outside timing it reopens every paragraph, verifies
+every resource path, manifest media type and exact payload, checks patch
+replay, exact inverse and stale-source refusal, and requires deterministic
+output. The harness regression additionally proves raw local/central record
+identity for all untouched core and media members. This case does not vary
+with `--semantic-shape` and is opt-in.
 
 `odp_media_textbox_edit_save` is a separate fixed-medium source-backed
 publication corpus: 12 slides plus eight deterministic 2 MiB resources under
