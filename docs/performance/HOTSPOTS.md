@@ -3,7 +3,7 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0037`](changes/0037-opc-source-backed-one-part-publication.md)
+[`change 0039`](changes/0039-docx-source-backed-semantic-publication.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -57,8 +57,10 @@ Current work shape:
   same-topology publisher. It validates/materializes only the selected existing
   Part, regenerates that member, raw-copies every other physical member, and
   monitors source version through bounded sequential output. Signed real
-  changes and unsupported layouts return typed zero-output refusals; broad
-  mutable format-facade integration remains absent.
+  changes and unsupported layouts return typed zero-output refusals. DOCX now
+  exposes a guarded exact-source main-document transaction over that publisher:
+  raw-MCE identity and main-Part-only operations are required, transfers are
+  refused, and PPTX/XLSX facade integration remains absent.
 - `PackageWriter` previously reconstructed generated XML and Part order during
   emission. The measured `PublicationPlan` change now constructs, audits, and
   reuses that state once. It reduced allocation calls by 37.0% in the profiled
@@ -75,6 +77,10 @@ Current work shape:
   Part materializations/recompressions on the four-Part corpus, reducing p50
   73.12%, instructions 65.42% and peak heap 3.20%; see change 0037. Complete
   physical archive input/output and the selected-Part compressor buffer remain.
+  The DOCX facade integration then removes eager ownership and recompression of
+  16 unselected Parts in the media-rich one-edit/save case: p50 falls 97.43%,
+  instructions 74.91%, and semantic materializations 17 -> 1 while the eager
+  DOCX guard remains neutral; see change 0039.
 
 ## XLSX selective read and edit path
 

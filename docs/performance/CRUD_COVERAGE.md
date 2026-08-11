@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 
-This is a coverage map, not a completion claim. It compares the 118 selectable
+This is a coverage map, not a completion claim. It compares the 119 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -18,7 +18,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring; large/streaming creation remains missing |
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
 | Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication; signed/extension corpora remain missing |
-| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT, ODS and ODP additionally verify eight exact 2 MiB resources and manifest media types after one paragraph/cell/text-box edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
+| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT, ODS and ODP verify eight exact 2 MiB resources and manifest media types, while the source-backed DOCX case verifies eight exact 2 MiB images, every relationship and all 200 paragraphs after one edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
 | About 1% semantic update and save | Covered for XLSX/DOCX/PPTX generated corpora | Deterministic evenly spaced cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch and reopens the package |
 | Bulk update matching objects | Missing | No semantic end-to-end case |
 | Clear/remove/hide/detach/GC distinctions | Missing | No complete matrix |
@@ -29,7 +29,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS-row preservation, and exact raw ODT/ODS/ODP auxiliary/media members during neighboring paragraph/cell/text-box edits; broader format-semantic extension corpora remain missing |
-| Replace one low-level Part, preserve the rest | Covered for owned and narrow source-backed same-topology OPC | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; change 0037 adds a consuming source-backed one-Part publisher with raw unknown-member preservation, source-version checks, signed/unsupported zero-output refusal and matched save evidence; semantic facade integration remains missing |
+| Replace one low-level Part, preserve the rest | Covered for owned OPC, narrow source-backed OPC, and guarded DOCX main-document semantics | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; change 0037 adds the consuming source-backed one-Part publisher; change 0039 integrates it with exact-source DOCX transactions while refusing MCE rewrites, transfers, signed changes and unsupported layouts before output; PPTX/XLSX semantic integration remains missing |
 
 The source/output matrix is also incomplete. Owned bytes and instrumented
 `ReadAt` exist for OPC/XLSX, and the deterministic range simulator covers
@@ -56,9 +56,10 @@ timing, PPTX facade streaming output, and non-seek semantic conversion remain.
 4. XLSX bulk update plus distinct clear/remove/hide behavior. Direct
    writer-local action regrouping was measured and rejected in change 0030;
    broader coverage must not present that immaterial prototype as a solution.
-5. Integrate the narrow source-backed one-Part publisher into bounded
-   DOCX/PPTX/XLSX semantic transactions, with real media, extensions,
-   signatures and explicit topology-change fallback/refusal matrices.
+5. Integrate the narrow source-backed one-Part publisher into bounded PPTX and
+   XLSX semantic transactions, and broaden DOCX beyond change 0039 with real
+   producers, MCE-aware editing, dependency transfers and explicit
+   topology/signature fallback or refusal matrices.
 6. Unknown OOXML extension and media preservation during a known semantic edit.
 7. Durable PPTX patch produce/encode/decode/apply/inverse/join/three-way flows,
    including stale-base and conflict cases.
@@ -176,6 +177,14 @@ members, preserves exact output identity, and refuses signed real changes or
 unsupported layouts before output. It does not add DOCX/PPTX/XLSX semantic
 transactions, topology changes, signature policy, real-producer/media matrices
 or atomic filesystem publication.
+
+Change 0039 integrates that publisher with exact-source DOCX main-document
+transactions over a fixed 16 MiB media-rich package. It materializes only the
+main Part, raw-copies every other physical member, fully reopens the result and
+retains byte-exact no-op/signature/source-version behavior. MCE-normalized
+documents and paragraph transfers are deliberately refused; PPTX/XLSX,
+topology changes, real producers, encrypted input and atomic filesystem
+publication remain open.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

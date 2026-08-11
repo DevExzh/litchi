@@ -220,12 +220,13 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **118
+The stage-1 records above are retained unchanged. The current harness has **119
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
-stage/control cases, one opt-in source-backed OPC one-Part publication case, one
-opt-in media-rich ODT paragraph-publication case, 16 opt-in DOCX/PPTX semantic
+stage/control cases, one opt-in source-backed OPC one-Part publication case,
+one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
+ODT paragraph-publication case, 16 opt-in DOCX/PPTX semantic
 cases, seven opt-in RTF semantic case names across four capability-bounded
 variants (25 tiny / 44 tiny-plus-large rows), 24 opt-in ODT/ODS/ODP semantic
 cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It remains an
@@ -259,6 +260,13 @@ incomplete program and CRUD matrix.
   to one, and output remains byte-identical to the eager baseline. Signed real
   changes and unsupported layouts refuse before output. See
   [`0037`](changes/0037-opc-source-backed-one-part-publication.md).
+- The guarded DOCX facade now carries an exact raw main-document transaction
+  through that publisher. On the fixed 17-Part media-rich corpus, pooled p50
+  falls from 223.183 to 5.732 ms (-97.43%), instructions fall 74.91%, and
+  semantic materializations fall 17 -> 1 with identical deterministic output.
+  MCE rewrites, dependency transfers and signed real changes refuse before
+  output; the unchanged eager DOCX guard is neutral. See
+  [`0039`](changes/0039-docx-source-backed-semantic-publication.md).
 - The positional XLSX source record reports p50 opens of 33.881 us (tiny),
   56.493 us (medium), and 139.897 us (dense); list-after-open has zero timed
   source reads. First-cell and narrow-range operations physically overlap only

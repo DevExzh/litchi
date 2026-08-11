@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `5e0a5df71`
+Production base for the latest measured tranche: `627e4a4fb`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,11 +13,12 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **118 selectable cases**: 36 default cases and 198 default
+harness contains **119 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
-one opt-in media-rich ODT paragraph-publication case, 16 opt-in DOCX/PPTX
+one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
+ODT paragraph-publication case, 16 opt-in DOCX/PPTX
 semantic cases, seven opt-in RTF semantic case names across four
 capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 24 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
@@ -57,6 +58,7 @@ is still not broad program or CRUD coverage.
 | OPC shared changed-Part payload | Few-large compressible targeted save **-20.73%** p50 / **-18.49%** mean; cache misses **-31.12%** | Removes one 4.19 MiB handoff copy; peak heap -3.42%, uninstrumented RSS +0.22% (flat); the remaining local-span copy is removed by the follow-up below |
 | ZIP generated local-span move | Few-large compressible/incompressible targeted save **-4.09% / -2.70%** p50; means **-4.08% / -2.25%** | Removes the separate 4.20 MiB post-validation local-span copy; peak heap -3.20%, uninstrumented RSS -0.10% (flat); required compressor/archive buffer remains |
 | Source-backed OPC one-Part publication | Fixed four-Part save p50 **-73.12%**, mean **-73.58%**; semantic materializations **4 -> 1**; instructions **-65.42%** | Low-level consuming same-topology replacement only; raw-copies all unselected ZIP members; signed real changes and unsupported layouts refuse before output; complete physical input/output bytes remain |
+| Source-backed DOCX semantic publication | Fixed media-rich one-edit/save p50 **-97.43%**, mean **-97.41%**, p95 **-97.27%**; materializations **17 -> 1**; instructions **-74.91%** | Exact raw main-document transactions only; MCE rewrites, dependency transfers and signed real changes refuse; physical archive input/output remains and eager DOCX guard p50 is +0.25% |
 
 Raw evidence: [`XLSX before A`](results/abba-xlsx-range-before-a.json),
 [`after A`](results/abba-xlsx-range-after-a.json),
@@ -508,7 +510,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 118 selectable cases and a 198-record default
+The standalone harness provides 119 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus

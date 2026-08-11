@@ -425,6 +425,25 @@ impl Snapshot {
         })
     }
 
+    pub(crate) fn from_shared_xml(xml: Arc<Vec<u8>>) -> TransactionResult<Self> {
+        if xml.len() > MAX_DOCUMENT_XML_BYTES {
+            return Err(TransactionError::Limit {
+                resource: "XML bytes",
+                max: MAX_DOCUMENT_XML_BYTES,
+                actual: xml.len(),
+            });
+        }
+        let layout = scan_document(&xml)?;
+        Ok(Self {
+            xml,
+            paragraphs: layout.paragraphs.into(),
+            tables: layout.tables.into(),
+            block_controls: layout.block_controls.into(),
+            content_end: layout.content_end,
+            conformance: layout.conformance,
+        })
+    }
+
     /// Borrow the exact main-document XML bytes.
     #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
@@ -710,6 +729,31 @@ pub enum Operation {
 }
 
 impl Operation {
+    pub(crate) const fn supports_source_backed_main_document_overlay(&self) -> bool {
+        match self {
+            Self::ReplaceParagraphText { .. }
+            | Self::ReplaceHyperlinkText { .. }
+            | Self::ReplaceRunText { .. }
+            | Self::ReplaceSimpleFieldText { .. }
+            | Self::ReplaceComplexFieldText { .. }
+            | Self::ReplaceRevisionText { .. }
+            | Self::ReplaceContentControlText { .. }
+            | Self::ReplaceNestedContentControlText { .. }
+            | Self::ReplaceNestedContentControlHyperlinkText { .. }
+            | Self::ReplaceBlockContentControlParagraphText { .. }
+            | Self::ReplaceBlockContentControlParagraphHyperlinkText { .. }
+            | Self::ReplaceCellText { .. }
+            | Self::ReplaceCellParagraphText { .. }
+            | Self::ReplaceNestedCellParagraphText { .. }
+            | Self::ReplaceNestedCellParagraphHyperlinkText { .. }
+            | Self::InsertParagraph { .. }
+            | Self::RemoveParagraph { .. } => true,
+            Self::InsertTransferredParagraph { .. } | Self::RemoveTransferredParagraph { .. } => {
+                false
+            },
+        }
+    }
+
     fn inverse(&self) -> Self {
         match self {
             Self::ReplaceParagraphText {
@@ -4755,6 +4799,34 @@ mod tests {
             256 * 1024,
             512 * 1024,
         )
+    }
+
+    #[test]
+    fn source_backed_overlay_classification_refuses_transfer_operations() {
+        let ordinary = Operation::InsertParagraph {
+            position: Position::new(0),
+            text: "plain".into(),
+        };
+        let transferred = Operation::InsertTransferredParagraph {
+            position: Position::new(0),
+            xml: Arc::new(b"<w:p/>".to_vec()),
+            dependency_digest: Arc::from("before"),
+            inverse_dependency_digest: Arc::from("after"),
+            graph: Arc::new(TransferGraph::empty()),
+        };
+
+        assert!(ordinary.supports_source_backed_main_document_overlay());
+        assert!(!transferred.supports_source_backed_main_document_overlay());
+    }
+
+    #[test]
+    fn source_backed_snapshot_reuses_the_exact_raw_xml_allocation() {
+        let xml = Arc::new(document("<w:p><w:r><w:t>source backed</w:t></w:r></w:p>"));
+        let allocation = xml.as_ptr();
+        let snapshot = Snapshot::from_shared_xml(Arc::clone(&xml)).unwrap();
+
+        assert_eq!(snapshot.xml.as_ptr(), allocation);
+        assert!(Arc::ptr_eq(&snapshot.xml, &xml));
     }
 
     #[test]
