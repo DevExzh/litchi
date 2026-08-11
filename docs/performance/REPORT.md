@@ -54,6 +54,7 @@ is still not broad program or CRUD coverage.
 | Common OLE2 publication stages and rejected handoffs | Current open/publication/finish/end-to-end p50: **1.382 / 7.979 / 5.473 / 26.086 ms**; inline recapture prototype end-to-end **-2.61%** p50 | Stages are non-additive; shared-payload, validated-render and inline recapture prototypes are all fully reverted |
 | Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
 | Native DOC PieceTable physical index | Large open p50 **-55.91%**, mean **-55.78%**; changed edit/save p50 **-31.08%** | Private FC-ordered/prefix-max index only; exact scalar mapping, full FKP validation and strict/public reopens remain; peak heap/RSS flat |
+| Native DOC paragraph-style baseline cache | Large open p50 **-11.44%**, mean **-11.87%**; changed edit/save p50 **-4.01%** | One private resolved baseline only; direct PAPX, piece modifiers, direct style switches and complete readbacks remain; allocation calls -18.61%, peak heap/RSS flat |
 | Native PPT root snapshot CFB reuse | Repeated large root open p50 **-8.78%**, mean **-10.58%**; allocation calls **-5.01%** | Reuses only the validated CFB index; independent stream/current-user/live-document, slide-order, review-history and public-reader checks remain |
 | Native PPT text-edit resolver reuse | Direct large edit/save p50 **-14.12%**, mean **-15.39%**; allocation calls **-3.53%** | Reuses the full editor preflight for persisted-record resolution; exact error precedence, fresh commit editor and complete readback remain; minor-fault increase disclosed |
 | Bounded XLSX validated-store handoff | Medium one-cell commit + first read p50 **-23.23%**, mean **-23.15%**; allocation calls **-21.01%** | At most 4,096 cells / 1 MiB XML with exact byte and lineage identity; peak heap +4.29%; unrestricted dense-wide candidate rejected at +8.99% peak heap |
@@ -450,6 +451,8 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | Native DOC one-paragraph edit/save, 512 paragraphs | 1.506 ms | 1.348 ms | **-10.52% p50 / -10.48% mean** | Duplicate publication-site allocations nearly halved; peak heap and uninstrumented RSS flat |
 | Native DOC open, 512 paragraphs | 790.727 us | 348.679 us | **-55.91% p50 / -55.78% mean** | Physical PieceTable scan self cycles 36.89% -> 4.17%; allocation calls +0.009%; peak heap and uninstrumented RSS flat |
 | Native DOC one-paragraph edit/save after PieceTable index, 512 paragraphs | 1.379 ms | 0.950 ms | **-31.08% p50 / -31.68% mean** | Same private index accelerates mandatory candidate/public readbacks; patch/inverse and exact output checks unchanged |
+| Native DOC open after PieceTable index, 512 paragraphs | 343.503 us | 304.199 us | **-11.44% p50 / -11.87% mean** | Paragraph-style validation 4.44% -> 0.83% self cycles; allocation calls -18.61%; peak heap and uninstrumented RSS flat |
+| Native DOC one-paragraph edit/save after style cache, 512 paragraphs | 912.288 us | 875.736 us | **-4.01% p50 / -4.23% mean** | Same one-entry cache accelerates mandatory candidate/public readbacks; patch/inverse and exact output checks unchanged |
 | Native PPT root snapshot open, 144 shapes | 37.522 us | 34.227 us | **-8.78% p50 / -10.58% mean** | Allocation calls -5.01%, temporary allocations -12.22%; peak heap and uninstrumented RSS flat |
 | Native PPT direct text edit/save, 144 shapes | 206.209 us | 177.089 us | **-14.12% p50 / -15.39% mean** | Allocation calls -3.53%, temporary allocations -6.05%; peak heap/RSS flat; minor faults +315.43% with zero major faults |
 | XLSX one-cell commit + first read, 4,096 cells | 4.431 ms | 3.402 ms | **-23.23% p50 / -23.15% mean** | Allocation calls -21.01%; peak heap +4.29%; unrestricted dense-wide retention rejected |
@@ -566,6 +569,10 @@ remain linked from change 0023.
 - Native DOC applies ordinary WordDocument and table-stream replacements to
   one isolated object-editor candidate and renders/reopens the CFB once rather
   than once per replacement.
+- Native DOC paragraph FKP parsing reuses one resolved initial-style baseline
+  across repeated source runs instead of reconstructing and revalidating the
+  same inheritance chain. Direct properties, piece modifiers and direct style
+  switches still execute independently for every PAPX.
 - DOCX one-paragraph selection no longer constructs the complete paragraph
   collection, and source-backed paragraph counts no longer construct any
   paragraph views. Complete XML validation and limits still run.
@@ -731,8 +738,10 @@ security, malformed and real-producer corpora, plus broader ODF and RTF
 coverage). Native DOC/XLS/PPT semantic baselines now have accepted XLS
 editor-reuse, DOC batched-publication, PPT root-open reuse and direct PPT
 text-edit resolver reuse follow-ups. Native DOC also indexes physical
-PieceTable intervals after a distinct profile attributed 36.89% of large-open
-self cycles to repeated scalar FKP range mapping; full validation remains.
+PieceTable intervals and reuses one resolved PAPX initial-style baseline after
+distinct profiles attributed 36.89% of large-open self cycles to scalar FKP
+range mapping and 6.94% to repeated style resolution/validation; full
+validation remains.
 Remaining native work requires new attribution inside the retained final
 owner/public-reader validation layers. The rejected XLS terminal-render
 handoff is not a reusable shortcut for those checks. The new opaque-heavy

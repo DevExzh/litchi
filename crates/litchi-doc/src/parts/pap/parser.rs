@@ -92,6 +92,35 @@ impl ParagraphProperties {
         )
     }
 
+    /// Resolve the inherited paragraph-style state before direct PAPX SPRMs.
+    ///
+    /// Callers parsing source-ordered PAPX runs may reuse this immutable
+    /// baseline for adjacent runs with the same initial style. Direct SPRMs
+    /// must still be applied independently for every run.
+    pub(crate) fn resolve_style_baseline(
+        initial_style_index: Option<u16>,
+        stylesheet: &StyleSheet,
+    ) -> Result<Self> {
+        Self::paragraph_style_on_baseline(&Self::default(), initial_style_index, stylesheet)
+    }
+
+    /// Apply one run's direct SPRMs to an already resolved initial style.
+    ///
+    /// A direct `sprmPIstd` or permutation still resolves from the document
+    /// baseline, exactly as [`Self::cascade_styles`] does.
+    pub(crate) fn cascade_styles_from_resolved_baseline(
+        resolved_initial: &Self,
+        direct_sprms: &[u8],
+        stylesheet: &StyleSheet,
+    ) -> Result<Self> {
+        Self::apply_direct_sprms(
+            resolved_initial.clone(),
+            &Self::default(),
+            direct_sprms,
+            stylesheet,
+        )
+    }
+
     pub(crate) fn cascade_table_style(
         table_style_sprms: &[u8],
         initial_style_index: Option<u16>,
@@ -113,8 +142,16 @@ impl ParagraphProperties {
         direct_sprms: &[u8],
         stylesheet: &StyleSheet,
     ) -> Result<Self> {
-        let mut current =
-            Self::paragraph_style_on_baseline(baseline, initial_style_index, stylesheet)?;
+        let current = Self::paragraph_style_on_baseline(baseline, initial_style_index, stylesheet)?;
+        Self::apply_direct_sprms(current, baseline, direct_sprms, stylesheet)
+    }
+
+    fn apply_direct_sprms(
+        mut current: Self,
+        style_baseline: &Self,
+        direct_sprms: &[u8],
+        stylesheet: &StyleSheet,
+    ) -> Result<Self> {
         let sprms = parse_sprms(direct_sprms)?;
         let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
         if consumed != direct_sprms.len() {
@@ -137,7 +174,7 @@ impl ParagraphProperties {
             };
             if let Some(requested) = requested_style {
                 let mut styled =
-                    Self::paragraph_style_on_baseline(baseline, Some(requested), stylesheet)?;
+                    Self::paragraph_style_on_baseline(style_baseline, Some(requested), stylesheet)?;
                 styled.style_index = Some(requested);
                 Self::preserve_style_state(&current, &mut styled);
                 current = styled;

@@ -71,6 +71,7 @@ impl PapBinTable {
         }
 
         let mut runs = Vec::with_capacity(page_count.saturating_mul(10));
+        let mut style_baseline_cache = None;
         let pn_array_offset = (page_count + 1) * 4;
 
         for index in 0..page_count {
@@ -107,11 +108,12 @@ impl PapBinTable {
                         .map(super::piece_table::TextPiece::property_modifier)
                         .unwrap_or_default();
                     let (properties, direct_grpprl, initial_style_index) =
-                        Self::parse_properties_with_direct(
+                        Self::parse_properties_with_direct_cached(
                             &entry.grpprl,
                             piece_modifier,
                             data_stream,
                             stylesheet,
+                            &mut style_baseline_cache,
                         )?;
                     runs.push(ParagraphRun {
                         start_cp,
@@ -155,11 +157,28 @@ impl PapBinTable {
             .map(|(properties, _, _)| properties)
     }
 
+    #[cfg(test)]
     fn parse_properties_with_direct(
         grpprl_and_istd: &[u8],
         piece_modifier: &[u8],
         data_stream: Option<&[u8]>,
         stylesheet: Option<&StyleSheet>,
+    ) -> Result<(ParagraphProperties, Vec<u8>, Option<u16>)> {
+        Self::parse_properties_with_direct_cached(
+            grpprl_and_istd,
+            piece_modifier,
+            data_stream,
+            stylesheet,
+            &mut None,
+        )
+    }
+
+    fn parse_properties_with_direct_cached(
+        grpprl_and_istd: &[u8],
+        piece_modifier: &[u8],
+        data_stream: Option<&[u8]>,
+        stylesheet: Option<&StyleSheet>,
+        style_baseline_cache: &mut Option<(u16, ParagraphProperties)>,
     ) -> Result<(ParagraphProperties, Vec<u8>, Option<u16>)> {
         if grpprl_and_istd.is_empty() {
             let properties = stylesheet.map_or_else(
@@ -195,10 +214,31 @@ impl PapBinTable {
         };
 
         let direct_grpprl = [sprms, piece_modifier].concat();
-        let mut properties = stylesheet.map_or_else(
-            || ParagraphProperties::from_sprm(&direct_grpprl),
-            |styles| ParagraphProperties::cascade_styles(style_index, &direct_grpprl, styles),
-        )?;
+        let mut properties = match (stylesheet, style_index) {
+            (Some(styles), Some(index)) => {
+                if style_baseline_cache
+                    .as_ref()
+                    .is_none_or(|(cached_index, _)| *cached_index != index)
+                {
+                    let baseline =
+                        ParagraphProperties::resolve_style_baseline(Some(index), styles)?;
+                    *style_baseline_cache = Some((index, baseline));
+                }
+                let baseline = &style_baseline_cache
+                    .as_ref()
+                    .expect("the adjacent style baseline was just populated")
+                    .1;
+                ParagraphProperties::cascade_styles_from_resolved_baseline(
+                    baseline,
+                    &direct_grpprl,
+                    styles,
+                )?
+            },
+            (Some(styles), None) => {
+                ParagraphProperties::cascade_styles(None, &direct_grpprl, styles)?
+            },
+            (None, _) => ParagraphProperties::from_sprm(&direct_grpprl)?,
+        };
         if properties.style_index.is_none() {
             properties.style_index = style_index;
         }
@@ -297,6 +337,82 @@ impl PapBinTable {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::leniency::Leniency;
+
+    fn style_record(
+        invariant_id: u16,
+        kind: u16,
+        base: u16,
+        next: u16,
+        name: &str,
+        property_sets: &[&[u8]],
+    ) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&invariant_id.to_le_bytes());
+        data.extend_from_slice(&(kind | (base << 4)).to_le_bytes());
+        data.extend_from_slice(&((property_sets.len() as u16) | (next << 4)).to_le_bytes());
+        data.extend_from_slice(&0_u16.to_le_bytes());
+        data.extend_from_slice(&0_u16.to_le_bytes());
+        let units = name.encode_utf16().collect::<Vec<_>>();
+        data.extend_from_slice(&(units.len() as u16).to_le_bytes());
+        data.extend(units.into_iter().flat_map(u16::to_le_bytes));
+        data.extend_from_slice(&0_u16.to_le_bytes());
+        for property_set in property_sets {
+            data.extend_from_slice(&(property_set.len() as u16).to_le_bytes());
+            data.extend_from_slice(property_set);
+            if property_set.len() % 2 != 0 {
+                data.push(0);
+            }
+        }
+        let size = data.len() as u16;
+        data[6..8].copy_from_slice(&size.to_le_bytes());
+        data
+    }
+
+    fn paragraph_stylesheet() -> StyleSheet {
+        let mut slots = vec![None; 17];
+        slots[0] = Some(style_record(0, 1, 0x0fff, 0, "Normal", &[&[], &[]]));
+        slots[15] = Some(style_record(
+            0x0ffe,
+            1,
+            0,
+            0,
+            "Base Paragraph",
+            &[&[15, 0, 0x03, 0x24, 2], &[]],
+        ));
+        slots[16] = Some(style_record(
+            0x0ffe,
+            1,
+            15,
+            0,
+            "Derived Paragraph",
+            &[&[0x03, 0x24, 1], &[]],
+        ));
+
+        let mut data = Vec::new();
+        data.extend_from_slice(&18_u16.to_le_bytes());
+        data.extend_from_slice(&(slots.len() as u16).to_le_bytes());
+        data.extend_from_slice(&10_u16.to_le_bytes());
+        data.extend_from_slice(&1_u16.to_le_bytes());
+        data.extend_from_slice(&15_u16.to_le_bytes());
+        data.extend_from_slice(&15_u16.to_le_bytes());
+        data.extend_from_slice(&0_u16.to_le_bytes());
+        data.extend_from_slice(&0_i16.to_le_bytes());
+        data.extend_from_slice(&0_i16.to_le_bytes());
+        data.extend_from_slice(&0_i16.to_le_bytes());
+        for slot in slots {
+            if let Some(record) = slot {
+                data.extend_from_slice(&(record.len() as u16).to_le_bytes());
+                data.extend_from_slice(&record);
+                if record.len() % 2 != 0 {
+                    data.push(0);
+                }
+            } else {
+                data.extend_from_slice(&0_u16.to_le_bytes());
+            }
+        }
+        StyleSheet::parse_data(&data, 0, Leniency::Strict).unwrap()
+    }
 
     #[test]
     fn resolves_huge_papx_and_preserves_style() {
@@ -354,5 +470,63 @@ mod tests {
             properties.justification,
             super::super::pap::Justification::Right
         );
+    }
+
+    #[test]
+    fn adjacent_style_cache_matches_scalar_cascade_and_rekeys() {
+        let stylesheet = paragraph_stylesheet();
+        let mut cache = None;
+
+        let derived_with_piece_override = [16, 0, 0x03, 0x24, 0];
+        let piece_modifier = [0x03, 0x24, 2];
+        let cached = PapBinTable::parse_properties_with_direct_cached(
+            &derived_with_piece_override,
+            &piece_modifier,
+            None,
+            Some(&stylesheet),
+            &mut cache,
+        )
+        .unwrap();
+        let scalar = PapBinTable::parse_properties_with_direct(
+            &derived_with_piece_override,
+            &piece_modifier,
+            None,
+            Some(&stylesheet),
+        )
+        .unwrap();
+        assert_eq!(format!("{:?}", cached.0), format!("{:?}", scalar.0));
+        assert_eq!(cached.1, scalar.1);
+        assert_eq!(cached.2, scalar.2);
+        assert_eq!(cache.as_ref().map(|(index, _)| *index), Some(16));
+
+        let switch_to_base = [16, 0, 0x00, 0x46, 15, 0];
+        let cached = PapBinTable::parse_properties_with_direct_cached(
+            &switch_to_base,
+            &[],
+            None,
+            Some(&stylesheet),
+            &mut cache,
+        )
+        .unwrap();
+        let scalar = PapBinTable::parse_properties_with_direct(
+            &switch_to_base,
+            &[],
+            None,
+            Some(&stylesheet),
+        )
+        .unwrap();
+        assert_eq!(format!("{:?}", cached.0), format!("{:?}", scalar.0));
+        assert_eq!(cached.0.style_index, Some(15));
+        assert_eq!(cache.as_ref().map(|(index, _)| *index), Some(16));
+
+        PapBinTable::parse_properties_with_direct_cached(
+            &[15, 0],
+            &[],
+            None,
+            Some(&stylesheet),
+            &mut cache,
+        )
+        .unwrap();
+        assert_eq!(cache.as_ref().map(|(index, _)| *index), Some(15));
     }
 }
