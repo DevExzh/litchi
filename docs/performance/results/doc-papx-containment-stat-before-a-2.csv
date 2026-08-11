@@ -1,0 +1,8 @@
+# started on Wed Aug 12 01:26:19 2026
+
+3954149089,,cycles,805306672,100.00,,
+21577395836,,instructions,805306672,100.00,5.46,insn per cycle
+5973965543,,branches,805306672,100.00,,
+7989201,,branch-misses,805306672,100.00,0.13,of all branches
+124329566,,cache-references,805306672,100.00,,
+4414664,,cache-misses,805306672,100.00,3.55,of all cache refs

@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 
-This is a coverage map, not a completion claim. It compares the 123 selectable
+This is a coverage map, not a completion claim. It compares the 124 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -268,6 +268,15 @@ fallible allocation, table/deletion fallback, all parser limits, exact no-op,
 patch/inverse, candidate parse/readback and transport/producer coverage remain.
 It adds no formatting/media edit, repair, security, conversion, cold-source or
 real-producer capability.
+
+Change 0056 leaves the native DOC CRUD and publication surface unchanged. It
+uses the parser-normalized ordering already present in private CLX pieces and
+PAPX runs to replace two repeated linear containment scans with predecessor
+binary searches. Scalar differential tests preserve empty/gap, half-open and
+numeric-boundary behavior; table filtering, strict SPRM decoding, exact patch
+and inverse, final owner validation and independent public DOC readback remain.
+It adds no formatting/media edit, repair, security, producer, streaming or new
+semantic capability.
 
 Change 0040 removes repeated UTF-8 scalar decoding from ordinary RTF text
 delimiter discovery without changing the existing CRUD surface. It measures

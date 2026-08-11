@@ -865,6 +865,18 @@ fn write_u32_at(bytes: &mut [u8], offset: usize, value: u32) -> Result<()> {
     Ok(())
 }
 
+fn containing_piece(pieces: &[RawPiece], cp: u32) -> Option<&RawPiece> {
+    let index = pieces
+        .partition_point(|piece| piece.start <= cp)
+        .checked_sub(1)?;
+    pieces.get(index).filter(|piece| cp < piece.end)
+}
+
+fn containing_papx(runs: &[PapxRun], fc: u32) -> Option<&PapxRun> {
+    let index = runs.partition_point(|run| run.start <= fc).checked_sub(1)?;
+    runs.get(index).filter(|run| fc < run.end)
+}
+
 #[derive(Clone)]
 pub struct RevisionEditor {
     package: ObjectEditor,
@@ -1398,10 +1410,7 @@ impl RevisionEditor {
 
     /// Whether the paragraph ending at `cp` has the MS-DOC in-table flag.
     pub(crate) fn is_in_table_at_cp(&self, cp: u32) -> Result<bool> {
-        let piece = self
-            .pieces
-            .iter()
-            .find(|piece| piece.start <= cp && cp < piece.end)
+        let piece = containing_piece(&self.pieces, cp)
             .ok_or_else(|| corrupted("paragraph terminator has no text piece"))?;
         let width = if piece.unicode { 2 } else { 1 };
         let fc = piece
@@ -1413,10 +1422,7 @@ impl RevisionEditor {
                     .ok_or_else(|| corrupted("paragraph FC overflow"))?,
             )
             .ok_or_else(|| corrupted("paragraph FC overflow"))?;
-        let run = self
-            .papx
-            .iter()
-            .find(|run| run.start <= fc && fc < run.end)
+        let run = containing_papx(&self.papx, fc)
             .ok_or_else(|| corrupted("paragraph terminator has no PAPX run"))?;
         let body = run
             .grpprl
@@ -2635,6 +2641,111 @@ impl RevisionEditor {
             .map_err(PackageError::from)?;
         self.changed = true;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod containment_tests {
+    use super::*;
+
+    fn piece(start: u32, end: u32) -> RawPiece {
+        RawPiece {
+            start,
+            end,
+            fc: start,
+            unicode: false,
+            prefix: [0; 2],
+            prm: [0; 2],
+        }
+    }
+
+    fn papx(start: u32, end: u32) -> PapxRun {
+        PapxRun {
+            start,
+            end,
+            grpprl: vec![0; 2],
+            phe: crate::parts::fkp::ParagraphHeight {
+                info_field: 0,
+                reserved: 0,
+                dxa_col: 0,
+                dym_line_or_height: 0,
+            },
+        }
+    }
+
+    #[test]
+    fn indexed_piece_containment_matches_scalar_boundaries() {
+        let cases = [
+            Vec::new(),
+            vec![piece(0, 1)],
+            vec![piece(0, 4), piece(4, 8), piece(8, 12)],
+            vec![piece(2, 5), piece(9, 11), piece(u32::MAX - 2, u32::MAX)],
+        ];
+        let points = [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            u32::MAX - 2,
+            u32::MAX - 1,
+            u32::MAX,
+        ];
+        for pieces in &cases {
+            for cp in points {
+                let scalar = pieces
+                    .iter()
+                    .position(|piece| piece.start <= cp && cp < piece.end);
+                let indexed = containing_piece(pieces, cp).and_then(|candidate| {
+                    pieces
+                        .iter()
+                        .position(|piece| std::ptr::eq(piece, candidate))
+                });
+                assert_eq!(indexed, scalar, "piece containment differs at CP {cp}");
+            }
+        }
+    }
+
+    #[test]
+    fn indexed_papx_containment_matches_scalar_boundaries() {
+        let cases = [
+            Vec::new(),
+            vec![papx(0, 1)],
+            vec![papx(0, 4), papx(4, 8), papx(8, 12)],
+            vec![papx(2, 5), papx(9, 11), papx(u32::MAX - 2, u32::MAX)],
+        ];
+        let points = [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            u32::MAX - 2,
+            u32::MAX - 1,
+            u32::MAX,
+        ];
+        for runs in &cases {
+            for fc in points {
+                let scalar = runs.iter().position(|run| run.start <= fc && fc < run.end);
+                let indexed = containing_papx(runs, fc)
+                    .and_then(|candidate| runs.iter().position(|run| std::ptr::eq(run, candidate)));
+                assert_eq!(indexed, scalar, "PAPX containment differs at FC {fc}");
+            }
+        }
     }
 }
 

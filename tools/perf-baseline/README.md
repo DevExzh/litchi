@@ -27,9 +27,9 @@ range cases, two execution-scaling cases, one low-level source-overlay save
 case, one source-backed DOCX semantic publication case, one source-backed
 media-rich PPTX semantic publication case, one XLSX commit/read attribution case,
 two matched XLSX calculation-metadata publication cases,
-four opaque-heavy common OLE2 stage/edit-save cases, 20 native OLE2 semantic cases, 16
+four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, seven RTF semantic cases, and 26 ODF semantic cases
-are opt-in, for 123 selectable cases in total:
+are opt-in, for 124 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -534,6 +534,11 @@ remain distinguishable.
   paragraph replacement, and materialize owned bytes. Exact no-op bytes,
   deterministic changed bytes, public reopen, forward patch application, and
   inverse restoration are checked outside timing.
+- `doc_body_snapshot_list_paragraphs`: open one exact-source
+  `body_text::Snapshot` before timing, then time only
+  `paragraphs(Projection::All)`. Every returned position and paragraph text is
+  verified after timing. This narrow opt-in case attributes the paragraph
+  terminator/PAPX containment work used by exact-source DOC transactions.
 - `xls_semantic_open`: open the generated native workbook through the ordinary
   `litchi_xls::Workbook` reader.
 - `xls_semantic_list_worksheets` / `xls_semantic_one_cell` /

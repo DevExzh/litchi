@@ -1,0 +1,662 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 728  of event 'cycles:P'
+# Event count (approx.): 3526960826
+#
+# Overhead  Command    Shared Object         Symbol
+# ........  .........  ....................  .............................................................................................................................
+#
+    11.10%  candidate  candidate             [.] litchi_doc::tracked_revision::package::RevisionEditor::is_in_table_at_cp
+            |
+            ---litchi_doc::tracked_revision::package::RevisionEditor::is_in_table_at_cp
+               litchi_doc::body_text::source_paragraphs
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     9.68%  candidate  candidate             [.] _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String10from_utf16
+            |
+            ---_RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String10from_utf16
+               _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17h8762ffb8965dba73E.llvm.8202548277213780502
+               litchi_doc::body_text::source_paragraphs
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     7.35%  candidate  candidate             [.] litchi_doc::body_text::source_paragraphs
+            |
+            ---litchi_doc::body_text::source_paragraphs
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     5.66%  candidate  candidate             [.] litchi_doc::tracked_revision::package::RevisionEditor::revisions
+            |
+            ---litchi_doc::tracked_revision::package::RevisionEditor::revisions
+               litchi_doc::tracked_revision::package::RevisionEditor::open
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     5.58%  candidate  candidate             [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral
+            |
+            ---_RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral
+               _RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+               _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+               _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     4.85%  candidate  libc.so.6             [.] _int_malloc
+            |
+            ---_int_malloc
+               |
+               |--4.43%--__GI___libc_malloc (inlined)
+               |          |
+               |          |--2.21%--litchi_doc::parts::fkp::PapxFkp::parse
+               |          |          litchi_doc::tracked_revision::codec::parse_papx
+               |          |          litchi_doc::tracked_revision::package::RevisionEditor::open
+               |          |          litchi_doc::body_text::Snapshot::paragraphs
+               |          |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               |          |          litchi_perf_baseline::main
+               |          |          0xffffffffffffffff
+               |          |
+               |          |--1.38%--litchi_doc::body_text::source_paragraphs
+               |          |          litchi_doc::body_text::Snapshot::paragraphs
+               |          |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               |          |          litchi_perf_baseline::main
+               |          |          0xffffffffffffffff
+               |          |
+               |           --0.70%--litchi_doc::tracked_revision::codec::parse_papx
+               |                     litchi_doc::tracked_revision::package::RevisionEditor::open
+               |                     litchi_doc::body_text::Snapshot::paragraphs
+               |                     litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               |                     litchi_perf_baseline::main
+               |                     0xffffffffffffffff
+               |
+                --0.42%--_int_realloc
+                          __GI___libc_realloc (inlined)
+                          |
+                           --0.28%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17he497b834530d83e3E.llvm.6904642078094986750
+
+     4.56%  candidate  libc.so.6             [.] _int_free
+            |
+            |--4.01%--_int_free
+            |          |
+            |           --3.87%--__GI___libc_free (inlined)
+            |                     |
+            |                     |--1.11%--litchi_doc::tracked_revision::package::RevisionEditor::revisions
+            |                     |          litchi_doc::tracked_revision::package::RevisionEditor::open
+            |                     |          litchi_doc::body_text::Snapshot::paragraphs
+            |                     |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+            |                     |          litchi_perf_baseline::main
+            |                     |          0xffffffffffffffff
+            |                     |
+            |                     |--0.97%--core::ptr::drop_in_place<litchi_doc::tracked_revision::package::RevisionEditor>
+            |                     |          litchi_doc::body_text::Snapshot::paragraphs
+            |                     |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+            |                     |          litchi_perf_baseline::main
+            |                     |          0xffffffffffffffff
+            |                     |
+            |                     |--0.70%--litchi_doc::tracked_revision::codec::parse_papx
+            |                     |          litchi_doc::tracked_revision::package::RevisionEditor::open
+            |                     |          litchi_doc::body_text::Snapshot::paragraphs
+            |                     |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+            |                     |          litchi_perf_baseline::main
+            |                     |          0xffffffffffffffff
+            |                     |
+            |                     |--0.41%--litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+            |                     |          litchi_perf_baseline::main
+            |                     |          0xffffffffffffffff
+            |                     |
+            |                     |--0.28%--litchi_doc::tracked_revision::package::RevisionEditor::is_in_table_at_cp
+            |                     |          litchi_doc::body_text::source_paragraphs
+            |                     |          litchi_doc::body_text::Snapshot::paragraphs
+            |                     |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+            |                     |          litchi_perf_baseline::main
+            |                     |          0xffffffffffffffff
+            |                     |
+            |                      --0.28%--litchi_doc::tracked_revision::codec::parse_chpx
+            |                                litchi_doc::tracked_revision::package::RevisionEditor::open
+            |                                litchi_doc::body_text::Snapshot::paragraphs
+            |                                litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+            |                                litchi_perf_baseline::main
+            |                                0xffffffffffffffff
+            |
+             --0.42%--tcache_put (inlined)
+                       _int_free
+                       __GI___libc_free (inlined)
+                       |
+                        --0.28%--litchi_doc::tracked_revision::codec::parse_papx
+                                  litchi_doc::tracked_revision::package::RevisionEditor::open
+                                  litchi_doc::body_text::Snapshot::paragraphs
+                                  litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                                  litchi_perf_baseline::main
+                                  0xffffffffffffffff
+
+     4.45%  candidate  candidate             [.] <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+            |
+            ---<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+               _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17h8762ffb8965dba73E.llvm.8202548277213780502
+               litchi_doc::body_text::source_paragraphs
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     4.34%  candidate  candidate             [.] _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17h8762ffb8965dba73E.llvm.8202548277213780502
+            |
+            ---_ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17h8762ffb8965dba73E.llvm.8202548277213780502
+               litchi_doc::body_text::source_paragraphs
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     4.18%  candidate  libc.so.6             [.] __memmove_avx512_unaligned
+            |
+            ---__memcpy_avx512_unaligned (inlined)
+               |
+               |--3.34%--_ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17h8762ffb8965dba73E.llvm.8202548277213780502
+               |          litchi_doc::body_text::source_paragraphs
+               |          litchi_doc::body_text::Snapshot::paragraphs
+               |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --0.71%--_RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+                          |
+                          |--0.41%--_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                          |          _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                          |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                          |          litchi_perf_baseline::main
+                          |          0xffffffffffffffff
+                          |
+                           --0.29%--_RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral
+                                     _RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+                                     _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                                     _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                                     litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                                     litchi_perf_baseline::main
+                                     0xffffffffffffffff
+
+     3.55%  candidate  libc.so.6             [.] malloc
+            |
+            |--2.34%--__GI___libc_malloc (inlined)
+            |          |
+            |          |--0.69%--litchi_doc::sprm::parse_sprms
+            |          |          |
+            |          |          |--0.28%--litchi_doc::tracked_revision::codec::strict_sprms
+            |          |          |          litchi_doc::tracked_revision::package::RevisionEditor::is_in_table_at_cp
+            |          |          |          litchi_doc::body_text::source_paragraphs
+            |          |          |          litchi_doc::body_text::Snapshot::paragraphs
+            |          |          |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+            |          |          |          litchi_perf_baseline::main
+            |          |          |          0xffffffffffffffff
+            |          |          |
+            |          |           --0.28%--litchi_doc::tracked_revision::codec::parse_papx
+            |          |                     litchi_doc::tracked_revision::package::RevisionEditor::open
+            |          |                     litchi_doc::body_text::Snapshot::paragraphs
+            |          |                     litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+            |          |                     litchi_perf_baseline::main
+            |          |                     0xffffffffffffffff
+            |          |
+            |          |--0.55%--_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+            |          |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+            |          |          litchi_perf_baseline::main
+            |          |          0xffffffffffffffff
+            |          |
+            |          |--0.42%--litchi_doc::tracked_revision::codec::parse_papx
+            |          |          litchi_doc::tracked_revision::package::RevisionEditor::open
+            |          |          litchi_doc::body_text::Snapshot::paragraphs
+            |          |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+            |          |          litchi_perf_baseline::main
+            |          |          0xffffffffffffffff
+            |          |
+            |           --0.27%--litchi_doc::parts::fkp::PapxFkp::parse
+            |                     litchi_doc::tracked_revision::codec::parse_papx
+            |                     litchi_doc::tracked_revision::package::RevisionEditor::open
+            |                     litchi_doc::body_text::Snapshot::paragraphs
+            |                     litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+            |                     litchi_perf_baseline::main
+            |                     0xffffffffffffffff
+            |
+             --1.21%--tcache_get_n (inlined)
+                       tcache_get (inlined)
+                       __GI___libc_malloc (inlined)
+                       |
+                       |--0.41%--litchi_doc::sprm::parse_sprms
+                       |
+                       |--0.28%--_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                       |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                       |          litchi_perf_baseline::main
+                       |          0xffffffffffffffff
+                       |
+                        --0.28%--litchi_doc::parts::fkp::PapxFkp::parse
+                                  litchi_doc::tracked_revision::codec::parse_papx
+                                  litchi_doc::tracked_revision::package::RevisionEditor::open
+                                  litchi_doc::body_text::Snapshot::paragraphs
+                                  litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                                  litchi_perf_baseline::main
+                                  0xffffffffffffffff
+
+     2.49%  candidate  candidate             [.] litchi_doc::tracked_revision::codec::strict_sprms
+            |
+            ---litchi_doc::tracked_revision::codec::strict_sprms
+               litchi_doc::tracked_revision::package::RevisionEditor::is_in_table_at_cp
+               litchi_doc::body_text::source_paragraphs
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     2.49%  candidate  candidate             [.] _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+            |
+            ---_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     2.36%  candidate  libc.so.6             [.] cfree@GLIBC_2.2.5
+            |
+             --2.22%--__GI___libc_free (inlined)
+                       |
+                       |--0.97%--core::ptr::drop_in_place<litchi_doc::tracked_revision::package::RevisionEditor>
+                       |          litchi_doc::body_text::Snapshot::paragraphs
+                       |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                       |          litchi_perf_baseline::main
+                       |          0xffffffffffffffff
+                       |
+                       |--0.28%--litchi_doc::tracked_revision::codec::parse_chpx
+                       |          litchi_doc::tracked_revision::package::RevisionEditor::open
+                       |          litchi_doc::body_text::Snapshot::paragraphs
+                       |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                       |          litchi_perf_baseline::main
+                       |          0xffffffffffffffff
+                       |
+                       |--0.28%--litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                       |          litchi_perf_baseline::main
+                       |          0xffffffffffffffff
+                       |
+                       |--0.28%--_ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17h8762ffb8965dba73E.llvm.8202548277213780502
+                       |          litchi_doc::body_text::source_paragraphs
+                       |          litchi_doc::body_text::Snapshot::paragraphs
+                       |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                       |          litchi_perf_baseline::main
+                       |          0xffffffffffffffff
+                       |
+                        --0.27%--litchi_doc::tracked_revision::codec::parse_papx
+                                  litchi_doc::tracked_revision::package::RevisionEditor::open
+                                  litchi_doc::body_text::Snapshot::paragraphs
+                                  litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                                  litchi_perf_baseline::main
+                                  0xffffffffffffffff
+
+     2.07%  candidate  libc.so.6             [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memcpy_avx512_unaligned_erms (inlined)
+               |
+               |--0.43%--litchi_doc::body_text::Snapshot::paragraphs
+               |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+               |--0.42%--_RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+               |          _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+               |          _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+               |--0.28%--litchi_doc::body_text::source_paragraphs
+               |          litchi_doc::body_text::Snapshot::paragraphs
+               |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+               |--0.28%--litchi_doc::tracked_revision::package::RevisionEditor::open
+               |          litchi_doc::body_text::Snapshot::paragraphs
+               |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --0.28%--litchi_cfb::file::OleFile<R>::read_sectors_batched
+                          litchi_cfb::file::OleFile<R>::read_stream_from_fat
+                          litchi_cfb::file::OleFile<R>::open_stream
+                          litchi_ole_common::object::codec::capture_container
+                          litchi_ole_common::object::codec::Package::capture
+                          litchi_ole_common::object::editor::Editor::open
+                          litchi_doc::tracked_revision::package::RevisionEditor::open
+                          litchi_doc::body_text::Snapshot::paragraphs
+                          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     1.81%  candidate  libc.so.6             [.] unlink_chunk.isra.0
+            |
+            ---unlink_chunk (inlined)
+               |
+               |--1.26%--malloc_consolidate
+               |          |
+               |           --0.98%--_int_malloc
+               |                     __GI___libc_malloc (inlined)
+               |                     litchi_doc::body_text::Snapshot::paragraphs
+               |                     litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               |                     litchi_perf_baseline::main
+               |                     0xffffffffffffffff
+               |
+                --0.56%--_int_malloc
+                          __GI___libc_malloc (inlined)
+                          litchi_doc::parts::fkp::PapxFkp::parse
+                          litchi_doc::tracked_revision::codec::parse_papx
+                          litchi_doc::tracked_revision::package::RevisionEditor::open
+                          litchi_doc::body_text::Snapshot::paragraphs
+                          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     1.65%  candidate  libc.so.6             [.] malloc_consolidate
+            |
+            ---malloc_consolidate
+               _int_malloc
+               __GI___libc_malloc (inlined)
+               |
+               |--0.83%--litchi_doc::body_text::Snapshot::paragraphs
+               |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --0.83%--litchi_doc::parts::fkp::PapxFkp::parse
+                          litchi_doc::tracked_revision::codec::parse_papx
+                          litchi_doc::tracked_revision::package::RevisionEditor::open
+                          litchi_doc::body_text::Snapshot::paragraphs
+                          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     1.38%  candidate  libc.so.6             [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+               |
+                --1.24%--litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     1.24%  candidate  candidate             [.] litchi_doc::tracked_revision::codec::parse_chpx
+            |
+            ---litchi_doc::tracked_revision::codec::parse_chpx
+               litchi_doc::tracked_revision::package::RevisionEditor::open
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     1.04%  candidate  candidate             [.] litchi_doc::sprm::parse_sprms
+            |
+            ---litchi_doc::sprm::parse_sprms
+               |
+               |--0.34%--litchi_doc::tracked_revision::codec::strict_sprms
+               |          litchi_doc::tracked_revision::package::RevisionEditor::is_in_table_at_cp
+               |          litchi_doc::body_text::source_paragraphs
+               |          litchi_doc::body_text::Snapshot::paragraphs
+               |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+               |--0.28%--litchi_doc::tracked_revision::package::RevisionEditor::revisions
+               |          litchi_doc::tracked_revision::package::RevisionEditor::open
+               |          litchi_doc::body_text::Snapshot::paragraphs
+               |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --0.28%--litchi_doc::tracked_revision::codec::parse_papx
+                          litchi_doc::tracked_revision::package::RevisionEditor::open
+                          litchi_doc::body_text::Snapshot::paragraphs
+                          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     0.98%  candidate  candidate             [.] _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+            |
+            ---_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+               _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.97%  candidate  candidate             [.] _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+            |
+            ---_RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+               |
+                --0.83%--_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                          _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     0.84%  candidate  candidate             [.] _RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+            |
+            ---_RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+               _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+               _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.83%  candidate  candidate             [.] litchi_doc::tracked_revision::codec::parse_clx
+            |
+            ---litchi_doc::tracked_revision::codec::parse_clx
+               litchi_doc::tracked_revision::package::RevisionEditor::open
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.69%  candidate  candidate             [.] _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+               |
+               |--0.42%--litchi_doc::sprm::parse_sprms
+               |
+                --0.28%--litchi_doc::parts::fkp::PapxFkp::parse
+                          litchi_doc::tracked_revision::codec::parse_papx
+                          litchi_doc::tracked_revision::package::RevisionEditor::open
+                          litchi_doc::body_text::Snapshot::paragraphs
+                          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     0.56%  candidate  candidate             [.] _RNvCsfLfy6EI15iL_7___rustc35___rust_no_alloc_shim_is_unstable_v2
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc35___rust_no_alloc_shim_is_unstable_v2
+               |
+                --0.42%--litchi_doc::sprm::parse_sprms
+
+     0.56%  candidate  candidate             [.] litchi_cfb::directory_name::directory_name_data
+            |
+            ---litchi_cfb::directory_name::directory_name_data
+               |
+               |--0.28%--litchi_cfb::file::OleFile<R>::find_entry
+               |          litchi_cfb::file::OleFile<R>::open_stream
+               |          litchi_ole_common::object::codec::capture_container
+               |          litchi_ole_common::object::codec::Package::capture
+               |          litchi_ole_common::object::editor::Editor::open
+               |          litchi_doc::tracked_revision::package::RevisionEditor::open
+               |          litchi_doc::body_text::Snapshot::paragraphs
+               |          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --0.28%--litchi_cfb::file::OleFile<R>::load_directory
+                          litchi_cfb::file::OleFile<R>::open
+                          litchi_ole_common::object::editor::Editor::open
+                          litchi_doc::tracked_revision::package::RevisionEditor::open
+                          litchi_doc::body_text::Snapshot::paragraphs
+                          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     0.56%  candidate  candidate             [.] _RNvCsfLfy6EI15iL_7___rustc12___rust_alloc
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc12___rust_alloc
+
+     0.42%  candidate  candidate             [.] litchi_cfb::file::collect_sector_chain_exact
+            |
+            ---litchi_cfb::file::collect_sector_chain_exact
+               |
+                --0.28%--litchi_cfb::file::OleFile<R>::validate_stream_allocations
+                          litchi_cfb::file::OleFile<R>::open
+                          litchi_ole_common::object::editor::Editor::open
+                          litchi_doc::tracked_revision::package::RevisionEditor::open
+                          litchi_doc::body_text::Snapshot::paragraphs
+                          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     0.42%  candidate  candidate             [.] litchi_doc::tracked_revision::codec::parse_papx
+            |
+            ---litchi_doc::tracked_revision::codec::parse_papx
+               litchi_doc::tracked_revision::package::RevisionEditor::open
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.41%  candidate  candidate             [.] litchi_doc::parts::fkp::ChpxFkp::parse
+            |
+            ---litchi_doc::parts::fkp::ChpxFkp::parse
+               litchi_doc::tracked_revision::codec::parse_chpx
+               litchi_doc::tracked_revision::package::RevisionEditor::open
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.41%  candidate  candidate             [.] _RNvCsfLfy6EI15iL_7___rustc13___rdl_dealloc
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc13___rdl_dealloc
+               |
+                --0.28%--litchi_doc::tracked_revision::package::RevisionEditor::is_in_table_at_cp
+                          litchi_doc::body_text::source_paragraphs
+                          litchi_doc::body_text::Snapshot::paragraphs
+                          litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     0.28%  candidate  candidate             [.] <&T as core::fmt::Display>::fmt
+            |
+            ---<&T as core::fmt::Display>::fmt
+               _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+               _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.28%  candidate  candidate             [.] litchi_cfb::file::OleFile<R>::load_fat
+            |
+            ---litchi_cfb::file::OleFile<R>::load_fat
+               litchi_cfb::file::OleFile<R>::open
+               litchi_ole_common::object::editor::Editor::open
+               litchi_doc::tracked_revision::package::RevisionEditor::open
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.28%  candidate  candidate             [.] litchi_doc::tracked_revision::codec::parse_cp_table
+            |
+            ---litchi_doc::tracked_revision::codec::parse_cp_table
+               <core::iter::adapters::GenericShunt<I,R> as core::iter::traits::iterator::Iterator>::next
+               <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+               core::iter::adapters::try_process
+               litchi_doc::tracked_revision::package::RevisionEditor::open
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.28%  candidate  candidate             [.] litchi_doc::tracked_revision::codec::u32_at
+            |
+            ---litchi_doc::tracked_revision::codec::u32_at
+               litchi_doc::tracked_revision::codec::parse_clx
+               litchi_doc::tracked_revision::package::RevisionEditor::open
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.28%  rustc      rustup                [.] toml::de::parser::parse_document
+            |
+            ---toml::de::parser::parse_document
+               toml::de::deserializer::Deserializer::parse
+               rustup::dist::manifest::Manifest::parse
+               rustup::dist::manifestation::Manifestation::load_manifest
+               rustup::config::Cfg::ensure_installed::_$u7b$$u7b$closure$u7d$$u7d$::_$u7b$$u7b$closure$u7d$$u7d$::h38f9df8f2cd8d231
+               rustup::config::Cfg::ensure_installed::_$u7b$$u7b$closure$u7d$$u7d$::h1fc0f02d7f575393
+               rustup::config::Cfg::ensure_active_toolchain::_$u7b$$u7b$closure$u7d$$u7d$::_$u7b$$u7b$closure$u7d$$u7d$::hd593e01311c924e4
+               0xffffffffffffffff
+
+     0.28%  candidate  candidate             [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter3pad
+            |
+            ---_RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter3pad
+               _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+               _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.28%  candidate  [unknown]             [k] 0xffffffff9d800f30
+            |
+            ---0xffffffff9d800f30
+
+     0.27%  candidate  candidate             [.] litchi_ole_common::object::codec::capture_container
+            |
+            ---litchi_ole_common::object::codec::capture_container
+               litchi_ole_common::object::codec::Package::capture
+               litchi_ole_common::object::editor::Editor::open
+               litchi_doc::tracked_revision::package::RevisionEditor::open
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.27%  candidate  candidate             [.] litchi_cfb::file::OleFile<R>::load_directory
+            |
+            ---litchi_cfb::file::OleFile<R>::load_directory
+               litchi_cfb::file::OleFile<R>::open
+               litchi_ole_common::object::editor::Editor::open
+               litchi_doc::tracked_revision::package::RevisionEditor::open
+               litchi_doc::body_text::Snapshot::paragraphs
+               litchi_perf_baseline::run_doc_body_snapshot_list_paragraphs
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.27%  rustc      [unknown]             [k] 0xffffffff9c5a56ba
+            |
+            ---0xffffffff9c5a56ba
+               0xffffffff9c4d7ef8
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               elf_machine_rela_relative (inlined)
+               elf_dynamic_do_Rela (inlined)
+               _dl_relocate_object
+               dl_main
+               _dl_sysdep_start
+               _dl_start_final (inlined)
+               _dl_start
+               _start
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
