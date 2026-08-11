@@ -1,0 +1,183 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 9K of event 'cycles:P'
+# Event count (approx.): 48429828415
+#
+# Overhead  Command  Shared Object         Symbol
+# ........  .......  ....................  ..........................................................................................................................
+#
+    54.27%  before   before                [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+            |
+            ---zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               zlib_rs::stable::Deflate::compress
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |
+               |--51.06%--soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+               |          litchi_opc::phys_pkg::PhysPkgWriter<W>::write
+               |          litchi_opc::pkgwriter::PackageWriter::write_to_stream
+               |          litchi_perf_baseline::run_opc_source_overlay_one_part_save
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --3.18%--flate2::zio::Writer<W,D>::write_with_status
+                          std::io::Write::write_all
+                          soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+                          litchi_opc::phys_pkg::PhysPkgWriter<W>::write
+                          litchi_opc::pkgwriter::PackageWriter::to_bytes
+                          |
+                          |--1.65%--litchi_perf_baseline::run_opc_source_overlay_one_part_save
+                          |          litchi_perf_baseline::main
+                          |          0xffffffffffffffff
+                          |
+                           --1.53%--litchi_perf_baseline::build_opc_corpus
+                                     litchi_perf_baseline::main
+                                     0xffffffffffffffff
+
+    17.65%  before   before                [.] zlib_rs::deflate::longest_match::longest_match
+            |
+            ---zlib_rs::deflate::longest_match::longest_match
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               zlib_rs::stable::Deflate::compress
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |
+               |--16.89%--soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+               |          litchi_opc::phys_pkg::PhysPkgWriter<W>::write
+               |          litchi_opc::pkgwriter::PackageWriter::write_to_stream
+               |          litchi_perf_baseline::run_opc_source_overlay_one_part_save
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --0.75%--flate2::zio::Writer<W,D>::write_with_status
+                          std::io::Write::write_all
+                          soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+                          litchi_opc::phys_pkg::PhysPkgWriter<W>::write
+                          litchi_opc::pkgwriter::PackageWriter::to_bytes
+
+     5.93%  before   before                [.] litchi_perf_baseline::payload_bytes
+            |
+            ---litchi_perf_baseline::payload_bytes
+               |
+                --5.73%--litchi_perf_baseline::verify_opc_overlay_output
+                          litchi_perf_baseline::run_opc_source_overlay_one_part_save
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     4.58%  before   before                [.] zlib_rs::deflate::Heap::pqdownheap
+            |
+            ---zlib_rs::deflate::Heap::pqdownheap
+               |
+                --4.14%--zlib_rs::deflate::Heap::construct_huffman_tree
+                          zlib_rs::deflate::flush_block_only
+                          zlib_rs::deflate::algorithm::medium::deflate_medium
+                          zlib_rs::deflate::deflate
+                          zlib_rs::stable::Deflate::compress
+                          <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+                          |
+                           --3.89%--soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+                                     litchi_opc::phys_pkg::PhysPkgWriter<W>::write
+                                     litchi_opc::pkgwriter::PackageWriter::write_to_stream
+                                     0xffffffffffffffff
+
+     2.64%  before   before                [.] sha2::sha256::x86_sha::compress
+            |
+            ---sha2::sha256::x86_sha::compress
+               litchi_perf_baseline::sha256_hex
+               |
+                --2.55%--litchi_perf_baseline::run_opc_source_overlay_one_part_save
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     2.08%  before   libc.so.6             [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memcpy_avx512_unaligned_erms (inlined)
+
+     1.41%  before   [unknown]             [k] 0xffffffff9c5a56ba
+            |
+            ---0xffffffff9c5a56ba
+               0xffffffff9c4d7ef8
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               |
+                --0.96%--__memcpy_avx512_unaligned_erms (inlined)
+
+     1.17%  before   [unknown]             [k] 0xffffffff9d6600b7
+            |
+            ---0xffffffff9d6600b7
+               |
+                --1.14%--0xffffffff9c82e7e3
+                          0xffffffff9c82f8db
+                          0xffffffff9c82ff44
+                          0xffffffff9c83021a
+                          0xffffffff9c4d7f29
+                          0xffffffff9d64e923
+                          0xffffffff9d800bc7
+                          |
+                           --0.76%--__memcpy_avx512_unaligned_erms (inlined)
+
+     1.16%  before   before                [.] crc32fast::specialized::pclmulqdq::calculate
+            |
+            ---crc32fast::specialized::pclmulqdq::calculate
+               crc32fast::Hasher::update
+
+     1.14%  before   [unknown]             [k] 0xffffffff9c848383
+            |
+            ---0xffffffff9c848383
+               0xffffffff9c82797f
+               0xffffffff9c8284e0
+               0xffffffff9c8290c6
+               0xffffffff9c829389
+               0xffffffff9c8299c5
+               0xffffffff9c835a28
+               0xffffffff9c836b98
+               |
+                --0.87%--0xffffffff9c83a981
+                          0xffffffff9c83aa12
+                          0xffffffff9c40747b
+                          0xffffffff9d6485af
+                          0xffffffff9d800130
+                          __brk
+                          __GI___sbrk (inlined)
+                          __glibc_morecore (inlined)
+                          systrim (inlined)
+                          __GI___libc_free (inlined)
+                          alloc::sync::Arc<T,A>::drop_slow
+                          |
+                           --0.50%--alloc::sync::Arc<T,A>::drop_slow
+                                     litchi_perf_baseline::run_opc_source_overlay_one_part_save
+                                     litchi_perf_baseline::main
+                                     0xffffffffffffffff
+
+     0.69%  before   [unknown]             [k] 0xffffffff9d5cfb97
+            |
+            ---0xffffffff9d5cfb97
+               0xffffffff9c85c182
+               0xffffffff9c85d999
+               0xffffffff9c8974c1
+               0xffffffff9c897834
+               0xffffffff9c82e51c
+               0xffffffff9c82e70c
+               0xffffffff9c82f8db
+               0xffffffff9c82ff44
+               0xffffffff9c83021a
+               0xffffffff9c4d7f29
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+
+     0.52%  before   libc.so.6             [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+
+     0.52%  before   [unknown]             [k] 0xffffffff9d800ba0
+            |
+            ---0xffffffff9d800ba0
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

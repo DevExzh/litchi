@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `70e1b96fc`
+Production base for the latest measured tranche: `89a888830`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,12 +13,13 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **117 selectable cases**: 36 default cases and 198 default
+harness contains **118 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
-stage/control cases, one opt-in media-rich ODT paragraph-publication case, 16
-opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic case names across
-four capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 24 opt-in
+stage/control cases, one opt-in source-backed OPC one-Part publication case,
+one opt-in media-rich ODT paragraph-publication case, 16 opt-in DOCX/PPTX
+semantic cases, seven opt-in RTF semantic case names across four
+capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 24 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
 is still not broad program or CRUD coverage.
 
@@ -54,6 +55,7 @@ is still not broad program or CRUD coverage.
 | RTF ASCII transport batching | Large open p50 **-26.67%**; large/medium one-edit-save **-6.26% / -10.07%**; instructions **-18.40%** | ASCII source tokens only; byte-valued non-ASCII and invalid-Unicode fallback unchanged; allocation count, peak heap and RSS flat |
 | OPC shared changed-Part payload | Few-large compressible targeted save **-20.73%** p50 / **-18.49%** mean; cache misses **-31.12%** | Removes one 4.19 MiB handoff copy; peak heap -3.42%, uninstrumented RSS +0.22% (flat); the remaining local-span copy is removed by the follow-up below |
 | ZIP generated local-span move | Few-large compressible/incompressible targeted save **-4.09% / -2.70%** p50; means **-4.08% / -2.25%** | Removes the separate 4.20 MiB post-validation local-span copy; peak heap -3.20%, uninstrumented RSS -0.10% (flat); required compressor/archive buffer remains |
+| Source-backed OPC one-Part publication | Fixed four-Part save p50 **-73.12%**, mean **-73.58%**; semantic materializations **4 -> 1**; instructions **-65.42%** | Low-level consuming same-topology replacement only; raw-copies all unselected ZIP members; signed real changes and unsupported layouts refuse before output; complete physical input/output bytes remain |
 
 Raw evidence: [`XLSX before A`](results/abba-xlsx-range-before-a.json),
 [`after A`](results/abba-xlsx-range-after-a.json),
@@ -253,6 +255,15 @@ edge, tiny and exact-no-op guardrails, allocation attribution, RSS and hardware
 counters are summarized in
 [`change 0022`](changes/0022-zip-generated-local-span-move.md).
 
+The source-backed overlay evidence is
+[`before A`](results/abba-opc-source-overlay-before-a.json),
+[`after A`](results/abba-opc-source-overlay-after-a.json),
+[`after B`](results/abba-opc-source-overlay-after-b.json), and
+[`before B`](results/abba-opc-source-overlay-before-b.json). Source/sink
+counters, CPU and memory attribution, failure boundaries and binary/evidence
+digests are summarized in
+[`change 0037`](changes/0037-opc-source-backed-one-part-publication.md).
+
 The ODT full-text ownership evidence is retained as four short ABBA cycles
 under `results/abba-odt-full-text-single-repeat-*.json`. Structured-query,
 open, size, exact-no-op and edit guardrails, rejected broad-parser evidence,
@@ -260,8 +271,9 @@ allocation attribution, RSS and hardware counters are summarized in
 [`change 0023`](changes/0023-odt-full-text-owned-blocks.md).
 
 Source-backed cache bytes are bounded by `SourceCacheLimits` but are not yet
-charged to hierarchical `Budget`. Raw ZIP preservation is now integrated for
-owned same-topology OPC mutations; broader source-backed editing is pending.
+charged to hierarchical `Budget`. Raw ZIP preservation is integrated for owned
+same-topology OPC mutations and the narrow consuming source-backed one-Part
+publisher; broad source-backed semantic editing remains pending.
 See [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
 [`0007`](changes/0007-source-backed-opc-and-facades.md),
@@ -370,6 +382,7 @@ The underlying records are:
 - [`0034-odp-unchanged-media-preservation.md`](changes/0034-odp-unchanged-media-preservation.md)
 - [`0035-odt-content-only-paragraph-publication.md`](changes/0035-odt-content-only-paragraph-publication.md)
 - [`0036-ole-common-stage-attribution.md`](changes/0036-ole-common-stage-attribution.md)
+- [`0037-opc-source-backed-one-part-publication.md`](changes/0037-opc-source-backed-one-part-publication.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -404,6 +417,10 @@ remain linked from change 0023.
   Parts. It audits the ordinary publication plan, regenerates only changed
   payload/relationship/content-type closures, and raw-copies unchanged local
   spans and central records, including unknown non-part members.
+- The low-level source-backed one-Part publisher no longer converts the
+  positional package into an eager owning package or recompresses every Part.
+  It materializes and validates the selected original payload, regenerates that
+  member, and raw-copies every other member while monitoring source version.
 - The changed ordinary Part now shares its already-owned immutable logical
   payload with ZIP regeneration rather than allocating and copying it again.
   Generated XML and the required compressor/archive buffer stay owned.
@@ -483,11 +500,12 @@ No unsafe code, ambient I/O, dependency edge, public archive type, or global
 synchronization primitive was introduced. Exact-source authorization is
 revoked conservatively on every mutable OPC entry point, including failed and
 semantic no-op calls. Borrowed ingress, topology-changing edits, and unsupported
-ZIP layouts use the fully validated rewrite path before any sink output.
+ZIP layouts use the fully validated owning rewrite path; the narrow
+source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 117 selectable cases and a 198-record default
+The standalone harness provides 118 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus
@@ -533,6 +551,11 @@ task clock 21.08%, cycles 19.41% and cache misses 31.12% on its matched
 few-large compressible process. The local-span follow-up removes the next 4.20
 MiB allocation, cuts peak heap another 3.20% and task clock 2.11%; its other
 major hardware counters stay within 5%. Uninstrumented RSS is flat for both.
+The source-backed one-Part publisher removes three unnecessary Part
+materializations and recompressions on its four-Part corpus: operation p50
+falls 73.12%, instructions 65.42%, allocation calls 6.41%, peak heap 3.20% and
+maximum observed uninstrumented RSS 3.26%. Physical source bytes remain flat
+because every unchanged compressed span is still copied to the output.
 The ODT full-text follow-up removes 420,019 allocation calls over ten samples,
 cuts temporary allocations 45.52%, task clock 2.39%, instructions 2.51% and
 cache misses 13.05%; peak heap and uninstrumented RSS remain flat.
@@ -567,14 +590,15 @@ Lock-wait evidence remains missing.
 ## Remaining highest-impact work
 
 The largest remaining limitation is the incomplete migration from eager OPC to
-source-backed CRUD: selective open, source versions, finite cache and
-single-flight now exist, but cache bytes are not yet charged to the hierarchical
-budget and broad edit/patch coverage is incomplete. Raw ZIP preservation is
-integrated for eager owned same-topology mutation, but not for source-backed
-editable packages. The changed-Part handoff copy is removed; eager retained
-source and the required compressor/archive buffer remain to be attributed and
-reduced independently. The post-validation generated-local-span copy is also
-removed.
+source-backed CRUD: selective open, source versions, finite cache,
+single-flight, and a low-level consuming one-Part publisher now exist, but
+cache bytes are not yet charged to the hierarchical budget and broad semantic
+edit/patch coverage is incomplete. Raw ZIP preservation is integrated for
+eager owned same-topology mutation and this narrow source-backed case; format
+facades, topology changes, signatures and real-producer/media matrices remain.
+The changed-Part handoff and post-validation local-span copies are removed;
+the required selected-Part/compressor buffer remains to be attributed and
+reduced independently.
 
 Other high-priority gaps are cold-filesystem and real range-source matrices,
 threshold tuning/contention work beyond the committed explicit scaling curves,

@@ -36,8 +36,8 @@
 
 use crate::path::{RawPath, ZipFilePath};
 use crate::{
-    CompressionMethod, Error, ErrorKind, RECOMMENDED_BUFFER_SIZE, ReaderAt, ZipArchive,
-    ZipArchiveWriter, ZipLocator, ZipSliceArchive, ZipVerification,
+    CompressionMethod, Error, ErrorKind, PreservationIndex, RECOMMENDED_BUFFER_SIZE, ReaderAt,
+    ZipArchive, ZipArchiveWriter, ZipLocator, ZipSliceArchive, ZipVerification,
 };
 use flate2::Compression;
 use flate2::read::DeflateDecoder;
@@ -889,6 +889,18 @@ impl<R> IndexedArchive<R>
 where
     R: ReaderAt,
 {
+    /// Build a raw-member preservation index from this already located ZIP.
+    ///
+    /// This borrows the positional archive held by this index and does not run
+    /// another EOCD search. `scratch` is used to scan the existing central
+    /// directory and must be large enough for its records.
+    pub fn preservation_index<'archive>(
+        &'archive self,
+        scratch: &mut [u8],
+    ) -> Result<PreservationIndex<'archive, R>, Error> {
+        PreservationIndex::new(&self.archive, scratch)
+    }
+
     /// Locate and index a positional ZIP source with default resource limits.
     ///
     /// `end_offset` is the exclusive source length used by the ZIP locator.
@@ -2219,6 +2231,75 @@ mod tests {
         assert_eq!(results[1].1.as_ref().unwrap(), b"first");
     }
 
+    #[test]
+    fn indexed_archive_borrows_a_preservation_index_with_exact_raw_names() {
+        let bytes = fixture(&[
+            FixtureEntry::stored(b"before.bin", b"before"),
+            FixtureEntry::stored(b"folder/", b""),
+            FixtureEntry::stored("caf\u{e9}.txt".as_bytes(), b"utf8"),
+            FixtureEntry::stored(b"\xffraw.bin", b"opaque"),
+        ]);
+        let indexed = indexed_archive(bytes);
+        let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
+        let preservation = indexed.preservation_index(&mut scratch).unwrap();
+        let names: Vec<_> = preservation
+            .entries()
+            .iter()
+            .map(|entry| entry.raw_name_bytes().to_vec())
+            .collect();
+
+        assert_eq!(
+            names,
+            vec![
+                b"before.bin".to_vec(),
+                b"folder/".to_vec(),
+                "caf\u{e9}.txt".as_bytes().to_vec(),
+                b"\xffraw.bin".to_vec(),
+            ]
+        );
+        assert_eq!(preservation.entries().len(), 4);
+    }
+
+    #[test]
+    fn preservation_ids_follow_central_records_not_office_entry_ordinals() {
+        let mut bytes = fixture(&[
+            FixtureEntry::stored(b"first.bin", b"first"),
+            FixtureEntry::stored(b"folder/", b""),
+            FixtureEntry::stored(b"second.bin", b"second"),
+        ]);
+        let archive = ZipArchive::from_slice(&bytes).unwrap();
+        let central = archive.directory_offset() as usize;
+        let eocd = archive.eocd_offset() as usize;
+        let first_len = central_record_len(&bytes, central);
+        let second_len = central_record_len(&bytes, central + first_len);
+        let first = bytes[central..central + first_len].to_vec();
+        let second = bytes[central + first_len..central + first_len + second_len].to_vec();
+        let third = bytes[central + first_len + second_len..eocd].to_vec();
+        bytes[central..eocd].copy_from_slice(&[third, second, first].concat());
+
+        let indexed = indexed_archive(bytes);
+        assert_eq!(
+            indexed.file_names().collect::<Vec<_>>(),
+            vec!["first.bin", "second.bin"]
+        );
+        let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
+        let preservation = indexed.preservation_index(&mut scratch).unwrap();
+        let names: Vec<_> = preservation
+            .entries()
+            .iter()
+            .map(|entry| entry.raw_name_bytes().to_vec())
+            .collect();
+
+        assert_eq!(
+            names,
+            vec![
+                b"second.bin".to_vec(),
+                b"folder/".to_vec(),
+                b"first.bin".to_vec(),
+            ]
+        );
+    }
+
     fn indexed_archive(bytes: Vec<u8>) -> IndexedArchive<std::io::Cursor<Vec<u8>>> {
         indexed_archive_result(bytes, ArchiveLimits::default()).expect("valid indexed archive")
     }
@@ -2389,6 +2470,14 @@ mod tests {
 
     fn push_u32(output: &mut Vec<u8>, value: u32) {
         output.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn central_record_len(bytes: &[u8], offset: usize) -> usize {
+        const FIXED_SIZE: usize = 46;
+        let name_len = u16::from_le_bytes([bytes[offset + 28], bytes[offset + 29]]) as usize;
+        let extra_len = u16::from_le_bytes([bytes[offset + 30], bytes[offset + 31]]) as usize;
+        let comment_len = u16::from_le_bytes([bytes[offset + 32], bytes[offset + 33]]) as usize;
+        FIXED_SIZE + name_len + extra_len + comment_len
     }
 
     fn bulk_fixture() -> Vec<u8> {

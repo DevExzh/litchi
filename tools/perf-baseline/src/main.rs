@@ -7544,14 +7544,8 @@ fn run_opc_source_overlay_one_part_save(
         let started = Instant::now();
         let source_package =
             SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
-        let mut package = source_package.into_opc_package()?;
-        package
-            .get_part_mut(&target_uri)?
-            .set_blob(replacement_part);
-        PackageWriter::write_to_stream(&mut sink, &package)?;
+        source_package.write_part_overlay_to_stream(&mut sink, &target_uri, replacement_part)?;
         let duration = started.elapsed();
-        std::hint::black_box(&package);
-        drop(package);
 
         let metrics = source.snapshot();
         if metrics.read_calls == 0
@@ -7570,7 +7564,7 @@ fn run_opc_source_overlay_one_part_save(
             return Err("OPC overlay output digest differs between iterations".into());
         }
         if iteration >= warmup_iterations {
-            source_summary.record_opc(metrics, corpus.manifest.entry_count as u64);
+            source_summary.record_opc(metrics, 1);
             sink_summaries.push(sink.summary());
             measured_digests.push(digest);
         }
@@ -8605,7 +8599,7 @@ mod tests {
         assert!(source.read_calls.iter().all(|&calls| calls > 0));
         assert!(source.read_calls.windows(2).all(|pair| pair[0] == pair[1]));
         assert!(source.read_bytes.windows(2).all(|pair| pair[0] == pair[1]));
-        assert_eq!(source.ordinary_payload_materializations, Some(vec![4, 4]));
+        assert_eq!(source.ordinary_payload_materializations, Some(vec![1, 1]));
     }
 
     #[test]

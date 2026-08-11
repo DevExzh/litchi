@@ -73,10 +73,11 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/opc-source-overlay.json
 ```
 
-This case times positional source open, complete conversion with
-`into_opc_package`, same-Part payload replacement under the existing URI and
-content type, and `PackageWriter::write_to_stream` into a sequential sink.
-Payload preparation and complete output verification stay outside timing.
+This case times positional source open and the source-backed one-Part publisher,
+which validates the selected payload, preserves the existing URI, content type,
+relationships and topology, raw-copies every other member, and writes to a
+sequential sink. Payload preparation and complete output verification stay
+outside timing.
 
 For just the end-to-end legacy writer packaging runs:
 
@@ -416,11 +417,11 @@ remain distinguishable.
   both must receive the same pinned allocation, and a third access must be a
   zero-I/O cache hit.
 - `opc_source_overlay_one_part_save`: on the fixed few-large incompressible
-  corpus, time `InstrumentedSource` open, complete conversion to `OpcPackage`,
-  mutation of the existing main Part under the same URI and content type, and
-  sequential output through `PackageWriter::write_to_stream`. Source reads and
-  sink writes are reported; exact bytes, every reopened Part, and output digest
-  are verified after timing.
+  corpus, time `InstrumentedSource` open and the source-backed one-Part
+  publisher, replacing the existing main Part under the same URI and content
+  type and writing sequential output. Source reads and sink writes are
+  reported; exact bytes, every reopened Part, and output digest are verified
+  after timing.
 - `cfb_open`: parse the complete generated container into `litchi_cfb::OleFile`.
 - `cfb_list_streams`: enumerate and materialize all stream paths from an
   already-open CFB container.
@@ -653,7 +654,7 @@ bandwidth, and maximum physical range. `configuration.execution_workers`
 records the resolved, capped, deduplicated scaling points in deterministic
 ascending order.
 
-The eighteen positional cases add a `source` object; older cases omit it. Its
+The nineteen positional cases add a `source` object; older cases omit it. Its
 arrays contain one value for every measured iteration and record `read_calls`,
 `read_bytes`, compressed ordinary-OPC-payload range overlap, and
 `max_in_flight_reads`. Applicable OPC cases also record a semantic per-sample
@@ -686,7 +687,10 @@ outside the harness.
 
 `opc_source_overlay_one_part_save` additionally emits `output_sha256`. The
 field is omitted from every other result, preserving existing JSON consumers
-while independently identifying the deterministic changed archive.
+while independently identifying the deterministic changed archive. Its
+`ordinary_payload_materializations` value is exactly one per sample: the
+selected original Part is validated, while every unselected member is copied
+physically without semantic materialization.
 
 ## External profiling
 

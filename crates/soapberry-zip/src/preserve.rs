@@ -48,6 +48,14 @@ impl PreservedEntry {
     pub fn central_record(&self) -> Range<u64> {
         self.central_record.clone()
     }
+
+    /// The exact raw member-name bytes from this entry's central-directory
+    /// record. These bytes are not normalized or decoded as UTF-8.
+    pub fn raw_name_bytes(&self) -> &[u8] {
+        let name_len =
+            u16::from_le_bytes([self.central_bytes[28], self.central_bytes[29]]) as usize;
+        &self.central_bytes[ZipFileHeaderFixed::SIZE..ZipFileHeaderFixed::SIZE + name_len]
+    }
 }
 
 /// A newly generated ordinary ZIP member.

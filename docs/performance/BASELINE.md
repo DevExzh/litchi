@@ -220,15 +220,16 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **117
+The stage-1 records above are retained unchanged. The current harness has **118
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
-stage/control cases, one opt-in media-rich ODT paragraph-publication case, 16
-opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic case names across four
-capability-bounded variants (25 tiny / 44 tiny-plus-large rows), and 24 opt-in
-ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
-remains an incomplete program and CRUD matrix.
+stage/control cases, one opt-in source-backed OPC one-Part publication case, one
+opt-in media-rich ODT paragraph-publication case, 16 opt-in DOCX/PPTX semantic
+cases, seven opt-in RTF semantic case names across four capability-bounded
+variants (25 tiny / 44 tiny-plus-large rows), 24 opt-in ODT/ODS/ODP semantic
+cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It remains an
+incomplete program and CRUD matrix.
 
 - The XLSX row-start index is accepted for the narrow-range case: ABBA p50
   geometric mean **-80.499%**, mean geometric mean **-79.962%**; full scan
@@ -250,6 +251,14 @@ remains an incomplete program and CRUD matrix.
   See [`EOCD A`](results/abba-eocd-before-a.json),
   [`EOCD B`](results/abba-eocd-before-b.json), and
   [`source versus eager`](results/stage3-source-vs-eager-many-small.json).
+- The low-level source-backed package can now consume one existing ordinary
+  Part replacement without changing URI, content type, relationships or
+  topology. It validates/materializes only the target and raw-copies every
+  other ZIP member. On the fixed four-Part 16.78 MiB corpus, pooled p50 falls
+  from 223.602 to 60.112 ms (-73.12%), semantic materializations fall from four
+  to one, and output remains byte-identical to the eager baseline. Signed real
+  changes and unsupported layouts refuse before output. See
+  [`0037`](changes/0037-opc-source-backed-one-part-publication.md).
 - The positional XLSX source record reports p50 opens of 33.881 us (tiny),
   56.493 us (medium), and 139.897 us (dense); list-after-open has zero timed
   source reads. First-cell and narrow-range operations physically overlap only
