@@ -74,6 +74,7 @@ is still not broad program or CRUD coverage.
 | ODS exact no-op handoff | Large exact-no-op p50 **-23.26%**, mean **-23.21%**; instructions **-10.54%**; peak heap flat | Exact no-op only; changed commits retain complete audit, preservation and readback paths; read-only link-layout trigger disclosed |
 | ODP indexed slide selector | Large middle-slide p50 **-4.09%**, mean **-4.20%**, p95 **-5.18%**; allocation calls **-3.86%**; peak heap/RSS flat | Full style/content EOF validation remains; tiny is neutral, medium p50 -1.55%, and unchanged list/save guards remain within thresholds |
 | ODP snapshot slide-projection reuse | Large exact-no-op edit/save p50 **-59.96% (2.50x)**, mean **-59.92%**; large changed edit/save p50 **-20.78%**; allocation calls **-20.13%** | Reuses only the snapshot-validated slide projection for detached staging; package/security reopen, auxiliary parsing, raw page coverage, complete publication/readback and peak heap/RSS remain |
+| ODP final slide-snapshot handoff | Large one-slide edit/save p50 **-32.35%**, mean **-32.92%**, p95 **-35.95%**; allocation calls **-16.71%** | Exact slide-only commits move the already parsed candidate projection only after the independent final package/audit/media pipeline; compound domains retain ordinary final parsing; peak heap/RSS flat |
 | ODS adaptive cell locator | Large public cell sweep p50 **-81.74%**, mean **-80.72%**; full cell text p50 **-52.65%** | Builds lazily at 64 calls, requests 3,216 bytes on the dense corpus and is capped at 4 MiB; peak heap/RSS flat |
 | RTF parser-state specialization | Large open p50 **-20.09%**; large/medium one-edit-save **-11.54% / -14.16%**; cycles **-10.50%** | Ordinary body text only; insertion/deletion metadata retains the full state; allocation count, peak heap and RSS flat |
 | RTF ASCII transport batching | Large open p50 **-26.67%**; large/medium one-edit-save **-6.26% / -10.07%**; instructions **-18.40%** | ASCII source tokens only; byte-valued non-ASCII and invalid-Unicode fallback unchanged; allocation count, peak heap and RSS flat |
@@ -278,6 +279,12 @@ Tiny/medium scaling, large changed-edit and read/media guards are in the
 [`guard summary`](results/odp-slide-projection-guard-summary.json); matched
 profiles, counters, Heaptrack, GNU Time and exact binary provenance are indexed
 in [`change 0060`](changes/0060-odp-snapshot-slide-projection-reuse.md).
+
+The ODP final-snapshot evidence uses a drift-gated warmed 2,000-sample pool per
+state in the [`summary`](results/odp-final-snapshot/summary.json). Tiny/medium
+scaling, ineligible no-op/media guards, repeated read-only tails, matched
+Heaptrack, GNU Time, counters and binary provenance are indexed in
+[`change 0065`](changes/0065-odp-final-snapshot-handoff.md).
 
 The RTF parser-state follow-up evidence is
 [`before A`](results/abba-rtf-state-clone-one-edit-before-a.json),
@@ -521,6 +528,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | ODT middle paragraph, 10,000 paragraphs | 3.202 ms | 1.647 ms | **-48.56% p50 / -48.33% mean** | Allocation calls -27.05%; peak heap -24.74%; uninstrumented RSS -10.93%; complete EOF validation retained |
 | ODP middle slide, 100 slides | 1.019 ms | 0.977 ms | **-4.09% p50 / -4.20% mean** | p95 -5.18%; allocation calls -3.86%; peak heap/RSS flat; complete style/content EOF validation retained |
 | ODP exact no-op transaction/save, 100 slides | 1.728 ms | 0.692 ms | **-59.96% p50 (2.50x) / -59.92% mean** | Large changed edit/save p50 -20.78%; allocations -20.13%; complete package/security and final readback retained; peak heap/RSS flat |
+| ODP one-slide edit/save, 100 source slides | 3.573 ms | 2.417 ms | **-32.35% p50 / -32.92% mean** | p95 -35.95%; allocations -16.71%; final package reopen/audits/media checks retained; peak heap/RSS flat |
 | ODT media-rich paragraph edit/save, 200 paragraphs + 16 MiB media | 249.177 ms | 11.001 ms | **-95.58% p50 / -95.63% mean** | p95 -95.43%; allocation calls -6.71%; peak heap flat; RSS -0.59% |
 | ODT direct snapshot sharing, 200 paragraphs + 16 MiB media | 32.270 ms | 7.798 ms | **-75.84% p50 / -73.84% mean** | Two archive-sized copies removed; p95 -75.41%; peak heap/RSS flat |
 | ODT compact-audit package sharing, 200 paragraphs + 16 MiB media | 7.773 ms | 5.407 ms | **-30.44% p50 / -31.36% mean** | Three archive-sized audit copies removed; p95 -32.41%; allocations -0.57%; peak heap/RSS flat; exact no-op +39 ns disclosed |
@@ -609,6 +617,7 @@ The underlying records are:
 - [`0062-ppt-root-text-publication-adoption.md`](changes/0062-ppt-root-text-publication-adoption.md)
 - [`0063-pptx-atomic-source-backed-shape-text-batch.md`](changes/0063-pptx-atomic-source-backed-shape-text-batch.md)
 - [`0064-rtf-retained-story-length.md`](changes/0064-rtf-retained-story-length.md)
+- [`0065-odp-final-snapshot-handoff.md`](changes/0065-odp-final-snapshot-handoff.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on

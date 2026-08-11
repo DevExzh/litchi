@@ -361,6 +361,16 @@ signed/encrypted refusal coverage are unchanged. No new CRUD capability is
 claimed; broader structural/resource edits, real producers and repeated
 ODT/ODP reads remain open.
 
+Change 0065 leaves the ODP CRUD and publication surface unchanged. An exact
+slide-only commit retains its already mandatory parsed slide candidate through
+the final validation pipeline and moves it into the published snapshot instead
+of parsing the same immutable bytes again. The independent final package
+reopen, raw/compact XML audit, embedded-media verification, patch/inverse and
+source lineage remain. RDF, chart, design, annotation and rich-content
+compound commits retain the established final snapshot parse. It adds no
+structural/resource edit, security, producer, streaming, cold-source or
+positional-I/O capability.
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.
