@@ -17,11 +17,19 @@ on:
       - 'docs/FEATURE_MATRIX.md'
       - 'docs/OFFICE_API_GUIDE.md'
       - 'docs/adr/**'
+      - 'test-data/libreoffice-core/**'
+      - 'test-data/odf/**'
+      - 'test-data/office-interop/**'
+      - 'test-data/ole/**'
+      - 'test-data/ooxml/**'
+      - 'test-data/poi/**'
       - 'tools/check_crate_boundaries.py'
       - 'tools/check_numbers_public_dependencies.py'
       - 'tools/crate_boundaries.json'
       - 'tools/test_check_crate_boundaries.py'
       - 'tools/test_check_numbers_public_dependencies.py'
+      - 'tools/native_odf_resave.py'
+      - 'tools/test_native_odf_resave.py'
     branches:
       - main
   pull_request:
@@ -40,11 +48,19 @@ on:
       - 'docs/FEATURE_MATRIX.md'
       - 'docs/OFFICE_API_GUIDE.md'
       - 'docs/adr/**'
+      - 'test-data/libreoffice-core/**'
+      - 'test-data/odf/**'
+      - 'test-data/office-interop/**'
+      - 'test-data/ole/**'
+      - 'test-data/ooxml/**'
+      - 'test-data/poi/**'
       - 'tools/check_crate_boundaries.py'
       - 'tools/check_numbers_public_dependencies.py'
       - 'tools/crate_boundaries.json'
       - 'tools/test_check_crate_boundaries.py'
       - 'tools/test_check_numbers_public_dependencies.py'
+      - 'tools/native_odf_resave.py'
+      - 'tools/test_native_odf_resave.py'
     branches:
       - main
 
@@ -78,6 +94,9 @@ jobs:
 
       - name: Check Numbers public dependencies
         run: python3 tools/check_numbers_public_dependencies.py
+
+      - name: Verify checked native-resave evidence
+        run: python3 -m unittest tools.test_native_odf_resave
 
   portable-foundations:
     name: foundation tests (${{ matrix.os }})
