@@ -3,7 +3,7 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0047`](changes/0047-odt-indexed-paragraph-selector.md)
+[`change 0048`](changes/0048-rtf-retained-body-source-span.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -468,6 +468,17 @@ measured -1.41% and +1.02% p50 across separate 4,000-sample/state runs. The
 production parser was restored exactly; do not revisit this copy in isolation.
 See change 0043.
 
+The next changed-commit profile isolated a separate, short-lived owner: after
+the initial complete parse, `ordinary_body_source_span` cloned the 540,051-byte
+ASCII source, tokenized it again and scanned root depth before the required
+candidate parse/readback. Direct uncompressed ASCII parses now retain a compact
+range proven inside the parser's existing structural preflight. Ambiguous,
+empty, binary, non-ASCII, compressed and over-32-bit ranges keep the established
+locator/refusal. Large one-edit/save improves 10.72% p50 and 10.11% mean;
+instructions fall 10.64%, and the 588 before-only locator allocation calls
+over 20 edits disappear. Peak heap and uninstrumented RSS remain flat. See
+change 0048.
+
 Formatting/media, malformed/security, broader real-producer, cold-source,
 broad edit and conversion matrices remain missing. Compressed LZFu and raw
 CP-1252 open/read/no-op coverage is now measured but remains narrow.
@@ -505,7 +516,7 @@ pattern elsewhere.
 | 12 | Confirmed for generic detection; disproved for focused prepared iWork detection. | Generic detect-then-open versus prepared-source handoff. |
 | 13 | Measured for ODS snapshots: one package clone and duplicate package parse were removable. Same-topology ODS row-local publication and compact ODS/ODP/ODT content raw preservation avoid rebuilding untouched data; repeated ODS cell lookup uses a bounded lazy locator. ODT existing-document/direct-byte snapshots, changed-operation compact audits and envelope classification share exact validated package allocations, consuming full-text block strings and an indexed one-paragraph retention path are accepted, and consecutive plain-text replacements publish one candidate. Direct final-document adoption remains reverted. All accepted paths retain readback and source lineage. | Broader ODF source-backed reads, repeated ODP semantic scans, non-text bulk edits, resource-adding/structural publication, real-producer media, final-result copies, and structural-edit profiles. |
 | 14 | Confirmed for DOCX direct-body batches: repeated full XML rebuild/parse work was removable while retaining ordinary durable operations and complete readback. | Real-producer/extension/security corpora and broader structural/bulk edit semantics. |
-| 15 | Measured and implemented for RTF full-text, text-only edit/save and ordinary parser paths: temporary fragment/property vectors, per-character writer calls, unconditional full-state cloning, per-character ASCII transport-buffer extensions and twice-decoded ordinary-text delimiter traversal were removable. Raw CP-1252, LZFu and a real-producer watermark have capability-bounded read/no-op coverage, and `relsize` has checked native semantic readback. | Extend the accepted native matrix to formatting/media, malformed/security, more real producers and broad edit scenarios; attribute a distinct remaining frame before another specialization. |
+| 15 | Measured and implemented for RTF full-text, text-only edit/save and ordinary parser paths: temporary fragment/property vectors, per-character writer calls, unconditional full-state cloning, per-character ASCII transport-buffer extensions, twice-decoded ordinary-text delimiter traversal and the second ordinary-body source lexer were removable. Raw CP-1252, LZFu and a real-producer watermark have capability-bounded read/no-op coverage, and `relsize` has checked native semantic readback. | Extend the accepted native matrix to formatting/media, malformed/security, more real producers and broad edit scenarios; attribute a distinct remaining frame before another specialization. |
 
 ## Ranked work queue
 
@@ -524,7 +535,7 @@ The order below is provisional until baseline measurements are recorded.
 | 9 | Coalesce DOCX same-structure paragraph replacements and measure PPTX capture/fingerprint reuse. | 1% semantic document/presentation edits. | Medium-high | Implemented for canonical direct-body DOCX batches and PPTX selected-scene reuse; complete source validation and candidate readback remain. See changes 0010 and 0012. |
 | 10 | Charge source-backed cache bytes to hierarchical budgets and measure contention. | Concurrent repeated Part reads. | Medium-high | Weighted bounded eviction and per-entry single-flight are implemented. |
 | 11 | Extend ODF beyond accepted ODS snapshot, row-local reuse, ODS/ODP/ODT unchanged-member publication, adaptive cell lookup and ODT byte/full-text/indexed-query/audit/envelope/batch ownership: positional source-backed reads, repeated ODP scans, final-result copies, non-text bulk edits, resource-adding/structural publication and real-producer media. | ODT/ODS/ODP open/query and changed save. | High | Same-topology ODS row splicing, compact ODS/ODP/ODT content raw preservation, bounded facade lookup, direct/existing-document ODT snapshot sharing, consuming full-text blocks, indexed paragraph retention, compact-audit/envelope sharing and consecutive paragraph coalescing are accepted; final-document adoption remains reverted for a read regression; structural fallback, exact no-op and full readback remain. See changes 0011, 0014, 0018, 0019, 0020, 0023, 0027, 0031, 0034, 0035, 0038, 0041, 0042, 0045 and 0047. |
-| 12 | Extend accepted native RTF work beyond the capability-bounded variant matrix after parser-state, transport batching and byte-delimiter scanning. | RTF formatted/media, malformed/security, broader real-producer and broad edit paths. | Medium | Plain, raw CP-1252, LZFu and producer-watermark read/no-op inputs plus a narrow native shape-text chain are covered; only plain generated paragraph editing is timed. Cached text, byte-valued fallback, revisions and native forward-only output contracts remain. See changes 0013, 0019, 0020, 0029 and 0040. |
+| 12 | Extend accepted native RTF work beyond the capability-bounded variant matrix after parser-state, transport batching, byte-delimiter scanning and retained ordinary-body ranges. | RTF formatted/media, malformed/security, broader real-producer and broad edit paths. | Medium | Plain, raw CP-1252, LZFu and producer-watermark read/no-op inputs plus a narrow native shape-text chain are covered; only plain generated paragraph editing is timed. Cached text, byte-valued fallback, revisions, candidate readback and native forward-only output contracts remain. See changes 0013, 0019, 0020, 0029, 0040 and 0048. |
 | 13 | Attribute and reduce remaining native XLS/DOC final-publication work. | OLE2 spreadsheet/document edit publication rather than substrate-only insertion. | Medium-high | Editor reuse and DOC stream batching are accepted in changes 0016/0017; PPT root-open reuse is accepted in 0024. XLS terminal-render, shared CFB writer payload, editor-wide validated-render and inline recapture-allocation prototypes are rejected in 0028/0033/0036. The 4x4 MiB common stage/control cases remain; exact patches, complete BIFF/CFB or DOC validation and independent public readback remain. |
 | 14 | Share existing ODT transaction bytes when a validated document creates a snapshot. | ODT no-op and changed edit/save. | Low-medium | Implemented with private `Arc` identity proof; no-op p50 -18.51% large, guardrails within 3%. See change 0014. |
 | 15 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |

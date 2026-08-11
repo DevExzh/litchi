@@ -256,9 +256,15 @@ impl<'a> Parser<'a> {
             ));
         }
         let mut contexts: Vec<NoteGuardContext> = Vec::new();
+        let mut ordinary_body_start = None;
+        let mut ordinary_body_end = None;
+        let mut ordinary_body_cacheable = true;
         for (index, token) in self.tokens.iter().enumerate() {
             match token {
                 Token::OpenBrace => {
+                    if contexts.len() == 1 && ordinary_body_start.is_some() {
+                        ordinary_body_cacheable = false;
+                    }
                     if let Some(parent) = contexts.last_mut() {
                         parent.inert_section_format = false;
                     }
@@ -371,6 +377,12 @@ impl<'a> Parser<'a> {
                     contexts.push(context);
                 },
                 Token::CloseBrace => {
+                    if contexts.len() == 1 {
+                        ordinary_body_end = self
+                            .token_spans
+                            .and_then(|spans| spans.get(index))
+                            .map(|span| span.start);
+                    }
                     contexts.pop();
                     if contexts.is_empty() {
                         break;
@@ -389,6 +401,12 @@ impl<'a> Parser<'a> {
                     }
                 },
                 Token::Text(text) if !text.is_empty() => {
+                    if contexts.len() == 1 && ordinary_body_start.is_none() {
+                        ordinary_body_start = self
+                            .token_spans
+                            .and_then(|spans| spans.get(index))
+                            .map(|span| span.start);
+                    }
                     if let Some(context) = contexts.last_mut() {
                         context.inert_section_format = false;
                     }
@@ -441,9 +459,17 @@ impl<'a> Parser<'a> {
                             .to_string(),
                     ));
                 },
+                Token::Binary(_) if contexts.len() == 1 => ordinary_body_cacheable = false,
                 Token::Control(_) | Token::Text(_) | Token::Binary(_) => {},
             }
         }
+        let ordinary_body_source_span = if ordinary_body_cacheable {
+            ordinary_body_start
+                .zip(ordinary_body_end)
+                .and_then(|(start, end)| (start < end).then_some(start..end))
+        } else {
+            None
+        };
 
         // Expect opening brace
         if !matches!(self.tokens.first(), Some(Token::OpenBrace)) {
@@ -499,6 +525,7 @@ impl<'a> Parser<'a> {
         }
 
         Ok(ParsedDocument {
+            ordinary_body_source_span,
             font_table: self.font_table.into_inner(),
             file_table: self.file_table,
             color_table: self.color_table.into_inner(),

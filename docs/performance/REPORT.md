@@ -65,6 +65,7 @@ is still not broad program or CRUD coverage.
 | RTF parser-state specialization | Large open p50 **-20.09%**; large/medium one-edit-save **-11.54% / -14.16%**; cycles **-10.50%** | Ordinary body text only; insertion/deletion metadata retains the full state; allocation count, peak heap and RSS flat |
 | RTF ASCII transport batching | Large open p50 **-26.67%**; large/medium one-edit-save **-6.26% / -10.07%**; instructions **-18.40%** | ASCII source tokens only; byte-valued non-ASCII and invalid-Unicode fallback unchanged; allocation count, peak heap and RSS flat |
 | RTF byte delimiter scanning | Large open p50 **-17.23%**, mean **-17.99%**; one-edit/save p50 **-14.65%**, mean **-14.84%**; instructions **-21.27%** | Ordinary-text lexer only; plain/CP-1252/LZFu opens improve; prepared LZFu no-op segment +0.290 us/+6.41% p50 is disclosed while complete open improves 19.39%; peak heap/RSS flat |
+| RTF retained body source span | Large one-edit/save p50 **-10.72%**, mean **-10.11%**, p95 **-8.76%**; instructions **-10.64%** | Direct uncompressed ASCII ordinary bodies only; cached range is proven during full parser preflight, while ambiguous/binary/non-ASCII/LZFu inputs keep the established locator/refusal and candidate parse/readback |
 | Rejected RTF decoded-body ownership | Broad raw CP-1252 open **-3.08% p50 / -3.28% mean**; allocation calls **-20.15%** | Fully reverted: plain large open **+25.53% p50 / +22.45% mean**; owned-only variants were compiler-layout sensitive at -1.41% and +1.02% p50 |
 | OPC shared changed-Part payload | Few-large compressible targeted save **-20.73%** p50 / **-18.49%** mean; cache misses **-31.12%** | Removes one 4.19 MiB handoff copy; peak heap -3.42%, uninstrumented RSS +0.22% (flat); the remaining local-span copy is removed by the follow-up below |
 | ZIP generated local-span move | Few-large compressible/incompressible targeted save **-4.09% / -2.70%** p50; means **-4.08% / -2.25%** | Removes the separate 4.20 MiB post-validation local-span copy; peak heap -3.20%, uninstrumented RSS -0.10% (flat); required compressor/archive buffer remains |
@@ -266,6 +267,15 @@ refinements, Heaptrack, `perf record`, and GNU Time summaries. The raw JSON
 digests and full rejection rationale are in
 [`change 0043`](changes/0043-rtf-decoded-body-ownership-rejected.md).
 
+The retained RTF body-source-span evidence is
+[`before A`](results/abba-rtf-body-span-before-a.json),
+[`after A`](results/abba-rtf-body-span-after-a.json),
+[`after B`](results/abba-rtf-body-span-after-b.json), and
+[`before B`](results/abba-rtf-body-span-before-b.json). Tiny/medium scaling,
+open/list/no-op guards, allocation attribution, counters, RSS, capability
+smoke and artifact hashes are summarized in
+[`change 0048`](changes/0048-rtf-retained-body-source-span.md).
+
 The source-backed PPTX selected-slide publication evidence is
 [`before A`](results/abba-pptx-source-edit-before-a.json),
 [`after A`](results/abba-pptx-source-edit-after-a.json),
@@ -424,6 +434,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | RTF transport batching, one paragraph edit/save, 10,000 paragraphs | 7.795 ms | 7.307 ms | **-6.26% p50 / -5.73% mean** | Instructions -18.40%; allocation count, peak heap and RSS flat |
 | RTF byte-delimiter scan, open, 10,000 paragraphs | 2.479 ms | 2.052 ms | **-17.23% p50 / -17.99% mean** | `tokenize_with_spans` share 17.36% -> 11.06%; instructions -21.27%; peak heap/RSS flat |
 | RTF byte-delimiter scan, one paragraph edit/save, 10,000 paragraphs | 7.554 ms | 6.447 ms | **-14.65% p50 / -14.84% mean** | p95 -16.34%; allocations effectively flat; complete edit/save readback unchanged |
+| RTF retained body span, one paragraph edit/save, 10,000 paragraphs | 6.053 ms | 5.404 ms | **-10.72% p50 / -10.11% mean** | p95 -8.76%; 588 locator-subtree allocation calls over 20 edits removed; peak heap/RSS flat; candidate parse/readback unchanged |
 | ODT no-op edit/save, 10,000 paragraphs | 3.950 us | 3.219 us | -18.51% p50 / -29.58% mean | Exactly two allocations and one 28.42 KiB archive copy removed per snapshot; peak heap/RSS flat |
 | ODT full text, 10,000 blocks | 4.127 ms | 3.993 ms | **-3.25% p50 / -4.81% mean** | Allocation calls -15.48%, temporary allocations -45.52%; peak heap/RSS flat; open guard disclosed |
 | ODT middle paragraph, 10,000 paragraphs | 3.202 ms | 1.647 ms | **-48.56% p50 / -48.33% mean** | Allocation calls -27.05%; peak heap -24.74%; uninstrumented RSS -10.93%; complete EOF validation retained |
@@ -487,6 +498,7 @@ The underlying records are:
 - [`0045-odt-coalesced-paragraph-publication.md`](changes/0045-odt-coalesced-paragraph-publication.md)
 - [`0046-xlsx-source-backed-calculation-metadata-publication.md`](changes/0046-xlsx-source-backed-calculation-metadata-publication.md)
 - [`0047-odt-indexed-paragraph-selector.md`](changes/0047-odt-indexed-paragraph-selector.md)
+- [`0048-rtf-retained-body-source-span.md`](changes/0048-rtf-retained-body-source-span.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on

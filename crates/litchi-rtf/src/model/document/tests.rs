@@ -22,6 +22,28 @@ fn test_simple_document() {
 }
 
 #[test]
+fn retains_only_proven_uncompressed_ascii_body_spans() {
+    let source = br"{\rtf1\ansi Hello\par}";
+    let document = RtfDocument::parse_bytes(source).unwrap();
+    let span = document.ordinary_body_source_span().unwrap();
+    assert_eq!(&source[span], br"Hello\par");
+
+    for source in [
+        br"{\rtf1\ansi}".as_slice(),
+        br"{\rtf1\ansi Hello{\b world}}".as_slice(),
+        br"{\rtf1\ansi\bin3 abc}".as_slice(),
+        b"{\\rtf1\\ansi Caf\xe9}".as_slice(),
+    ] {
+        let document = RtfDocument::parse_bytes(source).unwrap();
+        assert!(document.ordinary_body_source_span().is_none());
+    }
+
+    let compressed = crate::compress(source, true).unwrap();
+    let document = RtfDocument::parse_bytes(&compressed).unwrap();
+    assert!(document.ordinary_body_source_span().is_none());
+}
+
+#[test]
 fn text_concatenates_fragmented_blocks_without_changing_separators() {
     let doc = RtfDocument::parse(r"{\rtf1\ansi A{\b B}{\i C}\par D}").unwrap();
 

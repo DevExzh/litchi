@@ -401,6 +401,13 @@ incomplete program and CRUD matrix.
   -1.41% and +1.02% p50. Only a malformed multibyte-tail exact-preservation
   regression remains. See
   [`0043`](changes/0043-rtf-decoded-body-ownership-rejected.md).
+- Ordinary changed RTF body commits now retain a compact source range proven
+  during the initial parser preflight instead of cloning and lexing the source
+  again to rediscover it. Large one-edit/save p50 improves **10.72%**, mean
+  **10.11%**, instructions fall **10.64%**, and the before-only locator subtree's
+  588 allocations over 20 edits disappear. Candidate parse/readback and every
+  conservative fallback/refusal remain. See
+  [`0048`](changes/0048-rtf-retained-body-source-span.md).
 - ODT changed-operation compactness audits now share the already validated
   predecessor and candidate packages instead of allocating and copying three
   complete archives. The fixed 16 MiB-media paragraph edit/save improves

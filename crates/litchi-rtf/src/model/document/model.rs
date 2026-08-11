@@ -23,6 +23,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
+use std::ops::Range;
 use std::path::Path;
 
 const MAX_ROOT_SHAPES: usize = 65_536;
@@ -138,6 +139,8 @@ pub struct RtfDocument<'a> {
     opaque_nodes: Vec<crate::opaque::Node>,
     /// Original transport for byte-exact writes of immutable snapshots containing opaque syntax.
     preserved_source: Option<Vec<u8>>,
+    /// Packed proven body range in an uncompressed ASCII source; zero means unavailable.
+    ordinary_body_source_span: u64,
     /// Extracted tables
     tables: Vec<super::super::table::Table<'a>>,
     /// Extracted pictures
@@ -372,7 +375,8 @@ impl<'a> RtfDocument<'a> {
         }
 
         // Check if it's compressed RTF
-        let input_bytes = if super::super::compressed::is_compressed_rtf(bytes) {
+        let is_compressed = super::super::compressed::is_compressed_rtf(bytes);
+        let input_bytes = if is_compressed {
             // Decompress first
             Cow::Owned(super::super::compressed::decompress_with_limits(
                 bytes,
@@ -399,7 +403,9 @@ impl<'a> RtfDocument<'a> {
             Cow::Owned(input_bytes.iter().map(|byte| char::from(*byte)).collect())
         };
 
-        let mut document = Self::parse_string(input_str.as_ref(), limits)?;
+        let retain_ordinary_body_source_span = !is_compressed && bytes.is_ascii();
+        let mut document =
+            Self::parse_string(input_str.as_ref(), limits, retain_ordinary_body_source_span)?;
         let mut source = Vec::new();
         source
             .try_reserve(bytes.len())
@@ -413,7 +419,11 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Parse an RTF document from a UTF-8 string (internal)
-    fn parse_string(input: &str, limits: ParseLimits) -> RtfResult<RtfDocument<'static>> {
+    fn parse_string(
+        input: &str,
+        limits: ParseLimits,
+        retain_ordinary_body_source_span: bool,
+    ) -> RtfResult<RtfDocument<'static>> {
         // Create arena for temporary allocations during parsing
         let arena = Bump::new();
 
@@ -424,6 +434,15 @@ impl<'a> RtfDocument<'a> {
         // Parser phase
         let parser = Parser::new_with_source(&tokens, &token_spans, input, &arena, limits);
         let parsed = parser.parse()?;
+        let ordinary_body_source_span = retain_ordinary_body_source_span
+            .then_some(parsed.ordinary_body_source_span)
+            .flatten()
+            .and_then(|span| {
+                let start = u32::try_from(span.start).ok()?;
+                let end = u32::try_from(span.end).ok()?;
+                Some((u64::from(start) << u32::BITS) | u64::from(end))
+            })
+            .unwrap_or(0);
 
         // Convert parsed document to owned document
         // We need to convert Cow::Borrowed to Cow::Owned to detach from input lifetime
@@ -531,6 +550,7 @@ impl<'a> RtfDocument<'a> {
             text_len,
             opaque_nodes: parsed.opaque_nodes,
             preserved_source: None,
+            ordinary_body_source_span,
             tables: owned_tables,
             pictures: owned_pictures,
             picture_compatibility_records: parsed.picture_compatibility_records,
@@ -1003,6 +1023,16 @@ impl<'a> RtfDocument<'a> {
 
     pub(crate) fn preserved_source(&self) -> Option<&[u8]> {
         self.preserved_source.as_deref()
+    }
+
+    pub(crate) fn ordinary_body_source_span(&self) -> Option<Range<usize>> {
+        let packed = self.ordinary_body_source_span;
+        if packed == 0 {
+            return None;
+        }
+        let start = usize::try_from(packed >> u32::BITS).ok()?;
+        let end = usize::try_from(packed & u64::from(u32::MAX)).ok()?;
+        Some(start..end)
     }
 
     pub(crate) fn retained_blocks(&self) -> &[StyleBlock<'a>] {

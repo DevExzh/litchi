@@ -1,0 +1,40 @@
+Frozen executables used for measurement
+3cf6c077ff116355558724e51038382b01894876ece10ab8c62c1874e71271b8  before
+4008ca067234a83e08ed5e7f3a3069da13d9425db769b90f174217cb6d0f2b69  after
+
+Executable .text sections
+d052acef3b92331c64a4b89fb4304fb03d7ab53e845f52335a69bfa10f68994a  before.text
+a035e0b6a38a036e03f51495ea4512511f763f40fa477081d9b29e2569f517e1  after.text
+
+Committed evidence
+83af0b4393e86d6c45b6b89a397e20887ae21932b21b487621f9487888d32ad2  abba-rtf-body-span-after-a.json
+79d1aabd8f0ddb74545b811c26296745c833dcc9a173cc5d59aa4880a1bb25df  abba-rtf-body-span-after-b.json
+5a5aa8d9b559d2ef967cb73015745bef0e9d749653eba733a5a6a592ec7d2b99  abba-rtf-body-span-before-a.json
+f6a0a946e200a41842e52562d044744ecb0289f121e2016c4bb8ebfb68be62c1  abba-rtf-body-span-before-b.json
+52885fdb6fc1f905f9b738e0961d1c697cfccf997f3e2a13bc012622384a187d  abba-rtf-body-span-list-after-a.json
+21670fe56a3fec8b244eb3655d0849df70da46ee0b86c7735fe9cc08c82da41c  abba-rtf-body-span-list-after-b.json
+3612023033d2fdf4a55e5434b6286f0ef502314c12b495f7c10b9fe80a0b6c99  abba-rtf-body-span-list-before-a.json
+b186572feec0cfb4b7d018fe68de3c891e3a8aaf7b81e4d8bc1d35b75b44f51e  abba-rtf-body-span-list-before-b.json
+28d5dc723bc00700f799b572722f3bbab5344db023d08ff58db87807da554f02  abba-rtf-body-span-noop-after-a.json
+8cf4ad2acc61a4ba50ecfccddb8bfebce7ab547e776d34f48890bb28ccb41b01  abba-rtf-body-span-noop-after-b.json
+cf5cd258428b7a8b5c8eadd347f980d6dc8cb92c5697ad87b742a7c01d8cb4d2  abba-rtf-body-span-noop-before-a.json
+943611153a7b9a7c7216a42bf686fd4044907007e77251e5cf528f969233fbea  abba-rtf-body-span-noop-before-b.json
+30a47eeb75219787d552e044538f0325a63b8f59cfb0a8445edb7ddbb938ee9d  abba-rtf-body-span-open-after-a.json
+3a409ae2ee4cae1d8a155118ff0dea4e6d7d03d3bc8ae663ff0bcabc0faebf7b  abba-rtf-body-span-open-after-b.json
+4768ed739fd0641cda1b26f537fb451bc16c6a56fb9007811f542f2efb5bc82f  abba-rtf-body-span-open-before-a.json
+2e399064f70f0c2b15e7dac008d399273304fe857d817e5d2402cbc7fb6ba7fb  abba-rtf-body-span-open-before-b.json
+5945aa89a4861fc923445f34492c83795dac145fff6a44999ca754bc8ea7a16c  abba-rtf-body-span-shapes-after-a.json
+3aeb7847c0ca910d0d08a4565da9ab0cdd03f9d839f76adf7c6b0abb0461eb76  abba-rtf-body-span-shapes-after-b.json
+2b91901960ea33312f0b07d309a9c7853df322e73bff89c1cd34ccc2d32c5581  abba-rtf-body-span-shapes-before-a.json
+9e72423ef5f5a8a3cec02f4b213466590ad9059ebdadc6a21137c07c878abeed  abba-rtf-body-span-shapes-before-b.json
+dc4d26e3252f6d29107cfb4ca69d5ddf785c3f2ffbbfffb7ea4fba0732b656e6  rtf-body-span-after-heaptrack.txt
+38eda3de9632d726c8f7709ec5792cb2856dda89f537d9123c8713967acd6177  rtf-body-span-before-heaptrack.txt
+1941231335c51c5027811af45f1605bc88910b0220d83c3395569c97616ca47a  rtf-body-span-perf-after-a.csv
+1247bd695b5120096a5694b59b2c32ed3c55483c0ca4f235e35a3e76bb91afb6  rtf-body-span-perf-after-b.csv
+3d474522568ec373dac096c58df43cfee9034ca7f173cf70c71310bccdfb495c  rtf-body-span-perf-before-a.csv
+28154fae90677752e72e9acffb7c206372be85d1b1506cc831f6a73561783cb5  rtf-body-span-perf-before-b.csv
+3713c96ecb35302ebcfd170b5e37f569b5c8eb37e3520bc25d0dc8cb7b5c17c5  rtf-body-span-time-after-a.txt
+25eca48e8d1d66cca1414b0c4dec5bcf68278cee87736a54b3617a29b00f69b2  rtf-body-span-time-after-b.txt
+5361bc37fb98271d9ebb37bf7f053b890783d0061f9812ab1b1236911cbeb61c  rtf-body-span-time-before-a.txt
+5db0eded012da9159a51ea41794800844061869a3405e62d49ea5462efb4ba9c  rtf-body-span-time-before-b.txt
+a6e5d42ab5df793960e894426ed1f43e961f71a6c080454f5b22c4819112b6c7  rtf-body-span-variant-smoke.json

@@ -2003,6 +2003,8 @@ struct LatentStyleExceptionBuilder {
 /// before being converted into the final `RtfDocument` structure.
 /// All fields are public to allow direct access during document construction.
 pub(crate) struct ParsedDocument<'a> {
+    /// Root-level body range proven during the parser's structural preflight.
+    pub ordinary_body_source_span: Option<Range<usize>>,
     /// Font table
     pub font_table: FontTable<'a>,
     pub file_table: Option<crate::FileTable<'a>>,
