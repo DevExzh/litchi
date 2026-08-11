@@ -6,7 +6,7 @@ use crate::core::{MetaXmlPatch, PackageWriter, Structure, patch_meta_xml};
 use crate::elements::parser::OrderElement;
 use crate::elements::text::Paragraph;
 use litchi_core::{Result, xml::escape_xml};
-use litchi_odf_common::package::xml_splice_publication;
+use litchi_odf_common::package::{replace_content_xml, xml_splice_publication};
 use std::path::Path;
 
 impl MutableDocument {
@@ -395,6 +395,33 @@ impl MutableDocument {
         let bytes = self.to_bytes()?;
         std::fs::write(path, bytes)?;
         Ok(())
+    }
+
+    /// Publish a content-only edit against the retained package.
+    ///
+    /// This path is intentionally crate-private and is used only after a
+    /// transaction has proved that no package resource or metadata domain is
+    /// changing. Unsupported physical layouts fall back inside the common ODF
+    /// publisher without weakening normal package validation.
+    pub(crate) fn to_bytes_content_only(&self) -> Result<Vec<u8>> {
+        let source = self.source_package.as_ref().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "content-only ODT publication requires a retained source package".to_string(),
+            )
+        })?;
+        if !self.pending_images.is_empty() {
+            return Err(litchi_core::Error::InvalidFormat(
+                "content-only ODT publication cannot add image resources".to_string(),
+            ));
+        }
+        let generated_content_xml;
+        let content_xml = if let Some(content_xml) = self.content_xml.as_deref() {
+            content_xml
+        } else {
+            generated_content_xml = self.generate_content_xml();
+            &generated_content_xml
+        };
+        replace_content_xml(source, content_xml)
     }
 
     /// Convert the document to bytes.

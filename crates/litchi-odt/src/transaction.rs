@@ -895,7 +895,7 @@ impl Edit {
                 Operation::ReplaceParagraph { index, text } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.replace_semantic_paragraph(*index, text)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveParagraph { index } => {
