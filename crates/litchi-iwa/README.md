@@ -118,6 +118,10 @@ println!("objects: {}", stats.total_objects);
   set/clear/UTF-16-span transactions with reversible patches. Checked
   `TextPosition` and insertion-capable `TextSpan` values keep byte offsets,
   native object identifiers, and protobuf records out of the public API.
+- `litchi-pages::Package` selector-first aggregate section-settings reads and
+  exact-source transactions. The semantic value preserves optional name,
+  Boolean, and pagination presence while `section::settings` owns the direct
+  edit, patch, diagnostics, error, limit, dependency, and path types.
 - Native-style ordinary shape duplication across Pages, Numbers, and Keynote
   with independent rich-text storage, fresh UUID mappings, preserved opaque
   fields, and app-specific selection offsets
@@ -1170,10 +1174,9 @@ let first_header = pages
 pages.set_header_footer_text(first_header.storage.object_id, "Quarterly report")?;
 // Section-name editing now lives in litchi-pages and uses SectionSelector;
 // see litchi-pages/examples/edit_section_name.rs.
-let mut section_settings = pages.section_settings(section_id)?;
-section_settings.set_inherit_previous_header_footer(Some(false));
-section_settings.set_first_page_hides_header_footer(Some(true));
-pages.set_section_settings(section_id, section_settings)?;
+// Aggregate section settings, including header/footer inheritance and the
+// first-page flags, now live in litchi-pages; see
+// litchi-pages/examples/edit_section_settings.rs.
 // Section-pagination editing now lives in litchi-pages and uses
 // SectionSelector; see litchi-pages/examples/edit_section_pagination.rs.
 pages.set_section_background(
@@ -1402,6 +1405,86 @@ exact original package. See `litchi-pages/examples/edit_page_layout.rs` for a
 complete command-line workflow; it requires a distinct new output path and
 publishes through a synchronized sibling temporary file with no-clobber
 publication.
+
+### Pages section settings use one selector-first aggregate transaction
+
+Section names, header/footer inheritance, first-page and even/odd template
+flags, section-start behavior, and page numbering are no longer aggregate
+`PagesEditor` raw-ID operations. Select a section by exact semantic name or
+checked position and exchange the complete aggregate
+`litchi_pages::section::Settings` value. The direct transaction types live under
+`litchi_pages::section::settings`; their public paths contain only the resolved
+semantic position, never a native object identifier, member name, protobuf
+value, or raw record.
+
+```rust,no_run
+use litchi_pages::{Package, SectionSelector, section::Settings};
+
+let package = Package::open("input.pages")?;
+let selector = SectionSelector::name("Introduction");
+let mut settings: Settings = package.section_settings(selector)?;
+
+// Preserve the name and pagination while changing two optional flags.
+settings.set_inherit_previous_header_footer(Some(false));
+settings.set_first_page_hides_header_footer(Some(true));
+let commit = package
+    .edit_section_settings(selector)?
+    .set(settings)?
+    .commit()?;
+assert_eq!(
+    &commit.package().section_settings(selector)?,
+    commit.patch().after(),
+);
+
+let restored = commit
+    .package()
+    .apply_section_settings(&commit.patch().inverse())?;
+assert_eq!(restored.package().source_bytes(), package.source_bytes());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Each optional Boolean has three lossless states: `None` removes native field
+presence, `Some(false)` retains explicit false, and `Some(true)` retains true.
+The name likewise distinguishes absence from an explicitly empty string;
+pagination keeps absent values and future native enum discriminants without
+allowing known values to masquerade as `Unknown`. The consuming `Edit::set`
+validates the complete replacement before it can be committed.
+
+An unchanged replacement is exact no-op and retains the source allocation,
+derived layout cache, and previews. A changed exact-source transaction proves
+the selected section's template dependencies, rewrites only the selected
+Section component, preserves ViewState, the rooted layout cache, and every
+canonical root preview exactly, and fully reopens and reverse-reads the
+candidate. A changed native-supported edit reports one touched component and
+zero deleted previews. Its inverse applies only to the exact committed package
+and restores the complete original artifact. Changed legacy nested packages
+are refused rather than silently normalized.
+
+Matched Pages 14.4 pairs provide a deliberately narrower UI oracle. In the
+second section, changing field 17 from explicit false to true made pages 3 and
+4 reuse header/footer 1; changing field 19 from explicit false to true showed
+header/footer 2 on page 3 and left page 4 blank; changing field 28 from
+explicit false to true left page 3 blank and showed header/footer 2 on page 4.
+Each pair changed only that scalar in section object 1732889 (type 10011): the
+section header, template objects, and all 36 text storages stayed exact. Pages
+opened each Rust artifact without a warning and completed Save As, close, and
+exact-path reopen with the same observed layout. Field 18 remained explicitly
+false in every pair, so first-page-different behavior and absent-versus-false
+distinctions are Rust codec/transaction evidence, not native UI claims.
+Pages also retained all native previews byte-for-byte, matching the focused
+transaction's exact preservation of previews, the layout cache, and every
+other ViewState byte.
+
+`edit_section_name` and `edit_section_pagination` remain ergonomic focused
+facades when only one value family changes; use the aggregate transaction when
+several families must be published atomically. The migration-host
+`section_settings`/`set_section_settings` pair and its raw-ID example are
+retired. Section backgrounds and section insertion/removal remain separate
+migration capabilities. See
+`litchi-pages/examples/edit_section_settings.rs` for a selector-first CLI that
+preserves name and pagination, verifies exact inverse restoration before
+publication, and writes distinct output artifacts through synchronized sibling
+temporary files without clobbering existing paths.
 
 ### Numbers table locks use the focused package API
 
@@ -2142,10 +2225,17 @@ above and in `litchi-pages/examples/edit_page_layout.rs`. That transaction
 retains unknown source bytes, rejects malformed selected fields rather than
 normalizing them, requires an exact source for changes, invalidates dependent
 layout caches, removes stale root previews, and supports exact inverse patches.
-Facing-page section starts and continue/restart numbering behavior use lossless
-enums; future native values remain available as typed `Unknown` variants.
-Starting page numbers use a validated non-zero type. Selector-first section
-pagination lives in `litchi-pages/examples/edit_section_pagination.rs`.
+Settings stored directly on a section belong to the selector-first aggregate
+`litchi_pages::section::settings` transaction shown above and in
+`litchi-pages/examples/edit_section_settings.rs`. It preserves the native
+presence of the name, four Boolean flags, and three pagination fields, proves
+template dependencies, rewrites only the selected Section component, preserves
+ViewState, the derived layout cache, and root previews exactly, and supports
+exact inverse patches. The focused section-name and pagination APIs remain
+ergonomic facades;
+future pagination values remain typed `Unknown` variants and starting page
+numbers use a validated non-zero type. The migration host no longer exposes
+aggregate raw-ID section-settings reads or writes.
 Reachable `TP.PlaceholderArchive` and `TSWP.ShapeInfoArchive` drawables expose
 their owned text storages in stable object order. Text-box content supports
 UTF-16 range replacement, whole-value update, and clear operations; detached

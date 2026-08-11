@@ -9679,3 +9679,134 @@ and 141/141. The full checker retains only 14 unchanged dependency-policy
 baselines. The topology snapshot is 64 packages/237 internal declarations/14
 `litchi-iwa` dependency declarations/14 ordered debts; debt 015 remains and no
 edge closes.
+
+## 2026-08-11 amendment: aggregate Pages section-settings cutover
+
+This cutover is complete only when one focused Pages transaction owns the
+physical read/rewrite/publication path for `TP.SectionArchive` fields 17--22,
+26, and 28, and the retained name and pagination APIs demonstrably delegate to
+it. The public audit must find no raw object identifier, IWA/component/member
+name, protobuf/Buffa type, field record, exact artifact, or source byte in the
+focused signatures, errors, diagnostics, or `Debug` output.
+
+The exact wire matrix is four optional canonical Booleans, three optional
+canonical `uint32` values with a nonzero field-22 page, and one optional
+canonical UTF-8 name. Strict raw routing rejects duplicates, wrong wire types,
+noncanonical keys/values/lengths, Boolean values above one, invalid UTF-8,
+page zero, truncation, malformed or mismatched groups, excess bytes/fields/
+nesting/work/name storage, and disagreement with the forced aggregate Buffa
+lazy view. Tests must cover all 81 Boolean presence/value combinations while
+holding name and pagination values constant, all name-presence distinctions,
+known and future pagination discriminants, and every exact/one-over resource
+boundary. The projection must remain generated-private, borrow the optional
+name, retain no repeated or unknown storage, provide no production encoder,
+and have a build-ratcheted generated size and deterministic digest. Those
+five generated files total 80,202 bytes under an 80 KiB ceiling, contain zero
+`RepeatedView`/`LazyRepeatedView` declarations, and have deterministic
+aggregate SHA-256
+`2202f4b1d394346450cb9f88a41c2784ab476cff23b181fffbab6f37b4a42b62`.
+The complete focused protobuf suite passes 149/149 tests.
+
+Changed-source tests must prove the rooted section position and exact owner,
+template prerequisites at fields 23--25 when activated by the target value,
+previous-section inheritance closure, and exact rooted layout/cache state.
+They must distinguish an absent otherwise-valid prerequisite as
+`UnsupportedDependency` from malformed/ambiguous ownership as `InvalidSource`.
+The changed byte oracle permits only the selected section payload and exact
+object length framing plus required component/ZIP framing. The rooted cache
+edge/reference metadata, opaque and detached cache objects, every canonical
+root preview, templates, background field 30, fields 29/31, unknown section
+records and order, sibling sections, unrelated messages/components, retained
+member metadata, and package statistics remain exact. Preview subsets remain
+unchanged; duplicate preview names fail ingress rather than becoming a changed
+transaction concern.
+
+Transaction tests must cover exact-name and checked-position selection,
+missing/ambiguous selectors, duplicate destination names, exact no-op source
+allocation identity, no-op legacy admission, changed-legacy refusal, exactly
+one-component publication, zero preview deletion, complete
+retained-limit reopen, stale/replayed/tampered/competing patch conflicts, exact
+apply, exact inverse, failure atomicity, `Send + Sync`, and content-free
+formatting. Dedicated equivalence cases must apply every name-only and
+pagination-only edit through both its retained facade and the aggregate API and
+compare the complete candidate bytes and diagnostics.
+
+The host retirement gate removes `PagesEditor::section_settings`,
+`set_section_settings`, and `set_section_name`; the direct raw-ID
+`set_pages_section_settings` example; duplicate settings/name tests; and README
+usage. It retains the separate section-background behavior by relocating or
+renaming its private payload helpers, and retains mixed header/footer or
+section-graph tests after migrating only their name-update step. Boundary
+ratchets must forbid the three methods, example, stale README calls, and a
+second physical writer in the compatibility facades.
+
+The executed gate record must include the full Pages library/integration/
+doctest suite, focused codec and full protobuf suites, Pages-feature root
+facade, migration-host library and all examples, no-dependency warnings-denied
+Clippy, strict rustdoc, formatting and diff checks, boundary regressions, live
+boundary disposition, focused fuzz compile/smokes, and the available sanitizer
+status. Linear-work evidence must exercise the maximum supported section
+population rather than claim timing. The production test uses rooted real
+packages with 4,096 and 8,192 total objects. Selected fields are 77 and 77
+(1.0x), strict `WireWork` is 564 and 564, and selected references are 4 and 4.
+`TransactionWork` is 292,154 and 587,222 (2.0100x). Both changed runs perform
+exactly one bounded output allocation and one full reopen. With the configured
+transaction-work ceiling set to maximum minus one, the typed limit error occurs
+before output and reports zero output allocations and zero reopens. This is
+deterministic resource-scaling evidence, not a wall-clock, RSS, or allocation-
+latency claim.
+
+The executed focused gate is 7/7 section-settings integration tests plus four
+private production/security tests for exact budget observations,
+4,096-to-8,192 object scaling, alias-metadata refusal, and repeated-reference
+scaling/max-minus-one refusal. The strict/projection suite is 149/149, and the
+final locality review has no finding. The complete Pages library/integration
+total is 118/118: 67 library, 14 document-settings, 1 native-fixture, 10
+page-layout, 5 section-name,
+6 section-pagination, 7 section-settings, and 8 section-text tests. Boundary
+regressions pass 181/181; the focused facade and host audits each report zero;
+and the full checker reports only the unchanged 14 dependency-policy baselines.
+Final topology is unchanged at 64 packages, 237 internal declarations, 14
+`litchi-iwa` declarations, and 14 ordered debts.
+
+Apple Pages 14.4 supplied a two-section native seed of 101,399 bytes with
+SHA-256
+`19b8a24c7bc0d57d87614a0f08215072c9c61519b15629827f5a448b29218422`.
+Three matched control/change pairs isolate independent second-section Boolean
+settings:
+
+- field 17 control is 101,328 bytes,
+  `67c1d16ef682814c720bff7f189b539bad486a998f48e79f9fd2282975abe40b`;
+  match-previous is 101,323 bytes,
+  `af4119b13cf4ff5d4db1fc172a55404b85f6a41833d755d4c1a5d22d40aacda9`;
+- field 19 control is 101,376 bytes,
+  `7724862901685f14f0c1262391df8464332390d681b5af6328a4de6483d70a7f`;
+  left/right is 101,334 bytes,
+  `a0956e21dff5b89fba0a2314224fce93bc19a3b32be91228d18b1bfa3032da2a`;
+  and
+- field 28 control is 101,368 bytes,
+  `184753935f12a9d16ed6787e82b43fc9420d63cb47dffec35c217ab03342d438`;
+  hide-first is 101,333 bytes,
+  `f19639a8c93966b5d1a4b87d07c7908f5aaa3bc6e19de9e7eaee96650c3dbc18`.
+
+Every pair changes one scalar on section object 1732889/type 10011 and nothing
+else in the logical package: field 17 `88 01 00` to `88 01 01`, field 19
+`98 01 00` to `98 01 01`, or field 28 `e0 01 00` to `e0 01 01`. The other
+three selected flags remain explicitly false, including field 18; the 57-byte
+message header and references, templates and header/footer storages, all 13
+entry names, layout/cache state, and previews are exact. Warning-free Save As,
+close, and exact-path reopen showed H1/F1 on pages 3 and 4 for enabled field 17,
+H2/F2 on page 3 with blank page 4 for enabled field 19, and blank page 3 with
+H2/F2 on page 4 for enabled field 28.
+
+This matched native evidence freezes the scalar meaning and exact-preservation
+closure. The focused Rust integration gate independently covers complete
+eight-field read/edit/apply, same-settings byte equality, patch conflict, and
+exact inverse; no separate claim is made that a Rust-authored aggregate
+candidate was the artifact opened for the UI oracle. Producer-name proof
+therefore remains focused reverse-read rather than a visual assertion.
+
+This cut changes no manifest edge. Current topology before the cut is 64
+packages, 237 internal declarations, 14 `litchi-iwa` dependency declarations,
+and 14 ordered debts; the final verification must confirm that unchanged
+inventory rather than copy historical Pages counts.

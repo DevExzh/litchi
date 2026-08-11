@@ -1,4 +1,8 @@
 pub mod pagination;
+/// Exact-source transactions for the settings stored on one section.
+pub mod settings;
+
+use std::{fmt, sync::Arc};
 
 use crate::selector::SectionSelector;
 use litchi_iwa_text::storage::Storage;
@@ -41,16 +45,40 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Lossless settings stored directly on a Pages section.
 ///
 /// Native boolean presence and values are packed into two bytes. The section
-/// name owns exactly one UTF-8 allocation, while pagination values retain
-/// unknown native discriminants without carrying archive or protobuf state.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+/// name owns one exact-size UTF-8 allocation behind a cheaply cloned shared
+/// handle, while pagination values retain unknown native discriminants without
+/// carrying archive or protobuf state.
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct Settings {
-    name: Option<Box<str>>,
+    name: Option<Arc<Box<str>>>,
     present: u8,
     values: u8,
     start: Option<Start>,
     page_numbering: Option<PageNumbering>,
     starting_page_number: Option<PageNumber>,
+}
+
+impl fmt::Debug for Settings {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Settings")
+            .field("name_present", &self.name.is_some())
+            .field("name_bytes", &self.name().map(str::len))
+            .field(
+                "inherit_previous_header_footer",
+                &self.inherit_previous_header_footer(),
+            )
+            .field("first_page_different", &self.first_page_different())
+            .field("even_odd_pages_different", &self.even_odd_pages_different())
+            .field(
+                "first_page_hides_header_footer",
+                &self.first_page_hides_header_footer(),
+            )
+            .field("start", &self.start)
+            .field("page_numbering", &self.page_numbering)
+            .field("starting_page_number", &self.starting_page_number)
+            .finish()
+    }
 }
 
 impl Settings {
@@ -70,7 +98,7 @@ impl Settings {
     /// Return the optional display name.
     #[must_use]
     pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+        self.name.as_ref().map(|name| name.as_ref().as_ref())
     }
 
     /// Set or clear the display name.
@@ -90,7 +118,7 @@ impl Settings {
         {
             return Err(Error::NameContainsNul);
         }
-        self.name = boxed;
+        self.name = boxed.map(Arc::new);
         Ok(())
     }
 
@@ -198,6 +226,53 @@ impl Settings {
         self.starting_page_number = value;
     }
 
+    /// Return the three presence-preserving pagination settings as one value.
+    #[must_use]
+    pub fn pagination(&self) -> Pagination {
+        let mut pagination = Pagination::new();
+        if pagination.set_start(self.start).is_err()
+            || pagination.set_page_numbering(self.page_numbering).is_err()
+        {
+            return Pagination::new();
+        }
+        pagination.set_starting_page_number(self.starting_page_number);
+        pagination
+    }
+
+    /// Replace all three pagination settings atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when a known native enumeration value is
+    /// represented by a noncanonical `Unknown` variant. This settings value is
+    /// unchanged when validation fails.
+    pub fn set_pagination(&mut self, pagination: Pagination) -> Result<()> {
+        if pagination
+            .start()
+            .is_some_and(|value| !value.is_canonical())
+        {
+            return Err(Error::NonCanonicalStart);
+        }
+        if pagination
+            .page_numbering()
+            .is_some_and(|value| !value.is_canonical())
+        {
+            return Err(Error::NonCanonicalNumbering);
+        }
+        self.start = pagination.start();
+        self.page_numbering = pagination.page_numbering();
+        self.starting_page_number = pagination.starting_page_number();
+        Ok(())
+    }
+
+    /// Remove all three pagination fields while preserving every other
+    /// section setting.
+    pub const fn clear_pagination(&mut self) {
+        self.start = None;
+        self.page_numbering = None;
+        self.starting_page_number = None;
+    }
+
     /// Validate all semantic invariants before an archive adapter publishes
     /// this value.
     ///
@@ -205,7 +280,7 @@ impl Settings {
     ///
     /// Returns a typed error when a name or pagination value is invalid.
     pub fn validate(&self) -> Result<()> {
-        if self.name.as_deref().is_some_and(|name| name.contains('\0')) {
+        if self.name().is_some_and(|name| name.contains('\0')) {
             return Err(Error::NameContainsNul);
         }
         if self.start.is_some_and(|value| !value.is_canonical()) {

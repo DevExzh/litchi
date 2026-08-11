@@ -1055,12 +1055,30 @@ fn enforce_pages_section_projection_provenance(
     proto_directory: &Path,
     projection_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
-    const CANONICAL_FIELDS: [&str; 3] = [
+    const CANONICAL_FIELDS: [&str; 8] = [
+        "optional bool inherit_previous_header_footer = 17;",
+        "optional bool section_template_first_page_different = 18;",
+        "optional bool section_template_even_odd_pages_different = 19;",
         "optional uint32 section_start_kind = 20;",
         "optional uint32 section_page_number_kind = 21;",
         "optional uint32 section_page_number_start = 22;",
+        "optional string name = 26;",
+        "optional bool section_template_first_page_hides_header_footer = 28;",
     ];
-    const PROJECTION_MESSAGE: &str = "message PagesSectionPaginationArchive {\n  optional uint32 section_start_kind = 20;\n  optional uint32 section_page_number_kind = 21;\n  optional uint32 section_page_number_start = 22;\n}";
+    const PAGINATION_PROJECTION: &str = "message PagesSectionPaginationArchive {\n  optional uint32 section_start_kind = 20;\n  optional uint32 section_page_number_kind = 21;\n  optional uint32 section_page_number_start = 22;\n}";
+    const SETTINGS_PROJECTION: &str = "message PagesSectionSettingsArchive {\n  optional bool inherit_previous_header_footer = 17;\n  optional bool section_template_first_page_different = 18;\n  optional bool section_template_even_odd_pages_different = 19;\n  optional uint32 section_start_kind = 20;\n  optional uint32 section_page_number_kind = 21;\n  optional uint32 section_page_number_start = 22;\n  optional string name = 26;\n  optional bool section_template_first_page_hides_header_footer = 28;\n}";
+    const ROUTER_DECLARATIONS: [&str; 10] = [
+        "const INHERIT_HEADER_FOOTER_FIELD: u32 = 17;",
+        "const FIRST_PAGE_DIFFERENT_FIELD: u32 = 18;",
+        "const EVEN_ODD_PAGES_DIFFERENT_FIELD: u32 = 19;",
+        "const SECTION_START_FIELD: u32 = 20;",
+        "const PAGE_NUMBERING_FIELD: u32 = 21;",
+        "const STARTING_PAGE_NUMBER_FIELD: u32 = 22;",
+        "const SECTION_NAME_FIELD: u32 = 26;",
+        "const FIRST_PAGE_HIDES_HEADER_FOOTER_FIELD: u32 = 28;",
+        "const MAX_RECURSION: u32 = 64;",
+        "const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;",
+    ];
 
     let pages = fs::read_to_string(proto_directory.join("TPArchives.proto"))?;
     let projection = fs::read_to_string(projection_directory.join("TPSectionArchive.proto"))?;
@@ -1071,8 +1089,12 @@ fn enforce_pages_section_projection_provenance(
     if !CANONICAL_FIELDS
         .iter()
         .all(|declaration| pages.matches(declaration).count() == 1)
-        || projection.matches(PROJECTION_MESSAGE).count() != 1
-        || projection.len() > 1024
+        || projection.matches(PAGINATION_PROJECTION).count() != 1
+        || projection.matches(SETTINGS_PROJECTION).count() != 1
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| codec.matches(declaration).count() == 1)
+        || projection.len() > 2 * 1024
         || projection.contains("repeated ")
         || production_codec.contains("to_owned_message")
         || production_codec.contains("encode_to_vec")
@@ -1080,7 +1102,7 @@ fn enforce_pages_section_projection_provenance(
         || production_codec.contains(".encode(")
     {
         return Err(
-            "derived Pages section projection drifted from TP.SectionArchive fields 20--22, exceeded its 1 KiB source budget, introduced generated repeated storage, or added production encoding"
+            "derived Pages section projections drifted from TP.SectionArchive fields 17--22/26/28, exceeded their 2 KiB source budget, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
     }
@@ -2222,35 +2244,63 @@ fn enforce_keynote_slide_transition_projection_budget(
 }
 
 fn enforce_pages_section_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
-    const EXPECTED_FILES: usize = 5;
-    const MAX_GENERATED_BYTES: u64 = 64 * 1024;
+    const EXPECTED_FILES: [&str; 5] = [
+        "LitchiIwaProjection.mod.rs",
+        "TPSectionArchive.__lazy_view.rs",
+        "TPSectionArchive.__view.rs",
+        "TPSectionArchive.rs",
+        "iwa_pages_section_buffa_protos.rs",
+    ];
+    // Buffa 0.9.1 emits 80,202 bytes for the retained pagination projection
+    // and the eight-field aggregate projection. Keep less than 1.7 KiB of
+    // generator/formatter allowance; the digest catches any within-cap drift.
+    const MAX_GENERATED_BYTES: u64 = 80 * 1024;
+    const EXPECTED_DIGEST: &str =
+        "2202f4b1d394346450cb9f88a41c2784ab476cff23b181fffbab6f37b4a42b62";
 
-    let mut files = 0usize;
+    let mut entries = fs::read_dir(directory)?
+        .map(|result| result.map(|entry| (entry.file_name(), entry.path(), entry.file_type())))
+        .collect::<Result<Vec<_>, _>>()?;
+    entries.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut names = Vec::new();
     let mut bytes = 0u64;
-    let mut generated_repeated_views = 0usize;
-    for entry_result in fs::read_dir(directory)? {
-        let entry = entry_result?;
-        if !entry.file_type()?.is_file() {
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    let mut digest = Sha256::new();
+    for (file_name, path, file_type_result) in entries {
+        if !file_type_result?.is_file() {
             continue;
         }
-        files = files
-            .checked_add(1)
-            .ok_or("generated file count overflow")?;
+        let name = file_name
+            .into_string()
+            .map_err(|_name| "Pages section projection generated a non-UTF-8 filename")?;
+        let generated = fs::read(&path)?;
+        let text = std::str::from_utf8(&generated)?;
         bytes = bytes
-            .checked_add(entry.metadata()?.len())
-            .ok_or("generated byte count overflow")?;
-        generated_repeated_views = generated_repeated_views
-            .checked_add(
-                fs::read_to_string(entry.path())?
-                    .matches("LazyRepeatedView")
-                    .count(),
-            )
-            .ok_or("generated repeated-view count overflow")?;
+            .checked_add(u64::try_from(generated.len())?)
+            .ok_or("Pages section generated-byte count overflow")?;
+        repeated_views = repeated_views
+            .checked_add(text.matches("RepeatedView").count())
+            .ok_or("Pages section repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(text.matches("LazyRepeatedView").count())
+            .ok_or("Pages section lazy-repeated-view count overflow")?;
+        digest.update(generated);
+        names.push(name);
     }
-
-    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || generated_repeated_views != 0 {
+    let aggregate_digest = digest
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    if names.as_slice() != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+        || aggregate_digest != EXPECTED_DIGEST
+    {
         return Err(format!(
-            "Pages section projection generated {files} files/{bytes} bytes/{generated_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+            "Pages section projections generated {names:?}/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions/digest {aggregate_digest}; expected {EXPECTED_FILES:?}, at most {MAX_GENERATED_BYTES} bytes, zero repeated views, and digest {EXPECTED_DIGEST}"
         )
         .into());
     }

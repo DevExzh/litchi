@@ -14,7 +14,7 @@ use litchi_pages::footnote::{
 };
 use litchi_pages::header_footer::{Kind, Template};
 use litchi_pages::page_layout::Orientation as PageOrientation;
-use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
+use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Start};
 
 #[test]
 fn pages_native_discriminants_are_typed_and_lossless() {
@@ -89,209 +89,6 @@ fn semantic_body_update_and_clear_are_transactional() {
     assert_eq!(editor.body_text().unwrap(), "A東京B");
     editor.clear_body().unwrap();
     assert_eq!(editor.body_text().unwrap(), "");
-}
-
-#[test]
-fn section_settings_crud_is_lossless_validated_and_transactional() {
-    let body_id = 42;
-    let section_id = 43;
-    let root = DocumentArchive {
-        body_storage: Some(reference(body_id)),
-        section: Some(reference(section_id)),
-        ..Default::default()
-    };
-    let body = StorageArchive {
-        text: vec!["Body".to_owned()],
-        ..Default::default()
-    };
-    let mut fill_payload = litchi_iwa_common::varint::encode_varint(99 << 3);
-    fill_payload.extend(litchi_iwa_common::varint::encode_varint(7));
-    let mut section_data = SectionArchive {
-        inherit_previous_header_footer: Some(true),
-        section_template_first_page_different: Some(false),
-        section_template_even_odd_pages_different: Some(false),
-        section_start_kind: Some(Start::NextPage.as_raw()),
-        section_page_number_kind: Some(PageNumbering::ContinueFromPrevious.as_raw()),
-        section_page_number_start: Some(PageNumber::new(1).unwrap().get()),
-        name: Some("Blank".to_owned()),
-        section_template_first_page_hides_header_footer: Some(false),
-        background_fill: Some(tsd::FillArchive::default()),
-        ..Default::default()
-    }
-    .encode_to_vec();
-    section_data =
-        patch_length_delimited_field(&section_data, 30, true, Some(&fill_payload)).unwrap();
-    let mut unknown_section_field = litchi_iwa_common::varint::encode_varint(101 << 3);
-    unknown_section_field.extend(litchi_iwa_common::varint::encode_varint(999));
-    section_data.extend_from_slice(&unknown_section_field);
-
-    let objects = vec![
-        object(1, 10000, root.encode_to_vec()),
-        object(body_id, 2001, body.encode_to_vec()),
-        object(section_id, SECTION_MESSAGE_TYPE, section_data),
-    ];
-    let mut package = IWorkPackage::new();
-    package
-        .replace_archive("Index/Document.iwa", &Archive { objects })
-        .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
-    let mut original = Settings::new();
-    original.set_name(Some("Blank")).unwrap();
-    original.set_inherit_previous_header_footer(Some(true));
-    original.set_first_page_different(Some(false));
-    original.set_even_odd_pages_different(Some(false));
-    original.set_start(Some(Start::NextPage)).unwrap();
-    original
-        .set_page_numbering(Some(PageNumbering::ContinueFromPrevious))
-        .unwrap();
-    original.set_starting_page_number(Some(PageNumber::new(1).unwrap()));
-    original.set_first_page_hides_header_footer(Some(false));
-    assert_eq!(editor.section_settings(section_id).unwrap(), original);
-    let baseline = editor.to_bytes().unwrap();
-    editor
-        .set_section_settings(section_id, original.clone())
-        .unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-
-    let mut updated = original.clone();
-    updated.set_name(Some("Chapter Two")).unwrap();
-    updated.set_inherit_previous_header_footer(Some(false));
-    updated.set_first_page_different(Some(true));
-    updated.set_even_odd_pages_different(Some(true));
-    updated.set_start(Some(Start::LeftPage)).unwrap();
-    updated
-        .set_page_numbering(Some(PageNumbering::Restart))
-        .unwrap();
-    updated.set_starting_page_number(Some(PageNumber::new(42).unwrap()));
-    updated.set_first_page_hides_header_footer(Some(true));
-    editor
-        .set_section_settings(section_id, updated.clone())
-        .unwrap();
-    assert_eq!(editor.section_settings(section_id).unwrap(), updated);
-    let archive = editor.package().archive("Index/Document.iwa").unwrap();
-    let section_payload = &archive.object(section_id).unwrap().messages[0].data;
-    let section = SectionArchive::decode(section_payload.as_slice()).unwrap();
-    assert_eq!(section.section_start_kind, Some(2));
-    assert_eq!(section.section_page_number_kind, Some(1));
-    assert_eq!(section.section_page_number_start, Some(42));
-    assert!(
-        section_payload
-            .windows(unknown_section_field.len())
-            .any(|window| window == unknown_section_field)
-    );
-    let reparsed = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(reparsed.section_settings(section_id).unwrap(), updated);
-
-    updated.set_start(Some(Start::Unknown(7))).unwrap();
-    updated
-        .set_page_numbering(Some(PageNumbering::Unknown(3)))
-        .unwrap();
-    editor
-        .set_section_settings(section_id, updated.clone())
-        .unwrap();
-    assert_eq!(editor.section_settings(section_id).unwrap(), updated);
-    let section = SectionArchive::decode(
-        editor
-            .package()
-            .archive("Index/Document.iwa")
-            .unwrap()
-            .object(section_id)
-            .unwrap()
-            .messages[0]
-            .data
-            .as_slice(),
-    )
-    .unwrap();
-    assert_eq!(section.section_start_kind, Some(7));
-    assert_eq!(section.section_page_number_kind, Some(3));
-
-    editor
-        .set_section_settings(section_id, original.clone())
-        .unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-    let mut invalid_name = original.clone();
-    assert!(invalid_name.set_name(Some("bad\0name")).is_err());
-    let mut invalid_start = original.clone();
-    assert!(invalid_start.set_start(Some(Start::Unknown(0))).is_err());
-    let mut invalid_numbering = original.clone();
-    assert!(
-        invalid_numbering
-            .set_page_numbering(Some(PageNumbering::Unknown(1)))
-            .is_err()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-    assert!(editor.section_settings(999).is_err());
-    assert!(editor.set_section_settings(999, original.clone()).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-
-    let mut malformed = editor.package().clone();
-    malformed
-        .update_archive("Index/Document.iwa", |archive| {
-            let object = archive.object_mut(section_id).unwrap();
-            let mut message = object.messages[0].clone();
-            message
-                .data
-                .extend(litchi_iwa_common::varint::encode_varint(17 << 3));
-            message.data.push(0);
-            Ok(object.replace_message(0, message).map(|_| ())?)
-        })
-        .unwrap();
-    let mut malformed = PagesEditor::from_package(malformed).unwrap();
-    let malformed_baseline = malformed.to_bytes().unwrap();
-    assert!(malformed.section_settings(section_id).is_err());
-    assert!(
-        malformed
-            .set_section_settings(section_id, original)
-            .is_err()
-    );
-    assert_eq!(malformed.to_bytes().unwrap(), malformed_baseline);
-}
-
-#[test]
-fn section_settings_reject_zero_starting_page_number_transactionally() {
-    let body_id = 42;
-    let section_id = 43;
-    let root = DocumentArchive {
-        body_storage: Some(reference(body_id)),
-        section: Some(reference(section_id)),
-        ..Default::default()
-    };
-    let section = SectionArchive {
-        section_start_kind: Some(Start::NextPage.as_raw()),
-        section_page_number_kind: Some(PageNumbering::Restart.as_raw()),
-        section_page_number_start: Some(0),
-        ..Default::default()
-    };
-    let mut package = IWorkPackage::new();
-    package
-        .replace_archive(
-            "Index/Document.iwa",
-            &Archive {
-                objects: vec![
-                    object(1, 10000, root.encode_to_vec()),
-                    object(
-                        body_id,
-                        2001,
-                        StorageArchive {
-                            text: vec!["Body".to_owned()],
-                            ..Default::default()
-                        }
-                        .encode_to_vec(),
-                    ),
-                    object(section_id, SECTION_MESSAGE_TYPE, section.encode_to_vec()),
-                ],
-            },
-        )
-        .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
-    let before = editor.to_bytes().unwrap();
-    assert!(editor.section_settings(section_id).is_err());
-    assert!(
-        editor
-            .set_section_settings(section_id, Settings::default())
-            .is_err()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]
@@ -544,13 +341,6 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
             .set_header_footer_text(TextStorageId::new(body_id).unwrap(), "no")
             .is_err()
     );
-    let before = editor.to_bytes().unwrap();
-    assert!(editor.set_section_name(999, Some("no")).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
-    editor
-        .set_section_name(section_id, Some("Renamed"))
-        .unwrap();
-    assert_eq!(editor.sections()[0].name.as_deref(), Some("Renamed"));
     let reparsed = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let regions = reparsed.header_footers().unwrap();
     assert_eq!(regions[0].template, Template::Odd);
@@ -559,7 +349,6 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
     assert_eq!(regions[1].kind, Kind::Footer);
     assert_eq!(regions[0].storage.storage.text(), "A東京B");
     assert!(regions[1].storage.storage.is_empty());
-    assert_eq!(reparsed.sections()[0].name.as_deref(), Some("Renamed"));
 }
 
 #[test]

@@ -72,6 +72,73 @@ Macros, VBA, ActiveX, controls, OLE objects, and embedded code are only ever
 retained as inert blobs when exposed or preserved. Litchi never executes or
 activates them.
 
+## Focused Pages section-settings edits
+
+Enable the `pages` feature to use the selector-first Pages package API through
+`litchi::pages`. `section::Settings` is the complete aggregate value for this
+transaction: its optional name, four optional Boolean flags, and three optional
+pagination fields retain native presence. In particular, `None` removes a
+Boolean field while `Some(false)` preserves an explicitly encoded false.
+Transaction, patch, diagnostics, error, limit, dependency, and path types live
+under `litchi::pages::section::settings`; none exposes a native identifier.
+
+```toml
+[dependencies]
+litchi = { version = "0", default-features = false, features = ["pages"] }
+```
+
+```rust,no_run
+use litchi::pages::{Package, SectionSelector, section::Settings};
+
+let package = Package::open("input.pages")?;
+let selector = SectionSelector::name("Introduction");
+let mut settings: Settings = package.section_settings(selector)?;
+settings.set_inherit_previous_header_footer(Some(false));
+settings.set_first_page_hides_header_footer(Some(true));
+
+let commit = package
+    .edit_section_settings(selector)?
+    .set(settings)?
+    .commit()?;
+assert_eq!(
+    &commit.package().section_settings(selector)?,
+    commit.patch().after(),
+);
+
+let restored = commit
+    .package()
+    .apply_section_settings(&commit.patch().inverse())?;
+assert_eq!(restored.package().source_bytes(), package.source_bytes());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+An unchanged replacement is an exact no-op and retains the source allocation,
+layout cache, and previews. A changed exact-source transaction proves the
+selected section's template dependencies, patches only the selected Section
+component, preserves ViewState, the rooted derived layout cache, and canonical
+root previews exactly, and fully reopens the candidate before publication. Its
+inverse is authorized only against the exact committed artifact and restores
+the exact source. Changed legacy nested packages are refused instead of
+normalized.
+
+Pages 14.4 opened, saved, closed, and exact-path reopened matched Rust
+artifacts without warnings. Separate pairs proved only explicit-false-to-true
+changes for header/footer inheritance, even/odd distinction, and first-page
+header/footer hiding; the section header, templates, and all 36 text storages
+remained exact. First-page-different stayed explicitly false, and the UI does
+not prove absent-versus-false behavior. Native previews also stayed exact, so
+the focused writer retains them together with the layout cache and all other
+ViewState bytes. A changed native-supported edit touches one Section component
+and reports zero deleted previews.
+
+The focused section-name and section-pagination APIs remain ergonomic facades
+for their individual value families. Use the aggregate transaction when the
+four flags, name, or pagination must change atomically. For safe filesystem
+publication, `litchi-pages/examples/edit_section_settings.rs` preserves the
+source name and pagination while changing the four Boolean fields, writes a
+distinct output through a synchronized sibling temporary file, and never
+clobbers an existing target.
+
 ## Focused Keynote transition edits
 
 Enable the `keynote` feature to use the focused Keynote package API through

@@ -1809,3 +1809,61 @@ public title, 9/9 codec, and 141/141 full protobuf tests. The full checker has
 only 14 unchanged dependency-policy baselines. Inventory is 64 packages/237
 internal declarations/14 `litchi-iwa` dependency declarations/14 ordered
 debts; debt 015 remains and no edge closes.
+
+## 2026-08-11 current-status amendment: aggregate Pages section settings
+
+The prior Pages section-name and pagination records remain historical evidence,
+but their independent-writer descriptions and statements that the
+legacy-normalizing settings/name writer remains are superseded. The concrete
+current owner is `litchi-pages::section::settings`, operating on the
+archive-free, presence-preserving `section::Settings` through
+`Package::{section_settings, edit_section_settings,
+apply_section_settings}`. Exact names and checked positions are the only public
+selection identities. Generated values, raw IDs, physical member names, wire
+records, and exact artifacts remain private.
+
+One strict raw/Buffa projection covers optional fields 17--22, 26, and 28. Raw
+records preserve and splice those settings; Buffa is a bounded borrowed
+semantic cross-check and has no production encode path. The legacy
+pagination-only projection remains a scoped facade reader, while both the
+section-name and pagination transaction facades delegate their physical work
+to the aggregate core. The aggregate generated-output ceiling and digest are
+80,202 bytes under 80 KiB and
+`2202f4b1d394346450cb9f88a41c2784ab476cff23b181fffbab6f37b4a42b62`;
+its five generated files contain no repeated lazy view, and the focused
+protobuf suite passes 149/149.
+
+Target-sensitive dependency validation covers the previous section's template
+closure and fields 23--25 without rewriting them. A changed edit also proves
+and exactly preserves rooted layout/cache state, its metadata, and every root
+preview. Only the selected section component is rewritten; template payloads,
+field-30 background, fields 29/31, sibling sections, and all unrelated physical
+state remain exact. An exact no-op precedes dependency planning and remains
+byte-identical with zero touched components, preview deletions, or reopen.
+
+The host no longer owns `section_settings`, `set_section_settings`, or
+`set_section_name`, and the raw-ID settings example is retired. The separate
+background writer remains under a private background seam. Changed legacy
+nested sources are refused instead of normalized; reads and exact no-ops remain
+supported. Matched Pages 14.4 pairs prove independent field-17, field-19, and
+field-28 false-to-true changes as one exact scalar delta on section
+1732889/type 10011, with header/references, field 18, templates, storages, names,
+caches, and previews exact. Warning-free close/reopen showed the expected
+inherited, alternating, and hidden-first-page header/footer behavior. The seed
+hash is `19b8a24c7bc0d57d87614a0f08215072c9c61519b15629827f5a448b29218422`;
+full pair hashes are recorded in ADR 0008. Production scaling at 4,096 and
+8,192 rooted real-package objects keeps selected fields/wire work/references at
+77/564/4 and scales `TransactionWork` from 292,154 to 587,222 (2.0100x), with
+one output allocation and reopen at each size. A maximum-minus-one work budget
+fails before output with both counters zero. Focused integration is 7/7, two
+private production tests cover observation and scaling, and two private
+security tests cover alias metadata plus repeated-reference scaling/refusal;
+the projection suite is 149/149, and locality review is clean. The complete Pages
+library/integration gate is 118/118; boundary regressions are 181/181; focused
+facade and host audits are empty; and the live checker retains only the 14
+unchanged baselines. The matched native pairs are the UI oracle; no distinct
+Rust-authored UI artifact is claimed.
+
+No manifest edge or ordered debt changes. The inventory remains 64 workspace
+packages, 237 internal declarations, 14 `litchi-iwa` dependency declarations,
+and 14 ordered debts, including debt 017 (`litchi-iwa -> litchi-pages`).

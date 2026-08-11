@@ -1650,3 +1650,76 @@ checker retains only the unchanged 14 baselines: six development-only
 annotations and eight edge classifications. Topology remains 64 packages/237
 internal declarations/14 host dependency declarations/14 ordered debts, and
 debt 015 remains.
+
+## 2026-08-11 amendment: aggregate Pages section-settings API
+
+The canonical aggregate value is `litchi_pages::section::Settings`. It is not a
+protobuf message, property bag, raw-ID map, or lossy collection of effective
+values. It owns at most one exact-size section-name allocation and packs native
+presence/value for four optional Booleans; `Start`, `PageNumbering`, and
+`PageNumber` retain the three optional pagination fields. `Settings::new()` and
+`default()` mean that all eight native fields are absent, not that Pages
+defaults were serialized explicitly.
+
+Callers read and mutate one existing section through:
+
+```rust,ignore
+Package::section_settings(SectionSelector) -> Result<Settings, Error>
+Package::edit_section_settings(SectionSelector) -> Result<Edit<'_>, Error>
+Package::apply_section_settings(&Patch) -> Result<Commit, Error>
+```
+
+The focused `section::settings` module owns `Edit`, `Patch`, `Commit`,
+`Diagnostics`, `Error`, `LimitKind`, `Path`, and `DependencyKind`. `Path`
+contains only `Package` or a checked semantic section position. `Edit::set` is
+consuming and returns the edit after validating the complete value; staging a
+failure leaves the source package unchanged. Public errors and `Debug` output
+omit authored names and values, native identities, member names, raw bytes,
+retained artifacts, and lower-layer diagnostic strings.
+
+The semantic distinctions are lossless:
+
+- every Boolean distinguishes absent, explicitly false, and explicitly true;
+- the name distinguishes absent, present empty, and present nonempty, rejects
+  NUL, and permits duplicate destination names;
+- exact-name selection is case-sensitive and reports ambiguity for duplicate
+  current names;
+- section start and numbering preserve future native `u32` discriminants but
+  reject an `Unknown` wrapper that aliases a known variant; and
+- a starting page number is absent or a nonzero checked `PageNumber`.
+
+`DependencyKind` reports only a missing otherwise-valid
+`PreviousSectionTemplates`, `FirstTemplate`, `EvenTemplate`, or `OddTemplate`.
+Malformed, contradictory, ambiguous, aliased, external, or wrongly typed
+relationships are `InvalidSource`, not unsupported caller values. A missing
+prerequisite is checked only when the target setting needs it. Exact no-ops
+remain valid without forcing dormant dependencies.
+
+This surface owns replacement of fields 17--22, 26, and 28 on one existing
+section. It does not create, delete, or reorder sections; allocate identifiers;
+edit body/header/footer text; create or mutate page templates; edit background
+field 30; change guide or hyperlink state; normalize legacy packages; publish
+files atomically; or expose a reference collection. Layout/cache state and root
+previews are neither semantic `Settings` members nor mutation consequences;
+matched native evidence requires their exact preservation.
+
+`section_name` and `section_pagination` remain narrow ergonomic projections.
+They select and expose only their established semantic subset, then delegate
+publication to the aggregate owner. Their continued public presence therefore
+does not authorize multiple physical writers. This amendment supersedes the
+older statement that fields 20--22, names, and header/footer flags have
+independent current mutation owners; it does not invalidate their prior
+semantic or native evidence.
+
+The implemented API is covered by 7/7 focused integration tests and four
+private production/security gates for budget observation, object scaling,
+alias-metadata refusal, and repeated-reference scaling/max-minus-one refusal.
+Its real-package 4,096-to-8,192-object scaling keeps selected fields, strict
+wire work, and references constant at 77, 564, and 4;
+aggregate transaction work scales 292,154 to 587,222 (2.0100x), with one
+output allocation and reopen at either size. A maximum-minus-one work budget
+returns a typed error before either operation. These counters establish bounded
+linear transaction behavior, not latency or RSS performance. The full Pages
+library/integration gate passes 118/118, boundary regressions pass 181/181,
+focused facade and host audits are empty, and the live checker retains only its
+14 established dependency-policy baselines.
