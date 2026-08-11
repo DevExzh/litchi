@@ -71,13 +71,16 @@ pub(super) struct MutablePresentation {
 }
 
 impl MutablePresentation {
-    /// Create a mutable presentation from an existing Presentation.
+    /// Create a mutable presentation from an existing presentation and the
+    /// slide projection already validated for the same immutable package.
     ///
-    /// This parses the presentation structure into mutable elements.
+    /// Package-owned auxiliary structures are still parsed independently;
+    /// only the duplicate complete slide traversal is skipped.
     ///
     /// # Arguments
     ///
     /// * `presentation` - The presentation to make mutable
+    /// * `validated_slides` - Slides parsed from the same source package
     ///
     /// # Examples
     ///
@@ -92,8 +95,15 @@ impl MutablePresentation {
     /// # Ok(())
     /// # }
     /// ```
-    pub(super) fn from_presentation(presentation: &Presentation) -> Result<Self> {
-        let slides = presentation.slides()?;
+    pub(super) fn from_presentation_with_validated_slides(
+        presentation: &Presentation,
+        validated_slides: &[Slide],
+    ) -> Result<Self> {
+        // Editing snapshots construct this projection from the same immutable
+        // package bytes before a transaction can be opened. Keep staging
+        // isolated by cloning it into the draft, but do not parse every slide
+        // a second time solely to obtain the same semantic values.
+        let slides = validated_slides.to_vec();
         let settings = presentation.settings()?;
         let parsed_declarations = presentation.declarations()?;
         let parsed_page_metadata = presentation.pages()?;
@@ -799,4 +809,54 @@ fn slide_content_eq(left: &Slide, right: &Slide) -> bool {
         && *animations == right.animations
         && *legacy_animation == right.legacy_animation
         && *shapes == right.shapes
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MutablePresentation;
+    use crate::{Builder, Presentation};
+    use litchi_core::Result;
+
+    fn presentation_with_two_slides() -> Result<Presentation> {
+        let mut builder = Builder::new();
+        builder.add_slide_with_title("First", "First body")?;
+        builder.add_slide_with_title("Second", "Second body")?;
+        Presentation::from_bytes(builder.build()?)
+    }
+
+    #[test]
+    fn validated_slide_projection_is_cloned_into_isolated_draft_state() -> Result<()> {
+        let presentation = presentation_with_two_slides()?;
+        let validated_slides = presentation.slides()?;
+        let mut draft = MutablePresentation::from_presentation_with_validated_slides(
+            &presentation,
+            &validated_slides,
+        )?;
+
+        assert_eq!(draft.slides, validated_slides);
+        assert_eq!(draft.source_slides, validated_slides);
+        assert!(draft.retains_source_slide(0));
+
+        draft.update_slide(0, "Changed", "Changed body")?;
+        assert_eq!(validated_slides[0].title.as_deref(), Some("First"));
+        assert_eq!(draft.source_slides, validated_slides);
+        assert!(!draft.retains_source_slide(0));
+        Ok(())
+    }
+
+    #[test]
+    fn validated_slide_projection_refuses_incomplete_source_page_coverage() -> Result<()> {
+        let presentation = presentation_with_two_slides()?;
+        let validated_slides = presentation.slides()?;
+        let error = match MutablePresentation::from_presentation_with_validated_slides(
+            &presentation,
+            &validated_slides[..1],
+        ) {
+            Ok(_) => panic!("incomplete source slide coverage was accepted"),
+            Err(error) => error,
+        };
+
+        assert!(error.to_string().contains("coverage is incomplete"));
+        Ok(())
+    }
 }

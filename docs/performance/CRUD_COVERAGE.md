@@ -229,6 +229,14 @@ public/full-list parity, out-of-range behavior, late semantic failure and style
 inheritance failure. It does not provide positional ZIP/XML I/O, early
 termination, repeated-query caching, or broader real-producer/media selection.
 
+Change 0060 leaves ODP CRUD capabilities unchanged while reusing the immutable
+editing snapshot's already validated complete slide projection when creating an
+isolated transaction. Package/security reopening, settings, declarations, page
+metadata, lossless source-page coverage, deterministic commit, exact no-op,
+patch/inverse and complete final semantic readback remain. It adds no new edit,
+structural/resource, repair, producer, streaming, cold-source or security
+capability.
+
 Change 0050 leaves native DOC CRUD and publication semantics unchanged while
 indexing the private CLX PieceTable for repeated PAPX/CHPX physical-range
 queries. Scalar differential tests cover overlapping fast-save intervals,

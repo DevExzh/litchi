@@ -306,6 +306,13 @@ incomplete program and CRUD matrix.
   allocation calls fall 3.86%. Tiny is neutral, medium improves 1.55% p50,
   and the unchanged list/save guards remain within thresholds. See
   [`0049`](changes/0049-odp-indexed-slide-selector.md).
+- ODP transaction staging now reuses the complete slide projection already
+  validated and retained by its immutable editing snapshot. Large exact-no-op
+  edit/save p50 falls from 1.728 to 0.692 ms (-59.96%, 2.50x), while large
+  changed edit/save falls 20.78%. Process allocation calls fall 20.13%, peak
+  heap and uninstrumented RSS remain flat, and the complete package/security,
+  raw-page-coverage, publication and independent readback boundaries remain.
+  See [`0060`](changes/0060-odp-snapshot-slide-projection-reuse.md).
 - Native DOC now indexes CLX pieces by physical FC with prefix maximum ends,
   so repeated PAPX/CHPX FKP range mapping skips non-overlapping pieces without
   assuming fast-save intervals are disjoint. Large public open p50 falls from

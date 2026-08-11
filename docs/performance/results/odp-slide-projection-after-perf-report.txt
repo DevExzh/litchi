@@ -1,0 +1,494 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 4K of event 'cycles:P'
+# Event count (approx.): 20805740431
+#
+# Overhead  Command  Shared Object         Symbol
+# ........  .......  ....................  ......................................................................................................................................................................................
+#
+    13.75%  after    after                 [.] litchi_odp::codec::parser::codec::xml::validation::<impl litchi_odp::codec::parser::codec::Parser>::get_attr
+            |
+            ---litchi_odp::codec::parser::codec::xml::validation::<impl litchi_odp::codec::parser::codec::Parser>::get_attr
+
+    10.81%  after    after                 [.] quick_xml::events::attributes::IterState::next
+            |
+            ---quick_xml::events::attributes::IterState::next
+               |
+               |--0.87%--0x4e
+               |
+               |--0.71%--0x20
+               |
+               |--0.71%--0x3a
+               |
+               |--0.59%--0x69
+               |
+               |--0.47%--0x8000000000000001
+               |          |
+               |          |--0.26%--0x2404100f306b894c
+               |          |
+               |           --0.21%--0x386b8948306b894c
+               |
+               |--0.35%--0x3a3a3a3a3a3a3a3a
+               |          |
+               |          |--0.21%--0x2404100f306b894c
+               |          |
+               |           --0.14%--0x31223d6e6f697372
+               |
+               |--0.31%--0x6a
+               |
+               |--0.31%--0x9f
+               |
+               |--0.30%--0x64fb74a758d0
+               |
+               |--0.28%--0xa1
+               |
+               |--0.28%--0x7e
+               |
+               |--0.26%--0x91
+               |
+               |--0.24%--0x7f
+               |
+               |--0.21%--0x800000000000003a
+               |
+               |--0.21%--0xa
+               |
+               |--0.16%--0x7ffe0b75b4f0
+               |          0x21
+               |
+               |--0.16%--0x93
+               |
+               |--0.12%--0x64fb561ced34
+               |
+               |--0.12%--0x7
+               |          0x6f697461746e6573
+               |
+                --0.12%--0x64fb5619dcd8
+
+    10.77%  after    libc.so.6             [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+               |
+                --0.61%--0x3a7761726420656d
+
+     5.76%  after    after                 [.] quick_xml::events::attributes::IterState::check_for_duplicates
+            |
+            ---quick_xml::events::attributes::IterState::check_for_duplicates
+               |
+               |--4.68%--0x3a7761726420656d
+               |
+               |--0.19%--0x20
+               |
+               |--0.12%--0xa1
+               |
+               |--0.12%--0x4e
+               |
+                --0.12%--0xa
+
+     5.06%  after    after                 [.] quick_xml::name::NamespaceResolver::resolve_prefix
+            |
+            ---quick_xml::name::NamespaceResolver::resolve_prefix
+               |
+                --0.12%--0x64fb74a758d0
+
+     3.43%  after    libc.so.6             [.] _int_malloc
+            |
+             --3.41%--_int_malloc
+                       |
+                       |--2.80%--_int_realloc
+                       |          realloc
+                       |          |
+                       |          |--2.54%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+                       |          |          |
+                       |          |           --2.45%--0x3a7761726420656d
+                       |          |
+                       |           --0.14%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd12329f143ae49b8E.llvm.3547822891097061640
+                       |
+                        --0.54%--malloc
+                                  |
+                                   --0.12%--_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+
+     2.77%  after    after                 [.] _ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17h2ff24e4ba73a1388E.llvm.1502123506574063379
+            |
+            ---_ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17h2ff24e4ba73a1388E.llvm.1502123506574063379
+               |
+                --0.23%--0x8000000000000000
+
+     2.77%  after    after                 [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+            |
+            ---<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+               |
+                --0.12%--0x10001000000
+
+     2.45%  after    after                 [.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+            |
+            ---quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+
+     2.00%  after    after                 [.] _ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+            |
+            ---_ZN10litchi_odp5codec6parser5codec3xml5codec58_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$23parse_pages_with_styles17h91f5b6d7cd5c12b8E.llvm.4165376561976870151
+
+     1.76%  after    after                 [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+            |
+            ---memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+               |
+               |--1.48%--quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+               |
+                --0.28%--quick_xml::reader::Reader<R>::read_event_impl
+
+     1.71%  after    after                 [.] quick_xml::name::NamespaceResolver::resolve_event
+            |
+            ---quick_xml::name::NamespaceResolver::resolve_event
+
+     1.67%  after    after                 [.] litchi_odp::codec::parser::codec::xml::semantic::<impl litchi_odp::codec::parser::codec::Parser>::shape_builder
+            |
+            ---litchi_odp::codec::parser::codec::xml::semantic::<impl litchi_odp::codec::parser::codec::Parser>::shape_builder
+
+     1.65%  after    libc.so.6             [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+               |
+                --0.16%--realloc
+                          |
+                           --0.12%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd12329f143ae49b8E.llvm.3547822891097061640
+
+     1.51%  after    libc.so.6             [.] _int_free
+            |
+            ---_int_free
+               |
+               |--1.13%--cfree@GLIBC_2.2.5
+               |          |
+               |          |--0.33%--litchi_odp::codec::parser::codec::xml::semantic::<impl litchi_odp::codec::parser::codec::Parser>::finish_shape
+               |          |          0xcccccccccccccccc
+               |          |
+               |           --0.28%--litchi_odp::codec::parser::codec::xml::validation::<impl litchi_odp::codec::parser::codec::Parser>::get_attr
+               |
+                --0.26%--_int_realloc
+                          realloc
+                          |
+                           --0.17%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+                                     0x3a7761726420656d
+
+     1.48%  after    after                 [.] litchi_odp::codec::parser::codec::xml::semantic::<impl litchi_odp::codec::parser::codec::Parser>::drawing_attributes
+            |
+            ---litchi_odp::codec::parser::codec::xml::semantic::<impl litchi_odp::codec::parser::codec::Parser>::drawing_attributes
+               |
+                --1.15%--0x64fb74a758d0
+
+     1.46%  after    after                 [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+            |
+            ---memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+               |
+               |--1.06%--quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+               |
+                --0.12%--quick_xml::reader::Reader<R>::read_event_impl
+
+     1.29%  after    libc.so.6             [.] __memmove_avx512_unaligned
+            |
+            ---__memmove_avx512_unaligned
+               |
+                --0.19%--realloc
+                          _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+                          |
+                           --0.17%--0x3a7761726420656d
+
+     1.22%  after    after                 [.] quick_xml::reader::state::ReaderState::emit_start
+            |
+            ---quick_xml::reader::state::ReaderState::emit_start
+               |
+               |--0.35%--0x1
+               |
+                --0.33%--0
+
+     1.17%  after    after                 [.] litchi_odp::codec::parser::codec::xml::codec::<impl litchi_odp::codec::parser::codec::Parser>::parse_transition_style_definitions
+            |
+            ---litchi_odp::codec::parser::codec::xml::codec::<impl litchi_odp::codec::parser::codec::Parser>::parse_transition_style_definitions
+
+     1.01%  after    after                 [.] litchi_odp::codec::content_source::scanner::Scanner::run
+            |
+            ---litchi_odp::codec::content_source::scanner::Scanner::run
+
+     0.99%  after    after                 [.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+            |
+            ---quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+
+     0.98%  after    libc.so.6             [.] unlink_chunk.isra.0
+            |
+            ---unlink_chunk.isra.0
+               |
+               |--0.63%--_int_malloc
+               |          |
+               |           --0.56%--_int_realloc
+               |                     realloc
+               |                     _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+               |                     0x3a7761726420656d
+               |
+                --0.12%--cfree@GLIBC_2.2.5
+                          litchi_odp::codec::parser::codec::xml::validation::<impl litchi_odp::codec::parser::codec::Parser>::get_attr
+
+     0.97%  after    after                 [.] quick_xml::reader::Reader<R>::read_event_impl
+            |
+            ---quick_xml::reader::Reader<R>::read_event_impl
+               |
+                --0.26%--0
+
+     0.94%  after    libc.so.6             [.] malloc
+            |
+            ---malloc
+               |
+               |--0.40%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+               |          |
+               |           --0.31%--0x3a7761726420656d
+               |
+                --0.12%--alloc::raw_vec::RawVecInner<A>::try_allocate_in
+
+     0.89%  after    after                 [.] _RNvNtNtCsgEmfK2I1SDS_4core3str8converts9from_utf8
+            |
+            ---_RNvNtNtCsgEmfK2I1SDS_4core3str8converts9from_utf8
+               |
+                --0.16%--0x3
+                          0x6e3a736973616f3a
+
+     0.70%  after    after                 [.] zlib_rs::inflate::inftrees::inflate_table
+            |
+            ---zlib_rs::inflate::inftrees::inflate_table
+
+     0.68%  after    after                 [.] litchi_odp::codec::parser::model::ParagraphText::push_text
+            |
+            ---litchi_odp::codec::parser::model::ParagraphText::push_text
+               |
+                --0.31%--0x4100000000
+
+     0.68%  after    after                 [.] quick_xml::name::NamespaceResolver::push
+            |
+            ---quick_xml::name::NamespaceResolver::push
+               |
+               |--0.19%--0x3a3a3a3a3a3a3a3a
+               |          |
+               |           --0.12%--0x2404100f306b894c
+               |
+               |--0.19%--0x8000000000000001
+               |
+                --0.12%--0x800000000000003a
+
+     0.66%  after    libc.so.6             [.] _int_realloc
+            |
+            ---_int_realloc
+               |
+                --0.59%--realloc
+                          |
+                          |--0.45%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+                          |          0x3a7761726420656d
+                          |
+                           --0.14%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd12329f143ae49b8E.llvm.3547822891097061640
+
+     0.66%  after    after                 [.] zlib_rs::inflate::inflate_fast_help_avx2
+            |
+            ---zlib_rs::inflate::inflate_fast_help_avx2
+
+     0.64%  after    after                 [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+            |
+            ---_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+               |
+                --0.61%--0x3a7761726420656d
+
+     0.61%  after    after                 [.] memchr::arch::x86_64::avx2::memchr::One::find_raw
+            |
+            ---memchr::arch::x86_64::avx2::memchr::One::find_raw
+               |
+               |--0.38%--quick_xml::name::QName::decompose
+               |
+                --0.14%--quick_xml::name::NamespaceResolver::resolve_event
+
+     0.59%  after    after                 [.] alloc::raw_vec::RawVec<T,A>::grow_one
+            |
+            ---alloc::raw_vec::RawVec<T,A>::grow_one
+               |
+                --0.57%--0x3a7761726420656d
+
+     0.59%  after    after                 [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+            |
+            ---memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+               quick_xml::reader::Reader<R>::read_event_impl
+               |
+                --0.12%--0x8000000000000000
+
+     0.52%  after    after                 [.] quick_xml::name::QName::decompose
+            |
+            ---quick_xml::name::QName::decompose
+               |
+                --0.12%--0x64fb74a758d0
+
+     0.52%  after    libc.so.6             [.] cfree@GLIBC_2.2.5
+            |
+            ---cfree@GLIBC_2.2.5
+               |
+                --0.21%--litchi_odp::codec::parser::codec::xml::validation::<impl litchi_odp::codec::parser::codec::Parser>::get_attr
+
+     0.52%  after    libc.so.6             [.] _int_free_merge_chunk
+            |
+            ---_int_free_merge_chunk
+               cfree@GLIBC_2.2.5
+               |
+                --0.45%--litchi_odp::codec::parser::codec::xml::validation::<impl litchi_odp::codec::parser::codec::Parser>::get_attr
+
+     0.49%  after    after                 [.] quick_xml::reader::state::ReaderState::emit_end
+            |
+            ---quick_xml::reader::state::ReaderState::emit_end
+               |
+                --0.28%--0x1
+
+     0.45%  after    libc.so.6             [.] realloc
+            |
+            ---realloc
+               |
+               |--0.31%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+               |          |
+               |           --0.26%--0x3a7761726420656d
+               |
+                --0.12%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd12329f143ae49b8E.llvm.3547822891097061640
+
+     0.45%  after    [unknown]             [k] 0xffffffff9d800f30
+            |
+            ---0xffffffff9d800f30
+
+     0.42%  after    after                 [.] litchi_odp::codec::parser::codec::xml::semantic::<impl litchi_odp::codec::parser::codec::Parser>::finish_shape
+            |
+            ---litchi_odp::codec::parser::codec::xml::semantic::<impl litchi_odp::codec::parser::codec::Parser>::finish_shape
+
+     0.42%  after    after                 [.] zlib_rs::inflate::inflate
+            |
+            ---zlib_rs::inflate::inflate
+
+     0.38%  after    after                 [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw
+            |
+            ---memchr::arch::x86_64::avx2::memchr::Three::find_raw
+               |
+               |--0.26%--quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+               |
+                --0.12%--quick_xml::reader::Reader<R>::read_event_impl
+
+     0.35%  after    after                 [.] memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+            |
+            ---memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+               |
+                --0.23%--quick_xml::reader::Reader<R>::read_event_impl
+
+     0.33%  after    after                 [.] _RNvNtNtCsgEmfK2I1SDS_4core5slice6memchr7memrchr
+            |
+            ---_RNvNtNtCsgEmfK2I1SDS_4core5slice6memchr7memrchr
+               |
+                --0.31%--_RNvXs0_NtNtCsgEmfK2I1SDS_4core3str7patternNtB5_12CharSearcherNtB5_15ReverseSearcher15next_match_back
+
+     0.31%  after    after                 [.] quick_xml::reader::Reader<R>::read_event_impl
+            |
+            ---quick_xml::reader::Reader<R>::read_event_impl
+
+     0.26%  after    after                 [.] litchi_odf_common::package::codec::parse_entry
+            |
+            ---litchi_odf_common::package::codec::parse_entry
+
+     0.26%  after    after                 [.] quick_xml::escape::normalize_attribute_value
+            |
+            ---quick_xml::escape::normalize_attribute_value
+
+     0.26%  after    after                 [.] crc32fast::specialized::pclmulqdq::calculate
+            |
+            ---crc32fast::specialized::pclmulqdq::calculate
+               |
+                --0.24%--0x79646f622d70646f
+
+     0.26%  after    after                 [.] litchi_odp::model::settings::parse
+            |
+            ---litchi_odp::model::settings::parse
+
+     0.26%  after    libc.so.6             [.] malloc_consolidate
+            |
+            ---malloc_consolidate
+               |
+                --0.19%--_int_malloc
+                          |
+                           --0.12%--malloc
+
+     0.26%  after    after                 [.] litchi_odp::codec::parser::codec::xml::semantic::<impl litchi_odp::codec::parser::codec::Parser>::classify
+            |
+            ---litchi_odp::codec::parser::codec::xml::semantic::<impl litchi_odp::codec::parser::codec::Parser>::classify
+               |
+                --0.16%--0x646f2d656e696c3e
+
+     0.24%  after    libc.so.6             [.] _int_free_maybe_consolidate
+            |
+            ---_int_free_maybe_consolidate
+               |
+                --0.21%--cfree@GLIBC_2.2.5
+                          |
+                           --0.16%--litchi_odp::codec::parser::codec::xml::validation::<impl litchi_odp::codec::parser::codec::Parser>::get_attr
+
+     0.21%  after    after                 [.] litchi_odp::model::slide::DrawingAttribute::new
+            |
+            ---litchi_odp::model::slide::DrawingAttribute::new
+
+     0.21%  after    after                 [.] litchi_odp::model::declaration::parse
+            |
+            ---litchi_odp::model::declaration::parse
+
+     0.21%  after    after                 [.] litchi_odp::model::page_metadata::parse
+            |
+            ---litchi_odp::model::page_metadata::parse
+               0x8000000000000000
+
+     0.21%  after    after                 [.] memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+            |
+            ---memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+               |
+                --0.14%--quick_xml::name::QName::decompose
+
+     0.19%  after    libc.so.6             [.] __memset_avx512_unaligned_erms
+            |
+            ---__memset_avx512_unaligned_erms
+
+     0.17%  after    after                 [.] alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+            |
+            ---alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+
+     0.16%  after    after                 [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw
+            |
+            ---memchr::arch::x86_64::avx2::memchr::Two::find_raw
+               quick_xml::reader::Reader<R>::read_event_impl
+
+     0.14%  after    after                 [.] _ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17ha34f0284a646bfcbE.llvm.410775697957024005
+            |
+            ---_ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17ha34f0284a646bfcbE.llvm.410775697957024005
+
+     0.14%  after    after                 [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd12329f143ae49b8E.llvm.3547822891097061640
+            |
+            ---_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd12329f143ae49b8E.llvm.3547822891097061640
+
+     0.14%  after    after                 [.] hashbrown::map::HashMap<K,V,S,A>::insert
+            |
+            ---hashbrown::map::HashMap<K,V,S,A>::insert
+               0x7739ba887c864c4b
+
+     0.12%  after    after                 [.] _RNvCsfLfy6EI15iL_7___rustc13___rdl_realloc
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc13___rdl_realloc
+
+     0.12%  after    after                 [.] _RNvCsfLfy6EI15iL_7___rustc14___rust_realloc
+            |
+            ---_RNvCsfLfy6EI15iL_7___rustc14___rust_realloc
+
+     0.12%  after    after                 [.] litchi_odp::model::page_metadata::parse_page
+            |
+            ---litchi_odp::model::page_metadata::parse_page
+
+     0.12%  after    after                 [.] litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_pages_with_styles::_$u7b$$u7b$closure$u7d$$u7d$::h64c9283095b270e9
+            |
+            ---litchi_odp::codec::parser::codec::xml::codec::_$LT$impl$u20$litchi_odp..codec..parser..codec..Parser$GT$::parse_pages_with_styles::_$u7b$$u7b$closure$u7d$$u7d$::h64c9283095b270e9
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

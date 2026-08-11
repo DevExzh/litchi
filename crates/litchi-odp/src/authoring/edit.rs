@@ -290,7 +290,10 @@ impl Snapshot {
         ensure_editable_source(presentation.owned_package())?;
         Ok(Transaction {
             source: self.clone(),
-            draft: MutablePresentation::from_presentation(&presentation)?,
+            draft: MutablePresentation::from_presentation_with_validated_slides(
+                &presentation,
+                self.slides(),
+            )?,
             changed: false,
             rdf: None,
             charts: None,
