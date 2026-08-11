@@ -23,16 +23,16 @@ use std::{
 };
 
 use litchi_cfb::{OleFile, OleWriter, SharedOleFile, SharedOleFileLimits};
-use litchi_core::Position;
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, SourceVersion,
 };
+use litchi_core::{OwnedSource, Position};
 use litchi_ole_common::object::{
     Editor as OleObjectEditor, Limits as OleObjectLimits, Targets as OleObjectTargets,
 };
 use litchi_opc::{
-    BlobPart, OpcPackage, OpenSession, PackURI, PackageWriter, ReadLimits, SourceBackedPackage,
-    SourceCacheLimits, TargetMode, constants::relationship_type,
+    BlobPart, OpcPackage, OpenSession, PackURI, PackageWriter, ReadLimits, Relationships,
+    SourceBackedPackage, SourceCacheLimits, TargetMode, constants::relationship_type,
 };
 use litchi_xlsx::{Cell as XlsxCell, SourceBackedWorkbook, Value as XlsxValue, Workbook};
 use serde::Serialize;
@@ -52,6 +52,7 @@ const CFB_CORPUS_GENERATOR: &str = "litchi-cfb-synthetic-v1";
 const LEGACY_WRITER_CORPUS_GENERATOR: &str = "litchi-legacy-writer-v1";
 const XLSX_CORPUS_GENERATOR: &str = "litchi-xlsx-synthetic-v1";
 const SEMANTIC_DOCX_CORPUS_GENERATOR: &str = "litchi-docx-semantic-v1";
+const DOCX_SOURCE_EDIT_CORPUS_GENERATOR: &str = "litchi-docx-source-edit-media-v1";
 const SEMANTIC_PPTX_CORPUS_GENERATOR: &str = "litchi-pptx-semantic-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
 const ODT_MEDIA_CORPUS_GENERATOR: &str = "litchi-odt-media-paragraph-publication-v1";
@@ -62,6 +63,8 @@ const ODP_MEDIA_CORPUS_GENERATOR: &str = "litchi-odp-media-textbox-publication-v
 const SEMANTIC_RTF_CORPUS_GENERATOR: &str = "litchi-rtf-semantic-v2";
 const ODS_MEDIA_ENTRY_COUNT: usize = 8;
 const ODS_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
+const DOCX_SOURCE_MEDIA_ENTRY_COUNT: usize = 8;
+const DOCX_SOURCE_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const ODP_MEDIA_TEXT_BOX_NAME: &str = "litchi-perf-media-text-box";
 const OLE_COMMON_CORPUS_GENERATOR: &str = "litchi-ole-common-copy-elision-v1";
 const OLE_COMMON_TARGET: &str = "ole_common_edit_target.bin";
@@ -333,6 +336,7 @@ enum Case {
     OpcSourceCachedMainRead,
     OpcSourceConcurrentSamePart,
     OpcSourceOverlayOnePartSave,
+    DocxSourceBackedOneEditSave,
     CfbOpen,
     CfbListStreams,
     CfbReadOne,
@@ -495,6 +499,7 @@ impl Case {
             Self::OpcSourceCachedMainRead => "opc_source_cached_main_read",
             Self::OpcSourceConcurrentSamePart => "opc_source_concurrent_same_part",
             Self::OpcSourceOverlayOnePartSave => "opc_source_overlay_one_part_save",
+            Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::CfbOpen => "cfb_open",
             Self::CfbListStreams => "cfb_list_streams",
             Self::CfbReadOne => "cfb_read_one",
@@ -826,6 +831,10 @@ impl Case {
 
     const fn is_opc_source_overlay_save(self) -> bool {
         matches!(self, Self::OpcSourceOverlayOnePartSave)
+    }
+
+    const fn is_docx_source_edit_save(self) -> bool {
+        matches!(self, Self::DocxSourceBackedOneEditSave)
     }
 }
 
@@ -1655,6 +1664,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_odp()
                     && !case.uses_odp_media()
                     && !case.is_opc_source_overlay_save()
+                    && !case.is_docx_source_edit_save()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
                     cfb_corpus
@@ -1695,6 +1705,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         let corpus = build_opc_corpus(CorpusShape::FewLarge, PayloadKind::Incompressible)?;
         results.push(run_opc_source_overlay_one_part_save(
+            &corpus,
+            options.warmup_iterations,
+            options.samples,
+        )?);
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_docx_source_edit_save())
+    {
+        let corpus = build_docx_source_edit_corpus()?;
+        results.push(run_docx_source_backed_one_edit_save(
             &corpus,
             options.warmup_iterations,
             options.samples,
@@ -2162,6 +2185,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_source_cached_main_read" => Some(Case::OpcSourceCachedMainRead),
         "opc_source_concurrent_same_part" => Some(Case::OpcSourceConcurrentSamePart),
         "opc_source_overlay_one_part_save" => Some(Case::OpcSourceOverlayOnePartSave),
+        "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
         "cfb_open" => Some(Case::CfbOpen),
         "cfb_list_streams" => Some(Case::CfbListStreams),
         "cfb_read_one" => Some(Case::CfbReadOne),
@@ -2341,6 +2365,7 @@ fn print_usage() {
                                        opc_source_open_main_read,opc_source_cached_main_read,\n\
                                        opc_source_concurrent_same_part,\n\
                                        opc_source_overlay_one_part_save,\n\
+                                       docx_source_backed_one_edit_save,\n\
                                        cfb_open,cfb_list_streams,cfb_read_one,\n\
                                        cfb_create_stream_borrowed,cfb_create_stream_owned,\n\
                                        ole_common_open,ole_common_put_stream_publish,\n\
@@ -3011,6 +3036,81 @@ fn build_semantic_docx_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
         },
         archive,
         target_name: "paragraph:0".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn docx_source_media_payload(index: usize) -> Vec<u8> {
+    let mut bytes = payload_bytes(
+        PayloadKind::Incompressible,
+        40_000 + index,
+        DOCX_SOURCE_MEDIA_ENTRY_BYTES,
+    );
+    bytes[..8].copy_from_slice(b"\x89PNG\r\n\x1a\n");
+    bytes
+}
+
+fn docx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut package = litchi_docx::Package::new()?;
+    let document = package.document_mut()?;
+    for index in 0..SemanticShape::Medium.docx_paragraphs() {
+        let paragraph = document.add_paragraph_with_text(&semantic_docx_text(index, false));
+        if index < DOCX_SOURCE_MEDIA_ENTRY_COUNT {
+            paragraph.add_picture_from_bytes(
+                docx_source_media_payload(index),
+                Some(914_400),
+                Some(914_400),
+            )?;
+        }
+    }
+    let mut output = Cursor::new(Vec::new());
+    package.to_stream(&mut output)?;
+    Ok(output.into_inner())
+}
+
+fn build_docx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let archive = docx_source_edit_bytes()?;
+    let package = litchi_docx::Package::from_reader(Cursor::new(archive.clone()))?;
+    verify_semantic_docx(&package, SemanticShape::Medium, &[])?;
+    let opc = OpcPackage::from_bytes(&archive)?;
+    let entry_count = opc.part_count();
+    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
+        total
+            .checked_add(part.blob().len())
+            .ok_or("DOCX source-edit logical byte count overflows usize")
+    })?;
+    for index in 0..DOCX_SOURCE_MEDIA_ENTRY_COUNT {
+        let uri = PackURI::new(format!("/word/media/image{}.png", index + 1))?;
+        if opc.get_part(&uri)?.blob() != docx_source_media_payload(index) {
+            return Err("DOCX source-edit media payload differs from specification".into());
+        }
+    }
+    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let target = SemanticShape::Medium.docx_paragraphs() / 2;
+    let target_payload = semantic_docx_text(target, false).into_bytes();
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: "docx-source-backed-media".to_owned(),
+            generator: DOCX_SOURCE_EDIT_CORPUS_GENERATOR,
+            package_format: "DOCX/OPC/ZIP",
+            shape: "media-rich",
+            payload_kind: "deterministic-incompressible-media",
+            compression: "deflate",
+            entry_count,
+            archive_member_count,
+            entry_bytes: DOCX_SOURCE_MEDIA_ENTRY_BYTES,
+            uncompressed_payload_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: format!("paragraph:{target}"),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "word/document.xml".to_owned(),
         target_payload,
         xlsx: None,
     })
@@ -3866,6 +3966,9 @@ fn run_case_with_config(
         },
         Case::OpcSourceOverlayOnePartSave => {
             run_opc_source_overlay_one_part_save(corpus, warmup_iterations, samples)
+        },
+        Case::DocxSourceBackedOneEditSave => {
+            run_docx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
         },
         Case::CfbOpen => run_cfb_open(corpus, warmup_iterations, samples),
         Case::CfbListStreams => run_cfb_list_streams(corpus, warmup_iterations, samples),
@@ -7094,6 +7197,29 @@ fn zip_member_ranges(bytes: &[u8]) -> Result<Vec<(String, Range<u64>)>, Box<dyn 
     Ok(members)
 }
 
+fn docx_source_payload_ranges(
+    corpus: &Corpus,
+) -> Result<(Vec<Range<u64>>, Range<u64>), Box<dyn Error>> {
+    let mut ordinary = Vec::with_capacity(corpus.manifest.entry_count);
+    let mut target = None;
+    for (name, range) in zip_member_ranges(&corpus.archive)? {
+        if name == "[Content_Types].xml" || name.ends_with(".rels") {
+            continue;
+        }
+        if name == corpus.target_name {
+            target = Some(range.clone());
+        }
+        ordinary.push(range);
+    }
+    if ordinary.len() != corpus.manifest.entry_count {
+        return Err("DOCX source-edit payload count differs from corpus manifest".into());
+    }
+    Ok((
+        ordinary,
+        target.ok_or("DOCX source-edit main document has no compressed source range")?,
+    ))
+}
+
 fn xlsx_source_layout(
     bytes: &[u8],
     expected_sheet_count: usize,
@@ -7581,6 +7707,173 @@ fn run_opc_source_overlay_one_part_save(
     }
     Ok(CaseResult {
         case: Case::OpcSourceOverlayOnePartSave.name(),
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: Some(expected_digest),
+    })
+}
+
+fn relationship_signatures(relationships: &Relationships) -> Vec<(String, String, String, bool)> {
+    let mut signatures = relationships
+        .iter()
+        .map(|relationship| {
+            (
+                relationship.r_id().to_owned(),
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.is_external(),
+            )
+        })
+        .collect::<Vec<_>>();
+    signatures.sort();
+    signatures
+}
+
+fn verify_docx_source_edit_output(corpus: &Corpus, output: &[u8]) -> Result<(), Box<dyn Error>> {
+    let target = SemanticShape::Medium.docx_paragraphs() / 2;
+    let document = litchi_docx::Package::from_reader(Cursor::new(output))?;
+    verify_semantic_docx(&document, SemanticShape::Medium, &[target])?;
+
+    let source = OpcPackage::from_bytes(&corpus.archive)?;
+    let candidate = OpcPackage::from_bytes(output)?;
+    if source.part_count() != corpus.manifest.entry_count
+        || candidate.part_count() != source.part_count()
+        || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
+    {
+        return Err("DOCX source-edit package topology differs from source".into());
+    }
+    let main_uri = PackURI::new("/word/document.xml")?;
+    for source_part in source.iter_parts() {
+        let candidate_part = candidate.get_part(source_part.partname())?;
+        if candidate_part.content_type() != source_part.content_type()
+            || relationship_signatures(candidate_part.rels())
+                != relationship_signatures(source_part.rels())
+        {
+            return Err("DOCX source-edit Part metadata differs from source".into());
+        }
+        if source_part.partname() == &main_uri {
+            if source_part.blob() == candidate_part.blob() {
+                return Err("DOCX source-edit main document did not change".into());
+            }
+        } else if source_part.blob() != candidate_part.blob() {
+            return Err("DOCX source-edit changed an unselected Part payload".into());
+        }
+    }
+    for index in 0..DOCX_SOURCE_MEDIA_ENTRY_COUNT {
+        let uri = PackURI::new(format!("/word/media/image{}.png", index + 1))?;
+        if candidate.get_part(&uri)?.blob() != docx_source_media_payload(index) {
+            return Err("DOCX source-edit media readback differs from specification".into());
+        }
+    }
+    Ok(())
+}
+
+fn publish_docx_source_edit_control<W: Write>(
+    source: Arc<dyn ReadAt>,
+    writer: W,
+) -> Result<(usize, litchi_docx::document::Commit), Box<dyn Error>> {
+    let source_package = SourceBackedPackage::from_read_at(source)?;
+    let materializations = source_package.iter_parts().count();
+    let opc = source_package.into_opc_package()?;
+    let mut package = litchi_docx::Package::from_opc_package(opc)?;
+    let target = SemanticShape::Medium.docx_paragraphs() / 2;
+    let mut edit = package.edit_document()?;
+    edit.replace_paragraph_text(Position::new(target), semantic_docx_text(target, true))?;
+    let commit = edit.commit()?;
+    if !commit.patch().changed() || commit.diagnostics().operations() != 1 {
+        return Err("DOCX source-edit control produced unexpected commit diagnostics".into());
+    }
+    package.publish_document_commit(commit.clone())?;
+    package.to_stream(writer)?;
+    Ok((materializations, commit))
+}
+
+fn run_docx_source_backed_one_edit_save(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != DOCX_SOURCE_EDIT_CORPUS_GENERATOR {
+        return Err("DOCX source-edit case requires its fixed media-rich corpus".into());
+    }
+    let expected_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+    let mut expected = Vec::new();
+    let (expected_materializations, expected_commit) =
+        publish_docx_source_edit_control(expected_source, &mut expected)?;
+    if expected == corpus.archive
+        || expected_materializations != corpus.manifest.entry_count
+        || expected_commit.diagnostics().operations() != 1
+    {
+        return Err("DOCX source-edit control does not exercise all-Part publication".into());
+    }
+    verify_docx_source_edit_output(corpus, &expected)?;
+    let expected_digest = sha256_hex(&expected);
+    let maximum = u64::try_from(expected.len())?
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("DOCX source-edit sequential output ceiling overflows u64")?;
+    let (payload_ranges, _target_range) = docx_source_payload_ranges(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut measured_digests = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = Arc::new(InstrumentedSource::new(
+            corpus.archive.clone(),
+            payload_ranges.clone(),
+        ));
+        let read_at: Arc<dyn ReadAt> = source.clone();
+        let mut sink = CountingSink::bounded(maximum, 64 * 1024);
+        sink.reserve_budget()?;
+        let started = Instant::now();
+        let (materializations, commit) = publish_docx_source_edit_control(read_at, &mut sink)?;
+        let duration = started.elapsed();
+
+        if materializations != expected_materializations || sink.bytes != expected {
+            return Err("DOCX source-edit control differs between iterations".into());
+        }
+        let replayed = commit.patch().apply(commit.patch().source())?;
+        if replayed.xml_bytes() != commit.snapshot().xml_bytes() {
+            return Err("DOCX source-edit patch replay differs from commit".into());
+        }
+        let restored = commit.patch().inverse().apply(commit.snapshot())?;
+        if restored.xml_bytes() != commit.patch().source().xml_bytes() {
+            return Err("DOCX source-edit inverse did not restore main XML".into());
+        }
+        if commit.patch().apply(commit.snapshot()).is_ok() {
+            return Err("DOCX source-edit patch accepted a stale target".into());
+        }
+        verify_docx_source_edit_output(corpus, &sink.bytes)?;
+        let digest = sha256_hex(&sink.bytes);
+        if digest != expected_digest {
+            return Err("DOCX source-edit output digest differs from expected output".into());
+        }
+        let metrics = source.snapshot();
+        if metrics.ordinary_payload_read_calls == 0 || metrics.ordinary_payload_read_bytes == 0 {
+            return Err("DOCX source-edit control performed no ordinary source reads".into());
+        }
+        if iteration >= warmup_iterations {
+            source_summary.record_opc(metrics, u64::try_from(materializations)?);
+            sink_summaries.push(sink.summary());
+            measured_digests.push(digest);
+        }
+        std::hint::black_box(&sink.bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let sink = deterministic_sink_summary(&sink_summaries, "DOCX source-backed edit/save")?;
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("DOCX source-edit measured output digests are not stable".into());
+    }
+    Ok(CaseResult {
+        case: Case::DocxSourceBackedOneEditSave.name(),
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -8509,15 +8802,16 @@ mod tests {
     use super::{
         Case, CorpusShape, CountingSink, InstrumentedSource, PayloadKind, RangeSimulationConfig,
         RequestSizeBuckets, RtfSemanticVariant, SemanticShape, SimulatedRangeSource,
-        SourceBackedPackage, WriterShape, XlsxShape, build_cfb_corpus, build_odp_media_corpus,
-        build_ods_media_corpus, build_odt_media_corpus, build_ole_common_corpus, build_opc_corpus,
+        SourceBackedPackage, WriterShape, XlsxShape, build_cfb_corpus,
+        build_docx_source_edit_corpus, build_odp_media_corpus, build_ods_media_corpus,
+        build_odt_media_corpus, build_ole_common_corpus, build_opc_corpus,
         build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
         build_semantic_odt_corpus, build_semantic_pptx_corpus, build_semantic_rtf_corpus,
         build_writer_corpus, build_xlsx_corpus, expected_opc_overlay_output,
         ole_common_changed_output, opc_overlay_replacement_payload, payload_bytes,
         resolve_execution_workers, run_case, run_case_with_config,
-        run_opc_source_overlay_one_part_save, run_scaling_case, sha256_hex,
-        simulated_request_delay, statistics,
+        run_docx_source_backed_one_edit_save, run_opc_source_overlay_one_part_save,
+        run_scaling_case, sha256_hex, simulated_request_delay, statistics,
     };
 
     #[test]
@@ -8567,6 +8861,7 @@ mod tests {
         let xlsx_results = 15 * XlsxShape::ALL.len();
         assert_eq!(substrate_results + writer_results + xlsx_results, 198);
         assert!(!Case::DEFAULT.contains(&Case::OpcSourceOverlayOnePartSave));
+        assert!(!Case::DEFAULT.contains(&Case::DocxSourceBackedOneEditSave));
     }
 
     #[test]
@@ -8600,6 +8895,27 @@ mod tests {
         assert!(source.read_calls.windows(2).all(|pair| pair[0] == pair[1]));
         assert!(source.read_bytes.windows(2).all(|pair| pair[0] == pair[1]));
         assert_eq!(source.ordinary_payload_materializations, Some(vec![1, 1]));
+    }
+
+    #[test]
+    fn docx_source_edit_control_is_deterministic_and_emits_complete_evidence() {
+        let corpus = build_docx_source_edit_corpus().unwrap();
+        let again = build_docx_source_edit_corpus().unwrap();
+        assert_eq!(corpus.archive, again.archive);
+        assert_eq!(
+            corpus.manifest.archive_sha256,
+            "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4"
+        );
+        let measured = run_docx_source_backed_one_edit_save(&corpus, 0, 1).unwrap();
+        assert_eq!(measured.case, "docx_source_backed_one_edit_save");
+        assert_eq!(measured.elapsed_ns.samples.len(), 1);
+        assert!(measured.output_sha256.is_some());
+        let source = measured.source.unwrap();
+        assert_eq!(source.read_calls.len(), 1);
+        assert_eq!(
+            source.ordinary_payload_materializations,
+            Some(vec![u64::try_from(corpus.manifest.entry_count).unwrap()])
+        );
     }
 
     #[test]
