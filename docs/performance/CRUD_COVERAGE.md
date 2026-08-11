@@ -186,6 +186,13 @@ documents and paragraph transfers are deliberately refused; PPTX/XLSX,
 topology changes, real producers, encrypted input and atomic filesystem
 publication remain open.
 
+Change 0040 removes repeated UTF-8 scalar decoding from ordinary RTF text
+delimiter discovery without changing the existing CRUD surface. It measures
+plain, raw CP-1252 and LZFu opens at medium and large, retains the 25-row
+transport/producer smoke, and preserves exact no-op, opaque syntax, limits,
+patch/inverse and complete readback contracts. Formatting/media-heavy,
+malformed/security and broader real-producer edits remain open.
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.

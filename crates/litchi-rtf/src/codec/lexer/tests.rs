@@ -98,6 +98,31 @@ fn test_tokenize_text() {
 }
 
 #[test]
+fn plain_text_scan_preserves_utf8_delimiters_and_physical_line_breaks() {
+    let arena = Bump::new();
+    let input = "alpha 你好\r\n\n beta\\par gamma{delta}";
+    let mut lexer = Lexer::new(input, &arena);
+    let (tokens, spans) = lexer.tokenize_with_spans().unwrap();
+
+    assert_eq!(
+        tokens,
+        vec![
+            Token::Text(Cow::Borrowed("alpha 你好")),
+            Token::Text(Cow::Borrowed(" beta")),
+            Token::Control(ControlWord::Par),
+            Token::Text(Cow::Borrowed("gamma")),
+            Token::OpenBrace,
+            Token::Text(Cow::Borrowed("delta")),
+            Token::CloseBrace,
+        ]
+    );
+    assert_eq!(
+        spans,
+        vec![0..13, 13..20, 20..25, 25..30, 30..31, 31..36, 36..37]
+    );
+}
+
+#[test]
 fn test_tokenize_multiple_control_words() {
     let arena = Bump::new();
     let input = r"{\rtf1\ansi\deff0}";
