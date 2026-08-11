@@ -1,0 +1,10 @@
+reading file "/tmp/doc-chpx-range-before.heaptrack.zst.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-perf-next-before-fcc89cbea --warmup 2 --samples 20 --case doc_semantic_list_paragraphs --writer-shape large --json /tmp/doc-chpx-range-before-heaptrack.json
+finished reading file, now analyzing data:
+
+total runtime: 0.334000s.
+calls to allocation functions: 748147 (2239961/s)
+temporary memory allocations: 355439 (1064188/s)
+peak heap memory consumption: 6.63M
+peak RSS (including heaptrack overhead): 18.49M
+total memory leaked: 544B

@@ -49,7 +49,9 @@ conversion remain.
    attributed repeated DOC PieceTable physical-range scan but retains the
    complete owner and public-reader validation layers. Change 0051 removes
    repeated adjacent paragraph-style inheritance resolution while retaining
-   every direct PAPX, style switch and both readback layers;
+   every direct PAPX, style switch and both readback layers. Change 0053
+   removes repeated full CHPX-vector scans from paragraph queries while
+   preserving exact run identity/order and both readback layers;
    preserve exact-source patch/inverse and the rejected DOC move as independent
    guardrails.
 2. Extend native RTF beyond the new raw CP-1252, LZFu and watermark read/no-op
@@ -241,6 +243,15 @@ PAPX, tables/revisions, malformed styles, the complete final snapshot, patch
 and inverse verification, and the independent public DOC reopen remain. This
 does not add repair, security, real-producer, streaming-output, or new edit
 coverage.
+
+Change 0053 leaves the same DOC CRUD and publication surface unchanged. It
+uses the private parser-normalized CHPX ordering to binary-search the first
+possible overlap and stops after the matching slice. Differential tests cover
+empty, reversed, adjacent, gapped, all/no-match and numeric-boundary queries
+and preserve exact run identity/order. Formatting cascading, fields/pictures,
+comments, glossary parsing, patches, inverse, final snapshot and independent
+public DOC readback remain. No new repair, security, producer, streaming or
+edit capability is claimed.
 
 Change 0040 removes repeated UTF-8 scalar decoding from ordinary RTF text
 delimiter discovery without changing the existing CRUD surface. It measures
