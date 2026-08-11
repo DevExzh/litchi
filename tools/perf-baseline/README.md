@@ -22,10 +22,11 @@ default 36 cases / 198 records.
 
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
-range cases, two execution-scaling cases, one XLSX commit/read attribution case,
+range cases, two execution-scaling cases, one source-overlay save case, one
+XLSX commit/read attribution case,
 four opaque-heavy common OLE2 stage/edit-save cases, 20 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, seven RTF semantic cases, and 25 ODF semantic cases
-are opt-in, for 117 selectable cases in total:
+are opt-in, for 118 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -62,6 +63,20 @@ The stage cases separately time public editor open, `put_stream` candidate
 publication, and changed `finish` rendering. The end-to-end case times all
 three. Stage preparation, exact deterministic output comparison and a complete
 public CFB reopen of all five streams remain outside each timed interval.
+
+Measure the current evidence-first OPC source overlay path on its fixed
+few-large incompressible corpus:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 5 --case opc_source_overlay_one_part_save \
+  --json target/perf/opc-source-overlay.json
+```
+
+This case times positional source open, complete conversion with
+`into_opc_package`, same-Part payload replacement under the existing URI and
+content type, and `PackageWriter::write_to_stream` into a sequential sink.
+Payload preparation and complete output verification stay outside timing.
 
 For just the end-to-end legacy writer packaging runs:
 
@@ -400,6 +415,12 @@ remain distinguishable.
 - `opc_source_concurrent_same_part`: start two cold main-Part reads together;
   both must receive the same pinned allocation, and a third access must be a
   zero-I/O cache hit.
+- `opc_source_overlay_one_part_save`: on the fixed few-large incompressible
+  corpus, time `InstrumentedSource` open, complete conversion to `OpcPackage`,
+  mutation of the existing main Part under the same URI and content type, and
+  sequential output through `PackageWriter::write_to_stream`. Source reads and
+  sink writes are reported; exact bytes, every reopened Part, and output digest
+  are verified after timing.
 - `cfb_open`: parse the complete generated container into `litchi_cfb::OleFile`.
 - `cfb_list_streams`: enumerate and materialize all stream paths from an
   already-open CFB container.
@@ -632,11 +653,12 @@ bandwidth, and maximum physical range. `configuration.execution_workers`
 records the resolved, capped, deduplicated scaling points in deterministic
 ascending order.
 
-The seventeen positional cases add a `source` object; older cases omit it. Its
+The eighteen positional cases add a `source` object; older cases omit it. Its
 arrays contain one value for every measured iteration and record `read_calls`,
 `read_bytes`, compressed ordinary-OPC-payload range overlap, and
-`max_in_flight_reads`. OPC cases also record semantic
-`ordinary_payload_materializations` (0 or 1). Payload-range overlap is a
+`max_in_flight_reads`. Applicable OPC cases also record a semantic per-sample
+`ordinary_payload_materializations` count; it may be zero, one, or multiple
+Parts depending on the timed operation. Payload-range overlap is a
 physical request-amplification metric: bounded ZIP metadata reads may fetch
 adjacent compressed payload bytes without decompressing or caching that Part.
 Accordingly, `opc_source_open` may report overlap while still reporting zero
@@ -661,6 +683,10 @@ Scaling records contain `execution.worker_count`, `logical_tasks`, and
 order. Those fields and the elapsed samples are sufficient to compute
 throughput, speedup, scaling efficiency, and an Amdahl serial-fraction estimate
 outside the harness.
+
+`opc_source_overlay_one_part_save` additionally emits `output_sha256`. The
+field is omitted from every other result, preserving existing JSON consumers
+while independently identifying the deterministic changed archive.
 
 ## External profiling
 
