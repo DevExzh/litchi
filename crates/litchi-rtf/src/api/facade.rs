@@ -344,6 +344,62 @@ mod tests {
         reason = "test assertions panic on failure by design"
     )]
     use super::Document;
+    use crate::text::{Break, Inline, Paragraph};
+
+    fn paragraph_signature(
+        paragraph: Paragraph<'_>,
+    ) -> (String, Option<String>, String, Vec<String>) {
+        let inlines = paragraph
+            .inlines()
+            .map(|inline| match inline {
+                Inline::Text(run) => format!(
+                    "text:{:?}:{}:{}:{:?}",
+                    run.text(),
+                    run.format().bold(),
+                    run.format().italic(),
+                    run.format().underline()
+                ),
+                Inline::Break(Break::Line) => "break:line".to_string(),
+                Inline::Break(Break::Paragraph) => "break:paragraph".to_string(),
+            })
+            .collect();
+        (
+            paragraph.to_text(),
+            paragraph.as_str().map(str::to_string),
+            format!("{:?}", paragraph.format()),
+            inlines,
+        )
+    }
+
+    fn assert_nth_matches_repeated_next(source: &str) {
+        let document = Document::parse(source).unwrap();
+        let paragraphs = document.body().paragraphs().count();
+        for index in 0..=paragraphs {
+            let mut repeated = document.body().paragraphs();
+            let mut expected = None;
+            for _ in 0..=index {
+                expected = repeated.next();
+                if expected.is_none() {
+                    break;
+                }
+            }
+            let mut selected = document.body().paragraphs();
+            let actual = selected.nth(index);
+            assert_eq!(
+                actual.map(paragraph_signature),
+                expected.map(paragraph_signature),
+                "paragraph {index} differed for {source:?}"
+            );
+            assert_eq!(
+                selected.next().map(paragraph_signature),
+                repeated.next().map(paragraph_signature),
+                "paragraph {index} did not leave the same iterator state for {source:?}"
+            );
+        }
+        let mut exhausted = document.body().paragraphs();
+        assert!(exhausted.nth(usize::MAX).is_none());
+        assert!(exhausted.next().is_none());
+    }
 
     #[test]
     fn semantic_story_traversal_does_not_flatten_the_snapshot() {
@@ -354,7 +410,7 @@ mod tests {
         let run_bytes: usize = document
             .body()
             .paragraphs()
-            .flat_map(super::super::story::Paragraph::runs)
+            .flat_map(Paragraph::runs)
             .map(|run| run.text().len())
             .sum();
 
@@ -374,5 +430,21 @@ mod tests {
             .unwrap();
 
         assert!(document.inner.paragraph_count.get().is_none());
+    }
+
+    #[test]
+    fn sparse_paragraph_nth_matches_repeated_next_for_structural_variants() {
+        for source in [
+            r"{\rtf1 first\par second\par third}",
+            r"{\rtf1 first\par\par third\par}",
+            r"{\rtf1 first\line wrapped\par second}",
+            r"{\rtf1 first\par\line second\par third}",
+            r"{\rtf1 first\par\qc plain {\b bold} {\i italic}\par\ql third}",
+            r"{\rtf1 first\par decoded\u10?linefeed\par third}",
+            r"{\rtf1 trailing unterminated text}",
+            r"{\rtf1}",
+        ] {
+            assert_nth_matches_repeated_next(source);
+        }
     }
 }

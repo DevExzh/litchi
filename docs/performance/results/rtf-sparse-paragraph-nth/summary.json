@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "status": "accepted",
+  "production_base": "e013f9e4d5b557786c0ce93929e04c54c2ae159a",
+  "control_binary_sha256": "48ec19374e8ffd47fa6001cc25fdc451ad68cf93b4e48542474d030436d2bbba",
+  "candidate_binary_sha256": "f7ef0c89eb290f36bc91c50e33a9d25fd103fdb4021730a16fd3cb3d58af9e7a",
+  "environment": {
+    "os": "Linux 6.8.0-101-generic x86_64",
+    "cpu": "AMD EPYC 9575F",
+    "cpu_affinity": 2,
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "perf_event_paranoid": 1
+  },
+  "corpus": {
+    "name": "rtf-semantic-plain-large",
+    "generator": "litchi-rtf-semantic-v2",
+    "paragraphs": 10000,
+    "archive_bytes": 540051,
+    "visible_text_bytes": 499999,
+    "archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e"
+  },
+  "primary_protocol": {
+    "order": ["before-a", "after-a", "after-b", "before-b"],
+    "warmups_per_leg": 100,
+    "samples_per_leg": 1000,
+    "pooled_samples_per_state": 2000
+  },
+  "primary": {
+    "rtf_semantic_one_paragraph": {
+      "before_ns": {"p50": 12446, "mean": 13100.6555, "p95": 17284, "p99": 24334},
+      "after_ns": {"p50": 6488, "mean": 6819.2875, "p95": 8742, "p99": 12457},
+      "delta_percent": {"p50": -47.8708, "mean": -47.9470, "p95": -49.4214, "p99": -48.8083}
+    }
+  },
+  "guard_protocol": {
+    "order": ["after-a", "before-a", "before-b", "after-b"],
+    "read_warmups_per_leg": 100,
+    "read_samples_per_leg": 1000,
+    "read_pooled_samples_per_state": 2000,
+    "noop_warmups_per_leg": 100,
+    "noop_samples_per_leg": 2000,
+    "noop_pooled_samples_per_state": 4000,
+    "changed_warmups_per_leg": 30,
+    "changed_samples_per_leg": 250,
+    "changed_pooled_samples_per_state": 500
+  },
+  "guards": {
+    "rtf_semantic_open": {"p50_delta_percent": 0.3330, "mean_delta_percent": -2.3334, "p95_delta_percent": -10.0361},
+    "rtf_semantic_list_paragraphs": {"p50_delta_percent": -2.6050, "mean_delta_percent": -3.3096, "p95_delta_percent": -6.7773},
+    "rtf_semantic_full_text": {"p50_delta_percent": -0.5035, "mean_delta_percent": 0.0291, "p95_delta_percent": 3.3492},
+    "rtf_semantic_stream_save": {"p50_delta_percent": -0.7849, "mean_delta_percent": -1.2493, "p95_delta_percent": -7.8628},
+    "rtf_semantic_noop_edit_save": {"p50_delta_percent": -7.9565, "mean_delta_percent": -6.6687, "p95_delta_percent": -2.1244},
+    "rtf_semantic_one_edit_save": {"p50_delta_percent": -2.8150, "mean_delta_percent": -2.5563, "p95_delta_percent": -0.8999}
+  },
+  "variant_correctness": {
+    "raw_cp1252_large_archive_sha256": "7157437b91b57aa50fd9725861c350f83eca84d0114341bcbc7bcda554fed50e",
+    "lzfu_large_archive_sha256": "e293574fa01c27edd82f6b3d43d10a257eced749e15fc5a3988eda07b74c5176",
+    "producer_watermark_archive_sha256": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+  },
+  "memory": {
+    "heaptrack_allocation_calls_before": 4087326,
+    "heaptrack_allocation_calls_after": 4087326,
+    "heaptrack_temporary_allocations_before": 1020512,
+    "heaptrack_temporary_allocations_after": 1020512,
+    "heaptrack_peak_heap_before_mb": 14.30,
+    "heaptrack_peak_heap_after_mb": 14.30,
+    "gnu_time_max_rss_kib_before": [30848, 30976],
+    "gnu_time_max_rss_kib_after": [30848, 30720]
+  },
+  "process_wide_perf_stat": {
+    "scope": "three complete 1100-iteration processes per state; deterministic corpus construction and untimed full verification included",
+    "before": {"task_clock_ms": 3360.77, "cycles": 16399305171, "instructions": 74303738180},
+    "after": {"task_clock_ms": 3436.13, "cycles": 16869963082, "instructions": 74024056935}
+  }
+}

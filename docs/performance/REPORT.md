@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `761b88bdc2218e419cde8cba7acb96f5645a1b5c`
+Production base for the latest measured tranche: `e013f9e4d5b557786c0ce93929e04c54c2ae159a`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -42,6 +42,7 @@ is still not broad program or CRUD coverage.
 | ODF semantic baselines and ODS snapshot reuse | Medium/large ODS no-op edit-save p50 **-7.45% / -11.78%**; one-cell edit-save **-3.57% / -2.06%** | Generated ODT/ODS/ODP baseline corpora; focused ODP/ODT publication follow-ups are listed below |
 | RTF semantic baseline and text paths | Medium/large full-text p50 **-38.39% / -27.08%**; one-edit/save **-33.40% / -25.79%** | Generated native RTF text corpus; open guard +0.96% / +3.41%; formatting/media/security matrices remain missing |
 | RTF retained story length | Large paragraph-list p50 **-15.04%**, mean **-13.71%**; middle-paragraph p50 **-27.19%**, mean **-25.23%** | Already-open generated 10,000-block story queries only; exact parser-derived length, all allocation/peak-heap/RSS metrics flat, and open/full-text/save/no-op guards remain within 5% |
+| RTF sparse paragraph selection | Large middle-paragraph p50 **-47.87%**, mean **-47.95%**, p95 **-49.42%** | Explicit `Paragraphs::nth` only; remains linear and allocation-free, constructs the selected view once, preserves iterator state/formatting, and leaves open/list/full-text/save/edit guards within policy |
 | ODT shared transaction bytes | Medium/large no-op edit-save p50 **-27.05% / -18.51%**; exactly two allocations and one archive copy removed per snapshot | Existing-document snapshot handoff only; changed edit/save and open guardrails remain within 3%; changed publication still rewrites the package |
 | ODT consuming full-text blocks | Repeated large full-text p50 **-3.25%**, mean **-4.81%**; allocation calls **-15.48%**, temporary allocations **-45.52%** | Private full-text mode only; structured queries remain near neutral; unchanged open +3.94% p50/+4.17% mean and +10.95% p99 disclosed |
 | ODT indexed paragraph selector | Large middle-paragraph p50 **-48.56%**, mean **-48.33%**; allocation calls **-27.05%**; peak heap **-24.74%**; RSS **-10.93%** | Complete XML/limit validation remains; retains one paragraph, excludes headings from the index, and leaves the established list path neutral |
@@ -436,6 +437,12 @@ for the paragraph-list and middle-paragraph queries. A reverse-order
 allocation, RSS and process-wide profile records are indexed in
 [`change 0064`](changes/0064-rtf-retained-story-length.md).
 
+The sparse RTF paragraph-selection evidence pools two 1,000-sample legs per
+state for the already-open middle-paragraph query. Reverse-order read/save,
+4,000-sample no-op and changed-edit guard pools, iterator-equivalence tests,
+variant verification, allocation, RSS and process-wide profile records are
+indexed in [`change 0066`](changes/0066-rtf-sparse-paragraph-nth.md).
+
 The DOC PAPX-containment evidence pools five balanced pairs for both the
 already-open snapshot paragraph list and complete one-edit/save path, retaining
 every sample in the
@@ -618,6 +625,7 @@ The underlying records are:
 - [`0063-pptx-atomic-source-backed-shape-text-batch.md`](changes/0063-pptx-atomic-source-backed-shape-text-batch.md)
 - [`0064-rtf-retained-story-length.md`](changes/0064-rtf-retained-story-length.md)
 - [`0065-odp-final-snapshot-handoff.md`](changes/0065-odp-final-snapshot-handoff.md)
+- [`0066-rtf-sparse-paragraph-nth.md`](changes/0066-rtf-sparse-paragraph-nth.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
