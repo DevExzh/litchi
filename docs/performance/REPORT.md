@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `473c458ada4c684a5d642b9b907fccac8298504c`
+Production base for the latest measured tranche: `58dbdcc055dc8dd72961c5476f5215100b1de7be`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -47,6 +47,7 @@ is still not broad program or CRUD coverage.
 | ODT direct snapshot byte sharing | Media-rich direct paragraph edit/save p50 **-75.84%**, mean **-73.84%**, p95 **-75.41%**; peak heap/RSS flat | Removes two 16 MiB archive copies from direct snapshot validation/rehydration; complete XML parsing, publication, reopen/readback, patch and inverse remain |
 | ODT compact-audit package sharing | Media-rich paragraph edit/save p50 **-30.44%**, mean **-31.36%**, p95 **-32.41%**; allocations **-0.57%**, peak heap/RSS flat | Removes three archive-sized audit copies (50.36 MB/operation); compact validation, final materialization and readback remain; exact no-op +39 ns p50 is disclosed |
 | ODT envelope-classification package sharing | Media-rich paragraph edit/save p50 **-11.40%**, mean **-11.95%**, p95 **-12.19%**; two allocations/commit removed, peak heap/RSS flat | Removes one 16.79 MB envelope copy; archive/manifest and signed/encrypted classification remain; large exact no-op +152 ns p50 is disclosed |
+| ODT final changed-result byte handoff | Media-rich paragraph edit/save p50 **-22.74%**, mean **-22.56%**, p95 **-21.48%**; final 16.79 MB copy removed; allocation calls **-3.46%** | Snapshot remains byte-only and one independent final reopen remains; medium one-paragraph +2.77% p50/+1.29% mean is within the 3% gate; peak heap/RSS flat |
 | Coalesced ODT paragraph publication | Large 100-edit/save p50 **-98.28% (58.05x)**, mean **-98.27%**; medium two-edit/save p50 **-27.62%**; allocation calls **-96.13%** | Consecutive plain-text replacements only; ordinary durable operations, ordered duplicate semantics, atomic refusal, compact audit, full reopen and scalar path remain |
 | Native DOC/XLS/PPT semantic baseline | Large one-edit/save p50: XLS **1.722 ms**, DOC **1.416 ms**, PPT **0.357 ms**; large XLS open **1.383 ms** | Generated writer corpora; accepted XLS and DOC follow-ups are listed below |
 | Native XLS validated-editor reuse | Large one-cell edit/save p50 **-7.72%**, mean **-7.90%** | Final exact owner parse, public Workbook reopen and typed readback remain; peak heap/RSS flat |
@@ -326,6 +327,14 @@ exploratory run, profiles, counters, memory and complete correctness gates are
 summarized in
 [`change 0042`](changes/0042-odt-envelope-package-sharing.md).
 
+The ODT final changed-result byte-handoff evidence comprises two balanced
+execution cycles with four 500-sample legs per state. Primary raw reports use
+the `odt-final-handoff-cycle*` prefix; the matched medium/large read/no-op/edit
+matrix uses `odt-final-handoff-guards*`. Profiles, counters, allocation/RSS,
+the byte-only ownership distinction and complete correctness gates are
+summarized in
+[`change 0052`](changes/0052-odt-final-result-byte-handoff.md).
+
 The OPC shared-payload evidence is
 [`before A`](results/abba-opc-shared-regeneration-primary-before-a.json),
 [`after A`](results/abba-opc-shared-regeneration-primary-after-a.json),
@@ -446,6 +455,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | ODT direct snapshot sharing, 200 paragraphs + 16 MiB media | 32.270 ms | 7.798 ms | **-75.84% p50 / -73.84% mean** | Two archive-sized copies removed; p95 -75.41%; peak heap/RSS flat |
 | ODT compact-audit package sharing, 200 paragraphs + 16 MiB media | 7.773 ms | 5.407 ms | **-30.44% p50 / -31.36% mean** | Three archive-sized audit copies removed; p95 -32.41%; allocations -0.57%; peak heap/RSS flat; exact no-op +39 ns disclosed |
 | ODT envelope-classification sharing, 200 paragraphs + 16 MiB media | 5.555 ms | 4.921 ms | **-11.40% p50 / -11.95% mean** | One archive-sized envelope copy and two allocations/commit removed; p95 -12.19%; peak heap/RSS flat; large exact no-op +152 ns disclosed |
+| ODT final changed-result byte handoff, 200 paragraphs + 16 MiB media | 5.216 ms | 4.030 ms | **-22.74% p50 / -22.56% mean** | One 16.79 MB result copy and redundant parse removed; p95 -21.48%; allocation calls -3.46%; independent final reopen and peak heap/RSS retained |
 | ODT 1% paragraph edit/save, 10,000 paragraphs / 100 replacements | 906.439 ms | 15.615 ms | **-98.28% p50 (58.05x) / -98.27% mean** | One mutable candidate/publication/reopen/audit replaces 100; allocations -96.13%; peak heap and uninstrumented RSS flat; tool-inclusive RSS +9.93% disclosed |
 | Native XLS one-cell edit/save, 8,192 cells | 1.777 ms | 1.639 ms | **-7.72% p50 / -7.90% mean** | Allocation calls -1.19%; peak heap and uninstrumented RSS flat |
 | Native DOC one-paragraph edit/save, 512 paragraphs | 1.506 ms | 1.348 ms | **-10.52% p50 / -10.48% mean** | Duplicate publication-site allocations nearly halved; peak heap and uninstrumented RSS flat |
@@ -509,6 +519,8 @@ The underlying records are:
 - [`0048-rtf-retained-body-source-span.md`](changes/0048-rtf-retained-body-source-span.md)
 - [`0049-odp-indexed-slide-selector.md`](changes/0049-odp-indexed-slide-selector.md)
 - [`0050-doc-piece-table-physical-index.md`](changes/0050-doc-piece-table-physical-index.md)
+- [`0051-doc-adjacent-style-baseline-cache.md`](changes/0051-doc-adjacent-style-baseline-cache.md)
+- [`0052-odt-final-result-byte-handoff.md`](changes/0052-odt-final-result-byte-handoff.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -525,7 +537,10 @@ candidate is retained.
 An ODT final-document adoption candidate was also fully reverted. It improved
 large one-edit/save p50 5.70%, but a dedicated medium one-paragraph read guard
 regressed 6.33% mean and 17.64% p95. The accepted snapshot-byte sharing remains;
-the rejected handoff contributes no production or test code.
+the rejected parsed-document retention contributes no production or test code.
+Change 0052 is deliberately narrower: it shares only immutable final bytes and
+retains a fresh independent final reopen; its same guard stays within 3% p50
+and mean with a better p95.
 
 The first ODT full-text ownership candidate also moved strings for structured
 list and one-paragraph callers. Their large-corpus p50 regressed 5.71% and
@@ -760,9 +775,10 @@ writer-local action regrouping was immaterial and reverted; distinct bulk
 actions, any larger planning/emission coalescing, large-sheet retention,
 source-backed editable publication, structural changes and broad preservation
 matrices remain independent work.
-The rejected direct ODS target-package and ODT final-document adoptions are not
-evidence that those broader paths are complete or that validation should be
-weakened.
+The rejected direct ODS target-package and parsed ODT final-document adoptions
+are not evidence that those broader paths are complete or that validation
+should be weakened. Change 0052 shares final bytes only and retains the
+independent parse boundary.
 iWork work is deliberately deferred while the `iwa-*` crates are changing
 independently.
 The scenario-by-scenario gap map and next case queue are in

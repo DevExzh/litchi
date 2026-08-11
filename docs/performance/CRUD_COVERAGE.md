@@ -80,8 +80,8 @@ conversion remain.
    unchanged-member publication: source-backed selectors, resource-adding and
    structural publication, 1% and bulk edits, unknown extensions, real
    producers, richer media, security and source-backed I/O. The generated ODT
-   1% paragraph case is covered by change 0045; broader bulk and structural
-   operations remain.
+   1% paragraph case is covered by change 0045, and changed-result byte
+   finalization by change 0052; broader bulk and structural operations remain.
    iWork is deliberately deferred while the `iwa-*` crates change separately.
 
 The former first item is complete for existing-document ODT transaction
@@ -281,6 +281,15 @@ reads back paragraph/media content, and verifies patch/inverse and stale-source
 behavior. Open/no-op/edit guards remain; the untouched large exact no-op
 segment's +152 ns p50 movement is disclosed. Broader structural/resource edits,
 real producers and repeated ODT/ODP reads remain open.
+
+Change 0052 removes the final archive-sized changed-result copy and one
+redundant parse from the same ODT transaction surface. The snapshot remains
+byte-only and one independent complete final reopen remains, so this does not
+revive the rejected parsed-final-document retention. Exact no-op, compact
+audit, package bounds, raw media, patch/inverse, stale-source and
+signed/encrypted refusal coverage are unchanged. No new CRUD capability is
+claimed; broader structural/resource edits, real producers and repeated
+ODT/ODP reads remain open.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

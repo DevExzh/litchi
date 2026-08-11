@@ -444,6 +444,13 @@ incomplete program and CRUD matrix.
   two allocation calls per commit and peak heap/RSS remain flat. Archive,
   manifest, encryption and signature checks remain. See
   [`0042`](changes/0042-odt-envelope-package-sharing.md).
+- ODT changed-result finalization now transfers the already validated
+  document's immutable package bytes into a byte-only snapshot instead of
+  copying 16.79 MB and parsing that copy. One independent final reopen remains.
+  Across two balanced cycles, media-rich edit/save improves 22.74% p50,
+  22.56% mean and 21.48% p95; the attributed allocation disappears, allocation
+  calls fall 3.46%, and peak heap/RSS remain flat. See
+  [`0052`](changes/0052-odt-final-result-byte-handoff.md).
 - Targeted OPC changed-Part publication now shares the Part's existing
   immutable payload with the ZIP regeneration layer. Heaptrack removes one
   4.19 MiB allocation and peak heap falls 3.42%. Few-large compressible save

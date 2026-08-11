@@ -109,6 +109,14 @@ impl Snapshot {
     }
 }
 
+fn snapshot_from_final_document(source: &Snapshot, document: &Document) -> Result<Snapshot> {
+    if document.original_bytes() == source.as_bytes() {
+        Ok(source.clone())
+    } else {
+        Snapshot::from_document(document)
+    }
+}
+
 /// Security envelope classification relevant to package mutation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -1360,13 +1368,7 @@ impl Edit {
             results.push(result);
             operation_index += 1;
         }
-        let bytes = copy_bytes(document.original_bytes())?;
-        ensure_package_size(bytes.len(), "ODT transaction output")?;
-        let after = if bytes == self.source.as_bytes() {
-            self.source.clone()
-        } else {
-            Snapshot::from_bytes(bytes)?
-        };
+        let after = snapshot_from_final_document(&self.source, &document)?;
         // Reparse after the compact audit so commit never returns an invalid
         // candidate even when a writer implementation changes independently.
         after.document()?;
@@ -4766,6 +4768,28 @@ mod tests {
 
         assert!(Arc::ptr_eq(&snapshot.bytes, &package_bytes));
         assert_eq!(snapshot.as_bytes(), document.original_bytes());
+        Ok(())
+    }
+
+    #[test]
+    fn changed_final_document_handoff_shares_bytes_and_reopens_independently() -> Result<()> {
+        let mut source_document = MutableDocument::new();
+        source_document.add_paragraph("before")?;
+        let source = Snapshot::from_bytes(source_document.to_bytes()?)?;
+
+        let mut changed_document = MutableDocument::new();
+        changed_document.add_paragraph("after")?;
+        let changed_document = Document::from_bytes(changed_document.to_bytes()?)?;
+        let changed_bytes = changed_document.transaction_package().shared_bytes();
+        let copied_and_reparsed =
+            Snapshot::from_bytes(copy_bytes(changed_document.original_bytes())?)?;
+
+        let snapshot = snapshot_from_final_document(&source, &changed_document)?;
+
+        assert!(Arc::ptr_eq(&snapshot.bytes, &changed_bytes));
+        assert_eq!(snapshot.as_bytes(), copied_and_reparsed.as_bytes());
+        assert_ne!(snapshot.as_bytes(), source.as_bytes());
+        assert_eq!(snapshot.document()?.text()?, "after");
         Ok(())
     }
 
