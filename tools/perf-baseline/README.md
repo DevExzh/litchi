@@ -113,6 +113,22 @@ and one-Part overlay publication into a bounded sequential sink. Full PPTX seman
 readback plus exact Part topology, relationships, content types, unselected
 payload/media, source/output hashes, and source/sink checks remain untimed.
 
+Measure the matched atomic eight-shape eager/source-backed controls:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 \
+  --case pptx_eager_batch_edit_save,pptx_source_backed_batch_edit_save \
+  --json target/perf/pptx-source-batch.json
+```
+
+Both paths resolve and replace the same eight text boxes on slide 100 through
+the public atomic batch API and emit byte-identical output. The eager control
+materializes all 229 ordinary Parts; the source-backed path materializes only
+the presentation root and selected slide. Corpus creation plus complete
+semantic, topology, relationship, media, patch/inverse, output-hash, and
+source/sink verification remain outside the timed interval.
+
 Measure the matched XLSX calculation-metadata publication controls:
 
 ```sh
@@ -507,6 +523,13 @@ remain distinguishable.
   overlay publication through a bounded sequential sink. The path reports two
   semantic Part materializations per sample; full PPTX readback and exact topology,
   relationship, content-type, unselected-Part, and media checks remain untimed.
+- `pptx_eager_batch_edit_save`: use the same media-rich corpus, eagerly own all
+  229 ordinary Parts, atomically replace all eight text boxes on the selected
+  slide, and publish through a bounded sequential sink.
+- `pptx_source_backed_batch_edit_save`: perform the identical atomic eight-shape
+  edit while materializing only the presentation root and selected slide. Both
+  cases require the same deterministic output hash and complete untimed
+  preservation/readback checks.
 - `xlsx_eager_calculation_metadata_edit_save`: on the fixed media-rich XLSX
   corpus, time positional open, eager ownership of all twelve ordinary Parts,
   one calculation-properties transaction, and full sequential publication.
@@ -808,6 +831,10 @@ source/sink distributions, and `ordinary_payload_materializations`. Its value
 is exactly two per sample: the mandatory presentation root and selected slide
 are loaded for semantic validation, while every other slide and all eight media
 payloads remain source-backed through physical raw-copy publication.
+
+The paired PPTX batch controls emit the same evidence and byte-identical
+output. Their `ordinary_payload_materializations` values are exactly 229 and
+two per sample, respectively.
 
 The two XLSX calculation-metadata publication cases also emit deterministic
 `output_sha256`, complete source/sink distributions, and semantic

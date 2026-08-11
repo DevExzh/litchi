@@ -350,6 +350,8 @@ enum Case {
     OpcSourceOverlayOnePartSave,
     DocxSourceBackedOneEditSave,
     PptxSourceBackedOneEditSave,
+    PptxEagerBatchEditSave,
+    PptxSourceBackedBatchEditSave,
     XlsxEagerCalculationMetadataEditSave,
     XlsxSourceBackedCalculationMetadataEditSave,
     XlsxEagerPageBreakEditSave,
@@ -520,6 +522,8 @@ impl Case {
             Self::OpcSourceOverlayOnePartSave => "opc_source_overlay_one_part_save",
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
+            Self::PptxEagerBatchEditSave => "pptx_eager_batch_edit_save",
+            Self::PptxSourceBackedBatchEditSave => "pptx_source_backed_batch_edit_save",
             Self::XlsxEagerCalculationMetadataEditSave => {
                 "xlsx_eager_calculation_metadata_edit_save"
             },
@@ -870,7 +874,12 @@ impl Case {
     }
 
     const fn is_pptx_source_edit_save(self) -> bool {
-        matches!(self, Self::PptxSourceBackedOneEditSave)
+        matches!(
+            self,
+            Self::PptxSourceBackedOneEditSave
+                | Self::PptxEagerBatchEditSave
+                | Self::PptxSourceBackedBatchEditSave
+        )
     }
 
     const fn is_xlsx_calculation_metadata_edit_save(self) -> bool {
@@ -1804,11 +1813,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         .any(|case| case.is_pptx_source_edit_save())
     {
         let corpus = build_pptx_source_edit_corpus()?;
-        results.push(run_pptx_source_backed_one_edit_save(
-            &corpus,
-            options.warmup_iterations,
-            options.samples,
-        )?);
+        for case in options
+            .cases
+            .iter()
+            .filter(|case| case.is_pptx_source_edit_save())
+        {
+            results.push(match case {
+                Case::PptxSourceBackedOneEditSave => run_pptx_source_backed_one_edit_save(
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?,
+                Case::PptxEagerBatchEditSave | Case::PptxSourceBackedBatchEditSave => {
+                    run_pptx_batch_edit_save(
+                        *case,
+                        &corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                    )?
+                },
+                _ => unreachable!("filtered PPTX source-edit case"),
+            });
+        }
     }
 
     if options
@@ -2294,6 +2320,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_source_overlay_one_part_save" => Some(Case::OpcSourceOverlayOnePartSave),
         "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
         "pptx_source_backed_one_edit_save" => Some(Case::PptxSourceBackedOneEditSave),
+        "pptx_eager_batch_edit_save" => Some(Case::PptxEagerBatchEditSave),
+        "pptx_source_backed_batch_edit_save" => Some(Case::PptxSourceBackedBatchEditSave),
         "xlsx_eager_calculation_metadata_edit_save" => {
             Some(Case::XlsxEagerCalculationMetadataEditSave)
         },
@@ -2485,6 +2513,8 @@ fn print_usage() {
                                        opc_source_overlay_one_part_save,\n\
                                        docx_source_backed_one_edit_save,\n\
                                        pptx_source_backed_one_edit_save,\n\
+                                       pptx_eager_batch_edit_save,\n\
+                                       pptx_source_backed_batch_edit_save,\n\
                                        xlsx_eager_calculation_metadata_edit_save,\n\
                                        xlsx_source_backed_calculation_metadata_edit_save,\n\
                                        xlsx_eager_page_break_edit_save,\n\
@@ -3292,7 +3322,7 @@ fn build_docx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_pptx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let archive = pptx_source_edit_bytes()?;
     let package = litchi_pptx::Package::from_bytes(&archive)?;
-    verify_pptx_source_edit_semantics(&package, false)?;
+    verify_pptx_source_edit_semantics(&package, 0)?;
     let opc = OpcPackage::from_bytes(&archive)?;
     let entry_count = opc.part_count();
     let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
@@ -4334,6 +4364,9 @@ fn run_case_with_config(
         Case::PptxSourceBackedOneEditSave => {
             run_pptx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
         },
+        Case::PptxEagerBatchEditSave | Case::PptxSourceBackedBatchEditSave => {
+            run_pptx_batch_edit_save(case, corpus, warmup_iterations, samples)
+        },
         Case::XlsxEagerCalculationMetadataEditSave
         | Case::XlsxSourceBackedCalculationMetadataEditSave => {
             run_xlsx_calculation_metadata_edit_save(case, corpus, warmup_iterations, samples)
@@ -4846,7 +4879,7 @@ fn verify_semantic_pptx(
 
 fn verify_pptx_source_edit_semantics(
     package: &litchi_pptx::Package,
-    updated: bool,
+    updated_shapes: usize,
 ) -> Result<(), Box<dyn Error>> {
     let presentation = package.presentation()?;
     if presentation.slide_count()? != PPTX_SOURCE_SLIDE_COUNT {
@@ -4873,7 +4906,7 @@ fn verify_pptx_source_edit_semantics(
         }
         let mut slide_text = Vec::with_capacity(PPTX_SOURCE_TEXT_BOXES_PER_SLIDE);
         for (shape_index, actual) in text_shapes.into_iter().enumerate() {
-            let is_updated = updated && slide_index == target_slide && shape_index == 0;
+            let is_updated = slide_index == target_slide && shape_index < updated_shapes;
             let expected = semantic_pptx_text(slide_index, shape_index, is_updated);
             if actual != expected {
                 return Err("PPTX source-edit shape text differs from specification".into());
@@ -8380,9 +8413,13 @@ fn run_docx_source_backed_one_edit_save(
     })
 }
 
-fn verify_pptx_source_edit_output(corpus: &Corpus, output: &[u8]) -> Result<(), Box<dyn Error>> {
+fn verify_pptx_source_edit_output(
+    corpus: &Corpus,
+    output: &[u8],
+    updated_shapes: usize,
+) -> Result<(), Box<dyn Error>> {
     let reopened = litchi_pptx::Package::from_bytes(output)?;
-    verify_pptx_source_edit_semantics(&reopened, true)?;
+    verify_pptx_source_edit_semantics(&reopened, updated_shapes)?;
 
     let source = OpcPackage::from_bytes(&corpus.archive)?;
     let candidate = OpcPackage::from_bytes(output)?;
@@ -8467,7 +8504,7 @@ fn run_pptx_source_backed_one_edit_save(
             "PPTX source edit did not materialize exactly its root and selected slide".into(),
         );
     }
-    verify_pptx_source_edit_output(corpus, &expected)?;
+    verify_pptx_source_edit_output(corpus, &expected, 1)?;
     let expected_digest = sha256_hex(&expected);
     let maximum = u64::try_from(expected.len())?
         .checked_mul(2)
@@ -8497,7 +8534,7 @@ fn run_pptx_source_backed_one_edit_save(
         if sink.summary().largest_write > 64 * 1024 {
             return Err("PPTX source edit exceeded the sequential sink write bound".into());
         }
-        verify_pptx_source_edit_output(corpus, &sink.bytes)?;
+        verify_pptx_source_edit_output(corpus, &sink.bytes, 1)?;
         let digest = sha256_hex(&sink.bytes);
         if digest != expected_digest {
             return Err("PPTX source-edit output digest differs from expected output".into());
@@ -8524,6 +8561,175 @@ fn run_pptx_source_backed_one_edit_save(
     }
     Ok(CaseResult {
         case: Case::PptxSourceBackedOneEditSave.name(),
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: Some(expected_digest),
+    })
+}
+
+fn pptx_batch_replacements(texts: &[String]) -> Vec<litchi_pptx::ShapeTextReplacement<'_>> {
+    texts
+        .iter()
+        .enumerate()
+        .map(|(index, text)| litchi_pptx::ShapeTextReplacement::at(index, text))
+        .collect()
+}
+
+fn publish_pptx_batch_edit<W: Write>(
+    source: Arc<dyn ReadAt>,
+    writer: &mut W,
+    source_backed: bool,
+) -> Result<usize, Box<dyn Error>> {
+    let target_slide = PPTX_SOURCE_SLIDE_COUNT / 2;
+    let texts = (0..PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)
+        .map(|shape| semantic_pptx_text(target_slide, shape, true))
+        .collect::<Vec<_>>();
+    let replacements = pptx_batch_replacements(&texts);
+    if source_backed {
+        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(source)?;
+        let mut edit = editor.edit_slide(target_slide)?;
+        if edit.set_shape_texts(&replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
+            return Err("PPTX source-backed batch changed an unexpected shape count".into());
+        }
+        let commit = edit.commit();
+        if !commit.is_changed() {
+            return Err("PPTX source-backed batch produced an unchanged commit".into());
+        }
+        let replayed = commit.patch().apply(commit.patch().source())?;
+        if commit.patch().inverse().apply(&replayed).is_err() {
+            return Err("PPTX source-backed batch inverse rejected its candidate".into());
+        }
+        let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
+        let published = editor.publish_slide_commit_to_stream(writer, &commit)?;
+        if commit.patch().inverse().apply(&published).is_err()
+            || commit.patch().apply(&published).is_ok()
+        {
+            return Err("PPTX source-backed batch published another snapshot".into());
+        }
+        Ok(materializations)
+    } else {
+        let package = SourceBackedPackage::from_read_at(source)?;
+        let opc = package.into_opc_package()?;
+        let materializations = opc.part_count();
+        let mut package = litchi_pptx::Package::from_opc_package(opc)?;
+        let mut edit = package.opened_presentation_transaction()?;
+        if edit.set_shape_texts(target_slide, &replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
+            return Err("PPTX eager batch changed an unexpected shape count".into());
+        }
+        let commit = edit.commit()?;
+        if !commit.is_changed() {
+            return Err("PPTX eager batch produced an unchanged commit".into());
+        }
+        let inverse = commit.patch().inverse();
+        let published = package.apply_opened_presentation_commit(commit)?;
+        if package
+            .apply_opened_presentation_patch(&inverse)
+            .and_then(|_| package.apply_opened_presentation_patch(&inverse.inverse()))
+            .is_err()
+        {
+            return Err("PPTX eager batch inverse/forward replay failed".into());
+        }
+        if published.slides().len() != PPTX_SOURCE_SLIDE_COUNT {
+            return Err("PPTX eager batch changed the slide graph".into());
+        }
+        let output = package.to_bytes()?;
+        for chunk in output.chunks(64 * 1024) {
+            writer.write_all(chunk)?;
+        }
+        Ok(materializations)
+    }
+}
+
+fn run_pptx_batch_edit_save(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != PPTX_SOURCE_EDIT_CORPUS_GENERATOR
+        || !matches!(
+            case,
+            Case::PptxEagerBatchEditSave | Case::PptxSourceBackedBatchEditSave
+        )
+    {
+        return Err("PPTX batch case requires its fixed media-rich corpus".into());
+    }
+    if sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256 {
+        return Err("PPTX batch source digest differs from corpus manifest".into());
+    }
+    let source_backed = case == Case::PptxSourceBackedBatchEditSave;
+    let expected_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+    let mut expected = Vec::new();
+    let expected_materializations =
+        publish_pptx_batch_edit(expected_source, &mut expected, source_backed)?;
+    let required_materializations = if source_backed {
+        2
+    } else {
+        corpus.manifest.entry_count
+    };
+    if expected == corpus.archive || expected_materializations != required_materializations {
+        return Err("PPTX batch materialized an unexpected Part count".into());
+    }
+    verify_pptx_source_edit_output(corpus, &expected, PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)?;
+    let expected_digest = sha256_hex(&expected);
+    let maximum = u64::try_from(expected.len())?
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("PPTX batch sequential output ceiling overflows u64")?;
+    let payload_ranges = pptx_source_payload_ranges(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut measured_digests = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = Arc::new(InstrumentedSource::new(
+            corpus.archive.clone(),
+            payload_ranges.clone(),
+        ));
+        let read_at: Arc<dyn ReadAt> = source.clone();
+        let mut sink = CountingSink::bounded(maximum, 64 * 1024);
+        sink.reserve_budget()?;
+        let started = Instant::now();
+        let materializations = publish_pptx_batch_edit(read_at, &mut sink, source_backed)?;
+        let duration = started.elapsed();
+
+        if materializations != expected_materializations || sink.bytes != expected {
+            return Err("PPTX batch differs between iterations".into());
+        }
+        if sink.summary().largest_write > 64 * 1024 {
+            return Err("PPTX batch exceeded the sequential sink write bound".into());
+        }
+        verify_pptx_source_edit_output(corpus, &sink.bytes, PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)?;
+        let digest = sha256_hex(&sink.bytes);
+        if digest != expected_digest {
+            return Err("PPTX batch output digest differs from expected output".into());
+        }
+        let metrics = source.snapshot();
+        if metrics.ordinary_payload_read_calls == 0 || metrics.ordinary_payload_read_bytes == 0 {
+            return Err("PPTX batch performed no ordinary source reads".into());
+        }
+        if iteration >= warmup_iterations {
+            source_summary.record_opc(metrics, u64::try_from(materializations)?);
+            sink_summaries.push(sink.summary());
+            measured_digests.push(digest);
+        }
+        std::hint::black_box(&sink.bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let sink = deterministic_sink_summary(&sink_summaries, case.name())?;
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("PPTX batch measured output digests are not stable".into());
+    }
+    Ok(CaseResult {
+        case: case.name(),
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -9839,9 +10045,10 @@ mod tests {
         build_xlsx_page_break_edit_corpus, expected_opc_overlay_output, ole_common_changed_output,
         opc_overlay_replacement_payload, payload_bytes, resolve_execution_workers, run_case,
         run_case_with_config, run_docx_source_backed_one_edit_save,
-        run_opc_source_overlay_one_part_save, run_pptx_source_backed_one_edit_save,
-        run_scaling_case, run_xlsx_calculation_metadata_edit_save, run_xlsx_page_break_edit_save,
-        sha256_hex, simulated_request_delay, statistics,
+        run_opc_source_overlay_one_part_save, run_pptx_batch_edit_save,
+        run_pptx_source_backed_one_edit_save, run_scaling_case,
+        run_xlsx_calculation_metadata_edit_save, run_xlsx_page_break_edit_save, sha256_hex,
+        simulated_request_delay, statistics,
     };
 
     #[test]
@@ -9965,6 +10172,30 @@ mod tests {
         let source = measured.source.unwrap();
         assert_eq!(source.read_calls.len(), 1);
         assert_eq!(source.ordinary_payload_materializations, Some(vec![2]));
+    }
+
+    #[test]
+    fn pptx_batch_controls_are_deterministic_and_materialization_matched() {
+        let corpus = build_pptx_source_edit_corpus().unwrap();
+        let eager = run_pptx_batch_edit_save(Case::PptxEagerBatchEditSave, &corpus, 0, 1).unwrap();
+        let source_backed =
+            run_pptx_batch_edit_save(Case::PptxSourceBackedBatchEditSave, &corpus, 0, 1).unwrap();
+        assert_eq!(eager.case, "pptx_eager_batch_edit_save");
+        assert_eq!(source_backed.case, "pptx_source_backed_batch_edit_save");
+        assert_eq!(eager.elapsed_ns.samples.len(), 1);
+        assert_eq!(source_backed.elapsed_ns.samples.len(), 1);
+        assert_eq!(eager.output_sha256, source_backed.output_sha256);
+        assert_eq!(
+            eager.source.unwrap().ordinary_payload_materializations,
+            Some(vec![corpus.manifest.entry_count as u64])
+        );
+        assert_eq!(
+            source_backed
+                .source
+                .unwrap()
+                .ordinary_payload_materializations,
+            Some(vec![2])
+        );
     }
 
     #[test]

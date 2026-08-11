@@ -1,8 +1,8 @@
 # Performance CRUD coverage
 
-Date: 2026-08-11
+Date: 2026-08-12
 
-This is a coverage map, not a completion claim. It compares the 124 selectable
+This is a coverage map, not a completion claim. It compares the 126 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -20,7 +20,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication; signed/extension corpora remain missing |
 | One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT, ODS and ODP verify eight exact 2 MiB resources and manifest media types, while source-backed DOCX/PPTX and narrow XLSX calculation-metadata publication verify eight exact 2 MiB media Parts after one semantic edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
 | About 1% semantic update and save | Covered for XLSX/DOCX/PPTX/ODT generated corpora | Deterministic evenly spaced cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch, while ODT coalesces ordinary scalar durable replacements internally; both reopen the package |
-| Bulk update matching objects | Missing | No semantic end-to-end case |
+| Bulk update matching objects | Partial | PPTX has one bounded atomic same-slide batch for up to 256 unique nonoverlapping shape-text selectors; cross-slide, structural and other formats remain missing |
 | Clear/remove/hide/detach/GC distinctions | Missing | No complete matrix |
 | Sanitization and irreversible redaction | Missing | No complete matrix |
 | Copy object with dependency closure | Missing | No measured format case |
@@ -29,7 +29,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS-row preservation, and exact raw ODT/ODS/ODP auxiliary/media members during neighboring paragraph/cell/text-box edits; broader format-semantic extension corpora remain missing |
-| Replace one low-level Part, preserve the rest | Covered for owned OPC, narrow source-backed OPC, guarded DOCX main-document semantics, guarded PPTX selected-slide semantics, and XLSX calculation metadata | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; change 0037 adds the consuming source-backed one-Part publisher; changes 0039, 0044 and 0046 integrate exact-source DOCX, PPTX and XLSX calculation-metadata transactions while refusing unsafe MCE, signature, transfer/multi-operation, stale/foreign and topology cases before output; general XLSX cell/formula editing remains outside the one-Part closure |
+| Replace one low-level Part, preserve the rest | Covered for owned OPC, narrow source-backed OPC, guarded DOCX main-document semantics, guarded PPTX selected-slide semantics, and XLSX calculation metadata/page breaks | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; change 0037 adds the consuming source-backed one-Part publisher; changes 0039, 0044/0063, 0046 and 0061 integrate exact-source DOCX, atomic same-slide PPTX, XLSX calculation-metadata and XLSX worksheet-page-break transactions while refusing unsafe MCE, signature, stale/foreign and topology cases before output; general XLSX cell/formula and multi-slide PPTX editing remain outside the one-Part closure |
 
 The source/output matrix is also incomplete. Owned bytes and instrumented
 `ReadAt` exist for OPC/XLSX, and the deterministic range simulator covers

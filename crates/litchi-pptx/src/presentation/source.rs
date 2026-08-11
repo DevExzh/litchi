@@ -97,6 +97,7 @@ pub struct SourceBackedPresentationEditor {
     package: SourceBackedPackage,
     _presentation: BlobPart,
     slides: Box<[Arc<SourceSlideData>]>,
+    limits: ReadLimits,
 }
 
 /// An immutable exact-source snapshot of one slide XML part.
@@ -106,6 +107,7 @@ pub struct SourceBackedSlideSnapshot {
     part_uri: PackURI,
     xml: Arc<Vec<u8>>,
     closure: SlideClosure,
+    max_output_bytes: usize,
 }
 
 /// An isolated edit of one exact-source slide snapshot.
@@ -208,18 +210,23 @@ impl SourceBackedPresentationEditor {
 
     /// Open an ordinary PPTX source with explicit OPC resource limits.
     pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source, limits,
-        )?)
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits(source, limits)?,
+            limits,
+        )
     }
 
     /// Build an owning editor from a validated deferred OPC package.
-    fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
+    fn from_source_backed_package(
+        package: SourceBackedPackage,
+        limits: ReadLimits,
+    ) -> Result<Self> {
         let catalog = source_catalog(&package)?;
         Ok(Self {
             package,
             _presentation: catalog.presentation,
             slides: catalog.slides,
+            limits,
         })
     }
 
@@ -310,6 +317,7 @@ impl SourceBackedPresentationEditor {
                 presentation_xml: catalog.presentation_xml,
                 slide: data.binding.clone(),
             },
+            max_output_bytes: source_slide_output_limit(self.limits),
         })
     }
 }
@@ -339,6 +347,7 @@ impl SourceBackedSlideSnapshot {
             && self.closure.presentation == other.closure.presentation
             && self.closure.presentation_xml == other.closure.presentation_xml
             && self.closure.slide == other.closure.slide
+            && self.max_output_bytes == other.max_output_bytes
     }
 }
 
@@ -358,54 +367,44 @@ impl SourceBackedSlideEdit {
         shape: impl Into<crate::shape::Key<'k>>,
         text: impl AsRef<str>,
     ) -> Result<bool> {
-        let key = shape.into();
         let text = text.as_ref();
+        let replacement = crate::opened::ShapeTextReplacement::new(shape.into(), text);
+        Ok(self.set_shape_texts(std::slice::from_ref(&replacement))? != 0)
+    }
+
+    /// Atomically replace visible text in a bounded set of shapes.
+    ///
+    /// All selectors resolve against the same immutable slide state. The
+    /// batch is canonicalized by raw shape position, refuses duplicate and
+    /// overlapping selections, and publishes at most this one existing slide
+    /// part. The return value is the number of changed shapes.
+    ///
+    /// An empty batch is a no-op and does not consume the edit capability. A
+    /// successful nonempty batch, including an all-equal batch, consumes it.
+    pub fn set_shape_texts(
+        &mut self,
+        replacements: &[crate::opened::ShapeTextReplacement<'_>],
+    ) -> Result<usize> {
+        if replacements.is_empty() {
+            return Ok(0);
+        }
         if self.operation_used {
             return Err(Error::UnsafeEdit {
-                operation: "set_shape_text",
-                reason: "source-backed slide edits support one shape text operation",
+                operation: "set_shape_texts",
+                reason: "source-backed slide edits support one atomic shape text operation",
             });
         }
-        let scene = crate::shape::Scene::read(self.working.as_slice())?;
-        if scene.is_rewritten() {
-            return Err(Error::UnsafeEdit {
-                operation: "set_shape_text",
-                reason: "source-backed slide edits do not support markup-compatibility branch selection",
-            });
-        }
-        let selected = scene.shape(key)?;
-        if selected.common().text() == Some(text) {
-            self.operation_used = true;
-            return Ok(false);
-        }
-        if selected.common().text().is_none() {
-            return Err(Error::Invalid(
-                "source-backed selected shape has no text body".to_string(),
-            ));
-        }
-        let span = crate::tag::shape::selected_raw_span_for_shape(
+        let (xml, changed) = crate::opened::stage_shape_texts(
             self.working.as_slice(),
-            selected,
-            scene.len(),
-        )?;
-        let xml = crate::opened::rewrite_shape_text(
-            self.working.as_slice(),
-            span,
-            text,
+            replacements,
             crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
         )?;
-        let staged = crate::shape::Scene::read(&xml)?;
-        if staged.is_rewritten()
-            || staged.shape(key)?.common().text() != Some(text)
-            || staged.len() != scene.len()
-        {
-            return Err(Error::Invalid(
-                "source-backed shape text did not round-trip semantically".to_string(),
-            ));
+        if let Some(xml) = xml {
+            self.working = Arc::new(xml);
         }
-        self.working = Arc::new(xml);
         self.operation_used = true;
-        Ok(true)
+        Ok(changed)
     }
 
     /// Validate and freeze this isolated edit for source-backed publication.
@@ -416,6 +415,7 @@ impl SourceBackedSlideEdit {
             part_uri: self.source.part_uri.clone(),
             xml: self.working,
             closure: self.source.closure.clone(),
+            max_output_bytes: self.source.max_output_bytes,
         };
         let patch = SourceBackedSlidePatch {
             before: self.source,
@@ -576,6 +576,17 @@ fn validate_slide_graph(
         }));
     }
     Ok(slides.into_boxed_slice())
+}
+
+fn source_slide_output_limit(limits: ReadLimits) -> usize {
+    let bounded = limits
+        .max_part_bytes()
+        .min(limits.max_archive_entry_bytes())
+        .min(limits.max_total_part_bytes())
+        .min(limits.max_archive_total_bytes());
+    usize::try_from(bounded)
+        .unwrap_or(usize::MAX)
+        .min(crate::shape::Limits::DEFAULT.output_bytes())
 }
 
 fn source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalog> {

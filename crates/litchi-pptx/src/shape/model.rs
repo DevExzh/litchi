@@ -44,7 +44,7 @@ impl Span {
         self.start.checked_add(self.len)
     }
 
-    pub(super) fn range(self, owner_len: usize) -> Result<Range<usize>> {
+    pub(crate) fn range(self, owner_len: usize) -> Result<Range<usize>> {
         let start = usize::try_from(self.start)
             .map_err(|_err| Error::Invalid("shape offset does not fit usize".into()))?;
         let len = usize::try_from(self.len)

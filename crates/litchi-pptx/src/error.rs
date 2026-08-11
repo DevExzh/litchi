@@ -52,6 +52,13 @@ pub enum Error {
         detail: String,
     },
 
+    /// One atomic shape-text batch selected the same semantic shape twice.
+    #[error("shape-text batch selects shape index {index} more than once")]
+    DuplicateShapeTextSelection {
+        /// Repeated zero-based pre-order shape index.
+        index: usize,
+    },
+
     /// Filesystem access or atomic output replacement failed.
     #[error("PPTX I/O error: {0}")]
     Io(#[from] std::io::Error),

@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "2e7dc466f8c5f91f5b6e5ff6bce563ee4551a1ab",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 12,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1"
+  },
+  "configuration": {
+    "samples_per_case": 1,
+    "warmup_iterations_per_case": 0,
+    "cases": [
+      "pptx_eager_batch_edit_save",
+      "pptx_source_backed_batch_edit_save"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1,
+      2,
+      4,
+      8,
+      12
+    ]
+  },
+  "results": [
+    {
+      "case": "pptx_eager_batch_edit_save",
+      "corpus": {
+        "name": "pptx-source-backed-media",
+        "generator": "litchi-pptx-source-edit-media-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "media-rich",
+        "payload_kind": "deterministic-incompressible-media",
+        "compression": "deflate",
+        "entry_count": 229,
+        "archive_member_count": 445,
+        "entry_bytes": 2097152,
+        "uncompressed_payload_bytes": 17568429,
+        "archive_bytes": 17017139,
+        "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+        "target_entry": "slide:100/shape:0",
+        "target_payload_bytes": 52,
+        "target_payload_sha256": "26c9e1dffc347568407eb56d54c87d5fddb8cdb895a867fffb3cd9f302be18e6",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          326262329
+        ],
+        "min": 326262329,
+        "p50": 326262329,
+        "p95": 326262329,
+        "p99": 326262329,
+        "max": 326262329,
+        "mean": 326262329.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 326262329.0,
+          "upper": 326262329.0
+        }
+      },
+      "sink": {
+        "accepted_bytes": 17017138,
+        "write_calls": 260,
+        "largest_write": 65536
+      },
+      "source": {
+        "read_calls": [
+          2740
+        ],
+        "read_bytes": [
+          17004461
+        ],
+        "ordinary_payload_read_calls": [
+          741
+        ],
+        "ordinary_payload_read_bytes": [
+          16907750
+        ],
+        "max_in_flight_reads": [
+          1
+        ],
+        "ordinary_payload_materializations": [
+          229
+        ]
+      },
+      "output_sha256": "8371618225b8478d7ea606f13d21d3453e7960f5cb09935975ac672320001755"
+    },
+    {
+      "case": "pptx_source_backed_batch_edit_save",
+      "corpus": {
+        "name": "pptx-source-backed-media",
+        "generator": "litchi-pptx-source-edit-media-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "media-rich",
+        "payload_kind": "deterministic-incompressible-media",
+        "compression": "deflate",
+        "entry_count": 229,
+        "archive_member_count": 445,
+        "entry_bytes": 2097152,
+        "uncompressed_payload_bytes": 17568429,
+        "archive_bytes": 17017139,
+        "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+        "target_entry": "slide:100/shape:0",
+        "target_payload_bytes": 52,
+        "target_payload_sha256": "26c9e1dffc347568407eb56d54c87d5fddb8cdb895a867fffb3cd9f302be18e6",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          8609768
+        ],
+        "min": 8609768,
+        "p50": 8609768,
+        "p95": 8609768,
+        "p99": 8609768,
+        "max": 8609768,
+        "mean": 8609768.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 8609768.0,
+          "upper": 8609768.0
+        }
+      },
+      "sink": {
+        "accepted_bytes": 17017138,
+        "write_calls": 1403,
+        "largest_write": 32768
+      },
+      "source": {
+        "read_calls": [
+          2941
+        ],
+        "read_bytes": [
+          17151171
+        ],
+        "ordinary_payload_read_calls": [
+          742
+        ],
+        "ordinary_payload_read_bytes": [
+          16909038
+        ],
+        "max_in_flight_reads": [
+          1
+        ],
+        "ordinary_payload_materializations": [
+          2
+        ]
+      },
+      "output_sha256": "8371618225b8478d7ea606f13d21d3453e7960f5cb09935975ac672320001755"
+    }
+  ]
+}

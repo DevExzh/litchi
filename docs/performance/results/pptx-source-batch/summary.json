@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-12",
+  "corpus_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+  "output_sha256": "8371618225b8478d7ea606f13d21d3453e7960f5cb09935975ac672320001755",
+  "output_bytes": 17017138,
+  "measurement_binary_sha256": "4ece3601613889ff99bcafdd5d1e227c702ca711b1e3311fa384bcdbb84bd080",
+  "final_binary_sha256": "3f4aea56e8c1921072afed0e2c2d21f87472eb4480babfee50e3f18354f4ef0e",
+  "frozen_prechange_binary_sha256": "718297e1e86e716284d82f233ab09fd143d07e4bc6ad04c477f6d62b4f07344a",
+  "accepted_stable_legs": {
+    "eager": ["abba-eager-b.json", "abba2-eager-b.json"],
+    "source_backed": ["abba2-source-b.json", "stable-source-c.json"]
+  },
+  "discarded_for_drift": [
+    "abba-eager-a.json",
+    "abba-source-a.json",
+    "abba-source-b.json",
+    "abba2-eager-a.json",
+    "abba2-source-a.json",
+    "stable-eager-c.json",
+    "stable-eager-d.json",
+    "stable-eager-d50.json",
+    "stable-source-d.json"
+  ],
+  "pooled_samples_per_state": 200,
+  "eager_ns": {
+    "p50": 322305725.5,
+    "mean": 323876123.425,
+    "p95": 329235311,
+    "p99": 334162346
+  },
+  "source_backed_ns": {
+    "p50": 8206053.0,
+    "mean": 8274339.135,
+    "p95": 8997350,
+    "p99": 9252542
+  },
+  "delta_percent": {
+    "p50": -97.45395369962175,
+    "mean": -97.44521484094022,
+    "p95": -97.26719774599147,
+    "p99": -97.23112370057397
+  },
+  "final_confirmation_25_samples": {
+    "eager_p50_ns": 320494996,
+    "eager_mean_ns": 321103788.2,
+    "source_backed_p50_ns": 8422332,
+    "source_backed_mean_ns": 8426292.28,
+    "p50_delta_percent": -97.37208627120032,
+    "mean_delta_percent": -97.37583529386714
+  },
+  "ordinary_payload_materializations": {
+    "eager": 229,
+    "source_backed": 2
+  },
+  "heaptrack": {
+    "eager_allocation_calls": 3220146,
+    "source_backed_allocation_calls": 1938449,
+    "allocation_call_delta_percent": -39.802449951027064,
+    "eager_peak_heap_mib": 175.13,
+    "source_backed_peak_heap_mib": 159.49,
+    "peak_heap_delta_percent": -8.930508764917477
+  },
+  "gnu_time_max_rss_kib": {
+    "eager": 145340,
+    "source_backed": 147056,
+    "delta_percent": 1.1806797853309403
+  },
+  "profile_scope": "Whole process; includes deterministic corpus construction and untimed complete verification."
+}
