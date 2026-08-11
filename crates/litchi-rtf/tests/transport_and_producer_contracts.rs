@@ -27,6 +27,7 @@ fn literal_byte1252_transport_is_exact_and_changed_write_is_atomic_on_refusal() 
 
     let document = Document::from_bytes(&source).unwrap();
     assert_eq!(document.text(), "caf\u{e9}");
+    assert_eq!(document.body().len(), document.text().len());
     assert_eq!(document.to_bytes().unwrap(), source);
 
     let noop = document.edit().commit().unwrap();
@@ -47,6 +48,7 @@ fn specification_lzfu_transport_is_exact_and_changed_write_fails_closed() {
 
     let document = Document::from_bytes(LZFU_SPEC).unwrap();
     assert_eq!(document.text(), "hello world");
+    assert_eq!(document.body().len(), document.text().len());
     assert_eq!(document.to_bytes().unwrap(), LZFU_SPEC);
     let mut streamed = Vec::new();
     document.write_to(&mut streamed).unwrap();
@@ -68,6 +70,7 @@ fn libreoffice_watermark_is_visible_through_public_header_shapes_and_exact_on_no
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/watermark.rtf"
     );
     let document = Document::from_bytes(source).unwrap();
+    assert_eq!(document.body().len(), document.text().len());
     let themed_fill = document
         .sections()
         .iter()

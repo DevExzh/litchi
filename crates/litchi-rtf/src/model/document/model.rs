@@ -1039,6 +1039,10 @@ impl<'a> RtfDocument<'a> {
         &self.blocks
     }
 
+    pub(crate) const fn retained_text_len(&self) -> usize {
+        self.text_len
+    }
+
     pub(crate) fn plain_body_text_editability(&self) -> Result<(), &'static str> {
         self.plain_body_editability(false)
     }

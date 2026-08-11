@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `4abe2e0197df0fb8075d973b84b9463863938a52`
+Production base for the latest measured tranche: `761b88bdc2218e419cde8cba7acb96f5645a1b5c`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -41,6 +41,7 @@ is still not broad program or CRUD coverage.
 | Coalesced DOCX paragraph edits | Large 100-edit/save p50 **-94.99% (19.97x)** and mean **-95.02%**; medium two-edit/save p50 **-12.98%**; scalar one-edit guardrail neutral | Direct-body, strictly ordered paragraph text replacement; generated corpus; scalar API remains separate |
 | ODF semantic baselines and ODS snapshot reuse | Medium/large ODS no-op edit-save p50 **-7.45% / -11.78%**; one-cell edit-save **-3.57% / -2.06%** | Generated ODT/ODS/ODP baseline corpora; focused ODP/ODT publication follow-ups are listed below |
 | RTF semantic baseline and text paths | Medium/large full-text p50 **-38.39% / -27.08%**; one-edit/save **-33.40% / -25.79%** | Generated native RTF text corpus; open guard +0.96% / +3.41%; formatting/media/security matrices remain missing |
+| RTF retained story length | Large paragraph-list p50 **-15.04%**, mean **-13.71%**; middle-paragraph p50 **-27.19%**, mean **-25.23%** | Already-open generated 10,000-block story queries only; exact parser-derived length, all allocation/peak-heap/RSS metrics flat, and open/full-text/save/no-op guards remain within 5% |
 | ODT shared transaction bytes | Medium/large no-op edit-save p50 **-27.05% / -18.51%**; exactly two allocations and one archive copy removed per snapshot | Existing-document snapshot handoff only; changed edit/save and open guardrails remain within 3%; changed publication still rewrites the package |
 | ODT consuming full-text blocks | Repeated large full-text p50 **-3.25%**, mean **-4.81%**; allocation calls **-15.48%**, temporary allocations **-45.52%** | Private full-text mode only; structured queries remain near neutral; unchanged open +3.94% p50/+4.17% mean and +10.95% p99 disclosed |
 | ODT indexed paragraph selector | Large middle-paragraph p50 **-48.56%**, mean **-48.33%**; allocation calls **-27.05%**; peak heap **-24.74%**; RSS **-10.93%** | Complete XML/limit validation remains; retains one paragraph, excludes headings from the index, and leaves the established list path neutral |
@@ -422,6 +423,12 @@ covers plain, raw CP-1252 and LZFu with the same six-pair protocol. Allocation,
 RSS, profile, counter, tiny-variant and binary-provenance artifacts are indexed
 in [`change 0055`](changes/0055-rtf-body-block-reservation.md).
 
+The retained RTF story-length evidence pools two 1,000-sample legs per state
+for the paragraph-list and middle-paragraph queries. A reverse-order
+2,000-sample pool covers open, full-text, exact stream-save and no-op guards;
+allocation, RSS and process-wide profile records are indexed in
+[`change 0064`](changes/0064-rtf-retained-story-length.md).
+
 The DOC PAPX-containment evidence pools five balanced pairs for both the
 already-open snapshot paragraph list and complete one-edit/save path, retaining
 every sample in the
@@ -507,6 +514,8 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | RTF retained body span, one paragraph edit/save, 10,000 paragraphs | 6.053 ms | 5.404 ms | **-10.72% p50 / -10.11% mean** | p95 -8.76%; 588 locator-subtree allocation calls over 20 edits removed; peak heap/RSS flat; candidate parse/readback unchanged |
 | RTF bounded body-block reservation, open, 10,000 paragraphs | 2.073 ms | 1.634 ms | **-21.17% p50 / -21.00% mean** | p95 -21.04%; body-vector allocations 264 -> 22 over 22 parses; peak heap -29.73%; uninstrumented RSS flat |
 | RTF bounded body-block reservation, one paragraph edit/save | 5.585 ms | 5.503 ms | **-1.46% p50 / -1.75% mean** | p95 -1.87%, p99 -4.11%; complete candidate parse/readback unchanged |
+| RTF paragraph list, already-open 10,000-block story | 29.692 us | 25.225 us | **-15.04% p50 / -13.71% mean** | p95 -8.64%; reuses the parser-owned exact text length; allocations and peak heap/RSS flat |
+| RTF middle paragraph, already-open 10,000-block story | 18.926 us | 13.780 us | **-27.19% p50 / -25.23% mean** | p95 -14.46%; paragraph boundaries, formatting, exact no-op and complete verification unchanged |
 | ODT no-op edit/save, 10,000 paragraphs | 3.950 us | 3.219 us | -18.51% p50 / -29.58% mean | Exactly two allocations and one 28.42 KiB archive copy removed per snapshot; peak heap/RSS flat |
 | ODT full text, 10,000 blocks | 4.127 ms | 3.993 ms | **-3.25% p50 / -4.81% mean** | Allocation calls -15.48%, temporary allocations -45.52%; peak heap/RSS flat; open guard disclosed |
 | ODT middle paragraph, 10,000 paragraphs | 3.202 ms | 1.647 ms | **-48.56% p50 / -48.33% mean** | Allocation calls -27.05%; peak heap -24.74%; uninstrumented RSS -10.93%; complete EOF validation retained |
@@ -598,6 +607,8 @@ The underlying records are:
 - [`0060-odp-snapshot-slide-projection-reuse.md`](changes/0060-odp-snapshot-slide-projection-reuse.md)
 - [`0061-xlsx-source-backed-page-break-publication.md`](changes/0061-xlsx-source-backed-page-break-publication.md)
 - [`0062-ppt-root-text-publication-adoption.md`](changes/0062-ppt-root-text-publication-adoption.md)
+- [`0063-pptx-atomic-source-backed-shape-text-batch.md`](changes/0063-pptx-atomic-source-backed-shape-text-batch.md)
+- [`0064-rtf-retained-story-length.md`](changes/0064-rtf-retained-story-length.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -693,6 +704,9 @@ remain linked from change 0023.
 - RTF first full-text materialization retains only a byte count during parse,
   then allocates the final string once and copies blocks in one pass instead of
   allocating and joining a temporary fragment vector.
+- RTF borrowed stories now receive that already validated byte count instead
+  of rescanning every retained style block to establish paragraph and inline
+  iterator endpoints.
 - RTF canonical text emission writes ordinary ASCII spans in chunks instead of
   one formatted write per character. Text-only commits skip paragraph-property
   vectors/scans, and a successful paragraph selector stops at its target.

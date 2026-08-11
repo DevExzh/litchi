@@ -43,6 +43,7 @@ impl Boundary {
 pub struct Story<'a> {
     blocks: &'a [StyleBlock<'static>],
     boundaries: &'a [Boundary],
+    text_len: usize,
     fonts: crate::font::Catalog<'a>,
     colors: crate::color::Palette<'a>,
 }
@@ -51,12 +52,14 @@ impl<'a> Story<'a> {
     pub(crate) const fn new(
         blocks: &'a [StyleBlock<'static>],
         boundaries: &'a [Boundary],
+        text_len: usize,
         fonts: crate::font::Catalog<'a>,
         colors: crate::color::Palette<'a>,
     ) -> Self {
         Self {
             blocks,
             boundaries,
+            text_len,
             fonts,
             colors,
         }
@@ -64,14 +67,14 @@ impl<'a> Story<'a> {
 
     /// Number of UTF-8 bytes in the visible retained story text.
     #[must_use]
-    pub fn len(self) -> usize {
-        text_len(self.blocks)
+    pub const fn len(self) -> usize {
+        self.text_len
     }
 
     /// Whether this story contains no retained text bytes.
     #[must_use]
-    pub fn is_empty(self) -> bool {
-        self.blocks.iter().all(|block| block.text.is_empty())
+    pub const fn is_empty(self) -> bool {
+        self.text_len == 0
     }
 
     /// Lazily traverse logical paragraphs, including explicitly empty ones.
@@ -709,12 +712,6 @@ fn locate<'a, 'text>(
         block = block.checked_add(1)?;
         block_position = block_end;
     }
-}
-
-fn text_len(blocks: &[StyleBlock<'_>]) -> usize {
-    blocks.iter().fold(0usize, |length, block| {
-        length.saturating_add(block.text.len())
-    })
 }
 
 pub(crate) fn validate_boundaries(
