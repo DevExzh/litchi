@@ -23,8 +23,44 @@ use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::mem::size_of;
 use std::num::NonZeroU16;
 use std::ops::Range;
+
+const BODY_BLOCK_RESERVE_SOURCE_MULTIPLIER: usize = 24;
+const MAX_BODY_BLOCK_RESERVE_BYTES: usize = 16 * 1_048_576;
+const MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES: usize = 64 * 1_024;
+
+fn initial_body_block_capacity(
+    source_len: Option<usize>,
+    potential_blocks: usize,
+    max_tokens: usize,
+) -> usize {
+    let source_len = source_len.unwrap_or(0);
+    if source_len < MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES {
+        return 0;
+    }
+    let source_relative_bytes = source_len.saturating_mul(BODY_BLOCK_RESERVE_SOURCE_MULTIPLIER);
+    let capacity_ceiling =
+        source_relative_bytes.min(MAX_BODY_BLOCK_RESERVE_BYTES) / size_of::<StyleBlock<'static>>();
+    potential_blocks.min(capacity_ceiling).min(max_tokens)
+}
+
+fn disables_body_block_reservation(control: &ControlWord<'_>) -> bool {
+    matches!(
+        control,
+        ControlWord::TableNestingLevel(_)
+            | ControlWord::TableRowDefaults
+            | ControlWord::TableRow
+            | ControlWord::TableCell
+            | ControlWord::InTable
+            | ControlWord::CellX(_)
+            | ControlWord::NestedTableCell(_)
+            | ControlWord::NestedTableRow(_)
+            | ControlWord::NestedTableProperties(_)
+            | ControlWord::Deleted(true)
+    )
+}
 
 #[derive(Debug, Clone, Copy)]
 enum RtfEncoding {
@@ -1418,6 +1454,8 @@ pub(crate) struct Parser<'a> {
     color_table: RefCell<ColorTable>,
     /// Parsed style blocks
     blocks: Vec<StyleBlock<'a>>,
+    /// Bounded first-allocation hint derived during structural validation.
+    body_block_capacity_hint: usize,
     /// Arena for temporary allocations
     arena: &'a Bump,
     /// Extracted tables
@@ -2160,7 +2198,14 @@ mod unicode;
 
 #[cfg(test)]
 mod tests {
-    use super::{RtfError, append_transport_bytes};
+    use super::{
+        BODY_BLOCK_RESERVE_SOURCE_MULTIPLIER, ControlWord, MAX_BODY_BLOCK_RESERVE_BYTES,
+        MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, ParseLimits, Parser, RtfError, StyleBlock,
+        append_transport_bytes, disables_body_block_reservation, initial_body_block_capacity,
+    };
+    use crate::codec::lexer::Lexer;
+    use bumpalo::Bump;
+    use std::mem::size_of;
 
     #[derive(Default)]
     struct CountingBuffer {
@@ -2204,5 +2249,180 @@ mod tests {
 
         assert_eq!(buffer, b"ok");
         assert!(matches!(error, RtfError::InvalidUnicode(_)));
+    }
+
+    #[test]
+    fn body_block_capacity_is_bounded_by_source_candidates_and_limits() {
+        assert_eq!(initial_body_block_capacity(None, 10, 10), 0);
+        assert_eq!(initial_body_block_capacity(Some(10), 0, 10), 0);
+        assert_eq!(
+            initial_body_block_capacity(Some(MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES - 1), 10, 10),
+            0
+        );
+
+        let enough_source = MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES.max(
+            size_of::<StyleBlock<'static>>()
+                .saturating_mul(10)
+                .div_ceil(BODY_BLOCK_RESERVE_SOURCE_MULTIPLIER),
+        );
+        assert_eq!(initial_body_block_capacity(Some(enough_source), 5, 10), 5);
+        assert_eq!(initial_body_block_capacity(Some(enough_source), 10, 3), 3);
+
+        let hard_capacity = MAX_BODY_BLOCK_RESERVE_BYTES / size_of::<StyleBlock<'static>>();
+        assert_eq!(
+            initial_body_block_capacity(Some(usize::MAX), usize::MAX, usize::MAX),
+            hard_capacity
+        );
+    }
+
+    #[test]
+    fn table_and_deletion_controls_disable_body_block_reservation() {
+        for control in [
+            ControlWord::TableNestingLevel(Some(2)),
+            ControlWord::TableRowDefaults,
+            ControlWord::TableRow,
+            ControlWord::TableCell,
+            ControlWord::InTable,
+            ControlWord::CellX(1_000),
+            ControlWord::NestedTableCell(None),
+            ControlWord::NestedTableRow(None),
+            ControlWord::NestedTableProperties(None),
+            ControlWord::Deleted(true),
+        ] {
+            assert!(disables_body_block_reservation(&control));
+        }
+        assert!(!disables_body_block_reservation(&ControlWord::Par));
+        assert!(!disables_body_block_reservation(&ControlWord::Deleted(
+            false
+        )));
+    }
+
+    #[test]
+    fn dense_plain_body_uses_the_bounded_preflight_capacity() {
+        const PARAGRAPHS: usize = 1_536;
+        let mut source = String::from("{\\rtf1 ");
+        for index in 0..PARAGRAPHS {
+            if index != 0 {
+                source.push_str("\\par ");
+            }
+            source.push_str("paragraph-abcdefghijklmnopqrstuvwxyz-0123456789-");
+            source.push_str(&index.to_string());
+        }
+        source.push('}');
+
+        let arena = Bump::new();
+        let limits = ParseLimits::default();
+        let (tokens, spans) = Lexer::new_with_limits(&source, &arena, limits)
+            .tokenize_with_spans()
+            .expect("dense body tokens");
+        let expected_capacity =
+            initial_body_block_capacity(Some(source.len()), PARAGRAPHS, tokens.len());
+        assert_eq!(expected_capacity, PARAGRAPHS);
+
+        let parsed = Parser::new_with_source(&tokens, &spans, &source, &arena, limits)
+            .parse()
+            .expect("dense body parse");
+
+        assert_eq!(parsed.blocks.len(), PARAGRAPHS);
+        assert!(parsed.blocks.capacity() >= expected_capacity);
+        assert_eq!(
+            parsed.blocks.first().map(|block| block.text.as_ref()),
+            Some("paragraph-abcdefghijklmnopqrstuvwxyz-0123456789-0")
+        );
+        assert!(
+            parsed
+                .blocks
+                .last()
+                .is_some_and(|block| block.text.ends_with("1535"))
+        );
+    }
+
+    #[test]
+    fn oversized_optional_hint_falls_back_to_one_block() {
+        let source = r"{\rtf1 body}";
+        let arena = Bump::new();
+        let limits = ParseLimits::default();
+        let (tokens, spans) = Lexer::new_with_limits(source, &arena, limits)
+            .tokenize_with_spans()
+            .expect("body tokens");
+        let mut parser = Parser::new_with_source(&tokens, &spans, source, &arena, limits);
+        parser.body_block_capacity_hint = usize::MAX;
+
+        parser
+            .prepare_body_block_push()
+            .expect("one-block fallback reserve");
+
+        assert!(parser.blocks.capacity() >= 1);
+        assert_eq!(parser.body_block_capacity_hint, 0);
+    }
+
+    #[test]
+    fn table_heavy_body_keeps_lazy_block_growth() {
+        const CELLS: usize = 256;
+        let filler = "x".repeat(256);
+        let mut source = String::from("{\\rtf1\\trowd");
+        for cell in 1..=CELLS {
+            source.push_str("\\cellx");
+            source.push_str(&(cell * 100).to_string());
+        }
+        source.push_str("\\intbl ");
+        for cell in 0..CELLS {
+            source.push_str("cell-");
+            source.push_str(&cell.to_string());
+            source.push_str(&filler);
+            source.push_str("\\cell ");
+        }
+        source.push_str("\\row\\pard body}");
+
+        let arena = Bump::new();
+        let limits = ParseLimits::default();
+        let (tokens, spans) = Lexer::new_with_limits(&source, &arena, limits)
+            .tokenize_with_spans()
+            .expect("table-heavy tokens");
+        let unsafe_capacity =
+            initial_body_block_capacity(Some(source.len()), CELLS + 1, tokens.len());
+        let parsed = Parser::new_with_source(&tokens, &spans, &source, &arena, limits)
+            .parse()
+            .expect("table-heavy parse");
+
+        assert_eq!(parsed.blocks.len(), 1);
+        assert_eq!(parsed.blocks[0].text, "body");
+        assert!(parsed.blocks.capacity() < unsafe_capacity);
+        assert_eq!(parsed.tables.len(), 1);
+        assert_eq!(parsed.tables[0].rows()[0].cells().len(), CELLS);
+    }
+
+    #[test]
+    fn deletion_heavy_body_keeps_lazy_block_growth() {
+        const DELETED_RUNS: usize = 256;
+        let filler = "x".repeat(256);
+        let mut source = String::from("{\\rtf1{\\*\\revtbl Unknown;}\\deleted\\revauthdel0 ");
+        for run in 0..DELETED_RUNS {
+            source.push_str("hidden-");
+            source.push_str(&run.to_string());
+            source.push_str(&filler);
+            source.push_str(if run % 2 == 0 { "\\b " } else { "\\b0 " });
+        }
+        source.push_str("\\deleted0 body}");
+
+        let arena = Bump::new();
+        let limits = ParseLimits::default();
+        let (tokens, spans) = Lexer::new_with_limits(&source, &arena, limits)
+            .tokenize_with_spans()
+            .expect("deletion-heavy tokens");
+        let unsafe_capacity =
+            initial_body_block_capacity(Some(source.len()), DELETED_RUNS + 1, tokens.len());
+        let parsed = Parser::new_with_source(&tokens, &spans, &source, &arena, limits)
+            .parse()
+            .expect("deletion-heavy parse");
+
+        assert_eq!(parsed.blocks.len(), 1);
+        assert_eq!(parsed.blocks[0].text, "body");
+        assert!(parsed.blocks.capacity() < unsafe_capacity);
+        assert_eq!(parsed.revisions.len(), 1);
+        let expected_deleted_len = (0..DELETED_RUNS)
+            .map(|run| "hidden-".len() + run.to_string().len() + filler.len())
+            .sum::<usize>();
+        assert_eq!(parsed.revisions[0].content.len(), expected_deleted_len);
     }
 }

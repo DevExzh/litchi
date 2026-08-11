@@ -336,6 +336,14 @@ incomplete program and CRUD matrix.
   `BlobBundle::insert` payload-copy site disappears; matched peak heap falls
   1.92%, while uninstrumented RSS is flat. See
   [`0054`](changes/0054-ods-shared-durable-patch-blobs.md).
+- Large plain RTF parsing now derives an exact root-text block count during the
+  existing structural preflight and performs one bounded lazy style-block
+  reservation. Across 6,000 samples/state, open p50 improves 21.17%, mean
+  21.00%, and p95 21.04%; one-edit/save improves 1.46% p50 and 1.75% mean.
+  The block vector moves from 264 geometric allocations to 22 exact reserves
+  over 22 parses, and peak heap falls 29.73%. Medium plain/CP-1252 centers move
+  +0.49%/+2.84% p50 and are disclosed. See
+  [`0055`](changes/0055-rtf-body-block-reservation.md).
 - The positional XLSX source record reports p50 opens of 33.881 us (tiny),
   56.493 us (medium), and 139.897 us (dense); list-after-open has zero timed
   source reads. First-cell and narrow-range operations physically overlap only

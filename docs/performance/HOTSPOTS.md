@@ -3,7 +3,7 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0054`](changes/0054-ods-shared-durable-patch-blobs.md)
+[`change 0055`](changes/0055-rtf-body-block-reservation.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -521,6 +521,16 @@ locator/refusal. Large one-edit/save improves 10.72% p50 and 10.11% mean;
 instructions fall 10.64%, and the 588 before-only locator allocation calls
 over 20 edits disappear. Peak heap and uninstrumented RSS remain flat. See
 change 0048.
+
+The next large-open profile attributed 25.65% of cycles to `memmove`; the
+10,000 retained `StyleBlock` values grew through 12 vector allocations to a
+16,384-element / 16.12 MiB capacity. The existing structural preflight now
+counts root text tokens and passes a bounded hint to the first retained block.
+One 9.84 MiB exact reserve replaces those growth/copy steps. Large open p50
+improves 21.17%, mean 21.00%, cycles 14.91%, and cache misses 32.20%; peak heap
+falls 29.73%. Table/deletion-heavy and sub-64-KiB sources retain lazy growth.
+Medium plain/CP-1252 p50 movements of +0.49%/+2.84% are disclosed. See change
+0055.
 
 Formatting/media, malformed/security, broader real-producer, cold-source,
 broad edit and conversion matrices remain missing. Compressed LZFu and raw

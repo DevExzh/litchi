@@ -98,6 +98,7 @@ impl Parser<'_> {
                         .ok_or_else(|| {
                             RtfError::MalformedDocument("RTF body text length overflow".into())
                         })?;
+                self.prepare_body_block_push()?;
                 self.blocks.push(block);
                 self.append_revision_text(&state, allocated, start, self.body_text_len)?;
             }

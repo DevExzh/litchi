@@ -261,6 +261,14 @@ limit/error precedence, allocation identity and source/target direction; the
 complete ODS package/media reopen remains. It adds no patch encode/apply
 timing, structural/bulk edit, producer, security or source-backed I/O coverage.
 
+Change 0055 leaves the RTF CRUD and publication surface unchanged. It changes
+only the private capacity chosen for the root body style-block vector. The
+existing full structural pass supplies the count; source/token/absolute bounds,
+fallible allocation, table/deletion fallback, all parser limits, exact no-op,
+patch/inverse, candidate parse/readback and transport/producer coverage remain.
+It adds no formatting/media edit, repair, security, conversion, cold-source or
+real-producer capability.
+
 Change 0040 removes repeated UTF-8 scalar decoding from ordinary RTF text
 delimiter discovery without changing the existing CRUD surface. It measures
 plain, raw CP-1252 and LZFu opens at medium and large, retains the 25-row
