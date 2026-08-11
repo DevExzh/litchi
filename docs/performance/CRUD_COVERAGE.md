@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 
-This is a coverage map, not a completion claim. It compares the 112 selectable
+This is a coverage map, not a completion claim. It compares the 113 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -18,7 +18,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring; large/streaming creation remains missing |
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
 | Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication; signed/extension corpora remain missing |
-| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODS additionally verifies eight exact 2 MiB resources and manifest media types after one cell edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
+| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODS and ODP additionally verify eight exact 2 MiB resources and manifest media types after one cell/text-box edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
 | About 1% semantic update and save | Covered for XLSX/DOCX/PPTX generated corpora | Deterministic evenly spaced cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch and reopens the package |
 | Bulk update matching objects | Missing | No semantic end-to-end case |
 | Clear/remove/hide/detach/GC distinctions | Missing | No complete matrix |
@@ -28,7 +28,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Patch encode/apply/invert/merge | Partial | DOCX coalesced replacement correctness covers deterministic durable encode/decode/apply/inverse, but no durable lifecycle timing; broader formats/merge remain missing |
 | Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
-| Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS-row preservation, and exact raw ODS auxiliary/media members during a neighboring cell edit; broader format-semantic extension corpora remain missing |
+| Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS-row preservation, and exact raw ODS/ODP auxiliary/media members during neighboring cell/text-box edits; broader format-semantic extension corpora remain missing |
 | Replace one low-level Part, preserve the rest | Covered for owned same-topology OPC | Changes 0008/0021/0022 test raw framing, fallback, shared changed-payload ownership, validated local-span movement and matched save behavior; source-backed editing remains missing |
 
 The source/output matrix is also incomplete. Owned bytes and instrumented
@@ -64,8 +64,8 @@ semantic conversion remain.
    macro-enabled, protected and external-link fixtures.
 9. Smart detection versus prepared-source reuse. OOXML smart results retain an
    adoptable parsed OPC package; ODF detection/handoff remains unmeasured.
-10. Broaden ODF beyond generated text/grid/deck and accepted compact ODS
-   unchanged-member publication: source-backed selectors, other family and
+10. Broaden ODF beyond generated text/grid/deck and accepted compact ODS/ODP
+   unchanged-member publication: source-backed selectors, resource-adding and
    structural publication, 1% and bulk edits, unknown extensions, real
    producers, richer media, security and source-backed I/O.
    iWork is deliberately deferred while the `iwa-*` crates change separately.
@@ -140,6 +140,15 @@ members. It proves exact opaque/media payloads, manifest media types, no-op and
 logical fallback behavior, but does not complete other-family or structural
 publication, 1%/bulk edits, real-producer, signature/encryption, source-backed
 or broad media semantics.
+
+Change 0034 adds the matching media-rich ODP source-backed text-box edit/save
+case and accepts the already shared checked-splice/raw-copy publication path
+for content-only rich-object operations. Resource additions and unsupported or
+security-sensitive layouts keep the complete rebuild. The case proves exact
+media/metadata framing, complete slide and rich-content readback, deterministic
+patch/inverse/stale behavior, and material end-to-end latency improvement; it
+does not complete structural/bulk edits, repeated queries, real-producer media,
+or source-backed positional I/O.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
