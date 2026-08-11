@@ -42,6 +42,7 @@ is still not broad program or CRUD coverage.
 | Native PPT text-edit resolver reuse | Direct large edit/save p50 **-14.12%**, mean **-15.39%**; allocation calls **-3.53%** | Reuses the full editor preflight for persisted-record resolution; exact error precedence, fresh commit editor and complete readback remain; minor-fault increase disclosed |
 | Bounded XLSX validated-store handoff | Medium one-cell commit + first read p50 **-23.23%**, mean **-23.15%**; allocation calls **-21.01%** | At most 4,096 cells / 1 MiB XML with exact byte and lineage identity; peak heap +4.29%; unrestricted dense-wide candidate rejected at +8.99% peak heap |
 | Rejected direct XLSX action-plan flattening | Best formal p50 **-1.61%**; dense commit **-0.27%** p50 with mean interval crossing zero | Fully reverted; process allocation calls -0.0623%, peak heap flat, medium commit p99 +4.33% |
+| XLSX no-extension worksheet scan | Medium commit/save p50 **-19.31% to -20.74%**; cold reads about **-35%**; dense 1% commit p50 **-19.62%** | `dyDescent`-free success path only; rejected inputs rerun the original collector for error precedence; allocation calls -25.24%, peak heap flat |
 | ODS row-local publication | Large/medium one-cell edit-save p50 **-9.54% / -7.22%**; allocation calls **-5.85%**, peak heap **-27.18%** | Same-topology modeled rows only; structural edits fall back and touched opaque rows refuse |
 | ODS unchanged-media publication | Media-rich one-cell edit/save p50 **-4.73%**, mean **-5.73%**, p95 **-7.65%**; peak heap **-8.78%** | Compact `content.xml` replacements in ordinary unsigned/unencrypted ZIPs; every unproved layout/member retains logical rebuild or comparison fallback |
 | ODS adaptive cell locator | Large public cell sweep p50 **-81.74%**, mean **-80.72%**; full cell text p50 **-52.65%** | Builds lazily at 64 calls, requests 3,216 bytes on the dense corpus and is capped at 4 MiB; peak heap/RSS flat |
@@ -147,6 +148,12 @@ medium and dense-wide 1% commit/save ABBA reports are under
 `results/abba-xlsx-action-plan-*.json`; matched allocation evidence and the
 rejection rationale are in
 [`change 0030`](changes/0030-xlsx-action-plan-flattening-rejected.md).
+
+The accepted XLSX no-extension scan evidence is under
+`results/abba-xlsx-x14ac-*.json`. Medium and dense-wide latency, read/no-op
+guards, allocation/RSS/counter attribution and malformed-input precedence are
+summarized in
+[`change 0032`](changes/0032-xlsx-no-extension-scan.md).
 
 The ODS row-local publication evidence is
 [`before A`](results/abba-ods-row-splice-one-edit-before-a.json),
@@ -316,6 +323,7 @@ The underlying records are:
 - [`0029-rtf-transport-and-producer-coverage.md`](changes/0029-rtf-transport-and-producer-coverage.md)
 - [`0030-xlsx-action-plan-flattening-rejected.md`](changes/0030-xlsx-action-plan-flattening-rejected.md)
 - [`0031-ods-unchanged-media-preservation.md`](changes/0031-ods-unchanged-media-preservation.md)
+- [`0032-xlsx-no-extension-scan.md`](changes/0032-xlsx-no-extension-scan.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on

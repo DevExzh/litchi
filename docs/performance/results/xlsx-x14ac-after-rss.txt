@@ -1,0 +1,11 @@
+Command being timed: target/perf/x14ac-scan/after --warmup 5 --samples 20 --case xlsx_one_percent_commit --xlsx-shape dense-wide --json docs/performance/results/xlsx-x14ac-after-rss.json
+User time (seconds): 9.85
+System time (seconds): 0.08
+Percent of CPU this job got: 100%
+Elapsed (wall clock) time: 0:09.93
+Maximum resident set size (kbytes): 116092
+Major page faults: 0
+Minor page faults: 48379
+Voluntary context switches: 77
+Involuntary context switches: 175
+Exit status: 0

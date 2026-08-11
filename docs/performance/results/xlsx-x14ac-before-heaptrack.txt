@@ -1,0 +1,7 @@
+command: target/perf/x14ac-scan/before --warmup 2 --samples 10 --case xlsx_one_percent_commit --xlsx-shape dense-wide --json docs/performance/results/xlsx-x14ac-before-heaptrack.json
+total runtime: 41.498000s
+calls to allocation functions: 210837749
+temporary memory allocations: 33547137
+peak heap memory consumption: 91.79M
+peak RSS (including heaptrack overhead): 123.32M
+total memory leaked: 1.78K

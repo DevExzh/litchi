@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0026`](changes/0026-ppt-text-edit-resolver-reuse.md)
+Evidence through: [`change 0032`](changes/0032-xlsx-no-extension-scan.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -102,6 +102,12 @@ Confirmed source facts:
 - A targeted cell edit performs a semantic parse, an independent lossless
   layout scan, full replacement-byte construction, and a full changed-sheet
   semantic readback before publication.
+- Plain worksheets previously ran a separate namespace-aware x14ac collection
+  before every complete semantic parse even when no `dyDescent` token existed.
+  Successful no-token reads now skip that pass; rejected inputs rerun it to
+  preserve error precedence. Medium changed commits improve about 20% and cold
+  reads about 35%; dense-wide 1% commit improves 19.62% p50, allocation calls
+  fall 25.24%, and peak heap remains flat. Direct x14ac/MCE paths are unchanged.
 - Eligible changed sheets now adopt that exact commit-validated store into the
   target snapshot. Medium commit plus first read improves 23.23% p50 and
   allocation calls fall 21.01%. The handoff is capped at 4,096 cells and 1 MiB

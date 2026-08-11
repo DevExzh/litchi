@@ -1,5 +1,5 @@
 use super::model::MAX_XML_DEPTH;
-use super::{parse, parse_defaults};
+use super::{parse, parse_defaults, x14ac};
 use crate::cell::{Cell, Text, Value};
 use crate::column;
 use crate::formula::Cache;
@@ -8,6 +8,36 @@ use crate::row;
 use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex};
 
 const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+#[test]
+fn plain_worksheets_skip_only_the_unneeded_extension_capture() {
+    let plain = format!(
+        r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet>"#
+    );
+    assert!(!x14ac::may_contain_descent(plain.as_bytes()));
+    assert!(parse(plain.as_bytes(), || Ok(None)).is_ok());
+
+    let conservative_false_positive =
+        format!(r#"<worksheet xmlns="{S}"><!-- dyDescent --><sheetData/></worksheet>"#);
+    assert!(x14ac::may_contain_descent(
+        conservative_false_positive.as_bytes()
+    ));
+    assert!(parse(conservative_false_positive.as_bytes(), || Ok(None)).is_ok());
+}
+
+#[test]
+fn rejected_plain_worksheets_keep_extension_error_precedence() {
+    let malformed =
+        format!(r#"<worksheet xmlns="{S}"><sheetData><row r="1"></sheetData></worksheet>"#);
+    assert!(!x14ac::may_contain_descent(malformed.as_bytes()));
+    let error = parse(malformed.as_bytes(), || Ok(None)).expect_err("malformed worksheet");
+    assert!(
+        error
+            .to_string()
+            .contains("invalid worksheet extension XML"),
+        "unexpected error precedence: {error}"
+    );
+}
 
 #[test]
 fn parses_exact_sparse_values_formulas_and_explicit_empty_cells() {
