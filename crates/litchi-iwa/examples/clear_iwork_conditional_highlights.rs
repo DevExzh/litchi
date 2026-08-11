@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn clear_numbers(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersEditor::open(source)?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
     editor.clear_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN)?;
     editor.save(output)?;
     assert!(

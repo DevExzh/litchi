@@ -1,5 +1,7 @@
 //! Compact package-local object lookup for the Numbers adapter.
 
+use std::mem::size_of;
+
 use litchi_iwa_core::RawMessage;
 
 use super::{Components, Error, Result, SemanticLimitKind, SemanticPath};
@@ -124,6 +126,29 @@ impl Index {
 
     pub(super) fn object_count(&self) -> usize {
         self.locators.len()
+    }
+
+    /// Conservative comparison work for one binary object-identifier lookup.
+    pub(super) const fn lookup_work(&self) -> usize {
+        let object_count = self.locators.len();
+        if object_count <= 1 {
+            return 1;
+        }
+        usize::BITS
+            .saturating_sub((object_count - 1).leading_zeros())
+            .saturating_add(1) as usize
+    }
+
+    /// Conservative allocation/population/sort cost for rebuilding this index.
+    pub(super) fn rebuild_work(&self) -> usize {
+        let object_count = self.locators.len();
+        let allocation = object_count
+            .saturating_mul(size_of::<ObjectLocator>().saturating_add(size_of::<Entry>()));
+        let populate_and_sort = object_count
+            .saturating_mul(self.lookup_work())
+            .saturating_mul(2)
+            .saturating_add(object_count);
+        allocation.saturating_add(populate_and_sort)
     }
 
     pub(super) fn iter_entries_by_type(

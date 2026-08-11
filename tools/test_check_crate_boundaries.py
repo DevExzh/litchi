@@ -240,6 +240,27 @@ def add_numbers_sheet_order_canonical_scaffold(root: Path) -> None:
     sheet_export.write_text(sheet_source + "pub mod order;\n", encoding="utf-8")
 
 
+def add_numbers_table_title_settings_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_TITLE_SETTINGS_CANONICAL_TYPES
+        ),
+        encoding="utf-8",
+    )
+    owner = root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text("impl Package {}\n", encoding="utf-8")
+    lib_export, package_export, table_export = (
+        root / path for path in boundaries.NUMBERS_TABLE_TITLE_SETTINGS_EXPORT_SOURCES
+    )
+    lib_export.write_text("pub mod table;\n", encoding="utf-8")
+    package_export.write_text("pub(crate) mod table_title;\n", encoding="utf-8")
+    table_export.write_text("pub mod title;\n", encoding="utf-8")
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -256,6 +277,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 {
                     boundaries.Edge("litchi-iwa-detect", "litchi-iwa-protos"),
                     boundaries.Edge("litchi-iwa-structured", "litchi-iwa-text"),
+                    boundaries.Edge("litchi-odc", "soapberry-zip"),
                     boundaries.Edge("litchi-sign", "soapberry-zip"),
                 }
             ),
@@ -8319,6 +8341,330 @@ class BoundaryPolicyTests(unittest.TestCase):
                     )
                     for index, name in enumerate(boundaries.LEGACY_HOST_SHAPE_NAMES, start=1)
                 ],
+            )
+
+
+    def test_numbers_table_title_settings_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_METHODS,
+            ("table_title_settings", "set_table_title_settings"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_EXAMPLE,
+            Path("crates/litchi-iwa/examples/edit_numbers_table_title.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_TESTS,
+            (
+                "table_title_settings_are_lossless_transactional_and_wire_exact",
+                "table_title_settings_restore_native_presence_exactly",
+                "table_title_settings_reject_missing_render_styles_transactionally",
+                "table_title_settings_reject_malformed_wire_transactionally",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_TITLE_SETTINGS_SEMANTIC_SOURCE,
+            Path("crates/litchi-numbers/src/table/title.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_TITLE_SETTINGS_OWNER_SOURCE,
+            Path("crates/litchi-numbers/src/package/table_title.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_TITLE_SETTINGS_OWNER_HELPER_ROOT,
+            Path("crates/litchi-numbers/src/package/table_title"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_TITLE_SETTINGS_CANONICAL_TYPES,
+            (
+                "Settings",
+                "Edit",
+                "Patch",
+                "Commit",
+                "Diagnostics",
+                "Error",
+                "LimitKind",
+                "Path",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_TITLE_SETTINGS_PACKAGE_METHODS,
+            ("table_title_settings", "edit_table_title", "apply_table_title"),
+        )
+        self.assertTrue(
+            {
+                "TitleSettings",
+                "TableTitleSettings",
+                "TableTitleEdit",
+                "TableTitlePatch",
+                "TableTitleCommit",
+            }
+            <= boundaries.NUMBERS_TABLE_TITLE_SETTINGS_FLAT_ALIASES
+        )
+
+    def test_retired_iwa_numbers_table_title_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/table_title.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "pub fn table_title_settings() {}\n"
+                "pub fn set_table_title_settings() {}\n"
+                "pub(crate) fn table_title_settings_in_package() {}\n"
+                "pub(crate) fn set_table_title_settings_in_package() {}\n",
+                encoding="utf-8",
+            )
+            tests = root / boundaries.IWA_NUMBERS_EDITOR_TEST_SOURCE
+            tests.write_text(
+                "\n".join(
+                    f"fn {name}() {{}}"
+                    for name in (
+                        boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_TESTS
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_EXAMPLE
+            example.parent.mkdir(parents=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+
+            violations = (
+                boundaries.audit_iwa_numbers_table_title_settings_source_topology(
+                    root
+                )
+            )
+
+            self.assertEqual(len(violations), 7)
+            self.assertTrue(any("example returned" in item for item in violations))
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_METHODS:
+                self.assertTrue(
+                    any(f"settings method {method}:" in item for item in violations)
+                )
+            for name in boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_TESTS:
+                self.assertTrue(
+                    any(f"settings test {name}:" in item for item in violations)
+                )
+            self.assertFalse(any("in_package" in item for item in violations))
+
+    def test_retired_iwa_numbers_table_title_readme_calls_and_example(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            readme = root / boundaries.IWA_NUMBERS_README
+            readme.parent.mkdir(parents=True)
+            readme.write_text(
+                "numbers.table_title_settings(sheet, table);\n"
+                "numbers_editor\n  .\n  "
+                "set_table_title_settings(sheet, table, value);\n"
+                "crate::NumbersEditor::table_title_settings(sheet, table);\n"
+                "edit_numbers_table_title\n"
+                "edit_numbers_table_title.rs\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_iwa_numbers_table_title_settings_source_topology(
+                    root
+                )
+            )
+
+            self.assertEqual(len(violations), 5)
+            self.assertEqual(
+                sum("README call" in item for item in violations),
+                3,
+            )
+            self.assertEqual(
+                sum("README example reference" in item for item in violations),
+                2,
+            )
+
+    def test_iwa_numbers_table_title_policy_retains_private_shared_helpers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/table_title.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "pub(crate) fn table_title_settings_in_package() {}\n"
+                "pub(crate) fn set_table_title_settings_in_package() {}\n"
+                "pub(super) fn read_table_title_settings_wire() {}\n"
+                "pub(super) fn write_table_title_settings_wire() {}\n",
+                encoding="utf-8",
+            )
+            pages = root / "crates/litchi-iwa/src/pages/editor/table_title.rs"
+            pages.parent.mkdir(parents=True)
+            pages.write_text(
+                "use crate::numbers::editor::{table_title_settings_in_package, "
+                "set_table_title_settings_in_package};\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_NUMBERS_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "Use table::title and package.edit_table_title().\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_title_settings_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_table_title_requires_each_direct_canonical_type(
+        self,
+    ) -> None:
+        for missing in boundaries.NUMBERS_TABLE_TITLE_SETTINGS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_table_title_settings_canonical_scaffold(root)
+                    semantic = (
+                        root
+                        / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_SEMANTIC_SOURCE
+                    )
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in (
+                                boundaries.NUMBERS_TABLE_TITLE_SETTINGS_CANONICAL_TYPES
+                            )
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_title_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-title settings public API is "
+                            f"missing canonical table::title type {missing}: "
+                            "crates/litchi-numbers/src/table/title.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_table_title_requires_modules_and_private_owner(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_title_settings_canonical_scaffold(root)
+            package = root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_EXPORT_SOURCES[1]
+            package.write_text("pub mod table_title;\n", encoding="utf-8")
+            table = root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_EXPORT_SOURCES[2]
+            table.write_text("mod title;\n", encoding="utf-8")
+
+            violations = (
+                boundaries.audit_numbers_table_title_settings_facade_source_topology(
+                    root
+                )
+            )
+
+            self.assertTrue(
+                any(
+                    "missing canonical table::title module" in item
+                    for item in violations
+                )
+            )
+            self.assertTrue(
+                any(
+                    "exposes duplicate package::table_title module" in item
+                    for item in violations
+                )
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_title_settings_canonical_scaffold(root)
+            (root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_OWNER_SOURCE).unlink()
+            violations = (
+                boundaries.audit_numbers_table_title_settings_facade_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(
+                violations,
+                [
+                    "focused litchi-numbers table-title settings public API is "
+                    "missing private package owner source: "
+                    "crates/litchi-numbers/src/package/table_title.rs"
+                ],
+            )
+
+    def test_focused_numbers_table_title_rejects_aliases_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_title_settings_canonical_scaffold(root)
+            helper = (
+                root
+                / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_OWNER_HELPER_ROOT
+                / "api.rs"
+            )
+            helper.parent.mkdir(parents=True)
+            helper.write_text(
+                "pub type TableTitleEdit = Edit;\n"
+                "pub fn table_title_settings(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use crate::table::title::{Settings, Edit};\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_table_title_settings_facade_source_topology(
+                    root
+                )
+            )
+
+            for fragment in (
+                "retains flat alias TableTitleEdit",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes public table-title owner alias",
+                "retains root alias Settings",
+                "retains root alias Edit",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_table_title_allows_canonical_common_settings_reexport(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_title_settings_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use crate::package::table_title::{Commit, Diagnostics, "
+                "Edit, Error, "
+                "LimitKind, Patch, Path};\n"
+                "pub use litchi_iwa_common::table::title::Settings;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_title_settings_facade_source_topology(
+                    root
+                ),
+                [],
             )
 
 

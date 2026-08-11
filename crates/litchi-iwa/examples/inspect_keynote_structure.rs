@@ -1,7 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 
 use litchi_iwa::keynote::{Acceleration, KeynoteEditor, Mode, TextDelivery};
+use litchi_iwa::media::MediaAssetId;
 use litchi_iwa::raw::package::IWorkPackage;
 use litchi_iwa_core::ArchiveObject;
 use litchi_iwa_protos::kn::{
@@ -180,13 +181,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "soundtrack {} archive={} info={:?}: {soundtrack:?}",
             reference.identifier, archive_name, object.archive_info.message_infos
         );
+        let soundtrack_media_ids = soundtrack
+            .movie_media
+            .iter()
+            .map(|media| MediaAssetId::try_from(media.identifier))
+            .collect::<Result<HashSet<_>, _>>()?;
         for media in &soundtrack.movie_media {
+            let data_identifier = MediaAssetId::try_from(media.identifier)?;
             println!(
                 " soundtrack media {}: {:?}",
                 media.identifier,
                 media_assets
                     .iter()
-                    .find(|asset| asset.data_identifier == media.identifier)
+                    .find(|asset| asset.data_identifier == data_identifier)
             );
         }
         for component in package_metadata
@@ -195,10 +202,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .chain(&package_metadata.versioned_components)
             .filter(|component| {
                 component.data_references.iter().any(|data| {
-                    soundtrack
-                        .movie_media
-                        .iter()
-                        .any(|media| media.identifier == data.data_identifier)
+                    MediaAssetId::try_from(data.data_identifier)
+                        .is_ok_and(|identifier| soundtrack_media_ids.contains(&identifier))
                 })
             })
         {

@@ -26,19 +26,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(sheet_index)
         .ok_or("sheet index out of range")?;
     let drawable = editor
-        .sheet_drawables(sheet.object_id)?
+        .sheet_drawables(sheet.id())?
         .into_iter()
         .nth(drawable_index)
         .ok_or("drawable index out of range")?;
     let drawable_id = drawable.id.get();
-    let old = editor.sheet_drawable_comment(sheet.object_id, drawable_id)?;
+    let old = editor.sheet_drawable_comment(sheet.id(), drawable_id)?;
     if replacement == "--clear" {
-        editor.clear_sheet_drawable_comment(sheet.object_id, drawable_id)?;
+        editor.clear_sheet_drawable_comment(sheet.id(), drawable_id)?;
     } else {
-        editor.set_sheet_drawable_comment(sheet.object_id, drawable_id, replacement)?;
+        editor.set_sheet_drawable_comment(sheet.id(), drawable_id, replacement)?;
     }
     editor.save(output)?;
-    let new = editor.sheet_drawable_comment(sheet.object_id, drawable_id)?;
+    let new = editor.sheet_drawable_comment(sheet.id(), drawable_id)?;
     println!(
         "sheet={sheet_index} drawable={} old={:?} new={:?}",
         drawable_id,

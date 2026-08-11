@@ -36,6 +36,7 @@ pub(crate) mod sheet_order;
 mod table;
 pub(crate) mod table_headers;
 mod table_lock;
+pub(crate) mod table_title;
 
 use std::collections::HashSet;
 use std::fmt;

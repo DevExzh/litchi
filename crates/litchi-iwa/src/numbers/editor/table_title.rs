@@ -4,43 +4,11 @@ use super::*;
 
 mod wire;
 
-use litchi_numbers::TableSelector;
 use wire::{read_table_title_settings_wire, write_table_title_settings_wire};
 
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 const SHAPE_STYLE_MESSAGE_TYPE: u32 = 2_025;
-
-impl NumbersEditor {
-    /// Read an attached table's lossless title visibility and outline settings.
-    pub fn table_title_settings(&self, selector: TableSelector<'_>) -> Result<Settings> {
-        let table_id = super::selectors::table_id(self, selector)?;
-        table_title_settings_in_package(&self.package, table_id)
-    }
-
-    /// Replace an attached table's title visibility and outline settings transactionally.
-    pub fn set_table_title_settings(
-        &mut self,
-        selector: TableSelector<'_>,
-        settings: Settings,
-    ) -> Result<()> {
-        let table_id = super::selectors::table_id(self, selector)?;
-        if self.table_title_settings(selector)? == settings {
-            return Ok(());
-        }
-        let mut staged = self.package.clone();
-        set_table_title_settings_in_package(&mut staged, table_id, settings)?;
-
-        let verified = Self::from_package(staged)?;
-        if verified.table_title_settings(selector)? != settings {
-            return Err(Error::InvalidFormat(
-                "Numbers table title settings failed round-trip validation".to_owned(),
-            ));
-        }
-        self.package = verified.package;
-        Ok(())
-    }
-}
 
 pub(crate) fn table_title_settings_in_package(
     package: &IWorkPackage,

@@ -1738,3 +1738,74 @@ full checker retains only 14 unchanged baselines: six missing dev-only
 `litchi-odf-common`/`litchi-opc` edges to `xml-minifier`). Topology remains 64
 packages/235 internal declarations/14 `litchi-iwa` declarations/14 ordered
 debts, including debt 014 (`litchi-iwa -> litchi-keynote`).
+
+## 2026-08-11 current-status amendment: Numbers table-title owner
+
+Numbers now exposes the focused
+`table::title::{Settings, Edit, Patch, Commit, Diagnostics, Error, LimitKind,
+Path}` family through
+`Package::{table_title_settings, edit_table_title, apply_table_title}`. The
+API is selector-first and archive-free; the focused signatures expose no raw
+source, native identity, component, or generated value, and publication uses
+`write_to`. `Settings` independently preserves presence for TableModel
+field-22 visibility and field-37 outline; the consuming
+infallible `Edit::set` stages the complete value.
+
+The changed owner follows the rooted Document/Sheet-or-FormBasedSheet/
+TableInfo/TableModel chain, requires exact local reference metadata and one
+canonical selected message, and rejects a locked table. Effective visibility
+also requires valid field-33 height and distinct exact field-30/field-36
+references to canonical type-2022 paragraph and type-2025 shape styles. Missing,
+external, aliased, or malformed prerequisites fail closed. Changed admission
+scans `Index/ViewState.iwa` and returns `UnsupportedSource` for any native
+type-6284 table-name-selection message because that transient selection state
+is an unsupported dependency. Reads and exact no-ops remain broad. Accepted
+changed sources preserve every other ViewState byte exactly.
+
+The scalar-only private projection covers fields 22/33/37 and reuses the
+existing scalar Reference view for fields 30/36. Strict raw validation precedes
+forced Buffa parity; raw records retain preservation authority. Generated
+evidence is five files/32,332 bytes under 33 KiB, digest
+`56cfd70666ffa6079175bdab0a63a4ddd055099edf3c771ed3ad8b3051596ee1`,
+with 9/9 focused codec and 141/141 full protobuf tests.
+
+Exact no-op shares source and skips reopen. Changed publication rewrites one
+selected `Index/CalculationEngine.iwa` component, deletes each existing
+canonical preview (zero to three), reopens, and verifies semantic state and
+exact locality while preserving accepted ViewState and all other components.
+Exact source/target apply, conflict, and inverse semantics remain process-local
+and byte-exact; legacy changed sources fail closed.
+
+The native control resave is 136,204 bytes/SHA-256
+`25c9fc858ca4fb4f1fedeafb944e96afb81af03a082a41be297ecf6f2542dbdb`;
+the native title-hidden artifact is 136,273 bytes/
+`ac8a7117ad6256b0da2e6d191b9e64f721b689d71696a89ac0f78bc6aa513a28`.
+Numbers removes raw field 22 for the hidden form instead of encoding false;
+field 37 retains its independent presence contract. The native comparison is
+not evidence for mutating type-6284 ViewState; changed admission rejects it.
+
+The exact Rust source is the 136,357-byte
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`;
+the 136,351-byte hidden candidate is
+`4c7f6340b6f2675240577c5b59d5c154de24c8a7e763a31257c56a9899a8e40c`,
+and its inverse restores the source exactly. Numbers 14.4 opened it warning-free
+with Table Title off and retained the 22-by-7 table, B2 fixture marker, and B3
+value 42. Warning-free Save As, close, and exact-URL reopen preserved that UI
+state in the 136,353-byte resave
+`5b162f8431f45333f0ae9a8654dfa724794f2ec2b391ea11f6a5eee7822cbb10`.
+
+Performance review is final with no P0/P1 finding. At 4,096 -> 8,192 objects,
+the real rooted Package path records fields 53,307 -> 108,363 (2.0326x),
+`WireWork` 315,936 -> 636,752 (2.0155x), references 16,386 -> 32,770 (exact
+`2 + 4N`, 1.9999x), and `TransactionWork` 9,084,384 -> 18,298,157 (2.0142x).
+All are at most 2.3x; maximum-minus-one work refuses before output. P2 consists
+only of linear selector temporary vectors and redundant changed decode passes.
+
+The host retirement removes two public NumbersEditor methods, 32 production
+lines, 245 direct-test lines, and the legacy title example. Private cross-format
+package helpers and wire code stay for Pages and Keynote. Boundary regressions
+pass 173/173. Final gates are 111/111 Numbers library, 2/2 private title, 5/5
+public title, 9/9 codec, and 141/141 full protobuf tests. The full checker has
+only 14 unchanged dependency-policy baselines. Inventory is 64 packages/237
+internal declarations/14 `litchi-iwa` dependency declarations/14 ordered
+debts; debt 015 remains and no edge closes.

@@ -31,17 +31,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn list_numbers(input: &str) -> Result<(), Box<dyn std::error::Error>> {
     let editor = NumbersEditor::open(input)?;
     for sheet in editor.sheets()? {
-        for chart in editor.sheet_charts(sheet.object_id)? {
+        for chart in editor.sheet_charts(sheet.id())? {
             if chart.kind.supports_radar_series_style() {
                 println!(
                     "Numbers sheet={} chart={} kind={:?} style={:?}",
-                    sheet.object_id,
+                    sheet.id(),
                     chart.drawable_object_id,
                     chart.kind,
-                    editor.sheet_chart_radar_series_style(
-                        sheet.object_id,
-                        chart.drawable_object_id
-                    )?
+                    editor.sheet_chart_radar_series_style(sheet.id(), chart.drawable_object_id)?
                 );
             }
         }

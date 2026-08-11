@@ -328,6 +328,31 @@ mod buffa_numbers_sheet_order_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for Numbers table-title scalars.
+///
+/// Title style references are routed from caller-owned bytes and forced
+/// through the separately pinned scalar Numbers reference projection. This
+/// module therefore contains no collection or nested message field.
+#[doc(hidden)]
+mod buffa_numbers_table_title_generated {
+    #![allow(
+        clippy::all,
+        clippy::pedantic,
+        clippy::arbitrary_source_item_ordering,
+        clippy::allow_attributes_without_reason,
+        clippy::module_name_repetitions,
+        clippy::shadow_same,
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        non_snake_case,
+        reason = "Private Buffa generated projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-numbers-table-title/iwa_numbers_table_title_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for `TST.TableInfoArchive.table_model`.
 ///
 /// The required drawable base archive and all unselected table metadata remain
@@ -660,6 +685,11 @@ pub mod numbers_sheet_order_codec;
 /// remain private and scalar facts borrow only caller-owned source bytes.
 #[doc(hidden)]
 pub mod numbers_table_header_settings_codec;
+
+/// Internal strict Numbers table-title projection. Generated types remain
+/// private and caller-owned source bytes remain the rewrite authority.
+#[doc(hidden)]
+pub mod numbers_table_title_codec;
 
 /// Internal Keynote slide-transition projection implemented by a private
 /// Buffa lazy-view sidecar. Generated types remain inaccessible downstream.

@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .sheet_name("Scratch Line")
         .table_name("Source Data")
         .build()?;
-    let sheet_id = editor.sheets()?[0].object_id;
+    let sheet_id = editor.sheets()?[0].id();
     let stroke = Stroke::new(
         RgbaColor::new(0.1, 0.45, 0.9, 1.0, RgbColorSpace::Srgb)?,
         Width::new(4.0)?,

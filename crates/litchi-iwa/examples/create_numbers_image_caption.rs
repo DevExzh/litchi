@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|name| name.to_str())
         .ok_or("image path has no UTF-8 filename")?;
     let mut editor = NumbersDocumentBuilder::new().sheet_name("Media").build()?;
-    let sheet_id = editor.sheets()?[0].object_id;
+    let sheet_id = editor.sheets()?[0].id();
     let created = editor.add_sheet_image(
         sheet_id,
         filename,

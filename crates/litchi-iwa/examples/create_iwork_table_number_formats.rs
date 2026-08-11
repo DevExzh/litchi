@@ -169,19 +169,19 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Number Formats")
         .table_dimensions(3, 18)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
     editor.set_cell(
         table_id,
         ROW,
         NUMBER_COLUMN,
-        CellValue::Number(NUMBER_VALUE),
+        CellValue::number(NUMBER_VALUE)?,
     )?;
     editor.set_table_cell_number_format(table_id, ROW, NUMBER_COLUMN, numbers_format()?)?;
     editor.set_cell(
         table_id,
         ROW,
         PERCENTAGE_COLUMN,
-        CellValue::Number(PERCENTAGE_VALUE),
+        CellValue::number(PERCENTAGE_VALUE)?,
     )?;
     editor.set_table_cell_percentage_format(
         table_id,
@@ -193,7 +193,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         CURRENCY_COLUMN,
-        CellValue::Number(CURRENCY_VALUE),
+        CellValue::number(CURRENCY_VALUE)?,
     )?;
     editor.set_table_cell_currency_format(
         table_id,
@@ -205,7 +205,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         SCIENTIFIC_COLUMN,
-        CellValue::Number(SCIENTIFIC_VALUE),
+        CellValue::number(SCIENTIFIC_VALUE)?,
     )?;
     editor.set_table_cell_scientific_format(
         table_id,
@@ -217,7 +217,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         FRACTION_COLUMN,
-        CellValue::Number(FRACTION_VALUE),
+        CellValue::number(FRACTION_VALUE)?,
     )?;
     editor.set_table_cell_fraction_format(
         table_id,
@@ -229,7 +229,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         NUMERAL_SYSTEM_COLUMN,
-        CellValue::Number(NUMERAL_SYSTEM_VALUE),
+        CellValue::number(NUMERAL_SYSTEM_VALUE)?,
     )?;
     editor.set_table_cell_numeral_system_format(
         table_id,
@@ -241,7 +241,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         DATE_TIME_COLUMN,
-        CellValue::Date(DATE_TIME_VALUE),
+        CellValue::date(DATE_TIME_VALUE)?,
     )?;
     editor.set_table_cell_date_time_format(
         table_id,
@@ -253,7 +253,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         DURATION_COLUMN,
-        CellValue::Duration(DURATION_VALUE),
+        CellValue::duration(DURATION_VALUE)?,
     )?;
     editor.set_table_cell_duration_format(
         table_id,
@@ -267,21 +267,21 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         STAR_RATING_COLUMN,
-        CellValue::Number(STAR_RATING_VALUE),
+        CellValue::number(STAR_RATING_VALUE)?,
     )?;
     editor.set_table_cell_star_rating_format(table_id, ROW, STAR_RATING_COLUMN, StarRating)?;
     editor.set_cell(
         table_id,
         ROW,
         SLIDER_COLUMN,
-        CellValue::Number(SLIDER_VALUE),
+        CellValue::number(SLIDER_VALUE)?,
     )?;
     editor.set_table_cell_slider_format(table_id, ROW, SLIDER_COLUMN, numbers_slider_format()?)?;
     editor.set_cell(
         table_id,
         ROW,
         STEPPER_COLUMN,
-        CellValue::Number(STEPPER_VALUE),
+        CellValue::number(STEPPER_VALUE)?,
     )?;
     editor.set_table_cell_stepper_format(
         table_id,
@@ -306,7 +306,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         CUSTOM_NUMBER_COLUMN,
-        CellValue::Number(NUMBER_VALUE),
+        CellValue::number(NUMBER_VALUE)?,
     )?;
     editor.set_table_cell_custom_format(
         table_id,
@@ -318,7 +318,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         CUSTOM_DATE_TIME_COLUMN,
-        CellValue::Date(DATE_TIME_VALUE),
+        CellValue::date(DATE_TIME_VALUE)?,
     )?;
     editor.set_table_cell_custom_format(
         table_id,
@@ -352,14 +352,14 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         NUMBER_COLUMN,
-        CellValue::Number(NUMBER_VALUE),
+        CellValue::number(NUMBER_VALUE)?,
     )?;
     editor.set_table_cell_number_format(table_id, ROW, NUMBER_COLUMN, semantic_format()?)?;
     editor.set_table_cell(
         table_id,
         ROW,
         PERCENTAGE_COLUMN,
-        CellValue::Number(PERCENTAGE_VALUE),
+        CellValue::number(PERCENTAGE_VALUE)?,
     )?;
     editor.set_table_cell_percentage_format(
         table_id,
@@ -371,7 +371,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         CURRENCY_COLUMN,
-        CellValue::Number(CURRENCY_VALUE),
+        CellValue::number(CURRENCY_VALUE)?,
     )?;
     editor.set_table_cell_currency_format(
         table_id,
@@ -383,7 +383,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         SCIENTIFIC_COLUMN,
-        CellValue::Number(SCIENTIFIC_VALUE),
+        CellValue::number(SCIENTIFIC_VALUE)?,
     )?;
     editor.set_table_cell_scientific_format(
         table_id,
@@ -395,7 +395,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         FRACTION_COLUMN,
-        CellValue::Number(FRACTION_VALUE),
+        CellValue::number(FRACTION_VALUE)?,
     )?;
     editor.set_table_cell_fraction_format(
         table_id,
@@ -407,7 +407,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         NUMERAL_SYSTEM_COLUMN,
-        CellValue::Number(NUMERAL_SYSTEM_VALUE),
+        CellValue::number(NUMERAL_SYSTEM_VALUE)?,
     )?;
     editor.set_table_cell_numeral_system_format(
         table_id,
@@ -419,7 +419,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         DATE_TIME_COLUMN,
-        CellValue::Date(DATE_TIME_VALUE),
+        CellValue::date(DATE_TIME_VALUE)?,
     )?;
     editor.set_table_cell_date_time_format(
         table_id,
@@ -431,7 +431,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         DURATION_COLUMN,
-        CellValue::Duration(DURATION_VALUE),
+        CellValue::duration(DURATION_VALUE)?,
     )?;
     editor.set_table_cell_duration_format(
         table_id,
@@ -445,21 +445,21 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         STAR_RATING_COLUMN,
-        CellValue::Number(STAR_RATING_VALUE),
+        CellValue::number(STAR_RATING_VALUE)?,
     )?;
     editor.set_table_cell_star_rating_format(table_id, ROW, STAR_RATING_COLUMN, StarRating)?;
     editor.set_table_cell(
         table_id,
         ROW,
         SLIDER_COLUMN,
-        CellValue::Number(SLIDER_VALUE),
+        CellValue::number(SLIDER_VALUE)?,
     )?;
     editor.set_table_cell_slider_format(table_id, ROW, SLIDER_COLUMN, numbers_slider_format()?)?;
     editor.set_table_cell(
         table_id,
         ROW,
         STEPPER_COLUMN,
-        CellValue::Number(STEPPER_VALUE),
+        CellValue::number(STEPPER_VALUE)?,
     )?;
     editor.set_table_cell_stepper_format(
         table_id,
@@ -484,7 +484,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         CUSTOM_NUMBER_COLUMN,
-        CellValue::Number(NUMBER_VALUE),
+        CellValue::number(NUMBER_VALUE)?,
     )?;
     editor.set_table_cell_custom_format(
         table_id,
@@ -496,7 +496,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         CUSTOM_DATE_TIME_COLUMN,
-        CellValue::Date(DATE_TIME_VALUE),
+        CellValue::date(DATE_TIME_VALUE)?,
     )?;
     editor.set_table_cell_custom_format(
         table_id,
@@ -540,7 +540,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         NUMBER_COLUMN,
-        CellValue::Number(NUMBER_VALUE),
+        CellValue::number(NUMBER_VALUE)?,
     )?;
     editor.set_slide_table_cell_number_format(
         0,
@@ -554,7 +554,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         PERCENTAGE_COLUMN,
-        CellValue::Number(PERCENTAGE_VALUE),
+        CellValue::number(PERCENTAGE_VALUE)?,
     )?;
     editor.set_slide_table_cell_percentage_format(
         0,
@@ -568,7 +568,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         CURRENCY_COLUMN,
-        CellValue::Number(CURRENCY_VALUE),
+        CellValue::number(CURRENCY_VALUE)?,
     )?;
     editor.set_slide_table_cell_currency_format(
         0,
@@ -582,7 +582,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         SCIENTIFIC_COLUMN,
-        CellValue::Number(SCIENTIFIC_VALUE),
+        CellValue::number(SCIENTIFIC_VALUE)?,
     )?;
     editor.set_slide_table_cell_scientific_format(
         0,
@@ -596,7 +596,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         FRACTION_COLUMN,
-        CellValue::Number(FRACTION_VALUE),
+        CellValue::number(FRACTION_VALUE)?,
     )?;
     editor.set_slide_table_cell_fraction_format(
         0,
@@ -610,7 +610,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         NUMERAL_SYSTEM_COLUMN,
-        CellValue::Number(NUMERAL_SYSTEM_VALUE),
+        CellValue::number(NUMERAL_SYSTEM_VALUE)?,
     )?;
     editor.set_slide_table_cell_numeral_system_format(
         0,
@@ -624,7 +624,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         DATE_TIME_COLUMN,
-        CellValue::Date(DATE_TIME_VALUE),
+        CellValue::date(DATE_TIME_VALUE)?,
     )?;
     editor.set_slide_table_cell_date_time_format(
         0,
@@ -638,7 +638,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         DURATION_COLUMN,
-        CellValue::Duration(DURATION_VALUE),
+        CellValue::duration(DURATION_VALUE)?,
     )?;
     editor.set_slide_table_cell_duration_format(
         0,
@@ -666,7 +666,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         STAR_RATING_COLUMN,
-        CellValue::Number(STAR_RATING_VALUE),
+        CellValue::number(STAR_RATING_VALUE)?,
     )?;
     editor.set_slide_table_cell_star_rating_format(
         0,
@@ -680,7 +680,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         SLIDER_COLUMN,
-        CellValue::Number(SLIDER_VALUE),
+        CellValue::number(SLIDER_VALUE)?,
     )?;
     editor.set_slide_table_cell_slider_format(
         0,
@@ -694,7 +694,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         STEPPER_COLUMN,
-        CellValue::Number(STEPPER_VALUE),
+        CellValue::number(STEPPER_VALUE)?,
     )?;
     editor.set_slide_table_cell_stepper_format(
         0,
@@ -721,12 +721,12 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     for (column, value, format) in [
         (
             CUSTOM_NUMBER_COLUMN,
-            CellValue::Number(NUMBER_VALUE),
+            CellValue::number(NUMBER_VALUE)?,
             numbers_custom_number_format()?,
         ),
         (
             CUSTOM_DATE_TIME_COLUMN,
-            CellValue::Date(DATE_TIME_VALUE),
+            CellValue::date(DATE_TIME_VALUE)?,
             numbers_custom_date_time_format()?,
         ),
         (

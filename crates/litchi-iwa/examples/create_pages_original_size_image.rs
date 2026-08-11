@@ -3,17 +3,18 @@
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::pages::{PagesEditor, PagesImageOptions};
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::pages::PagesEditor;
 use litchi_iwa_common::comment::DrawableId;
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_pages::image::Options as ImageOptions;
 
 const BODY_TEXT: &str = "This image was restored to its original size by litchi-iwa.";
-const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 64.0, y: 128.0 };
-const DISPLAYED_IMAGE_SIZE: DrawableSize = DrawableSize {
+const IMAGE_POSITION: Point = Point { x: 64.0, y: 128.0 };
+const DISPLAYED_IMAGE_SIZE: Size = Size {
     width: 240.0,
     height: 240.0,
 };
-const ORIGINAL_IMAGE_SIZE: DrawableSize = DrawableSize {
+const ORIGINAL_IMAGE_SIZE: Size = Size {
     width: 512.0,
     height: 512.0,
 };
@@ -38,8 +39,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         BODY_TEXT.encode_utf16().count(),
         image_filename,
         &image,
-        PagesImageOptions::new(IMAGE_POSITION, DISPLAYED_IMAGE_SIZE)
-            .with_natural_size(ORIGINAL_IMAGE_SIZE),
+        ImageOptions::new(IMAGE_POSITION, DISPLAYED_IMAGE_SIZE)?
+            .with_natural_size(ORIGINAL_IMAGE_SIZE)?,
     )?;
     editor.restore_body_image_original_size(DrawableId::from_raw(created.drawable_object_id)?)?;
     editor.save(output)?;

@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .sheets()?
         .get(sheet_index)
         .ok_or("sheet index is out of bounds")?
-        .object_id;
+        .id();
     let audio = editor
         .sheet_audio(sheet_id)?
         .get(audio_index)

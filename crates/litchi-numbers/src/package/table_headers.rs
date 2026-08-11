@@ -11,9 +11,9 @@
 mod api;
 mod dependencies;
 mod error;
-mod ownership;
-mod resolve;
-mod rewrite;
+pub(super) mod ownership;
+pub(super) mod resolve;
+pub(super) mod rewrite;
 
 use std::{fmt, sync::Arc};
 
@@ -531,27 +531,27 @@ impl Commit {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Target {
-    sheet_position: usize,
-    table_position: usize,
-    model_identifier: u64,
-    sheet_identifier: u64,
-    drawable_identifier: u64,
-    drawable_position: usize,
-    sheet_component_index: usize,
-    sheet_object_index: usize,
-    sheet_message_index: usize,
-    sheet_message_type: u32,
-    info_component_index: usize,
-    info_object_index: usize,
-    info_message_index: usize,
-    info_message_type: u32,
-    component_index: usize,
-    object_index: usize,
-    message_index: usize,
-    message_type: u32,
-    settings: Settings,
-    rows: u32,
-    columns: u32,
-    locked: LockState,
+pub(super) struct Target {
+    pub(super) sheet_position: usize,
+    pub(super) table_position: usize,
+    pub(super) model_identifier: u64,
+    pub(super) sheet_identifier: u64,
+    pub(super) drawable_identifier: u64,
+    pub(super) drawable_position: usize,
+    pub(super) sheet_component_index: usize,
+    pub(super) sheet_object_index: usize,
+    pub(super) sheet_message_index: usize,
+    pub(super) sheet_message_type: u32,
+    pub(super) info_component_index: usize,
+    pub(super) info_object_index: usize,
+    pub(super) info_message_index: usize,
+    pub(super) info_message_type: u32,
+    pub(super) component_index: usize,
+    pub(super) object_index: usize,
+    pub(super) message_index: usize,
+    pub(super) message_type: u32,
+    pub(super) settings: Settings,
+    pub(super) rows: u32,
+    pub(super) columns: u32,
+    pub(super) locked: LockState,
 }

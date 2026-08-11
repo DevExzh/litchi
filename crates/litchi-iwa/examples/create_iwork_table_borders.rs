@@ -45,7 +45,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Borders")
         .table_dimensions(3, 3)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
     editor.set_cell(table_id, ROW, COLUMN, CellValue::Text("Numbers".to_owned()))?;
     for side in SIDES {
         editor.set_table_cell_border(table_id, ROW, COLUMN, side, border()?)?;

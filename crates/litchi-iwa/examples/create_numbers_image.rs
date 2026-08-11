@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let image = fs::read(&image_path)?;
 
     let mut editor = NumbersDocumentBuilder::new().sheet_name("Media").build()?;
-    let sheet_id = editor.sheets()?[0].object_id;
+    let sheet_id = editor.sheets()?[0].id();
     let created = editor.add_sheet_image(
         sheet_id,
         preferred_filename,

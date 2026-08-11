@@ -1530,3 +1530,123 @@ boundary suite passes 165/165; host and focused audits each report zero, and
 the full checker reports only the unchanged 14 baselines: six development-only
 annotations and eight edge classifications. The focused boundary inventory is
 the private error/resolve/rewrite helper tuple and five source files.
+
+## 2026-08-11 amendment: focused Numbers table-title API
+
+The canonical public namespace is
+`litchi_numbers::table::title::{Settings, Edit, Patch, Commit, Diagnostics,
+Error, LimitKind, Path}`. It has no flat `TableTitle*` aliases or package-root
+transaction re-exports. The immutable `Package` owns exactly these methods:
+
+- `table_title_settings(sheet, table) -> Result<Settings, Error>`;
+- `edit_table_title(sheet, table) -> Result<Edit<'_>, Error>`; and
+- `apply_table_title(&Patch) -> Result<Commit, Error>`.
+
+Both read and edit select an exact semantic sheet by name or checked position,
+then a table by name or checked position within that sheet. No native object
+identifier, archive/component locator, protobuf/generated value, source byte
+slice, or mutation-capable package handle crosses the public boundary. Source
+bytes stay crate-private and publication is through `Package::write_to`.
+
+`Settings::new(visible: Option<bool>, outlined: Option<bool>)` is the complete
+lossless semantic value. The two accessors return presence exactly;
+`is_visible` and `is_outlined` are convenience effective-value checks that are
+true only for `Some(true)`. `None` and `Some(false)` are never aliases. The API
+supports all nine combinations as Rust transaction values, but native evidence
+currently proves only visibility field 22 changing from `Some(true)` to
+absent. Neither explicit false nor outline field 37 is claimed native-proven.
+
+`Edit::path` reports only checked semantic positions, `Edit::settings` returns
+the staged complete value, consuming `Edit::set(self, Settings) -> Self` is
+infallible, and consuming `Edit::commit` performs source admission and returns
+one verified immutable package, exact patch, and content-redacted diagnostics.
+Selection and initial settings are resolved against the immutable base
+snapshot. `Patch::{before, after, path, inverse}` exposes semantic and reversal
+information without exposing retained artifacts; diagnostic fingerprints do
+not authorize application.
+
+The error vocabulary distinguishes missing sheet/table selectors, a selected
+table lock, missing visible-title rendering dependencies, unsupported physical
+provenance, invalid rooted source, finite resource exhaustion, allocation,
+verification, and exact-source patch conflict. `LimitKind` covers package and
+entry bytes, entries and aggregate bytes, payload bytes/objects/messages/items/
+references, strict wire input/output/fields/nesting/work, and aggregate
+transaction work. `Path` is content-free (`Package` or checked sheet/table
+positions); errors and `Debug` output do not reveal sheet names, table names,
+member paths, native IDs, or document content.
+
+Changed publication is deliberately narrower than reading. It accepts the
+shared, uniquely rooted Document -> Sheet or FormBasedSheet -> TableInfo ->
+TableModel ownership profile only when selected reference metadata and message
+framing are exact, the table is unlocked, and the physical source is exact.
+Canonical and unambiguous legacy TableInfo/TableModel message variants remain
+readable; changed nested/non-exact storage returns `UnsupportedSource` under
+Preserve. An effectively visible requested title additionally requires the
+existing finite nonnegative title height and distinct exact local paragraph-
+and shape-style closure. The semantic API neither exposes those prerequisites
+nor grants permission to repair them. Before any changed commit, the owner
+scans all messages in `Index/ViewState.iwa` and returns `UnsupportedSource` if
+any native type-6284 transient table-title selection message is present. This
+is a conservative package-wide refusal, not an ownership inference. Reads and
+exact no-ops skip the changed-only guard; an accepted changed source has no
+type-6284 message, and every other ViewState byte remains exact.
+
+An equal staged value is an exact shared-artifact no-op with zero component or
+preview changes and no candidate reopen. A change preserves the independent
+field-22/37 presence requested by `Settings`, touches one selected
+CalculationEngine component, deletes every existing canonical root preview,
+and completely reopens and verifies the candidate. Exact apply conflicts on a
+different source or prior semantic state; inverse restores the full source
+artifact and preview set. The patch is a process-local exact two-artifact
+capability, not a durable semantic operation, serialized patch format, merge
+contract, or save protocol.
+
+The codec boundary is scalar-only: private
+`TSTTableTitleSettingsArchive.proto` covers fields 22/33/37, while strict raw
+routing forces fields 30/36 through the already private scalar Reference view.
+Generated code has no encoder or repeated-field view. Its frozen five-file
+closure is 32,332 bytes under 33 KiB with SHA-256
+`56cfd70666ffa6079175bdab0a63a4ddd055099edf3c771ed3ad8b3051596ee1`.
+This projection is validation evidence, never the preservation authority.
+
+Final performance review reports no P0 or P1 issue. The real rooted `Package`
+path's 4,096-to-8,192 structural gate measures fields 53,307 to 108,363
+(2.0326 times), wire work 315,936 to 636,752 (2.0155 times), references 16,386
+to 32,770 with the exact `2 + 4N` formula (1.9999 times), and transaction work
+9,084,384 to 18,298,157 (2.0142 times). All remain within 2.3 times, and a
+maximum-minus-one allowance rejects before output. The test has no wall-clock
+threshold. Bounded linear selector temporary vectors and redundant changed-
+path decodes are accepted P2 debt; the API admits neither quadratic work nor
+unbounded retention.
+
+The matched Numbers 14.4 control and hidden-title artifacts are respectively
+136,204 bytes/SHA-256
+`25c9fc858ca4fb4f1fedeafb944e96afb81af03a082a41be297ecf6f2542dbdb`
+and 136,273 bytes/SHA-256
+`ac8a7117ad6256b0da2e6d191b9e64f721b689d71696a89ac0f78bc6aa513a28`.
+The matched oracle establishes field 22 true-to-absent only. The final Rust
+gate starts from the 136,357-byte source SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`,
+produces the 136,351-byte hidden artifact SHA-256
+`4c7f6340b6f2675240577c5b59d5c154de24c8a7e763a31257c56a9899a8e40c`,
+and inverses exactly to the source. Numbers 14.4 opened the Rust artifact
+without warning, showed the title checkbox off while retaining the 22 by 7
+table, `B2` marker, and `B3 = 42`, and preserved those semantics across native
+resave and exact-path reopen. That 136,353-byte output has SHA-256
+`5b162f8431f45333f0ae9a8654dfa724794f2ec2b391ea11f6a5eee7822cbb10`.
+These oracles do not extend the semantic write set to explicit false, outline,
+or ViewState.
+
+The direct `NumbersEditor` read/set methods, their four whole direct tests, and
+the legacy raw-ID example are retired. The exact cut is 32 production lines,
+245 test lines, and the 39-line example. The private cross-format package/wire
+helpers and common `Settings` remain for Pages and Keynote, whose table-title
+APIs and CRUD are outside this handoff.
+
+The final gates pass 9/9 codec, 141/141 protobuf, 111/111 Numbers library, 2/2
+private transaction, and 5/5 public focused integration tests. Boundary
+regressions pass 173/173; live host and focused audits are empty, and the full
+checker retains only the unchanged 14 baselines: six development-only
+annotations and eight edge classifications. Topology remains 64 packages/237
+internal declarations/14 host dependency declarations/14 ordered debts, and
+debt 015 remains.

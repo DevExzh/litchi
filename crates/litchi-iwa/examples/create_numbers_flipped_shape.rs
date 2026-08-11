@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .sheet_name("Flipped Shape")
         .table_name("Data")
         .build()?;
-    let sheet_id = editor.sheets()?[0].object_id;
+    let sheet_id = editor.sheets()?[0].id();
     let arrow = editor.add_sheet_shape(
         sheet_id,
         "Horizontally Flipped",

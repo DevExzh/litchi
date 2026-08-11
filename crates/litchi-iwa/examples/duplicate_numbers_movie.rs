@@ -23,15 +23,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(sheet_index)
         .ok_or("sheet index is out of bounds")?;
     let source = editor
-        .sheet_movies(sheet.object_id)?
+        .sheet_movies(sheet.id())?
         .into_iter()
         .nth(movie_index)
         .ok_or("ordinary movie index is out of bounds")?;
-    let created = editor.duplicate_sheet_movie(sheet.object_id, source.drawable_object_id)?;
+    let created = editor.duplicate_sheet_movie(sheet.id(), source.drawable_object_id)?;
     editor.save(output)?;
     println!(
         "sheet={} drawable={} source={} video={} poster={}",
-        sheet.object_id,
+        sheet.id(),
         created.drawable_object_id,
         source.drawable_object_id,
         created.movie_data_identifier,

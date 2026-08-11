@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::{pages::PagesEditor, text::TextStorageId};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let storage_id = arguments
         .next()
         .ok_or("missing storage ID")?
-        .parse::<u64>()?;
+        .parse::<TextStorageId>()?;
     let replacement = arguments.next().ok_or("missing replacement text")?;
 
     let mut editor = PagesEditor::open(input)?;

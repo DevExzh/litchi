@@ -9,7 +9,6 @@ use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 use litchi_iwa_common::table::cell::conditional_highlight::{
     Condition, Rule, Style, Text as ConditionalText,
 };
-use litchi_numbers::Settings as TitleSettings;
 use litchi_numbers::cell::Value as CellValue;
 use litchi_numbers::cell::data_format::control::Range as ControlRange;
 use litchi_numbers::cell::data_format::custom::{
@@ -32,6 +31,7 @@ use litchi_numbers::cell::data_format::{
     Scientific, Slider, StarRating, Stepper, Text as TextFormat,
 };
 use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
+use litchi_numbers::table::title::Settings as TitleSettings;
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 
 const SOURCE_BUILT_TABLE_INFO_OBJECT_ID: u64 = 9;

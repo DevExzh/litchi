@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .sheet_name("Layered Shapes")
         .table_name("Data")
         .build()?;
-    let sheet_id = editor.sheets()?[0].object_id;
+    let sheet_id = editor.sheets()?[0].id();
     let first = editor.add_sheet_shape_with_fill(
         sheet_id,
         "Moved to Front",

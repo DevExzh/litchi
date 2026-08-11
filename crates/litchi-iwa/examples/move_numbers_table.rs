@@ -3,6 +3,7 @@
 use std::env;
 
 use litchi_iwa::numbers::NumbersEditor;
+use litchi_numbers::{SheetSelector, TableSelector};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -27,7 +28,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .get(target_sheet_index)
         .cloned()
         .ok_or_else(|| format!("sheet index {target_sheet_index} is out of range"))?;
-    editor.move_table(table.object_id, target.object_id)?;
+    editor.move_table(
+        TableSelector::index(table_index),
+        SheetSelector::index(target_sheet_index),
+    )?;
     editor.save(output)?;
 
     println!("moved table {:?} to sheet {:?}", table.name, target.name);

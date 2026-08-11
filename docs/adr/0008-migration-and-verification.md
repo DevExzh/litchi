@@ -9596,3 +9596,86 @@ eight unclassified edges (those six plus the `litchi-odf-common` and
 (`litchi-iwa -> litchi-keynote`) remains. Topology is unchanged at 64 workspace
 packages, 235 internal declarations, 14 `litchi-iwa` dependency declarations,
 and 14 ordered debts.
+
+## 2026-08-11 amendment: Numbers table-title transaction cutover
+
+The Numbers-only table-title read/write path moves from direct editor methods
+to `table::title::{Settings, Edit, Patch, Commit, Diagnostics, Error,
+LimitKind, Path}` and
+`Package::{table_title_settings, edit_table_title, apply_table_title}`. A
+semantic sheet selector and a sheet-scoped table selector replace raw model
+identifiers. The new method/type signatures expose no raw source, component,
+object identifier, or generated value; source bytes remain crate-private and
+publication uses `write_to`. The compact `Settings` value retains optional
+presence for TableModel field 22 visibility and field 37 outline, so `None`
+and `Some(false)` remain distinct. `Edit::set` consumes the edit and cannot
+fail; validation occurs at commit.
+
+Changed admission reuses the strict rooted Document -> Sheet/FormBasedSheet ->
+TableInfo -> TableModel ownership and exact metadata proof from the focused
+table-header owner. It rejects effective table locks. When the requested title
+is visible, TableModel must also contain a finite nonnegative field-33 height,
+exact local field-30 paragraph-style and field-36 shape-style references,
+distinct nonaliased style identities, and unique canonical type-2022/type-2025
+messages with valid required super framing. Missing or malformed rendering
+dependencies return a typed fail-closed error. Changed admission also scans
+`Index/ViewState.iwa`: any native type-6284 table-name-selection message is
+transient title-selection state and returns `UnsupportedSource` rather than
+being inferred or normalized. Reads and exact no-ops retain broad compatibility
+because this check is changed-only. On an accepted changed source, all other
+ViewState bytes remain outside the write set and exact.
+
+Strict raw preflight owns fields 22/30/33/36/37, then forces and cross-checks a
+three-scalar table-title Buffa view plus the reused scalar Reference lazy view.
+Generated code never owns unknown preservation, repeated references, or
+encoding. The five-file generated closure is 32,332 bytes under 33 KiB, digest
+`56cfd70666ffa6079175bdab0a63a4ddd055099edf3c771ed3ad8b3051596ee1`;
+the codec passes 9/9 and the complete protobuf suite passes 141/141.
+
+No-op commit and application preserve exact bytes and avoid reassembly/reopen.
+A change raw-splices only fields 22 and 37 in the selected TableModel message,
+rewrites its `Index/CalculationEngine.iwa` component, deletes each existing
+canonical root preview (zero to three), reassembles once, reopens once, and
+verifies semantic readback and exact locality. Apply requires the exact source
+and stored target; tamper or replay conflicts, and inverse restores exact
+source bytes and preview state. Legacy/non-exact changed sources return
+`UnsupportedSource`. The patch is an immutable process-local exact-artifact
+capability, not a durable or serialized semantic log.
+
+Numbers 14.4 matched controls record a 136,204-byte resave at
+`25c9fc858ca4fb4f1fedeafb944e96afb81af03a082a41be297ecf6f2542dbdb`
+and a 136,273-byte title-hidden artifact at
+`ac8a7117ad6256b0da2e6d191b9e64f721b689d71696a89ac0f78bc6aa513a28`.
+The native hidden form removes the raw field-22 occurrence instead of writing
+false, while field-37 remains a separately presence-preserving setting. This
+does not establish a right to rewrite type-6284 ViewState state.
+Changed admission rejects that transient state instead.
+
+The final exact-artifact gate starts from the 136,357-byte source
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`.
+Rust hid the title in a 136,351-byte candidate,
+`4c7f6340b6f2675240577c5b59d5c154de24c8a7e763a31257c56a9899a8e40c`,
+whose inverse restores the source byte-for-byte. Numbers 14.4 opened it without
+warning, reported Table Title off, retained the 22-by-7 table, B2 marker
+`Litchi native Numbers fixture`, and B3 value 42, and preserved that state
+through warning-free Save As, close, and exact-URL reopen. The 136,353-byte native resave is
+`5b162f8431f45333f0ae9a8654dfa724794f2ec2b391ea11f6a5eee7822cbb10`.
+
+The completed performance review has no P0/P1 finding. Real rooted Package
+counters for 4,096 -> 8,192 objects are fields 53,307 -> 108,363 (2.0326x),
+`WireWork` 315,936 -> 636,752 (2.0155x), references 16,386 -> 32,770
+(exactly `2 + 4N`, 1.9999x), and `TransactionWork` 9,084,384 -> 18,298,157
+(2.0142x). All remain within 2.3x, and maximum-minus-one work rejects before
+output. Remaining P2 costs are linear selector temporary vectors and redundant
+changed-edit decode passes; this is resource accounting, not wall-clock proof.
+
+The cut deletes the two direct NumbersEditor methods, 32 production lines,
+245 direct-test lines, and the old `edit_numbers_table_title` example. Private
+package helpers and wire support remain for Pages and Keynote table-title
+read/write paths, together with their format-specific CRUD. Boundary tests
+pass 173/173. Final Numbers suites pass 111/111 library, 2/2 private
+table-title, and 5/5 public table-title tests; codec/protobuf suites pass 9/9
+and 141/141. The full checker retains only 14 unchanged dependency-policy
+baselines. The topology snapshot is 64 packages/237 internal declarations/14
+`litchi-iwa` dependency declarations/14 ordered debts; debt 015 remains and no
+edge closes.

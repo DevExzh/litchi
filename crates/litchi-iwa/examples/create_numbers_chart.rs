@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .sheet_name("Quarterly Results")
         .table_name("Source Data")
         .build()?;
-    let sheet_id = editor.sheets()?[0].object_id;
+    let sheet_id = editor.sheets()?[0].id();
     let data = ChartData::new(
         vec!["North".to_owned(), "South".to_owned()],
         vec!["Q1".to_owned(), "Q2".to_owned(), "Q3".to_owned()],

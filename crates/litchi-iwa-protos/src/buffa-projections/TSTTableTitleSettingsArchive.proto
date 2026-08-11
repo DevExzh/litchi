@@ -1,0 +1,15 @@
+// Wire-only scalar projection derived from `TST.TableModelArchive` fields 22,
+// 33, and 37. The canonical double at field 33 is represented as fixed64 so
+// every IEEE-754 bit pattern, including NaN and negative zero, compares exactly.
+//
+// Title paragraph/shape style references at fields 30 and 36 are strictly
+// routed from caller-owned source bytes and forced through the existing private
+// `NumbersSheetReferenceArchive` lazy view. No generated message owns a
+// collection or becomes the preservation authority.
+syntax = "proto2";
+package LitchiIwaProjection;
+message TableTitleSettingsArchive {
+  optional bool table_name_enabled = 22;
+  optional fixed64 table_name_height_bits = 33;
+  optional bool table_name_border_enabled = 37;
+}

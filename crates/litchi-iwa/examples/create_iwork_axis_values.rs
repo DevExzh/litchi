@@ -11,6 +11,7 @@ use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_keynote::ChartSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -29,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut numbers = NumbersDocumentBuilder::new()
         .sheet_name("Axis Values")
         .build()?;
-    let sheet_id = numbers.sheets()?[0].object_id;
+    let sheet_id = numbers.sheets()?[0].id();
     let chart = numbers.add_sheet_chart(
         sheet_id,
         Kind::Line2d,
@@ -79,7 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 650.0,
         },
     )?;
-    keynote.set_slide_chart_direction(0, chart.drawable_object_id, Direction::Columns)?;
+    keynote.set_slide_chart_direction(0, ChartSelector::index(0), Direction::Columns)?;
     keynote.set_slide_chart_title(0, chart.drawable_object_id, "Axis values")?;
     set_keynote_axis_values(&mut keynote, chart.drawable_object_id, bounds, steps)?;
     keynote.save(output.join("axis-values-crate.key"))?;

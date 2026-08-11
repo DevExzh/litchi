@@ -64,7 +64,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Conditional")
         .table_dimensions(3, 3)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
     editor.set_cell(
         table_id,
         HIGHLIGHT_ROW,
@@ -75,13 +75,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         SIGN_HIGHLIGHT_ROW,
         POSITIVE_HIGHLIGHT_COLUMN,
-        CellValue::Number(POSITIVE_VALUE),
+        CellValue::number(POSITIVE_VALUE)?,
     )?;
     editor.set_cell(
         table_id,
         SIGN_HIGHLIGHT_ROW,
         NEGATIVE_HIGHLIGHT_COLUMN,
-        CellValue::Number(NEGATIVE_VALUE),
+        CellValue::number(NEGATIVE_VALUE)?,
     )?;
     let rules = highlight_rules()?;
     editor.set_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN, &rules)?;
@@ -143,13 +143,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         SIGN_HIGHLIGHT_ROW,
         POSITIVE_HIGHLIGHT_COLUMN,
-        CellValue::Number(POSITIVE_VALUE),
+        CellValue::number(POSITIVE_VALUE)?,
     )?;
     editor.set_table_cell(
         table_id,
         SIGN_HIGHLIGHT_ROW,
         NEGATIVE_HIGHLIGHT_COLUMN,
-        CellValue::Number(NEGATIVE_VALUE),
+        CellValue::number(NEGATIVE_VALUE)?,
     )?;
     let rules = highlight_rules()?;
     editor.set_table_cell_conditional_highlighting(
@@ -227,14 +227,14 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         SIGN_HIGHLIGHT_ROW,
         POSITIVE_HIGHLIGHT_COLUMN,
-        CellValue::Number(POSITIVE_VALUE),
+        CellValue::number(POSITIVE_VALUE)?,
     )?;
     editor.set_slide_table_cell(
         0,
         table.model_object_id,
         SIGN_HIGHLIGHT_ROW,
         NEGATIVE_HIGHLIGHT_COLUMN,
-        CellValue::Number(NEGATIVE_VALUE),
+        CellValue::number(NEGATIVE_VALUE)?,
     )?;
     let rules = highlight_rules()?;
     editor.set_slide_table_cell_conditional_highlighting(

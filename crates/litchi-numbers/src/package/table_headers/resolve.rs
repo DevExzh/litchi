@@ -18,7 +18,7 @@ use super::{
 };
 use crate::table::lock::State as LockState;
 
-pub(super) fn resolve_target(
+pub(in crate::package) fn resolve_target(
     source: &Package,
     sheet_position: usize,
     table_position: usize,
@@ -167,7 +167,7 @@ pub(super) fn settings_at_target(source: &Package, target: Target) -> Result<Set
     Ok(settings)
 }
 
-pub(super) fn resolved_object<'a>(
+pub(in crate::package) fn resolved_object<'a>(
     source: &'a Package,
     resolved: Resolved<'a>,
 ) -> Result<&'a litchi_iwa_core::ArchiveObject, Error> {
@@ -182,7 +182,9 @@ pub(super) fn resolved_object<'a>(
         })
 }
 
-pub(super) fn unique_sheet_message_index(messages: &[RawMessage]) -> Result<usize, Error> {
+pub(in crate::package) fn unique_sheet_message_index(
+    messages: &[RawMessage],
+) -> Result<usize, Error> {
     let sheet = unique_message_index(messages, SHEET_MESSAGE_TYPE)?;
     let form = unique_message_index(messages, FORM_BASED_SHEET_MESSAGE_TYPE)?;
     match (sheet, form) {
@@ -193,7 +195,7 @@ pub(super) fn unique_sheet_message_index(messages: &[RawMessage]) -> Result<usiz
     }
 }
 
-pub(super) fn unique_table_info(
+pub(in crate::package) fn unique_table_info(
     resolved: Resolved<'_>,
 ) -> Result<Option<(usize, &RawMessage)>, Error> {
     let canonical = unique_message_index(resolved.messages, TABLE_INFO_MESSAGE_TYPE)?;
@@ -207,7 +209,9 @@ pub(super) fn unique_table_info(
     }
 }
 
-pub(super) fn unique_table_model(messages: &[RawMessage]) -> Result<(usize, &RawMessage), Error> {
+pub(in crate::package) fn unique_table_model(
+    messages: &[RawMessage],
+) -> Result<(usize, &RawMessage), Error> {
     let canonical = unique_message_index(messages, TABLE_MODEL_MESSAGE_TYPE)?;
     let legacy = unique_message_index(messages, LEGACY_TABLE_MODEL_MESSAGE_TYPE)?;
     match (canonical, legacy) {
@@ -218,7 +222,7 @@ pub(super) fn unique_table_model(messages: &[RawMessage]) -> Result<(usize, &Raw
     }
 }
 
-pub(super) fn unique_message_index(
+pub(in crate::package) fn unique_message_index(
     messages: &[RawMessage],
     message_type: u32,
 ) -> Result<Option<(usize, &RawMessage)>, Error> {
@@ -306,7 +310,7 @@ pub(super) fn validate_requested(
     Ok(())
 }
 
-pub(super) fn validate_message_metadata(
+pub(in crate::package) fn validate_message_metadata(
     object: &litchi_iwa_core::ArchiveObject,
     message_index: usize,
 ) -> Result<(), Error> {
@@ -339,7 +343,7 @@ pub(super) fn validate_message_metadata(
     Ok(())
 }
 
-pub(super) fn require_declared_reference(
+pub(in crate::package) fn require_declared_reference(
     object: &litchi_iwa_core::ArchiveObject,
     message_index: usize,
     identifier: u64,
@@ -383,7 +387,7 @@ pub(super) fn require_declared_reference(
     Ok(())
 }
 
-pub(super) fn repeated_length_payloads(
+pub(in crate::package) fn repeated_length_payloads(
     source: &[u8],
     field_number: u32,
 ) -> Result<Vec<&[u8]>, Error> {
@@ -411,7 +415,10 @@ pub(super) fn repeated_length_payloads(
     Ok(values)
 }
 
-pub(super) fn singular_length_payload(source: &[u8], field_number: u32) -> Result<&[u8], Error> {
+pub(in crate::package) fn singular_length_payload(
+    source: &[u8],
+    field_number: u32,
+) -> Result<&[u8], Error> {
     let values = repeated_length_payloads(source, field_number)?;
     match values.as_slice() {
         [value] => Ok(*value),
@@ -421,7 +428,7 @@ pub(super) fn singular_length_payload(source: &[u8], field_number: u32) -> Resul
     }
 }
 
-pub(super) fn sheet_drawable_payloads(
+pub(in crate::package) fn sheet_drawable_payloads(
     message_type: u32,
     source: &[u8],
 ) -> Result<Vec<&[u8]>, Error> {
@@ -449,7 +456,10 @@ pub(super) fn canonical_varint(source: &[u8]) -> Result<u64, Error> {
     Ok(value)
 }
 
-pub(super) fn require_local_reference(source: &[u8], expected: u64) -> Result<(), Error> {
+pub(in crate::package) fn require_local_reference(
+    source: &[u8],
+    expected: u64,
+) -> Result<(), Error> {
     if local_reference_identifier(source)? != expected {
         return Err(Error::InvalidSource {
             path: Path::Package,
@@ -458,7 +468,7 @@ pub(super) fn require_local_reference(source: &[u8], expected: u64) -> Result<()
     Ok(())
 }
 
-pub(super) fn local_reference_identifier(source: &[u8]) -> Result<u64, Error> {
+pub(in crate::package) fn local_reference_identifier(source: &[u8]) -> Result<u64, Error> {
     let view = WireView::parse(source).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut deprecated_type = None;

@@ -28,11 +28,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_iter()
         .nth(sheet_index)
         .ok_or("sheet index out of range")?;
-    let mut geometry = editor.sheet_text_box_geometry(sheet.object_id, drawable_id)?;
+    let mut geometry = editor.sheet_text_box_geometry(sheet.id(), drawable_id)?;
     geometry.position = Some(DrawablePoint { x, y });
     geometry.size = Some(DrawableSize { width, height });
     geometry.angle = Some(angle);
-    editor.set_sheet_text_box_geometry(sheet.object_id, drawable_id, geometry)?;
+    editor.set_sheet_text_box_geometry(sheet.id(), drawable_id, geometry)?;
     editor.save(output)?;
     println!("sheet={sheet_index} drawable={drawable_id} geometry={geometry:?}");
     Ok(())

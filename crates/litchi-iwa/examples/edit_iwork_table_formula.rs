@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 row,
                 column,
                 expression,
-                FormulaCachedValue::Number(0.0),
+                FormulaCachedValue::number(0.0)?,
             )?;
             editor.save(output)?;
         },
@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 row,
                 column,
                 expression,
-                FormulaCachedValue::Number(0.0),
+                FormulaCachedValue::number(0.0)?,
             )?;
             editor.save(output)?;
         },

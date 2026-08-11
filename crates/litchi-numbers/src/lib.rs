@@ -13,6 +13,49 @@
 //! use litchi_numbers::cell::wire::BncCell;
 //! ```
 //!
+//! # Table-title transactions
+//!
+//! Use [`table::title`] to read and transactionally update a single table
+//! title. The public boundary is selector-first: choose a sheet with
+//! [`SheetSelector`] and then choose a table on that sheet with
+//! [`TableSelector`]. The API deliberately accepts neither native object IDs
+//! nor raw package/archive bytes.
+//!
+//! [`table::title::Settings`] is lossless for the two native optional Boolean
+//! fields. `None` means the field is absent; it is distinct from
+//! `Some(false)`, which retains an explicitly stored false value. A commit
+//! whose requested settings equal the source is an exact byte and shared
+//! snapshot no-op. A changed commit is source-bound, removes every existing
+//! canonical root preview, and its inverse restores the original artifact
+//! exactly. Changed publication refuses an effectively locked table. When a
+//! requested title is visible, the native title height and both canonical
+//! paragraph and shape style prerequisites must be valid.
+//!
+//! ```no_run
+//! use litchi_numbers::{Package, SheetSelector, TableSelector};
+//! use litchi_numbers::table::title::Settings;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let package = Package::open("input.numbers")?;
+//! let sheet = SheetSelector::name("Summary");
+//! let table = TableSelector::name("Revenue");
+//!
+//! let before = package.table_title_settings(sheet, table)?;
+//! let commit = package
+//!     .edit_table_title(sheet, table)?
+//!     .set(Settings::new(Some(false), before.outlined()))
+//!     .commit()?;
+//!
+//! // A patch is authorized only for its exact source. Its inverse restores
+//! // the original package and any previews deleted by this changed commit.
+//! let restored = commit
+//!     .package()
+//!     .apply_table_title(&commit.patch().inverse())?;
+//! # let _ = restored;
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! # Reorder sheets
 //!
 //! Use the direct [`sheet::order`] namespace for the transaction types. A move
@@ -71,7 +114,6 @@ pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
 };
-pub use litchi_iwa_common::table::title::Settings;
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::__compatibility_tables_from_prepared_source;

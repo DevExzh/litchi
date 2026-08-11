@@ -12,15 +12,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for sheet in editor.sheets()? {
         println!(
             "sheet={} object={} name={:?}",
-            sheet.index, sheet.object_id, sheet.name
+            sheet.index,
+            sheet.id(),
+            sheet.name
         );
-        for (index, image) in editor
-            .sheet_images(sheet.object_id)?
-            .into_iter()
-            .enumerate()
-        {
-            let comment =
-                editor.sheet_drawable_comment(sheet.object_id, image.drawable_object_id)?;
+        for (index, image) in editor.sheet_images(sheet.id())?.into_iter().enumerate() {
+            let comment = editor.sheet_drawable_comment(sheet.id(), image.drawable_object_id)?;
             println!(
                 "  image_index={index} drawable={} data={} thumbnail={:?} geometry={:?} original={:?} natural={:?} comment={:?}",
                 image.drawable_object_id,

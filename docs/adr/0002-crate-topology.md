@@ -2708,3 +2708,97 @@ plus `litchi-odf-common -> xml-minifier` and `litchi-opc -> xml-minifier`). No
 dependency edge closes: debt 014 (`litchi-iwa -> litchi-keynote`) remains, and
 topology stays at 64 workspace packages, 235 internal declarations, 14
 `litchi-iwa` dependency declarations, and 14 ordered debts.
+
+## 2026-08-11 amendment: focused Numbers table-title ownership
+
+Numbers table-title visibility and outline settings now have the canonical
+archive-free surface `table::title::{Settings, Edit, Patch, Commit,
+Diagnostics, Error, LimitKind, Path}` and
+`Package::{table_title_settings, edit_table_title, apply_table_title}`. The
+read/edit entry points select a table through a semantic sheet selector
+followed by a sheet-scoped table selector. These focused signatures expose no
+source artifact, native identifier, component, or generated value; source
+bytes remain crate-private and output stays behind `write_to`. `Settings`
+preserves independent optional-Boolean presence for native TableModel fields
+22 and 37; absent and explicit false are not aliases. `Edit::settings` reads
+the staged value and consuming
+`Edit::set(self, Settings) -> Self` is infallible.
+
+The owner reuses the rooted Document field-1 -> Sheet or FormBasedSheet ->
+TableInfo field-2 -> TableModel chain and the selected-object, message,
+metadata, locality, and effective-lock proof established for table headers.
+Changed publication is refused for a locked table. An effectively visible
+title additionally requires a finite nonnegative field-33 height, distinct
+local paragraph-style and shape-style references at exact fields 30 and 36,
+and unique canonical type-2022 and type-2025 style messages with valid required
+super framing. Missing, external, aliased, ambiguously owned, or malformed
+prerequisites fail closed. Changed admission scans `Index/ViewState.iwa` and
+rejects any native type-6284 table-name-selection message as
+`UnsupportedSource`: this transient selection state is an unsupported
+dependency, not part of the write set. Reads and exact no-ops do not impose
+that changed-only restriction. For an accepted changed source, every other
+ViewState byte remains exact.
+
+The private `TSTTableTitleSettingsArchive.proto` Buffa projection contains only
+fields 22, 33, and 37. Strict handwritten routing validates those scalars and
+the two reused scalar `TSP.Reference` payloads before forcing and
+cross-checking the lazy views. Raw records remain the rewrite and preservation
+authority; there is no generated encoder or repeated view. The deterministic
+closure is five files/32,332 bytes under 33 KiB, with SHA-256
+`56cfd70666ffa6079175bdab0a63a4ddd055099edf3c771ed3ad8b3051596ee1`.
+Focused codec tests pass 9/9 and the full protobuf suite passes 141/141.
+
+An exact semantic no-op shares the source, touches no component, deletes no
+preview, and skips candidate reopen. A change rewrites only the selected
+TableModel in `Index/CalculationEngine.iwa`, deletes each existing canonical
+root `preview.jpg`, `preview-micro.jpg`, and `preview-web.jpg`, fully reopens
+the candidate, and verifies the selected payload plus exact package locality.
+Every other component, accepted ViewState object, table data/style object, and
+unknown record remains exact. Changed apply authorizes the exact source and
+retained target, reopens the target, and verifies the stored transition;
+conflicts and inverse restoration are exact. Legacy/non-exact changed publication is
+unsupported, while exact reads and no-ops remain compatible. Patches stay
+process-local.
+
+Matched Numbers 14.4 evidence uses a 136,204-byte native control resave,
+SHA-256
+`25c9fc858ca4fb4f1fedeafb944e96afb81af03a082a41be297ecf6f2542dbdb`,
+and a 136,273-byte native hidden artifact,
+`ac8a7117ad6256b0da2e6d191b9e64f721b689d71696a89ac0f78bc6aa513a28`.
+The native hide removes the raw field-22 record rather than storing false;
+field-37 presence remains independently modeled. These artifacts establish
+wire and application compatibility, not permission to rewrite native
+type-6284 ViewState state; changed admission rejects that state instead.
+
+The final Rust/native gate starts from the 136,357-byte source
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`.
+The 136,351-byte Rust-hidden candidate is
+`4c7f6340b6f2675240577c5b59d5c154de24c8a7e763a31257c56a9899a8e40c`,
+and inverse application restores the exact source hash. Numbers 14.4 opened it
+without warning, showed Table Title unchecked, retained the 22-by-7 table, B2
+marker `Litchi native Numbers fixture`, and B3 value 42, then completed
+warning-free Save As, close, and exact-URL reopen with the same UI state. The
+136,353-byte native resave is
+`5b162f8431f45333f0ae9a8654dfa724794f2ec2b391ea11f6a5eee7822cbb10`.
+
+The final performance audit reports no P0 or P1 issue. The real rooted Package
+path at 4,096 and 8,192 objects records fields 53,307 -> 108,363 (2.0326x),
+`WireWork` 315,936 -> 636,752 (2.0155x), references 16,386 -> 32,770
+(exactly `2 + 4N`, 1.9999x), and `TransactionWork` 9,084,384 -> 18,298,157
+(2.0142x); every ratio is at most 2.3x. A maximum-minus-one work allowance
+rejects before output. P2 is limited to linear selector temporary vectors and
+redundant decode passes on a changed edit; no wall-clock claim is made.
+
+The host cut removes the two public NumbersEditor table-title settings methods,
+32 production lines, 245 direct-test lines, and the legacy
+`edit_numbers_table_title` example. The private cross-format
+`table_title_settings_in_package`/`set_table_title_settings_in_package` and
+their wire support remain because Pages and Keynote table-title paths still use
+them; this is not their retirement. Boundary regressions currently pass
+173/173. Final Numbers verification passes 111/111 library tests, 2/2 private
+table-title tests, and 5/5 public table-title integration tests; the focused
+codec and full protobuf suites pass 9/9 and 141/141. The full checker retains
+only the unchanged 14 dependency-policy baselines. No edge or debt closes:
+topology remains 64 workspace packages, 237 internal declarations, 14
+`litchi-iwa` dependency declarations, and 14 ordered debts, including debt 015
+(`litchi-iwa -> litchi-numbers`).

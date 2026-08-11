@@ -1,12 +1,13 @@
 use std::fs;
 
-use litchi_iwa::pages::{PagesEditor, PagesImageOptions};
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::pages::PagesEditor;
 use litchi_iwa_common::comment::DrawableId;
+use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
+use litchi_pages::image::Options as ImageOptions;
 
-const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
-const IMAGE_SIZE: DrawableSize = DrawableSize {
+const IMAGE_POSITION: Point = Point { x: 96.0, y: 144.0 };
+const IMAGE_SIZE: Size = Size {
     width: 300.0,
     height: 225.0,
 };
@@ -34,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         anchor,
         filename,
         &image,
-        PagesImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
+        ImageOptions::new(IMAGE_POSITION, IMAGE_SIZE)?,
     )?;
     let drawable_object_id = DrawableId::from_raw(created.drawable_object_id)?;
     let mut properties = editor.body_image_properties(drawable_object_id)?;
