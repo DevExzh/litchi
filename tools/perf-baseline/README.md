@@ -24,8 +24,8 @@ Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
 range cases, two execution-scaling cases, one XLSX commit/read attribution case,
 one opaque-heavy common OLE2 edit/save case, 20 native OLE2 semantic cases, 16
-DOCX/PPTX semantic cases, seven RTF semantic cases, and 23 ODF semantic cases
-are opt-in, for 112 selectable cases in total:
+DOCX/PPTX semantic cases, seven RTF semantic cases, and 24 ODF semantic cases
+are opt-in, for 113 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -324,6 +324,14 @@ snapshot open, one middle-cell edit, commit and output materialization. Outside
 timing it reopens the complete grid and verifies every resource path, manifest
 media type, exact payload and deterministic output. This case does not vary
 with `--semantic-shape` and is not part of the 22-record tiny ODF smoke matrix.
+
+`odp_media_textbox_edit_save` is a separate fixed-medium source-backed
+publication corpus: 12 slides plus eight deterministic 2 MiB resources under
+`Pictures/`. It times public snapshot open, one `add_text_box` operation,
+commit, and output materialization. Outside timing it checks every original
+slide, the inserted text box through `rich_content`, exact patch/inverse and
+stale-source behavior, deterministic output, and every resource payload and
+manifest media type. It does not vary with `--semantic-shape` and is opt-in.
 
 Each ODP batch uses `Builder`, `Presentation::from_bytes`, `slides()`,
 `Presentation::text`, source snapshots, and public presentation transactions.

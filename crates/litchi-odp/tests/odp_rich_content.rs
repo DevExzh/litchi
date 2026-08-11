@@ -8,6 +8,7 @@ use litchi_odf_common::chart::authoring::{
     CachedCell, CachedRow, CachedTable, CachedValue, Definition, SeriesSpec,
 };
 use litchi_odf_common::core::{OwnedPackage, PackageWriter};
+use litchi_odf_common::package::raw_identical_members;
 use litchi_odp::content::{
     Cell, ControlKind, ElementSelector, FormControl, Paragraph, RichText, Run, Table, TextBox,
 };
@@ -469,4 +470,116 @@ fn producer_bom_remains_source_provenance_during_rich_content_edit() {
             .unwrap()
             .contains("BOM-safe box")
     );
+}
+
+#[test]
+fn content_only_text_box_edit_raw_preserves_unchanged_media_and_metadata() {
+    const MIME: &str = "application/vnd.oasis.opendocument.presentation";
+    const MEDIA_PATH: &str = "Pictures/opaque.bin";
+    let mut builder = Builder::new();
+    builder.add_slide_with_title("Source", "Body").unwrap();
+    let base = OwnedPackage::from_bytes(builder.build().unwrap()).unwrap();
+    let package = base.package().unwrap();
+    let mut writer = PackageWriter::new();
+    writer.set_mimetype(MIME).unwrap();
+    for path in package.files().unwrap() {
+        if matches!(path.as_str(), "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
+            continue;
+        }
+        writer
+            .add_file_with_media_type(
+                &path,
+                &package.get_file(&path).unwrap(),
+                package.manifest().get_media_type(&path).unwrap_or_default(),
+            )
+            .unwrap();
+    }
+    writer.add_manifest_directory("Pictures/", "").unwrap();
+    writer
+        .add_file_with_media_type(
+            MEDIA_PATH,
+            &vec![0x5a; 1024 * 1024],
+            "application/octet-stream",
+        )
+        .unwrap();
+    let source_bytes = writer.finish_to_bytes().unwrap();
+    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
+
+    let mut transaction = source.transaction().unwrap();
+    transaction
+        .add_text_box(
+            0usize,
+            &TextBox::new("Added", RichText::plain("retained media").unwrap()).unwrap(),
+        )
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.snapshot().bytes()).unwrap();
+
+    assert!(!identical.contains("content.xml"));
+    for path in [
+        "mimetype",
+        "styles.xml",
+        "meta.xml",
+        "META-INF/manifest.xml",
+        MEDIA_PATH,
+    ] {
+        assert!(identical.contains(path), "{path}");
+    }
+    let reopened = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    assert_eq!(
+        reopened.get_file(MEDIA_PATH).unwrap(),
+        vec![0x5a; 1024 * 1024]
+    );
+    assert_eq!(
+        reopened
+            .package()
+            .unwrap()
+            .manifest()
+            .get_media_type(MEDIA_PATH),
+        Some("application/octet-stream")
+    );
+    assert_eq!(
+        commit.patch().apply(&source).unwrap().bytes(),
+        commit.snapshot().bytes()
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .bytes(),
+        source_bytes
+    );
+}
+
+#[test]
+fn content_only_raw_publication_refuses_noncompact_referenced_xml() {
+    const MIME: &str = "application/vnd.oasis.opendocument.presentation";
+    const CONTENT: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page draw:name="Source"/></office:presentation></office:body></office:document-content>"#;
+    const MANIFEST: &[u8] = br#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.presentation"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="Object 1/content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
+    archive.write_deflated("content.xml", CONTENT).unwrap();
+    archive
+        .write_deflated("Object 1/content.xml", b"<object>\n  <opaque/>\n</object>")
+        .unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", MANIFEST)
+        .unwrap();
+    let source_bytes = archive.finish_to_bytes().unwrap();
+    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
+
+    let mut transaction = source.transaction().unwrap();
+    assert!(
+        transaction
+            .add_text_box(
+                0usize,
+                &TextBox::new("Blocked", RichText::plain("Body").unwrap()).unwrap(),
+            )
+            .is_err()
+    );
+    let commit = transaction.commit().unwrap();
+    assert!(!commit.changed());
+    assert_eq!(commit.snapshot().bytes(), source_bytes);
 }

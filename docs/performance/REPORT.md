@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest tranche: `e0434ae15`
+Production base for the latest tranche: `1214a63b4`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,12 +13,12 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **112 selectable cases**: 36 default cases and 198 default
+harness contains **113 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, one opt-in opaque-heavy common OLE2
 publication case, 16
 opt-in DOCX/PPTX semantic cases, seven opt-in RTF semantic case names across
-four capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 23 opt-in
+four capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 24 opt-in
 ODT/ODS/ODP semantic cases, and 20 opt-in native DOC/XLS/PPT semantic cases. It
 is still not broad program or CRUD coverage.
 
@@ -47,6 +47,7 @@ is still not broad program or CRUD coverage.
 | XLSX no-extension worksheet scan | Medium commit/save p50 **-19.31% to -20.74%**; cold reads about **-35%**; dense 1% commit p50 **-19.62%** | `dyDescent`-free success path only; rejected inputs rerun the original collector for error precedence; allocation calls -25.24%, peak heap flat |
 | ODS row-local publication | Large/medium one-cell edit-save p50 **-9.54% / -7.22%**; allocation calls **-5.85%**, peak heap **-27.18%** | Same-topology modeled rows only; structural edits fall back and touched opaque rows refuse |
 | ODS unchanged-media publication | Media-rich one-cell edit/save p50 **-4.73%**, mean **-5.73%**, p95 **-7.65%**; peak heap **-8.78%** | Compact `content.xml` replacements in ordinary unsigned/unencrypted ZIPs; every unproved layout/member retains logical rebuild or comparison fallback |
+| ODP content-only unchanged-media publication | Media-rich text-box edit/save p50 **-94.44%**, mean **-94.43%**, p95 **-94.29%**; allocation calls **+0.52%**; peak heap/RSS flat | Source-backed content-only operations reuse accepted checked-splice/raw-copy publication; resource additions and unsupported/security-sensitive layouts retain logical rebuild |
 | ODS adaptive cell locator | Large public cell sweep p50 **-81.74%**, mean **-80.72%**; full cell text p50 **-52.65%** | Builds lazily at 64 calls, requests 3,216 bytes on the dense corpus and is capped at 4 MiB; peak heap/RSS flat |
 | RTF parser-state specialization | Large open p50 **-20.09%**; large/medium one-edit-save **-11.54% / -14.16%**; cycles **-10.50%** | Ordinary body text only; insertion/deletion metadata retains the full state; allocation count, peak heap and RSS flat |
 | RTF ASCII transport batching | Large open p50 **-26.67%**; large/medium one-edit-save **-6.26% / -10.07%**; instructions **-18.40%** | ASCII source tokens only; byte-valued non-ASCII and invalid-Unicode fallback unchanged; allocation count, peak heap and RSS flat |
@@ -188,6 +189,15 @@ proofs, the no-media guard, fallback semantics, memory and counter attribution
 are summarized in
 [`change 0031`](changes/0031-ods-unchanged-media-preservation.md).
 
+The ODP content-only publication evidence is
+[`before A`](results/abba-odp-media-textbox-before-a.json),
+[`after A`](results/abba-odp-media-textbox-after-a.json),
+[`after B`](results/abba-odp-media-textbox-after-b.json), and
+[`before B`](results/abba-odp-media-textbox-before-b.json). Raw-member proofs,
+ordinary ODP guards, patch/inverse checks, memory, and hardware counters are
+summarized in
+[`change 0034`](changes/0034-odp-unchanged-media-preservation.md).
+
 The RTF parser-state follow-up evidence is
 [`before A`](results/abba-rtf-state-clone-one-edit-before-a.json),
 [`after A`](results/abba-rtf-state-clone-one-edit-after-a.json),
@@ -286,6 +296,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | ODS one-cell edit/save, 32,768 cells | 384.150 ms | 376.237 ms | -2.06% p50 / -2.19% mean | Changed package rewrite/readback still dominates |
 | ODS row-local one-cell edit/save, 32,768 cells | 359.011 ms | 324.774 ms | **-9.54% p50 / -9.32% mean** | Allocation calls -5.85%; peak heap -27.18%; uninstrumented RSS improved |
 | ODS media-rich one-cell edit/save, 2,048 cells + 16 MiB media | 325.902 ms | 310.472 ms | **-4.73% p50 / -5.73% mean** | p95 -7.65%; peak heap -8.78%; existing no-media guard p50 -0.77% |
+| ODP media-rich text-box edit/save, 12 slides + 16 MiB media | 227.606 ms | 12.665 ms | **-94.44% p50 / -94.43% mean** | p95 -94.29%; allocation calls +0.52%; peak heap/RSS flat |
 | ODS public cell sweep, 32,768 cells | 2.049 ms | 0.374 ms | **-81.74% p50 / -80.72% mean** | Lazy 3,216-byte dense index; peak heap/RSS flat; allocation calls +0.0004% process-wide |
 | ODS full cell text, 32,768 cells | 3.047 ms | 1.443 ms | **-52.65% p50 / -52.30% mean** | Existing string clones/join remain; lookup work only is indexed |
 | RTF full text, 10,000 paragraphs | 33.095 us | 24.134 us | -27.08% p50 / -25.37% mean | One fragment-vector allocation removed per first materialization |
@@ -335,6 +346,7 @@ The underlying records are:
 - [`0031-ods-unchanged-media-preservation.md`](changes/0031-ods-unchanged-media-preservation.md)
 - [`0032-xlsx-no-extension-scan.md`](changes/0032-xlsx-no-extension-scan.md)
 - [`0033-ole-common-publication-handoffs-rejected.md`](changes/0033-ole-common-publication-handoffs-rejected.md)
+- [`0034-odp-unchanged-media-preservation.md`](changes/0034-odp-unchanged-media-preservation.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -452,7 +464,7 @@ ZIP layouts use the fully validated rewrite path before any sink output.
 
 ## Evidence and verification
 
-The standalone harness provides 112 selectable cases and a 198-record default
+The standalone harness provides 113 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus
@@ -556,10 +568,10 @@ common OLE2 case also rejects direct shared writer payloads (+32.02% p50) and
 an editor-wide validated-render cache: its heavy path improved 34.06%, but DOC
 open regressed 21.64% and DOC edit/save 9.08%. ODT full-text block
 ownership is accepted, and repeated ODS facade cell lookup now has a bounded
-lazy index. Compact ODS content edits now preserve unchanged ZIP members, but
-broader ODF source-backed reads, repeated ODT/ODP semantic scans, other family
-and structural publications, package-parse reuse and structural-edit profiles
-remain open.
+lazy index. Compact ODS and content-only ODP edits now preserve unchanged ZIP
+members, but broader ODF source-backed reads, repeated ODT/ODP semantic scans,
+resource-adding/structural publications, package-parse reuse and structural-edit
+profiles remain open.
 XLSX changed-sheet validation can now seed a bounded first-read cache. Direct
 writer-local action regrouping was immaterial and reverted; distinct bulk
 actions, any larger planning/emission coalescing, large-sheet retention,

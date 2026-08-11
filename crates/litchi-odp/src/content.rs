@@ -4,7 +4,9 @@
 //! executable form behavior. Package mutation is owned by [`crate::edit`].
 
 use litchi_core::{Error, Result, xml::escape_xml};
-use litchi_odf_common::package::{is_linked_href, rebuild_package, resolve_package_path, splice};
+use litchi_odf_common::package::{
+    is_linked_href, rebuild_package, replace_content_xml, resolve_package_path, splice,
+};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -2177,6 +2179,10 @@ pub(crate) fn apply(source: &crate::core::OwnedPackage, operation: &Operation) -
             validate_resource_additions(source, resources.clone())?,
         ),
     };
+    if resources.is_empty() {
+        crate::authoring::edit::validate_raw_preserved_xml_parts(source)?;
+        return replace_content_xml(source, &updated);
+    }
     let additions = resources
         .into_iter()
         .map(|resource| litchi_odf_common::package::Addition {

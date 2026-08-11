@@ -1813,6 +1813,9 @@ impl Transaction {
         }
         let reopened = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
         let source_package = OwnedPackage::from_shared_bytes(Arc::clone(&self.source.bytes))?;
+        if !content_changed {
+            validate_raw_preserved_referenced_xml_parts(&source_package)?;
+        }
         validate_compact_xml_parts(&reopened, &source_package)?;
         self.draft.verify_embedded_media(&reopened)?;
         if let Some(rdf) = &self.rdf
@@ -3219,6 +3222,22 @@ fn shape_resource(root: &Shape) -> Result<usize> {
 }
 
 fn validate_compact_xml_parts(package: &OwnedPackage, source: &OwnedPackage) -> Result<()> {
+    validate_compact_xml_parts_against(package, Some(source), true)
+}
+
+pub(crate) fn validate_raw_preserved_xml_parts(package: &OwnedPackage) -> Result<()> {
+    validate_compact_xml_parts_against(package, None, true)
+}
+
+fn validate_raw_preserved_referenced_xml_parts(package: &OwnedPackage) -> Result<()> {
+    validate_compact_xml_parts_against(package, None, false)
+}
+
+fn validate_compact_xml_parts_against(
+    package: &OwnedPackage,
+    source: Option<&OwnedPackage>,
+    audit_core_parts: bool,
+) -> Result<()> {
     let mut part_count = 0usize;
     let mut aggregate_bytes = 0usize;
     for path in package.files()? {
@@ -3227,18 +3246,33 @@ fn validate_compact_xml_parts(package: &OwnedPackage, source: &OwnedPackage) -> 
         }) {
             continue;
         }
-        let payload = package.get_file(&path)?;
-        if source.has_file(&path)?
-            && source
-                .get_file(&path)
-                .is_ok_and(|source_payload| source_payload == payload)
+        if !audit_core_parts
+            && matches!(
+                path.as_str(),
+                "content.xml"
+                    | "styles.xml"
+                    | "meta.xml"
+                    | "settings.xml"
+                    | "META-INF/manifest.xml"
+            )
         {
             continue;
         }
-        if let Ok(candidate) = std::str::from_utf8(&payload)
-            && litchi_odf_common::package::xml_splice_publication(source, &path, candidate).is_ok()
-        {
-            continue;
+        let payload = package.get_file(&path)?;
+        if let Some(source) = source {
+            if source.has_file(&path)?
+                && source
+                    .get_file(&path)
+                    .is_ok_and(|source_payload| source_payload == payload)
+            {
+                continue;
+            }
+            if let Ok(candidate) = std::str::from_utf8(&payload)
+                && litchi_odf_common::package::xml_splice_publication(source, &path, candidate)
+                    .is_ok()
+            {
+                continue;
+            }
         }
         part_count = part_count
             .checked_add(1)
@@ -3260,19 +3294,21 @@ fn validate_compact_xml_parts(package: &OwnedPackage, source: &OwnedPackage) -> 
         .map_err(|config_error| {
             invalid_error(format!("invalid ODP XML audit limits: {config_error}"))
         })?;
-        let _report = audit::verify(&payload, limits).map_err(|audit_error| match audit_error {
-            audit::Error::NotCompact(_) => Error::Unsupported(format!(
-                "ODP XML part '{path}' is not compact: {audit_error}"
-            )),
-            audit::Error::Limit { .. }
-            | audit::Error::Encoding { .. }
-            | audit::Error::Malformed { .. }
-            | audit::Error::Doctype { .. }
-            | audit::Error::Allocation
-            | _ => {
-                Error::InvalidFormat(format!("ODP XML part '{path}' failed audit: {audit_error}"))
-            },
-        })?;
+        let audit_payload = payload.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&payload);
+        let _report =
+            audit::verify(audit_payload, limits).map_err(|audit_error| match audit_error {
+                audit::Error::NotCompact(_) => Error::Unsupported(format!(
+                    "ODP XML part '{path}' is not compact: {audit_error}"
+                )),
+                audit::Error::Limit { .. }
+                | audit::Error::Encoding { .. }
+                | audit::Error::Malformed { .. }
+                | audit::Error::Doctype { .. }
+                | audit::Error::Allocation
+                | _ => Error::InvalidFormat(format!(
+                    "ODP XML part '{path}' failed audit: {audit_error}"
+                )),
+            })?;
     }
     Ok(())
 }

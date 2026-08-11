@@ -172,6 +172,28 @@ jobs:
           assert len(result["elapsed_ns"]["samples"]) == 1
           PY
 
+      - name: Run ODP media publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case odp_media_textbox_edit_save \
+            --json target/perf/odp-media-textbox-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odp-media-textbox-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "odp_media_textbox_edit_save"
+          assert result["corpus"]["entry_count"] == 20
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_778_260
+          assert result["corpus"]["archive_sha256"] == "c5e98dac88846d7b8264f0af4e893d80e21672222c35c3b8890f78cff53242d3"
+          assert len(result["elapsed_ns"]["samples"]) == 1
+          PY
+
       - name: Run native OLE2 semantic smoke
         run: |
           cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
@@ -342,6 +364,27 @@ jobs:
           assert result["corpus"]["entry_count"] == 5
           assert result["corpus"]["uncompressed_payload_bytes"] == 16_777_252
           assert result["corpus"]["archive_sha256"] == "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+          assert len(result["elapsed_ns"]["samples"]) == 15
+          PY
+
+      - name: Run release ODP media publication case
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case odp_media_textbox_edit_save \
+            --json target/perf/odp-media-textbox-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odp-media-textbox-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "odp_media_textbox_edit_save"
+          assert result["corpus"]["entry_count"] == 20
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_778_260
+          assert result["corpus"]["archive_sha256"] == "c5e98dac88846d7b8264f0af4e893d80e21672222c35c3b8890f78cff53242d3"
           assert len(result["elapsed_ns"]["samples"]) == 15
           PY
 
