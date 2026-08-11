@@ -59,12 +59,8 @@ impl Snapshot {
     /// Opens and retains an ODT package as an immutable snapshot.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         ensure_package_size(bytes.len(), "ODT transaction input")?;
-        // Validate a bounded copy so the retained snapshot is the exact
-        // caller-provided package, not a writer-normalized representation.
-        Document::from_bytes(copy_bytes(&bytes)?)?;
-        Ok(Self {
-            bytes: Arc::new(bytes),
-        })
+        let document = Document::from_bytes(bytes)?;
+        Self::from_document(&document)
     }
 
     /// Captures the exact bytes backing an already validated document.
@@ -83,7 +79,7 @@ impl Snapshot {
 
     /// Reopens this immutable snapshot for semantic inspection.
     pub fn document(&self) -> Result<Document> {
-        Document::from_bytes(copy_bytes(self.as_bytes())?)
+        Document::from_shared_bytes(Arc::clone(&self.bytes))
     }
 
     /// Starts a detached, failure-atomic package edit.
@@ -4737,6 +4733,23 @@ mod tests {
         let snapshot = Snapshot::from_document(&document)?;
 
         assert!(Arc::ptr_eq(&snapshot.bytes, &package_bytes));
+        assert_eq!(snapshot.as_bytes(), document.original_bytes());
+        Ok(())
+    }
+
+    #[test]
+    fn direct_snapshot_and_reopened_document_share_exact_package_allocation() -> Result<()> {
+        let mut mutable = MutableDocument::new();
+        mutable.add_paragraph("shared direct snapshot")?;
+        let bytes = mutable.to_bytes()?;
+        let source_pointer = bytes.as_ptr();
+
+        let snapshot = Snapshot::from_bytes(bytes)?;
+        let document = snapshot.document()?;
+        let document_bytes = document.transaction_package().shared_bytes();
+
+        assert_eq!(snapshot.as_bytes().as_ptr(), source_pointer);
+        assert!(Arc::ptr_eq(&snapshot.bytes, &document_bytes));
         assert_eq!(snapshot.as_bytes(), document.original_bytes());
         Ok(())
     }
