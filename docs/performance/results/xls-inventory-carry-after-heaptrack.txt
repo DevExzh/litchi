@@ -1,0 +1,10 @@
+reading file "target/perf/xls-inventory-carry/after-heaptrack.zst.zst" - please wait, this might take some time...
+Debuggee command was: target/perf/xls-inventory-carry/frozen/litchi-perf-baseline-after --warmup 2 --samples 20 --case xls_semantic_one_edit_save --writer-shape large --json target/perf/xls-inventory-carry/after-heaptrack.json
+finished reading file, now analyzing data:
+
+total runtime: 0.470000s.
+calls to allocation functions: 239850 (510319/s)
+temporary memory allocations: 21729 (46231/s)
+peak heap memory consumption: 7.67M
+peak RSS (including heaptrack overhead): 19.80M
+total memory leaked: 544B

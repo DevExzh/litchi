@@ -33,10 +33,11 @@ use litchi_core::patch::{
     BlobBundle, BlobLimits, DiagnosticFingerprint, Patch as CorePatch, PatchLimits, PatchOperation,
     Reversible, ReversibleOperation,
 };
+use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_ole_common::object::{Editor as PackageEditor, Limits, Targets};
 use std::collections::BTreeMap;
 use std::fmt;
-use std::io::Cursor;
+use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
 
 const BOF: u16 = 0x0809;
@@ -313,7 +314,7 @@ struct Entry {
 struct SheetData {
     name: String,
     workbook_index: usize,
-    entries: Vec<Entry>,
+    entries: Arc<Vec<Entry>>,
 }
 
 struct Inner {
@@ -372,18 +373,7 @@ impl Snapshot {
         // it can mutate to have survived that complete semantic open.
         let (shared_strings, shared_string_properties) = {
             let workbook = Workbook::new(Cursor::new(source.as_slice()))?;
-            for sheet in &sheets {
-                if workbook
-                    .sheet(sheet.workbook_index)
-                    .and_then(crate::SheetMetadata::parsed_worksheet_index)
-                    .is_none()
-                {
-                    return Err(Error::UnsafeEdit(format!(
-                        "worksheet at tab position {} was not published by the complete XLS reader",
-                        sheet.workbook_index
-                    )));
-                }
-            }
+            require_public_worksheet_coverage(&workbook, &sheets)?;
             let strings = workbook.shared_strings_shared();
             let mut properties = Vec::new();
             properties
@@ -411,6 +401,40 @@ impl Snapshot {
                 shared_string_properties,
                 sst_total_offset,
                 xf_records: Arc::new(xf_records),
+                sheets,
+            }),
+        })
+    }
+
+    fn from_fixed_numeric_package_editor(
+        package: PackageEditor,
+        source_snapshot: &Self,
+        changes: &[Change],
+    ) -> Result<Self> {
+        let workbook_stream = package
+            .stream_shared(&source_snapshot.inner.workbook_path)
+            .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
+        let sheets = carry_fixed_numeric_inventory(source_snapshot, &workbook_stream, changes)?;
+        let source = package.finish()?;
+
+        // Keep the complete public reader as an independent validation owner.
+        // Only the private offset inventory is carried forward after proving
+        // that every other Workbook-stream byte is unchanged.
+        let workbook = Workbook::new(Cursor::new(source.as_slice()))?;
+        require_public_worksheet_coverage(&workbook, &sheets)?;
+        verify_public_numeric_readback(&workbook, source_snapshot, changes)?;
+
+        Ok(Self {
+            inner: Arc::new(Inner {
+                bytes: Arc::from(source),
+                workbook_path: source_snapshot.inner.workbook_path.clone(),
+                workbook_stream,
+                shared_strings: Arc::clone(&source_snapshot.inner.shared_strings),
+                shared_string_properties: Arc::clone(
+                    &source_snapshot.inner.shared_string_properties,
+                ),
+                sst_total_offset: source_snapshot.inner.sst_total_offset,
+                xf_records: Arc::clone(&source_snapshot.inner.xf_records),
                 sheets,
             }),
         })
@@ -2027,7 +2051,15 @@ impl Transaction {
         // The committed package editor has already rendered, reopened, and
         // recaptured the candidate CFB. Reuse it so snapshot construction
         // performs the owner parse and complete Workbook validation once.
-        let snapshot = Snapshot::from_package_editor(package)?;
+        let snapshot = if fixed_cells != 0
+            && self.structural_changes.is_empty()
+            && self.resource_changes.is_empty()
+            && changes_are_fixed_numeric(&self.source, &self.changes)
+        {
+            Snapshot::from_fixed_numeric_package_editor(package, &self.source, &self.changes)?
+        } else {
+            Snapshot::from_package_editor(package)?
+        };
         verify_readback(&snapshot, &self.changes)?;
         verify_structural_readback(&snapshot, &self.source, &self.structural_changes)?;
         verify_resource_readback(&snapshot, &self.resource_changes)?;
@@ -3872,7 +3904,7 @@ fn parse_workbook_stream(
         sheets.push(SheetData {
             name: bound.name.clone(),
             workbook_index,
-            entries,
+            entries: Arc::new(entries),
         });
     }
     if xf_records.is_empty() {
@@ -3882,7 +3914,7 @@ fn parse_workbook_stream(
     }
     if let Some(cell) = sheets
         .iter()
-        .flat_map(|sheet| &sheet.entries)
+        .flat_map(|sheet| sheet.entries.iter())
         .find(|entry| usize::from(entry.cell.style.get()) >= xf_records.len())
     {
         return Err(Error::InvalidRecord {
@@ -4424,6 +4456,211 @@ fn change_is_effective(snapshot: &Snapshot, change: &Change) -> bool {
     source.storage != change.storage || !values_equal(&source.value, &change.value)
 }
 
+#[derive(Debug, Clone, Copy)]
+struct FixedNumericField {
+    start: usize,
+    end: usize,
+    change: usize,
+}
+
+fn changes_are_fixed_numeric(snapshot: &Snapshot, changes: &[Change]) -> bool {
+    changes
+        .iter()
+        .filter(|change| change_is_effective(snapshot, change))
+        .all(|change| {
+            snapshot
+                .inner
+                .sheets
+                .get(change.sheet)
+                .and_then(|sheet| sheet.entries.get(change.entry))
+                .is_some_and(|entry| {
+                    entry.cell.storage == change.storage
+                        && matches!(
+                            change.storage,
+                            Storage::Number | Storage::Rk | Storage::MulRk
+                        )
+                        && matches!(change.value, Value::Number(_))
+                })
+        })
+}
+
+fn carry_fixed_numeric_inventory(
+    snapshot: &Snapshot,
+    workbook: &[u8],
+    changes: &[Change],
+) -> Result<Vec<SheetData>> {
+    if snapshot.inner.workbook_stream.len() != workbook.len() {
+        return Err(Error::UnsafeEdit(
+            "fixed-width numeric edit changed the Workbook stream length".into(),
+        ));
+    }
+
+    let mut fields = Vec::new();
+    fields
+        .try_reserve_exact(changes.len())
+        .map_err(|_error| Error::Allocation("certifying fixed-width numeric fields"))?;
+    for (change_index, change) in changes.iter().enumerate() {
+        if !change_is_effective(snapshot, change) {
+            continue;
+        }
+        let entry = snapshot
+            .inner
+            .sheets
+            .get(change.sheet)
+            .and_then(|sheet| sheet.entries.get(change.entry))
+            .ok_or_else(|| Error::UnsafeEdit("fixed-width numeric dependency is stale".into()))?;
+        if entry.cell.storage != change.storage {
+            return Err(Error::UnsafeEdit(
+                "fixed-width numeric edit changed its BIFF record family".into(),
+            ));
+        }
+        let width = match (&change.storage, &change.value) {
+            (Storage::Number, Value::Number(value)) => {
+                require_numeric_field(workbook, entry, &value.to_le_bytes())?;
+                8
+            },
+            (Storage::Rk | Storage::MulRk, Value::Number(value)) => {
+                let encoded = encode_rk(*value).ok_or_else(|| {
+                    Error::UnsafeEdit(
+                        "numeric replacement is not exactly representable as RK".into(),
+                    )
+                })?;
+                require_numeric_field(workbook, entry, &encoded.to_le_bytes())?;
+                4
+            },
+            _ => {
+                return Err(Error::UnsafeEdit(
+                    "inventory reuse requires unchanged Number, RK, or MulRk storage".into(),
+                ));
+            },
+        };
+        let start = entry
+            .value_offset
+            .ok_or_else(|| Error::UnsafeEdit("numeric cell has no value field".into()))?;
+        let end = start
+            .checked_add(width)
+            .ok_or_else(|| Error::InvalidData("numeric value range overflow".into()))?;
+        fields.push(FixedNumericField {
+            start,
+            end,
+            change: change_index,
+        });
+    }
+    fields.sort_unstable_by_key(|field| field.start);
+
+    let source = snapshot.inner.workbook_stream.as_ref();
+    let mut cursor = 0;
+    for field in &fields {
+        if field.start < cursor {
+            return Err(Error::UnsafeEdit(
+                "fixed-width numeric edit fields overlap".into(),
+            ));
+        }
+        if source.get(cursor..field.start) != workbook.get(cursor..field.start) {
+            return Err(Error::UnsafeEdit(
+                "fixed-width numeric edit changed bytes outside its value fields".into(),
+            ));
+        }
+        cursor = field.end;
+    }
+    if source.get(cursor..) != workbook.get(cursor..) {
+        return Err(Error::UnsafeEdit(
+            "fixed-width numeric edit changed bytes outside its value fields".into(),
+        ));
+    }
+
+    let mut sheets = snapshot.inner.sheets.clone();
+    for field in fields {
+        let change = &changes[field.change];
+        let entries = Arc::make_mut(&mut sheets[change.sheet].entries);
+        let cell = &mut entries[change.entry].cell;
+        cell.storage = change.storage;
+        cell.value = change.value.clone();
+    }
+    Ok(sheets)
+}
+
+fn require_numeric_field(workbook: &[u8], entry: &Entry, expected: &[u8]) -> Result<()> {
+    let start = entry
+        .value_offset
+        .ok_or_else(|| Error::UnsafeEdit("numeric cell has no value field".into()))?;
+    let end = start
+        .checked_add(expected.len())
+        .ok_or_else(|| Error::InvalidData("numeric value range overflow".into()))?;
+    if workbook.get(start..end) != Some(expected) {
+        return Err(Error::UnsafeEdit(
+            "fixed-width numeric field failed exact encoded readback".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn require_public_worksheet_coverage<R: Read + Seek>(
+    workbook: &Workbook<R>,
+    sheets: &[SheetData],
+) -> Result<()> {
+    for sheet in sheets {
+        if workbook
+            .sheet(sheet.workbook_index)
+            .and_then(crate::SheetMetadata::parsed_worksheet_index)
+            .is_none()
+        {
+            return Err(Error::UnsafeEdit(format!(
+                "worksheet at tab position {} was not published by the complete XLS reader",
+                sheet.workbook_index
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn verify_public_numeric_readback<R: Read + Seek>(
+    workbook: &Workbook<R>,
+    snapshot: &Snapshot,
+    changes: &[Change],
+) -> Result<()> {
+    for change in changes {
+        if !change_is_effective(snapshot, change) {
+            continue;
+        }
+        let source_sheet = &snapshot.inner.sheets[change.sheet];
+        let metadata = workbook.sheet(source_sheet.workbook_index).ok_or_else(|| {
+            Error::UnsafeEdit("edited worksheet disappeared from public readback".into())
+        })?;
+        let worksheet_index = metadata.parsed_worksheet_index().ok_or_else(|| {
+            Error::UnsafeEdit("edited tab is not a public worksheet on readback".into())
+        })?;
+        let cell = workbook
+            .xls_worksheet(worksheet_index)?
+            .get_cell(
+                u32::from(change.reference.row()),
+                u32::from(change.reference.column()),
+            )
+            .ok_or_else(|| {
+                Error::UnsafeEdit("edited cell is absent from public readback".into())
+            })?;
+        let Value::Number(expected) = change.value else {
+            return Err(Error::UnsafeEdit(
+                "inventory reuse received a nonnumeric value".into(),
+            ));
+        };
+        let actual = match cell.value() {
+            CellValue::Float(value) | CellValue::DateTime(value) => *value,
+            _ => {
+                return Err(Error::UnsafeEdit(
+                    "edited numeric cell has a nonnumeric public value".into(),
+                ));
+            },
+        };
+        if actual.to_bits() != expected.to_bits() {
+            return Err(Error::UnsafeEdit(
+                "edited numeric cell failed independent public readback".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn structural_changes_overlap(left: &StructuralChange, right: &StructuralChange) -> bool {
     match (left, right) {
         (
@@ -4783,12 +5020,12 @@ fn update_sst_total(workbook: &mut [u8], offset: Option<usize>, delta: i64) -> R
 }
 
 fn resolve_shared_strings(sheets: &mut [SheetData], shared_strings: &[String]) -> Result<()> {
-    for entry in sheets.iter_mut().flat_map(|sheet| &mut sheet.entries) {
-        let Some(index) = entry.sst_index else {
-            continue;
-        };
-        let text =
-            shared_strings
+    for sheet in sheets {
+        for entry in Arc::make_mut(&mut sheet.entries) {
+            let Some(index) = entry.sst_index else {
+                continue;
+            };
+            let text = shared_strings
                 .get(usize::try_from(index).map_err(|_error| {
                     Error::InvalidData("LabelSst index does not fit usize".into())
                 })?)
@@ -4796,12 +5033,13 @@ fn resolve_shared_strings(sheets: &mut [SheetData], shared_strings: &[String]) -
                     record_type: LABEL_SST,
                     message: format!("LabelSst index {index} is outside the SST"),
                 })?;
-        let mut retained = String::new();
-        retained
-            .try_reserve_exact(text.len())
-            .map_err(|_error| Error::Allocation("retaining LabelSst text"))?;
-        retained.push_str(text);
-        entry.cell.value = Value::Text(retained);
+            let mut retained = String::new();
+            retained
+                .try_reserve_exact(text.len())
+                .map_err(|_error| Error::Allocation("retaining LabelSst text"))?;
+            retained.push_str(text);
+            entry.cell.value = Value::Text(retained);
+        }
     }
     Ok(())
 }
@@ -5290,7 +5528,7 @@ fn verify_shifted_cells(
 ) -> Result<()> {
     let before = &source.inner.sheets[sheet].entries;
     let after = &snapshot.inner.sheets[sheet].entries;
-    for entry in before {
+    for entry in before.iter() {
         let reference = match shift {
             Shift::Rows {
                 start,

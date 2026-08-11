@@ -1,0 +1,2 @@
+672deac8e3056a267941cd4c80a8356e72094d8e8e08de25bfd6759a4b807773  litchi-perf-baseline-before
+955dad8ec0d12103b63dc677a2eeab8c9c61351f285225a7fcd6fa4289d9cee1  litchi-perf-baseline-after
