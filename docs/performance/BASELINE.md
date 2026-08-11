@@ -343,6 +343,16 @@ incomplete program and CRUD matrix.
   `BlobBundle::insert` payload-copy site disappears; matched peak heap falls
   1.92%, while uninstrumented RSS is flat. See
   [`0054`](changes/0054-ods-shared-durable-patch-blobs.md).
+- Eligible ODS row-local worksheet transactions now retain their exact checked
+  source ranges through package publication. The prior flattened result could
+  not be rediscovered as one conservative maximal diff, so the package layer
+  rebuilt the archive and recompressed eight unchanged 2 MiB media members.
+  On that fixed media-rich case, p50 falls from 287.766 to 74.365 ms (-74.16%),
+  mean and p95 fall 74.17%/74.11%, instructions fall 69.04%, and matched peak
+  heap/RSS remain flat. Foreign provenance refuses; signatures,
+  encryption-sensitive/unsupported ZIP layouts and structural edits retain
+  the established fallback. See
+  [`0057`](changes/0057-ods-row-splice-raw-publication.md).
 - Large plain RTF parsing now derives an exact root-text block count during the
   existing structural preflight and performs one bounded lazy style-block
   reservation. Across 6,000 samples/state, open p50 improves 21.17%, mean

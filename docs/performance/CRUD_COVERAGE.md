@@ -278,6 +278,16 @@ and inverse, final owner validation and independent public DOC readback remain.
 It adds no formatting/media edit, repair, security, producer, streaming or new
 semantic capability.
 
+Change 0057 leaves the ODS CRUD and publication surface unchanged. Eligible
+same-topology worksheet commits retain their exact checked row-range
+provenance through raw package emission instead of losing it before the
+existing package-preservation gate. Tests preserve exact untouched row,
+manifest and media bytes; foreign provenance and unexpected assembly refuse;
+signed changed packages retain the established stale-signature stripping
+fallback. Compact audit, bounds, complete package/sheet/media readback,
+patch/inverse and structural fallback remain. It adds no structural/resource
+edit, security capability, real-producer, streaming or cold-source coverage.
+
 Change 0040 removes repeated UTF-8 scalar decoding from ordinary RTF text
 delimiter discovery without changing the existing CRUD surface. It measures
 plain, raw CP-1252 and LZFu opens at medium and large, retains the 25-row

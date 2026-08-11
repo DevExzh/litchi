@@ -152,6 +152,49 @@ pub fn replace_content_xml(source: &OwnedPackage, content: &str) -> Result<Vec<u
     )
 }
 
+/// Replace `content.xml` from an already checked source-provenance splice.
+///
+/// Format owners that already know the exact edited source ranges can retain
+/// that proof instead of deriving one maximal byte diff from the assembled
+/// part. Every untouched ZIP member follows the same raw-preservation gate and
+/// logical fallback as [`replace_content_xml`].
+///
+/// # Errors
+///
+/// Returns an error when the publication belongs to another package, does not
+/// assemble the expected `content.xml`, exceeds the replacement bound, or
+/// cannot be published through the preserving or established rebuild path.
+pub fn replace_content_xml_spliced(
+    source: &OwnedPackage,
+    content: &str,
+    publication: XmlSplicePublication,
+) -> Result<Vec<u8>> {
+    if content.len() > MAX_CONTENT_REPLACEMENT_BYTES {
+        return invalid("outer content.xml exceeds package mutation limit");
+    }
+    if !publication.belongs_to(source) {
+        return invalid("content.xml splice publication has different package provenance");
+    }
+    let (path, replacement, _media_type) = publication.assemble()?;
+    if path != constants::ODF_CONTENT || replacement != content.as_bytes() {
+        return invalid("checked content.xml splice assembled unexpected bytes");
+    }
+    if source.get_file(constants::ODF_CONTENT)? == replacement {
+        return Ok(source.as_bytes().to_vec());
+    }
+    if let Some(bytes) = try_preserve_content_replacement(source, replacement) {
+        return Ok(bytes);
+    }
+    rebuild_package(
+        source,
+        content,
+        Vec::new(),
+        Vec::new(),
+        Vec::<String>::new(),
+        Vec::<String>::new(),
+    )
+}
+
 fn try_preserve_content_replacement(
     source: &OwnedPackage,
     replacement: Vec<u8>,

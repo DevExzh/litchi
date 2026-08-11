@@ -1,0 +1,232 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 3K of event 'cycles:P'
+# Event count (approx.): 18328915753
+#
+# Overhead  Command  Shared Object         Symbol
+# ........  .......  ....................  ......................................................................................................................
+#
+    42.58%  control  control               [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+            |
+            ---zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               zlib_rs::stable::Deflate::compress
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |
+               |--37.97%--flate2::zio::Writer<W,D>::write_with_status
+               |          std::io::Write::write_all
+               |          soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+               |          _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17hb84d7cac4c8dbc92E.llvm.17475570438763808224
+               |          |
+               |           --37.86%--litchi_odf_common::core::writer::PackageWriter<W>::copy_source_files_from_except
+               |                     litchi_odf_common::package::edit::rebuild_package
+               |                     litchi_odf_common::package::edit::replace_content_xml
+               |                     litchi_ods::worksheet::snapshot::Edit::commit
+               |                     litchi_ods::document::Edit::worksheets
+               |                     litchi_perf_baseline::run_ods_media_one_edit_save
+               |                     litchi_perf_baseline::main
+               |                     0xffffffffffffffff
+               |
+                --4.07%--flate2::zio::Writer<W,D>::write_with_status
+                          soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+                          _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17h622ec3d313453d2dE.llvm.12592586514332291734
+                          |
+                           --4.04%--litchi_odf_common::core::writer::PackageWriter<W>::add_file_with_media_type
+                                     litchi_perf_baseline::build_ods_media_corpus
+                                     litchi_perf_baseline::main
+                                     0xffffffffffffffff
+
+    15.04%  control  control               [.] zlib_rs::deflate::longest_match::longest_match
+            |
+            ---zlib_rs::deflate::longest_match::longest_match
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               zlib_rs::stable::Deflate::compress
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |
+               |--13.81%--flate2::zio::Writer<W,D>::write_with_status
+               |          std::io::Write::write_all
+               |          soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+               |          _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17hb84d7cac4c8dbc92E.llvm.17475570438763808224
+               |          litchi_odf_common::core::writer::PackageWriter<W>::copy_source_files_from_except
+               |          litchi_odf_common::package::edit::rebuild_package
+               |          litchi_odf_common::package::edit::replace_content_xml
+               |          litchi_ods::worksheet::snapshot::Edit::commit
+               |          litchi_ods::document::Edit::worksheets
+               |          litchi_perf_baseline::run_ods_media_one_edit_save
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --1.05%--flate2::zio::Writer<W,D>::write_with_status
+                          soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+                          _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17h622ec3d313453d2dE.llvm.12592586514332291734
+                          litchi_odf_common::core::writer::PackageWriter<W>::add_file_with_media_type
+                          litchi_perf_baseline::build_ods_media_corpus
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     6.52%  control  libc.so.6             [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memcpy_avx512_unaligned_erms (inlined)
+               |
+               |--1.09%--litchi_ods::document::changed_package_files
+               |
+                --0.71%--flate2::zio::read
+                          <soapberry_zip::archive::ZipSliceVerifier<D> as std::io::Read>::read
+                          std::io::default_read_to_end
+                          soapberry_zip::office::ArchiveReader::read
+                          litchi_odf_common::package::codec::<impl litchi_odf_common::package::model::Archive>::read
+                          litchi_odf_common::core::package::Package::get_file
+
+     6.49%  control  control               [.] litchi_perf_baseline::payload_bytes
+            |
+            ---litchi_perf_baseline::payload_bytes
+               |
+               |--5.95%--litchi_perf_baseline::verify_ods_media_archive
+               |          |
+               |           --5.47%--litchi_perf_baseline::run_ods_media_one_edit_save
+               |                     litchi_perf_baseline::main
+               |                     0xffffffffffffffff
+               |
+                --0.54%--litchi_perf_baseline::build_ods_media_corpus
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     5.85%  control  control               [.] sha2::sha256::x86_sha::compress
+            |
+            ---sha2::sha256::x86_sha::compress
+               |
+               |--3.75%--<D as digest::digest::Digest>::digest
+               |          litchi_core::patch::BlobBundle::insert_shared
+               |          litchi_ods::document::Patch::build
+               |          litchi_ods::document::Edit::commit_with_security
+               |          litchi_ods::document::Edit::commit
+               |          litchi_perf_baseline::run_ods_media_one_edit_save
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --2.11%--litchi_perf_baseline::sha256_hex
+                          |
+                           --1.90%--litchi_perf_baseline::run_ods_media_one_edit_save
+                                     litchi_perf_baseline::main
+                                     0xffffffffffffffff
+
+     3.76%  control  control               [.] zlib_rs::deflate::Heap::pqdownheap
+            |
+            ---zlib_rs::deflate::Heap::pqdownheap
+               |
+                --3.41%--zlib_rs::deflate::Heap::construct_huffman_tree
+                          zlib_rs::deflate::flush_block_only
+                          zlib_rs::deflate::algorithm::medium::deflate_medium
+                          zlib_rs::deflate::deflate
+                          zlib_rs::stable::Deflate::compress
+                          <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+                          |
+                           --2.94%--flate2::zio::Writer<W,D>::write_with_status
+                                     std::io::Write::write_all
+                                     soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated
+                                     _ZN17litchi_odf_common4core6writer22PackageWriter$LT$W$GT$10write_file17hb84d7cac4c8dbc92E.llvm.17475570438763808224
+                                     litchi_odf_common::core::writer::PackageWriter<W>::copy_source_files_from_except
+                                     litchi_odf_common::package::edit::rebuild_package
+                                     litchi_odf_common::package::edit::replace_content_xml
+                                     litchi_ods::worksheet::snapshot::Edit::commit
+                                     litchi_ods::document::Edit::worksheets
+                                     litchi_perf_baseline::run_ods_media_one_edit_save
+                                     litchi_perf_baseline::main
+                                     0xffffffffffffffff
+
+     1.17%  control  libc.so.6             [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+
+     1.15%  control  [unknown]             [k] 0xffffffff9c5a56ba
+            |
+            ---0xffffffff9c5a56ba
+               0xffffffff9c4d7ef8
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               |
+                --1.10%--__memcpy_avx512_unaligned_erms (inlined)
+
+     0.91%  control  [unknown]             [k] 0xffffffff9d6600b7
+            |
+            ---0xffffffff9d6600b7
+               0xffffffff9c82e7e3
+               0xffffffff9c82f8db
+               0xffffffff9c82ff44
+               0xffffffff9c83021a
+               0xffffffff9c4d7f29
+               0xffffffff9d64e923
+               0xffffffff9d800bc7
+               |
+                --0.86%--__memcpy_avx512_unaligned_erms (inlined)
+
+     0.89%  control  control               [.] crc32fast::specialized::pclmulqdq::calculate
+            |
+            ---crc32fast::specialized::pclmulqdq::calculate
+               crc32fast::Hasher::update
+               |
+                --0.53%--<soapberry_zip::archive::ZipSliceVerifier<D> as std::io::Read>::read
+                          std::io::default_read_to_end
+                          soapberry_zip::office::ArchiveReader::read
+                          litchi_odf_common::package::codec::<impl litchi_odf_common::package::model::Archive>::read
+                          litchi_odf_common::core::package::Package::get_file
+
+     0.82%  control  [unknown]             [k] 0xffffffff9d5cfb97
+            |
+            ---0xffffffff9d5cfb97
+               0xffffffff9c85c182
+               0xffffffff9c85d999
+               0xffffffff9c8974c1
+               |
+                --0.82%--0xffffffff9c897834
+                          0xffffffff9c82e51c
+                          0xffffffff9c82e70c
+                          0xffffffff9c82f8db
+                          0xffffffff9c82ff44
+                          0xffffffff9c83021a
+                          0xffffffff9c4d7f29
+                          0xffffffff9d64e923
+                          0xffffffff9d800bc7
+                          __memcpy_avx512_unaligned_erms (inlined)
+
+     0.73%  control  [unknown]             [k] 0xffffffff9d800ba0
+            |
+            ---0xffffffff9d800ba0
+               |
+                --0.66%--__memcpy_avx512_unaligned_erms (inlined)
+
+     0.70%  control  control               [.] quick_xml::name::NamespaceResolver::resolve_event
+            |
+            ---quick_xml::name::NamespaceResolver::resolve_event
+
+     0.65%  control  [unknown]             [k] 0xffffffff9c848383
+            |
+            ---0xffffffff9c848383
+               0xffffffff9c82797f
+               0xffffffff9c8284e0
+               0xffffffff9c8290c6
+               0xffffffff9c829389
+               0xffffffff9c8299c5
+               0xffffffff9c835a28
+               0xffffffff9c836b98
+               |
+                --0.57%--0xffffffff9c83a981
+                          0xffffffff9c83aa12
+                          0xffffffff9c40747b
+                          0xffffffff9d6485af
+                          0xffffffff9d800130
+                          __brk
+                          __GI___sbrk (inlined)
+                          __glibc_morecore (inlined)
+                          systrim (inlined)
+                          __GI___libc_free (inlined)
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

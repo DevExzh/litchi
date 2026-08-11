@@ -7,6 +7,10 @@
 
 use super::{Sheet, codec, validation};
 use litchi_core::{Error, Result};
+use litchi_odf_common::{
+    constants,
+    core::{AuthoredXmlFragment, OwnedPackage, XmlSourcePart, XmlSplicePublication},
+};
 use quick_xml::{
     events::Event,
     name::{Namespace, ResolveResult},
@@ -28,6 +32,20 @@ struct Span {
     end: usize,
     parent: Option<usize>,
     empty: bool,
+}
+
+#[derive(Clone, Debug)]
+struct RowEdit {
+    start: usize,
+    end: usize,
+    replacement: String,
+}
+
+/// One row-local result retaining both assembled content and its exact source
+/// range proofs for package publication.
+pub(crate) struct ChangedRows {
+    pub(crate) content: String,
+    pub(crate) publication: XmlSplicePublication,
 }
 
 /// Replace the direct table children of `office:spreadsheet` in one bounded
@@ -115,19 +133,24 @@ pub(crate) fn replace_changed_rows(
     candidate: &[Option<&Sheet>],
     max_output_bytes: usize,
 ) -> Result<String> {
-    replace_changed_rows_impl(xml, original, candidate, max_output_bytes, false)?.ok_or_else(|| {
-        invalid("flat ODS row transaction is not eligible for row-local publication")
-    })
+    let edits =
+        changed_row_edits(xml, original, candidate, max_output_bytes, false)?.ok_or_else(|| {
+            invalid("flat ODS row transaction is not eligible for row-local publication")
+        })?;
+    apply_edits_bounded(xml, edits, max_output_bytes)
 }
 
-/// Try a row-local packaged worksheet publication without changing the
-/// established structural-edit fallback.
-pub(crate) fn try_replace_changed_rows(
-    xml: &str,
+/// Try a provenance-bearing row-local packaged worksheet publication without
+/// changing the established structural-edit fallback.
+pub(crate) fn try_replace_changed_rows_spliced(
+    source: &OwnedPackage,
     original: &[Sheet],
     candidate: &[Sheet],
     max_output_bytes: usize,
-) -> Result<Option<String>> {
+) -> Result<Option<ChangedRows>> {
+    let source_bytes = source.get_file(constants::ODF_CONTENT)?;
+    let xml = std::str::from_utf8(&source_bytes)
+        .map_err(|error| Error::InvalidFormat(format!("invalid ODS content.xml UTF-8: {error}")))?;
     if original.len() != candidate.len() {
         return Ok(None);
     }
@@ -136,16 +159,40 @@ pub(crate) fn try_replace_changed_rows(
         .zip(candidate)
         .map(|(before, after)| (before != after).then_some(after))
         .collect::<Vec<_>>();
-    replace_changed_rows_impl(xml, original, &changed, max_output_bytes, true)
+    let Some(edits) = changed_row_edits(xml, original, &changed, max_output_bytes, true)? else {
+        return Ok(None);
+    };
+    let content = apply_edits_bounded(xml, edits.clone(), max_output_bytes)?;
+    let source_part = XmlSourcePart::load(source, constants::ODF_CONTENT)?;
+    let mut publication = XmlSplicePublication::new(source_part.clone());
+    for edit in edits {
+        let expected = source_part
+            .bytes()
+            .get(edit.start..edit.end)
+            .ok_or_else(|| {
+                Error::InvalidFormat("ODS row splice source range is invalid".to_string())
+            })?;
+        let proof = source_part.checked_range(edit.start..edit.end, expected)?;
+        let fragment = if edit.replacement.is_empty() {
+            AuthoredXmlFragment::deletion()
+        } else {
+            AuthoredXmlFragment::markup(edit.replacement.into_bytes())?
+        };
+        publication.replace(proof, fragment)?;
+    }
+    Ok(Some(ChangedRows {
+        content,
+        publication,
+    }))
 }
 
-fn replace_changed_rows_impl(
+fn changed_row_edits(
     xml: &str,
     original: &[Sheet],
     candidate: &[Option<&Sheet>],
     max_output_bytes: usize,
     allow_ineligible: bool,
-) -> Result<Option<String>> {
+) -> Result<Option<Vec<RowEdit>>> {
     validation::validate_content_xml_size(xml)?;
     if candidate.len() > validation::MAX_PHYSICAL_RUNS {
         return Err(Error::InvalidFormat(format!(
@@ -230,36 +277,36 @@ fn replace_changed_rows_impl(
         for row in &rows[prefix..old_end] {
             validate_rewritable_row(xml, &spans, &spans[*row])?;
         }
-        edits.push((
-            spans[rows[prefix]].start,
-            spans[rows[old_end - 1]].end,
-            codec::write_rows_bounded(&after.rows[prefix..new_end], max_output_bytes)?,
-        ));
+        edits.push(RowEdit {
+            start: spans[rows[prefix]].start,
+            end: spans[rows[old_end - 1]].end,
+            replacement: codec::write_rows_bounded(&after.rows[prefix..new_end], max_output_bytes)?,
+        });
     }
 
-    apply_edits_bounded(xml, edits, max_output_bytes).map(Some)
+    Ok(Some(edits))
 }
 
 fn apply_edits_bounded(
     xml: &str,
-    mut edits: Vec<(usize, usize, String)>,
+    mut edits: Vec<RowEdit>,
     max_output_bytes: usize,
 ) -> Result<String> {
-    edits.sort_unstable_by_key(|(start, _, _)| *start);
+    edits.sort_unstable_by_key(|edit| edit.start);
     let mut cursor = 0usize;
     let mut removed = 0usize;
     let mut added = 0usize;
-    for (start, end, replacement) in &edits {
-        if *start < cursor || *end < *start || *end > xml.len() {
+    for edit in &edits {
+        if edit.start < cursor || edit.end < edit.start || edit.end > xml.len() {
             return Err(invalid("overlapping or out-of-bounds flat ODS edit"));
         }
         removed = removed
-            .checked_add(end - start)
+            .checked_add(edit.end - edit.start)
             .ok_or_else(|| invalid("flat ODS removed-byte count overflow"))?;
         added = added
-            .checked_add(replacement.len())
+            .checked_add(edit.replacement.len())
             .ok_or_else(|| invalid("flat ODS replacement-byte count overflow"))?;
-        cursor = *end;
+        cursor = edit.end;
     }
     let output_len = xml
         .len()
@@ -276,10 +323,10 @@ fn apply_edits_bounded(
         .try_reserve_exact(output_len)
         .map_err(|_error| invalid("flat ODS output allocation failed"))?;
     cursor = 0;
-    for (start, end, replacement) in edits {
-        output.push_str(&xml[cursor..start]);
-        output.push_str(&replacement);
-        cursor = end;
+    for edit in edits {
+        output.push_str(&xml[cursor..edit.start]);
+        output.push_str(&edit.replacement);
+        cursor = edit.end;
     }
     output.push_str(&xml[cursor..]);
     Ok(output)
