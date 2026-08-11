@@ -40,19 +40,27 @@ impl<'a> Lexer<'a> {
         let mut start = self.pos;
 
         while self.pos < self.input.len() {
-            let ch = self.current_char()?;
-            match ch {
-                '\\' | '{' | '}' => break,
-                '\r' | '\n' => {
-                    let end = self.pos;
-                    self.advance()?;
-                    if end > start {
-                        return Ok(Token::Text(Cow::Borrowed(self.source_range(start, end)?)));
-                    }
-                    start = self.pos;
-                },
-                _ => self.advance()?,
+            let remaining = self.remaining()?;
+            let Some((offset, delimiter)) = remaining
+                .as_bytes()
+                .iter()
+                .copied()
+                .enumerate()
+                .find(|(_offset, byte)| matches!(*byte, b'\\' | b'{' | b'}' | b'\r' | b'\n'))
+            else {
+                self.pos = self.input.len();
+                break;
+            };
+            self.pos += offset;
+            if matches!(delimiter, b'\\' | b'{' | b'}') {
+                break;
             }
+            let end = self.pos;
+            self.pos += 1;
+            if end > start {
+                return Ok(Token::Text(Cow::Borrowed(self.source_range(start, end)?)));
+            }
+            start = self.pos;
         }
 
         // Plain text already lives in the source and needs no arena copy. An

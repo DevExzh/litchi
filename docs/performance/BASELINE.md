@@ -354,6 +354,14 @@ incomplete program and CRUD matrix.
   unchanged. See [`0020`](changes/0020-rtf-ascii-transport-batching.md). An
   ODT final-document adoption candidate was reverted because its medium
   one-paragraph read guard regressed 6.33% mean and 17.64% p95.
+- RTF ordinary-text lexing now finds the next structural or physical-line
+  delimiter in one byte pass instead of decoding each UTF-8 scalar twice.
+  Large open p50 improves 17.23% and one-edit/save improves 14.65%; plain,
+  raw CP-1252 and LZFu opens improve at medium and large. Instructions fall
+  21.27%, while peak heap and RSS remain flat. A prepared LZFu no-op segment
+  moves +0.290 us/+6.41% p50 after parsing; the changed large LZFu open
+  improves 19.39%. See
+  [`0040`](changes/0040-rtf-byte-delimiter-scanning.md).
 - Targeted OPC changed-Part publication now shares the Part's existing
   immutable payload with the ZIP regeneration layer. Heaptrack removes one
   4.19 MiB allocation and peak heap falls 3.42%. Few-large compressible save

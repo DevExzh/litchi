@@ -1,0 +1,476 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 2K of event 'cycles:P'
+# Event count (approx.): 3029156227
+#
+# Overhead  Symbol                                                                                                                                                  IPC   [IPC Coverage]
+# ........  ......................................................................................................................................................  ....................
+#
+    20.20%  [.] __memmove_avx512_unaligned_erms                                                                                                                     -      -
+            |
+             --1.02%--__GI___libc_realloc (inlined)
+                       _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hce9ccbf7cee2b4dfE.llvm.12982656895952877099
+
+    17.36%  [.] litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans                                                                                  -      -
+            |
+            ---litchi_rtf::model::document::model::RtfDocument::parse_string
+               0xffffffffffffffff
+
+     3.58%  [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral                                                                                      -      -
+            |
+            ---_RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+               _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+               _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               |
+               |--2.18%--<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+               |          <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+               |          litchi_perf_baseline::semantic_rtf_expected_text
+               |          |
+               |           --2.14%--litchi_perf_baseline::verify_semantic_rtf
+               |                     |
+               |                      --2.10%--litchi_perf_baseline::run_case_with_config
+               |                                0xffffffffffffffff
+               |
+                --1.40%--litchi_perf_baseline::verify_semantic_rtf
+                          |
+                           --1.36%--litchi_perf_baseline::run_case_with_config
+                                     0xffffffffffffffff
+
+     3.20%  [.] litchi_rtf::api::story::Paragraph::to_text                                                                                                          -      -
+            |
+            ---litchi_perf_baseline::verify_semantic_rtf
+               |
+                --3.16%--litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     3.07%  [.] litchi_perf_baseline::verify_semantic_rtf                                                                                                           -      -
+            |
+            ---litchi_perf_baseline::run_case_with_config
+               0xffffffffffffffff
+
+     2.55%  [.] <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend                                                -      -
+            |
+            ---litchi_rtf::codec::parser::codec::append_transport_bytes
+               litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::parse_content
+               litchi_rtf::codec::parser::codec::groups::<impl litchi_rtf::codec::parser::codec::Parser>::parse_group
+               0xffffffffffffffff
+
+     2.18%  [.] <litchi_rtf::api::story::Paragraph as core::fmt::Display>::fmt                                                                                      -      -
+            |
+            ---litchi_rtf::api::story::Paragraph::to_text
+               litchi_perf_baseline::verify_semantic_rtf
+               litchi_perf_baseline::run_case_with_config
+               0xffffffffffffffff
+
+     2.15%  [.] litchi_rtf::codec::lexer::codec::control_word::dispatch::match_control_word                                                                         -      -
+            |
+            ---litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans
+               litchi_rtf::model::document::model::RtfDocument::parse_string
+               0xffffffffffffffff
+
+     2.14%  [.] __memmove_avx512_unaligned                                                                                                                          -      -
+            |
+             --0.55%--_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                       _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+
+     2.14%  [.] _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner                                                                                               -      -
+            |
+            |--1.36%--<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+            |          <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+            |          litchi_perf_baseline::semantic_rtf_expected_text
+            |          litchi_perf_baseline::verify_semantic_rtf
+            |          litchi_perf_baseline::run_case_with_config
+            |          0xffffffffffffffff
+            |
+             --0.74%--litchi_perf_baseline::verify_semantic_rtf
+                       litchi_perf_baseline::run_case_with_config
+                       0xffffffffffffffff
+
+     1.84%  [.] _RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt                                                                                     -      -
+            |
+            ---_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+               _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               |
+               |--1.02%--litchi_perf_baseline::verify_semantic_rtf
+               |          litchi_perf_baseline::run_case_with_config
+               |          0xffffffffffffffff
+               |
+                --0.82%--<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+                          <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+                          litchi_perf_baseline::semantic_rtf_expected_text
+                          litchi_perf_baseline::verify_semantic_rtf
+                          litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     1.72%  [.] litchi_codepage::Mbcs::decode_lossy                                                                                                                 -      -
+            |
+            ---litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::flush_text_buffer
+               litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::dispatch_content_control
+               0xffffffffffffffff
+
+     1.60%  [.] _int_malloc                                                                                                                                         -      -
+            |
+            ---__GI___libc_malloc (inlined)
+               |
+               |--0.86%--_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               |          <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+               |          <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+               |          litchi_perf_baseline::semantic_rtf_expected_text
+               |          litchi_perf_baseline::verify_semantic_rtf
+               |          litchi_perf_baseline::run_case_with_config
+               |          0xffffffffffffffff
+               |
+                --0.70%--<alloc::vec::into_iter::IntoIter<T,A> as core::iter::traits::iterator::Iterator>::try_fold
+                          |
+                           --0.62%--0xffffffffffffffff
+
+     1.56%  [.] encoding_rs::Encoding::decode_without_bom_handling                                                                                                  -      -
+            |
+            ---litchi_codepage::Mbcs::decode_lossy
+               litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::flush_text_buffer
+               |
+               |--0.97%--0xffffffffffffffff
+               |
+                --0.58%--litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::dispatch_content_control
+                          0xffffffffffffffff
+
+     1.56%  [.] _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str                                                        -      -
+            |
+             --1.36%--_RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                       |
+                        --1.28%--_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                                  |
+                                   --0.82%--litchi_perf_baseline::verify_semantic_rtf
+                                             litchi_perf_baseline::run_case_with_config
+                                             0xffffffffffffffff
+
+     1.37%  [.] litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::flush_text_buffer                                       -      -
+            |
+            ---litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::dispatch_content_control
+               |
+                --1.21%--0xffffffffffffffff
+
+     1.36%  [.] __memcmp_evex_movbe                                                                                                                                 -      -
+     1.32%  [.] litchi_rtf::api::story::validate_boundaries                                                                                                         -      -
+            |
+            ---litchi_rtf::codec::parser::codec::api::<impl litchi_rtf::codec::parser::codec::Parser>::parse
+               litchi_rtf::model::document::model::RtfDocument::parse_string
+               0xffffffffffffffff
+
+     1.25%  [.] _RNvNtCsgEmfK2I1SDS_4core3fmt5write                                                                                                                 -      -
+            |
+            ---_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+               |
+                --0.78%--<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+                          <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+                          litchi_perf_baseline::semantic_rtf_expected_text
+                          litchi_perf_baseline::verify_semantic_rtf
+                          litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     1.17%  [.] <alloc::vec::into_iter::IntoIter<T,A> as core::iter::traits::iterator::Iterator>::try_fold                                                          -      -
+            |
+            ---alloc::vec::in_place_collect::from_iter_in_place
+               litchi_rtf::model::document::model::RtfDocument::parse_string
+               0xffffffffffffffff
+
+     1.09%  [.] _int_free                                                                                                                                           -      -
+            |
+             --0.82%--__GI___libc_free (inlined)
+
+     1.09%  [.] malloc                                                                                                                                              -      -
+            |
+             --0.85%--__GI___libc_malloc (inlined)
+
+     1.06%  [.] unlink_chunk.isra.0                                                                                                                                 -      -
+            |
+             --0.94%--malloc_consolidate
+                       _int_free_maybe_consolidate
+                       __GI___libc_free (inlined)
+                       |
+                        --0.51%--_ZN4core3ptr68drop_in_place$LT$litchi_rtf..model..document..model..RtfDocument$GT$17hf6be803ba74bb7a0E.llvm.2166513705208295559
+                                  _int_free_maybe_consolidate
+                                  __GI___libc_free (inlined)
+                                  _ZN4core3ptr68drop_in_place$LT$litchi_rtf..model..document..model..RtfDocument$GT$17hf6be803ba74bb7a0E.llvm.2166513705208295559
+                                  0xffffffffffffffff
+
+     1.02%  [.] cfree@GLIBC_2.2.5                                                                                                                                   -      -
+            |
+             --0.94%--__GI___libc_free (inlined)
+                       |
+                        --0.55%--_ZN4core3ptr68drop_in_place$LT$litchi_rtf..model..document..model..RtfDocument$GT$17hf6be803ba74bb7a0E.llvm.2166513705208295559
+
+     0.94%  [.] <litchi_rtf::api::story::Paragraphs as core::iter::traits::iterator::Iterator>::next                                                                -      -
+     0.86%  [.] litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::parse_content                                           -      -
+            |
+            ---litchi_rtf::codec::parser::codec::groups::<impl litchi_rtf::codec::parser::codec::Parser>::parse_group
+               |
+                --0.82%--0xffffffffffffffff
+
+     0.82%  [.] litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::dispatch_content_control                                -      -
+            |
+            ---litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::parse_content
+               litchi_rtf::codec::parser::codec::groups::<impl litchi_rtf::codec::parser::codec::Parser>::parse_group
+               0xffffffffffffffff
+
+     0.74%  [.] litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::effective_text_encoding                                 -      -
+            |
+            ---litchi_rtf::codec::parser::codec::content::<impl litchi_rtf::codec::parser::codec::Parser>::flush_text_buffer
+               |
+                --0.55%--0xffffffffffffffff
+
+     0.74%  [.] malloc_consolidate                                                                                                                                  -      -
+            |
+             --0.70%--_int_free_maybe_consolidate
+                       __GI___libc_free (inlined)
+
+     0.73%  [.] <litchi_rtf::api::story::Inlines as core::iter::traits::iterator::Iterator>::next                                                                   -      -
+            |
+            ---<litchi_rtf::api::story::Paragraph as core::fmt::Display>::fmt
+               litchi_rtf::api::story::Paragraph::to_text
+               litchi_perf_baseline::verify_semantic_rtf
+               litchi_perf_baseline::run_case_with_config
+               0xffffffffffffffff
+
+     0.69%  [.] _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str.llvm.13107517878594940067                              -      -
+            |
+            ---<litchi_rtf::api::story::Paragraph as core::fmt::Display>::fmt
+               litchi_rtf::api::story::Paragraph::to_text
+               litchi_perf_baseline::verify_semantic_rtf
+               |
+                --0.66%--litchi_perf_baseline::run_case_with_config
+                          0xffffffffffffffff
+
+     0.51%  [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hce9ccbf7cee2b4dfE.llvm.12982656895952877099                                                  -      -
+            |
+            ---alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+               _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str.llvm.13107517878594940067
+               <litchi_rtf::api::story::Paragraph as core::fmt::Display>::fmt
+               litchi_rtf::api::story::Paragraph::to_text
+               litchi_perf_baseline::verify_semantic_rtf
+               litchi_perf_baseline::run_case_with_config
+               0xffffffffffffffff
+
+     0.51%  [.] litchi_rtf::model::document::model::RtfDocument::parse_string                                                                                       -      -
+            |
+            ---0xffffffffffffffff
+
+     0.46%  [.] core::str::<impl str>::trim_matches                                                                                                                 -      -
+     0.43%  [.] _ZN4core3ptr68drop_in_place$LT$litchi_rtf..model..document..model..RtfDocument$GT$17hf6be803ba74bb7a0E.llvm.2166513705208295559                     -      -
+     0.42%  [k] 0xffffffff9c929ddd                                                                                                                                  -      -
+     0.41%  [k] 0xffffffff9d5cfb97                                                                                                                                  -      -
+     0.39%  [.] _ZN3std4sync4once4Once15call_once_force28_$u7b$$u7b$closure$u7d$$u7d$17h442acb91a0472a2fE.llvm.2166513705208295559                                  -      -
+     0.39%  [.] litchi_rtf::codec::lexer::codec::scanner::cursor::<impl litchi_rtf::codec::lexer::codec::lexer::Lexer>::current_char                                -      -
+     0.39%  [.] litchi_rtf::codec::parser::codec::append_transport_bytes                                                                                            -      -
+     0.39%  [k] 0xffffffff9c7c6082                                                                                                                                  -      -
+     0.36%  [k] 0xffffffff9c5a56ba                                                                                                                                  -      -
+     0.33%  [k] 0xffffffff9cc69fbc                                                                                                                                  -      -
+     0.30%  [.] _dl_relocate_object                                                                                                                                 -      -
+     0.27%  [k] 0xffffffff9c848383                                                                                                                                  -      -
+     0.23%  [.] litchi_rtf::codec::parser::codec::api::<impl litchi_rtf::codec::parser::codec::Parser>::parse                                                       -      -
+     0.23%  [.] litchi_rtf::model::document::model::RtfDocument::parse_internal                                                                                     -      -
+     0.23%  [.] litchi_rtf::codec::lexer::codec::scanner::cursor::<impl litchi_rtf::codec::lexer::codec::lexer::Lexer>::source_range                                -      -
+     0.23%  [k] 0xffffffff9d6602e0                                                                                                                                  -      -
+     0.20%  [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter3pad                                                                                                -      -
+     0.20%  [.] toml::de::parser::parse_document                                                                                                                    -      -
+     0.19%  [.] litchi_rtf::codec::lexer::codec::scanner::control::<impl litchi_rtf::codec::lexer::codec::lexer::Lexer>::parse_numeric_parameter                    -      -
+     0.19%  [.] litchi_rtf::model::document::model::RtfDocument::text                                                                                               -      -
+     0.19%  [k] 0xffffffff9c91b273                                                                                                                                  -      -
+     0.18%  [k] 0xffffffff9d6600b7                                                                                                                                  -      -
+     0.16%  [.] litchi_rtf::codec::parser::codec::info::<impl litchi_rtf::codec::parser::codec::Parser>::current_state                                              -      -
+     0.16%  [.] toml::de::parser::key::State::close_key                                                                                                             -      -
+     0.16%  [.] alloc_perturb                                                                                                                                       -      -
+     0.15%  [k] 0xffffffff9d800f30                                                                                                                                  -      -
+     0.12%  [.] <&T as core::fmt::Display>::fmt                                                                                                                     -      -
+     0.12%  [.] alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle                                                                                      -      -
+     0.12%  [k] 0xffffffff9cb6832f                                                                                                                                  -      -
+     0.12%  [.] core::result::Result<T,E>::is_ok_and                                                                                                                -      -
+     0.12%  [.] _RNvXsb_NtCsgEmfK2I1SDS_4core3fmtNtB5_9FormatterNtB5_5Write9write_str                                                                               -      -
+     0.12%  [.] litchi_perf_baseline::semantic_rtf_expected_text                                                                                                    -      -
+     0.12%  [.] litchi_rtf::codec::lexer::codec::scanner::cursor::<impl litchi_rtf::codec::lexer::codec::lexer::Lexer>::advance                                     -      -
+     0.12%  [.] <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold                                                               -      -
+     0.12%  [.] _RNvCsfLfy6EI15iL_7___rustc12___rust_alloc                                                                                                          -      -
+     0.12%  [.] _RNvXsi_NtCsgEmfK2I1SDS_4core3fmteNtB5_7Display3fmt                                                                                                 -      -
+     0.12%  [.] _RNvNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB7_9Formatter12pad_integral12write_prefix                                                                      -      -
+     0.12%  [k] 0xffffffff9c7c79d6                                                                                                                                  -      -
+     0.11%  [.] _RNvNtNtCsgEmfK2I1SDS_4core3str8converts9from_utf8                                                                                                  -      -
+     0.11%  [k] 0xffffffff9ca06186                                                                                                                                  -      -
+     0.11%  [.] 0x00000000001d3aeb                                                                                                                                  -      -
+     0.08%  [.] litchi_rtf::codec::parser::codec::controls::<impl litchi_rtf::codec::parser::codec::Parser>::apply_control_word                                     -      -
+     0.08%  [.] _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc                                                                                                           -      -
+     0.08%  [.] alloc::str::join_generic_copy                                                                                                                       -      -
+     0.08%  [.] litchi_rtf::codec::error::try_reserve_one                                                                                                           -      -
+     0.08%  [.] _RNvCsfLfy6EI15iL_7___rustc14___rust_dealloc                                                                                                        -      -
+     0.08%  [.] realloc                                                                                                                                             -      -
+     0.08%  [k] 0xffffffff9c8591bf                                                                                                                                  -      -
+     0.08%  [k] 0xffffffff9d65f8cb                                                                                                                                  -      -
+     0.08%  [.] litchi_rtf::codec::parser::codec::resources::<impl litchi_rtf::codec::parser::codec::Parser>::parse_font_table                                      -      -
+     0.08%  [k] 0xffffffff9d800ba0                                                                                                                                  -      -
+     0.08%  [.] _RNvCsfLfy6EI15iL_7___rustc13___rdl_dealloc                                                                                                         -      -
+     0.08%  [k] 0xffffffff9c904fd1                                                                                                                                  -      -
+     0.08%  [.] <litchi_rtf::codec::parser::codec::State as core::clone::Clone>::clone                                                                              -      -
+     0.08%  [k] 0xffffffff9c9516f0                                                                                                                                  -      -
+     0.08%  [.] _RNvCsfLfy6EI15iL_7___rustc35___rust_no_alloc_shim_is_unstable_v2                                                                                   -      -
+     0.08%  [k] 0xffffffff9cc69dc7                                                                                                                                  -      -
+     0.08%  [.] _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write10write_char                                                      -      -
+     0.08%  [k] 0xffffffff9c82fc90                                                                                                                                  -      -
+     0.08%  [.] <alloc::vec::into_iter::IntoIter<T,A> as core::iter::traits::iterator::Iterator>::try_fold                                                          -      -
+     0.08%  [k] 0xffffffff9c86b641                                                                                                                                  -      -
+     0.08%  [.] 0x00000000001d3ac4                                                                                                                                  -      -
+     0.06%  [k] 0xffffffff9c7c61de                                                                                                                                  -      -
+     0.04%  [.] core::ptr::drop_in_place<core::cell::UnsafeCell<indicatif::multi::MultiState>>                                                                      -      -
+     0.04%  [.] alloc::vec::in_place_collect::from_iter_in_place                                                                                                    -      -
+     0.04%  [k] 0xffffffff9c5a653b                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c912800                                                                                                                                  -      -
+     0.04%  [.] serde_core::de::impls::<impl serde_core::de::Deserialize for alloc::vec::Vec<T>>::deserialize                                                       -      -
+     0.04%  [.] __cxa_atexit                                                                                                                                        -      -
+     0.04%  [.] alloc::collections::btree::map::IntoIter<K,V,A>::dying_next                                                                                         -      -
+     0.04%  [.] _int_free_merge_chunk                                                                                                                               -      -
+     0.04%  [.] 0x0000000006203d4a                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c7d873c                                                                                                                                  -      -
+     0.04%  [.] toml::de::parser::key::on_key                                                                                                                       -      -
+     0.04%  [.] free_default                                                                                                                                        -      -
+     0.04%  [k] 0xffffffff9c9056f8                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c8b2fb5                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c9dff0a                                                                                                                                  -      -
+     0.04%  [.] 0x000000000020a543                                                                                                                                  -      -
+     0.04%  [.] toml_parser::decoder::string::decode_basic_string                                                                                                   -      -
+     0.04%  [.] litchi_rtf::api::story::Story::paragraphs                                                                                                           -      -
+     0.04%  [.] litchi_rtf::model::types::Font::validate                                                                                                            -      -
+     0.04%  [.] llvm::cl::Option::addArgument()                                                                                                                     -      -
+     0.04%  [.] toml_parser::parser::document::opt_dot_keys                                                                                                         -      -
+     0.04%  [k] 0xffffffff9c929dd7                                                                                                                                  -      -
+     0.04%  [.] toml_parser::parser::document::on_expression_key                                                                                                    -      -
+     0.04%  [k] 0xffffffff9c90b373                                                                                                                                  -      -
+     0.04%  [.] alloc::vec::in_place_collect::from_iter_in_place                                                                                                    -      -
+     0.04%  [.] _RNvXsb_NtCsjrHSEGnQ3l9_3std2fsNtB5_4FileNtNtB7_2io5Write5write                                                                                     -      -
+     0.04%  [.] _ZN91_$LT$serde_json..ser..Compound$LT$W$C$F$GT$$u20$as$u20$serde_core..ser..SerializeStruct$GT$3end17h513e07067b0619f7E.llvm.15861731252344933614  -      -
+     0.04%  [k] 0xffffffff9c8fb8ae                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c90b332                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c91b29e                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c94f778                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c94f77c                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9ca06019                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9ca06098                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9ca0619d                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9cb52cb5                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9cb545f2                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9cb680fb                                                                                                                                  -      -
+     0.04%  [.] 0x000000000017c854                                                                                                                                  -      -
+     0.04%  [.] _GLOBAL__sub_I_DwarfDebug.cpp                                                                                                                       -      -
+     0.04%  [.] _dl_lookup_symbol_x                                                                                                                                 -      -
+     0.04%  [.] core::ptr::drop_in_place<core::option::Option<litchi_rtf::content::table::Row>>                                                                     -      -
+     0.04%  [.] __GI___readdir64                                                                                                                                    -      -
+     0.04%  [.] core::iter::adapters::try_process                                                                                                                   -      -
+     0.04%  [.] 0x000000000020a540                                                                                                                                  -      -
+     0.04%  [.] toml::de::parser::document::State::finish_table                                                                                                     -      -
+     0.04%  [.] _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call                                                                               -      -
+     0.04%  [.] <alloc::vec::Vec<toml_parser::parser::event::Event> as toml_parser::parser::event::EventReceiver>::whitespace                                       -      -
+     0.04%  [k] 0xffffffff9c93464e                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c913867                                                                                                                                  -      -
+     0.04%  [.] smallvec::SmallVec<A>::push                                                                                                                         -      -
+     0.04%  [.] check_match                                                                                                                                         -      -
+     0.04%  [k] 0xffffffff9d5ae0ab                                                                                                                                  -      -
+     0.04%  [.] toml::de::parser::document::descend_path                                                                                                            -      -
+     0.04%  [k] 0xffffffff9c7c653a                                                                                                                                  -      -
+     0.04%  [.] 0x00000000001ae620                                                                                                                                  -      -
+     0.04%  [.] 0x0000000000240bc7                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c95afd1                                                                                                                                  -      -
+     0.04%  [.] litchi_rtf::api::facade::Document::from_bytes_with_limits                                                                                           -      -
+     0.04%  [.] regex_automata::nfa::thompson::compiler::Compiler::c                                                                                                -      -
+     0.04%  [k] 0xffffffff9c8565cf                                                                                                                                  -      -
+     0.04%  [.] regex_automata::meta::regex::Builder::build                                                                                                         -      -
+     0.04%  [k] 0xffffffff9c79f5d0                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9cb64b25                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c8568a7                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c86ced5                                                                                                                                  -      -
+     0.04%  [.] do_lookup_x                                                                                                                                         -      -
+     0.04%  [k] 0xffffffff9ca06050                                                                                                                                  -      -
+     0.04%  [.] pthread_rwlock_wrlock@@GLIBC_2.34                                                                                                                   -      -
+     0.04%  [k] 0xffffffff9d5d0305                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9d6599f2                                                                                                                                  -      -
+     0.04%  [.] __strncmp_evex                                                                                                                                      -      -
+     0.04%  [k] 0xffffffff9c7c79ca                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c60e2ea                                                                                                                                  -      -
+     0.04%  [.] regex_automata::meta::strategy::new                                                                                                                 -      -
+     0.04%  [k] 0xffffffff9d5d0308                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c648e6d                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c4ad275                                                                                                                                  -      -
+     0.04%  [.] 0x00000000002e173d                                                                                                                                  -      -
+     0.04%  [.] <alloc::vec::drain::Drain<T,A> as core::ops::drop::Drop>::drop                                                                                      -      -
+     0.04%  [k] 0xffffffff9c82938d                                                                                                                                  -      -
+     0.04%  [.] core::ptr::drop_in_place<litchi_rtf::codec::parser::codec::DrawingStoryCapture>                                                                     -      -
+     0.04%  [.] 0x0000000000000c4e                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c56e156                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c648357                                                                                                                                  -      -
+     0.04%  [.] 0x0000000000240c9b                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9d5cc52f                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c92019d                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c8ecab4                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c8c4cc9                                                                                                                                  -      -
+     0.04%  [.] <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend                                                -      -
+     0.04%  [k] 0xffffffff9c7fcde9                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c90b2cd                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9d5d0187                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c5a5c2c                                                                                                                                  -      -
+     0.04%  [.] <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend                                                -      -
+     0.04%  [k] 0xffffffff9c86c6dc                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9d5ae0a1                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9cb666ce                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9d5c05f3                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c588087                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9d5ae1a4                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9cb83ef5                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c9f29ce                                                                                                                                  -      -
+     0.04%  [.] 0x0000000000209f59                                                                                                                                  -      -
+     0.04%  [.] 0x000000000031de60                                                                                                                                  -      -
+     0.04%  [.] is_dst                                                                                                                                              -      -
+     0.04%  [k] 0xffffffff9d5c0677                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9d5ae27e                                                                                                                                  -      -
+     0.04%  [.] sha2::sha256::x86_sha::compress                                                                                                                     -      -
+     0.04%  [.] litchi_perf_baseline::sha256_hex                                                                                                                    -      -
+     0.04%  [k] 0xffffffff9c9f2a89                                                                                                                                  -      -
+     0.04%  [.] 0x000000000024725b                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c7ff78e                                                                                                                                  -      -
+     0.04%  [.] 0x0000000000209f50                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c9df032                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c877989                                                                                                                                  -      -
+     0.04%  [.] 0x0000000000003e38                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9d800178                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9ca061c6                                                                                                                                  -      -
+     0.04%  [.] 0x0000000000181a79                                                                                                                                  -      -
+     0.04%  [k] 0xffffffff9c5f8133                                                                                                                                  -      -
+     0.04%  [.] _dl_map_object_from_fd                                                                                                                              -      -
+     0.04%  [.] 0x000000000020a5d5                                                                                                                                  -      -
+     0.03%  [k] 0xffffffff9d5cfb9a                                                                                                                                  -      -
+     0.03%  [k] 0xffffffff9d650656                                                                                                                                  -      -
+     0.03%  [k] 0xffffffff9c824064                                                                                                                                  -      -
+     0.03%  [k] 0xffffffff9c8481c2                                                                                                                                  -      -
+     0.03%  [.] __GI___stat64                                                                                                                                       -      -
+     0.03%  [k] 0xffffffff9d5bb321                                                                                                                                  -      -
+     0.03%  [k] 0xffffffff9c871e11                                                                                                                                  -      -
+     0.03%  [k] 0xffffffff9c82e78c                                                                                                                                  -      -
+     0.03%  [.] __cpu_indicator_init                                                                                                                                -      -
+     0.03%  [k] 0xffffffff9c844f3c                                                                                                                                  -      -
+     0.03%  [k] 0xffffffff9c8ec8f5                                                                                                                                  -      -
+     0.03%  [k] 0xffffffff9d5b1b43                                                                                                                                  -      -
+     0.03%  [k] 0xffffffff9c806efa                                                                                                                                  -      -
+     0.02%  [.] _dl_next_ld_env_entry                                                                                                                               -      -
+     0.02%  [k] 0xffffffff9cb53544                                                                                                                                  -      -
+     0.01%  [k] 0xffffffff9d5b85b5                                                                                                                                  -      -
+     0.01%  [k] 0xffffffff9d650695                                                                                                                                  -      -
+     0.00%  [k] 0xffffffff9c5e5202                                                                                                                                  -      -
+     0.00%  [k] 0xffffffff9c56d24c                                                                                                                                  -      -
+     0.00%  [k] 0xffffffff9c563d57                                                                                                                                  -      -
+     0.00%  [k] 0xffffffff9c7a0a65                                                                                                                                  -      -
+     0.00%  [k] 0xffffffff9c4c7c48                                                                                                                                  -      -
+     0.00%  [k] 0xffffffff9c7a9843                                                                                                                                  -      -
+     0.00%  [k] 0xffffffff9c7a0a61                                                                                                                                  -      -
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
