@@ -52,7 +52,9 @@ semantic conversion remain.
    remain open.
 3. Separate logical authoring/append time from final serialization and reopen
    for DOCX, PPTX and XLSX.
-4. XLSX bulk update plus distinct clear/remove/hide behavior.
+4. XLSX bulk update plus distinct clear/remove/hide behavior. Direct
+   writer-local action regrouping was measured and rejected in change 0030;
+   broader coverage must not present that immaterial prototype as a solution.
 5. Unknown OOXML extension and media preservation during a known semantic edit.
 6. Durable PPTX patch produce/encode/decode/apply/inverse/join/three-way flows,
    including stale-base and conflict cases.
@@ -123,6 +125,13 @@ producer watermark join the plain corpus under explicit capability filters.
 It also gates the checked `relsize` source/Litchi/LibreOffice semantic chain.
 This is coverage evidence, not an optimization result; formatted/media-heavy,
 malformed/security and broad real-producer edits remain open.
+
+Change 0030 attributes the existing XLSX 1% update and save cases to the
+writer's nested row/cell action regrouping. An owned forward-stream prototype
+improved formal p50 by at most 1.61%, reduced process allocation calls only
+0.0623%, and left peak heap flat; it and its prototype-only tests were fully
+reverted. Distinct bulk clear/remove/hide, structural edits and any larger
+semantic-planning/emission coalescing remain open.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

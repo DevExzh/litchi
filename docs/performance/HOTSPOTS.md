@@ -107,7 +107,9 @@ Confirmed source facts:
   allocation calls fall 21.01%. The handoff is capped at 4,096 cells and 1 MiB
   XML; the unrestricted dense-wide prototype was rejected at +8.99% peak heap.
 - Bulk cell actions are held in address order, then regrouped into nested
-  row/cell `BTreeMap`s during worksheet emission.
+  row/cell `BTreeMap`s during worksheet emission. A direct owned-stream
+  replacement removed that regrouping but improved formal 1% commit/save by
+  at most 1.61% p50, so it was fully reverted in change 0030.
 - An empty edit returns the original immutable workbook allocation. When the
   workbook came from owned ingress, saving that no-op snapshot now preserves
   the exact validated OPC source; borrowed ingress still performs a rewrite.
@@ -362,7 +364,7 @@ pattern elsewhere.
 | 6 | Refined by measurement: exact unchanged saves copy the source; owned same-topology mutations raw-copy unchanged entries; changed Parts share their immutable logical payload and validated generated local span without extra copies; borrowed/topology-changing/unsupported sources rewrite fully. | Real media-heavy 1% updates, source-backed editable publication, and attribution of the remaining retained-source/compressor-buffer memory cost. |
 | 7 | Confirmed structurally: duplicate indexes, boxed Parts, source-XML map, and linear fallback exist. | Allocation profiles, type sizes, cache counters and repeated noncanonical lookup. |
 | 8 | Refined: source-backed XLSX structural open/list avoids timed reads; selected first/range reads physically overlap only the selected worksheet. | Broader source-backed selectors, edits and real workbook matrices. |
-| 9 | Refined by measurement: small XLSX edits scan/rebuild/reparse the complete touched sheet; bounded commits can reuse the validation store for first read, while large sheets fall back cold. | Bulk action-plan work, first/middle/last cells, 1% updates, structural edits, large-sheet retention and commit-versus-save separation. |
+| 9 | Refined by measurement: small XLSX edits scan/rebuild/reparse the complete touched sheet; bounded commits can reuse the validation store for first read, while large sheets fall back cold. Direct writer-local action regrouping was immaterial and reverted. | Attribute larger semantic-planning/emission/readback passes, first/middle/last cells, distinct bulk actions, structural edits, large-sheet retention and commit-versus-save separation without reviving direct regrouping alone. |
 | 10 | Plausible but unmeasured: per-cell semantic ownership and transient parse duplication may dominate large stores. | Allocation count/bytes, type sizes, peak RSS and cache-miss profiles. |
 | 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers; child lookup descends the validated tree; native DOC/XLS/PPT semantic baselines, XLS editor reuse, DOC batched publication, PPT root-open reuse and PPT text-edit resolver reuse are accepted. The later XLS terminal-render handoff was neutral on large changed saves and regressed exact no-op, so it was reverted. | Attribute remaining final owner/public-reader work without reviving the rejected handoff; add deep-directory, MiniFAT-heavy, concurrent-read, real-producer, and security scenarios beyond generated corpora. |
 | 12 | Confirmed for generic detection; disproved for focused prepared iWork detection. | Generic detect-then-open versus prepared-source handoff. |

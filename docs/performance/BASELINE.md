@@ -386,6 +386,11 @@ remains an incomplete program and CRUD matrix.
   cycles regressed 22.00% p50 / 16.69% mean. Peak heap stayed flat and
   allocation calls fell 0.33%; the regression remains the rejection gate. See
   [`0028`](changes/0028-xls-terminal-render-handoff-rejected.md).
+- Direct XLSX action-plan flattening was measured and fully reverted. Formal
+  medium 1% commit/save p50 improved only 1.54%/1.61%; dense-wide improved
+  0.27%/0.68%, process allocation calls fell 0.0623%, and peak heap was flat.
+  The writer's larger scan/emission/parse/readback boundary still dominates.
+  See [`0030`](changes/0030-xlsx-action-plan-flattening-rejected.md).
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and

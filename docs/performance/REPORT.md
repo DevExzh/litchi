@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 Branch: `feat/office-format-completeness`
-Production base for the latest tranche: `16014fda8e542e39649ddabc650bca07a70743e3`
+Production base for the latest tranche: `0fbabeba2841a6a1b09fd2c02a9666f7b8a67b88`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -41,6 +41,7 @@ is still not broad program or CRUD coverage.
 | Native PPT root snapshot CFB reuse | Repeated large root open p50 **-8.78%**, mean **-10.58%**; allocation calls **-5.01%** | Reuses only the validated CFB index; independent stream/current-user/live-document, slide-order, review-history and public-reader checks remain |
 | Native PPT text-edit resolver reuse | Direct large edit/save p50 **-14.12%**, mean **-15.39%**; allocation calls **-3.53%** | Reuses the full editor preflight for persisted-record resolution; exact error precedence, fresh commit editor and complete readback remain; minor-fault increase disclosed |
 | Bounded XLSX validated-store handoff | Medium one-cell commit + first read p50 **-23.23%**, mean **-23.15%**; allocation calls **-21.01%** | At most 4,096 cells / 1 MiB XML with exact byte and lineage identity; peak heap +4.29%; unrestricted dense-wide candidate rejected at +8.99% peak heap |
+| Rejected direct XLSX action-plan flattening | Best formal p50 **-1.61%**; dense commit **-0.27%** p50 with mean interval crossing zero | Fully reverted; process allocation calls -0.0623%, peak heap flat, medium commit p99 +4.33% |
 | ODS row-local publication | Large/medium one-cell edit-save p50 **-9.54% / -7.22%**; allocation calls **-5.85%**, peak heap **-27.18%** | Same-topology modeled rows only; structural edits fall back and touched opaque rows refuse |
 | ODS adaptive cell locator | Large public cell sweep p50 **-81.74%**, mean **-80.72%**; full cell text p50 **-52.65%** | Builds lazily at 64 calls, requests 3,216 bytes on the dense corpus and is capped at 4 MiB; peak heap/RSS flat |
 | RTF parser-state specialization | Large open p50 **-20.09%**; large/medium one-edit-save **-11.54% / -14.16%**; cycles **-10.50%** | Ordinary body text only; insertion/deletion metadata retains the full state; allocation count, peak heap and RSS flat |
@@ -139,6 +140,12 @@ The bounded XLSX commit/read evidence is retained under
 latency, allocation/RSS/counter attribution and rejected unrestricted
 dense-wide prototype are summarized in
 [`change 0025`](changes/0025-xlsx-validated-store-handoff.md).
+
+The direct XLSX writer-regrouping prototype was also fully reverted. Its
+medium and dense-wide 1% commit/save ABBA reports are under
+`results/abba-xlsx-action-plan-*.json`; matched allocation evidence and the
+rejection rationale are in
+[`change 0030`](changes/0030-xlsx-action-plan-flattening-rejected.md).
 
 The ODS row-local publication evidence is
 [`before A`](results/abba-ods-row-splice-one-edit-before-a.json),
@@ -265,6 +272,8 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | Native PPT root snapshot open, 144 shapes | 37.522 us | 34.227 us | **-8.78% p50 / -10.58% mean** | Allocation calls -5.01%, temporary allocations -12.22%; peak heap and uninstrumented RSS flat |
 | Native PPT direct text edit/save, 144 shapes | 206.209 us | 177.089 us | **-14.12% p50 / -15.39% mean** | Allocation calls -3.53%, temporary allocations -6.05%; peak heap/RSS flat; minor faults +315.43% with zero major faults |
 | XLSX one-cell commit + first read, 4,096 cells | 4.431 ms | 3.402 ms | **-23.23% p50 / -23.15% mean** | Allocation calls -21.01%; peak heap +4.29%; unrestricted dense-wide retention rejected |
+| Rejected XLSX 1% commit + save, 4,096 cells | 15.235 ms | 14.990 ms | -1.61% p50 / -1.26% mean | Fully reverted as immaterial; p99 +0.18%, peak heap flat |
+| Rejected XLSX 1% commit + save, 131,072 cells | 514.926 ms | 511.407 ms | -0.68% p50 / -0.66% mean | Fully reverted as immaterial; process allocation calls -0.0623% |
 
 The underlying records are:
 
@@ -292,6 +301,9 @@ The underlying records are:
 - [`0025-xlsx-validated-store-handoff.md`](changes/0025-xlsx-validated-store-handoff.md)
 - [`0026-ppt-text-edit-resolver-reuse.md`](changes/0026-ppt-text-edit-resolver-reuse.md)
 - [`0027-ods-adaptive-cell-locator.md`](changes/0027-ods-adaptive-cell-locator.md)
+- [`0028-xls-terminal-render-handoff-rejected.md`](changes/0028-xls-terminal-render-handoff-rejected.md)
+- [`0029-rtf-transport-and-producer-coverage.md`](changes/0029-rtf-transport-and-producer-coverage.md)
+- [`0030-xlsx-action-plan-flattening-rejected.md`](changes/0030-xlsx-action-plan-flattening-rejected.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -504,9 +516,11 @@ ownership is accepted, and repeated ODS facade cell lookup now has a bounded
 lazy index, but
 broader ODF source-backed reads, repeated ODT/ODP semantic scans, package-parse reuse,
 unchanged ZIP-member publication and structural-edit profiles remain open.
-XLSX changed-sheet validation can now seed a bounded first-read cache, but bulk
-action planning, large-sheet retention, source-backed editable publication,
-structural changes and broad preservation matrices remain independent work.
+XLSX changed-sheet validation can now seed a bounded first-read cache. Direct
+writer-local action regrouping was immaterial and reverted; distinct bulk
+actions, any larger planning/emission coalescing, large-sheet retention,
+source-backed editable publication, structural changes and broad preservation
+matrices remain independent work.
 The rejected direct ODS target-package and ODT final-document adoptions are not
 evidence that those broader paths are complete or that validation should be
 weakened.
