@@ -65,7 +65,10 @@ Current work shape:
   bound into the snapshot, MCE-rewritten slides and more than one shape edit
   are refused. XLSX now has a narrower guarded transaction for typed
   calculation properties/features in `xl/workbook.xml`; cells, formulas,
-  chains and topology remain outside that capability.
+  chains and topology remain outside that capability. Two selected-worksheet
+  variants now bind the workbook relationship and worksheet owner for direct
+  typed page breaks or page margins; both materialize two Parts and refuse
+  wider worksheet/topology changes.
 - `PackageWriter` previously reconstructed generated XML and Part order during
   emission. The measured `PublicationPlan` change now constructs, audits, and
   reuses that state once. It reduced allocation calls by 37.0% in the profiled
@@ -93,7 +96,10 @@ Current work shape:
   ownership and recompression of 11 unselected Parts in its fixed media-rich
   edit/save case: p50 falls 99.2519% (133.67x), instructions 77.78%, and
   semantic materializations 12 -> 1 with byte-identical output; see change
-  0046.
+  0046. The selected-worksheet page-break and page-margin variants each
+  materialize only the workbook catalog and target worksheet; on their matched
+  media-rich controls, p50 falls 97.86% and 97.93%, respectively; see changes
+  0061 and 0067.
 
 ## XLSX selective read and edit path
 
@@ -610,9 +616,9 @@ pattern elsewhere.
 | 3 | Superseded for source-backed OPC: finite weighted LRU, per-entry single-flight and content-free diagnostics exist; legacy eager open does not use that cache. | Cache bytes are not yet charged to the hierarchical Budget; add contention and retention measurements. |
 | 4 | Measured: ordinary OPC open is serial and explicit eager open has a local bounded session. Six large ZIP tasks reach 4.52x p50 at 12 CPUs; small tasks regress. | Broader real-package scaling and threshold tuning. |
 | 5 | Confirmed: stored entries are CRC-checked then copied. | Stored-media one-Part read and package-open copied-byte/RSS deltas. |
-| 6 | Refined by measurement: exact unchanged saves copy the source; owned same-topology mutations raw-copy unchanged entries; changed Parts share their immutable logical payload and validated generated local span without extra copies; the narrow source-backed publisher materializes only its target and raw-copies the rest; guarded DOCX, atomic same-slide PPTX shape-text batches, and XLSX calculation-metadata/page-break facades consume it; borrowed/topology-changing paths rewrite fully, while unsupported source-backed layouts refuse. | Real media-heavy multi-Part updates, broader semantic closures, signature/topology policies, and attribution of the remaining selected-Part/compressor-buffer memory cost. |
+| 6 | Refined by measurement: exact unchanged saves copy the source; owned same-topology mutations raw-copy unchanged entries; changed Parts share their immutable logical payload and validated generated local span without extra copies; the narrow source-backed publisher materializes only its target and raw-copies the rest; guarded DOCX, atomic same-slide PPTX shape-text batches, and XLSX calculation-metadata/page-break/page-margin facades consume it; borrowed/topology-changing paths rewrite fully, while unsupported source-backed layouts refuse. | Real media-heavy multi-Part updates, broader semantic closures, signature/topology policies, and attribution of the remaining selected-Part/compressor-buffer memory cost. |
 | 7 | Confirmed structurally: duplicate indexes, boxed Parts, source-XML map, and linear fallback exist. | Allocation profiles, type sizes, cache counters and repeated noncanonical lookup. |
-| 8 | Refined: source-backed XLSX structural open/list avoids timed reads; selected first/range reads physically overlap only the selected worksheet; guarded calculation-metadata and worksheet page-break edits materialize only their one- or two-Part semantic closures. | Broader source-backed selectors, general cell/formula edits and real workbook matrices. |
+| 8 | Refined: source-backed XLSX structural open/list avoids timed reads; selected first/range reads physically overlap only the selected worksheet; guarded calculation-metadata, worksheet page-break and worksheet page-margin edits materialize only their one- or two-Part semantic closures. | Broader source-backed selectors, general cell/formula edits and real workbook matrices. |
 | 9 | Refined by measurement: small XLSX edits scan/rebuild/reparse the complete touched sheet; bounded commits can reuse the validation store for first read, while large sheets fall back cold. Direct writer-local action regrouping was immaterial and reverted. | Attribute larger semantic-planning/emission/readback passes, first/middle/last cells, distinct bulk actions, structural edits, large-sheet retention and commit-versus-save separation without reviving direct regrouping alone. |
 | 10 | Plausible but unmeasured: per-cell semantic ownership and transient parse duplication may dominate large stores. | Allocation count/bytes, type sizes, peak RSS and cache-miss profiles. |
 | 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers; child lookup descends the validated tree; native DOC/XLS/PPT semantic baselines, XLS editor and inventory reuse, DOC batched publication and indexes, PPT root-open reuse, text-edit resolver reuse, and checked root text-publication adoption are accepted. The XLS terminal-render handoff was neutral on large changed saves and regressed exact no-op. The opaque-heavy common case rejected direct shared writer payloads, an editor-wide validated-render cache, and inline recapture-allocation reuse; its open/publication/finish/end-to-end stage split is non-additive. | Attribute materially different final owner/public-reader work without reviving the rejected handoffs or recapture reuse; add deep-directory, MiniFAT-heavy, concurrent-read, real-producer, and security scenarios beyond generated corpora. |
@@ -628,7 +634,7 @@ The order below is provisional until baseline measurements are recorded.
 | Rank | Candidate | Expected CRUD reach | Risk | ADR fit |
 |---:|---|---|---|---|
 | 1 | Extend source-backed OPC from selective reads and the narrow consuming publisher to broad query/edit/patch coverage. | All OOXML selective read/query/edit paths; offsets eager full-package work. | High | Positional source/descriptors and one low-level one-Part publication path are implemented; cache Budget charging and semantic CRUD coverage remain. |
-| 2 | Broaden the accepted source-backed DOCX/PPTX and XLSX calculation-metadata/page-break transactions only where complete semantic closures can be proved, with real media/signature/topology matrices. | Targeted OOXML save, especially media-heavy packages; avoids eager all-Part inflate/recompression where the same-topology proof applies. | High | DOCX is accepted in change 0039, guarded one-slide PPTX in change 0044 and its bounded same-slide text batch in 0063, XLSX calculation metadata in 0046, and worksheet page breaks in 0061. General XLSX cells/formulas/chains and multi-slide PPTX require wider closures; all accepted facades still need real-producer and broader topology/signature policy matrices. |
+| 2 | Broaden the accepted source-backed DOCX/PPTX and XLSX calculation-metadata/page-break/page-margin transactions only where complete semantic closures can be proved, with real media/signature/topology matrices. | Targeted OOXML save, especially media-heavy packages; avoids eager all-Part inflate/recompression where the same-topology proof applies. | High | DOCX is accepted in change 0039, guarded one-slide PPTX in change 0044 and its bounded same-slide text batch in 0063, XLSX calculation metadata in 0046, worksheet page breaks in 0061, and direct page margins in 0067. General XLSX cells/formulas/chains and multi-slide PPTX require wider closures; all accepted facades still need real-producer and broader topology/signature policy matrices. |
 | 3 | Tune explicit bounded-session thresholds and complete remaining I/O budget policy. | Large multi-Part open/save/validation. | Medium-high | 1/2/4/8/12 evidence exists; large tasks scale, small tasks regress; no hidden Rayon path remains. |
 | 4 | Build one validated OPC publication plan and reuse its generated XML and Part order during emission. | Every rewritten OPC save. | Low-medium | Implemented; see `changes/0001-opc-publication-plan.md`. |
 | 5 | Exact owned-source OPC no-op publication. | Owned DOCX/PPTX/XLSX open/read/no-op save. | Medium | Implemented; same-topology mutations now use targeted preservation. See changes 0004 and 0008. |
