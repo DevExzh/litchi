@@ -37,6 +37,7 @@ litchi-oth = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+zip = { version = "8", default-features = false, features = ["deflate"] }
 
 [[example]]
 name = "read_odp"

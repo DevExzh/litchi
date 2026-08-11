@@ -267,9 +267,7 @@ fn durable_document_patch_preserves_hyperlink_graph_and_reopens_exactly() {
 
 #[test]
 fn durable_hyperlink_edit_round_trips_real_open_xml_sdk_fixture() {
-    let fixture = include_bytes!(
-        "../../../../../test-data/ooxml/docx/Hyperlink.docx"
-    );
+    let fixture = include_bytes!("../../../../../test-data/ooxml/docx/Hyperlink.docx");
     let mut package = Package::from_reader(Cursor::new(fixture.as_slice())).unwrap();
     let relationships_before = document_relationship_inventory(&package);
     let source = package.document_snapshot().unwrap();

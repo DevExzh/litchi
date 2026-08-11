@@ -328,9 +328,9 @@ fn flat_text_save_supports_a_bare_relative_destination() {
     drop(reservation);
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_vendor = "apple")))]
 #[test]
-fn flat_text_save_supports_non_utf8_and_near_name_max_destinations() {
+fn flat_text_save_supports_non_utf8_destinations() {
     use std::ffi::OsString;
     use std::os::unix::ffi::OsStringExt;
 
@@ -341,7 +341,16 @@ fn flat_text_save_supports_non_utf8_and_near_name_max_destinations() {
         .join(OsString::from_vec(b"flat-\xff.fodt".to_vec()));
     source.save(&non_utf8).unwrap();
     assert_eq!(std::fs::read(non_utf8).unwrap(), source.as_bytes());
+}
 
+#[cfg(unix)]
+#[test]
+fn flat_text_save_supports_near_name_max_destinations() {
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt;
+
+    let directory = tempfile::tempdir().unwrap();
+    let source = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
     let mut long_name = vec![b'n'; 245];
     long_name.extend_from_slice(b".fodt");
     let near_name_max = directory.path().join(OsString::from_vec(long_name));

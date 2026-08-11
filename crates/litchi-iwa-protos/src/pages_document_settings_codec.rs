@@ -292,7 +292,7 @@ pub fn decode_document_settings(
     let total = root
         .len()
         .checked_add(settings.len())
-        .ok_or_else(|| DecodeError(ErrorKind::Projection))?;
+        .ok_or(DecodeError(ErrorKind::Projection))?;
     validate(total, options)?;
     let mut budget = Budget::new(options);
     let reference = preflight_root(root, options, &mut budget)?;
@@ -356,7 +356,7 @@ impl Budget {
         let observed = self
             .fields
             .checked_add(1)
-            .ok_or_else(|| DecodeError(ErrorKind::Projection))?;
+            .ok_or(DecodeError(ErrorKind::Projection))?;
         if observed > self.max_fields {
             return Err(DecodeError(ErrorKind::Field {
                 observed,
@@ -370,7 +370,7 @@ impl Budget {
         let observed = n
             .checked_mul(2)
             .and_then(|cost| self.work.checked_add(cost))
-            .ok_or_else(|| DecodeError(ErrorKind::Projection))?;
+            .ok_or(DecodeError(ErrorKind::Projection))?;
         if observed > self.max_work {
             return Err(DecodeError(ErrorKind::Work {
                 observed,
@@ -612,10 +612,10 @@ fn project_root(
     let reference = view
         .settings
         .get()?
-        .ok_or_else(|| DecodeError(ErrorKind::Projection))?;
+        .ok_or(DecodeError(ErrorKind::Projection))?;
     let projected = ReferenceSnapshot {
         identifier: NonZeroU64::new(reference.identifier)
-            .ok_or_else(|| DecodeError(ErrorKind::Projection))?,
+            .ok_or(DecodeError(ErrorKind::Projection))?,
         deprecated_type: reference.deprecated_type,
         deprecated_is_external: reference.deprecated_is_external,
     };

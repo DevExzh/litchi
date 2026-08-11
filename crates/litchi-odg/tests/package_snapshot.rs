@@ -31,7 +31,9 @@ const REAL_DRAW_CORPUS: &[(&str, &[u8])] = &[
     ),
     (
         "fit-frame-text",
-        include_bytes!("../../../test-data/libreoffice-core/sd/qa/unit/data/odg/FitToFrameText.odg"),
+        include_bytes!(
+            "../../../test-data/libreoffice-core/sd/qa/unit/data/odg/FitToFrameText.odg"
+        ),
     ),
     (
         "fontwork",

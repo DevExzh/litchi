@@ -101,7 +101,12 @@ vba-inspection = [
     "litchi-xlsx?/vba-inspection",
 ]
 formula = ["dep:litchi-formula", "litchi-doc?/formula", "litchi-ppt?/formula"]
-fonts = ["dep:litchi-fonts", "litchi-docx?/fonts", "litchi-ppt?/fonts", "litchi-pptx?/fonts"]
+fonts = [
+    "dep:litchi-fonts",
+    "litchi-docx?/fonts",
+    "litchi-ppt?/fonts",
+    "litchi-pptx?/fonts",
+]
 font-subset = [
     "fonts",
     "litchi-fonts/subset",
