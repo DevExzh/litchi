@@ -353,6 +353,18 @@ incomplete program and CRUD matrix.
   encryption-sensitive/unsupported ZIP layouts and structural edits retain
   the established fallback. See
   [`0057`](changes/0057-ods-row-splice-raw-publication.md).
+- Exact unified ODS worksheet no-ops now stop at the nested worksheet handoff
+  and construct their empty durable patch without reopening and diffing the
+  same package again. Large exact-no-op p50 falls 23.26%, instructions fall
+  10.54%, and peak heap remains flat. Changed commits retain every former
+  audit and publication gate. See
+  [`0058`](changes/0058-ods-exact-noop-handoff.md).
+- Same-family fixed-width native XLS numeric commits now certify exact changed
+  value ranges and carry the private BIFF cell-offset inventory forward while
+  retaining the complete public Workbook validation/readback. On the large
+  8,192-cell one-edit/save case, p50 falls 7.83%, mean falls 7.37%, peak heap
+  falls 5.54%, and uninstrumented RSS is flat. See
+  [`0059`](changes/0059-xls-fixed-numeric-inventory-carry.md).
 - Large plain RTF parsing now derives an exact root-text block count during the
   existing structural preflight and performs one bounded lazy style-block
   reservation. Across 6,000 samples/state, open p50 improves 21.17%, mean

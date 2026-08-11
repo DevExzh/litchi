@@ -44,7 +44,8 @@ conversion remain.
 ## Highest-return next cases
 
 1. Attribute remaining final owner/public-reader work after the accepted native
-   XLS editor reuse, DOC batched stream publication, PPT root-open reuse and
+   XLS editor reuse and fixed-width inventory carry-forward, DOC batched stream
+   publication, PPT root-open reuse and
    direct PPT text-edit resolver reuse. Change 0050 removes the newly
    attributed repeated DOC PieceTable physical-range scan but retains the
    complete owner and public-reader validation layers. Change 0051 removes
@@ -287,6 +288,21 @@ signed changed packages retain the established stale-signature stripping
 fallback. Compact audit, bounds, complete package/sheet/media readback,
 patch/inverse and structural fallback remain. It adds no structural/resource
 edit, security capability, real-producer, streaming or cold-source coverage.
+
+Change 0058 leaves the ODS CRUD surface unchanged. It short-circuits only an
+exact unified worksheet no-op whose nested commit already proved identical
+bytes, and constructs the same durable empty patch without rediscovering
+package effects. Changed commits retain every audit, preservation and readback
+path. It adds no edit, resource, structural, security, producer, streaming or
+cold-source capability.
+
+Change 0059 leaves the native XLS CRUD and publication surface unchanged. It
+certifies exact same-family Number/RK/MulRK value ranges, shares untouched
+worksheet inventories and carries source offsets forward while retaining the
+complete public Workbook validation/readback. Nonnumeric, storage-converting,
+structural and resource edits retain the full private parse. It adds no new
+cell family, edit, repair, producer, streaming, security or low-level archive
+capability.
 
 Change 0040 removes repeated UTF-8 scalar decoding from ordinary RTF text
 delimiter discovery without changing the existing CRUD surface. It measures

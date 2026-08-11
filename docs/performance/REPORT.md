@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `1198544231fc2b5be8fc251510d42a26a0df81f0`
+Production base for the latest measured tranche: `cad602d26f79379d10558b4e38a5316b701cef77`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -51,6 +51,7 @@ is still not broad program or CRUD coverage.
 | Coalesced ODT paragraph publication | Large 100-edit/save p50 **-98.28% (58.05x)**, mean **-98.27%**; medium two-edit/save p50 **-27.62%**; allocation calls **-96.13%** | Consecutive plain-text replacements only; ordinary durable operations, ordered duplicate semantics, atomic refusal, compact audit, full reopen and scalar path remain |
 | Native DOC/XLS/PPT semantic baseline | Large one-edit/save p50: XLS **1.722 ms**, DOC **1.416 ms**, PPT **0.357 ms**; large XLS open **1.383 ms** | Generated writer corpora; accepted XLS and DOC follow-ups are listed below |
 | Native XLS validated-editor reuse | Large one-cell edit/save p50 **-7.72%**, mean **-7.90%** | Final exact owner parse, public Workbook reopen and typed readback remain; peak heap/RSS flat |
+| Native XLS fixed-width numeric inventory carry-forward | Large one-cell edit/save p50 **-7.83%**, mean **-7.37%**, p95 **-7.20%** | Exact byte-range proof plus complete public Workbook validation/readback remain; peak heap -5.54%, RSS flat; all nonnumeric/structural/resource edits retain full parse |
 | Rejected XLS terminal-render handoff | Tiny changed save p50 **-7.55%**; large changed save **-0.39%** (neutral) | Fully reverted: repeated large exact no-op p50 **+22.00%**, mean **+16.69%** |
 | Common OLE2 publication stages and rejected handoffs | Current open/publication/finish/end-to-end p50: **1.382 / 7.979 / 5.473 / 26.086 ms**; inline recapture prototype end-to-end **-2.61%** p50 | Stages are non-additive; shared-payload, validated-render and inline recapture prototypes are all fully reverted |
 | Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
@@ -67,6 +68,7 @@ is still not broad program or CRUD coverage.
 | ODS shared durable-patch blobs | Media-rich one-cell edit/save p50 **-8.80%**, mean **-9.07%**, p95 **-13.85%**; 33.58 MB copy site removed; peak heap **-1.92%** | Shares only already retained immutable source/target package bytes with the forward/reverse semantic bundles; patch wire, limits, final reopen and media verification remain |
 | ODS row-splice raw publication | Media-rich one-cell edit/save p50 **-74.16%**, mean **-74.17%**, p95 **-74.11%**; instructions **-69.04%**; peak heap/RSS flat | Same-topology compact row replacements only; exact checked range provenance reaches raw ZIP emission, while structural, signed/encrypted and unsupported layouts retain established fallback/policy |
 | ODP content-only unchanged-media publication | Media-rich text-box edit/save p50 **-94.44%**, mean **-94.43%**, p95 **-94.29%**; allocation calls **+0.52%**; peak heap/RSS flat | Source-backed content-only operations reuse accepted checked-splice/raw-copy publication; resource additions and unsupported/security-sensitive layouts retain logical rebuild |
+| ODS exact no-op handoff | Large exact-no-op p50 **-23.26%**, mean **-23.21%**; instructions **-10.54%**; peak heap flat | Exact no-op only; changed commits retain complete audit, preservation and readback paths; read-only link-layout trigger disclosed |
 | ODP indexed slide selector | Large middle-slide p50 **-4.09%**, mean **-4.20%**, p95 **-5.18%**; allocation calls **-3.86%**; peak heap/RSS flat | Full style/content EOF validation remains; tiny is neutral, medium p50 -1.55%, and unchanged list/save guards remain within thresholds |
 | ODS adaptive cell locator | Large public cell sweep p50 **-81.74%**, mean **-80.72%**; full cell text p50 **-52.65%** | Builds lazily at 64 calls, requests 3,216 bytes on the dense corpus and is capped at 4 MiB; peak heap/RSS flat |
 | RTF parser-state specialization | Large open p50 **-20.09%**; large/medium one-edit-save **-11.54% / -14.16%**; cycles **-10.50%** | Ordinary body text only; insertion/deletion metadata retains the full state; allocation count, peak heap and RSS flat |
@@ -156,7 +158,12 @@ primary raw reports are
 [`before A`](results/abba-xls-commit-reuse-one-edit-before-a.json) and
 [`after A`](results/abba-xls-commit-reuse-one-edit-after-a.json), with pooled
 statistics and all four legs in
-[`change 0016`](changes/0016-xls-commit-editor-reuse.md). The DOC follow-up
+[`change 0016`](changes/0016-xls-commit-editor-reuse.md). The later fixed-width
+numeric follow-up carries the private BIFF inventory only after exact
+field-range certification and keeps the complete public Workbook validation
+boundary. Its record and pooled evidence are
+[`change 0059`](changes/0059-xls-fixed-numeric-inventory-carry.md) and the
+[`primary summary`](results/xls-inventory-carry-primary-summary.json). The DOC follow-up
 batches ordinary stream replacement; its primary raw reports are
 [`before A`](results/abba-doc-stream-batch-one-edit-before-a.json) and
 [`after A`](results/abba-doc-stream-batch-one-edit-after-a.json), with the
@@ -496,6 +503,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | ODT final changed-result byte handoff, 200 paragraphs + 16 MiB media | 5.216 ms | 4.030 ms | **-22.74% p50 / -22.56% mean** | One 16.79 MB result copy and redundant parse removed; p95 -21.48%; allocation calls -3.46%; independent final reopen and peak heap/RSS retained |
 | ODT 1% paragraph edit/save, 10,000 paragraphs / 100 replacements | 906.439 ms | 15.615 ms | **-98.28% p50 (58.05x) / -98.27% mean** | One mutable candidate/publication/reopen/audit replaces 100; allocations -96.13%; peak heap and uninstrumented RSS flat; tool-inclusive RSS +9.93% disclosed |
 | Native XLS one-cell edit/save, 8,192 cells | 1.777 ms | 1.639 ms | **-7.72% p50 / -7.90% mean** | Allocation calls -1.19%; peak heap and uninstrumented RSS flat |
+| Native XLS fixed-width numeric edit/save, 8,192 cells | 1.582 ms | 1.458 ms | **-7.83% p50 / -7.37% mean** | Complete public Workbook validation retained; peak heap -5.54%, RSS flat |
 | Native DOC one-paragraph edit/save, 512 paragraphs | 1.506 ms | 1.348 ms | **-10.52% p50 / -10.48% mean** | Duplicate publication-site allocations nearly halved; peak heap and uninstrumented RSS flat |
 | Native DOC open, 512 paragraphs | 790.727 us | 348.679 us | **-55.91% p50 / -55.78% mean** | Physical PieceTable scan self cycles 36.89% -> 4.17%; allocation calls +0.009%; peak heap and uninstrumented RSS flat |
 | Native DOC one-paragraph edit/save after PieceTable index, 512 paragraphs | 1.379 ms | 0.950 ms | **-31.08% p50 / -31.68% mean** | Same private index accelerates mandatory candidate/public readbacks; patch/inverse and exact output checks unchanged |
@@ -567,6 +575,8 @@ The underlying records are:
 - [`0055-rtf-body-block-reservation.md`](changes/0055-rtf-body-block-reservation.md)
 - [`0056-doc-papx-containment-index.md`](changes/0056-doc-papx-containment-index.md)
 - [`0057-ods-row-splice-raw-publication.md`](changes/0057-ods-row-splice-raw-publication.md)
+- [`0058-ods-exact-noop-handoff.md`](changes/0058-ods-exact-noop-handoff.md)
+- [`0059-xls-fixed-numeric-inventory-carry.md`](changes/0059-xls-fixed-numeric-inventory-carry.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on

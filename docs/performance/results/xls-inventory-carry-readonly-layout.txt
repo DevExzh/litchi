@@ -1,0 +1,18 @@
+XLS read-only trigger review
+============================
+
+Frozen before binary:
+  Worksheet::get_cell address 0x10d1610, size 0xa5
+Frozen after binary:
+  Worksheet::get_cell address 0x10a8c80, size 0xa5
+
+`objdump -d -C --no-show-raw-insn` was normalized by replacing instruction
+addresses, branch targets, and numeric offsets. The normalized 62-line
+Worksheet::get_cell functions are identical modulo the input filename header.
+
+The normalized 107-line `run_semantic_xls` iterator closure is also identical
+modulo anonymous LLVM symbol-number/hash suffixes. No XLS public reader,
+worksheet, cell accessor, benchmark-harness, or timed list/access source
+changed between the binaries. The observed nanosecond-scale read-only movement
+is therefore retained as link/layout/process-state evidence, not attributed to
+the fixed-width transaction optimization.

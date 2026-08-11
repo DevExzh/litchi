@@ -90,6 +90,18 @@ fn edits_only_one_number_field_and_round_trips_patch() {
     let mut edit = source.edit();
     edit.set_number(0usize.into(), reference, 9.25).unwrap();
     let commit = edit.commit().unwrap();
+    assert!(Arc::ptr_eq(
+        &source.inner.shared_strings,
+        &commit.snapshot().inner.shared_strings
+    ));
+    assert!(Arc::ptr_eq(
+        &source.inner.shared_string_properties,
+        &commit.snapshot().inner.shared_string_properties
+    ));
+    assert!(Arc::ptr_eq(
+        &source.inner.xf_records,
+        &commit.snapshot().inner.xf_records
+    ));
     assert_eq!(commit.diagnostics().changed_number_fields(), 1);
     assert_eq!(commit.diagnostics().touched_streams(), 1);
     let after_workbook = commit.snapshot().workbook_stream();
@@ -131,6 +143,104 @@ fn edits_only_one_number_field_and_round_trips_patch() {
         commit.patch().inverse().apply(&applied).unwrap().bytes(),
         source.bytes()
     );
+}
+
+#[test]
+fn sequential_number_commits_reuse_resources_and_reopen_publicly() {
+    use litchi_core::sheet::Cell as _;
+
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let first_reference = Reference::new(3, 2).unwrap();
+    let second_reference = Reference::new(4, 1).unwrap();
+    let mut first = source.edit();
+    first
+        .set_number("Sheet1".into(), first_reference, 9.25)
+        .unwrap();
+    let first = first.commit().unwrap();
+    let mut second = first.snapshot().edit();
+    second
+        .set_number("Sheet1".into(), second_reference, 7.5)
+        .unwrap();
+    let second = second.commit().unwrap();
+
+    assert!(Arc::ptr_eq(
+        &source.inner.shared_strings,
+        &second.snapshot().inner.shared_strings
+    ));
+    assert!(Arc::ptr_eq(
+        &source.inner.xf_records,
+        &second.snapshot().inner.xf_records
+    ));
+    let workbook = Workbook::new(Cursor::new(second.snapshot().bytes())).unwrap();
+    let metadata = workbook.sheet(0).unwrap();
+    let worksheet = workbook
+        .xls_worksheet(metadata.parsed_worksheet_index().unwrap())
+        .unwrap();
+    assert_eq!(
+        worksheet.get_cell(3, 2).unwrap().value().as_float(),
+        Some(9.25)
+    );
+    assert_eq!(
+        worksheet.get_cell(4, 1).unwrap().value().as_float(),
+        Some(7.5)
+    );
+    assert_eq!(stream(second.snapshot().bytes(), "Opaque"), b"untouched");
+}
+
+#[test]
+fn number_commit_shares_untouched_worksheet_inventories() {
+    let mut writer = crate::Writer::new();
+    let first = writer.add_worksheet("First").unwrap();
+    writer.write_number(first, 0, 0, 1.0).unwrap();
+    let second = writer.add_worksheet("Second").unwrap();
+    writer.write_number(second, 0, 0, 2.0).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let source = Snapshot::from_bytes(output.into_inner()).unwrap();
+
+    let mut edit = source.edit();
+    edit.set_number("First".into(), Reference::new(0, 0).unwrap(), 3.0)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert!(!Arc::ptr_eq(
+        &source.inner.sheets[0].entries,
+        &commit.snapshot().inner.sheets[0].entries
+    ));
+    assert!(Arc::ptr_eq(
+        &source.inner.sheets[1].entries,
+        &commit.snapshot().inner.sheets[1].entries
+    ));
+}
+
+#[test]
+fn inventory_carry_refuses_bytes_outside_changed_numeric_field() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let reference = Reference::new(3, 2).unwrap();
+    let sheet = source.resolve_sheet("Sheet1".into()).unwrap().unwrap();
+    let entry = unique_entry_index(&source.inner.sheets[sheet].entries, reference)
+        .unwrap()
+        .unwrap();
+    let change = Change {
+        sheet,
+        entry,
+        reference,
+        storage: Storage::Number,
+        value: Value::Number(9.25),
+    };
+    let mut workbook = source.workbook_stream().to_vec();
+    write_cell_value(
+        &mut workbook,
+        &source.inner.sheets[sheet].entries[entry],
+        &change,
+        &[],
+    )
+    .unwrap();
+    let kind_offset = source.inner.sheets[sheet].entries[entry].kind_offset;
+    workbook[kind_offset] ^= 1;
+
+    let error = carry_fixed_numeric_inventory(&source, &workbook, &[change]).unwrap_err();
+    assert!(error.to_string().contains("outside its value fields"));
 }
 
 #[test]
