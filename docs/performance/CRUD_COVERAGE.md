@@ -228,6 +228,15 @@ test covers a lossy incomplete Shift-JIS body byte plus byte-exact immutable
 publication; the broad prototype's plain/LZFu regression and the owned-only
 variants' sub-threshold instability are negative evidence, not support claims.
 
+Change 0048 keeps the same generated RTF paragraph-edit CRUD surface but
+removes a repeated source clone/lexer from eligible changed commits. The
+retained range is proven during the initial full parser preflight; empty,
+ambiguous, binary, non-ASCII and LZFu inputs retain the established fallback or
+refusal, and every changed candidate still receives complete parse/readback.
+The capability-bounded 63-record transport/producer smoke remains green. This
+does not add formatted/media editing, conversion, security repair or broader
+real-producer mutation coverage.
+
 Change 0041 removes three archive-sized copies from the existing ODT
 changed-operation compactness audit without adding a CRUD surface. The
 media-rich paragraph edit/save still parses both packages, audits compact XML,

@@ -1170,8 +1170,7 @@ impl Edit {
                 .plain_body_text_editability()
                 .map_err(Error::UnsupportedSource)?;
         }
-        let span =
-            ordinary_body_source_span(source_bytes, self.source.text(), self.source.limits())?;
+        let span = retained_or_located_body_source_span(&self.source, source_bytes)?;
         validate_opaque_preservation(&self.source, source_bytes, &span)?;
         let replacement_bytes = if property_operation {
             encoded_body_with_properties(
@@ -1847,6 +1846,23 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             observed: usize::MAX,
             limit: usize::MAX,
         })
+}
+
+#[inline(never)]
+fn retained_or_located_body_source_span(
+    source: &Snapshot,
+    source_bytes: &[u8],
+) -> Result<Range<usize>, Error> {
+    match source.model().ordinary_body_source_span() {
+        Some(span)
+            if source_bytes.is_ascii()
+                && span.start <= span.end
+                && span.end <= source_bytes.len() =>
+        {
+            Ok(span)
+        },
+        Some(_) | None => ordinary_body_source_span(source_bytes, source.text(), source.limits()),
+    }
 }
 
 fn ordinary_body_source_span(

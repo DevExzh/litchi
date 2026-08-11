@@ -1,0 +1,2250 @@
+reading file "target/perf/rtf-body-span/heaptrack-before.zst" - please wait, this might take some time...
+Debuggee command was: target/perf/rtf-body-span/before --warmup 0 --samples 20 --case rtf_semantic_one_edit_save --semantic-shape large --rtf-variant plain --json target/perf/rtf-body-span/heap-before.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+650000 calls to allocation functions with 1.50M peak consumption from
+_$LT$alloc..vec..into_iter..IntoIter$LT$T$C$A$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::hc0e4496a74325f8f
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+200000 calls with 500.00K peak consumption from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+200000 calls with 500.00K peak consumption from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+200000 calls with 500.00K peak consumption from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+10000 calls with 0B peak consumption from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::semantic_rtf_plain_bytes::h773850a2387855b8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+10000 calls with 0B peak consumption from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 30000 from 3 other places
+
+440023 calls to allocation functions with 760.10K peak consumption from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+200000 calls with 0B peak consumption from:
+    litchi_perf_baseline::verify_semantic_rtf::hc5f71b0449a9c07d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+200000 calls with 760.00K peak consumption from:
+    _$LT$core..iter..adapters..map..Map$LT$I$C$F$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::hf813b1f50b202144
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::hd4318130037e804a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::semantic_rtf_expected_text::h43f3357ea776d28b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::verify_semantic_rtf::hc5f71b0449a9c07d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+10000 calls with 0B peak consumption from:
+    litchi_perf_baseline::verify_semantic_rtf::hc5f71b0449a9c07d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+10000 calls with 0B peak consumption from:
+    _$LT$core..iter..adapters..map..Map$LT$I$C$F$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::hf813b1f50b202144
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::hd4318130037e804a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::semantic_rtf_expected_text::h43f3357ea776d28b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::verify_semantic_rtf::hc5f71b0449a9c07d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+10000 calls with 0B peak consumption from:
+    _$LT$core..iter..adapters..map..Map$LT$I$C$F$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::hf813b1f50b202144
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::hd4318130037e804a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::semantic_rtf_expected_text::h43f3357ea776d28b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 10023 from 6 other places
+
+214640 calls to allocation functions with 51.85M peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hce9ccbf7cee2b4dfE.llvm.9139011602153418662
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+200000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h7fbfc6e1afa4957c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str.llvm.12659966108294033255
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _$LT$litchi_rtf..api..story..Paragraph$u20$as$u20$core..fmt..Display$GT$::fmt::h6c79a68ba6de5d17
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::story::Paragraph::to_text::h90107af3df479bfb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::verify_semantic_rtf::hc5f71b0449a9c07d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+10000 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h7fbfc6e1afa4957c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str.llvm.12659966108294033255
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _$LT$litchi_rtf..api..story..Paragraph$u20$as$u20$core..fmt..Display$GT$::fmt::h6c79a68ba6de5d17
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::story::Paragraph::to_text::h90107af3df479bfb
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::verify_semantic_rtf::hc5f71b0449a9c07d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+260 calls with 0B peak consumption from:
+    litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans::hf88b2c9964751e8f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+260 calls with 0B peak consumption from:
+    litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans::hf88b2c9964751e8f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+260 calls with 0B peak consumption from:
+    litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans::hf88b2c9964751e8f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 3860 from 136 other places
+
+650 calls to allocation functions with 0B peak consumption from
+bumpalo::Bump$LT$_$GT$::alloc_layout_slow::h61bba29137c9142c
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+200 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+200 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+200 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+10 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::semantic_rtf_plain_bytes::h773850a2387855b8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+10 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 30 from 3 other places
+
+65 calls to allocation functions with 0B peak consumption from
+litchi_rtf::codec::parser::codec::DeferredText::decode::h27a595a361365ed2
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::_$u7b$$u7b$closure$u7d$$u7d$::h88a49fc0cbea1292
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::_$u7b$$u7b$closure$u7d$$u7d$::h88a49fc0cbea1292
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::_$u7b$$u7b$closure$u7d$$u7d$::h88a49fc0cbea1292
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::_$u7b$$u7b$closure$u7d$$u7d$::h88a49fc0cbea1292
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::semantic_rtf_plain_bytes::h773850a2387855b8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::_$u7b$$u7b$closure$u7d$$u7d$::h88a49fc0cbea1292
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 3 from 3 other places
+
+65 calls to allocation functions with 15B peak consumption from
+litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::_$u7b$$u7b$closure$u7d$$u7d$::h88a49fc0cbea1292
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 5B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 5B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 5B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::semantic_rtf_plain_bytes::h773850a2387855b8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 3 from 3 other places
+
+65 calls to allocation functions with 0B peak consumption from
+litchi_rtf::codec::parser::codec::DeferredText::push_transport::hee20c226f530c637
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::semantic_rtf_plain_bytes::h773850a2387855b8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 calls with 0B peak consumption from:
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 3 from 3 other places
+
+65 calls to allocation functions with 0B peak consumption from
+hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::h98566c5297b08a63
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 0B peak consumption from:
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h67ffdd9d518e7bfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 0B peak consumption from:
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h67ffdd9d518e7bfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 0B peak consumption from:
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h67ffdd9d518e7bfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 calls with 0B peak consumption from:
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h67ffdd9d518e7bfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::semantic_rtf_plain_bytes::h773850a2387855b8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 calls with 0B peak consumption from:
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h67ffdd9d518e7bfc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_entry::h327fdf307ea9e5d3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::resources::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_font_table::h5451227daf38ac64
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::dispatch::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_group_destination::ha31578cd682310af
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 3 from 3 other places
+
+65 calls to allocation functions with 0B peak consumption from
+litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::new_with_source::h98ec7b708080e217
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 0B peak consumption from:
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 0B peak consumption from:
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 0B peak consumption from:
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 calls with 0B peak consumption from:
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::parse_with_limits::hc7bd51e644cd9f78
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::semantic_rtf_plain_bytes::h773850a2387855b8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 calls with 0B peak consumption from:
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 3 from 3 other places
+
+64 calls to allocation functions with 12.10K peak consumption from
+litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 4.03K peak consumption from:
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 4.03K peak consumption from:
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 calls with 4.03K peak consumption from:
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 calls with 0B peak consumption from:
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 calls with 0B peak consumption from:
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 2 from 2 other places
+
+
+PEAK MEMORY CONSUMERS
+51.85M peak memory consumed over 214640 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hce9ccbf7cee2b4dfE.llvm.9139011602153418662
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+16.12M consumed over 240 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h2ec2af8e1aee53a0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+16.12M consumed over 240 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h2ec2af8e1aee53a0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+16.12M consumed over 240 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h2ec2af8e1aee53a0
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::flush_text_buffer::hd7f97d60148cf270
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::dispatch_content_control::he537362408a9c71d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::content::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_content::h3da4d7d96fe448e6
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+540.05K consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h7fbfc6e1afa4957c
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::to_bytes::hff43d86100b9bc72
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+540.05K consumed over 20 calls from:
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 2.41M from 136 other places
+
+1.50M peak memory consumed over 650000 calls from
+_$LT$alloc..vec..into_iter..IntoIter$LT$T$C$A$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::hc0e4496a74325f8f
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+500.00K consumed over 200000 calls from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+500.00K consumed over 200000 calls from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+500.00K consumed over 200000 calls from:
+    alloc::vec::in_place_collect::from_iter_in_place::he8af551801a029a3
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 0B from 3 other places
+
+1.50M peak memory consumed over 63 calls from
+litchi_rtf::model::document::model::RtfDocument::text::h8a68196ff901e6ae
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+500.00K consumed over 20 calls from:
+    _ZN3std4sync4once4Once15call_once_force28_$u7b$$u7b$closure$u7d$$u7d$17hcb6b8905d13b77abE.llvm.2382665268384783678
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std4sync9once_lock17OnceLock$LT$T$GT$10initialize17h7984e6290c9e9787E.llvm.2382665268384783678
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::text::h2178be5e60d1e920
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+500.00K consumed over 20 calls from:
+    _ZN3std4sync4once4Once15call_once_force28_$u7b$$u7b$closure$u7d$$u7d$17hcb6b8905d13b77abE.llvm.2382665268384783678
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std4sync9once_lock17OnceLock$LT$T$GT$10initialize17h7984e6290c9e9787E.llvm.2382665268384783678
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::text::h2178be5e60d1e920
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::verify_semantic_rtf::hc5f71b0449a9c07d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+500.00K consumed over 20 calls from:
+    _ZN3std4sync4once4Once15call_once_force28_$u7b$$u7b$closure$u7d$$u7d$17hcb6b8905d13b77abE.llvm.2382665268384783678
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvMs0_NtNtNtNtCsjrHSEGnQ3l9_3std3sys4sync4once5futexNtB5_4Once4call
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std4sync9once_lock17OnceLock$LT$T$GT$10initialize17h7984e6290c9e9787E.llvm.2382665268384783678
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::text::h2178be5e60d1e920
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::replace_paragraph_text::hdd73491e88392fe7
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 0B from 1 other places
+
+760.10K peak memory consumed over 440023 calls from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+760.00K consumed over 200000 calls from:
+    _$LT$core..iter..adapters..map..Map$LT$I$C$F$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::hf813b1f50b202144
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::hd4318130037e804a
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::semantic_rtf_expected_text::h43f3357ea776d28b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::verify_semantic_rtf::hc5f71b0449a9c07d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+76B consumed over 1 calls from:
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+28B consumed over 1 calls from:
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 0B from 6 other places
+
+540.05K peak memory consumed over 35 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h836e52d404a057c4E.llvm.2669839107685568870
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+540.05K consumed over 20 calls from:
+    litchi_perf_baseline::CountingSink::reserve_budget::h611ca28811a70706
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+
+500.00K peak memory consumed over 22 calls from
+alloc::str::join_generic_copy::he90a27a502420d20
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+500.00K consumed over 20 calls from:
+    litchi_perf_baseline::semantic_rtf_expected_text::h43f3357ea776d28b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::verify_semantic_rtf::hc5f71b0449a9c07d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+
+240.00K peak memory consumed over 22 calls from
+_$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::hd4318130037e804a
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+240.00K consumed over 20 calls from:
+    litchi_perf_baseline::semantic_rtf_expected_text::h43f3357ea776d28b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::verify_semantic_rtf::hc5f71b0449a9c07d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+
+73.73K peak memory consumed over 1 calls from
+0x7e153b4b738e
+  in /lib/x86_64-linux-gnu/libstdc++.so.6
+73.73K consumed over 1 calls from:
+    call_init
+      at ./elf/dl-init.c:74
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init::call_init
+      at ./elf/dl-init.c:120
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init
+      at ./elf/./elf/dl-init.c:121
+    _dl_start_user
+      in /lib64/ld-linux-x86-64.so.2
+
+12.10K peak memory consumed over 64 calls from
+litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+4.03K consumed over 20 calls from:
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+4.03K consumed over 20 calls from:
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+4.03K consumed over 20 calls from:
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 0B from 2 other places
+
+640B peak memory consumed over 23 calls from
+alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h56d204fda8e42b13
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+480B consumed over 1 calls from:
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+160B consumed over 1 calls from:
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+
+
+MOST TEMPORARY ALLOCATIONS
+219988 temporary allocations of 440023 allocations in total (49.99%) from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+200000 temporary allocations of 200000 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_semantic_rtf::hc5f71b0449a9c07d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+10000 temporary allocations of 10000 allocations in total (100.00%) from:
+    litchi_perf_baseline::verify_semantic_rtf::hc5f71b0449a9c07d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+9988 temporary allocations of 9999 allocations in total (99.89%) from:
+    litchi_perf_baseline::semantic_rtf_plain_bytes::h773850a2387855b8
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 0B from 6 other places
+
+87 temporary allocations of 214640 allocations in total (0.04%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hce9ccbf7cee2b4dfE.llvm.9139011602153418662
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 temporary allocations of 260 allocations in total (7.69%) from:
+    litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans::hf88b2c9964751e8f
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::ordinary_body_source_span::heb4353e268c3a10d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h9cffb4f1823407ac
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h9cffb4f1823407ac
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+20 temporary allocations of 20 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h9cffb4f1823407ac
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::edit::Edit::commit::h712f9c26b1a1f4da
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::run_case_with_config::hb6ae9319a7e6ce21
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h9cffb4f1823407ac
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::groups::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse_group::hac711291f91f3009
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::codec::parser::codec::api::_$LT$impl$u20$litchi_rtf..codec..parser..codec..Parser$GT$::parse::he110ae7189aba9b4
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_string::he46a595ab52af29b
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::model::document::model::RtfDocument::parse_internal::h85a9f08a2cb0dd49
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_rtf::api::facade::Document::from_bytes_with_limits::h520907582e908bcc
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::build_semantic_rtf_corpus::h49a81290e2fa6838
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 6B from 136 other places
+
+7 temporary allocations of 18 allocations in total (38.89%) from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjrHSEGnQ3l9_3std
+  in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+4 temporary allocations of 5 allocations in total (80.00%) from:
+    _RNvMNtNtNtCsjrHSEGnQ3l9_3std3sys2fd4unixNtB2_8FileDesc11read_to_end
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix6common11read_output
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::git_output::he6e3a4af11e22406
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::environment::h94cf7bd39f9f498d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalECsjrHSEGnQ3l9_3std
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RINvNvNtCsjrHSEGnQ3l9_3std2io19default_read_to_end16small_probe_readRNtNtNtNtB6_3sys2fd4unix8FileDescEB6_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvMNtNtNtCsjrHSEGnQ3l9_3std3sys2fd4unixNtB2_8FileDesc11read_to_end
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix6common11read_output
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::command_output::h638994ec47d95f63
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::environment::h94cf7bd39f9f498d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalECsjrHSEGnQ3l9_3std
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RINvNvNtCsjrHSEGnQ3l9_3std2io19default_read_to_end16small_probe_readRNtNtNtNtB6_3sys2fd4unix8FileDescEB6_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvMNtNtNtCsjrHSEGnQ3l9_3std3sys2fd4unixNtB2_8FileDesc11read_to_end
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix6common11read_output
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::git_output::he6e3a4af11e22406
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::environment::h94cf7bd39f9f498d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalECsjrHSEGnQ3l9_3std
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RINvNvNtCsjrHSEGnQ3l9_3std2io19default_read_to_end16small_probe_readRNtNtNtNtB6_3sys2fd4unix8FileDescEB6_
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvMNtNtNtCsjrHSEGnQ3l9_3std3sys2fd4unixNtB2_8FileDesc11read_to_end
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix6common11read_output
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::git_output::he6e3a4af11e22406
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::environment::h94cf7bd39f9f498d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+  and 0B from 9 other places
+
+3 temporary allocations of 3 allocations in total (100.00%) from
+__posix_spawn_file_actions_realloc
+  at ./posix/spawn_faction_init.c:32
+  in /lib/x86_64-linux-gnu/libc.so.6
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __posix_spawn_file_actions_adddup2
+      at ./posix/spawn_faction_adddup2.c:37
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvMNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix4unixNtNtB4_6common7Command5spawn
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::command_output::h638994ec47d95f63
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::environment::h94cf7bd39f9f498d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __posix_spawn_file_actions_adddup2
+      at ./posix/spawn_faction_adddup2.c:37
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvMNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix4unixNtNtB4_6common7Command5spawn
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::git_output::he6e3a4af11e22406
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::environment::h94cf7bd39f9f498d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __posix_spawn_file_actions_adddup2
+      at ./posix/spawn_faction_adddup2.c:37
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvMNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix4unixNtNtB4_6common7Command5spawn
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::git_output::he6e3a4af11e22406
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::environment::h94cf7bd39f9f498d
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    litchi_perf_baseline::main::hba77fb2241229ff1
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    std::sys::backtrace::__rust_begin_short_backtrace::he68f02c50d041274
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hdd514f9b27b3ce9cE.llvm.282559289109137440
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+
+1 temporary allocations of 1 allocations in total (100.00%) from
+0x7e153b4b738e
+  in /lib/x86_64-linux-gnu/libstdc++.so.6
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    call_init
+      at ./elf/dl-init.c:74
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init::call_init
+      at ./elf/dl-init.c:120
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init
+      at ./elf/./elf/dl-init.c:121
+    _dl_start_user
+      in /lib64/ld-linux-x86-64.so.2
+
+1 temporary allocations of 1 allocations in total (100.00%) from
+__GI___getdelim
+  at ./libio/iogetdelim.c:107
+  in /lib/x86_64-linux-gnu/libc.so.6
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __pthread_getattr_np
+      at ./nptl/pthread_getattr_np.c:122
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+    main
+      in /home/zhuhe/CodeProjects/litchi/target/perf/rtf-body-span/before
+
+
+total runtime: 0.66s.
+calls to allocation functions: 1306120 (1970015/s)
+temporary memory allocations: 220087 (331956/s)
+peak heap memory consumption: 56.98M
+peak RSS (including heaptrack overhead): 57.45M
+total memory leaked: 544B
