@@ -313,6 +313,14 @@ incomplete program and CRUD matrix.
   31.08%, and the former 36.89% self-cycle range-scan frame falls to 4.17%.
   Peak heap and uninstrumented RSS remain flat. See
   [`0050`](changes/0050-doc-piece-table-physical-index.md).
+- Native DOC PAPX reconstruction now retains one resolved paragraph-style
+  baseline and reuses it when the next source run starts from the same style.
+  Every run still applies and validates its own direct PAPX, piece modifier,
+  and any direct style switch. Large public open p50 falls from 343.503 to
+  304.199 us (-11.44%), mean falls 11.87%, and large changed edit/save p50
+  falls 4.01%. Allocation calls fall 18.61%, while peak heap and
+  uninstrumented RSS remain flat. See
+  [`0051`](changes/0051-doc-adjacent-style-baseline-cache.md).
 - The positional XLSX source record reports p50 opens of 33.881 us (tiny),
   56.493 us (medium), and 139.897 us (dense); list-after-open has zero timed
   source reads. First-cell and narrow-range operations physically overlap only

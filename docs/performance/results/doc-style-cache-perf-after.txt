@@ -1,0 +1,312 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cycles:P'
+# Event count (approx.): 27505591245
+#
+# Overhead  Symbol                                                                                                                                                                       IPC   [IPC Coverage]
+# ........  ...........................................................................................................................................................................  ....................
+#
+     8.65%  [.] __memmove_avx512_unaligned_erms                                                                                                                                          -      -
+            |
+            |--2.07%--realloc
+            |          |
+            |           --1.87%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17he497b834530d83e3E.llvm.1625926099375735867
+            |
+             --0.60%--0
+
+     6.76%  [.] litchi_doc::parts::pap_bin_table::PapBinTable::parse                                                                                                                     -      -
+     6.14%  [.] litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_runs                                                                                                 -      -
+     5.74%  [.] __memmove_avx512_unaligned                                                                                                                                               -      -
+            |
+             --1.10%--0x5dd73dfbb590
+
+     5.23%  [.] litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges                                                                                                        -      -
+     5.03%  [.] litchi_doc::parts::chp_bin_table::ChpBinTable::parse                                                                                                                     -      -
+     4.96%  [.] <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold                                                                                    -      -
+     4.28%  [.] litchi_doc::parts::text::TextExtractor::new                                                                                                                              -      -
+     3.93%  [.] _int_malloc                                                                                                                                                              -      -
+            |
+             --3.56%--malloc
+                       |
+                       |--1.17%--_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17he497b834530d83e3E.llvm.1625926099375735867
+                       |
+                       |--0.62%--litchi_doc::tracked_revision::codec::parse_papx
+                       |
+                        --0.53%--litchi_doc::parts::fkp::PapxFkp::parse
+
+     3.65%  [.] litchi_doc::tracked_revision::package::RevisionEditor::is_in_table_at_cp                                                                                                 -      -
+     2.67%  [.] <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone                                                                                        -      -
+     2.28%  [.] litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors                                                                                              -      -
+     2.20%  [.] malloc                                                                                                                                                                   -      -
+            |
+             --0.75%--litchi_doc::sprm::parse_sprms
+
+     2.10%  [.] _int_free                                                                                                                                                                -      -
+            |
+             --1.97%--cfree@GLIBC_2.2.5
+
+     1.90%  [.] unlink_chunk.isra.0                                                                                                                                                      -      -
+            |
+            |--0.92%--_int_malloc
+            |          |
+            |           --0.89%--malloc
+            |
+             --0.64%--malloc_consolidate
+
+     1.89%  [.] litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_paragraphs                                                                                           -      -
+     1.73%  [.] _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String10from_utf16                                                                                                               -      -
+            |
+             --1.63%--_ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17h8762ffb8965dba73E.llvm.17596652038889362499
+
+     1.66%  [.] _ZN10litchi_doc5parts3pap6parser68_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$18apply_direct_sprms17hc22e0561acb681aaE.llvm.8487014841149048648  -      -
+     1.63%  [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter12pad_integral                                                                                                           -      -
+            |
+             --1.49%--_RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt
+                       _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+                       _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+                       |
+                       |--0.81%--litchi_perf_baseline::writer_text
+                       |          0x657361622d667265
+                       |
+                        --0.66%--litchi_perf_baseline::verify_semantic_doc
+
+     1.59%  [.] litchi_doc::parts::paragraph_extractor::ParagraphExtractor::new                                                                                                          -      -
+     1.54%  [.] litchi_doc::tracked_revision::package::RevisionEditor::revisions                                                                                                         -      -
+            |
+             --0.74%--0x1
+
+     1.36%  [.] <litchi_doc::parts::chp::model::CharacterProperties as core::clone::Clone>::clone                                                                                        -      -
+     1.24%  [.] malloc_consolidate                                                                                                                                                       -      -
+            |
+             --0.99%--_int_malloc
+                       |
+                        --0.92%--malloc
+
+     1.20%  [.] litchi_doc::sprm::parse_sprms                                                                                                                                            -      -
+     1.12%  [.] _ZN10litchi_doc5parts3pap6parser68_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$17from_sprm_context17h27775aab31c3ce1eE.llvm.8487014841149048648   -      -
+     1.04%  [.] cfree@GLIBC_2.2.5                                                                                                                                                        -      -
+     0.92%  [.] litchi_doc::body_text::source_paragraphs                                                                                                                                 -      -
+     0.83%  [.] litchi_doc::parts::styles::semantic::validation::validate_style_sprms                                                                                                    -      -
+     0.71%  [.] _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17h8762ffb8965dba73E.llvm.17596652038889362499                                               -      -
+     0.60%  [.] <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone                                                                                        -      -
+     0.58%  [.] litchi_doc::parts::styles::semantic::resolve::<impl litchi_doc::parts::styles::model::StyleSheet>::resolve_paragraph_style_sprms                                         -      -
+     0.58%  [.] __memcmp_evex_movbe                                                                                                                                                      -      -
+     0.57%  [.] litchi_doc::parts::paragraph_extractor::cascade_character_properties_with_table                                                                                          -      -
+            |
+            ---0x2
+
+     0.55%  [.] litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::from_sprm                                                                      -      -
+     0.50%  [.] <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter                                                                            -      -
+     0.49%  [.] _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner                                                                                                                    -      -
+     0.43%  [.] <litchi_doc::parts::chp::model::CharacterProperties as core::cmp::PartialEq>::eq                                                                                         -      -
+     0.41%  [.] _int_free_merge_chunk                                                                                                                                                    -      -
+     0.41%  [.] litchi_doc::parts::fkp::ChpxFkp::parse                                                                                                                                   -      -
+     0.39%  [.] _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str                                                                             -      -
+     0.35%  [.] _RNvNtCsgEmfK2I1SDS_4core3fmt5write                                                                                                                                      -      -
+     0.35%  [.] _ZN4core3ptr71drop_in_place$LT$litchi_doc..parts..pap..model..ParagraphProperties$GT$17h917f72887c219cf4E.llvm.7428105530893699264                                       -      -
+     0.30%  [.] litchi_doc::parts::fkp::PapxFkp::parse                                                                                                                                   -      -
+     0.30%  [.] litchi_cfb::directory_name::directory_name_data                                                                                                                          -      -
+     0.30%  [.] litchi_doc::paragraph::model::Paragraph::new                                                                                                                             -      -
+     0.30%  [.] _RNvXsd_NtNtNtCsgEmfK2I1SDS_4core3fmt3num3impyNtB9_7Display3fmt                                                                                                          -      -
+     0.28%  [.] _RNvCsfLfy6EI15iL_7___rustc35___rust_no_alloc_shim_is_unstable_v2                                                                                                        -      -
+     0.27%  [k] 0xffffffff9d800f30                                                                                                                                                       -      -
+     0.27%  [.] __memset_avx512_unaligned_erms                                                                                                                                           -      -
+     0.26%  [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17he497b834530d83e3E.llvm.1625926099375735867                                                                        -      -
+     0.23%  [.] litchi_doc::document::model::semantic::layout::<impl litchi_doc::document::model::state::Document>::convert_to_paragraphs                                                -      -
+     0.21%  [.] _ZN4core3ptr71drop_in_place$LT$litchi_doc..parts..chp..model..CharacterProperties$GT$17h50a6ab357f1f5587E.llvm.7428105530893699264                                       -      -
+     0.20%  [.] <[V] as alloc::slice::Concat<T>>::concat                                                                                                                                 -      -
+     0.19%  [.] alloc::raw_vec::RawVec<T,A>::grow_one                                                                                                                                    -      -
+     0.18%  [.] alloc::raw_vec::RawVec<T,A>::grow_one                                                                                                                                    -      -
+     0.18%  [.] litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_text_range                                                                                           -      -
+     0.18%  [.] litchi_doc::tracked_revision::codec::parse_papx                                                                                                                          -      -
+     0.18%  [.] litchi_doc::parts::piece_table::PieceTable::parse                                                                                                                        -      -
+     0.18%  [.] <alloc::vec::Vec<T,A> as core::clone::Clone>::clone                                                                                                                      -      -
+     0.14%  [.] _int_free_maybe_consolidate                                                                                                                                              -      -
+     0.14%  [.] litchi_doc::tracked_revision::codec::parse_clx                                                                                                                           -      -
+     0.12%  [.] alloc::vec::Vec<T,A>::retain                                                                                                                                             -      -
+     0.12%  [.] _RNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB5_9Formatter3pad                                                                                                                     -      -
+     0.11%  [.] _ZN87_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$6to_vec17h2e418112777b5d55E.llvm.13907203013180145558                        -      -
+     0.11%  [.] litchi_cfb::file::read_u32_le                                                                                                                                            -      -
+     0.11%  [.] litchi_cfb::file::collect_sector_chain                                                                                                                                   -      -
+     0.11%  [.] litchi_doc::parts::piece_table::PieceTable::build_physical_index                                                                                                         -      -
+     0.11%  [.] litchi_cfb::file::collect_sector_chain_exact                                                                                                                             -      -
+     0.11%  [.] litchi_doc::paragraph::model::Run::resolve_revisions                                                                                                                     -      -
+     0.10%  [.] _int_realloc                                                                                                                                                             -      -
+     0.09%  [.] litchi_doc::parts::pap_bin_table::PapBinTable::expand_data_indirections                                                                                                  -      -
+     0.09%  [.] _RNvCsfLfy6EI15iL_7___rustc14___rust_dealloc                                                                                                                             -      -
+     0.09%  [.] _RNvCsfLfy6EI15iL_7___rustc13___rdl_dealloc                                                                                                                              -      -
+     0.09%  [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h6464526c3ff1b6b8E.llvm.521929143331856660                                                                         -      -
+     0.09%  [.] litchi_doc::tracked_revision::codec::parse_chpx                                                                                                                          -      -
+     0.09%  [.] _RNvCsfLfy6EI15iL_7___rustc12___rust_alloc                                                                                                                               -      -
+     0.07%  [.] _ZN4core3ptr60drop_in_place$LT$litchi_doc..paragraph..model..Paragraph$GT$17h64fc8719382faa5bE.llvm.7428105530893699264                                                  -      -
+     0.07%  [.] _ZN4core3ptr71drop_in_place$LT$litchi_doc..parts..pap..model..ParagraphProperties$GT$17hc91cc0109241a7feE.llvm.13907203013180145558                                      -      -
+     0.07%  [.] _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc                                                                                                                                -      -
+     0.07%  [.] core::slice::sort::unstable::ipnsort                                                                                                                                     -      -
+     0.07%  [.] litchi_doc::tracked_revision::codec::parse_bte                                                                                                                           -      -
+     0.07%  [.] litchi_perf_baseline::verify_semantic_doc                                                                                                                                -      -
+     0.05%  [.] core::slice::sort::unstable::ipnsort                                                                                                                                     -      -
+     0.05%  [.] litchi_cfb::file::try_push                                                                                                                                               -      -
+     0.05%  [.] <alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop                                                                                                    -      -
+     0.05%  [.] alloc::vec::Vec<T,A>::retain_mut                                                                                                                                         -      -
+     0.05%  [.] litchi_cfb::file::OleFile<R>::load_fat                                                                                                                                   -      -
+     0.05%  [.] litchi_doc::tracked_revision::codec::u32_at                                                                                                                              -      -
+     0.05%  [.] _RNvNvMsa_NtCsgEmfK2I1SDS_4core3fmtNtB7_9Formatter12pad_integral12write_prefix                                                                                           -      -
+     0.05%  [.] litchi_doc::parts::sections::codec::parse                                                                                                                                -      -
+     0.05%  [.] litchi_cfb::file::OleFile<R>::load_directory                                                                                                                             -      -
+     0.05%  [.] alloc_perturb                                                                                                                                                            -      -
+     0.05%  [.] core::slice::sort::unstable::ipnsort                                                                                                                                     -      -
+     0.05%  [.] litchi_cfb::file::OleFile<R>::load_directory                                                                                                                             -      -
+     0.05%  [.] litchi_doc::paragraph::model::Paragraph::resolve_revision                                                                                                                -      -
+     0.05%  [k] 0xffffffff9c848383                                                                                                                                                       -      -
+     0.04%  [k] 0xffffffff9d6600b7                                                                                                                                                       -      -
+     0.04%  [.] <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter                                                                            -      -
+     0.04%  [.] alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle                                                                                                           -      -
+     0.04%  [.] <core::char::decode::DecodeUtf16<I> as core::iter::traits::iterator::Iterator>::next                                                                                     -      -
+     0.04%  [.] _ZN4core3ptr54drop_in_place$LT$litchi_doc..paragraph..model..Run$GT$17h61c2b91d12abc5feE.llvm.7428105530893699264                                                        -      -
+     0.04%  [.] litchi_doc::paragraph::model::Paragraph::set_runs                                                                                                                        -      -
+     0.04%  [.] litchi_cfb::file::OleFile<R>::claim_sector                                                                                                                               -      -
+     0.04%  [.] core::ptr::drop_in_place<litchi_doc::parts::fkp::PapxFkp>                                                                                                                -      -
+     0.04%  [.] core::ptr::drop_in_place<alloc::vec::Vec<litchi_docx::document::transaction::ParagraphTextReplacement>>                                                                  -      -
+     0.04%  [.] _ZN4core3ptr71drop_in_place$LT$litchi_doc..parts..chp..model..CharacterProperties$GT$17h80dd4b748d5b3b7dE.llvm.13907203013180145558                                      -      -
+     0.04%  [k] 0xffffffff9c7c6082                                                                                                                                                       -      -
+     0.04%  [.] core::slice::sort::stable::drift::sort                                                                                                                                   -      -
+     0.04%  [.] litchi_cfb::file::OleFile<R>::open                                                                                                                                       -      -
+     0.04%  [.] _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write10write_char                                                                           -      -
+     0.04%  [.] litchi_cfb::file::OleFile<R>::find_entry                                                                                                                                 -      -
+     0.04%  [.] <alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop                                                                                                                    -      -
+     0.04%  [.] <&T as core::fmt::Display>::fmt                                                                                                                                          -      -
+     0.04%  [.] litchi_ole_common::object::codec::capture_container                                                                                                                      -      -
+     0.04%  [.] alloc::raw_vec::RawVec<T,A>::grow_one                                                                                                                                    -      -
+     0.04%  [.] core::slice::sort::stable::drift::sort                                                                                                                                   -      -
+     0.03%  [.] litchi_cfb::file::format_clsid                                                                                                                                           -      -
+     0.03%  [.] <A as core::slice::cmp::SlicePartialEq<B>>::equal_same_length                                                                                                            -      -
+     0.03%  [k] 0xffffffff9cb65172                                                                                                                                                       -      -
+     0.03%  [k] 0xffffffff9c8cc81b                                                                                                                                                       -      -
+     0.02%  [.] litchi_doc::writer::fkp::ChpxFkpBuilder::generate_pages                                                                                                                  -      -
+     0.02%  [k] 0xffffffff9cc74dfe                                                                                                                                                       -      -
+     0.02%  [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h836e52d404a057c4E.llvm.16124596282650307638                                                                       -      -
+     0.02%  [.] litchi_doc::parts::associated_strings::read_u16                                                                                                                          -      -
+     0.02%  [.] litchi_doc::document::package::<impl litchi_doc::document::model::state::Document>::from_ole_with_limits                                                                 -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::load_directory                                                                                                                             -      -
+     0.02%  [.] litchi_ole_common::object::codec::Package::capture                                                                                                                       -      -
+     0.02%  [.] hashbrown::raw::RawTable<T,A>::reserve_rehash                                                                                                                            -      -
+     0.02%  [.] hashbrown::map::HashMap<K,V,S,A>::insert                                                                                                                                 -      -
+     0.02%  [.] _ZN10litchi_doc4plcf4Plcf8position17h9f8c32652fda32acE.llvm.4674345666291078086                                                                                          -      -
+     0.02%  [.] litchi_doc::document::codec::<impl litchi_doc::document::model::state::Document>::parse_textbox_entries                                                                  -      -
+     0.02%  [.] litchi_doc::parts::document_properties::DocumentPropertiesBase::validate                                                                                                 -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::open                                                                                                                                       -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::read_sectors_batched                                                                                                                       -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::read_sector_into                                                                                                                           -      -
+     0.02%  [.] __memset_avx512_unaligned                                                                                                                                                -      -
+     0.02%  [.] core::ptr::drop_in_place<core::option::Option<litchi_doc::parts::piece_table::PieceTable>>                                                                               -      -
+     0.02%  [.] litchi_doc::parts::styles::codec::read_u16                                                                                                                               -      -
+     0.02%  [.] core::ptr::drop_in_place<litchi_doc::tracked_revision::package::RevisionEditor>                                                                                          -      -
+     0.02%  [.] _RNvXsi_NtCsgEmfK2I1SDS_4core3fmteNtB5_7Display3fmt                                                                                                                      -      -
+     0.02%  [.] core::iter::adapters::try_process                                                                                                                                        -      -
+     0.02%  [.] <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter                                                                                         -      -
+     0.02%  [.] alloc::raw_vec::RawVec<T,A>::grow_one                                                                                                                                    -      -
+     0.02%  [.] alloc::raw_vec::RawVec<T,A>::grow_one                                                                                                                                    -      -
+     0.02%  [.] _RNvCsfLfy6EI15iL_7___rustc13___rdl_realloc                                                                                                                              -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::parse_directory_entry                                                                                                                      -      -
+     0.02%  [.] core::ptr::drop_in_place<litchi_doc::parts::numbering::model::ListTablesMetadata>                                                                                        -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::read_sectors_batched                                                                                                                       -      -
+     0.02%  [k] 0xffffffff9c4ad0c5                                                                                                                                                       -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::claim_sector                                                                                                                               -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::list_directory_entries                                                                                                                     -      -
+     0.02%  [.] <alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop                                                                                                    -      -
+     0.02%  [.] <alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop                                                                                                                    -      -
+     0.02%  [.] litchi_doc::document::package::<impl litchi_doc::document::model::state::Document>::from_ole_with_options                                                                -      -
+     0.02%  [k] 0xffffffff9c5769e3                                                                                                                                                       -      -
+     0.02%  [.] <alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop                                                                                                                    -      -
+     0.02%  [.] litchi_core::simd::cmp::is_all_zero_avx2                                                                                                                                 -      -
+     0.02%  [.] _dl_relocate_object                                                                                                                                                      -      -
+     0.02%  [k] 0xffffffff9c5a56ba                                                                                                                                                       -      -
+     0.02%  [.] core::ptr::drop_in_place<core::option::Option<litchi_doc::parts::styles::model::StyleSheet>>                                                                             -      -
+     0.02%  [k] 0xffffffff9caecbe5                                                                                                                                                       -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::open_stream                                                                                                                                -      -
+     0.02%  [.] core::ptr::drop_in_place<core::result::Result<litchi_doc::parts::captions::semantic::Tables,litchi_doc::package::model::Error>>                                          -      -
+     0.02%  [.] litchi_doc::parts::textbox_breaks::TextBoxBreakTables::parse                                                                                                             -      -
+     0.02%  [.] <alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop                                                                                                                    -      -
+     0.02%  [.] alloc::raw_vec::RawVec<T,A>::grow_one                                                                                                                                    -      -
+     0.02%  [k] 0xffffffff9c859485                                                                                                                                                       -      -
+     0.02%  [.] litchi_cfb::file::CheckedBitSet::try_with_capacity                                                                                                                       -      -
+     0.02%  [.] toml::de::parser::key::State::close_key                                                                                                                                  -      -
+     0.02%  [.] toml_parser::decoder::string::decode_basic_string                                                                                                                        -      -
+     0.02%  [k] 0xffffffff9d5cfb97                                                                                                                                                       -      -
+     0.02%  [k] 0xffffffff9c7c6549                                                                                                                                                       -      -
+     0.02%  [.] toml::de::parser::value::on_scalar                                                                                                                                       -      -
+     0.02%  [.] litchi_ole_common::object::discovery::from_package                                                                                                                       -      -
+     0.02%  [k] 0xffffffff9d65f8cb                                                                                                                                                       -      -
+     0.02%  [.] __strcmp_evex                                                                                                                                                            -      -
+     0.02%  [.] toml::de::parser::parse_document                                                                                                                                         -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::validate_stream_allocations                                                                                                                -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::validate_stream_allocations                                                                                                                -      -
+     0.02%  [k] 0xffffffff9c7c79d6                                                                                                                                                       -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::build_storage_tree_iterative                                                                                                               -      -
+     0.02%  [.] serde_core::de::impls::<impl serde_core::de::Deserialize for alloc::vec::Vec<T>>::deserialize                                                                            -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::validate_stream_allocations                                                                                                                -      -
+     0.02%  [.] _ZN4core3ptr71drop_in_place$LT$litchi_doc..parts..pap..model..ParagraphProperties$GT$17hc91cc0109241a7feE.llvm.8487014841149048648                                       -      -
+     0.02%  [k] 0xffffffff9c870701                                                                                                                                                       -      -
+     0.02%  [k] 0xffffffff9c952814                                                                                                                                                       -      -
+     0.02%  [.] litchi_ole_common::object::directory::validation::validate                                                                                                               -      -
+     0.02%  [.] _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve                                                                                                              -      -
+     0.02%  [k] 0xffffffff9c5974a9                                                                                                                                                       -      -
+     0.02%  [.] <alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop                                                                                                                    -      -
+     0.02%  [.] _ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17he38c929dd3d0292bE.llvm.6247495593680743966                                                                        -      -
+     0.02%  [.] litchi_doc::body_text::Snapshot::open_bounded                                                                                                                            -      -
+     0.02%  [.] litchi_cfb::file::decode_utf16le                                                                                                                                         -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::load_fat                                                                                                                                   -      -
+     0.02%  [k] 0xffffffff9c82f81f                                                                                                                                                       -      -
+     0.02%  [.] do_lookup_x                                                                                                                                                              -      -
+     0.02%  [.] litchi_cfb::directory_name::DirectoryNameData::compare                                                                                                                   -      -
+     0.02%  [.] core::str::iter::SplitInternal<P>::next                                                                                                                                  -      -
+     0.02%  [k] 0xffffffff9c8451c0                                                                                                                                                       -      -
+     0.02%  [.] __strncmp_evex                                                                                                                                                           -      -
+     0.02%  [.] litchi_doc::tracked_revision::codec::infer_moves                                                                                                                         -      -
+     0.02%  [.] _RNvNtNtCsgEmfK2I1SDS_4core5slice6memchr14memchr_aligned                                                                                                                 -      -
+     0.02%  [k] 0xffffffff9c5a653b                                                                                                                                                       -      -
+     0.02%  [k] 0xffffffff9c9511a7                                                                                                                                                       -      -
+     0.02%  [.] 0x0000000000209f4d                                                                                                                                                       -      -
+     0.02%  [.] realloc                                                                                                                                                                  -      -
+     0.02%  [.] 0x00000000001ae6c5                                                                                                                                                       -      -
+     0.02%  [k] 0xffffffff9c9f283b                                                                                                                                                       -      -
+     0.02%  [.] litchi_doc::parts::associated_strings::DocumentAssociatedStrings::parse_bytes                                                                                            -      -
+     0.02%  [.] litchi_cfb::file::CheckedBitSet::insert                                                                                                                                  -      -
+     0.02%  [.] litchi_doc::parts::revisions::RevisionAuthorTable::parse                                                                                                                 -      -
+     0.02%  [.] alloc::vec::Vec<T,A>::resize                                                                                                                                             -      -
+     0.02%  [.] 0x0000000000000b96                                                                                                                                                       -      -
+     0.02%  [.] core::ptr::drop_in_place<core::option::Option<litchi_doc::parts::piece_table::PieceTable>>                                                                               -      -
+     0.02%  [.] core::slice::sort::stable::drift::sort                                                                                                                                   -      -
+     0.02%  [.] alloc::raw_vec::RawVec<T,A>::grow_one                                                                                                                                    -      -
+     0.02%  [.] litchi_cfb::file::try_push                                                                                                                                               -      -
+     0.02%  [k] 0xffffffff9cc69fbc                                                                                                                                                       -      -
+     0.02%  [k] 0xffffffff9c61ee46                                                                                                                                                       -      -
+     0.02%  [.] core::ptr::drop_in_place<alloc::vec::Vec<litchi_doc::paragraph::model::Paragraph>>                                                                                       -      -
+     0.02%  [.] litchi_cfb::file::OleFile<R>::load_fat                                                                                                                                   -      -
+     0.02%  [k] 0xffffffff9c588087                                                                                                                                                       -      -
+     0.02%  [.] litchi_doc::parts::document_properties::DocumentProperties::parse                                                                                                        -      -
+     0.02%  [.] alloc::vec::Vec<T,A>::retain_mut                                                                                                                                         -      -
+     0.02%  [k] 0xffffffff9c9dedd2                                                                                                                                                       -      -
+     0.02%  [k] 0xffffffff9d5d02a1                                                                                                                                                       -      -
+     0.02%  [k] 0xffffffff9d65066e                                                                                                                                                       -      -
+     0.02%  [k] 0xffffffff9cc6a0d8                                                                                                                                                       -      -
+     0.02%  [k] 0xffffffff9c929ddd                                                                                                                                                       -      -
+     0.02%  [.] 0x00000000002e1cc3                                                                                                                                                       -      -
+     0.02%  [k] 0xffffffff9cb6832f                                                                                                                                                       -      -
+     0.02%  [k] 0xffffffff9c7d8dce                                                                                                                                                       -      -
+     0.00%  [k] 0xffffffff9c817c27                                                                                                                                                       -      -
+     0.00%  [k] 0xffffffff9c7c61de                                                                                                                                                       -      -
+     0.00%  [k] 0xffffffff9c90b1f5                                                                                                                                                       -      -
+     0.00%  [k] 0xffffffff9d5b8c0f                                                                                                                                                       -      -
+     0.00%  [k] 0xffffffff9c5a651b                                                                                                                                                       -      -
+     0.00%  [k] 0xffffffff9d6599f2                                                                                                                                                       -      -
+     0.00%  [k] 0xffffffff9c7a0a61                                                                                                                                                       -      -
+     0.00%  [k] 0xffffffff9c7a9d94                                                                                                                                                       -      -
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

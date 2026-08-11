@@ -1,0 +1,10 @@
+reading file "/tmp/doc-style-cache-heap-after.zst.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-perf-doc-style-cache-after-4f2dca7d5 --warmup 2 --samples 20 --case doc_semantic_open --writer-shape large --json /tmp/doc-style-cache-heap-after.json
+finished reading file, now analyzing data:
+
+total runtime: 0.256000s.
+calls to allocation functions: 589923 (2304386/s)
+temporary memory allocations: 298921 (1167660/s)
+peak heap memory consumption: 5.67M
+peak RSS (including heaptrack overhead): 17.54M
+total memory leaked: 544B

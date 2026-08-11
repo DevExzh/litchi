@@ -47,7 +47,9 @@ conversion remain.
    XLS editor reuse, DOC batched stream publication, PPT root-open reuse and
    direct PPT text-edit resolver reuse. Change 0050 removes the newly
    attributed repeated DOC PieceTable physical-range scan but retains the
-   complete owner and public-reader validation layers;
+   complete owner and public-reader validation layers. Change 0051 removes
+   repeated adjacent paragraph-style inheritance resolution while retaining
+   every direct PAPX, style switch and both readback layers;
    preserve exact-source patch/inverse and the rejected DOC move as independent
    guardrails.
 2. Extend native RTF beyond the new raw CP-1252, LZFu and watermark read/no-op
@@ -230,6 +232,15 @@ queries. Scalar differential tests cover overlapping fast-save intervals,
 ANSI/UTF-16 boundaries and numeric limits; the complete final snapshot and
 public DOC reopens remain. This does not add repair, security, real-producer,
 streaming-output, or new edit coverage.
+
+Change 0051 likewise leaves native DOC CRUD and publication semantics
+unchanged while retaining one parse-local resolved paragraph-style baseline.
+Fresh/cached differential coverage includes base/derived inheritance, direct
+and piece properties, direct mid-run style switching and cache rekeying. Huge
+PAPX, tables/revisions, malformed styles, the complete final snapshot, patch
+and inverse verification, and the independent public DOC reopen remain. This
+does not add repair, security, real-producer, streaming-output, or new edit
+coverage.
 
 Change 0040 removes repeated UTF-8 scalar decoding from ordinary RTF text
 delimiter discovery without changing the existing CRUD surface. It measures
