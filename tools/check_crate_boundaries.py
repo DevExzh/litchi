@@ -1433,6 +1433,157 @@ IWA_PAGES_DOCUMENT_SETTINGS_MODULE = re.compile(
     r"[ \t\r\n]*(?:;|\{)",
     re.MULTILINE,
 )
+RETIRED_IWA_PAGES_SECTION_SETTINGS_METHODS = (
+    "section_settings",
+    "set_section_settings",
+    "set_section_name",
+)
+RETIRED_IWA_PAGES_SECTION_SETTINGS_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_SECTION_SETTINGS_METHODS
+)
+RETIRED_IWA_PAGES_SECTION_SETTINGS_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/set_pages_section_settings.rs"
+)
+RETIRED_IWA_PAGES_SECTION_SETTINGS_TESTS = (
+    "section_settings_crud_is_lossless_validated_and_transactional",
+    "section_settings_reject_zero_starting_page_number_transactionally",
+)
+RETIRED_IWA_PAGES_SECTION_SETTINGS_TEST_SET = frozenset(
+    RETIRED_IWA_PAGES_SECTION_SETTINGS_TESTS
+)
+IWA_PAGES_EDITOR_TEST_SOURCE = IWA_PAGES_SOURCE_ROOT / "editor" / "tests.rs"
+IWA_PAGES_README = Path("crates/litchi-iwa/README.md")
+IWA_PAGES_README_SECTION_SETTINGS_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor)[ \t\r\n]*\."
+        r"[ \t\r\n]*(?:r#)?(?P<method>section_settings|set_section_settings|set_section_name)"
+        r"\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])"
+        r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+        r"(?:r#)?PagesEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?(?P<method>section_settings|set_section_settings|set_section_name)"
+        r"\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>set_section_settings|set_section_name)\b[ \t\r\n]*\("
+    ),
+)
+IWA_PAGES_README_SECTION_SETTINGS_EXAMPLE = re.compile(
+    r"(?<![A-Za-z0-9_])(?P<example>set_pages_section_settings)"
+    r"(?:\.rs)?(?![A-Za-z0-9_])"
+)
+PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE = (
+    PAGES_SOURCE_ROOT / "section" / "settings.rs"
+)
+PAGES_SECTION_SETTINGS_OWNER_SOURCE = (
+    PAGES_SOURCE_ROOT / "package" / "section_settings.rs"
+)
+PAGES_SECTION_SETTINGS_OWNER_HELPER_ROOT = (
+    PAGES_SOURCE_ROOT / "package" / "section_settings"
+)
+PAGES_SECTION_SETTINGS_IMPLEMENTATION_SOURCES = (
+    PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE,
+    PAGES_SECTION_SETTINGS_OWNER_SOURCE,
+)
+PAGES_SECTION_SETTINGS_EXPORT_SOURCES = (
+    PAGES_SOURCE_ROOT / "lib.rs",
+    PAGES_SOURCE_ROOT / "package.rs",
+    PAGES_SOURCE_ROOT / "section.rs",
+)
+PAGES_SECTION_SETTINGS_CANONICAL_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Path",
+    "DependencyKind",
+)
+PAGES_SECTION_SETTINGS_VALUE_TYPE = "Settings"
+PAGES_SECTION_SETTINGS_SHORT_NAMES = frozenset(
+    PAGES_SECTION_SETTINGS_CANONICAL_TYPES
+)
+PAGES_SECTION_SETTINGS_PUBLIC_NAMES = (
+    PAGES_SECTION_SETTINGS_SHORT_NAMES | {PAGES_SECTION_SETTINGS_VALUE_TYPE}
+)
+PAGES_SECTION_SETTINGS_PACKAGE_METHODS = (
+    "section_settings",
+    "edit_section_settings",
+    "apply_section_settings",
+)
+PAGES_SECTION_SETTINGS_FLAT_ALIASES = frozenset(
+    {"SectionSettings", "PagesSectionSettings"}
+    | {
+        prefix + suffix
+        for prefix in ("SectionSettings", "PagesSectionSettings")
+        for suffix in PAGES_SECTION_SETTINGS_SHORT_NAMES
+        if suffix != "Settings"
+    }
+)
+PAGES_SECTION_SETTINGS_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:section_settings|section[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?settings)"
+    r"(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_PAGES_SECTION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?section\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_SECTION_SETTINGS_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?settings\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_PACKAGE_SECTION_SETTINGS_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?section_settings\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_PACKAGE_SECTION_SETTINGS_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?section_settings\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_SECTION_SETTINGS_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+        "SectionArchive",
+        "SectionSettingsArchive",
+        "SectionSettingsSnapshot",
+    }
+)
+PAGES_SECTION_SETTINGS_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+PAGES_SECTION_SETTINGS_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tp", "tsp", "tswp"}
+)
 CAMEL_CASE_WORD = re.compile(r"[A-Z]+(?=[A-Z][a-z]|$)|[A-Z]?[a-z]+|[0-9]+")
 RUST_BYTE_SLICE = re.compile(
     r"&[ \t\r\n]*(?:'[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]+)?"
@@ -2840,6 +2991,60 @@ def _is_pages_document_settings_public_declaration(
     }
     return bool(identifiers & PAGES_DOCUMENT_SETTINGS_PUBLIC_MARKERS) or any(
         "document_settings" in identifier.lower() for identifier in identifiers
+    )
+
+
+def _pages_section_settings_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in section settings."""
+
+    if identifier in PAGES_SECTION_SETTINGS_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in PAGES_SECTION_SETTINGS_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in PAGES_SECTION_SETTINGS_WIRE_TYPES:
+        return "wire type"
+    reason = _iwork_public_leak(identifier)
+    if reason is not None:
+        return reason
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return None
+
+
+def _pages_section_settings_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return PAGES_SECTION_SETTINGS_OWNER_PATH.search(declaration) is not None or any(
+        identifier in PAGES_SECTION_SETTINGS_PACKAGE_METHODS
+        for identifier in identifiers
+    )
+
+
+def _is_pages_section_settings_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return (
+        bool(identifiers & PAGES_SECTION_SETTINGS_FLAT_ALIASES)
+        or (
+            "settings" in identifiers
+            and bool(identifiers & PAGES_SECTION_SETTINGS_PUBLIC_NAMES)
+        )
+        or _pages_section_settings_owner_declaration(declaration)
     )
 
 
@@ -5397,6 +5602,281 @@ def audit_pages_document_settings_facade_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_pages_section_settings_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep retired Pages section settings and name ownership out of the host."""
+
+    violations: list[str] = []
+    example = root / RETIRED_IWA_PAGES_SECTION_SETTINGS_EXAMPLE
+    if example.exists():
+        violations.append(
+            "retired litchi-iwa Pages section-settings example returned: "
+            + str(RETIRED_IWA_PAGES_SECTION_SETTINGS_EXAMPLE)
+        )
+
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_PAGES_SECTION_SETTINGS_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Pages section-settings method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    tests_path = root / IWA_PAGES_EDITOR_TEST_SOURCE
+    if tests_path.is_file():
+        source = tests_path.read_text(encoding="utf-8")
+        for name, line_number in _rust_function_declarations(source):
+            if name not in RETIRED_IWA_PAGES_SECTION_SETTINGS_TEST_SET:
+                continue
+            violations.append(
+                "retired litchi-iwa Pages section-settings test "
+                f"{name}: {IWA_PAGES_EDITOR_TEST_SOURCE}:{line_number}"
+            )
+
+    readme_path = root / IWA_PAGES_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_PAGES_README_SECTION_SETTINGS_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages section-settings README call "
+                    f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
+                )
+        for match in IWA_PAGES_README_SECTION_SETTINGS_EXAMPLE.finditer(source):
+            line_number = source.count("\n", 0, match.start("example")) + 1
+            violations.append(
+                "retired litchi-iwa Pages section-settings README example "
+                f"reference {match.group('example')}: {IWA_PAGES_README}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_pages_section_settings_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the nested, archive-free Pages section-settings owner API."""
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    dedicated_sources = {
+        root / path
+        for path in PAGES_SECTION_SETTINGS_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    owner_helper_root = root / PAGES_SECTION_SETTINGS_OWNER_HELPER_ROOT
+    if owner_helper_root.is_dir():
+        dedicated_sources.update(owner_helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in PAGES_SECTION_SETTINGS_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    violations: list[str] = []
+
+    semantic_path = root / PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE
+    semantic_source = (
+        semantic_path.read_text(encoding="utf-8")
+        if semantic_path.is_file()
+        else ""
+    )
+    canonical_exports = _rust_canonical_exports(
+        semantic_source, PAGES_SECTION_SETTINGS_SHORT_NAMES
+    )
+    for name in PAGES_SECTION_SETTINGS_CANONICAL_TYPES:
+        if name in canonical_exports:
+            continue
+        violations.append(
+            "focused litchi-pages section-settings public API is missing "
+            f"canonical section::settings type {name}: "
+            f"{PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE}"
+        )
+    if PAGES_SECTION_SETTINGS_VALUE_TYPE in _rust_canonical_exports(
+        semantic_source, frozenset({PAGES_SECTION_SETTINGS_VALUE_TYPE})
+    ):
+        violations.append(
+            "focused litchi-pages section-settings public API duplicates canonical "
+            "section::Settings inside section::settings: "
+            f"{PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE}"
+        )
+
+    lib_path = root / PAGES_SECTION_SETTINGS_EXPORT_SOURCES[0]
+    lib_source = (
+        _mask_rust_non_code(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_SECTION_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-pages section-settings public API is missing "
+            f"canonical root section module: {PAGES_SECTION_SETTINGS_EXPORT_SOURCES[0]}"
+        )
+
+    section_path = root / PAGES_SECTION_SETTINGS_EXPORT_SOURCES[2]
+    section_source = (
+        _mask_rust_non_code(section_path.read_text(encoding="utf-8"))
+        if section_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_SECTION_SETTINGS_MODULE.search(section_source) is None:
+        violations.append(
+            "focused litchi-pages section-settings public API is missing "
+            "canonical section::settings module: "
+            f"{PAGES_SECTION_SETTINGS_EXPORT_SOURCES[2]}"
+        )
+    if PAGES_SECTION_SETTINGS_VALUE_TYPE not in _rust_canonical_exports(
+        section_source, frozenset({PAGES_SECTION_SETTINGS_VALUE_TYPE})
+    ):
+        violations.append(
+            "focused litchi-pages section-settings public API is missing canonical "
+            f"section::Settings: {PAGES_SECTION_SETTINGS_EXPORT_SOURCES[2]}"
+        )
+
+    package_path = root / PAGES_SECTION_SETTINGS_EXPORT_SOURCES[1]
+    if package_path.is_file():
+        package_source = _mask_rust_non_code(
+            package_path.read_text(encoding="utf-8")
+        )
+        if PAGES_PACKAGE_SECTION_SETTINGS_MODULE.search(package_source) is None:
+            violations.append(
+                "focused litchi-pages section-settings public API is missing "
+                f"private package owner module: {PAGES_SECTION_SETTINGS_EXPORT_SOURCES[1]}"
+            )
+        for match in PUBLIC_PAGES_PACKAGE_SECTION_SETTINGS_MODULE.finditer(
+            package_source
+        ):
+            line_number = package_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-pages section-settings public API exposes duplicate "
+                "package::section_settings module: "
+                f"{PAGES_SECTION_SETTINGS_EXPORT_SOURCES[1]}:{line_number}"
+            )
+    else:
+        violations.append(
+            "focused litchi-pages section-settings public API is missing "
+            f"private package owner module: {PAGES_SECTION_SETTINGS_EXPORT_SOURCES[1]}"
+        )
+
+    owner_path = root / PAGES_SECTION_SETTINGS_OWNER_SOURCE
+    if not owner_path.is_file():
+        violations.append(
+            "focused litchi-pages section-settings public API is missing private "
+            f"package owner source: {PAGES_SECTION_SETTINGS_OWNER_SOURCE}"
+        )
+    owner_source = owner_path.read_text(encoding="utf-8") if owner_path.is_file() else ""
+    owner_methods = {
+        name
+        for declaration, _line_number in _rust_public_declarations(owner_source)
+        for name, _nested_line in _rust_function_declarations(declaration)
+    }
+    for method in PAGES_SECTION_SETTINGS_PACKAGE_METHODS:
+        if method in owner_methods:
+            continue
+        violations.append(
+            "focused litchi-pages section-settings public API is missing Package "
+            f"method {method}: {PAGES_SECTION_SETTINGS_OWNER_SOURCE}"
+        )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for declaration, line_number, public_declaration, complete_source_scope in declarations:
+            if not _is_pages_section_settings_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            owner_declaration = _pages_section_settings_owner_declaration(declaration)
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            public_use_or_type = identifiers[:2] in (["pub", "type"], ["pub", "use"])
+            section_local_owner_alias = (
+                public_declaration
+                and path == section_path
+                and public_use_or_type
+                and "settings" in identifiers
+                and bool(set(identifiers) & PAGES_SECTION_SETTINGS_PUBLIC_NAMES)
+            )
+            if (
+                public_declaration
+                and path in export_sources
+                and (owner_declaration or section_local_owner_alias)
+                and identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-pages section-settings public API retains "
+                    "root aliases via section::settings glob: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            if (
+                public_declaration
+                and path in export_sources
+                and (owner_declaration or section_local_owner_alias)
+                and public_use_or_type
+            ):
+                violations.append(
+                    "focused litchi-pages section-settings public API exposes public "
+                    f"section-settings owner alias: {path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if public_declaration and identifier in PAGES_SECTION_SETTINGS_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-pages section-settings public API retains flat "
+                        f"alias {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and path in export_sources
+                    and (owner_declaration or section_local_owner_alias)
+                    and public_use_or_type
+                    and identifier in PAGES_SECTION_SETTINGS_PUBLIC_NAMES
+                ):
+                    violations.append(
+                        "focused litchi-pages section-settings public API retains root "
+                        f"alias {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _pages_section_settings_public_leak(identifier)
+                if reason is None:
+                    continue
+                violations.append(
+                    "focused litchi-pages section-settings public API exposes "
+                    f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-pages section-settings public API exposes raw "
+                    f"byte slice {byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_manifest_inventory(snapshot: Snapshot) -> list[str]:
     manifests = frozenset(path.resolve() for path in (ROOT / "crates").glob("*/Cargo.toml"))
     missing = manifests - snapshot.manifests
@@ -5684,6 +6164,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_page_layout_facade_source_topology()
         + audit_iwa_pages_document_settings_source_topology()
         + audit_pages_document_settings_facade_source_topology()
+        + audit_iwa_pages_section_settings_source_topology()
+        + audit_pages_section_settings_facade_source_topology()
         + audit_xlsb_source_topology()
         + audit_spreadsheet_sheet_view_source_topology()
         + audit_spreadsheet_chart_source_topology()

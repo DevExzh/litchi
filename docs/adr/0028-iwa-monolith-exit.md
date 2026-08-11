@@ -2307,3 +2307,76 @@ protobuf tests. The full checker retains only 14 unchanged dependency-policy
 baselines. No manifest edge or ordered debt closes: the current inventory is
 64 workspace packages, 237 internal declarations, 14 `litchi-iwa`
 declarations, and 14 ordered debts, including debt 015.
+
+## 2026-08-11 amendment: aggregate Pages section-settings host exit
+
+Deletion gate 3 now assigns the complete existing-section settings vertical to
+`litchi-pages`. The archive-free `section::Settings` and focused
+`section::settings::{Edit, Commit, Patch, Diagnostics, Error, LimitKind, Path,
+DependencyKind}` surface replace raw-ID host access for native fields 17--22,
+26, and 28. `Package::{section_settings, edit_section_settings,
+apply_section_settings}` resolves exact names or checked semantic positions;
+it exposes no monolith, archive, protobuf, Buffa, component, object-identifier,
+wire, or exact-artifact type.
+
+This is one physical-writer transfer. The retained `section_name` and
+`section_pagination` APIs are projection-scoped ergonomic facades over the same
+aggregate transaction core, not compatibility implementations in the
+migration host and not independent package writers. Their previous semantic
+and native evidence remains valid, while earlier claims that fields 20--22 and
+field 26 have separate current physical mutation owners are superseded.
+
+Strict raw preflight and a private aggregate Buffa lazy view agree on all eight
+selected optional fields. The borrowed view retains no unknown/repeated state
+and cannot encode; caller-owned records retain preservation authority. Fields
+23--25 are target-sensitive template prerequisites, while fields 29, 30, and
+31 and every unknown record remain outside the settings mutation. Missing
+otherwise-valid prerequisites fail as typed unsupported dependencies;
+malformed, ambiguous, aliased, or contradictory ownership fails closed. Final
+generated code is exactly five files and 80,202 bytes under 80 KiB, contains no
+repeated lazy view, and has aggregate SHA-256
+`2202f4b1d394346450cb9f88a41c2784ab476cff23b181fffbab6f37b4a42b62`.
+The focused protobuf suite passes 149/149.
+
+Exact no-ops share the source and avoid dependency/cache scans, preview
+planning, reassembly, and reopen. Changed publication rewrites one selected
+section payload while preserving the unique rooted layout/cache edge, metadata,
+and every root preview exactly, then reopens the whole candidate under retained
+limits. Template/background payloads, opaque and detached cache objects,
+sibling sections, and unrelated components/members remain exact. Patch
+application is authorized by exact artifacts, conflicts fail, and inverse
+application restores the accepted source byte-for-byte.
+
+The host cut removes `PagesEditor::section_settings`,
+`set_section_settings`, and `set_section_name`; the raw-ID
+`set_pages_section_settings` example; duplicate host tests; and stale README
+usage. Background mutation remains a separate host capability with only its
+private payload helpers retained or relocated. Changed legacy nested packages
+are no longer normalized by the deleted settings/name path; reads and exact
+no-ops remain broad, and changed focused transactions return
+`UnsupportedSource`.
+
+Matched native Pages 14.4 evidence now proves fields 17, 19, and 28 independently
+as one exact false-to-true scalar delta on object 1732889/type 10011. It keeps
+field 18, message header/references, templates, header/footer storages, entry
+names, caches, and previews exact and reopens warning-free with the expected UI
+behavior. ADR 0008 records all seed/control/change hashes. The independent
+production gate records 77-to-77
+selected fields, 564-to-564 strict wire work, 4-to-4 references, and
+292,154-to-587,222 `TransactionWork` (2.0100x) when rooted real-package objects
+double from 4,096 to 8,192. Output allocation and reopen counts remain one at
+both sizes; a maximum-minus-one work ceiling refuses before output with both
+counts zero. Focused integration passes 7/7, four private production/security
+tests cover budget observation, object scaling, alias-metadata refusal, and
+repeated-reference scaling/max-minus-one refusal; the projection suite passes
+149/149, and locality review is clean. The full Pages library/integration gate
+is 118/118; boundary regressions pass 181/181; focused facade/host audits report
+zero; and the live
+checker retains only 14 unchanged baselines. The matched native pairs are the
+UI oracle; no separate Rust-authored application artifact is claimed.
+The transfer closes no manifest edge and deletes no ordered debt: topology
+remains 64 workspace packages, 237 internal declarations, 14 `litchi-iwa`
+declarations, and 14 ordered debts, including debt 017. Remaining Pages
+editors, examples/tests/fuzz ownership, durable patch serialization, atomic
+filesystem publication, shared aggregate memory/work completion, remaining
+Buffa conversion, and the other host debts continue to block monolith deletion.

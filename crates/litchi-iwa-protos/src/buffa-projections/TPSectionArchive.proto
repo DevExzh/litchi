@@ -1,9 +1,11 @@
-// Wire-only Buffa projection derived from TP.SectionArchive fields 20--22 in
-// `TPArchives.proto`.
+// Wire-only Buffa projections derived from TP.SectionArchive fields
+// 17--22, 26, and 28 in `TPArchives.proto`.
 //
-// The generated lazy view decodes only the three scalar pagination values.
-// Every template reference, section name, background, and unknown field stays
-// opaque in caller-owned IWA bytes, which remain the preservation authority.
+// The pagination-only message is retained so its established decoder keeps
+// treating every non-pagination record as opaque.  The aggregate settings
+// message adds the four presence-sensitive flags and a borrowed section name.
+// Every template reference, background, and unknown field stays opaque in
+// caller-owned IWA bytes, which remain the preservation authority.
 syntax = "proto2";
 
 package LitchiIwaProjection;
@@ -12,4 +14,15 @@ message PagesSectionPaginationArchive {
   optional uint32 section_start_kind = 20;
   optional uint32 section_page_number_kind = 21;
   optional uint32 section_page_number_start = 22;
+}
+
+message PagesSectionSettingsArchive {
+  optional bool inherit_previous_header_footer = 17;
+  optional bool section_template_first_page_different = 18;
+  optional bool section_template_even_odd_pages_different = 19;
+  optional uint32 section_start_kind = 20;
+  optional uint32 section_page_number_kind = 21;
+  optional uint32 section_page_number_start = 22;
+  optional string name = 26;
+  optional bool section_template_first_page_hides_header_footer = 28;
 }

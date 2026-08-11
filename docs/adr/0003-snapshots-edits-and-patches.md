@@ -1152,3 +1152,73 @@ unchanged 14 baselines: six development-only annotations and eight edge
 classifications. No edge or debt closes: final topology is 64 workspace
 packages, 237 internal declarations, 14 `litchi-iwa` dependency declarations,
 and 14 ordered debts, including debt 015 (`litchi-iwa -> litchi-numbers`).
+
+## 2026-08-11 amendment: aggregate Pages section-settings exact patches
+
+`Package::edit_section_settings(selector)` resolves an exact producer name or
+checked position once against the immutable source snapshot and stores only the
+content-free `Position`. The edit owns one complete `section::Settings`
+replacement. `Edit::settings` borrows the staged value and consuming
+`Edit::set(Settings)` validates the archive-free name and pagination invariants
+before replacing it. The four optional Booleans, three optional pagination
+values, and optional name all retain native presence; equality of the complete
+value is the only semantic no-op.
+
+The no-op path shares the original package and exact source artifact, reports
+zero touched components and preview deletions, and does not inspect template
+dependencies, plan a rewrite, reassemble, or reopen. This ordering
+also admits reads and exact no-ops for supported legacy nested packages. A
+changed edit requires exact package provenance and rechecks the resolved
+section, its eight-field source value, rooted template prerequisites, and
+exact cache/preview state against the same immutable artifact before planning
+output.
+
+The changed dependency closure contains only the selected type-10011 section
+message and required enclosing IWA/ZIP length framing. The transaction
+raw-splices only fields 17--22, 26, and 28, retaining source position for
+replaced records and appending newly present selected records in numeric order.
+Rooted document/view-state layout caches, their exact reference metadata, and
+all canonical root previews remain byte-exact. The complete candidate is
+reopened under retained limits and must reproduce the requested settings,
+stable package statistics, unchanged cache/previews, and exact unrelated
+semantics and physical locality.
+
+`section::settings::Patch` exposes the resolved path, complete before/after
+semantic values, diagnostic fingerprints, `is_noop`, and `inverse`. Exact
+source and target artifacts, selected-payload evidence, and locality proof
+remain private. Fingerprints are never
+authorization. Application requires exact artifact bytes and the directional
+semantic/physical preconditions; a changed apply reopens the retained target
+rather than replaying a rewrite. Replay, stale or competing bases, source or
+target tampering, and using an inverse in the wrong direction yield
+`PatchConflict`. Inversion swaps every directional artifact and proof and
+restores the accepted source byte-for-byte.
+
+The retained `edit_section_name` and `edit_section_pagination` transactions are
+projection-scoped adapters over this patch core. A name adapter changes only
+`Settings::name`; a pagination adapter changes only fields 20--22. Each retains
+its established semantic facade and exact-patch behavior, but neither performs
+an independent payload decode, rewrite, reassembly, reopen, or locality check.
+Concurrent patches do not merge implicitly; exact source authorization keeps
+the immutable snapshots independent.
+
+The patch remains process-local. Durable deterministic serialization,
+versioned semantic operation/read-write sets, composition, three-way merge,
+bounded history, and library-owned atomic filesystem publication remain open
+ADR 0003 work. The frozen aggregate codec is exactly five generated files and
+80,202 bytes under 80 KiB, has no generated repeated view, and has aggregate
+SHA-256
+`2202f4b1d394346450cb9f88a41c2784ab476cff23b181fffbab6f37b4a42b62`.
+The real rooted-package scaling gate doubles total objects from 4,096 to 8,192:
+fields stay 77, `WireWork` stays 564, references stay 4, and
+`TransactionWork` changes from 292,154 to 587,222 (2.0100x). Both sizes perform
+one output allocation and one reopen. A maximum-minus-one transaction-work
+budget fails before output with zero allocations and reopens. Focused
+integration passes 7/7, four private production/security tests cover budget
+observation, object scaling, alias-metadata refusal, and repeated-reference
+scaling/max-minus-one refusal, and the final locality review is clean. The
+matched native pairs in ADR 0008, rather than an unrecorded Rust artifact, are
+the application UI
+oracle for this transaction. The full Pages library/integration total is
+118/118, boundary regressions are 181/181, both focused facade/host audits are
+empty, and the full checker reports only the unchanged 14 baselines.

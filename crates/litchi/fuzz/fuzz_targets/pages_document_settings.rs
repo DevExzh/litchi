@@ -6,10 +6,14 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::pages::{
-    Limits, Package, PackageError,
+    Limits, Package, PackageError, SectionSelector,
     document_options::Options,
     document_settings::Settings,
     footnote::{self, Format, Gap, Kind, Numbering},
+    section::{
+        Settings as SectionSettings,
+        settings::{Error as SectionSettingsError, Path as SectionSettingsPath},
+    },
 };
 
 const MAX_INPUT_BYTES: u64 = 256 * 1024;
@@ -19,6 +23,7 @@ const MAX_ENTRY_BYTES: u64 = 1024 * 1024;
 const MAX_EXPANDED_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_IWA_STREAM_BYTES: usize = 1024 * 1024;
 const PRIVATE_MALFORMED_INPUT: &[u8] = b"__litchi_private_pages_settings_input_9c42__";
+const PRIVATE_SECTION_NAME: &str = "__litchi_private_section_settings_9c42__";
 const NATIVE_PAGES: &[u8] = include_bytes!("../../../../test-data/iwork/pages/basic.pages");
 
 fuzz_target!(|data: &[u8]| {
@@ -59,10 +64,17 @@ fn native_package() -> &'static Package {
             panic!("native Pages fuzz seed must expose document settings: {error}")
         });
         package
+            .section_settings(SectionSelector::index(0))
+            .unwrap_or_else(|error| {
+                panic!("native Pages fuzz seed must expose aggregate section settings: {error}")
+            });
+        package
     })
 }
 
 fn exercise_package(package: &Package, data: &[u8]) {
+    exercise_section_settings(package, data);
+
     let before = match package.document_settings() {
         Ok(settings) => settings,
         Err(error) => {
@@ -159,6 +171,183 @@ fn exercise_package(package: &Package, data: &[u8]) {
         before,
     );
     assert_eq!(restored.package().source_bytes(), package.source_bytes());
+}
+
+fn exercise_section_settings(package: &Package, data: &[u8]) {
+    observe_result(
+        package.section_settings(SectionSelector::index(usize::from(read_u16(data, 12)))),
+    );
+    if let Some(section) = package.sections().first() {
+        if let Some(name) = section.name() {
+            observe_result(package.section_settings(SectionSelector::name(name)));
+        }
+    }
+    assert!(matches!(
+        package.section_settings(SectionSelector::index(package.sections().len())),
+        Err(SectionSettingsError::PositionNotFound { .. })
+    ));
+    if let Err(error) = package.section_settings(SectionSelector::name(PRIVATE_SECTION_NAME)) {
+        observe_redacted_text(error, PRIVATE_SECTION_NAME);
+    }
+
+    let selector = SectionSelector::index(0);
+    let before = match package.section_settings(selector) {
+        Ok(settings) => settings,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    observe_section_settings(&before);
+
+    let no_op = match package.edit_section_settings(selector) {
+        Ok(edit) => match edit.set(before.clone()) {
+            Ok(edit) => edit,
+            Err(error) => {
+                observe_error(error);
+                return;
+            },
+        },
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    assert_eq!(
+        no_op.path(),
+        SectionSettingsPath::Section {
+            position: litchi::pages::Position::new(0)
+        }
+    );
+    assert_eq!(no_op.settings(), &before);
+    let no_op_commit = match no_op.commit() {
+        Ok(commit) => commit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    let no_op_patch = no_op_commit.patch().clone();
+    let no_op_diagnostics = no_op_commit.diagnostics();
+    assert!(no_op_patch.is_noop());
+    assert_eq!(no_op_patch.before(), &before);
+    assert_eq!(no_op_patch.after(), &before);
+    assert!(!no_op_diagnostics.changed());
+    assert_eq!(no_op_diagnostics.touched_components(), 0);
+    assert_eq!(no_op_diagnostics.deleted_previews(), 0);
+    assert!(!no_op_diagnostics.full_reparse_performed());
+    assert_eq!(
+        no_op_commit.package().source_bytes(),
+        package.source_bytes()
+    );
+    let no_op_applied = package
+        .apply_section_settings(&no_op_patch)
+        .unwrap_or_else(|error| panic!("fresh no-op section-settings patch must apply: {error}"));
+    assert_eq!(
+        no_op_applied.package().source_bytes(),
+        package.source_bytes()
+    );
+
+    let after = changed_section_settings(&before, data);
+    assert_ne!(after, before);
+    assert_eq!(after.name(), before.name());
+    assert_eq!(after.pagination(), before.pagination());
+    let edit = match package.edit_section_settings(selector) {
+        Ok(edit) => match edit.set(after.clone()) {
+            Ok(edit) => edit,
+            Err(error) => {
+                observe_error(error);
+                return;
+            },
+        },
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    assert_eq!(edit.settings(), &after);
+    let commit = match edit.commit() {
+        Ok(commit) => commit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    let patch = commit.patch().clone();
+    let diagnostics = commit.diagnostics();
+    assert!(!patch.is_noop());
+    assert_eq!(patch.before(), &before);
+    assert_eq!(patch.after(), &after);
+    assert!(diagnostics.changed());
+    assert_eq!(diagnostics.touched_components(), 1);
+    assert_eq!(diagnostics.deleted_previews(), 0);
+    assert!(diagnostics.full_reparse_performed());
+    assert_eq!(
+        commit
+            .package()
+            .section_settings(selector)
+            .unwrap_or_else(|error| panic!("committed section settings must be readable: {error}")),
+        after,
+    );
+    let applied = package
+        .apply_section_settings(&patch)
+        .unwrap_or_else(|error| panic!("fresh section-settings patch must apply: {error}"));
+    assert_eq!(
+        applied
+            .package()
+            .section_settings(selector)
+            .unwrap_or_else(|error| panic!("applied section settings must be readable: {error}")),
+        after,
+    );
+    let inverse = patch.inverse();
+    assert_eq!(inverse.inverse(), patch);
+    assert!(matches!(
+        applied.package().apply_section_settings(&patch),
+        Err(SectionSettingsError::PatchConflict)
+    ));
+    assert!(matches!(
+        package.apply_section_settings(&inverse),
+        Err(SectionSettingsError::PatchConflict)
+    ));
+    let restored = applied
+        .package()
+        .apply_section_settings(&inverse)
+        .unwrap_or_else(|error| panic!("fresh section-settings inverse must apply: {error}"));
+    assert_eq!(restored.package().source_bytes(), package.source_bytes());
+    assert_eq!(
+        restored
+            .package()
+            .section_settings(selector)
+            .unwrap_or_else(|error| panic!("restored section settings must be readable: {error}")),
+        before,
+    );
+    black_box((&patch, diagnostics));
+}
+
+fn changed_section_settings(before: &SectionSettings, data: &[u8]) -> SectionSettings {
+    let values = [None, Some(false), Some(true)];
+    let mut after = before.clone();
+    after.set_inherit_previous_header_footer(values[usize::from(control(data, 0)) % values.len()]);
+    after.set_first_page_different(values[usize::from(control(data, 1)) % values.len()]);
+    after.set_even_odd_pages_different(values[usize::from(control(data, 2)) % values.len()]);
+    after.set_first_page_hides_header_footer(values[usize::from(control(data, 3)) % values.len()]);
+    if after == *before {
+        after.set_first_page_hides_header_footer(Some(
+            !before.first_page_hides_header_footer().unwrap_or(false),
+        ));
+    }
+    after
+}
+
+fn observe_section_settings(settings: &SectionSettings) {
+    black_box((
+        settings.name(),
+        settings.inherit_previous_header_footer(),
+        settings.first_page_different(),
+        settings.even_odd_pages_different(),
+        settings.first_page_hides_header_footer(),
+        settings.pagination(),
+    ));
 }
 
 fn combined_change(before: Settings, data: &[u8]) -> Settings {
@@ -283,6 +472,14 @@ fn observe_error(error: impl Debug + Display) {
 fn observe_redacted(error: impl Debug + Display, private: &[u8]) {
     let private = std::str::from_utf8(private)
         .unwrap_or_else(|error| unreachable!("private sentinel is valid UTF-8: {error}"));
+    let display = error.to_string();
+    let debug = format!("{error:?}");
+    assert!(!display.contains(private));
+    assert!(!debug.contains(private));
+    black_box((display, debug));
+}
+
+fn observe_redacted_text(error: impl Debug + Display, private: &str) {
     let display = error.to_string();
     let debug = format!("{error:?}");
     assert!(!display.contains(private));

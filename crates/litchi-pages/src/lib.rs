@@ -5,6 +5,19 @@
 //! inspect Pages files without importing the umbrella iWork crate, raw
 //! protobuf schemas, or package identifiers.
 //!
+//! Settings stored directly on a section use the complete, presence-preserving
+//! [`section::Settings`] value. [`Package::section_settings`] and
+//! [`Package::edit_section_settings`] accept a semantic [`SectionSelector`];
+//! the transaction vocabulary lives in [`section::settings`] and exposes no
+//! native object identifiers. Assigning `None` to one of the four Boolean
+//! setters removes that field, while `Some(false)` retains an explicit native
+//! false. A changed exact-source commit verifies the selected section's
+//! template dependencies, rewrites only that Section component, preserves
+//! ViewState, the derived layout cache, and root previews exactly, fully
+//! reopens the candidate, and returns an exact-source inverse.
+//! The focused section-name and pagination entry points remain convenient
+//! projections when only one of those value families is being changed.
+//!
 //! Section body text is read and edited through [`SectionSelector`] and
 //! checked [`TextSpan`] or [`TextPosition`] values. A text transaction stages
 //! one UTF-16 splice, preserves unrelated native records, fully reopens its

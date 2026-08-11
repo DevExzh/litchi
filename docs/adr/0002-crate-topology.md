@@ -2802,3 +2802,105 @@ only the unchanged 14 dependency-policy baselines. No edge or debt closes:
 topology remains 64 workspace packages, 237 internal declarations, 14
 `litchi-iwa` dependency declarations, and 14 ordered debts, including debt 015
 (`litchi-iwa -> litchi-numbers`).
+
+## 2026-08-11 amendment: aggregate Pages section-settings ownership
+
+The earlier Pages section-name and section-pagination amendments are
+superseded only where they describe independent physical writers or a
+pagination-only current projection. `litchi-pages` now has one physical owner
+for the lossless settings stored directly on an existing
+`TP.SectionArchive`: `section::settings`. Its archive-free value remains
+`section::Settings`, and the focused module owns the short `Edit`, `Commit`,
+`Patch`, `Diagnostics`, `Error`, `LimitKind`, `Path`, and `DependencyKind`
+transaction vocabulary. `Package::{section_settings, edit_section_settings,
+apply_section_settings}` accepts an exact-name or checked-position
+`SectionSelector`; no supported signature exposes an object identifier,
+component/member name, message type, generated value, field record, or source
+artifact.
+
+The selected payload owner covers exactly optional fields 17--22, 26, and 28:
+header/footer inheritance, first-page distinction, even/odd-page distinction,
+section start, numbering policy, nonzero starting page number, producer-visible
+name, and first-page header/footer hiding. Absence stays distinct from an
+explicit Boolean or scalar default, and `None` remains distinct from an
+explicitly present empty name. Fields 23--25 remain separately owned template
+references, field 29 remains an unowned guide-storage reference, field 30
+remains the separate background owner, and field 31 remains an unowned
+hyperlink UUID. They may be validated as prerequisites or preserved records;
+they are not rewritten by this transaction.
+
+One strict bounded raw pass is cross-checked with a private Buffa lazy view for
+the eight selected fields. The optional name stays borrowed during projection;
+unknown fields and repeated storage are not retained, and no generated
+encoding path is available. The former pagination projection remains only as
+a projection-scoped compatibility reader. Exact source records, not Buffa,
+retain preservation and rewrite authority. The aggregate projection's final
+build ratchet covers exactly five generated files totaling 80,202 bytes under
+an 80 KiB ceiling. Their deterministic aggregate SHA-256 is
+`2202f4b1d394346450cb9f88a41c2784ab476cff23b181fffbab6f37b4a42b62`.
+Generated output contains neither `RepeatedView` nor `LazyRepeatedView`, and
+the complete focused protobuf suite passes 149/149 tests.
+
+The established section-name and section-pagination APIs remain ergonomic and
+source-compatible projections, but their reads, edits, patches, and candidate
+publication delegate to the aggregate settings transaction core. They are not
+second physical owners. Boundary policy rejects archive, IWA, protobuf, Buffa,
+raw-wire, package-reassembly, or exact-artifact authority in either facade.
+
+Target settings that activate inherited or distinct page templates require an
+unambiguous rooted prerequisite closure: the previous section's template
+closure for enabled inheritance, the first-page template for first-page
+distinction or hiding, and the even and odd templates for even/odd distinction.
+A missing otherwise-valid relationship is a typed `UnsupportedDependency`;
+zero, external, duplicated, aliased, unresolved, wrongly typed, contradictory,
+or malformed ownership is `InvalidSource`. A changed transaction also requires
+exact preservation of the rooted layout/cache and rendering state. These checks
+do not transfer ownership of template or cache payloads to the settings value.
+
+An exact semantic no-op returns before dependency/cache planning, shares the
+source allocation, preserves every preview and cache byte, and performs no
+reassembly or reopen. A changed edit rewrites the selected section component,
+and preserves the rooted layout/cache graph, its reference metadata, and all
+three canonical root previews byte-for-byte. Exactly one IWA component is
+rewritten. Template payloads, background payload, sibling sections, and all
+unrelated members remain exact. Complete retained-limit reopen plus semantic,
+dependency, cache/preview, and locality readback precedes publication.
+
+Matched Apple Pages 14.4 controls freeze that locality. The 101,399-byte native
+seed has SHA-256
+`19b8a24c7bc0d57d87614a0f08215072c9c61519b15629827f5a448b29218422`.
+For object 1732889/type 10011, three independent native edits changed only the
+selected scalar: field 17 false-to-true, field 19 false-to-true, or field 28
+false-to-true. The 57-byte message header and references, explicit false field
+18, templates, header/footer storages, all 13 entry names, and root previews
+were exact. Warning-free native close/reopen showed inherited H1/F1 on pages
+3/4 for field 17, H2/F2 on page 3 and blank page 4 for field 19, and blank page
+3 with H2/F2 on page 4 for field 28. Exact artifact hashes are retained in ADR
+0008's verification record.
+
+The production rooted-package scaling gate doubles the real object population
+from 4,096 to 8,192. Selected wire fields remain 77 to 77, strict `WireWork`
+remains 564 to 564, and selected references remain 4 to 4;
+`TransactionWork` rises from 292,154 to 587,222, or 2.0100x. Each changed run
+performs one bounded output allocation and one reopen. A maximum-minus-one
+`TransactionWork` budget returns its typed limit error before output, with zero
+output allocations and zero reopens. Focused integration passes 7/7, and four
+private production/security tests cover budget observations, object scaling,
+alias-metadata refusal, and repeated-reference scaling/max-minus-one refusal.
+The locality review has no remaining finding. The complete Pages
+library/integration gate is
+118/118: 67 library, 14 document-settings, 1 native-fixture, 10 page-layout, 5
+section-name, 6 section-pagination, 7 section-settings, and 8 section-text
+tests. Boundary regressions pass 181/181, focused facade and host audits report
+zero findings, and the full checker retains only the 14 established baselines.
+
+The migration retires `PagesEditor::{section_settings,
+set_section_settings, set_section_name}` and the raw-ID
+`set_pages_section_settings` example. Private background helpers are retained
+only under the separate background seam. Changed legacy nested-`Index.zip`
+sources now return `UnsupportedSource`; reads and exact no-ops remain broad.
+This deliberate host cut supersedes the earlier promise to retain a
+normalizing `set_section_name` writer. No manifest edge or ordered debt closes:
+the topology remains 64 workspace packages, 237 internal declarations, 14
+`litchi-iwa` dependency declarations, and 14 ordered debts, including debt 017
+(`litchi-iwa -> litchi-pages`).

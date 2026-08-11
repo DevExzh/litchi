@@ -261,6 +261,37 @@ def add_numbers_table_title_settings_canonical_scaffold(root: Path) -> None:
     table_export.write_text("pub mod title;\n", encoding="utf-8")
 
 
+def add_pages_section_settings_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.PAGES_SECTION_SETTINGS_CANONICAL_TYPES
+        ),
+        encoding="utf-8",
+    )
+    owner = root / boundaries.PAGES_SECTION_SETTINGS_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "impl Package {\n"
+        + "".join(
+            f"pub fn {method}() {{}}\n"
+            for method in boundaries.PAGES_SECTION_SETTINGS_PACKAGE_METHODS
+        )
+        + "}\n",
+        encoding="utf-8",
+    )
+    lib_export, package_export, section_export = (
+        root / path for path in boundaries.PAGES_SECTION_SETTINGS_EXPORT_SOURCES
+    )
+    lib_export.write_text("pub mod section;\n", encoding="utf-8")
+    package_export.write_text("pub(crate) mod section_settings;\n", encoding="utf-8")
+    section_export.write_text(
+        "pub mod settings;\npub struct Settings;\n", encoding="utf-8"
+    )
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -8665,6 +8696,310 @@ class BoundaryPolicyTests(unittest.TestCase):
                     root
                 ),
                 [],
+            )
+
+    def test_pages_section_settings_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_SECTION_SETTINGS_METHODS,
+            ("section_settings", "set_section_settings", "set_section_name"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_SECTION_SETTINGS_TESTS,
+            (
+                "section_settings_crud_is_lossless_validated_and_transactional",
+                "section_settings_reject_zero_starting_page_number_transactionally",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_SECTION_SETTINGS_CANONICAL_TYPES,
+            (
+                "Edit",
+                "Patch",
+                "Commit",
+                "Diagnostics",
+                "Error",
+                "LimitKind",
+                "Path",
+                "DependencyKind",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_SECTION_SETTINGS_PACKAGE_METHODS,
+            ("section_settings", "edit_section_settings", "apply_section_settings"),
+        )
+        self.assertTrue(
+            {
+                "SectionSettings",
+                "SectionSettingsEdit",
+                "PagesSectionSettings",
+                "PagesSectionSettingsPatch",
+            }
+            <= boundaries.PAGES_SECTION_SETTINGS_FLAT_ALIASES
+        )
+
+    def test_retired_iwa_pages_section_settings_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/section_settings.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "pub fn section_settings() {}\n"
+                "pub fn set_section_settings() {}\n"
+                "pub fn set_section_name() {}\n"
+                "pub(super) fn section_background_payload() {}\n",
+                encoding="utf-8",
+            )
+            tests = root / boundaries.IWA_PAGES_EDITOR_TEST_SOURCE
+            tests.write_text(
+                "\n".join(
+                    f"fn {name}() {{}}"
+                    for name in boundaries.RETIRED_IWA_PAGES_SECTION_SETTINGS_TESTS
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_PAGES_EDITOR_SOURCE
+            editor.write_text("mod section_settings;\n", encoding="utf-8")
+            example = root / boundaries.RETIRED_IWA_PAGES_SECTION_SETTINGS_EXAMPLE
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+
+            violations = boundaries.audit_iwa_pages_section_settings_source_topology(
+                root
+            )
+
+            self.assertEqual(len(violations), 6)
+            self.assertTrue(any("example returned" in item for item in violations))
+            for method in boundaries.RETIRED_IWA_PAGES_SECTION_SETTINGS_METHODS:
+                self.assertTrue(
+                    any(f"settings method {method}:" in item for item in violations)
+                )
+            for name in boundaries.RETIRED_IWA_PAGES_SECTION_SETTINGS_TESTS:
+                self.assertTrue(any(f"test {name}:" in item for item in violations))
+            self.assertFalse(any("section_background_payload" in item for item in violations))
+
+    def test_retired_iwa_pages_section_settings_readme_tokens(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            readme = root / boundaries.IWA_PAGES_README
+            readme.parent.mkdir(parents=True)
+            readme.write_text(
+                "pages.section_settings(selector);\n"
+                "editor\n  .\n  set_section_settings(selector, value);\n"
+                "other.set_section_name(selector, name);\n"
+                "crate::PagesEditor::section_settings(selector);\n"
+                "set_pages_section_settings\n"
+                "set_pages_section_settings.rs\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_pages_section_settings_source_topology(
+                root
+            )
+
+            self.assertEqual(sum("README call" in item for item in violations), 4)
+            self.assertEqual(
+                sum("README example reference" in item for item in violations), 2
+            )
+
+    def test_iwa_pages_section_settings_policy_retains_adjacent_seams(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/section_wire.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "pub(super) fn section_message_data() {}\n"
+                "pub(super) fn section_background_payload() {}\n"
+                "pub(super) fn set_section_background_payload() {}\n"
+                "pub(super) fn validate_section_payload() {}\n"
+                "pub fn section_background() {}\n"
+                "pub fn set_section_background() {}\n"
+                "pub fn section_pagination() {}\n"
+                "pub fn edit_section_name() {}\n",
+                encoding="utf-8",
+            )
+            retained = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/section_settings.rs"
+            retained.write_text(
+                "pub(super) fn section_background_payload() {}\n"
+                "pub(super) fn set_section_background_payload() {}\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_PAGES_EDITOR_SOURCE
+            editor.write_text("mod section_settings;\n", encoding="utf-8")
+            readme = root / boundaries.IWA_PAGES_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "Use litchi_pages::section::settings and edit_section_settings.\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_section_settings_source_topology(root), []
+            )
+
+    def test_focused_pages_section_settings_requires_each_canonical_type(self) -> None:
+        for missing in boundaries.PAGES_SECTION_SETTINGS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_section_settings_canonical_scaffold(root)
+                    semantic = root / boundaries.PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_SECTION_SETTINGS_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_pages_section_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-pages section-settings public API is "
+                            f"missing canonical section::settings type {missing}: "
+                            "crates/litchi-pages/src/section/settings.rs"
+                        ],
+                    )
+
+    def test_focused_pages_section_settings_requires_nested_private_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_settings_canonical_scaffold(root)
+            package = root / boundaries.PAGES_SECTION_SETTINGS_EXPORT_SOURCES[1]
+            package.write_text("pub mod section_settings;\n", encoding="utf-8")
+            section = root / boundaries.PAGES_SECTION_SETTINGS_EXPORT_SOURCES[2]
+            section.write_text("mod settings;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_section_settings_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "missing canonical section::settings module" in item
+                    for item in violations
+                )
+            )
+            self.assertTrue(
+                any(
+                    "exposes duplicate package::section_settings module" in item
+                    for item in violations
+                )
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_settings_canonical_scaffold(root)
+            (root / boundaries.PAGES_SECTION_SETTINGS_OWNER_SOURCE).unlink()
+            self.assertEqual(
+                boundaries.audit_pages_section_settings_facade_source_topology(root),
+                [
+                    "focused litchi-pages section-settings public API is missing "
+                    "Package method apply_section_settings: "
+                    "crates/litchi-pages/src/package/section_settings.rs",
+                    "focused litchi-pages section-settings public API is missing "
+                    "Package method edit_section_settings: "
+                    "crates/litchi-pages/src/package/section_settings.rs",
+                    "focused litchi-pages section-settings public API is missing "
+                    "Package method section_settings: "
+                    "crates/litchi-pages/src/package/section_settings.rs",
+                    "focused litchi-pages section-settings public API is missing "
+                    "private package owner source: "
+                    "crates/litchi-pages/src/package/section_settings.rs"
+                ],
+            )
+
+    def test_focused_pages_section_settings_rejects_aliases_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_settings_canonical_scaffold(root)
+            helper = root / boundaries.PAGES_SECTION_SETTINGS_OWNER_HELPER_ROOT / "api.rs"
+            helper.parent.mkdir(parents=True)
+            helper.write_text(
+                "pub type SectionSettingsEdit = Edit;\n"
+                "pub fn section_settings(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_SECTION_SETTINGS_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod section;\n"
+                "pub use crate::section::settings::{Settings, Edit};\n",
+                encoding="utf-8",
+            )
+            section = root / boundaries.PAGES_SECTION_SETTINGS_EXPORT_SOURCES[2]
+            section.write_text(
+                "pub mod settings;\n"
+                "pub struct Settings;\n"
+                "pub use settings::{Patch, Commit};\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_section_settings_facade_source_topology(
+                root
+            )
+
+            for fragment in (
+                "retains flat alias SectionSettingsEdit",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes public section-settings owner alias",
+                "retains root alias Settings",
+                "retains root alias Edit",
+                "retains root alias Patch",
+                "retains root alias Commit",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_section_settings_allows_canonical_and_adjacent_api(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_settings_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use crate::package::section_settings::{Commit, Diagnostics, "
+                "Edit, Error, LimitKind, Patch, Path, DependencyKind};\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.PAGES_SECTION_SETTINGS_OWNER_SOURCE
+            owner.write_text(
+                "impl Package {\n"
+                "pub fn section_settings() {}\n"
+                "pub fn edit_section_settings() {}\n"
+                "pub fn apply_section_settings() {}\n"
+                "}\n"
+                "pub(crate) fn resolve_object_id(source_bytes: &[u8], wire: WireView) {}\n",
+                encoding="utf-8",
+            )
+            section = root / boundaries.PAGES_SECTION_SETTINGS_EXPORT_SOURCES[2]
+            section.write_text(
+                "pub mod pagination;\n"
+                "pub mod settings;\n"
+                "pub use pagination::{PageNumber, PageNumbering, Pagination, Start};\n"
+                "pub struct Settings;\n"
+                "pub enum Error { BackgroundPayloadTooLarge }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_section_settings_facade_source_topology(root), []
             )
 
 

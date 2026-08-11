@@ -8,7 +8,9 @@ pub(crate) mod document_settings;
 mod page_layout;
 mod section_name;
 mod section_pagination;
+pub(crate) mod section_settings;
 mod section_text;
+mod section_transaction;
 
 use std::collections::BTreeSet;
 use std::fmt;

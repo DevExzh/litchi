@@ -2365,15 +2365,6 @@ impl PagesEditor {
         &self.sections
     }
 
-    /// Set or clear the display name of a reachable Pages section.
-    pub fn set_section_name(&mut self, section_id: u64, name: Option<&str>) -> Result<()> {
-        let mut settings = self.section_settings(section_id)?;
-        settings
-            .set_name(name)
-            .map_err(|error| Error::ParseError(error.to_string()))?;
-        self.set_section_settings(section_id, settings)
-    }
-
     /// Insert a native section break at a UTF-16 body position.
     ///
     /// The new section copies the selected source section's page masters,

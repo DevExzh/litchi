@@ -132,6 +132,109 @@ fn section_pagination_transaction_reaches_pages_facade() -> Result<(), Box<dyn s
 }
 
 #[test]
+fn section_settings_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::error::Error>> {
+    use litchi::pages::section::{
+        Settings,
+        settings::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
+    };
+
+    assert_send_sync::<Settings>();
+    assert_send_sync::<Edit<'static>>();
+    assert_send_sync::<Patch>();
+    assert_send_sync::<Commit>();
+    assert_send_sync::<Diagnostics>();
+    assert_send_sync::<Error>();
+    assert_send_sync::<LimitKind>();
+    assert_send_sync::<Path>();
+
+    let package = Package::open(fixture_path())?;
+    let source = package.source_bytes().to_vec();
+    let source_pointer = package.source_bytes().as_ptr();
+    let selector = SectionSelector::index(0);
+    let before = package.section_settings(selector)?;
+
+    let noop_edit = package.edit_section_settings(selector)?;
+    assert_eq!(noop_edit.settings(), &before);
+    assert!(noop_edit.path().position().is_some());
+    let edit_debug = format!("{noop_edit:?}");
+    assert!(!edit_debug.contains("Blank"));
+    assert!(!edit_debug.contains("Index/"));
+    assert!(!edit_debug.contains(".iwa"));
+    assert!(!edit_debug.contains("identifier"));
+
+    let noop = noop_edit.set(before.clone())?.commit()?;
+    assert_eq!(noop.patch().before(), &before);
+    assert_eq!(noop.patch().after(), &before);
+    assert!(noop.patch().is_noop());
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.diagnostics().touched_components(), 0);
+    assert_eq!(noop.diagnostics().deleted_previews(), 0);
+    assert!(!noop.diagnostics().full_reparse_performed());
+    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(noop.package().source_bytes(), source);
+
+    let replayed_noop = package.apply_section_settings(noop.patch())?;
+    assert!(replayed_noop.patch().is_noop());
+    assert_eq!(
+        replayed_noop.package().source_bytes().as_ptr(),
+        source_pointer
+    );
+    assert_eq!(replayed_noop.package().source_bytes(), source);
+
+    let mut after = before.clone();
+    after.set_first_page_hides_header_footer(Some(
+        !before.first_page_hides_header_footer().unwrap_or(false),
+    ));
+    assert_ne!(after, before);
+    let changed = package
+        .edit_section_settings(selector)?
+        .set(after.clone())?
+        .commit()?;
+    assert_eq!(changed.patch().before(), &before);
+    assert_eq!(changed.patch().after(), &after);
+    assert!(!changed.patch().is_noop());
+    assert!(changed.diagnostics().changed());
+    assert!(changed.diagnostics().touched_components() >= 1);
+    assert!(changed.diagnostics().full_reparse_performed());
+    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package.source_bytes(), source);
+    assert_ne!(changed.package().source_bytes(), source);
+    assert_eq!(changed.package().section_settings(selector)?, after);
+
+    let patch_debug = format!("{:?}", changed.patch());
+    assert!(!patch_debug.contains("Blank"));
+    assert!(!patch_debug.contains("Index/"));
+    assert!(!patch_debug.contains(".iwa"));
+    assert!(!patch_debug.contains("identifier"));
+    assert!(!patch_debug.contains("fingerprint"));
+
+    let applied = package.apply_section_settings(changed.patch())?;
+    assert_eq!(
+        applied.package().source_bytes(),
+        changed.package().source_bytes()
+    );
+    assert_eq!(applied.package().section_settings(selector)?, after);
+
+    let conflict = changed
+        .package()
+        .apply_section_settings(changed.patch())
+        .expect_err("a section-settings patch must authorize its exact source");
+    assert!(matches!(&conflict, Error::PatchConflict));
+    assert_eq!(format!("{conflict:?}"), "PatchConflict");
+
+    let inverse = changed.patch().inverse();
+    let inverse_conflict = package
+        .apply_section_settings(&inverse)
+        .expect_err("an inverse section-settings patch must authorize its target");
+    assert!(matches!(inverse_conflict, Error::PatchConflict));
+
+    let restored = changed.package().apply_section_settings(&inverse)?;
+    assert_eq!(restored.package().source_bytes(), source);
+    assert_eq!(restored.package().section_settings(selector)?, before);
+    Ok(())
+}
+
+#[test]
 fn section_text_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::error::Error>> {
     assert_send_sync::<SectionTextCommit>();
     assert_send_sync::<SectionTextDiagnostics>();
