@@ -444,6 +444,10 @@ impl Snapshot {
         })
     }
 
+    pub(crate) fn shared_xml(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.xml)
+    }
+
     /// Borrow the exact main-document XML bytes.
     #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {

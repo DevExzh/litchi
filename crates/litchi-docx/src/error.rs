@@ -118,6 +118,21 @@ pub enum Error {
         #[source]
         source: TryReserveError,
     },
+
+    /// A bounded external hyperlink-wrapper detachment ceiling was exceeded.
+    #[error("DOCX external hyperlink detachment {resource} limit exceeded: {actual} > {maximum}")]
+    ExternalHyperlinkDetachmentLimit {
+        /// Bounded resource.
+        resource: &'static str,
+        /// Maximum accepted value.
+        maximum: usize,
+        /// Observed value.
+        actual: usize,
+    },
+
+    /// A source-bound external hyperlink patch was applied to a foreign closure.
+    #[error("DOCX external hyperlink detachment patch conflicts with the supplied source")]
+    ExternalHyperlinkDetachmentConflict,
 }
 
 impl From<quick_xml::Error> for Error {

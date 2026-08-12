@@ -15,8 +15,11 @@ use crate::paragraph::Paragraph;
 use crate::parts::document_part::{
     document_paragraph, document_paragraph_count, document_paragraphs, visible_document_xml,
 };
+use crate::sanitize::{self, RelationshipState};
+use crate::settings::DocumentSettings;
 use litchi_core::ReadAt;
-use litchi_opc::SourceBackedPackage;
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::{BlobPart, Part, SourceBackedPackage};
 use smallvec::SmallVec;
 use std::io::Write;
 use std::sync::Arc;
@@ -99,6 +102,82 @@ impl Package {
         Ok(self.document_snapshot()?.edit())
     }
 
+    /// Capture the exact source closure used to detach external hyperlinks in
+    /// the main document.
+    ///
+    /// The closure binds the raw main-document XML and its complete outbound
+    /// relationship set. Enforced document or write protection is refused.
+    /// Encrypted OOXML is rejected earlier because it is not a plaintext OPC
+    /// package. No external target is fetched or executed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed package, protection, markup-compatibility, XML, or
+    /// resource-limit error.
+    pub fn external_hyperlink_sanitization_snapshot(&self) -> Result<sanitize::Snapshot> {
+        self.external_hyperlink_sanitization_snapshot_with_limits(sanitize::Limits::default())
+    }
+
+    /// Capture the external-hyperlink sanitization closure with explicit
+    /// semantic scanner limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same failures as
+    /// [`Self::external_hyperlink_sanitization_snapshot`].
+    pub fn external_hyperlink_sanitization_snapshot_with_limits(
+        &self,
+        limits: sanitize::Limits,
+    ) -> Result<sanitize::Snapshot> {
+        let (_, document) = self
+            .main_document_snapshot("external_hyperlink_sanitization_snapshot")
+            .map_err(transaction_error_to_document)?;
+        self.refuse_protected_external_hyperlink_detachment()?;
+        let main = self.package.main_document_part()?;
+        let mut relationships = Vec::new();
+        relationships
+            .try_reserve_exact(main.rels().len())
+            .map_err(|source| Error::Allocation {
+                resource: "external-hyperlink relationship closure",
+                source,
+            })?;
+        for relationship in main.rels().iter() {
+            relationships.push(RelationshipState::new(
+                relationship.r_id().to_owned(),
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.is_external(),
+            ));
+        }
+        sanitize::Snapshot::from_source(document.shared_xml(), relationships, limits)
+    }
+
+    /// Build a non-mutating plan that detaches all external main-document
+    /// hyperlink wrappers while retaining their visible child markup.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same failures as
+    /// [`Self::external_hyperlink_sanitization_snapshot`].
+    pub fn plan_external_hyperlink_detachment(&self) -> Result<sanitize::SanitizePlan> {
+        Ok(self.external_hyperlink_sanitization_snapshot()?.plan())
+    }
+
+    /// Build the external-hyperlink detachment plan with explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same failures as
+    /// [`Self::external_hyperlink_sanitization_snapshot_with_limits`].
+    pub fn plan_external_hyperlink_detachment_with_limits(
+        &self,
+        limits: sanitize::Limits,
+    ) -> Result<sanitize::SanitizePlan> {
+        Ok(self
+            .external_hyperlink_sanitization_snapshot_with_limits(limits)?
+            .plan())
+    }
+
     /// Publish one exact-source-checked main-document commit to a sequential
     /// stream while preserving every other physical ZIP member.
     ///
@@ -142,6 +221,38 @@ impl Package {
         Ok(target)
     }
 
+    /// Publish an explicit external-hyperlink sanitization commit to a
+    /// sequential stream.
+    ///
+    /// Only the main-document payload is regenerated. Every other physical
+    /// member and the relationship topology are preserved. Consequently the
+    /// detached hyperlinks' external relationship records remain present and
+    /// are counted in [`sanitize::EffectReport`]. An exact no-op reproduces
+    /// every source byte, including signatures; a real change to a signed
+    /// package is refused because this API has no resigning policy.
+    ///
+    /// All source, protection, patch, XML, signature, and preservation checks
+    /// complete before output. A later sink failure is reported as the
+    /// underlying typed incomplete-output error.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed package, source-conflict, protection, signature, XML,
+    /// resource-limit, or sink error.
+    pub fn publish_external_hyperlink_sanitization_to_stream<W: Write>(
+        self,
+        writer: W,
+        commit: &sanitize::Commit,
+    ) -> Result<sanitize::Snapshot> {
+        let main = self.package.main_document_part()?.partname().clone();
+        let current =
+            self.external_hyperlink_sanitization_snapshot_with_limits(commit.patch().limits())?;
+        let target = commit.patch().apply(&current)?;
+        self.package
+            .write_part_overlay_to_stream(writer, &main, target.xml_bytes().to_vec())?;
+        Ok(target)
+    }
+
     fn main_document_snapshot(
         &self,
         operation: &'static str,
@@ -160,6 +271,68 @@ impl Package {
             .into());
         }
         Ok((partname, Snapshot::from_shared_xml(raw)?))
+    }
+
+    fn refuse_protected_external_hyperlink_detachment(&self) -> Result<()> {
+        const STRICT_SETTINGS: &str =
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/settings";
+
+        let main = self.package.main_document_part()?;
+        let mut settings_relationships = main.rels().iter().filter(|relationship| {
+            matches!(relationship.reltype(), rt::SETTINGS | STRICT_SETTINGS)
+        });
+        let Some(relationship) = settings_relationships.next() else {
+            return Ok(());
+        };
+        if settings_relationships.next().is_some() {
+            return Err(Error::InvalidRelationship(
+                "document has multiple settings relationships".into(),
+            ));
+        }
+        if relationship.is_external() {
+            return Err(Error::InvalidRelationship(
+                "settings relationship cannot be external".into(),
+            ));
+        }
+        let target = relationship.target_partname()?;
+        let settings_part = self.package.part(&target)?;
+        if settings_part.content_type() != ct::WML_SETTINGS {
+            return Err(Error::InvalidContentType {
+                expected: ct::WML_SETTINGS.into(),
+                got: settings_part.content_type().into(),
+            });
+        }
+        let mut staged = BlobPart::new(
+            target,
+            ct::WML_SETTINGS.to_owned(),
+            settings_part.data()?.as_bytes().to_vec(),
+        );
+        for relationship in settings_part.rels().iter() {
+            staged.rels_mut().try_add_relationship(
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.r_id().to_owned(),
+                relationship.target_mode(),
+            )?;
+        }
+        let settings = DocumentSettings::extract_from_part(&staged)?;
+        if settings.is_protected() || settings.is_write_protected() {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "external_hyperlink_wrapper_detachment",
+                reason: "document or write protection is enforced",
+            });
+        }
+        Ok(())
+    }
+}
+
+fn transaction_error_to_document(error: crate::document::TransactionError) -> Error {
+    match error {
+        crate::document::TransactionError::Document(error) => error,
+        other => Error::InvalidFormat(format!(
+            "external hyperlink-wrapper detachment snapshot could not be captured: {other}"
+        )),
     }
 }
 
