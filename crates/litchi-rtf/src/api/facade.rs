@@ -13,6 +13,14 @@ struct Inner {
     text: OnceLock<Box<str>>,
 }
 
+fn visible_text_fragment<'a>(inline: crate::text::Inline<'a>) -> Option<&'a str> {
+    match inline {
+        crate::text::Inline::Text(run) => Some(run.text()),
+        crate::text::Inline::Break(crate::text::Break::Line) => Some("\n"),
+        crate::text::Inline::Break(crate::text::Break::Paragraph) => None,
+    }
+}
+
 /// Immutable, cheap-to-share RTF document snapshot.
 ///
 /// Parsing always detaches the retained model from the input. Cloning a
@@ -122,6 +130,31 @@ impl Document {
         self.inner
             .text
             .get_or_init(|| self.inner.model.text().into_boxed_str())
+    }
+
+    /// Write body paragraphs as bounded UTF-8 text to a sequential, non-seek sink.
+    ///
+    /// Character formatting is intentionally omitted, inline line breaks remain
+    /// `\n`, and paragraph separators come from `options`. Unsupported inert
+    /// destinations are retained by the document but do not become visible text.
+    /// The immutable document snapshot is never changed.
+    ///
+    /// # Errors
+    /// Returns a typed resource-limit or partial sink failure.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: litchi_core::TextOutputOptions<'_>,
+    ) -> Result<litchi_core::TextOutputReport, litchi_core::TextOutputError<crate::Error>> {
+        let mut writer = litchi_core::SequentialTextWriter::new(output, options);
+        for paragraph in self.body().paragraphs() {
+            writer.write_joined_object(
+                litchi_core::TextObjectKind::Paragraph,
+                || paragraph.inlines().filter_map(visible_text_fragment),
+                "",
+            )?;
+        }
+        Ok(writer.finish())
     }
 
     /// Whether the body contains no text.

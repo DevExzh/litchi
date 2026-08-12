@@ -28,6 +28,8 @@ pub mod sheet;
 pub mod simd;
 pub mod source;
 pub mod style;
+/// Bounded semantic plain-text output to sequential sinks.
+pub mod text_output;
 /// Common unit conversion utilities (length units used across all formats)
 pub mod unit;
 /// XML utilities
@@ -62,6 +64,10 @@ pub use selector::{Position, Selector};
 pub use shapes::{PlaceholderType, ShapeType};
 pub use source::{OwnedSource, ReadAt, SliceSource, SourceVersion};
 pub use style::{Length, RGBColor, VerticalPosition};
+pub use text_output::{
+    SequentialTextWriter, TextObjectKind, TextOutputError, TextOutputLimit, TextOutputLimitKind,
+    TextOutputOptions, TextOutputReport,
+};
 // Unit conversions
 pub use unit::LengthUnit;
 // Shared slice types — kept `pub` (not `pub(crate)` per spec) because the
