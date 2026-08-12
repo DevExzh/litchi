@@ -19,6 +19,18 @@ pub enum Source {
 pub struct Range(String);
 
 impl Range {
+    /// Construct one checked A1 cell or rectangular cell range.
+    pub fn new(value: impl Into<String>) -> crate::Result<Self> {
+        let value = value.into();
+        let mut parsed = super::codec::parse_sqref(&value)?;
+        if parsed.len() != 1 {
+            return Err(crate::error::invalid(
+                "a conditional-formatting Range must contain exactly one area",
+            ));
+        }
+        Ok(parsed.remove(0))
+    }
+
     pub(crate) fn from_raw(value: String) -> Self {
         Self(value)
     }
@@ -455,9 +467,73 @@ pub struct Rule {
     pub extension_association: Association,
 }
 
+impl Rule {
+    /// Construct an authored core rule with checked positive priority.
+    pub fn new(rule_type: Kind, priority: i32) -> crate::Result<Self> {
+        if priority <= 0 {
+            return Err(crate::error::invalid(
+                "conditional-formatting priority must be positive",
+            ));
+        }
+        Ok(Self {
+            source: Source::Core,
+            rule_type: Some(rule_type),
+            priority: Some(priority),
+            differential_format: None,
+            formulas: SmallVec::new(),
+            stop_if_true: false,
+            above_average: true,
+            equal_average: false,
+            percent: false,
+            bottom: false,
+            operator: None,
+            text: None,
+            time_period: None,
+            rank: None,
+            standard_deviations: None,
+            payload: None,
+            extension_id: None,
+            extension_association: Association::Independent,
+        })
+    }
+
+    /// Append one opaque formula string, preserving its authored spelling.
+    pub fn push_formula(&mut self, formula: impl Into<String>) -> crate::Result<()> {
+        let formula = formula.into();
+        if self.formulas.len() >= 3 || formula.len() > super::codec::MAX_FORMULA_BYTES {
+            return Err(crate::error::invalid(
+                "conditional-formatting rule formula limit exceeded",
+            ));
+        }
+        self.formulas.push(formula);
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Formatting {
     pub ranges: Vec<Range>,
     pub pivot: bool,
     pub rules: Vec<Rule>,
+}
+
+impl Formatting {
+    /// Construct one ordered conditional-formatting collection.
+    pub fn new(ranges: Vec<Range>, rules: Vec<Rule>) -> crate::Result<Self> {
+        if ranges.is_empty() {
+            return Err(crate::error::invalid(
+                "conditionalFormatting requires at least one range",
+            ));
+        }
+        if rules.is_empty() {
+            return Err(crate::error::invalid(
+                "conditionalFormatting requires at least one rule",
+            ));
+        }
+        Ok(Self {
+            ranges,
+            pivot: false,
+            rules,
+        })
+    }
 }

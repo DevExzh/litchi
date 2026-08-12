@@ -75,7 +75,7 @@ impl Snapshot {
         )
     }
 
-    pub(super) fn load_source_backed<'a>(
+    pub(crate) fn load_source_backed<'a>(
         package: &SourceBackedPackage,
         selector: impl Into<Selector<'a>>,
     ) -> Result<Self> {
@@ -233,7 +233,7 @@ impl Snapshot {
         (filter_changed && self.filter_locked) || (sort_changed && self.sort_locked)
     }
 
-    pub(super) fn same_source(&self, other: &Self) -> bool {
+    pub(crate) fn same_source(&self, other: &Self) -> bool {
         self.sheet_name == other.sheet_name
             && self.sheet_position == other.sheet_position
             && self.filter_locked == other.filter_locked
@@ -241,7 +241,7 @@ impl Snapshot {
             && self.source == other.source
     }
 
-    pub(super) fn matches_source_backed(&self, package: &SourceBackedPackage) -> Result<bool> {
+    pub(crate) fn matches_source_backed(&self, package: &SourceBackedPackage) -> Result<bool> {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
         let workbook_xml = workbook.data()?;
@@ -285,7 +285,7 @@ impl Snapshot {
             && relationships_match(&self.source.worksheet_relationships, worksheet.rels()))
     }
 
-    pub(super) fn matches_current_source(&self, package: &OpcPackage) -> bool {
+    pub(crate) fn matches_current_source(&self, package: &OpcPackage) -> bool {
         let Ok(workbook) = package.main_document_part() else {
             return false;
         };
@@ -316,6 +316,27 @@ impl Snapshot {
                 self.source.worksheet.matches_part(part)
                     && relationships_match(&self.source.worksheet_relationships, part.rels())
             })
+    }
+
+    /// Rebind the retained worksheet closure after another embedded worksheet
+    /// owner has been rewritten. The direct auto-filter is reparsed so this
+    /// helper cannot accidentally bless a change to its semantic state.
+    pub(crate) fn rebind_worksheet_xml(&self, bytes: Vec<u8>) -> Result<Self> {
+        let value = super::parse_auto_filter(&bytes)?;
+        if value.as_ref() != self.auto_filter() {
+            return Err(invalid(
+                "worksheet-owner rewrite changed the direct auto-filter",
+            ));
+        }
+        Self::from_rewritten_source(self, bytes, value)
+    }
+
+    /// Differential-format cardinality bound into this worksheet closure.
+    pub(crate) fn differential_format_count(&self) -> usize {
+        self.source
+            .styles
+            .as_ref()
+            .map_or(0, |value| value.differential_format_count)
     }
 }
 
