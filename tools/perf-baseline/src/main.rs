@@ -87,6 +87,7 @@ const SEMANTIC_ODS_CORPUS_GENERATOR: &str = "litchi-ods-semantic-v1";
 const ODS_MEDIA_CORPUS_GENERATOR: &str = "litchi-ods-media-publication-v1";
 const SEMANTIC_ODP_CORPUS_GENERATOR: &str = "litchi-odp-semantic-v1";
 const ODP_MEDIA_CORPUS_GENERATOR: &str = "litchi-odp-media-textbox-publication-v1";
+const ODP_TEXT_BOX_BATCH_CORPUS_GENERATOR: &str = "litchi-odp-cross-slide-textbox-publication-v1";
 const SEMANTIC_RTF_CORPUS_GENERATOR: &str = "litchi-rtf-semantic-v2";
 const RTF_LIFECYCLE_CORPUS_GENERATOR: &str = "litchi-rtf-paragraph-lifecycle-v1";
 const ODS_MEDIA_ENTRY_COUNT: usize = 8;
@@ -98,6 +99,7 @@ const PPTX_SOURCE_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const PPTX_SOURCE_SLIDE_COUNT: usize = 200;
 const PPTX_SOURCE_TEXT_BOXES_PER_SLIDE: usize = 8;
 const PPTX_MULTI_SLIDE_BATCH_COUNT: usize = 8;
+const ODP_TEXT_BOX_BATCH_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const ODP_MEDIA_TEXT_BOX_NAME: &str = "litchi-perf-media-text-box";
@@ -525,6 +527,8 @@ enum Case {
     OdpSemanticNoopEditSave,
     OdpSemanticOneEditSave,
     OdpMediaTextBoxEditSave,
+    OdpMediaTextBoxScalarReplaceSave,
+    OdpMediaTextBoxBatchReplaceSave,
 }
 
 impl Case {
@@ -747,6 +751,8 @@ impl Case {
             Self::OdpSemanticNoopEditSave => "odp_semantic_noop_edit_save",
             Self::OdpSemanticOneEditSave => "odp_semantic_one_edit_save",
             Self::OdpMediaTextBoxEditSave => "odp_media_textbox_edit_save",
+            Self::OdpMediaTextBoxScalarReplaceSave => "odp_media_textbox_scalar_replace_save",
+            Self::OdpMediaTextBoxBatchReplaceSave => "odp_media_textbox_batch_replace_save",
         }
     }
 
@@ -970,6 +976,13 @@ impl Case {
 
     const fn uses_odp_media(self) -> bool {
         matches!(self, Self::OdpMediaTextBoxEditSave)
+    }
+
+    const fn uses_odp_text_box_batch(self) -> bool {
+        matches!(
+            self,
+            Self::OdpMediaTextBoxScalarReplaceSave | Self::OdpMediaTextBoxBatchReplaceSave
+        )
     }
 
     const fn uses_ods_media(self) -> bool {
@@ -1908,6 +1921,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_ods_media()
                     && !case.uses_semantic_odp()
                     && !case.uses_odp_media()
+                    && !case.uses_odp_text_box_batch()
                     && !case.is_opc_source_overlay_save()
                     && !case.is_docx_source_edit_save()
                     && !case.is_pptx_source_edit_save()
@@ -2462,6 +2476,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_odp_text_box_batch())
+    {
+        let corpus = build_odp_text_box_batch_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .filter(|case| case.uses_odp_text_box_batch())
+        {
+            results.push(run_case_with_config(
+                *case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
+        }
+    }
+
     let report = Report {
         schema_version: SCHEMA_VERSION,
         tool: Tool {
@@ -2862,6 +2897,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_semantic_noop_edit_save" => Some(Case::OdpSemanticNoopEditSave),
         "odp_semantic_one_edit_save" => Some(Case::OdpSemanticOneEditSave),
         "odp_media_textbox_edit_save" => Some(Case::OdpMediaTextBoxEditSave),
+        "odp_media_textbox_scalar_replace_save" => Some(Case::OdpMediaTextBoxScalarReplaceSave),
+        "odp_media_textbox_batch_replace_save" => Some(Case::OdpMediaTextBoxBatchReplaceSave),
         _ => None,
     }
 }
@@ -3026,7 +3063,9 @@ fn print_usage() {
                                        odp_semantic_open,odp_semantic_list_slides,\n\
                                        odp_semantic_one_slide,odp_semantic_full_text,\n\
                                        odp_semantic_create_small,odp_semantic_noop_edit_save,\n\
-                                       odp_semantic_one_edit_save,odp_media_textbox_edit_save\n\
+                                       odp_semantic_one_edit_save,odp_media_textbox_edit_save,\n\
+                                       odp_media_textbox_scalar_replace_save,\n\
+                                       odp_media_textbox_batch_replace_save\n\
            --shape LIST                tiny,many-small,few-large,wide-root\n\
            --payload LIST              compressible,incompressible\n\
            --writer-shape LIST         tiny,large,payload-heavy\n\
@@ -4307,6 +4346,19 @@ fn odp_media_text() -> String {
     "litchi-perf-baseline-odp-media-text-box-v1".to_owned()
 }
 
+fn odp_text_box_batch_name(index: usize) -> String {
+    format!("litchi-perf-odp-batch-text-box-{index:02}")
+}
+
+fn odp_text_box_batch_text(index: usize, updated: bool) -> String {
+    let state = if updated { "updated" } else { "source" };
+    format!("litchi-perf-baseline-odp-batch-v1-{state}-{index:02}")
+}
+
+fn odp_text_box_batch_page(index: usize) -> usize {
+    index * (SemanticShape::Medium.pptx_slides() - 1) / (ODP_TEXT_BOX_BATCH_COUNT - 1)
+}
+
 fn ods_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
     let base = semantic_ods_bytes(SemanticShape::Medium)?;
     let source = ArchiveReader::new(&base)?;
@@ -4366,6 +4418,42 @@ fn odp_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
             continue;
         }
         writer.add_file(path, &source.read(path)?)?;
+    }
+    writer.add_manifest_directory("Pictures/", "")?;
+    for index in 0..ODS_MEDIA_ENTRY_COUNT {
+        writer.add_file_with_media_type(
+            &odp_media_path(index),
+            &odp_media_payload(index),
+            "application/octet-stream",
+        )?;
+    }
+    Ok(writer.finish_to_bytes()?)
+}
+
+fn odp_text_box_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
+    let source = litchi_odp::authoring::edit::Snapshot::from_bytes(semantic_odp_bytes(
+        SemanticShape::Medium,
+    )?)?;
+    let mut transaction = source.transaction()?;
+    for index in 0..ODP_TEXT_BOX_BATCH_COUNT {
+        let text_box = litchi_odp::content::TextBox::new(
+            odp_text_box_batch_name(index),
+            litchi_odp::content::RichText::plain(odp_text_box_batch_text(index, false))?,
+        )?;
+        transaction.add_text_box(odp_text_box_batch_page(index), &text_box)?;
+    }
+    let commit = transaction.commit()?;
+    if !commit.changed() || commit.patch().is_noop() {
+        return Err("ODP text-box batch corpus construction was an exact no-op".into());
+    }
+    let staged = ArchiveReader::new(commit.snapshot().bytes())?;
+    let mut writer = litchi_odp::core::PackageWriter::new();
+    writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
+    for path in staged.file_names() {
+        if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
+            continue;
+        }
+        writer.add_file(path, &staged.read(path)?)?;
     }
     writer.add_manifest_directory("Pictures/", "")?;
     for index in 0..ODS_MEDIA_ENTRY_COUNT {
@@ -4633,6 +4721,64 @@ fn build_odp_media_corpus() -> Result<Corpus, Box<dyn Error>> {
         },
         archive,
         target_name: ODP_MEDIA_TEXT_BOX_NAME.to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn build_odp_text_box_batch_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let shape = SemanticShape::Medium;
+    let archive = odp_text_box_batch_archive()?;
+    verify_odp_text_box_batch_archive(&archive, false)?;
+    let target_payload = odp_text_box_batch_text(0, false).into_bytes();
+    let slide_bytes = (0..shape.pptx_slides()).try_fold(0usize, |total, index| {
+        total
+            .checked_add(semantic_odp_title(index, false).len())
+            .and_then(|total| total.checked_add(semantic_odp_text(index, false).len()))
+            .ok_or("ODP text-box batch slide byte count overflows usize")
+    })?;
+    let text_box_bytes = (0..ODP_TEXT_BOX_BATCH_COUNT).try_fold(0usize, |total, index| {
+        total
+            .checked_add(odp_text_box_batch_text(index, false).len())
+            .ok_or("ODP text-box batch text byte count overflows usize")
+    })?;
+    let media_bytes = ODS_MEDIA_ENTRY_COUNT
+        .checked_mul(ODS_MEDIA_ENTRY_BYTES)
+        .ok_or("ODP text-box batch media byte count overflows usize")?;
+    let entry_count = shape
+        .pptx_slides()
+        .checked_add(ODP_TEXT_BOX_BATCH_COUNT)
+        .and_then(|count| count.checked_add(ODS_MEDIA_ENTRY_COUNT))
+        .ok_or("ODP text-box batch logical entry count overflows usize")?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: "odp-cross-slide-textbox-publication".to_owned(),
+            generator: ODP_TEXT_BOX_BATCH_CORPUS_GENERATOR,
+            package_format: "ODP/ODF/ZIP",
+            shape: "media-rich-cross-slide",
+            payload_kind: "deterministic-incompressible-media-and-rich-text",
+            compression: "deflate",
+            entry_count,
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: ODS_MEDIA_ENTRY_BYTES,
+            uncompressed_payload_bytes: slide_bytes
+                .checked_add(text_box_bytes)
+                .and_then(|total| total.checked_add(media_bytes))
+                .ok_or("ODP text-box batch aggregate byte count overflows usize")?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: format!(
+                "slide:{}/{}",
+                odp_text_box_batch_page(0),
+                odp_text_box_batch_name(0)
+            ),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: odp_text_box_batch_name(0),
         target_payload,
         xlsx: None,
     })
@@ -5255,6 +5401,9 @@ fn run_case_with_config(
         },
         Case::OdpMediaTextBoxEditSave => {
             run_odp_media_textbox_edit_save(corpus, warmup_iterations, samples)
+        },
+        Case::OdpMediaTextBoxScalarReplaceSave | Case::OdpMediaTextBoxBatchReplaceSave => {
+            run_odp_text_box_model_publication(case, corpus, warmup_iterations, samples)
         },
         Case::OpcOpenSessionScaling | Case::CfbBulkReadScaling => {
             Err("scaling case requires an explicit worker count".into())
@@ -6249,6 +6398,105 @@ fn verify_odp_media_archive(bytes: &[u8], text_box_added: bool) -> Result<(), Bo
         }
         if package.get_file(&path)? != odp_media_payload(index) {
             return Err(format!("media-rich ODP payload differs for '{path}'").into());
+        }
+    }
+    Ok(())
+}
+
+fn verify_odp_text_box_batch_archive(bytes: &[u8], updated: bool) -> Result<(), Box<dyn Error>> {
+    let presentation = litchi_odp::Presentation::from_bytes(bytes.to_vec())?;
+    let slides = presentation.slides()?;
+    if slides.len() != SemanticShape::Medium.pptx_slides() {
+        return Err("ODP text-box batch slide count differs from specification".into());
+    }
+    for (page, slide) in slides.iter().enumerate() {
+        let mut expected = format!(
+            "{}\n{}",
+            semantic_odp_title(page, false),
+            semantic_odp_text(page, false)
+        );
+        for index in 0..ODP_TEXT_BOX_BATCH_COUNT {
+            if odp_text_box_batch_page(index) == page {
+                expected.push('\n');
+                expected.push_str(&odp_text_box_batch_text(index, updated));
+            }
+        }
+        if slide.title.as_deref() != Some(semantic_odp_title(page, false).as_str())
+            || slide.all_text() != expected
+        {
+            return Err("ODP text-box batch slide projection differs from specification".into());
+        }
+    }
+    let expected_full_text = slides
+        .iter()
+        .map(litchi_odp::Slide::all_text)
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    if presentation.text()? != expected_full_text {
+        return Err("ODP text-box batch full text differs from slide scan".into());
+    }
+
+    let snapshot = presentation.snapshot()?;
+    let inventory = snapshot.rich_content()?;
+    for index in 0..ODP_TEXT_BOX_BATCH_COUNT {
+        let name = odp_text_box_batch_name(index);
+        let matching = inventory
+            .text_boxes()
+            .iter()
+            .filter(|model| model.name() == name)
+            .collect::<Vec<_>>();
+        if matching.len() != 1 {
+            return Err(format!("ODP text-box batch owner '{name}' is not unique").into());
+        }
+        let model = matching[0];
+        if model.page() != odp_text_box_batch_page(index)
+            || model.name() != name
+            || model.paragraph_count() != 1
+            || model.list_count() != 0
+            || !model
+                .xml()
+                .contains(&odp_text_box_batch_text(index, updated))
+        {
+            return Err(format!("ODP text-box batch owner '{name}' differs").into());
+        }
+    }
+
+    let package = litchi_odf_common::core::OwnedPackage::from_bytes(bytes.to_vec())?;
+    let package = package.package()?;
+    for index in 0..ODS_MEDIA_ENTRY_COUNT {
+        let path = odp_media_path(index);
+        if package.manifest().get_media_type(&path) != Some("application/octet-stream") {
+            return Err(format!("ODP text-box batch manifest entry differs for '{path}'").into());
+        }
+        if package.get_file(&path)? != odp_media_payload(index) {
+            return Err(format!("ODP text-box batch payload differs for '{path}'").into());
+        }
+    }
+    Ok(())
+}
+
+fn verify_odp_text_box_batch_raw_members(
+    source: &[u8],
+    published: &[u8],
+    require_manifest: bool,
+) -> Result<(), Box<dyn Error>> {
+    let identical = litchi_odf_common::package::raw_identical_members(source, published)
+        .ok_or("ODP text-box batch raw-member comparison failed")?;
+    if identical.contains("content.xml") {
+        return Err("ODP text-box batch content.xml remained raw-identical".into());
+    }
+    if !require_manifest && identical.contains("META-INF/manifest.xml") {
+        return Err("ODP scalar text-box staging unexpectedly raw-preserved the manifest".into());
+    }
+    for path in ArchiveReader::new(source)?.file_names() {
+        if path != "content.xml"
+            && (require_manifest || path != "META-INF/manifest.xml")
+            && !identical.contains(path)
+        {
+            return Err(format!(
+                "ODP text-box batch changed raw member '{path}'; identical={identical:?}"
+            )
+            .into());
         }
     }
     Ok(())
@@ -8265,6 +8513,210 @@ fn run_odp_media_textbox_edit_save(
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
     Ok(result(Case::OdpMediaTextBoxEditSave, corpus, elapsed, None))
+}
+
+fn odp_text_box_batch_models(
+    source: &litchi_odp::authoring::edit::Snapshot,
+) -> Result<Vec<litchi_odp::content::TextBoxModel>, Box<dyn Error>> {
+    let inventory = source.rich_content()?;
+    let mut models = Vec::with_capacity(ODP_TEXT_BOX_BATCH_COUNT);
+    for index in 0..ODP_TEXT_BOX_BATCH_COUNT {
+        let name = odp_text_box_batch_name(index);
+        let mut matching = inventory
+            .text_boxes()
+            .iter()
+            .filter(|model| model.page() == odp_text_box_batch_page(index) && model.name() == name);
+        let mut model = matching
+            .next()
+            .ok_or_else(|| format!("ODP text-box batch source owner '{name}' is missing"))?
+            .clone();
+        if matching.next().is_some() {
+            return Err(format!("ODP text-box batch source owner '{name}' is ambiguous").into());
+        }
+        model.replace_paragraph(
+            0,
+            &litchi_odp::content::Paragraph::plain(odp_text_box_batch_text(index, true))?,
+        )?;
+        if model.name() != name {
+            return Err("ODP text-box batch model unexpectedly renamed its owner".into());
+        }
+        models.push(model);
+    }
+    Ok(models)
+}
+
+fn publish_odp_text_box_models(
+    case: Case,
+    source: &litchi_odp::authoring::edit::Snapshot,
+    replacements: &[litchi_odp::content::TextBoxModelReplacement<'_>],
+) -> Result<litchi_odp::authoring::edit::Commit, Box<dyn Error>> {
+    let mut transaction = source.transaction()?;
+    match case {
+        Case::OdpMediaTextBoxScalarReplaceSave => {
+            for replacement in replacements {
+                transaction.replace_text_box_model(replacement.name(), replacement.model())?;
+            }
+        },
+        Case::OdpMediaTextBoxBatchReplaceSave => {
+            let changed = transaction.replace_text_box_models(replacements)?;
+            if changed != ODP_TEXT_BOX_BATCH_COUNT {
+                return Err("ODP text-box batch changed-owner count differs".into());
+            }
+        },
+        _ => return Err("non-model ODP case passed to text-box publisher".into()),
+    }
+    Ok(transaction.commit()?)
+}
+
+fn verify_odp_text_box_model_commit(
+    case: Case,
+    source: &litchi_odp::authoring::edit::Snapshot,
+    commit: &litchi_odp::authoring::edit::Commit,
+    expected: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    if !commit.changed()
+        || commit.patch().is_noop()
+        || commit.patch().domains() != [litchi_odp::authoring::edit::Domain::Content]
+        || commit.snapshot().bytes() != expected
+    {
+        return Err(format!(
+            "ODP text-box model commit differs: changed={}, noop={}, domains={:?}, exact_output={}",
+            commit.changed(),
+            commit.patch().is_noop(),
+            commit.patch().domains(),
+            commit.snapshot().bytes() == expected
+        )
+        .into());
+    }
+    verify_odp_text_box_batch_archive(expected, true)?;
+    verify_odp_text_box_batch_raw_members(
+        source.bytes(),
+        expected,
+        case == Case::OdpMediaTextBoxBatchReplaceSave,
+    )?;
+
+    let replayed = commit.patch().apply(source)?;
+    if replayed.bytes() != expected {
+        return Err("ODP text-box model patch replay differs from publication".into());
+    }
+    let restored = commit.patch().inverse().apply(&replayed)?;
+    if restored.bytes() != source.bytes() {
+        return Err("ODP text-box model inverse did not restore exact source bytes".into());
+    }
+    if commit.patch().apply(&replayed).is_ok() {
+        return Err("ODP text-box model patch accepted a stale source".into());
+    }
+
+    let durable = litchi_odp::authoring::edit::Patch::from_durable_bytes(
+        &commit.patch().to_durable_bytes()?,
+    )?;
+    let durable_replayed = durable.apply(source)?;
+    if durable_replayed.bytes() != expected {
+        return Err("durable ODP text-box model replay differs from publication".into());
+    }
+    let durable_restored = durable.inverse().apply(&durable_replayed)?;
+    if durable_restored.bytes() != source.bytes() {
+        return Err("durable ODP text-box model inverse did not restore source".into());
+    }
+    if durable.apply(&durable_replayed).is_ok() {
+        return Err("durable ODP text-box model patch accepted a stale source".into());
+    }
+    Ok(())
+}
+
+fn run_odp_text_box_model_publication(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !case.uses_odp_text_box_batch() {
+        return Err("non-model ODP case passed to text-box publication runner".into());
+    }
+    let source = litchi_odp::authoring::edit::Snapshot::from_bytes(corpus.archive.clone())?;
+    let models = odp_text_box_batch_models(&source)?;
+    let replacements = models
+        .iter()
+        .enumerate()
+        .map(|(index, model)| {
+            litchi_odp::content::TextBoxModelReplacement::at(
+                odp_text_box_batch_page(index),
+                model.name(),
+                model,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let batch = publish_odp_text_box_models(
+        Case::OdpMediaTextBoxBatchReplaceSave,
+        &source,
+        &replacements,
+    )?;
+    let expected_batch = batch.snapshot().bytes().to_vec();
+    verify_odp_text_box_model_commit(
+        Case::OdpMediaTextBoxBatchReplaceSave,
+        &source,
+        &batch,
+        &expected_batch,
+    )?;
+    let scalar = publish_odp_text_box_models(
+        Case::OdpMediaTextBoxScalarReplaceSave,
+        &source,
+        &replacements,
+    )?;
+    let expected_scalar = scalar.snapshot().bytes().to_vec();
+    verify_odp_text_box_model_commit(
+        Case::OdpMediaTextBoxScalarReplaceSave,
+        &source,
+        &scalar,
+        &expected_scalar,
+    )?;
+    let scalar_projection =
+        litchi_odp::Presentation::from_bytes(expected_scalar.clone())?.text()?;
+    let batch_projection = litchi_odp::Presentation::from_bytes(expected_batch.clone())?.text()?;
+    if scalar_projection != batch_projection {
+        return Err("matched ODP scalar and batch semantic projections differ".into());
+    }
+    let expected = match case {
+        Case::OdpMediaTextBoxScalarReplaceSave => expected_scalar,
+        Case::OdpMediaTextBoxBatchReplaceSave => expected_batch,
+        _ => return Err("non-model ODP case reached output selection".into()),
+    };
+
+    let sink_ceiling = u64::try_from(expected.len())?;
+    let expected_digest = sha256_hex(&expected);
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sinks = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut sink = CountingSink::bounded(sink_ceiling, sink_ceiling);
+        sink.reserve_budget()?;
+        let started = Instant::now();
+        let commit = publish_odp_text_box_models(case, &source, &replacements)?;
+        sink.write_all(commit.snapshot().bytes())?;
+        let duration = started.elapsed();
+
+        if !commit.changed()
+            || commit.patch().is_noop()
+            || commit.patch().domains() != [litchi_odp::authoring::edit::Domain::Content]
+            || sink.bytes != expected
+        {
+            return Err("measured ODP text-box model publication differs from oracle".into());
+        }
+        let replayed = commit.patch().apply(&source)?;
+        if replayed.bytes() != expected
+            || commit.patch().inverse().apply(&replayed)?.bytes() != source.bytes()
+            || commit.patch().apply(&replayed).is_ok()
+        {
+            return Err("measured ODP text-box model patch contract differs".into());
+        }
+        sinks.push(sink.summary());
+        std::hint::black_box(commit);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let sink = deterministic_sink_summary(&sinks, "ODP text-box model publication")?;
+    let mut measured = result(case, corpus, elapsed, Some(sink));
+    measured.output_sha256 = Some(expected_digest);
+    Ok(measured)
 }
 
 fn run_xlsx_open_owned(
@@ -13630,22 +14082,22 @@ mod tests {
     use litchi_core::ReadAt;
 
     use super::{
-        Case, CorpusShape, CountingSink, InstrumentedSource, PPTX_MULTI_SLIDE_BATCH_COUNT,
-        PayloadKind, RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
-        SimulatedRangeSource, SourceBackedPackage, WriterShape, XlsxShape, build_cfb_corpus,
-        build_docx_source_edit_corpus, build_odp_media_corpus, build_ods_media_corpus,
-        build_odt_media_corpus, build_ole_common_corpus, build_opc_corpus,
-        build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_semantic_docx_corpus,
-        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
-        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_writer_corpus,
-        build_xlsx_auto_filter_edit_corpus, build_xlsx_calculation_metadata_edit_corpus,
-        build_xlsx_conditional_formatting_edit_corpus, build_xlsx_corpus,
-        build_xlsx_data_validation_edit_corpus, build_xlsx_defined_names_edit_corpus,
-        build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
-        build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
-        build_xlsx_sheet_protection_edit_corpus, expected_opc_overlay_output,
-        ole_common_changed_output, opc_overlay_replacement_payload, payload_bytes,
-        resolve_execution_workers, run_case, run_case_with_config,
+        Case, CorpusShape, CountingSink, InstrumentedSource, ODP_TEXT_BOX_BATCH_COUNT,
+        PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RangeSimulationConfig, RequestSizeBuckets,
+        RtfSemanticVariant, SemanticShape, SimulatedRangeSource, SourceBackedPackage, WriterShape,
+        XlsxShape, build_cfb_corpus, build_docx_source_edit_corpus, build_odp_media_corpus,
+        build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
+        build_ole_common_corpus, build_opc_corpus, build_pptx_source_edit_corpus,
+        build_rtf_lifecycle_corpus, build_semantic_docx_corpus, build_semantic_odp_corpus,
+        build_semantic_ods_corpus, build_semantic_odt_corpus, build_semantic_pptx_corpus,
+        build_semantic_rtf_corpus, build_writer_corpus, build_xlsx_auto_filter_edit_corpus,
+        build_xlsx_calculation_metadata_edit_corpus, build_xlsx_conditional_formatting_edit_corpus,
+        build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
+        build_xlsx_defined_names_edit_corpus, build_xlsx_page_break_edit_corpus,
+        build_xlsx_page_margin_edit_corpus, build_xlsx_page_setup_edit_corpus,
+        build_xlsx_print_options_edit_corpus, build_xlsx_sheet_protection_edit_corpus,
+        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
+        payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
         run_docx_source_backed_one_edit_save, run_opc_source_overlay_one_part_save,
         run_pptx_batch_edit_save, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_one_edit_save, run_scaling_case, run_xlsx_auto_filter_edit_save,
@@ -15000,6 +15452,61 @@ mod tests {
         for index in 0..super::ODS_MEDIA_ENTRY_COUNT {
             assert!(identical.contains(&super::odp_media_path(index)));
         }
+    }
+
+    #[test]
+    fn media_rich_odp_scalar_and_batch_text_box_replacements_are_matched() {
+        let first = build_odp_text_box_batch_corpus().unwrap();
+        let second = build_odp_text_box_batch_corpus().unwrap();
+        assert_eq!(first.archive, second.archive);
+        assert_eq!(first.manifest.entry_count, 28);
+        assert_eq!(first.manifest.archive_member_count, 13);
+        assert_eq!(first.manifest.uncompressed_payload_bytes, 16_778_604);
+        assert_eq!(first.manifest.archive_bytes, 16_786_244);
+        assert_eq!(
+            first.manifest.archive_sha256,
+            "dcbb1f88da9366f2eab8eb6029dcc73930ea2fc03552b78dd4922689f8a9655d"
+        );
+        assert_eq!(first.manifest.shape, "media-rich-cross-slide");
+        assert_eq!(
+            first.manifest.generator,
+            "litchi-odp-cross-slide-textbox-publication-v1"
+        );
+
+        let scalar = run_case(Case::OdpMediaTextBoxScalarReplaceSave, &first, 0, 1).unwrap();
+        let batch = run_case(Case::OdpMediaTextBoxBatchReplaceSave, &first, 0, 1).unwrap();
+        assert_eq!(
+            scalar.output_sha256.as_deref(),
+            Some("ee31f8c046af7b99819b183ca4fc56e00b97d2f97b36fa776c7d4c96dee3614b")
+        );
+        assert_eq!(
+            batch.output_sha256.as_deref(),
+            Some("fb4243a5433028d050ea97a5cb8db18c1af2ef66bb0d75071c95c2d9e83ec3cf")
+        );
+        for (measured, expected_bytes) in [(scalar, 16_786_370), (batch, 16_786_368)] {
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            assert!(measured.source.is_none());
+            let sink = measured.sink.unwrap();
+            assert_eq!(sink.write_calls, 1);
+            assert_eq!(sink.accepted_bytes, expected_bytes);
+            assert_eq!(sink.accepted_bytes, sink.largest_write);
+        }
+
+        let source =
+            litchi_odp::authoring::edit::Snapshot::from_bytes(first.archive.clone()).unwrap();
+        let inventory = source.rich_content().unwrap();
+        assert_eq!(
+            inventory
+                .text_boxes()
+                .iter()
+                .filter(|model| model.name().starts_with("litchi-perf-odp-batch-text-box-"))
+                .count(),
+            ODP_TEXT_BOX_BATCH_COUNT
+        );
+        assert!(inventory.text_boxes().iter().all(|model| {
+            !model.name().starts_with("litchi-perf-odp-batch-text-box-")
+                || model.xml().contains("-source-")
+        }));
     }
 
     #[test]

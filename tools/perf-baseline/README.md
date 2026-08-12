@@ -27,7 +27,8 @@ substrate records, nine writer records, and 45 XLSX records). The six simulated
 range cases, two execution-scaling cases, one low-level source-overlay save
 case, one source-backed DOCX semantic publication case, one source-backed
 media-rich PPTX semantic publication case, four matched same-slide/multi-slide
-PPTX batch cases, one XLSX commit/read attribution case,
+PPTX batch cases, two matched cross-slide ODP text-box publication cases, one
+XLSX commit/read attribution case,
 two matched XLSX calculation-metadata publication cases, two matched XLSX
 defined-name publication cases, two matched XLSX
 page-break publication cases, two matched XLSX page-margin publication cases,
@@ -38,8 +39,8 @@ two matched XLSX data-validation publication cases,
 two matched XLSX auto-filter/sort-state publication cases,
 two matched XLSX conditional-formatting publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
-DOCX/PPTX semantic cases, 13 RTF semantic cases, and 32 ODF semantic cases
-are opt-in, for 158 selectable cases in total:
+DOCX/PPTX semantic cases, 13 RTF semantic cases, and 34 ODF semantic cases
+are opt-in, for 160 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -438,6 +439,16 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/odt-media-structural-paragraph-publication.json
 ```
 
+Run the matched ODP cross-slide existing-text-box publication cases over a
+fixed media-rich corpus:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 \
+  --case odp_media_textbox_scalar_replace_save,odp_media_textbox_batch_replace_save \
+  --json target/perf/odp-cross-slide-textbox-publication.json
+```
+
 Run the plain tiny semantic RTF smoke matrix (13
 records):
 
@@ -677,6 +688,32 @@ commit, and output materialization. Outside timing it checks every original
 slide, the inserted text box through `rich_content`, exact patch/inverse and
 stale-source behavior, deterministic output, and every resource payload and
 manifest media type. It does not vary with `--semantic-shape` and is opt-in.
+
+`odp_media_textbox_scalar_replace_save` and
+`odp_media_textbox_batch_replace_save` share a second fixed-medium corpus: the
+same 12 deterministic slides and eight 2 MiB resources plus eight existing,
+globally unique rich-text boxes distributed over slide positions 0, 1, 3, 4,
+6, 7, 9, and 11. Replacement models and the immutable editing snapshot are
+prepared outside timing. Both intervals create one transaction, replace the
+same complete models without renaming any owner, commit once, and copy the
+published snapshot to one pre-reserved bounded sink. The scalar control calls
+`replace_text_box_model` eight times, so it exercises repeated candidate
+staging; the bounded case calls `replace_text_box_models` once.
+
+Outside timing, both paths reopen the complete presentation and rich-content
+inventory, require identical slide/full-text projections, verify all fixed
+names, pages, paragraph counts and updated text, check volatile and durable
+patch replay/inverse plus stale-source refusal, and retain deterministic input
+and output hashes. `mimetype`, `styles.xml`, `meta.xml`, and all eight media ZIP
+members remain physically identical. The batch also raw-preserves the manifest;
+the repeated scalar staging regenerates it, so the two semantically identical
+outputs intentionally have distinct bytes and digests. ODP's owned-byte editor
+exposes neither positional source-read nor logical-Part materialization
+diagnostics. The report therefore records real sink counters and omits
+`source`/materialization fields instead of inventing an OPC-style count. These
+cases add selectable evidence only: no latency, allocation, memory, or
+materialization improvement is claimed without a frozen CPU-pinned balanced
+ABBA capture.
 
 Each ODP batch uses `Builder`, `Presentation::from_bytes`, `slides()`,
 `Presentation::text`, source snapshots, and public presentation transactions.

@@ -13,18 +13,19 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **158 selectable cases**: 36 default cases and 198 default
+harness contains **160 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in
 source-backed media-rich PPTX semantic publication case, four opt-in matched
 same-slide/multi-slide PPTX batch cases, six opt-in media-rich ODT
-paragraph/line-break/inline-run/hyperlink/insertion/removal publication cases, 20 opt-in matched XLSX
+paragraph/line-break/inline-run/hyperlink/insertion/removal publication cases,
+two opt-in matched cross-slide ODP text-box publication cases, 20 opt-in matched XLSX
 calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation/auto-filter/conditional-formatting publication cases, 16 opt-in DOCX/PPTX
 semantic cases, 13 opt-in RTF semantic case names across four
 capability-bounded variants (39 tiny / 70 tiny-plus-large rows), 24
-shape-selected ODT/ODS/ODP semantic cases, eight fixed media-rich ODF cases,
+shape-selected ODT/ODS/ODP semantic cases, ten fixed media-rich ODF cases,
 and 21 opt-in native DOC/XLS/PPT semantic cases. It
 is still not broad program or CRUD coverage.
 
@@ -48,6 +49,7 @@ is still not broad program or CRUD coverage.
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |
 | Coalesced DOCX paragraph edits | Large 100-edit/save p50 **-94.99% (19.97x)** and mean **-95.02%**; medium two-edit/save p50 **-12.98%**; scalar one-edit guardrail neutral | Direct-body, strictly ordered paragraph text replacement; generated corpus; scalar API remains separate |
 | ODF semantic baselines and ODS snapshot reuse | Medium/large ODS no-op edit-save p50 **-7.45% / -11.78%**; one-cell edit-save **-3.57% / -2.06%** | Generated ODT/ODS/ODP baseline corpora; focused ODP/ODT publication follow-ups are listed below |
+| ODP cross-slide text-box batch evidence | Same semantic projection for matched eight-call scalar and one-call bounded batch publication; deterministic case-specific output hashes and one-write sink counters | Selectable evidence only: physical outputs differ because repeated scalar staging regenerates the manifest; no latency/allocation/memory/materialization claim without frozen CPU-pinned ABBA, and owned ODP exposes no source/materialization diagnostics |
 | RTF semantic baseline and text paths | Medium/large full-text p50 **-38.39% / -27.08%**; one-edit/save **-33.40% / -25.79%** | Generated native RTF text corpus; open guard +0.96% / +3.41%; formatting/media/security matrices remain missing |
 | RTF retained story length | Large paragraph-list p50 **-15.04%**, mean **-13.71%**; middle-paragraph p50 **-27.19%**, mean **-25.23%** | Already-open generated 10,000-block story queries only; exact parser-derived length, all allocation/peak-heap/RSS metrics flat, and open/full-text/save/no-op guards remain within 5% |
 | RTF sparse paragraph selection | Large middle-paragraph p50 **-47.87%**, mean **-47.95%**, p95 **-49.42%** | Explicit `Paragraphs::nth` only; remains linear and allocation-free, constructs the selected view once, preserves iterator state/formatting, and leaves open/list/full-text/save/edit guards within policy |
@@ -899,7 +901,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 158 selectable cases and a 198-record default
+The standalone harness provides 160 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus
