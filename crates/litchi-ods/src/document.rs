@@ -650,6 +650,75 @@ impl Edit {
         self.stage("annotation.edit", "annotations", bytes)
     }
 
+    /// Stage bounded content-validation definition CRUD.
+    ///
+    /// Cell bindings remain compact source-owned runs. Removal and clear operations are refused
+    /// while any such run retains a definition, and renames are refused because this API does not
+    /// perform an atomic binding rewrite. Changed publication is security-checked only by
+    /// [`Self::commit`] or [`Self::commit_with_security`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for opaque ownership, broken binding closure, limits, allocation,
+    /// provenance-splice failure, or typed package readback failure.
+    pub fn content_validations<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(
+            &mut crate::content_validation::Transaction<'_, '_>,
+        ) -> crate::content_validation::Result<()>,
+    {
+        let source = Arc::new(std::mem::take(&mut self.candidate));
+        let outcome: Result<Option<Vec<u8>>> = (|| {
+            let package = Package::from_shared_bytes(Arc::clone(&source))?;
+            let snapshot = crate::content_validation::Snapshot::parse(package.content_xml())
+                .map_err(content_validation_error)?;
+            let mut edit = snapshot.edit().map_err(content_validation_error)?;
+            update(&mut edit).map_err(content_validation_error)?;
+            let commit = edit.commit().map_err(content_validation_error)?;
+            if !commit.changed() {
+                return Ok(None);
+            }
+            crate::content_validation::publish_package_commit(&package, &commit)
+                .map(Package::into_bytes)
+                .map(Some)
+        })();
+        self.candidate = take_shared_bytes(source);
+        let Some(candidate) = outcome? else {
+            return Ok(());
+        };
+        self.stage_spliced("content-validation.edit", "content-validations", candidate)
+    }
+
+    /// Stage a reversible content-validation patch against its exact XML source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for stale/foreign lineage, invalid closure, splice publication, or
+    /// complete package readback failure.
+    pub fn apply_content_validation_patch(
+        &mut self,
+        patch: &crate::content_validation::Patch,
+    ) -> Result<()> {
+        let source = Arc::new(std::mem::take(&mut self.candidate));
+        let outcome: Result<Option<Vec<u8>>> = (|| {
+            let package = Package::from_shared_bytes(Arc::clone(&source))?;
+            let snapshot = crate::content_validation::Snapshot::parse(package.content_xml())
+                .map_err(content_validation_error)?;
+            let commit = patch.apply(&snapshot).map_err(content_validation_error)?;
+            if !commit.changed() {
+                return Ok(None);
+            }
+            crate::content_validation::publish_package_commit(&package, &commit)
+                .map(Package::into_bytes)
+                .map(Some)
+        })();
+        self.candidate = take_shared_bytes(source);
+        let Some(candidate) = outcome? else {
+            return Ok(());
+        };
+        self.stage_spliced("content-validation.patch", "content-validations", candidate)
+    }
+
     /// Stage inert RDF graph and triple CRUD.
     ///
     /// # Errors
@@ -2216,6 +2285,10 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 
 fn invalid_error(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
+}
+
+fn content_validation_error(error: crate::content_validation::Error) -> Error {
+    invalid_error(format!("ODS content-validation edit failed: {error}"))
 }
 
 fn is_reserved_path(path: &str) -> bool {
