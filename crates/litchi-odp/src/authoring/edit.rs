@@ -305,6 +305,7 @@ impl Snapshot {
             source_resource_bytes: self.resource_bytes,
             slide_order_changed: false,
             dependency_free_slide_copy_changed: false,
+            dependency_free_slide_removal_changed: false,
         })
     }
 
@@ -366,6 +367,7 @@ pub struct Transaction {
     source_resource_bytes: usize,
     slide_order_changed: bool,
     dependency_free_slide_copy_changed: bool,
+    dependency_free_slide_removal_changed: bool,
 }
 
 #[derive(Clone)]
@@ -672,9 +674,9 @@ impl Transaction {
     where
         S: Into<Selector<'a>>,
     {
-        if self.dependency_free_slide_copy_changed {
+        if self.dependency_free_slide_copy_changed || self.dependency_free_slide_removal_changed {
             return unsupported(
-                "ODP slide move cannot be staged after a dependency-free blank-slide copy",
+                "ODP slide move cannot be staged after a dependency-free blank-slide copy or removal",
             );
         }
         let Some(from) = select(self.draft.slides(), selector.into())? else {
@@ -755,6 +757,65 @@ impl Transaction {
         self.dependency_free_slide_copy_changed = true;
         self.changed = true;
         Ok(Some(copied_index))
+    }
+
+    /// Remove one exact retained dependency-free blank source slide.
+    ///
+    /// This is intentionally not a general slide-removal API. It accepts only
+    /// a compact self-closing `draw:page` whose sole non-namespace attribute is
+    /// `draw:name`. It refuses the final slide, retained declarations/settings,
+    /// package or content macro owners, copied pages, inbound name-bearing XML
+    /// attributes or fragment hyperlinks, and every dependency-bearing
+    /// selected-page construct.
+    /// Other package members and unselected page fragments are retained exactly
+    /// through the ordinary source-backed writer.
+    ///
+    /// A transaction may contain at most one dependency-free removal and cannot
+    /// combine it with other slide or page-indexed operations. A missing
+    /// selector returns `Ok(None)` without staging.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an ambiguous selector, the final slide, any unsafe
+    /// dependency owner, a non-retained/non-compact page, or a resource bound.
+    /// Refusal leaves the transaction unchanged.
+    pub fn remove_dependency_free_blank_slide<'a, S>(
+        &mut self,
+        selector: S,
+    ) -> Result<Option<Slide>>
+    where
+        S: Into<Selector<'a>>,
+    {
+        if self.dependency_free_slide_removal_changed {
+            return unsupported(
+                "ODP transaction already contains a dependency-free blank-slide removal",
+            );
+        }
+        if self.slide_order_changed || self.dependency_free_slide_copy_changed {
+            return unsupported(
+                "ODP dependency-free blank-slide removal cannot follow a slide move or copy",
+            );
+        }
+        let Some(index) = select(self.draft.slides(), selector.into())? else {
+            return Ok(None);
+        };
+        if self.changed || self.has_page_indexed_operations() {
+            return unsupported(
+                "ODP dependency-free blank-slide removal cannot combine with slide or page-indexed operations",
+            );
+        }
+        let removed_bytes = slide_resource(&self.draft.slides()[index])?;
+        let candidate = self.resource_candidate(removed_bytes, 0)?;
+        let removal = self
+            .draft
+            .prepare_dependency_free_blank_slide_removal(index)?;
+        let removed = self
+            .draft
+            .apply_dependency_free_blank_slide_removal(removal);
+        self.resource_bytes = candidate;
+        self.dependency_free_slide_removal_changed = true;
+        self.changed = true;
+        Ok(Some(removed))
     }
 
     /// Append a typed shape to one supported slide.
@@ -2457,6 +2518,11 @@ impl Transaction {
         if self.dependency_free_slide_copy_changed {
             return unsupported(format!(
                 "ODP {operation} operation cannot be staged after a dependency-free blank-slide copy"
+            ));
+        }
+        if self.dependency_free_slide_removal_changed {
+            return unsupported(format!(
+                "ODP {operation} operation cannot be staged after a dependency-free blank-slide removal"
             ));
         }
         Ok(())
