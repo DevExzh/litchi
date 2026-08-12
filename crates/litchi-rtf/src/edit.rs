@@ -20,11 +20,13 @@ use std::io::{self, Write as _};
 use std::ops::Range;
 
 mod composition;
+mod picture_payload;
 mod transfer;
 pub use composition::{
     Composition, CompositionConflict, CompositionError, CompositionLimits, ConflictSet, MergePlan,
     MergeResolution, Prepared,
 };
+pub use picture_payload::{MAX_PICTURE_PAYLOAD_OPERATIONS, PicturePayloadReplacement};
 pub use transfer::TransferPlan;
 
 /// Immutable RTF snapshot used by the transaction API.
@@ -674,6 +676,18 @@ pub enum Error {
     ParagraphOutOfRange { position: usize, count: usize },
     /// A checked retained-destination selector does not exist.
     DestinationOutOfRange(&'static str),
+    /// A checked standalone picture selector does not exist.
+    PictureOutOfRange { position: usize, count: usize },
+    /// Replacement picture bytes must keep the exact payload length.
+    PicturePayloadSizeMismatch {
+        position: usize,
+        expected: usize,
+        observed: usize,
+    },
+    /// A picture batch must contain at least one replacement.
+    EmptyPicturePayloadBatch,
+    /// Picture batch selectors must be strictly increasing and unique.
+    PicturePayloadBatchOutOfOrder { previous: usize, incoming: usize },
     /// A durable operation's semantic expectation is stale.
     StalePrecondition(&'static str),
     /// A durable patch uses an unsupported format-owned vocabulary.
@@ -762,6 +776,25 @@ impl fmt::Display for Error {
                     "RTF retained destination does not exist: {destination}"
                 )
             },
+            Self::PictureOutOfRange { position, count } => write!(
+                formatter,
+                "RTF standalone picture position {position} is outside 0..{count}"
+            ),
+            Self::PicturePayloadSizeMismatch {
+                position,
+                expected,
+                observed,
+            } => write!(
+                formatter,
+                "RTF picture {position} payload length must remain {expected} bytes, observed {observed}"
+            ),
+            Self::EmptyPicturePayloadBatch => {
+                formatter.write_str("RTF picture payload replacement batch must not be empty")
+            },
+            Self::PicturePayloadBatchOutOfOrder { previous, incoming } => write!(
+                formatter,
+                "RTF picture positions must be strictly increasing: {incoming} follows {previous}"
+            ),
             Self::StalePrecondition(reason) => {
                 write!(formatter, "stale RTF patch precondition: {reason}")
             },
@@ -867,6 +900,7 @@ enum Operation {
         before: String,
         after: String,
     },
+    PicturePayload(picture_payload::StagedPicturePayload),
     RootTransfer {
         vocabulary: &'static str,
         effect: String,
@@ -887,6 +921,7 @@ impl Operation {
             Self::InsertParagraph { text, .. } => text.len().saturating_add(1),
             Self::RestoreParagraph { text, .. } => text.len().saturating_add(1),
             Self::RemoveParagraph { .. } | Self::MoveParagraph { .. } => 0,
+            Self::PicturePayload(operation) => operation.after.len(),
             Self::RootTransfer { after, .. } => after.len(),
             Self::ParagraphLayout { before, after, .. } => {
                 let _ = (before, after);
@@ -920,6 +955,9 @@ impl Operation {
             Self::AnnotationText { index, .. } => vec![annotation_effect(*index)],
             Self::NoteText { index, .. } => vec![note_effect(*index)],
             Self::ShapeText { index, .. } => vec![shape_effect(*index)],
+            Self::PicturePayload(operation) => {
+                vec![format!("body:picture:{}:payload", operation.position)]
+            },
             Self::RootTransfer { effect, .. } => vec![effect.clone()],
         }
     }
@@ -939,6 +977,7 @@ impl Operation {
             | Self::AnnotationText { .. }
             | Self::NoteText { .. }
             | Self::ShapeText { .. }
+            | Self::PicturePayload(_)
             | Self::RootTransfer { .. } => None,
         }
     }
@@ -958,12 +997,17 @@ impl Operation {
                 | Self::AnnotationText { .. }
                 | Self::NoteText { .. }
                 | Self::ShapeText { .. }
+                | Self::PicturePayload(_)
                 | Self::RootTransfer { .. }
         )
     }
 
     const fn is_root_transfer(&self) -> bool {
         matches!(self, Self::RootTransfer { .. })
+    }
+
+    const fn is_picture_payload(&self) -> bool {
+        matches!(self, Self::PicturePayload(_))
     }
 
     const fn is_lifecycle(&self) -> bool {
@@ -1904,6 +1948,17 @@ impl Edit {
             .iter()
             .filter(|operation| operation.is_root_transfer())
             .count();
+        let picture_payload_count = self
+            .operations
+            .iter()
+            .filter(|operation| operation.is_picture_payload())
+            .count();
+        if picture_payload_count != 0 {
+            if picture_payload_count != operation_count {
+                return Err(Error::BodyDestinationConflict);
+            }
+            return picture_payload::commit(self, operation_count);
+        }
         if root_transfer_count != 0 {
             if root_transfer_count != 1 || operation_count != 1 {
                 return Err(Error::BodyDestinationConflict);
@@ -1998,7 +2053,8 @@ impl Edit {
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
                 | Operation::NoteText { .. }
-                | Operation::ShapeText { .. } => {
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_) => {
                     return Err(Error::BodyDestinationConflict);
                 },
                 Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
@@ -2181,6 +2237,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::PicturePayload(_)
             | Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
         }
     }
@@ -2253,6 +2310,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::PicturePayload(_)
             | Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
         }
     }
@@ -2580,6 +2638,7 @@ fn project_text(
             | Operation::AnnotationText { .. }
             | Operation::NoteText { .. }
             | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -2714,6 +2773,7 @@ fn project_lifecycle_text(source: &Snapshot, operation: &Operation) -> Result<St
         | Operation::AnnotationText { .. }
         | Operation::NoteText { .. }
         | Operation::ShapeText { .. }
+        | Operation::PicturePayload(_)
         | Operation::RootTransfer { .. } => {
             return Err(Error::UnsupportedSource(
                 "non-lifecycle operation entered lifecycle projection",
@@ -2866,6 +2926,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             | Operation::AnnotationText { .. }
             | Operation::NoteText { .. }
             | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -2916,6 +2977,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 | Operation::AnnotationText { .. }
                 | Operation::NoteText { .. }
                 | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(false)
@@ -2985,6 +3047,7 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             | Operation::AnnotationText { .. }
             | Operation::NoteText { .. }
             | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
             | Operation::RootTransfer { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -3539,6 +3602,7 @@ enum Change {
         before: String,
         after: String,
     },
+    PicturePayload(picture_payload::StagedPicturePayload),
     RootTransfer {
         vocabulary: &'static str,
         effect: String,
@@ -3668,6 +3732,7 @@ impl Change {
                 before: after.clone(),
                 after: before.clone(),
             },
+            Self::PicturePayload(operation) => Self::PicturePayload(operation.inverse()),
             Self::RootTransfer {
                 vocabulary,
                 effect,
@@ -3817,6 +3882,9 @@ fn semantic_changes(
                 before: before.clone(),
                 after: after.clone(),
             }),
+            Operation::PicturePayload(operation) if operation.before != operation.after => {
+                Some(Change::PicturePayload(operation.clone()))
+            },
             Operation::RootTransfer {
                 vocabulary,
                 effect,
@@ -3838,6 +3906,7 @@ fn semantic_changes(
             | Operation::AnnotationText { .. }
             | Operation::NoteText { .. }
             | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
             | Operation::RootTransfer { .. } => None,
         })
         .collect()
@@ -4152,6 +4221,9 @@ fn durable_operation(
                 Value::String(after.clone()),
             )
         },
+        Change::PicturePayload(operation) => {
+            picture_payload::durable_operation(limits, operation, source)
+        },
         Change::RootTransfer {
             vocabulary,
             effect,
@@ -4196,6 +4268,19 @@ pub(crate) fn apply_durable<Mode>(
         .source_bytes()
         .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
     let source_hash = litchi_core::patch::BlobId::of(source_bytes).as_hex();
+    let picture_operation_count = patch
+        .operations()
+        .iter()
+        .filter(|operation| operation.op == "picture-payload.replace")
+        .count();
+    if picture_operation_count != 0 {
+        if picture_operation_count != patch.operations().len() {
+            return Err(Error::DurablePatch(
+                "picture payload operations cannot compose with other RTF vocabularies".to_string(),
+            ));
+        }
+        return picture_payload::apply_durable_patch(source, patch.operations(), &source_hash);
+    }
     let mut edit = source.edit();
     for operation in patch.operations() {
         if operation.preconditions.len() != 2 {
@@ -4452,6 +4537,9 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("shape text value must be a string".to_string())
                 })?;
                 edit.set_shape_text(index, replacement)?;
+            },
+            "picture-payload.replace" => {
+                picture_payload::apply_durable_operation(source, &mut edit, operation)?;
             },
             vocabulary if is_root_transfer_vocabulary(vocabulary) => {
                 let expected_feature = operation
