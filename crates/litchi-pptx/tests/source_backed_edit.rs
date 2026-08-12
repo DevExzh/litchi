@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io;
 use std::io::Write;
 use std::sync::Arc;
@@ -7,8 +8,8 @@ use litchi_core::{ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
 use litchi_pptx::{
-    Error, MAX_SHAPE_TEXT_REPLACEMENTS, ReadLimits, ShapeTextReplacement, SourceBackedPresentation,
-    SourceBackedPresentationEditor,
+    Error, MAX_SHAPE_TEXT_REPLACEMENTS, MAX_SOURCE_BACKED_SLIDE_BATCH, ReadLimits,
+    ShapeTextReplacement, SourceBackedPresentation, SourceBackedPresentationEditor,
 };
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -17,6 +18,7 @@ const DRAWINGML: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const MAIN: &str = "/ppt/presentation.xml";
 const SLIDE: &str = "/ppt/slides/slide1.xml";
+const SLIDE_THREE: &str = "/ppt/slides/slide3.xml";
 const UNUSED: &str = "/ppt/media/unused.bin";
 
 struct VersionedSource {
@@ -151,6 +153,104 @@ fn fixture_with_presentation_namespace(
     PackageWriter::to_bytes(&package).unwrap()
 }
 
+fn multi_fixture(slide_count: usize, signed: bool) -> Vec<u8> {
+    let slide_ids = (0..slide_count)
+        .map(|index| {
+            format!(
+                r#"<p:sldId id="{}" r:id="rIdSlide{}"/>"#,
+                256 + index,
+                index + 1
+            )
+        })
+        .collect::<String>();
+    let presentation_xml = format!(
+        r#"<p:presentation xmlns:p="{PML}" xmlns:r="{REL}"><p:sldIdLst>{slide_ids}</p:sldIdLst></p:presentation>"#
+    );
+    let mut package = OpcPackage::new();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(MAIN).unwrap(),
+            ct::PML_PRESENTATION_MAIN.to_string(),
+            presentation_xml.into_bytes(),
+        )))
+        .unwrap();
+    for index in 0..slide_count {
+        let uri = PackURI::new(format!("/ppt/slides/slide{}.xml", index + 1)).unwrap();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                uri,
+                ct::PML_SLIDE.to_string(),
+                shape_xml(PML, &format!("before-{index}")).into_bytes(),
+            )))
+            .unwrap();
+        package
+            .get_part_mut(&PackURI::new(MAIN).unwrap())
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                rt::SLIDE.to_string(),
+                format!("slides/slide{}.xml", index + 1),
+                format!("rIdSlide{}", index + 1),
+                litchi_opc::TargetMode::Internal,
+            )
+            .unwrap();
+    }
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(UNUSED).unwrap(),
+            "application/octet-stream".to_string(),
+            (0..4096).map(|value| (value % 251) as u8).collect(),
+        )))
+        .unwrap();
+    package.relate_to("ppt/presentation.xml", rt::OFFICE_DOCUMENT);
+    if signed {
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+                ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_string(),
+                b"<origin/>".to_vec(),
+            )))
+            .unwrap();
+        package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+    }
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
+#[derive(Debug)]
+struct RawRecord {
+    local: Vec<u8>,
+    central: Vec<u8>,
+}
+
+fn raw_records(data: &[u8]) -> HashMap<Vec<u8>, RawRecord> {
+    let archive = soapberry_zip::ZipArchive::from_slice(data)
+        .unwrap()
+        .into_zip_archive();
+    let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+    let index = soapberry_zip::PreservationIndex::new(&archive, &mut scratch).unwrap();
+    index
+        .entries()
+        .iter()
+        .map(|entry| {
+            let local = entry.local_span();
+            let central = entry.central_record();
+            (
+                entry.raw_name_bytes().to_vec(),
+                RawRecord {
+                    local: data[local.start as usize..local.end as usize].to_vec(),
+                    central: data[central.start as usize..central.end as usize].to_vec(),
+                },
+            )
+        })
+        .collect()
+}
+
+fn central_without_local_offset(bytes: &[u8]) -> Vec<u8> {
+    let mut bytes = bytes.to_vec();
+    bytes[42..46].fill(0);
+    bytes
+}
+
 fn edit_commit(editor: &SourceBackedPresentationEditor) -> litchi_pptx::SourceBackedSlideCommit {
     let mut edit = editor.edit_slide(0).unwrap();
     assert!(edit.set_shape_text("Title", "after").unwrap());
@@ -227,6 +327,220 @@ fn changed_edit_reopens_and_changes_only_the_selected_logical_part() {
     let reopened =
         SourceBackedPresentation::from_read_at(Arc::new(VersionedSource::new(output))).unwrap();
     assert_eq!(reopened.slide(0).unwrap().text().unwrap(), "after\nstable");
+}
+
+#[test]
+fn multi_slide_batch_is_atomic_sorted_and_raw_copies_unselected_members() {
+    let source_bytes = multi_fixture(3, false);
+    let source_raw = raw_records(&source_bytes);
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source_bytes.clone(),
+    )))
+    .unwrap();
+    assert_eq!(editor.cache_diagnostics().successful_loads, 1);
+    let mut edit = editor.edit_slides();
+    assert_eq!(
+        edit.set_shape_texts(2, &[ShapeTextReplacement::named("Title", "after-2")])
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        edit.set_shape_texts(0, &[ShapeTextReplacement::named("Title", "after-0")])
+            .unwrap(),
+        1
+    );
+    let commit = edit.commit().unwrap();
+    assert!(commit.is_changed());
+    assert_eq!(
+        commit
+            .snapshot()
+            .slides()
+            .map(|slide| slide.position())
+            .collect::<Vec<_>>(),
+        vec![0, 2]
+    );
+    let replayed = commit.patch().apply(commit.patch().source()).unwrap();
+    assert!(commit.patch().inverse().apply(&replayed).is_ok());
+    assert_eq!(editor.cache_diagnostics().successful_loads, 3);
+
+    let mut output = Vec::new();
+    let published = editor
+        .publish_slide_batch_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert!(commit.patch().inverse().apply(&published).is_ok());
+    assert!(commit.patch().apply(&published).is_err());
+
+    let source = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let candidate = OpcPackage::from_bytes(&output).unwrap();
+    assert_eq!(source.part_count(), candidate.part_count());
+    assert_eq!(
+        relationship_signatures(source.rels()),
+        relationship_signatures(candidate.rels())
+    );
+    for part in source.iter_parts() {
+        let output_part = candidate.get_part(part.partname()).unwrap();
+        assert_eq!(part.content_type(), output_part.content_type());
+        assert_eq!(
+            relationship_signatures(part.rels()),
+            relationship_signatures(output_part.rels())
+        );
+        if matches!(part.partname().as_str(), SLIDE | SLIDE_THREE) {
+            assert_ne!(part.blob(), output_part.blob());
+        } else {
+            assert_eq!(part.blob(), output_part.blob());
+        }
+    }
+    let output_raw = raw_records(&output);
+    for (name, source_record) in source_raw {
+        if matches!(
+            name.as_slice(),
+            b"ppt/slides/slide1.xml" | b"ppt/slides/slide3.xml"
+        ) {
+            assert_ne!(output_raw[&name].local, source_record.local, "{name:?}");
+        } else {
+            assert_eq!(output_raw[&name].local, source_record.local, "{name:?}");
+            assert_eq!(
+                central_without_local_offset(&output_raw[&name].central),
+                central_without_local_offset(&source_record.central),
+                "{name:?}"
+            );
+        }
+    }
+    let reopened =
+        SourceBackedPresentation::from_read_at(Arc::new(VersionedSource::new(output))).unwrap();
+    assert_eq!(
+        reopened.slide(0).unwrap().text().unwrap(),
+        "after-0\nstable"
+    );
+    assert_eq!(
+        reopened.slide(1).unwrap().text().unwrap(),
+        "before-1\nstable"
+    );
+    assert_eq!(
+        reopened.slide(2).unwrap().text().unwrap(),
+        "after-2\nstable"
+    );
+}
+
+#[test]
+fn multi_slide_batch_noop_signed_source_is_exact_and_changed_signed_is_refused() {
+    let signed = multi_fixture(3, true);
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        signed.clone(),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slides();
+    assert_eq!(
+        edit.set_shape_texts(0, &[ShapeTextReplacement::named("Title", "before-0")])
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        edit.set_shape_texts(2, &[ShapeTextReplacement::named("Title", "before-2")])
+            .unwrap(),
+        0
+    );
+    let commit = edit.commit().unwrap();
+    assert!(!commit.is_changed());
+    let mut output = Vec::new();
+    editor
+        .publish_slide_batch_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, signed);
+
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(signed)))
+            .unwrap();
+    let mut edit = editor.edit_slides();
+    edit.set_shape_texts(0, &[ShapeTextReplacement::named("Title", "changed")])
+        .unwrap();
+    edit.set_shape_texts(2, &[ShapeTextReplacement::named("Title", "before-2")])
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    output.clear();
+    assert!(matches!(
+        editor.publish_slide_batch_commit_to_stream(&mut output, &commit),
+        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn multi_slide_batch_rejects_empty_duplicate_over_bound_and_stale_sets() {
+    let source = multi_fixture(MAX_SOURCE_BACKED_SLIDE_BATCH + 1, false);
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source.clone(),
+    )))
+    .unwrap();
+    assert!(matches!(
+        editor.edit_slides().commit(),
+        Err(Error::UnsafeEdit { .. })
+    ));
+    let mut edit = editor.edit_slides();
+    for position in 0..MAX_SOURCE_BACKED_SLIDE_BATCH {
+        let text = format!("before-{position}");
+        edit.set_shape_texts(position, &[ShapeTextReplacement::named("Title", &text)])
+            .unwrap();
+    }
+    assert!(matches!(
+        edit.set_shape_texts(
+            MAX_SOURCE_BACKED_SLIDE_BATCH,
+            &[ShapeTextReplacement::named("Title", "bounded")],
+        ),
+        Err(Error::Limit { .. })
+    ));
+    assert!(matches!(
+        edit.set_shape_texts(0, &[ShapeTextReplacement::named("Title", "duplicate")]),
+        Err(Error::UnsafeEdit { .. })
+    ));
+    let commit = edit.commit().unwrap();
+
+    let foreign = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        multi_fixture(MAX_SOURCE_BACKED_SLIDE_BATCH + 2, false),
+    )))
+    .unwrap();
+    let mut output = Vec::new();
+    assert!(matches!(
+        foreign.publish_slide_batch_commit_to_stream(&mut output, &commit),
+        Err(Error::StaleSource)
+    ));
+    assert!(output.is_empty());
+
+    let versioned = Arc::new(VersionedSource::new(source));
+    let editor = SourceBackedPresentationEditor::from_read_at(versioned.clone()).unwrap();
+    let mut edit = editor.edit_slides();
+    edit.set_shape_texts(0, &[ShapeTextReplacement::named("Title", "changed")])
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    versioned.changed();
+    assert!(matches!(
+        editor.publish_slide_batch_commit_to_stream(&mut output, &commit),
+        Err(Error::Opc(OpcError::SourceChanged { .. }))
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn multi_slide_batch_reports_partial_sink_failure() {
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        multi_fixture(3, false),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slides();
+    edit.set_shape_texts(0, &[ShapeTextReplacement::named("Title", "after-0")])
+        .unwrap();
+    edit.set_shape_texts(2, &[ShapeTextReplacement::named("Title", "after-2")])
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut sink = FailingSink {
+        accepted: 0,
+        limit: 128,
+    };
+    assert!(matches!(
+        editor.publish_slide_batch_commit_to_stream(&mut sink, &commit),
+        Err(Error::Opc(OpcError::IncompleteOutput { .. }))
+    ));
+    assert_eq!(sink.accepted, 128);
 }
 
 fn publish_batch(

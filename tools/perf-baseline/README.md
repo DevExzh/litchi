@@ -25,7 +25,8 @@ Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
 range cases, two execution-scaling cases, one low-level source-overlay save
 case, one source-backed DOCX semantic publication case, one source-backed
-media-rich PPTX semantic publication case, one XLSX commit/read attribution case,
+media-rich PPTX semantic publication case, four matched same-slide/multi-slide
+PPTX batch cases, one XLSX commit/read attribution case,
 two matched XLSX calculation-metadata publication cases, two matched XLSX
 defined-name publication cases, two matched XLSX
 page-break publication cases, two matched XLSX page-margin publication cases,
@@ -33,7 +34,7 @@ two matched XLSX page-setup publication cases,
 two matched XLSX print-options publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, nine RTF semantic cases, and 31 ODF semantic cases
-are opt-in, for 143 selectable cases in total:
+are opt-in, for 145 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -131,6 +132,22 @@ materializes all 229 ordinary Parts; the source-backed path materializes only
 the presentation root and selected slide. Corpus creation plus complete
 semantic, topology, relationship, media, patch/inverse, output-hash, and
 source/sink verification remain outside the timed interval.
+
+Measure the matched eight-slide batch controls on the same corpus:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 \
+  --case pptx_eager_multi_slide_batch_edit_save,pptx_source_backed_multi_slide_batch_edit_save \
+  --json target/perf/pptx-multi-slide-batch.json
+```
+
+Both paths replace all eight text boxes on slides 0, 28, 57, 85, 114, 142,
+171, and 199 and emit byte-identical output. The eager path materializes all
+229 ordinary Parts; the source-backed batch materializes the presentation root
+and eight selected slides, then regenerates only those eight slide members.
+Complete semantic, topology, relationship, raw unselected-member, media,
+patch/inverse, source-version, output-hash, and sink checks remain untimed.
 
 Measure the matched XLSX calculation-metadata publication controls:
 

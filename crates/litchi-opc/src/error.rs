@@ -133,7 +133,7 @@ pub enum OpcError {
         actual: litchi_core::SourceVersion,
     },
 
-    /// A source-backed one-Part publisher cannot prove that the physical
+    /// A source-backed bounded-Part publisher cannot prove that the physical
     /// source can be preserved without a full materializing rewrite.
     #[error("source-backed OPC Part overlay is unavailable: {reason}")]
     SourceBackedOverlayUnavailable {
@@ -141,7 +141,7 @@ pub enum OpcError {
         reason: String,
     },
 
-    /// A source-backed one-Part change would invalidate an existing signature
+    /// A source-backed Part change would invalidate an existing signature
     /// without an explicit strip-or-resign policy.
     #[error("signed OPC source requires an explicit signature edit policy")]
     SignedSourceRequiresExplicitPolicy,

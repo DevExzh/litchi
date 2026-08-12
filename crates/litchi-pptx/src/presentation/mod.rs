@@ -17,6 +17,8 @@ pub mod media;
 
 pub use model::Presentation;
 pub use source::{
-    SourceBackedPresentation, SourceBackedPresentationEditor, SourceBackedSlideCommit,
-    SourceBackedSlideEdit, SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceSlide,
+    MAX_SOURCE_BACKED_SLIDE_BATCH, SourceBackedPresentation, SourceBackedPresentationEditor,
+    SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit, SourceBackedSlideBatchPatch,
+    SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit, SourceBackedSlideEdit,
+    SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceSlide,
 };

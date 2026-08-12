@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-12",
+  "production_base": "a82a5d9f3f3e34706a9ee890fd23f48b92718e6f",
+  "control_binary_sha256": "9bee76796aecd22cc881e7d4e5cd2936b031a30d86b1f8e9b7572b49d6ad0993",
+  "candidate_binary_sha256": "ece3a2e77d591813ae9611a29bc7c62787ff1cdf87dedabeb5713cc968af6e3d",
+  "environment": {
+    "cpu": "AMD EPYC 9575F VM",
+    "cpu_affinity": 3,
+    "kernel": "Linux 6.8.0-101-generic x86_64",
+    "rustc": "1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator"
+  },
+  "corpus": {
+    "generator": "litchi-pptx-source-edit-media-v1",
+    "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "archive_bytes": 17017139,
+    "logical_part_bytes": 17568429,
+    "ordinary_parts": 229,
+    "zip_members": 445,
+    "selected_slide_positions": [0, 28, 57, 85, 114, 142, 171, 199],
+    "replacements_per_slide": 8,
+    "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9",
+    "output_bytes": 17017145
+  },
+  "protocol": {
+    "order": [
+      "eager_a",
+      "source_a",
+      "source_b",
+      "eager_b"
+    ],
+    "warmups_per_leg": 30,
+    "samples_per_leg": 200,
+    "pooled_samples_per_state": 400
+  },
+  "legs_ns": {
+    "eager_a": {
+      "p50": 330880351,
+      "mean": 332081949.5149999,
+      "p95": 348361290,
+      "p99": 359774905
+    },
+    "source_a": {
+      "p50": 14156587,
+      "mean": 14570204.309999995,
+      "p95": 16890186,
+      "p99": 19503055
+    },
+    "source_b": {
+      "p50": 13895741,
+      "mean": 14011057.685000004,
+      "p95": 16271231,
+      "p99": 16632609
+    },
+    "eager_b": {
+      "p50": 331910469,
+      "mean": 332238212.185,
+      "p95": 344079934,
+      "p99": 347731840
+    }
+  },
+  "pooled_ns": {
+    "eager": {
+      "samples": 400,
+      "min": 317937337,
+      "p50": 331362179,
+      "mean": 332160080.85,
+      "mean_ci95": [331483122.45685834, 332837039.2431417],
+      "p95": 345298469,
+      "p99": 352803805,
+      "max": 376767820
+    },
+    "source_backed": {
+      "samples": 400,
+      "min": 9738012,
+      "p50": 13996788,
+      "mean": 14290630.9975,
+      "mean_ci95": [14126797.22915714, 14454464.76584286],
+      "p95": 16504972,
+      "p99": 18518476,
+      "max": 23084048
+    },
+    "delta_percent": {
+      "p50": -95.775985,
+      "mean": -95.697668,
+      "p95": -95.220085,
+      "p99": -94.751055
+    }
+  },
+  "publication_evidence": {
+    "ordinary_part_materializations": {
+      "eager": 229,
+      "source_backed": 9
+    },
+    "ordinary_payload_read_calls": {
+      "eager": 741,
+      "source_backed": 742
+    },
+    "ordinary_payload_read_bytes": {
+      "eager": 16907750,
+      "source_backed": 16909038
+    },
+    "maximum_in_flight_reads": 1,
+    "sink_write_calls": {
+      "eager": 260,
+      "source_backed": 1403
+    },
+    "largest_sink_write": {
+      "eager": 65536,
+      "source_backed": 32768
+    }
+  },
+  "heaptrack_one_sample": {
+    "allocation_calls": {
+      "eager": 3277310,
+      "source_backed": 2210873
+    },
+    "temporary_allocations": {
+      "eager": 627700,
+      "source_backed": 207039
+    },
+    "peak_heap_mib": {
+      "eager": 175.14,
+      "source_backed": 159.49
+    },
+    "peak_rss_mib": {
+      "eager": 154.35,
+      "source_backed": 154.59
+    },
+    "leaked_kib": {
+      "eager": 1.78,
+      "source_backed": 1.78
+    }
+  },
+  "gnu_time_two_process_mean_max_rss_kib": {
+    "eager": 145916,
+    "source_backed": 146654
+  },
+  "perf_stat_three_process_mean": {
+    "eager": {
+      "task_clock_ms": 6186.4067,
+      "context_switches": 54,
+      "cpu_migrations": 1,
+      "page_faults": 424684.3333,
+      "cycles": 30256439700,
+      "instructions": 76781030806,
+      "branches": 13452955975.3333,
+      "branch_misses": 188294974,
+      "cache_references": 1718808737.6667,
+      "cache_misses": 43373593.3333
+    },
+    "source_backed": {
+      "task_clock_ms": 1892.27,
+      "context_switches": 34.6667,
+      "cpu_migrations": 1,
+      "page_faults": 299447,
+      "cycles": 9319761434.3333,
+      "instructions": 23347836620.3333,
+      "branches": 4006511534.6667,
+      "branch_misses": 21100340.3333,
+      "cache_references": 549034187.6667,
+      "cache_misses": 27235602
+    }
+  }
+}

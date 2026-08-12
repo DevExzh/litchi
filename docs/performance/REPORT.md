@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `2fead7927f6111acccf49aaaf543d285d88d0f90`
+Production base for the latest measured tranche: `a82a5d9f3f3e34706a9ee890fd23f48b92718e6f`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,12 +13,13 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **143 selectable cases**: 36 default cases and 198 default
+harness contains **145 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in
-source-backed media-rich PPTX semantic publication case, six opt-in media-rich ODT
+source-backed media-rich PPTX semantic publication case, four opt-in matched
+same-slide/multi-slide PPTX batch cases, six opt-in media-rich ODT
 paragraph/line-break/inline-run/hyperlink/insertion/removal publication cases, 12 opt-in matched XLSX
 calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup publication cases, 16 opt-in DOCX/PPTX
 semantic cases, nine opt-in RTF semantic case names across four
@@ -33,7 +34,7 @@ is still not broad program or CRUD coverage.
 | Targeted OPC raw publication | Four-cell ABBA p50 geomean **-84.98%**; few-large/incompressible **-71.70%**; matched cycles **-69.21%** | Initial peak heap **+37.18%**, one-shot RSS **+22.26%** from retained source/provenance and a changed-payload copy; the copy is removed by the shared-payload follow-up below |
 | Positional CFB/ZIP and explicit execution | Large-task p50 scaling at 12 CPUs: OPC **4.52x**, CFB **5.93x**; no hidden global Rayon | Many-small tasks regress at high worker counts; default/legacy paths remain serial |
 | Source-backed OPC and DOCX/XLSX/PPTX facades | EOCD structural-open source bytes **-73.6% to -98.5%**; ordinary payload overlap zero | No latency claim: later EntryId/cache-diagnostic changes confound comparison and some cells exceed 5% variance |
-| Source-backed PPTX selected-slide publication | Media-rich one-edit/save p50 **-97.12%**; atomic eight-shape batch p50/mean **-97.45%**, allocation calls **-39.80%**; materializations **229 -> 2**; byte-identical output | One operation in one existing slide only, bounded to 256 unique nonoverlapping shape-text replacements; MCE rewrites, topology changes and changed signed packages refuse before output |
+| Source-backed PPTX selected-slide publication | Media-rich one-edit/save p50 **-97.12%**; atomic same-slide batch p50 **-97.45%**, materializations **229 -> 2**; atomic eight-slide batch p50 **-95.78%**, allocations **-32.54%**, materializations **229 -> 9**; byte-identical output | At most 32 existing slides with one bounded 256-selector shape-text operation each; MCE rewrites, relationships/topology changes and changed signed packages refuse before output |
 | Source-backed XLSX calculation-metadata publication | Media-rich one-edit/save p50 **-99.2519%** (133.67x), mean **-99.2507%**; instructions **-77.78%**; materializations **12 -> 1**; byte-identical output | Existing `xl/workbook.xml` calculation properties/features only; cells, formulas, cached results, chains, relationships and topology remain outside the capability |
 | Source-backed XLSX defined-name publication | Media-rich catalog edit/save p50 **-97.84%** (46.32x), mean **-97.81%**; instructions **-78.45%**; materializations **12 -> 1**; byte-identical output | Complete direct `definedNames` catalog only; protected/MCE/unknown catalogs, sheet topology, cells, formulas, relationships and changed signed sources remain outside the capability |
 | Source-backed XLSX page-break publication | Media-rich one-edit/save p50 **-97.86%** (46.65x), mean **-97.86%**; materializations **12 -> 2**; byte-identical output | One existing normal worksheet's page-break collections only; cells, formulas, styles, relationships, topology, and changed signed sources remain outside the capability |
@@ -381,6 +382,15 @@ guard, CPU/allocation/RSS attribution, exact preservation/refusal matrix and
 frozen binary hashes are summarized in
 [`change 0044`](changes/0044-pptx-source-backed-semantic-publication.md).
 
+The source-backed PPTX multi-slide batch evidence is
+[`before A`](results/abba-pptx-multi-slide-batch-before-a.json),
+[`after A`](results/abba-pptx-multi-slide-batch-after-a.json),
+[`after B`](results/abba-pptx-multi-slide-batch-after-b.json), and
+[`before B`](results/abba-pptx-multi-slide-batch-before-b.json). Counters,
+profiles, allocation/RSS attribution, raw member preservation, refusal coverage
+and frozen binary hashes are summarized in
+[`change 0077`](changes/0077-pptx-source-backed-multi-slide-batch-publication.md).
+
 The source-backed XLSX calculation-metadata publication evidence is
 [`before A`](results/abba-xlsx-calculation-metadata-edit-before-a.json),
 [`after A`](results/abba-xlsx-calculation-metadata-edit-after-a.json),
@@ -513,7 +523,7 @@ counters, Heaptrack and GNU Time artifacts are indexed in
 
 Source-backed cache bytes are bounded by `SourceCacheLimits` but are not yet
 charged to hierarchical `Budget`. Raw ZIP preservation is integrated for owned
-same-topology OPC mutations and the narrow consuming source-backed one-Part
+same-topology OPC mutations and the bounded consuming source-backed multi-Part
 publisher; broad source-backed semantic editing remains pending.
 See [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
@@ -537,12 +547,10 @@ See [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0024`](changes/0024-ppt-slide-order-open-reuse.md), and
 [`0025`](changes/0025-xlsx-validated-store-handoff.md).
 
-Consolidated changed-crate tests passed, along with focused changed-crate
-warning-denied Clippy and formatter checks. The latest XLSX batch passes 732
-unit tests, all integration suites, two doctests and the 32-test harness.
-Warning-denied public rustdoc remains blocked by pre-existing broken/private
-links, and all-target XLSX Clippy retains the three unrelated findings named in
-change 0046. The broad crate-boundary checker likewise retains existing
+Consolidated OPC, PPTX and performance-harness tests passed, along with
+warning-denied changed-crate Clippy, formatter, workflow, JSON and final-diff
+checks. Warning-denied ODF-common Clippy and rustdoc also pass, revalidating the
+GenericArray deprecation fix. The broad crate-boundary checker retains existing
 unclassified workspace edges; no manifest or dependency edge changed. A
 workspace all-target/all-feature gate was not run because iWork was explicitly
 excluded while its crates are changing independently.
@@ -705,6 +713,7 @@ The underlying records are:
 - [`0074-odt-content-only-hyperlink-publication.md`](changes/0074-odt-content-only-hyperlink-publication.md)
 - [`0075-odt-structural-paragraph-publication.md`](changes/0075-odt-structural-paragraph-publication.md)
 - [`0076-xlsx-source-backed-defined-names-publication.md`](changes/0076-xlsx-source-backed-defined-names-publication.md)
+- [`0077-pptx-source-backed-multi-slide-batch-publication.md`](changes/0077-pptx-source-backed-multi-slide-batch-publication.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -851,7 +860,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 143 selectable cases and a 198-record default
+The standalone harness provides 145 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus

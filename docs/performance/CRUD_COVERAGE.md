@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 
-This is a coverage map, not a completion claim. It compares the 143 selectable
+This is a coverage map, not a completion claim. It compares the 145 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -20,7 +20,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication; signed/extension corpora remain missing |
 | One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT separately measures paragraph replacement, inline line-break/run/hyperlink insertion, and structural paragraph insertion/removal while ODT, ODS and ODP verify eight exact 2 MiB resources and manifest media types; source-backed DOCX/PPTX and narrow XLSX calculation-metadata/defined-name publication likewise verify eight exact 2 MiB media Parts after one semantic edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
 | About 1% semantic update and save | Covered for XLSX/DOCX/PPTX/ODT generated corpora | Deterministic evenly spaced cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch, while ODT coalesces ordinary scalar durable replacements internally; both reopen the package |
-| Bulk update matching objects | Partial | PPTX has one bounded atomic same-slide batch for up to 256 unique nonoverlapping shape-text selectors; cross-slide, structural and other formats remain missing |
+| Bulk update matching objects | Partial | PPTX has a bounded atomic batch across up to 32 existing slides, with up to 256 unique nonoverlapping shape-text selectors per slide; structural and other-format bulk updates remain missing |
 | Clear/remove/hide/detach/GC distinctions | Partial | ODT now has a measured exact paragraph-removal transaction that intentionally preserves orphaned resources; clear, hide, detach, explicit GC, and other-format distinctions remain missing |
 | Sanitization and irreversible redaction | Missing | No complete matrix |
 | Copy object with dependency closure | Missing | No measured format case |
@@ -29,16 +29,16 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS-row preservation, and exact raw ODT/ODS/ODP auxiliary/media members during neighboring paragraph/cell/text-box edits; broader format-semantic extension corpora remain missing |
-| Replace one low-level Part, preserve the rest | Covered for owned OPC, narrow source-backed OPC, guarded DOCX main-document semantics, guarded PPTX selected-slide semantics, and XLSX calculation metadata/defined names/page breaks/page margins/print options/relationship-free page setup | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; change 0037 adds the consuming one-Part publisher; changes 0039, 0044/0063, 0046, 0061, 0067, 0070, 0073 and 0076 integrate guarded semantic transactions while refusing unsafe MCE, signatures, stale closure, topology and printer-reference cases before output; general XLSX cell/formula, printer graph and multi-slide PPTX editing remain outside the closure |
+| Replace one or a bounded set of low-level Parts, preserve the rest | Covered for owned OPC, bounded source-backed OPC, guarded DOCX main-document semantics, guarded PPTX selected/multi-slide semantics, and XLSX calculation metadata/defined names/page breaks/page margins/print options/relationship-free page setup | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; changes 0037/0077 add consuming one-Part/bounded multi-Part publishers; changes 0039, 0044/0063/0077, 0046, 0061, 0067, 0070, 0073 and 0076 integrate guarded semantic transactions while refusing unsafe MCE, signatures, stale closure, topology and printer-reference cases before output; general XLSX cell/formula, printer graph and structural PPTX editing remain outside the closure |
 
 The source/output matrix is also incomplete. Owned bytes and instrumented
 `ReadAt` exist for OPC/XLSX, and the deterministic range simulator covers
-latency/range effects. The narrow source-backed OPC publisher accepts a
+latency/range effects. The bounded source-backed OPC publisher accepts a
 forward-only sink and records complete positional input plus bounded output,
 but this is not semantic conversion or memory-bounded authoring. RTF and DOCX
 final serialization also accept and test a forward-only non-seek sink.
 Borrowed-byte comparisons, filesystem positional cold reads, atomic-save
-timing, broad/multi-Part PPTX streaming output, and non-seek semantic
+timing, broad structural PPTX streaming output, and non-seek semantic
 conversion remain.
 
 ## Highest-return next cases
@@ -443,6 +443,15 @@ no-op, media, relationship, topology and calculation-policy preservation.
 Protected or MCE/unknown catalogs, invalid local scopes, changed signatures,
 stale sources and partial sinks refuse. It does not authorize sheet topology,
 formula/cell edits, relationships, name merging or general workbook mutation.
+
+Change 0077 broadens the low-level source-backed OPC publisher to a checked
+64-Part replacement set and adds a guarded PPTX batch over at most 32 existing
+slides. The measured case edits eight shapes on each of eight slides,
+materializes the presentation root plus those slides, raw-copies every
+unselected ZIP member, and proves exact patch/inverse, signed all-noop,
+stale/foreign/version, limit, topology, relationship, media and partial-sink
+behavior. Slide topology, relationships, notes/layouts/charts/media, MCE
+projection and changed signed sources remain outside the capability.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
