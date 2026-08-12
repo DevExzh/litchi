@@ -10,6 +10,7 @@
 mod copy_plan;
 mod model;
 mod patch;
+mod remove_plan;
 mod transaction;
 mod xml;
 
@@ -19,8 +20,10 @@ mod tests;
 pub use copy_plan::{SlideCopyPart, SlideCopyPlan};
 pub use model::{Limits, MAX_SHAPE_TEXT_REPLACEMENTS, ShapeTextReplacement, Slide, Snapshot};
 pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
+pub use remove_plan::{SlideRemovalPatch, SlideRemovalPlan};
 pub use transaction::{Commit, Transaction};
 
 pub(crate) use model::{capture, package_fingerprint};
 pub(crate) use patch::apply;
+pub(crate) use remove_plan::apply_patch as apply_removal_patch;
 pub(crate) use xml::stage_shape_texts;

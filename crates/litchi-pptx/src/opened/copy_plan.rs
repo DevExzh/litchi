@@ -863,7 +863,7 @@ fn reject_cycles(owned: &HashSet<PackURI>, edges: &HashMap<PackURI, Vec<PackURI>
     }
 }
 
-fn validate_slide_surface(xml: &[u8]) -> Result<()> {
+pub(super) fn validate_slide_surface(xml: &[u8]) -> Result<()> {
     validate_xml_surface(xml, XmlSurface::Slide)
 }
 
@@ -1056,7 +1056,7 @@ fn allowed_surface_attribute_namespace(surface: XmlSurface, value: &[u8]) -> boo
     allowed_surface_element_namespace(surface, value) || matches!(value, REL | STRICT_REL | XML)
 }
 
-fn reject_mce(xml: &[u8], context: &'static str) -> Result<()> {
+pub(super) fn reject_mce(xml: &[u8], context: &'static str) -> Result<()> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     loop {
@@ -1108,7 +1108,7 @@ fn reject_mce(xml: &[u8], context: &'static str) -> Result<()> {
     }
 }
 
-fn has_signature_infrastructure(package: &OpcPackage) -> bool {
+pub(super) fn has_signature_infrastructure(package: &OpcPackage) -> bool {
     package
         .rels()
         .iter()
@@ -1202,7 +1202,7 @@ fn available_copy_name(
     )
 }
 
-fn validate_registered_layout(
+pub(super) fn validate_registered_layout(
     package: &OpcPackage,
     presentation_part: &dyn Part,
     selected: &PackURI,
@@ -1303,7 +1303,7 @@ fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<Str
     Ok(format!("rId{candidate}"))
 }
 
-fn resolve_slide(snapshot: &Snapshot, key: crate::slide::Key<'_>) -> Result<Slide> {
+pub(super) fn resolve_slide(snapshot: &Snapshot, key: crate::slide::Key<'_>) -> Result<Slide> {
     match key {
         crate::slide::Key::Index(index) => {
             snapshot

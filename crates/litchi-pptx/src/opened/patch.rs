@@ -196,6 +196,12 @@ pub struct Patch {
     pub(crate) limits: Limits,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SinglePartChange {
+    Remove,
+    Add,
+}
+
 impl Patch {
     pub(crate) fn capture(
         source: &OpcPackage,
@@ -282,6 +288,61 @@ impl Patch {
     #[must_use]
     pub fn resources(&self) -> impl ExactSizeIterator<Item = &PackURI> {
         self.deltas.iter().map(|delta| &delta.name)
+    }
+
+    pub(crate) fn removes_resource(&self, name: &PackURI) -> bool {
+        self.deltas
+            .iter()
+            .any(|delta| &delta.name == name && delta.before.is_some() && delta.after.is_none())
+    }
+
+    pub(crate) fn exact_slide_removal_change(&self) -> Option<(SinglePartChange, &PackURI)> {
+        if self.root.is_some() || self.deltas.len() != 2 {
+            return None;
+        }
+        let presentation = self
+            .deltas
+            .iter()
+            .find(|delta| delta.name == self.presentation_name)?;
+        let (Some(presentation_before), Some(presentation_after)) =
+            (&presentation.before, &presentation.after)
+        else {
+            return None;
+        };
+        if presentation_before.content_type
+            != litchi_opc::constants::content_type::PML_PRESENTATION_MAIN
+            || presentation_after.content_type
+                != litchi_opc::constants::content_type::PML_PRESENTATION_MAIN
+        {
+            return None;
+        }
+        let slide = self
+            .deltas
+            .iter()
+            .find(|delta| delta.name != self.presentation_name)?;
+        match (&slide.before, &slide.after) {
+            (Some(before), None)
+                if before.content_type == litchi_opc::constants::content_type::PML_SLIDE =>
+            {
+                Some((SinglePartChange::Remove, &slide.name))
+            },
+            (None, Some(after))
+                if after.content_type == litchi_opc::constants::content_type::PML_SLIDE =>
+            {
+                Some((SinglePartChange::Add, &slide.name))
+            },
+            _ => None,
+        }
+    }
+
+    pub(crate) fn has_same_changes(&self, other: &Self) -> bool {
+        self.presentation_name == other.presentation_name
+            && self.deltas == other.deltas
+            && self.root == other.root
+    }
+
+    pub(crate) const fn limits(&self) -> Limits {
+        self.limits
     }
 
     /// Exact inverse, suitable only after this patch has been applied.
@@ -660,6 +721,22 @@ impl History {
 }
 
 pub(crate) fn apply(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+    apply_with_revision(package, patch, None)
+}
+
+pub(crate) fn apply_exact_revision(
+    package: &mut OpcPackage,
+    patch: &Patch,
+    result_revision: [u8; 32],
+) -> Result<Snapshot> {
+    apply_with_revision(package, patch, Some(result_revision))
+}
+
+fn apply_with_revision(
+    package: &mut OpcPackage,
+    patch: &Patch,
+    result_revision: Option<[u8; 32]>,
+) -> Result<Snapshot> {
     let current_main = crate::parts::PresentationPart::from_package(package)?
         .part()
         .partname()
@@ -671,7 +748,13 @@ pub(crate) fn apply(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot>
     }
     validate_before(package, patch)?;
     if patch.is_empty() {
-        return capture(package, patch.limits);
+        let snapshot = capture(package, patch.limits)?;
+        if result_revision.is_some_and(|expected| snapshot.revision() != expected) {
+            return Err(invalid(
+                "opened-presentation candidate has an unexpected complete-package revision",
+            ));
+        }
+        return Ok(snapshot);
     }
     let mut candidate = package.clone();
     if let Some((_before, after)) = &patch.root {
@@ -706,6 +789,11 @@ pub(crate) fn apply(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot>
     }
     let snapshot = capture(&candidate, patch.limits)?;
     validate_after(&candidate, patch)?;
+    if result_revision.is_some_and(|expected| snapshot.revision() != expected) {
+        return Err(invalid(
+            "opened-presentation candidate has an unexpected complete-package revision",
+        ));
+    }
     *package = candidate;
     Ok(snapshot)
 }

@@ -51,6 +51,31 @@ pub enum SlideCopyRefusal {
     GlobalTableStyle,
 }
 
+/// Stable classification for a whole-slide removal plan that cannot prove a
+/// complete, independent deletion boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SlideRemovalRefusal {
+    /// The source package contains OPC digital-signature infrastructure.
+    SignedPackage,
+    /// The package is macro-enabled or contains VBA infrastructure.
+    MacroEnabledPackage,
+    /// The presentation carries a modify-password verifier.
+    ProtectedPresentation,
+    /// Markup-compatibility input would require choosing or rewriting a branch.
+    MarkupCompatibility,
+    /// The selected slide or presentation owner has an unmodeled semantic surface.
+    UnknownSemanticSurface,
+    /// Another package resource or presentation feature references the selected slide.
+    SharedOwner,
+    /// The selected slide has a relationship outside the dependency-free boundary.
+    UnsupportedRelationship,
+    /// The package or selected slide has ambiguous physical ownership.
+    AmbiguousTopology,
+    /// A presentation must retain at least one slide.
+    FinalSlide,
+}
+
 impl std::fmt::Display for SlideCopyRefusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
@@ -63,6 +88,22 @@ impl std::fmt::Display for SlideCopyRefusal {
             Self::DependencyCycle => "dependency cycle",
             Self::AmbiguousTopology => "ambiguous package topology",
             Self::GlobalTableStyle => "presentation-global table style",
+        })
+    }
+}
+
+impl std::fmt::Display for SlideRemovalRefusal {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::SignedPackage => "signed package",
+            Self::MacroEnabledPackage => "macro-enabled package",
+            Self::ProtectedPresentation => "protected presentation",
+            Self::MarkupCompatibility => "markup-compatibility surface",
+            Self::UnknownSemanticSurface => "unknown semantic surface",
+            Self::SharedOwner => "shared or cross-slide owner",
+            Self::UnsupportedRelationship => "unsupported relationship family",
+            Self::AmbiguousTopology => "ambiguous package topology",
+            Self::FinalSlide => "final remaining slide",
         })
     }
 }
@@ -84,6 +125,15 @@ impl std::fmt::Display for ShapeTransferRefusal {
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// A whole-slide removal prerequisite was classified and refused without mutation.
+    #[error("unsupported PresentationML slide removal plan ({kind}): {detail}")]
+    SlideRemovalPlan {
+        /// Machine-readable refusal family.
+        kind: SlideRemovalRefusal,
+        /// Bounded human-readable source context.
+        detail: String,
+    },
+
     /// A whole-slide copy prerequisite was classified and refused without mutation.
     #[error("unsupported PresentationML slide copy plan ({kind}): {detail}")]
     SlideCopyPlan {

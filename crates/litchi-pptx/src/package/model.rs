@@ -233,6 +233,63 @@ impl Package {
         Ok(snapshot)
     }
 
+    /// Atomically publish a source-bound dependency-free whole-slide removal.
+    ///
+    /// Planning captures a complete-package fingerprint and an exact durable
+    /// patch over only the presentation owner and selected slide. Publication
+    /// refuses if any package resource changed after planning. The plan's
+    /// [`crate::opened::SlideRemovalPlan::patch`] can be serialized and inverted
+    /// through [`Self::apply_slide_removal_patch`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale plan, package mutation-policy refusal, or
+    /// a candidate graph that no longer applies exactly.
+    pub fn apply_slide_removal_plan(
+        &mut self,
+        plan: &crate::opened::SlideRemovalPlan,
+    ) -> Result<crate::opened::Snapshot> {
+        self.ensure_graph_current("apply_slide_removal_plan")?;
+        if self.mutable_pres.is_some() {
+            return Err(Error::UnsafeEdit {
+                operation: "apply_slide_removal_plan",
+                reason: "slide-removal plans require an already-opened package",
+            });
+        }
+        self.ensure_plain_mutation("apply_slide_removal_plan")?;
+        let snapshot = crate::opened::apply_removal_patch(
+            &mut self.opc,
+            plan.patch(),
+            "apply_slide_removal_plan",
+        )?;
+        self.mutable_pres = None;
+        Ok(snapshot)
+    }
+
+    /// Atomically publish a durable complete-revision-bound slide removal patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error before mutation when the complete package graph differs
+    /// from the patch source, or when candidate validation fails.
+    pub fn apply_slide_removal_patch(
+        &mut self,
+        patch: &crate::opened::SlideRemovalPatch,
+    ) -> Result<crate::opened::Snapshot> {
+        self.ensure_graph_current("apply_slide_removal_patch")?;
+        if self.mutable_pres.is_some() {
+            return Err(Error::UnsafeEdit {
+                operation: "apply_slide_removal_patch",
+                reason: "slide-removal patches require an already-opened package",
+            });
+        }
+        self.ensure_plain_mutation("apply_slide_removal_patch")?;
+        let snapshot =
+            crate::opened::apply_removal_patch(&mut self.opc, patch, "apply_slide_removal_patch")?;
+        self.mutable_pres = None;
+        Ok(snapshot)
+    }
+
     /// Publish one opened-presentation commit atomically.
     ///
     /// # Errors

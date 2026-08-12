@@ -117,50 +117,25 @@ impl Transaction {
         Ok(true)
     }
 
-    /// Remove one slide and any now-unreferenced acyclic dependency parts.
+    /// Remove one dependency-free slide through the same bounded ownership
+    /// proof used by [`Snapshot::plan_slide_removal`].
     ///
-    /// Shared layouts, masters, themes, media, charts, and notes remain when
-    /// any package edge still references them. At least one slide is retained.
+    /// The selected slide may retain only its one registered shared layout
+    /// edge. Notes, charts, media, external targets, custom relationships,
+    /// signatures, macros, MCE, protection, and incoming secondary owners are
+    /// refused before this transaction changes.
     ///
     /// # Errors
     ///
     /// Returns an error for a missing selector, the final remaining slide, or
-    /// malformed slide-list and relationship topology.
+    /// an unsupported slide-list or relationship topology.
     pub fn remove_slide<'s>(&mut self, slide: impl Into<crate::slide::Key<'s>>) -> Result<Slide> {
-        if self.slides.len() == 1 {
-            return Err(invalid("opened-presentation cannot remove the final slide"));
-        }
-        let selected = self.resolve_slide(slide.into())?;
-        let mut candidate = self.working.clone();
-        let presentation = candidate.get_part(&self.source.presentation_name)?;
-        let xml = super::xml::remove_slide(presentation.blob(), &self.slides, selected.id)?;
-        let dependency_roots: Vec<_> = self
-            .working
-            .get_part(&selected.part_name)?
-            .rels()
-            .iter()
-            .filter(|relationship| !relationship.is_external())
-            .map(|relationship| relationship.target_partname().map_err(Error::Opc))
-            .collect::<Result<_>>()?;
-        let presentation = candidate.get_part_mut(&self.source.presentation_name)?;
-        if presentation
-            .rels_mut()
-            .remove(&selected.relationship_id)
-            .is_none()
-        {
-            return Err(invalid(
-                "opened-presentation slide relationship disappeared during removal",
-            ));
-        }
-        presentation.set_blob(xml);
-        if !candidate.remove_part(&selected.part_name) {
-            return Err(invalid(
-                "opened-presentation slide part disappeared during removal",
-            ));
-        }
-        remove_unreferenced_dependencies(&mut candidate, dependency_roots)?;
-        self.working = candidate;
-        self.slides.retain(|candidate| candidate.id != selected.id);
+        let snapshot = capture(&self.working, self.source.limits)?;
+        let plan = snapshot.plan_slide_removal(slide)?;
+        let selected = plan.source().clone();
+        let published =
+            super::remove_plan::apply_patch(&mut self.working, plan.patch(), "remove_slide")?;
+        self.slides = published.slides;
         Ok(selected)
     }
 
