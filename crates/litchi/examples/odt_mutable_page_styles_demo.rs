@@ -19,7 +19,10 @@ fn main() -> Result<()> {
     let document = Document::open(base_file)?;
     let mut mutable = MutableDocument::from_document(document)?;
 
-    mutable.update_paragraph(0, "Mutable ODT Demo (reopened and updated)")?;
+    mutable.replace_paragraph_at(
+        litchi::common::Position::new(0),
+        "Mutable ODT Demo (reopened and updated)",
+    )?;
 
     mutable.add_paragraph(
         "The reopened document now includes extra paragraphs added through MutableDocument.",

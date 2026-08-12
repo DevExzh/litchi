@@ -123,30 +123,6 @@ pub(crate) fn remove_component_data_references_for_objects(
     Ok(affected)
 }
 
-/// Return every embedded-data identifier registered to one package component.
-///
-/// Components may retain a data reference without any object owners, so this
-/// deliberately reads the component-level registry rather than flattening only
-/// object-reference records.
-pub(crate) fn component_data_identifiers(
-    package: &IWorkPackage,
-    component_identifier: u64,
-) -> Result<Vec<u64>> {
-    let component = component_info(package, component_identifier)?;
-    let mut identifiers = HashSet::with_capacity(component.data_references.len());
-    for reference in component.data_references {
-        if reference.data_identifier == 0 || !identifiers.insert(reference.data_identifier) {
-            return Err(Error::InvalidFormat(format!(
-                "Component {component_identifier} has an invalid or repeated data reference {}",
-                reference.data_identifier
-            )));
-        }
-    }
-    let mut identifiers = identifiers.into_iter().collect::<Vec<_>>();
-    identifiers.sort_unstable();
-    Ok(identifiers)
-}
-
 fn adjust_component_data_reference(
     package: &mut IWorkPackage,
     component_identifier: u64,

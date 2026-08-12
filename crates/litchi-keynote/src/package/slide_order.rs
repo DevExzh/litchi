@@ -524,7 +524,7 @@ impl Package {
         Ok(source)
     }
 
-    fn private_slide_node_order(&self) -> Result<Box<[u64]>, SlideOrderError> {
+    pub(super) fn private_slide_node_order(&self) -> Result<Box<[u64]>, SlideOrderError> {
         let show_identifier = self.root_show_identifier().map_err(map_read_error)?;
         if show_identifier == 0 {
             return Ok(Box::default());

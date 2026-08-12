@@ -1339,8 +1339,6 @@ if let Some(drawable) = keynote.slide_drawables(0)?.first() {
     )?;
     keynote.remove_slide_build(0, trace.object_id)?;
 }
-let copy = keynote.duplicate_slide(0)?;
-keynote.remove_slide(copy.index)?;
 keynote.save("updated.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
@@ -2000,6 +1998,50 @@ This focused transaction owns only playback mode and volume. The migration
 host still owns soundtrack-media item and asset operations (including their
 ordering and references); use its retained media-item compatibility APIs when
 that collection itself must change.
+
+### Keynote existing-slide deletion is a focused transaction
+
+Deleting one existing slide is no longer a `KeynoteEditor` mutation. Use the
+immutable `litchi_keynote::slide::delete::{Edit, Patch, Commit, Diagnostics,
+Error, LimitKind, Path}` transaction with an exact navigator name or checked
+semantic position. The final slide cannot be deleted, native IDs do not enter
+the API, and the exact inverse is accepted only by the committed package. The
+transaction admits only the supported flat native ownership topology; a
+surviving child backlink or other inbound owner is a typed refusal.
+
+```rust,no_run
+use litchi_keynote::{Package, SlideSelector};
+
+let package = Package::open("input.key")?;
+let mut edit = package.edit_slide_deletion();
+edit.remove_slide(SlideSelector::name("Appendix"))?;
+let commit = edit.commit()?;
+assert_eq!(
+    commit.package().show()?.slides().len() + 1,
+    package.show()?.slides().len(),
+);
+
+let restored = commit
+    .package()
+    .apply_slide_deletion(&commit.patch().inverse())?;
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Deletion removes the selected SlideNode and Slide objects plus their exact
+PackageMetadata ownership records. It retains their component registrations,
+co-located objects, global data-catalog records, and every media/data payload.
+A component data-reference record remains with surviving owners or is removed
+when none survive. Shared or newly unreachable media therefore remains
+preserved: this operation is structural deletion, not package garbage
+collection. See
+`litchi-keynote/examples/remove_slide.rs` for distinct-output,
+sibling-temporary, synchronized no-clobber publication and optional exact
+inverse output.
 
 Keynote slide skip/include, ordering, and modern transition transactions have
 focused `litchi-keynote` package-owner paths. Transition transactions use

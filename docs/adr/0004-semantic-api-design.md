@@ -1851,3 +1851,49 @@ Pages/Keynote ownership remain. The new private rich-text wire implementation
 introduces `litchi-numbers -> litchi-iwa-text-wire`, raising internal
 declarations from 237 to 238 while leaving 64 packages, 14 host declarations,
 and 14 ordered debts unchanged.
+
+## 2026-08-12 amendment: Keynote existing-slide deletion semantics
+
+The canonical API is
+`litchi_keynote::slide::delete::{Edit, Patch, Commit, Diagnostics, Error,
+LimitKind, Path}` with
+`Package::{edit_slide_deletion, apply_slide_deletion}`. A caller stages
+`Edit::remove_slide` with an exact `SlideSelector` name or a checked semantic
+position (`Position`, including its established `usize` conversion). Native
+SlideNode or Slide IDs, component and package-member names, UUIDs, media IDs,
+protobuf records, and raw bytes never enter the public vocabulary.
+`KeynoteEditor::remove_slide` is retired without a compatibility method or
+public bridge alias.
+
+Selection uses the immutable base snapshot. Names mean developer-facing
+navigator names, not visible title text; duplicate exact names are ambiguous.
+Deletion of the last slide is a distinct refusal. `Commit` returns the new
+immutable package, a reversible exact-source patch, and content-free
+diagnostics. Forward diagnostics report one slide removed and none restored;
+inverse application reports none removed and one restored. Both report that
+the operation changed, the number of distinct touched components, and whether
+a full reparse occurred; they do not reveal selected content or physical
+identity. Public patch `Debug` likewise omits names, members, fingerprints, and
+bytes.
+
+This surface authorizes removal of one existing slide only. It does not imply
+slide creation, insertion, duplication, bulk deletion, ordering, layout
+assignment, placeholder creation, drawable/media CRUD, or a public native
+graph. It rejects unsupported hierarchy and uncertain incoming ownership
+rather than asking a caller to select cascade, detach, or retarget behavior.
+Slide ordering remains the distinct `slide_order` transaction family.
+
+Nor does `remove_slide` mean media reclamation. The physical transaction
+removes exact data-reference owner/count records for the deleted Node and
+Slide. A component data-reference record remains with surviving owners or is
+removed when none survive, while the global data-catalog record and every
+media/data payload remain preserved. Shared or uncertain media can remain
+after the semantic slide is gone. Reclaiming unreachable data is a separate
+future `gc` API and proof.
+
+The focused `remove_slide` example accepts `index:N` or `name:NAME`, requires a
+distinct new output, optionally materializes the exact inverse at another
+distinct path, and uses synchronized sibling-temporary no-clobber publication.
+It demonstrates safe command-line publication without claiming that
+`Package::write_to` itself flushes, syncs, renames, or atomically replaces a
+filesystem destination.

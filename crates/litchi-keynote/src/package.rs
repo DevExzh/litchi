@@ -8,8 +8,10 @@ mod edit;
 mod limits;
 mod rendering_invalidation;
 pub(crate) mod show_settings;
+pub(crate) mod slide_delete;
 mod slide_notes;
 mod slide_order;
+
 pub(crate) mod slide_placeholder_visibility;
 mod slide_preview;
 mod slide_text;

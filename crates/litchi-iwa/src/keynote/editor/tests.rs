@@ -3459,22 +3459,6 @@ fn slide_name_updates_preserve_unknown_wire_and_restore_exact_component() {
 }
 
 #[test]
-fn removes_slide_tree_node_and_slide_transactionally() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let removed = editor.remove_slide(0).unwrap();
-    assert_eq!(removed.slide_id, 4);
-    assert!(!editor.package().contains_entry("Index/Slide-4.iwa"));
-    assert!(editor.package().contains_entry("Index/Slide-10.iwa"));
-    let slides = editor.slides().unwrap();
-    assert_eq!(slides.len(), 1);
-    assert_eq!(slides[0].slide_id, 10);
-    assert_eq!(slides[0].title.as_deref(), Some("Second title"));
-    let before = editor.to_bytes().unwrap();
-    assert!(editor.remove_slide(0).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
-}
-
-#[test]
 fn reads_current_slide_layout_from_theme_relationship() {
     let editor = KeynoteEditor::from_package(test_package_with_current_layout()).unwrap();
     let slides = editor.slides().unwrap();
@@ -4358,40 +4342,6 @@ fn creates_empty_slide_from_typed_theme_layout_transactionally() {
     assert_eq!(graph.drawable_storage(40).unwrap(), Some(42));
     assert_eq!(graph.storage_text(34).unwrap(), "Slide Title");
     assert_eq!(graph.storage_text(35).unwrap(), "Slide bullet text");
-
-    assert_eq!(editor.remove_slide(1).unwrap().slide_id, created.slide_id);
-    let graph = ObjectGraph::read(editor.package()).unwrap();
-    assert_eq!(graph.storage_text(34).unwrap(), "Slide Title");
-    assert_eq!(graph.storage_text(35).unwrap(), "Slide bullet text");
-}
-
-#[test]
-fn slide_tree_clone_delete_preserves_unknown_reference_bytes() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_unknown_slide_tree()).unwrap();
-    let package_before = editor
-        .package()
-        .entry_names()
-        .map(|name| {
-            (
-                name.to_owned(),
-                editor.package().entry(name).unwrap().to_vec(),
-            )
-        })
-        .collect::<Vec<_>>();
-    let created = editor.duplicate_slide(0).unwrap();
-    assert_eq!(editor.slides().unwrap()[1].slide_id, created.slide_id);
-    assert_eq!(editor.remove_slide(1).unwrap().slide_id, created.slide_id);
-    let package_after = editor
-        .package()
-        .entry_names()
-        .map(|name| {
-            (
-                name.to_owned(),
-                editor.package().entry(name).unwrap().to_vec(),
-            )
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(package_after, package_before);
 }
 
 #[test]
@@ -4509,11 +4459,8 @@ fn duplicates_slide_graph_with_independent_objects() {
     assert_eq!(slides[1].notes.as_deref(), Some("Independent notes"));
     assert_eq!(slides[2].title.as_deref(), Some("Second title"));
 
-    let removed = editor.remove_slide(1).unwrap();
-    assert_eq!(removed.slide_id, created.slide_id);
-    assert_eq!(editor.slides().unwrap().len(), 2);
     let before = editor.to_bytes().unwrap();
-    assert!(editor.duplicate_slide(2).is_err());
+    assert!(editor.duplicate_slide(3).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 

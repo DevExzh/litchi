@@ -5285,7 +5285,6 @@ mod slide_background_reset;
 mod slide_background_wire;
 mod slide_charts;
 mod slide_create;
-mod slide_delete;
 mod slide_graph;
 mod slide_images;
 mod slide_layout_media;
