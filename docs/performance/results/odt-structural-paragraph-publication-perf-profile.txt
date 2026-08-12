@@ -1,0 +1,14 @@
+Protocol: perf record, CPU 2, 0 warmups and 10 samples per structural case
+Lost samples: control 0; candidate 0
+
+Exclusive sampled-cycle share:
+symbol             Full rebuild   Content-only
+deflate_medium     51.43%         11.22%
+longest_match      18.09%          3.81%
+
+The process-wide sampled-cycle counts fell by approximately the same 77.00%
+as the matched perf-stat cycle count. Weighting these shares by that ratio
+attributes approximate absolute sampled-cycle reductions of 94.98% in
+deflate_medium and 95.16% in longest_match. The profile includes deterministic
+corpus construction and complete untimed verification, so it understates the
+timed publication delta.

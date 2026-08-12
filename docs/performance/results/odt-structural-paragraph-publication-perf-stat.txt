@@ -1,0 +1,14 @@
+Control binary SHA-256: 7d79f32d9a81d9e237300447fe03bc5100760e777c082f7573fd68b9b87404ad
+Candidate binary SHA-256: 6ef7f4310eb9cea130874c4ad9d09b6f67eb209ea830ddfd59b1246640eba375
+Protocol: CPU 2, perf stat -r 3, 2 warmups and 10 samples per structural case
+
+Counter                         Full rebuild         Content-only       Delta
+task-clock (ms)                 6,754.49             1,539.98           -77.20%
+cycles                          33,012,047,928       7,591,187,482     -77.00%
+instructions                    85,022,904,390       15,188,458,747    -82.14%
+branches                        14,498,201,178       1,874,438,069     -87.07%
+branch misses                   313,263,022          14,658,655        -95.32%
+cache references                2,268,780,514        521,624,870       -77.01%
+cache misses                    44,948,657           30,177,107        -32.86%
+page faults                     399,115              274,589           -31.20%
+CPU migrations                  0                    0

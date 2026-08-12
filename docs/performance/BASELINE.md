@@ -220,18 +220,19 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **134
+The stage-1 records above are retained unchanged. The current harness has **141
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
-PPTX semantic publication case, three opt-in media-rich ODT
-paragraph/line-break/inline-run publication cases, ten opt-in matched XLSX calculation-metadata/page-break/page-margin/print-options/page-setup
+PPTX semantic publication case, six opt-in media-rich ODT paragraph,
+line-break, inline-run, hyperlink, insertion, and removal publication cases,
+ten opt-in matched XLSX calculation-metadata/page-break/page-margin/print-options/page-setup
 publication cases, 16 opt-in DOCX/PPTX semantic
 cases, nine opt-in RTF semantic case names across four capability-bounded
 variants (33 tiny / 58 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
-semantic cases, five fixed media-rich ODF cases, and 21 opt-in native
+semantic cases, eight fixed media-rich ODF cases, and 21 opt-in native
 DOC/XLS/PPT semantic cases. It remains an
 incomplete program and CRUD matrix.
 
@@ -668,6 +669,15 @@ incomplete program and CRUD matrix.
   no-op dispatch also avoids the changed-path frame while all changed commits
   retain their prior validation body. See
   [`0072`](changes/0072-odt-content-only-run-publication.md).
+- A third matched case appends one inert hyperlink through the same checked
+  boundary. Pooled p50 falls from 221.443 to 3.988 ms (-98.20%, 55.52x), with
+  exact URL/text reopen and raw preservation of every untouched member. See
+  [`0074`](changes/0074-odt-content-only-hyperlink-publication.md).
+- Two structural cases insert or remove the middle paragraph while changing
+  only `content.xml`. Pooled p50 falls 98.20% (55.55x) for insertion and 98.27%
+  (57.86x) for removal; instructions fall 82.14% in the combined profile,
+  allocation calls fall 8.47%, and peak heap/RSS remain flat. See
+  [`0075`](changes/0075-odt-structural-paragraph-publication.md).
 - The opaque-heavy common OLE2 case now separates editor open, candidate
   `put_stream` publication, changed `finish` rendering, and the end-to-end
   control. Current p50 values are 1.382, 7.979, 5.473, and 26.086 ms; the

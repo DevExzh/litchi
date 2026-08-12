@@ -1,0 +1,8 @@
+Protocol: one process per state, 0 warmups and 1 sample of both structural cases
+
+Metric                         Full rebuild         Content-only       Delta
+allocation calls               32,654               29,889             -8.47%
+temporary allocations          6,113                5,079              -16.91%
+peak heap                      107.18 MiB           107.14 MiB         flat
+peak RSS including Heaptrack   119.81 MiB           119.93 MiB         +0.10%
+leaked profiler/runtime memory 1.78 KiB             1.78 KiB          flat
