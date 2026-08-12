@@ -228,8 +228,16 @@ fn parse_worksheet_page_setup_parts(
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));
     }
-    let validated =
-        process_markup_compatibility(xml, &Capabilities::default(), &Limits::default())?;
+    let limits = Limits {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        max_depth: MAX_DEPTH,
+        ..Limits::default()
+    };
+    let validated = process_markup_compatibility(xml, &Capabilities::default(), &limits)?;
+    if validated.xml.len() > MAX_XML_BYTES {
+        return Err(invalid("processed worksheet XML is too large"));
+    }
     let selected = if validated.report.alternate_content_count == 0 {
         xml
     } else {

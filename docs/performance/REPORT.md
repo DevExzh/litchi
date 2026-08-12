@@ -20,7 +20,7 @@ stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in
 source-backed media-rich PPTX semantic publication case, three opt-in media-rich ODT
 paragraph/line-break/inline-run publication cases, eight opt-in matched XLSX
-calculation-metadata/page-break/page-margin/print-options publication cases, 16 opt-in DOCX/PPTX
+calculation-metadata/page-break/page-margin/print-options/page-setup publication cases, 16 opt-in DOCX/PPTX
 semantic cases, nine opt-in RTF semantic case names across four
 capability-bounded variants (33 tiny / 58 tiny-plus-large rows), 23
 shape-selected ODT/ODS/ODP semantic cases, five fixed media-rich ODF cases,
@@ -38,6 +38,7 @@ is still not broad program or CRUD coverage.
 | Source-backed XLSX page-break publication | Media-rich one-edit/save p50 **-97.86%** (46.65x), mean **-97.86%**; materializations **12 -> 2**; byte-identical output | One existing normal worksheet's page-break collections only; cells, formulas, styles, relationships, topology, and changed signed sources remain outside the capability |
 | Source-backed XLSX page-margin publication | Media-rich one-edit/save p50 **-97.93%** (48.26x), mean **-97.93%**; materializations **12 -> 2**; byte-identical output | One existing normal worksheet's direct six-value page-margin set only; cells, formulas, styles, relationships, topology, and changed signed sources remain outside the capability |
 | Source-backed XLSX print-options publication | Media-rich one-edit/save p50 **-97.87%** (46.98x), mean **-97.88%**; materializations **12 -> 2**; byte-identical output | One existing normal worksheet's direct five-flag print options only; cells, formulas, printer settings, relationships, topology, and changed signed sources remain outside the capability |
+| Source-backed XLSX page-setup publication | Media-rich one-edit/save p50 **-97.78%** (45.10x), mean **-97.79%**; materializations **12 -> 2**; byte-identical output | One existing normal worksheet's relationship-free typed settings only; printer settings, cells, formulas, relationships, topology, and changed signed sources remain outside the capability |
 | Deterministic range simulation | XLSX listing has zero timed requests; selected reads have zero unselected-sheet overlap; full physical size distributions recorded | Synthetic latency model, not a cold filesystem or ambient network |
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |
 | Coalesced DOCX paragraph edits | Large 100-edit/save p50 **-94.99% (19.97x)** and mean **-95.02%**; medium two-edit/save p50 **-12.98%**; scalar one-edit guardrail neutral | Direct-body, strictly ordered paragraph text replacement; generated corpus; scalar API remains separate |
@@ -605,6 +606,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | Source-backed XLSX page-break publication, 12 Parts + 16 MiB media | 216.789 ms | 4.647 ms | **-97.86% p50 (46.65x) / -97.86% mean** | Materializations 12 -> 2; allocation calls -15.95%; peak heap and uninstrumented RSS flat |
 | Source-backed XLSX page-margin publication, 12 Parts + 16 MiB media | 216.799 ms | 4.492 ms | **-97.93% p50 (48.26x) / -97.93% mean** | Materializations 12 -> 2; allocation calls -12.10%; peak heap and uninstrumented RSS flat |
 | Source-backed XLSX print-options publication, 12 Parts + 16 MiB media | 219.294 ms | 4.668 ms | **-97.87% p50 (46.98x) / -97.88% mean** | Materializations 12 -> 2; allocation calls -12.10%; peak heap and uninstrumented RSS flat |
+| Source-backed XLSX page-setup publication, 12 Parts + 16 MiB media | 218.626 ms | 4.847 ms | **-97.78% p50 (45.10x) / -97.79% mean** | Materializations 12 -> 2; allocation calls -10.50%; peak heap and uninstrumented RSS flat |
 
 The underlying records are:
 
@@ -675,6 +677,7 @@ The underlying records are:
 - [`0068-ods-shared-worksheet-archive-handoff.md`](changes/0068-ods-shared-worksheet-archive-handoff.md)
 - [`0069-rtf-retained-paragraph-count.md`](changes/0069-rtf-retained-paragraph-count.md)
 - [`0070-xlsx-source-backed-print-options-publication.md`](changes/0070-xlsx-source-backed-print-options-publication.md)
+- [`0073-xlsx-source-backed-page-setup-publication.md`](changes/0073-xlsx-source-backed-page-setup-publication.md)
 - [`0071-odt-content-only-line-break-publication.md`](changes/0071-odt-content-only-line-break-publication.md)
 - [`0072-odt-content-only-run-publication.md`](changes/0072-odt-content-only-run-publication.md)
 
