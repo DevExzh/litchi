@@ -1,5 +1,6 @@
 //! CFB capture and deterministic rendering for the object owner.
 
+use super::cfb_path::{CfbPath, path_identity_hash, same_path};
 use super::directory::{self, EntryKind};
 use super::model::{Limits, Object, Storage, Stream};
 use super::target::Target;
@@ -201,6 +202,144 @@ impl Package {
         }
         self.streams.push(Stream::new(path, data, None));
         self.check(limits)
+    }
+
+    pub(crate) fn remove_stream(
+        &mut self,
+        path: &CfbPath,
+        limits: Limits,
+    ) -> Result<Option<Arc<[u8]>>, OleError> {
+        let Some(removed) = self.removable_stream(path)? else {
+            return Ok(None);
+        };
+        let stream = self
+            .streams
+            .iter()
+            .position(|stream| same_path(stream.path(), path.as_slice()));
+        let stream = stream.ok_or_else(|| {
+            OleError::InvalidFormat("resolved CFB stream disappeared before removal".into())
+        })?;
+        self.streams.remove(stream);
+        self.check(limits)?;
+        Ok(Some(removed))
+    }
+
+    pub(crate) fn removable_stream(&self, path: &CfbPath) -> Result<Option<Arc<[u8]>>, OleError> {
+        if let Some(stream) = self
+            .streams
+            .iter()
+            .find(|stream| same_path(stream.path(), path.as_slice()))
+        {
+            return Ok(Some(stream.bytes_shared()));
+        }
+        if self
+            .storages
+            .iter()
+            .any(|storage| same_path(storage.path(), path.as_slice()))
+        {
+            return Err(OleError::InvalidFormat(format!(
+                "package entry {:?} is a storage, not a stream",
+                path.as_slice()
+            )));
+        }
+        Ok(None)
+    }
+
+    pub(crate) fn remove_streams<'a>(
+        &mut self,
+        paths: impl ExactSizeIterator<Item = &'a CfbPath>,
+        limits: Limits,
+    ) -> Result<Vec<Option<Arc<[u8]>>>, OleError> {
+        let mut by_identity = HashMap::new();
+        by_identity
+            .try_reserve(self.streams.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB stream removal index",
+                source,
+            })?;
+        for (index, stream) in self.streams.iter().enumerate() {
+            by_identity.insert(path_identity_hash(stream.path()), index);
+        }
+        let mut storage_by_identity = HashMap::new();
+        storage_by_identity
+            .try_reserve(self.storages.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB storage identity index",
+                source,
+            })?;
+        for (index, storage) in self.storages.iter().enumerate() {
+            storage_by_identity.insert(path_identity_hash(storage.path()), index);
+        }
+
+        let mut removed = Vec::new();
+        removed
+            .try_reserve_exact(paths.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "stream removal results",
+                source,
+            })?;
+        let mut positions = Vec::new();
+        positions
+            .try_reserve_exact(paths.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "stream removal positions",
+                source,
+            })?;
+        for path in paths {
+            let identity = path.identity_hash();
+            let position = match by_identity.get(&identity).copied() {
+                Some(index) if same_path(self.streams[index].path(), path.as_slice()) => {
+                    Some(index)
+                },
+                Some(_collision) => self
+                    .streams
+                    .iter()
+                    .position(|stream| same_path(stream.path(), path.as_slice())),
+                None => None,
+            };
+            if let Some(position) = position {
+                removed.push(Some(self.streams[position].bytes_shared()));
+                positions.push(position);
+            } else {
+                let is_storage = match storage_by_identity.get(&identity).copied() {
+                    Some(index) if same_path(self.storages[index].path(), path.as_slice()) => true,
+                    Some(_collision) => self
+                        .storages
+                        .iter()
+                        .any(|storage| same_path(storage.path(), path.as_slice())),
+                    None => false,
+                };
+                if is_storage {
+                    return Err(OleError::InvalidFormat(format!(
+                        "package entry {:?} is a storage, not a stream",
+                        path.as_slice()
+                    )));
+                }
+                removed.push(None);
+            }
+        }
+
+        if !positions.is_empty() {
+            let mut selected = Vec::new();
+            selected
+                .try_reserve_exact(self.streams.len())
+                .map_err(|source| OleError::Allocation {
+                    resource: "CFB stream removal bitmap",
+                    source,
+                })?;
+            selected.resize(self.streams.len(), false);
+            for position in positions {
+                selected[position] = true;
+            }
+            let mut position = 0usize;
+            self.streams.retain(|_| {
+                let keep = !selected[position];
+                position += 1;
+                keep
+            });
+            self.check(limits)?;
+        }
+        Ok(removed)
     }
 
     pub(crate) fn replace_object(
