@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `900f222347d6b8fe3134a1f924e1469f327c6609`
+Production base for the latest measured tranche: `63c22284b9d643809483d06e7c010c273bc8a957`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,17 +13,17 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **134 selectable cases**: 36 default cases and 198 default
+harness contains **141 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in
-source-backed media-rich PPTX semantic publication case, three opt-in media-rich ODT
-paragraph/line-break/inline-run publication cases, eight opt-in matched XLSX
+source-backed media-rich PPTX semantic publication case, six opt-in media-rich ODT
+paragraph/line-break/inline-run/hyperlink/insertion/removal publication cases, ten opt-in matched XLSX
 calculation-metadata/page-break/page-margin/print-options/page-setup publication cases, 16 opt-in DOCX/PPTX
 semantic cases, nine opt-in RTF semantic case names across four
 capability-bounded variants (33 tiny / 58 tiny-plus-large rows), 23
-shape-selected ODT/ODS/ODP semantic cases, five fixed media-rich ODF cases,
+shape-selected ODT/ODS/ODP semantic cases, eight fixed media-rich ODF cases,
 and 21 opt-in native DOC/XLS/PPT semantic cases. It
 is still not broad program or CRUD coverage.
 
@@ -50,9 +50,11 @@ is still not broad program or CRUD coverage.
 | ODT shared transaction bytes | Medium/large no-op edit-save p50 **-27.05% / -18.51%**; exactly two allocations and one archive copy removed per snapshot | Existing-document snapshot handoff only; changed edit/save and open guardrails remain within 3%; changed publication still rewrites the package |
 | ODT consuming full-text blocks | Repeated large full-text p50 **-3.25%**, mean **-4.81%**; allocation calls **-15.48%**, temporary allocations **-45.52%** | Private full-text mode only; structured queries remain near neutral; unchanged open +3.94% p50/+4.17% mean and +10.95% p99 disclosed |
 | ODT indexed paragraph selector | Large middle-paragraph p50 **-48.56%**, mean **-48.33%**; allocation calls **-27.05%**; peak heap **-24.74%**; RSS **-10.93%** | Complete XML/limit validation remains; retains one paragraph, excludes headings from the index, and leaves the established list path neutral |
-| ODT content-only unchanged-media publication | Media-rich paragraph edit/save p50 **-95.58%**, mean **-95.63%**, p95 **-95.43%**; allocation calls **-6.71%**; peak heap flat and RSS **-0.59%** | Exactly one paragraph in a fixed 16 MiB-media package; structural/mixed operations and regenerated content over the common 16 MiB limit retain the established rebuild |
+| ODT content-only unchanged-media publication | Media-rich paragraph edit/save p50 **-95.58%**, mean **-95.63%**, p95 **-95.43%**; allocation calls **-6.71%**; peak heap flat and RSS **-0.59%** | Exactly one paragraph in a fixed 16 MiB-media package; ineligible/mixed operations and regenerated content over the common 16 MiB limit retain the established rebuild |
 | ODT content-only line-break publication | Media-rich line-break edit/save p50 **-98.17% (54.59x)**, mean **-98.16%**; instructions **-78.34%**; allocation calls **-6.90%** | Exactly one appended line break in the same fixed 16 MiB-media package; only `content.xml` changes while untouched core/media members remain raw-identical; all ineligible operations retain the established rebuild/policy |
-| ODT content-only inline-run publication | Media-rich append-run edit/save p50 **-98.39% (62.01x)**, mean **-98.38%**; instructions **-78.48%**; allocation calls **-7.00%** | One existing styled or unstyled run append in the same fixed 16 MiB-media package; exact no-op dispatch also avoids the changed-path stack frame; structural/mixed/ineligible operations retain the established rebuild/policy |
+| ODT content-only inline-run publication | Media-rich append-run edit/save p50 **-98.39% (62.01x)**, mean **-98.38%**; instructions **-78.48%**; allocation calls **-7.00%** | One existing styled or unstyled run append in the same fixed 16 MiB-media package; exact no-op dispatch also avoids the changed-path stack frame; other/mixed/ineligible operations retain the established rebuild/policy |
+| ODT content-only hyperlink publication | Media-rich append-hyperlink edit/save p50 **-98.20% (55.52x)**, mean **-98.18%**; instructions **-78.34%**; allocation calls **-6.99%** | One inert hyperlink in the same fixed package; exact URL/text reopen and raw-member identity remain, with no relationship or fetch semantics |
+| ODT content-only structural paragraph publication | Media-rich insert/remove p50 **-98.20%/-98.27% (55.55x/57.86x)**; combined instructions **-82.14%**; allocation calls **-8.47%** | Existing bounded plain insertion/removal only; removal performs no resource GC, and richer structural/resource/security cases retain established behavior |
 | ODT direct snapshot byte sharing | Media-rich direct paragraph edit/save p50 **-75.84%**, mean **-73.84%**, p95 **-75.41%**; peak heap/RSS flat | Removes two 16 MiB archive copies from direct snapshot validation/rehydration; complete XML parsing, publication, reopen/readback, patch and inverse remain |
 | ODT compact-audit package sharing | Media-rich paragraph edit/save p50 **-30.44%**, mean **-31.36%**, p95 **-32.41%**; allocations **-0.57%**, peak heap/RSS flat | Removes three archive-sized audit copies (50.36 MB/operation); compact validation, final materialization and readback remain; exact no-op +39 ns p50 is disclosed |
 | ODT envelope-classification package sharing | Media-rich paragraph edit/save p50 **-11.40%**, mean **-11.95%**, p95 **-12.19%**; two allocations/commit removed, peak heap/RSS flat | Removes one 16.79 MB envelope copy; archive/manifest and signed/encrypted classification remain; large exact no-op +152 ns p50 is disclosed |
@@ -178,6 +180,13 @@ distribution, exact-no-op and changed-path guards, allocation/RSS/counter
 attribution, styled/unstyled raw-member identity, and exact output digest are
 indexed in
 [`change 0072`](changes/0072-odt-content-only-run-publication.md).
+
+The matched ODT hyperlink evidence is indexed in
+[`change 0074`](changes/0074-odt-content-only-hyperlink-publication.md). The
+structural insert/remove raw ABBA JSON, pooled distributions, allocation/RSS/
+counter attribution, guard reruns, exact output digests, and raw-member proof
+are indexed in
+[`change 0075`](changes/0075-odt-structural-paragraph-publication.md).
 
 The native OLE2 semantic baseline is
 [`ole2-semantic-baseline-a57506d23-2026-08-11.json`](results/ole2-semantic-baseline-a57506d23-2026-08-11.json).
@@ -581,6 +590,8 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | ODT media-rich paragraph edit/save, 200 paragraphs + 16 MiB media | 249.177 ms | 11.001 ms | **-95.58% p50 / -95.63% mean** | p95 -95.43%; allocation calls -6.71%; peak heap flat; RSS -0.59% |
 | ODT media-rich line-break edit/save, 200 paragraphs + 16 MiB media | 217.532 ms | 3.985 ms | **-98.17% p50 (54.59x) / -98.16% mean** | p95 -98.08%; instructions -78.34%; allocation calls -6.90%; peak heap/RSS flat |
 | ODT media-rich append-run edit/save, 200 paragraphs + 16 MiB media | 225.431 ms | 3.635 ms | **-98.39% p50 (62.01x) / -98.38% mean** | p95 -98.27%; instructions -78.48%; allocation calls -7.00%; peak heap/RSS flat |
+| ODT media-rich insert paragraph, 200 paragraphs + 16 MiB media | 220.507 ms | 3.969 ms | **-98.20% p50 (55.55x) / -98.19% mean** | p95 -98.10%; exact output/member identity; combined structural instructions -82.14% |
+| ODT media-rich remove paragraph, 200 paragraphs + 16 MiB media | 219.315 ms | 3.791 ms | **-98.27% p50 (57.86x) / -98.25% mean** | p95 -98.13%; exact output/member identity; removal performs no resource GC |
 | ODT direct snapshot sharing, 200 paragraphs + 16 MiB media | 32.270 ms | 7.798 ms | **-75.84% p50 / -73.84% mean** | Two archive-sized copies removed; p95 -75.41%; peak heap/RSS flat |
 | ODT compact-audit package sharing, 200 paragraphs + 16 MiB media | 7.773 ms | 5.407 ms | **-30.44% p50 / -31.36% mean** | Three archive-sized audit copies removed; p95 -32.41%; allocations -0.57%; peak heap/RSS flat; exact no-op +39 ns disclosed |
 | ODT envelope-classification sharing, 200 paragraphs + 16 MiB media | 5.555 ms | 4.921 ms | **-11.40% p50 / -11.95% mean** | One archive-sized envelope copy and two allocations/commit removed; p95 -12.19%; peak heap/RSS flat; large exact no-op +152 ns disclosed |
@@ -680,6 +691,8 @@ The underlying records are:
 - [`0073-xlsx-source-backed-page-setup-publication.md`](changes/0073-xlsx-source-backed-page-setup-publication.md)
 - [`0071-odt-content-only-line-break-publication.md`](changes/0071-odt-content-only-line-break-publication.md)
 - [`0072-odt-content-only-run-publication.md`](changes/0072-odt-content-only-run-publication.md)
+- [`0074-odt-content-only-hyperlink-publication.md`](changes/0074-odt-content-only-hyperlink-publication.md)
+- [`0075-odt-structural-paragraph-publication.md`](changes/0075-odt-structural-paragraph-publication.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -799,10 +812,11 @@ remain linked from change 0023.
   into the element and consumes it into final output instead of cloning the
   string at both private handoff boundaries. Structured block queries retain
   their original ownership behavior.
-- ODT line-break transactions now use the already accepted content-only
-  publisher. They regenerate compact `content.xml` while raw-copying every
-  eligible unchanged core/media member; structural, mixed, oversized and
-  security-sensitive cases retain the established path.
+- ODT line-break, run, hyperlink, and plain paragraph insertion/removal
+  transactions now use the accepted content-only publisher. They regenerate
+  compact `content.xml` while raw-copying every eligible unchanged core/media
+  member; other structural, mixed, oversized and security-sensitive cases
+  retain the established path.
 - Eligible XLSX changed sheets move their exact commit-validated semantic
   store into the published snapshot after byte and style/shared-string lineage
   checks. Retention is capped at 4,096 cells and 1 MiB of worksheet XML; larger
@@ -825,7 +839,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 134 selectable cases and a 198-record default
+The standalone harness provides 141 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus

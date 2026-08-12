@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-12",
+  "production_base": "63c22284b9d643809483d06e7c010c273bc8a957",
+  "control_binary_sha256": "7d79f32d9a81d9e237300447fe03bc5100760e777c082f7573fd68b9b87404ad",
+  "candidate_binary_sha256": "6ef7f4310eb9cea130874c4ad9d09b6f67eb209ea830ddfd59b1246640eba375",
+  "environment": {
+    "cpu": "AMD EPYC 9575F VM",
+    "cpu_affinity": 2,
+    "kernel": "Linux 6.8.0-101-generic x86_64",
+    "rustc": "1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "perf_event_paranoid": 1
+  },
+  "corpus": {
+    "generator": "litchi-odt-media-paragraph-publication-v1",
+    "archive_sha256": "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed",
+    "archive_bytes": 16786287,
+    "logical_payload_bytes": 16787016,
+    "paragraphs": 200,
+    "media_members": 8,
+    "media_member_bytes": 2097152,
+    "zip_members": 13,
+    "target": "paragraph:100",
+    "inserted_text": "Inserted performance paragraph",
+    "insert_output_sha256": "ddbeb156c053d84e816017fc323386938974b904ecaae62eef1d38dd831ceeec",
+    "remove_output_sha256": "f4040afaf4092fee50609e21d4dedd1e2affd4a69587c71f9f8ca6a69d1b15e5"
+  },
+  "protocol": {
+    "order": ["control_a", "candidate_a", "candidate_b", "control_b"],
+    "warmups_per_leg": 20,
+    "samples_per_leg": 200,
+    "pooled_samples_per_state": 400
+  },
+  "insert_paragraph": {
+    "legs_ns": {
+      "control_a": {"p50": 220008247, "mean": 220109038.27, "p95": 224998582, "p99": 227829391},
+      "candidate_a": {"p50": 3975046, "mean": 4029379.08, "p95": 4374526, "p99": 5677401},
+      "candidate_b": {"p50": 3959719, "mean": 3964577.725, "p95": 4280998, "p99": 4478159},
+      "control_b": {"p50": 220850809.5, "mean": 221920903.77, "p95": 232332531, "p99": 236197564}
+    },
+    "pooled_ns": {
+      "control": {"samples": 400, "p50": 220506915, "mean": 221014971.02, "mean_ci95": [220608067.11, 221421874.93], "p95": 228060876, "p99": 233807752},
+      "candidate": {"samples": 400, "p50": 3969222.5, "mean": 3996978.4025, "mean_ci95": [3972124.11, 4021832.69], "p95": 4331186, "p99": 4969276},
+      "delta_percent": {"p50": -98.199956, "mean": -98.191535, "p95": -98.100864, "p99": -97.874632},
+      "speedup": {"p50": 55.554183, "mean": 55.295513, "p95": 52.655526, "p99": 47.050667}
+    },
+    "between_leg_drift_percent": {"control_p50": 0.382969, "control_mean": 0.823167, "candidate_p50": -0.385580, "candidate_mean": -1.608222}
+  },
+  "remove_paragraph": {
+    "legs_ns": {
+      "control_a": {"p50": 219022566.5, "mean": 219159047.115, "p95": 224988273, "p99": 230467574},
+      "candidate_a": {"p50": 3753362, "mean": 3783977.95, "p95": 4160295, "p99": 4263789},
+      "candidate_b": {"p50": 3849393.5, "mean": 3876235.43, "p95": 4307457, "p99": 4810528},
+      "control_b": {"p50": 219495855, "mean": 219752112.82, "p95": 225911683, "p99": 228694818}
+    },
+    "pooled_ns": {
+      "control": {"samples": 400, "p50": 219315096.5, "mean": 219455579.9675, "mean_ci95": [219104816.84, 219806343.09], "p95": 225601516, "p99": 229593411},
+      "candidate": {"samples": 400, "p50": 3790593, "mean": 3830106.69, "mean_ci95": [3805785.82, 3854427.56], "p95": 4218056, "p99": 4371935},
+      "delta_percent": {"p50": -98.271622, "mean": -98.254723, "p95": -98.130307, "p99": -98.095792},
+      "speedup": {"p50": 57.857727, "mean": 57.297511, "p95": 53.484713, "p99": 52.515285}
+    },
+    "between_leg_drift_percent": {"control_p50": 0.216091, "control_mean": 0.270610, "candidate_p50": 2.558546, "candidate_mean": 2.438108}
+  },
+  "regression_guards_percent": {
+    "large_open": {"p50": -0.10, "mean": -0.52, "p95": -0.34},
+    "large_list_paragraphs": {"p50": 4.43, "mean": 4.00, "p95": 3.75},
+    "large_one_paragraph": {"p50": -0.57, "mean": -1.32, "p95": -4.28},
+    "large_full_text": {"p50": 1.10, "mean": 0.56, "p95": -2.39},
+    "large_exact_noop_edit_save": {"p50": 1.43, "mean": 0.95, "p95": -2.55},
+    "large_one_edit_save": {"p50": 1.20, "mean": 1.73, "p95": 2.24},
+    "large_one_percent_edit_save": {"p50": 0.48, "mean": 0.10, "p95": -1.39},
+    "media_paragraph_edit_save": {"p50": 0.92, "mean": 1.34, "p95": 3.76},
+    "media_line_break_edit_save": {"p50": -1.38, "mean": -1.12, "p95": -0.42},
+    "media_append_run_edit_save": {"p50": 0.17, "mean": 0.92, "p95": 3.42},
+    "media_append_hyperlink_edit_save": {"p50": -1.20, "mean": -1.42, "p95": -2.36}
+  },
+  "heaptrack_two_case_process": {
+    "allocation_calls": {"control": 32654, "candidate": 29889, "delta_percent": -8.47},
+    "temporary_allocations": {"control": 6113, "candidate": 5079, "delta_percent": -16.91},
+    "peak_heap_mib": {"control": 107.18, "candidate": 107.14},
+    "peak_rss_mib": {"control": 119.81, "candidate": 119.93},
+    "leaked_kib": {"control": 1.78, "candidate": 1.78}
+  },
+  "gnu_time_two_process_mean_max_rss_kib": {"control": 111432, "candidate": 111016, "delta_percent": -0.37},
+  "perf_stat_three_repeat_mean_two_warmups_ten_samples_each_case": {
+    "control": {"task_clock_ms": 6754.49, "cpu_migrations": 0, "page_faults": 399115, "cycles": 33012047928, "instructions": 85022904390, "branches": 14498201178, "branch_misses": 313263022, "cache_references": 2268780514, "cache_misses": 44948657},
+    "candidate": {"task_clock_ms": 1539.98, "cpu_migrations": 0, "page_faults": 274589, "cycles": 7591187482, "instructions": 15188458747, "branches": 1874438069, "branch_misses": 14658655, "cache_references": 521624870, "cache_misses": 30177107}
+  },
+  "perf_record_ten_samples_each_case": {
+    "lost_samples": {"control": 0, "candidate": 0},
+    "deflate_medium_exclusive_percent": {"control": 51.43, "candidate": 11.22},
+    "longest_match_exclusive_percent": {"control": 18.09, "candidate": 3.81},
+    "approximate_absolute_sampled_cycle_delta_percent": {"deflate_medium": -94.98, "longest_match": -95.16}
+  }
+}

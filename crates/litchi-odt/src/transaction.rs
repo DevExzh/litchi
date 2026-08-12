@@ -923,7 +923,7 @@ impl Edit {
                 Operation::InsertParagraph { index, text } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.insert_semantic_paragraph(*index, text)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
                     OperationResult::Index(*index)
                 },
                 Operation::ReplaceParagraph { index, text } => {
@@ -935,7 +935,7 @@ impl Edit {
                 Operation::RemoveParagraph { index } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.remove_semantic_paragraph(*index)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
                     OperationResult::Unit
                 },
                 Operation::AppendRun {

@@ -1,0 +1,11 @@
+Control binary SHA-256: 7d79f32d9a81d9e237300447fe03bc5100760e777c082f7573fd68b9b87404ad
+Candidate binary SHA-256: 6ef7f4310eb9cea130874c4ad9d09b6f67eb209ea830ddfd59b1246640eba375
+Protocol: GNU Time, 0 warmups and 1 sample per structural case, A/B/B/A order
+
+Maximum RSS (KiB):
+control A:    111,624
+candidate A:  111,016
+candidate B:  111,016
+control B:    111,240
+
+Mean maximum RSS: control 111,432 KiB; candidate 111,016 KiB (-0.37%, flat).

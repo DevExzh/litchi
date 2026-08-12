@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 
-This is a coverage map, not a completion claim. It compares the 134 selectable
+This is a coverage map, not a completion claim. It compares the 141 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -18,10 +18,10 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring; large/streaming creation remains missing |
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
 | Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication; signed/extension corpora remain missing |
-| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT separately measures paragraph replacement and inline line-break insertion while ODT, ODS and ODP verify eight exact 2 MiB resources and manifest media types; source-backed DOCX/PPTX and narrow XLSX calculation-metadata publication likewise verify eight exact 2 MiB media Parts after one semantic edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
+| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT separately measures paragraph replacement, inline line-break/run/hyperlink insertion, and structural paragraph insertion/removal while ODT, ODS and ODP verify eight exact 2 MiB resources and manifest media types; source-backed DOCX/PPTX and narrow XLSX calculation-metadata publication likewise verify eight exact 2 MiB media Parts after one semantic edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
 | About 1% semantic update and save | Covered for XLSX/DOCX/PPTX/ODT generated corpora | Deterministic evenly spaced cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch, while ODT coalesces ordinary scalar durable replacements internally; both reopen the package |
 | Bulk update matching objects | Partial | PPTX has one bounded atomic same-slide batch for up to 256 unique nonoverlapping shape-text selectors; cross-slide, structural and other formats remain missing |
-| Clear/remove/hide/detach/GC distinctions | Missing | No complete matrix |
+| Clear/remove/hide/detach/GC distinctions | Partial | ODT now has a measured exact paragraph-removal transaction that intentionally preserves orphaned resources; clear, hide, detach, explicit GC, and other-format distinctions remain missing |
 | Sanitization and irreversible redaction | Missing | No complete matrix |
 | Copy object with dependency closure | Missing | No measured format case |
 | Merge and split | Missing | No measured format case |
@@ -82,12 +82,13 @@ conversion remain.
    adoptable parsed OPC package; ODF detection/handoff remains unmeasured.
 11. Broaden ODF beyond generated text/grid/deck and accepted compact ODT/ODS/ODP
    unchanged-member publication: source-backed selectors, resource-adding and
-   structural publication, 1% and bulk edits, unknown extensions, real
+   richer structural publication, 1% and bulk edits, unknown extensions, real
    producers, richer media, security and source-backed I/O. The generated ODT
    1% paragraph case is covered by change 0045, changed-result byte
    finalization by change 0052, content-only line-break publication by change
-   0071, and existing-style inline-run publication by change 0072; new style
-   creation and broader bulk/structural operations remain.
+   0071, existing-style inline-run publication by change 0072, inert hyperlink
+   publication by change 0074, and plain paragraph insertion/removal by change
+   0075; new style creation and broader bulk/structural operations remain.
    iWork is deliberately deferred while the `iwa-*` crates change separately.
 
 The former first item is complete for existing-document ODT transaction
@@ -193,6 +194,15 @@ patch/inverse/stale checks and deterministic output. It also isolates exact
 no-op commit dispatch from the changed-operation stack frame without adding a
 new semantic operation, style-creation API, structural edit, resource edit,
 real-producer fixture, or positional-I/O capability.
+
+Change 0074 extends the same boundary to inert ODT hyperlink appends. Complete
+text/URL reopen and raw-member proofs remain; no relationship, fetch, or new
+security capability is introduced.
+
+Change 0075 covers plain paragraph insertion and removal. It proves exact
+paragraph order, raw preservation of every non-`content.xml` member, and exact
+patch/inverse behavior. Removal deliberately performs no resource garbage
+collection; richer structural/resource edits remain outside this closure.
 
 Change 0036 separates the common OLE2 one-stream edit into editor-open,
 candidate-publication, final-render and end-to-end attribution cases over four

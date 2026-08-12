@@ -226,6 +226,56 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
         source_bytes
     );
     assert!(commit.patch().apply(commit.snapshot()).is_err());
+
+    for inserted in [true, false] {
+        let mut edit = snapshot.edit();
+        if inserted {
+            edit.insert_paragraph(Position::new(0), "Inserted").unwrap();
+        } else {
+            edit.remove_paragraph(Position::new(0)).unwrap();
+        }
+        let commit = edit.commit().unwrap();
+        let identical = raw_identical_members(&source_bytes, commit.snapshot().as_bytes()).unwrap();
+        assert!(!identical.contains("content.xml"));
+        for path in [
+            "mimetype",
+            "styles.xml",
+            "meta.xml",
+            "META-INF/manifest.xml",
+            MEDIA_PATH,
+        ] {
+            assert!(identical.contains(path), "{path}");
+        }
+        let reopened = commit.snapshot().document().unwrap();
+        let text = reopened
+            .paragraphs()
+            .unwrap()
+            .into_iter()
+            .map(|paragraph| paragraph.text().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            text,
+            if inserted {
+                vec!["Inserted".to_string(), "Before".to_string()]
+            } else {
+                Vec::new()
+            }
+        );
+        assert_eq!(
+            commit.patch().apply(&snapshot).unwrap().as_bytes(),
+            commit.snapshot().as_bytes()
+        );
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .as_bytes(),
+            source_bytes
+        );
+        assert!(commit.patch().apply(commit.snapshot()).is_err());
+    }
 }
 
 #[test]
