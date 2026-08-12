@@ -138,6 +138,39 @@ pub struct TextSpan {
     end: usize,
 }
 
+/// One checked replacement in a bounded body-paragraph batch.
+///
+/// The zero-based paragraph position is resolved against the immutable source
+/// snapshot when the complete batch is staged.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParagraphTextReplacement {
+    position: usize,
+    replacement: String,
+}
+
+impl ParagraphTextReplacement {
+    /// Creates one source-relative paragraph replacement.
+    #[must_use]
+    pub fn new(position: usize, replacement: impl Into<String>) -> Self {
+        Self {
+            position,
+            replacement: replacement.into(),
+        }
+    }
+
+    /// Zero-based source paragraph position.
+    #[must_use]
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Replacement paragraph text.
+    #[must_use]
+    pub fn replacement(&self) -> &str {
+        &self.replacement
+    }
+}
+
 impl TextSpan {
     /// Creates an ordered half-open span. Document bounds and UTF-8 boundaries
     /// are checked when the span is staged.
@@ -218,6 +251,10 @@ pub enum Error {
     OperationAlreadyStaged,
     /// The finite operation bound was exceeded.
     OperationLimit { observed: usize, limit: usize },
+    /// A paragraph batch must contain at least one replacement.
+    EmptyParagraphBatch,
+    /// Paragraph batch selectors must be strictly increasing and unique.
+    ParagraphBatchOutOfOrder { previous: usize, incoming: usize },
     /// Two staged operations have overlapping effects.
     Conflict { existing: usize, incoming: usize },
     /// Paragraph-structure and property changes cannot be proven independent.
@@ -248,6 +285,10 @@ pub enum Error {
     Rtf(RtfError),
     /// Candidate transport construction failed before publication.
     Write(String),
+    /// The source declares active document protection, so changed publication is refused.
+    ProtectedDocument {
+        protection_type: crate::ProtectionType,
+    },
     /// The patch was applied to bytes other than the snapshot that created it.
     PatchConflict,
 }
@@ -264,6 +305,13 @@ impl fmt::Display for Error {
             Self::OperationLimit { observed, limit } => write!(
                 formatter,
                 "RTF edit operation limit exceeded: observed {observed}, limit {limit}"
+            ),
+            Self::EmptyParagraphBatch => {
+                formatter.write_str("RTF paragraph replacement batch must not be empty")
+            },
+            Self::ParagraphBatchOutOfOrder { previous, incoming } => write!(
+                formatter,
+                "RTF paragraph replacement positions must be strictly increasing: {incoming} follows {previous}"
             ),
             Self::Conflict { existing, incoming } => write!(
                 formatter,
@@ -309,6 +357,11 @@ impl fmt::Display for Error {
             Self::History(reason) => write!(formatter, "RTF history refused commit: {reason}"),
             Self::Rtf(error) => error.fmt(formatter),
             Self::Write(error) => write!(formatter, "RTF candidate construction failed: {error}"),
+            Self::ProtectedDocument { protection_type } => write!(
+                formatter,
+                "RTF document protection ({}) refuses changed publication",
+                protection_type_name(*protection_type)
+            ),
             Self::PatchConflict => {
                 formatter.write_str("RTF patch source does not match its expected snapshot")
             },
@@ -355,6 +408,19 @@ enum Operation {
         span: TextSpan,
         text: String,
     },
+    RemoveParagraph {
+        position: usize,
+        text: String,
+    },
+    RestoreParagraph {
+        position: usize,
+        text: String,
+    },
+    MoveParagraph {
+        position: usize,
+        final_position: usize,
+        text: String,
+    },
     TableCellText {
         path: TableCellPath,
         before: String,
@@ -398,6 +464,8 @@ impl Operation {
             | Self::NoteText { after, .. }
             | Self::ShapeText { after, .. } => after.len(),
             Self::InsertParagraph { text, .. } => text.len().saturating_add(1),
+            Self::RestoreParagraph { text, .. } => text.len().saturating_add(1),
+            Self::RemoveParagraph { .. } | Self::MoveParagraph { .. } => 0,
             Self::RootTransfer { after, .. } => after.len(),
             Self::Alignment { .. } | Self::Bold { .. } => 0,
         }
@@ -415,7 +483,10 @@ impl Operation {
             Self::Bold { span, .. } => {
                 vec![format!("body:character:{}-{}:bold", span.start, span.end)]
             },
-            Self::InsertParagraph { .. } => vec!["body:structure".to_string()],
+            Self::InsertParagraph { .. }
+            | Self::RemoveParagraph { .. }
+            | Self::RestoreParagraph { .. }
+            | Self::MoveParagraph { .. } => vec!["body:structure".to_string()],
             Self::TableCellText { path, .. } => vec![table_cell_effect(path)],
             Self::HeaderFooterText { target, .. } => vec![header_footer_effect(*target)],
             Self::AnnotationText { index, .. } => vec![annotation_effect(*index)],
@@ -431,6 +502,9 @@ impl Operation {
             | Self::Bold { span, .. }
             | Self::InsertParagraph { span, .. } => Some(*span),
             Self::Alignment { .. }
+            | Self::RemoveParagraph { .. }
+            | Self::RestoreParagraph { .. }
+            | Self::MoveParagraph { .. }
             | Self::TableCellText { .. }
             | Self::HeaderFooterText { .. }
             | Self::AnnotationText { .. }
@@ -458,6 +532,15 @@ impl Operation {
 
     const fn is_root_transfer(&self) -> bool {
         matches!(self, Self::RootTransfer { .. })
+    }
+
+    const fn is_lifecycle(&self) -> bool {
+        matches!(
+            self,
+            Self::RemoveParagraph { .. }
+                | Self::RestoreParagraph { .. }
+                | Self::MoveParagraph { .. }
+        )
     }
 }
 
@@ -550,6 +633,111 @@ impl Edit {
         self.replace_text(TextSpan::new(range.start, range.end)?, replacement)
     }
 
+    /// Atomically stages a bounded, source-ordered batch of paragraph replacements.
+    ///
+    /// The batch must be non-empty and its zero-based paragraph positions must
+    /// be strictly increasing. Every selector and conflict is preflighted with
+    /// one forward paragraph traversal before any operation is appended, so a
+    /// late failure leaves this edit unchanged. Newlines retain the scalar
+    /// replacement semantics and therefore form structural operations.
+    ///
+    /// # Errors
+    /// Returns an error for an empty or unordered batch, an invalid selector,
+    /// a conflict, a structural/property conflict, or retained limits.
+    pub fn replace_body_paragraph_texts(
+        &mut self,
+        replacements: &[ParagraphTextReplacement],
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        if replacements.is_empty() {
+            return Err(Error::EmptyParagraphBatch);
+        }
+        for (previous, incoming) in replacements.iter().zip(replacements.iter().skip(1)) {
+            let previous = previous.position;
+            let incoming = incoming.position;
+            if incoming <= previous {
+                return Err(Error::ParagraphBatchOutOfOrder { previous, incoming });
+            }
+        }
+
+        self.ensure_operation_room_for(replacements.len())?;
+        let replacement_bytes = replacements.iter().fold(0usize, |total, replacement| {
+            total.saturating_add(replacement.replacement.len())
+        });
+        let observed_replacement_bytes = self.replacement_bytes.saturating_add(replacement_bytes);
+        let replacement_limit = self.source.limits().max_source_bytes();
+        if observed_replacement_bytes > replacement_limit {
+            return Err(Error::InputTooLarge {
+                observed: observed_replacement_bytes,
+                limit: replacement_limit,
+            });
+        }
+
+        let has_property_operation = self.operations.iter().any(Operation::is_property);
+        let mut staged = Vec::with_capacity(replacements.len());
+        let mut replacements = replacements.iter().peekable();
+        let mut paragraph_start = 0usize;
+        for (position, paragraph) in self.source.body().paragraphs().enumerate() {
+            let paragraph_end =
+                paragraph_start
+                    .checked_add(paragraph.len())
+                    .ok_or(Error::InputTooLarge {
+                        observed: usize::MAX,
+                        limit: replacement_limit,
+                    })?;
+            if replacements
+                .peek()
+                .is_some_and(|replacement| replacement.position == position)
+            {
+                let replacement = replacements.next().ok_or(Error::UnsupportedSource(
+                    "paragraph replacement cursor became inconsistent",
+                ))?;
+                let span = TextSpan::new(paragraph_start, paragraph_end)?;
+                let before = self
+                    .source
+                    .text()
+                    .get(span.start..span.end)
+                    .ok_or(Error::SpanNotOnCharacterBoundary {
+                        position: span.start,
+                    })?
+                    .to_string();
+                let structural = before.contains('\n') || replacement.replacement.contains('\n');
+                if structural && has_property_operation {
+                    return Err(Error::StructuralPropertyConflict);
+                }
+                let incoming = self.operations.len().saturating_add(staged.len());
+                for (existing, operation) in self.operations.iter().enumerate() {
+                    if operation
+                        .span()
+                        .is_some_and(|existing_span| spans_conflict(existing_span, span))
+                    {
+                        return Err(Error::Conflict { existing, incoming });
+                    }
+                }
+                staged.push(Operation::Text {
+                    span,
+                    before,
+                    after: replacement.replacement.clone(),
+                    structural,
+                });
+            }
+            paragraph_start = paragraph_end.checked_add(1).ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: replacement_limit,
+            })?;
+        }
+        if let Some(replacement) = replacements.next() {
+            return Err(Error::ParagraphOutOfRange {
+                position: replacement.position,
+                count: self.source.paragraph_count(),
+            });
+        }
+
+        self.replacement_bytes = observed_replacement_bytes;
+        self.operations.append(&mut staged);
+        Ok(self)
+    }
+
     /// Stages one UTF-8 semantic body splice.
     ///
     /// Every selector resolves against the immutable base text. Disjoint spans
@@ -575,12 +763,7 @@ impl Edit {
             })?
             .to_string();
         let structural = before.contains('\n') || after.contains('\n');
-        if structural
-            && self
-                .operations
-                .iter()
-                .any(|operation| matches!(operation, Operation::Alignment { .. }))
-        {
+        if structural && self.operations.iter().any(Operation::is_property) {
             return Err(Error::StructuralPropertyConflict);
         }
         let incoming = self.operations.len();
@@ -632,6 +815,9 @@ impl Edit {
                     structural: true,
                     ..
                 } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -699,6 +885,95 @@ impl Edit {
         Ok(self)
     }
 
+    /// Removes one ordinary body paragraph selected against the immutable base.
+    ///
+    /// The selector is the paragraph's zero-based position before this edit.
+    /// Removing the sole paragraph produces an empty visible body story. This
+    /// lifecycle operation is intentionally exclusive: it cannot compose with
+    /// another body, property, destination, or structural operation in the same
+    /// edit, so staging order never becomes last-writer-wins behavior.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid selector, conflicting staged work, or
+    /// the finite operation bound. Changed publication additionally refuses
+    /// non-plain, ambiguous, compressed, opaque, or protected sources.
+    pub fn remove_paragraph(&mut self, position: usize) -> Result<&mut Self, Error> {
+        let text = paragraph_text_at(&self.source, position)?.to_string();
+        self.ensure_lifecycle_room()?;
+        self.operations
+            .push(Operation::RemoveParagraph { position, text });
+        Ok(self)
+    }
+
+    /// Moves one ordinary body paragraph to a final zero-based position.
+    ///
+    /// Both positions resolve against the immutable base paragraph list.
+    /// `final_position` is the paragraph's ordinal in the completed list, after
+    /// removal and reinsertion. Equal positions are an exact no-op that shares
+    /// the source snapshot. Like removal, a move is an exclusive structural
+    /// lifecycle operation and cannot compose with other staged work.
+    ///
+    /// # Errors
+    /// Returns an error when either position is outside the immutable base,
+    /// conflicting work is already staged, or finite limits are exceeded.
+    /// Changed publication additionally refuses non-plain, ambiguous,
+    /// compressed, opaque, or protected sources.
+    pub fn move_paragraph(
+        &mut self,
+        position: usize,
+        final_position: usize,
+    ) -> Result<&mut Self, Error> {
+        let count = self.source.paragraph_count();
+        let text = paragraph_text_at(&self.source, position)?.to_string();
+        if final_position >= count {
+            return Err(Error::ParagraphOutOfRange {
+                position: final_position,
+                count,
+            });
+        }
+        self.ensure_lifecycle_room()?;
+        self.operations.push(Operation::MoveParagraph {
+            position,
+            final_position,
+            text,
+        });
+        Ok(self)
+    }
+
+    fn restore_paragraph(&mut self, position: usize, text: &str) -> Result<&mut Self, Error> {
+        if text.contains('\n') {
+            return Err(Error::UnsupportedSource(
+                "one restored paragraph cannot contain an ambiguous newline",
+            ));
+        }
+        let count = self.source.paragraph_count();
+        if position > count {
+            return Err(Error::ParagraphOutOfRange { position, count });
+        }
+        self.ensure_lifecycle_room()?;
+        self.charge_replacement(text.len().saturating_add(1))?;
+        self.operations.push(Operation::RestoreParagraph {
+            position,
+            text: text.to_string(),
+        });
+        Ok(self)
+    }
+
+    fn ensure_lifecycle_room(&self) -> Result<(), Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self.operations.iter().any(Operation::is_property) {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        if !self.operations.is_empty() {
+            return Err(Error::Conflict {
+                existing: 0,
+                incoming: self.operations.len(),
+            });
+        }
+        Ok(())
+    }
+
     fn remove_paragraph_after(
         &mut self,
         position: usize,
@@ -740,6 +1015,9 @@ impl Edit {
                     structural: true,
                     ..
                 } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -989,6 +1267,12 @@ impl Edit {
         if self.operations.iter().any(Operation::is_destination) {
             return Err(Error::BodyDestinationConflict);
         }
+        if let Some(existing) = self.operations.iter().position(Operation::is_lifecycle) {
+            return Err(Error::Conflict {
+                existing,
+                incoming: self.operations.len(),
+            });
+        }
         Ok(())
     }
 
@@ -1017,7 +1301,11 @@ impl Edit {
     }
 
     fn ensure_operation_room(&self) -> Result<(), Error> {
-        let observed = self.operations.len().saturating_add(1);
+        self.ensure_operation_room_for(1)
+    }
+
+    fn ensure_operation_room_for(&self, additional: usize) -> Result<(), Error> {
+        let observed = self.operations.len().saturating_add(additional);
         if observed > self.limits.max_operations {
             return Err(Error::OperationLimit {
                 observed,
@@ -1113,7 +1401,11 @@ impl Edit {
                     projected_bold_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
                 },
-                Operation::Text { .. } | Operation::InsertParagraph { .. } => {},
+                Operation::Text { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. } => {},
                 Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -1145,6 +1437,7 @@ impl Edit {
                 semantic_delta,
             ));
         }
+        ensure_changed_publication_allowed(&self.source)?;
 
         let source_bytes = self
             .source
@@ -1213,6 +1506,17 @@ impl Edit {
 }
 
 fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    let semantic_delta = semantic_changes(&edit.operations, &[]);
+    if semantic_delta.is_empty() {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            false,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
     let source_bytes = edit
         .source
         .source_bytes()
@@ -1225,16 +1529,6 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
     if !edit.source.opaque().is_empty() {
         return Err(Error::UnsupportedSource(
             "canonical destination edits refuse unknown RTF destinations",
-        ));
-    }
-    let semantic_delta = semantic_changes(&edit.operations, &[]);
-    if semantic_delta.is_empty() {
-        return Ok(Commit::new(
-            edit.source.clone(),
-            edit.source,
-            false,
-            operation_count,
-            semantic_delta,
         ));
     }
 
@@ -1264,6 +1558,9 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Alignment { .. }
             | Operation::Bold { .. }
             | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
             | Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
         }
     }
@@ -1332,6 +1629,9 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Alignment { .. }
             | Operation::Bold { .. }
             | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
             | Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
         }
     }
@@ -1365,6 +1665,17 @@ fn commit_root_transfer(edit: Edit, operation_count: usize) -> Result<Commit, Er
     if source != before {
         return Err(Error::PatchConflict);
     }
+    let semantic_delta = semantic_changes(&edit.operations, &[]);
+    if source == after {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            false,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
     if crate::compressed::is_compressed_rtf(source) {
         return Err(Error::UnsupportedSource(
             "compressed RTF needs a transport-aware rewrite",
@@ -1381,15 +1692,34 @@ fn commit_root_transfer(edit: Edit, operation_count: usize) -> Result<Commit, Er
             "ordinary-root transfer produced unknown destinations",
         ));
     }
-    let semantic_delta = semantic_changes(&edit.operations, &[]);
-    let changed = source != after;
     Ok(Commit::new(
         edit.source,
         snapshot,
-        changed,
+        true,
         operation_count,
         semantic_delta,
     ))
+}
+
+fn ensure_changed_publication_allowed(source: &Snapshot) -> Result<(), Error> {
+    let protection = source.model().protection();
+    if protection.is_protected() {
+        return Err(Error::ProtectedDocument {
+            protection_type: protection.protection_type(),
+        });
+    }
+    Ok(())
+}
+
+const fn protection_type_name(protection_type: crate::ProtectionType) -> &'static str {
+    match protection_type {
+        crate::ProtectionType::None => "none",
+        crate::ProtectionType::ReadOnly => "read-only",
+        crate::ProtectionType::RevisionTracking => "revision tracking",
+        crate::ProtectionType::Comments => "comments",
+        crate::ProtectionType::Forms => "forms",
+        crate::ProtectionType::All => "all changes",
+    }
 }
 
 fn table_cell<'a>(
@@ -1586,10 +1916,25 @@ fn paragraph_range(source: &Snapshot, position: usize) -> Result<Range<usize>, E
     Err(Error::ParagraphOutOfRange { position, count })
 }
 
+fn paragraph_text_at(source: &Snapshot, position: usize) -> Result<&str, Error> {
+    let range = paragraph_range(source, position)?;
+    source.text().get(range).ok_or(Error::UnsupportedSource(
+        "paragraph selector did not resolve to one UTF-8 body range",
+    ))
+}
+
 fn project_text(
     source: &Snapshot,
     operations: &[Operation],
 ) -> Result<(String, Vec<(usize, TextSpan)>), Error> {
+    if let [
+        operation @ (Operation::RemoveParagraph { .. }
+        | Operation::RestoreParagraph { .. }
+        | Operation::MoveParagraph { .. }),
+    ] = operations
+    {
+        return Ok((project_lifecycle_text(source, operation)?, Vec::new()));
+    }
     let mut text_operations = operations
         .iter()
         .enumerate()
@@ -1605,6 +1950,9 @@ fn project_text(
             },
             Operation::Alignment { .. }
             | Operation::Bold { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -1670,6 +2018,134 @@ fn project_text(
     Ok((output, projected))
 }
 
+fn project_lifecycle_text(source: &Snapshot, operation: &Operation) -> Result<String, Error> {
+    if matches!(
+        operation,
+        Operation::MoveParagraph {
+            position,
+            final_position,
+            ..
+        } if position == final_position
+    ) {
+        return Ok(source.text().to_string());
+    }
+    let mut paragraphs = plain_lifecycle_paragraphs(source)?;
+    match operation {
+        Operation::RemoveParagraph { position, text } => {
+            let actual = paragraphs
+                .get(*position)
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: *position,
+                    count: paragraphs.len(),
+                })?;
+            if actual != text {
+                return Err(Error::StalePrecondition("paragraph text differs"));
+            }
+            paragraphs.remove(*position);
+        },
+        Operation::RestoreParagraph { position, text } => {
+            if *position > paragraphs.len() {
+                return Err(Error::ParagraphOutOfRange {
+                    position: *position,
+                    count: paragraphs.len(),
+                });
+            }
+            paragraphs.insert(*position, text.clone());
+        },
+        Operation::MoveParagraph {
+            position,
+            final_position,
+            text,
+        } => {
+            let count = paragraphs.len();
+            if *position >= count {
+                return Err(Error::ParagraphOutOfRange {
+                    position: *position,
+                    count,
+                });
+            }
+            if *final_position >= count {
+                return Err(Error::ParagraphOutOfRange {
+                    position: *final_position,
+                    count,
+                });
+            }
+            let actual = paragraphs
+                .get(*position)
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: *position,
+                    count,
+                })?;
+            if actual != text {
+                return Err(Error::StalePrecondition("moved paragraph text differs"));
+            }
+            let paragraph = paragraphs.remove(*position);
+            paragraphs.insert(*final_position, paragraph);
+        },
+        Operation::Text { .. }
+        | Operation::Alignment { .. }
+        | Operation::Bold { .. }
+        | Operation::InsertParagraph { .. }
+        | Operation::TableCellText { .. }
+        | Operation::HeaderFooterText { .. }
+        | Operation::AnnotationText { .. }
+        | Operation::NoteText { .. }
+        | Operation::ShapeText { .. }
+        | Operation::RootTransfer { .. } => {
+            return Err(Error::UnsupportedSource(
+                "non-lifecycle operation entered lifecycle projection",
+            ));
+        },
+    }
+    Ok(paragraphs.join("\n"))
+}
+
+fn plain_lifecycle_paragraphs(source: &Snapshot) -> Result<Vec<String>, Error> {
+    let source_bytes = source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    if crate::compressed::is_compressed_rtf(source_bytes) {
+        return Err(Error::UnsupportedSource(
+            "compressed RTF needs a transport-aware rewrite",
+        ));
+    }
+    if !source_bytes.is_ascii() {
+        return Err(Error::UnsupportedSource(
+            "paragraph lifecycle editing refuses non-ASCII transport encodings",
+        ));
+    }
+    if !source.opaque().is_empty() {
+        return Err(Error::UnsupportedSource(
+            "paragraph lifecycle editing refuses unknown RTF syntax",
+        ));
+    }
+    source
+        .model()
+        .plain_body_text_editability()
+        .map_err(Error::UnsupportedSource)?;
+    if source.model().retained_blocks().iter().any(|block| {
+        block.formatting != crate::types::Formatting::default()
+            || block.paragraph != crate::types::Paragraph::default()
+    }) {
+        return Err(Error::UnsupportedSource(
+            "paragraph lifecycle editing requires default body formatting",
+        ));
+    }
+    let paragraphs = source
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.to_text())
+        .collect::<Vec<_>>();
+    if paragraphs.iter().any(|paragraph| paragraph.contains('\n'))
+        || paragraphs.join("\n") != source.text()
+    {
+        return Err(Error::UnsupportedSource(
+            "paragraph lifecycle editing requires an unambiguous ordinary body story",
+        ));
+    }
+    Ok(paragraphs)
+}
+
 fn source_alignments(source: &Snapshot) -> Vec<Alignment> {
     source
         .body()
@@ -1700,6 +2176,9 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -1746,6 +2225,9 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
                 | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
                 | Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -1811,6 +2293,9 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             },
             Operation::Alignment { .. }
             | Operation::Bold { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -2225,6 +2710,16 @@ enum Change {
         text: String,
         removing: bool,
     },
+    RemoveParagraph {
+        position: usize,
+        text: String,
+        restoring: bool,
+    },
+    MoveParagraph {
+        position: usize,
+        final_position: usize,
+        text: String,
+    },
     TableCellText {
         path: TableCellPath,
         before: String,
@@ -2304,6 +2799,24 @@ impl Change {
                 after_span: *span,
                 text: text.clone(),
                 removing: !removing,
+            },
+            Self::RemoveParagraph {
+                position,
+                text,
+                restoring,
+            } => Self::RemoveParagraph {
+                position: *position,
+                text: text.clone(),
+                restoring: !restoring,
+            },
+            Self::MoveParagraph {
+                position,
+                final_position,
+                text,
+            } => Self::MoveParagraph {
+                position: *final_position,
+                final_position: *position,
+                text: text.clone(),
             },
             Self::TableCellText {
                 path,
@@ -2424,6 +2937,25 @@ fn semantic_changes(
                         removing: false,
                     })
                 }),
+            Operation::RemoveParagraph { position, text } => Some(Change::RemoveParagraph {
+                position: *position,
+                text: text.clone(),
+                restoring: false,
+            }),
+            Operation::RestoreParagraph { position, text } => Some(Change::RemoveParagraph {
+                position: *position,
+                text: text.clone(),
+                restoring: true,
+            }),
+            Operation::MoveParagraph {
+                position,
+                final_position,
+                text,
+            } if position != final_position => Some(Change::MoveParagraph {
+                position: *position,
+                final_position: *final_position,
+                text: text.clone(),
+            }),
             Operation::TableCellText {
                 path,
                 before,
@@ -2483,6 +3015,7 @@ fn semantic_changes(
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::Bold { .. }
+            | Operation::MoveParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -2665,6 +3198,49 @@ fn durable_operation(
                 } else {
                     Value::String(text.clone())
                 },
+            )
+        },
+        Change::RemoveParagraph {
+            position,
+            text,
+            restoring,
+        } => {
+            preconditions.insert(
+                "text".to_string(),
+                if *restoring {
+                    Value::Null
+                } else {
+                    Value::String(text.clone())
+                },
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                if *restoring {
+                    "paragraph.insert"
+                } else {
+                    "paragraph.remove"
+                },
+                format!("body:paragraph:{position}"),
+                preconditions,
+                if *restoring {
+                    Value::String(text.clone())
+                } else {
+                    Value::Null
+                },
+            )
+        },
+        Change::MoveParagraph {
+            position,
+            final_position,
+            text,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(text.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "paragraph.move",
+                format!("body:paragraph:{position}"),
+                preconditions,
+                Value::String(final_position.to_string()),
             )
         },
         Change::TableCellText {
@@ -2872,6 +3448,65 @@ pub(crate) fn apply_durable<Mode>(
                     ));
                 }
                 edit.remove_paragraph_after(position, expected)?;
+            },
+            "paragraph.remove" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing removed paragraph precondition".to_string())
+                    })?;
+                if paragraph_text_at(source, position)? != expected {
+                    return Err(Error::StalePrecondition("paragraph text differs"));
+                }
+                if !operation.value.is_null() {
+                    return Err(Error::DurablePatch(
+                        "paragraph removal value must be null".to_string(),
+                    ));
+                }
+                edit.remove_paragraph(position)?;
+            },
+            "paragraph.insert" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                if !operation
+                    .preconditions
+                    .get("text")
+                    .is_some_and(Value::is_null)
+                {
+                    return Err(Error::DurablePatch(
+                        "paragraph insertion precondition must be null".to_string(),
+                    ));
+                }
+                let text = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("inserted paragraph text must be a string".to_string())
+                })?;
+                edit.restore_paragraph(position, text)?;
+            },
+            "paragraph.move" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing moved paragraph precondition".to_string())
+                    })?;
+                if paragraph_text_at(source, position)? != expected {
+                    return Err(Error::StalePrecondition("moved paragraph text differs"));
+                }
+                let final_position = operation
+                    .value
+                    .as_str()
+                    .ok_or_else(|| {
+                        Error::DurablePatch("paragraph final position must be a string".to_string())
+                    })?
+                    .parse::<usize>()
+                    .map_err(|_error| {
+                        Error::DurablePatch("invalid paragraph final position".to_string())
+                    })?;
+                edit.move_paragraph(position, final_position)?;
             },
             "table-cell-text.replace" => {
                 let cell_path = parse_table_cell_target(&operation.target)?;
