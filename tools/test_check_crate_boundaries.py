@@ -86,6 +86,36 @@ def add_keynote_slide_transition_canonical_scaffold(root: Path) -> None:
     lib_export.write_text(lib_source + "pub mod transition;\n", encoding="utf-8")
 
 
+def add_keynote_slide_delete_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.KEYNOTE_SLIDE_DELETE_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_SLIDE_DELETE_CANONICAL_TYPES
+        )
+        + "impl Edit { pub fn remove_slide(&mut self, selector: SlideSelector) "
+        "-> Result<&mut Self, Error> { todo!() } }\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.KEYNOTE_SLIDE_DELETE_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "impl Package {\n"
+        "pub fn edit_slide_deletion(&self) -> slide::delete::Edit<'_> { todo!() }\n"
+        "pub fn apply_slide_deletion(&self, patch: &slide::delete::Patch) "
+        "-> Result<slide::delete::Commit, slide::delete::Error> { todo!() }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    lib_export, package_export, slide_export = (
+        root / path for path in boundaries.KEYNOTE_SLIDE_DELETE_EXPORT_SOURCES
+    )
+    lib_export.write_text("pub mod slide;\n", encoding="utf-8")
+    package_export.write_text("mod slide_delete;\n", encoding="utf-8")
+    slide_export.write_text("pub mod delete;\n", encoding="utf-8")
+
+
 def add_numbers_table_header_settings_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -3443,6 +3473,263 @@ class BoundaryPolicyTests(unittest.TestCase):
                             "duplicate package::slide_transition module: "
                             "crates/litchi-keynote/src/package.rs:1"
                         ],
+                    )
+
+    def test_keynote_slide_delete_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_DELETE_METHODS,
+            ("remove_slide",),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_DELETE_SOURCE,
+            Path("crates/litchi-iwa/src/keynote/editor/slide_delete.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_DELETE_MODULES,
+            ("slide_delete",),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_DELETE_EXAMPLE,
+            Path("crates/litchi-iwa/examples/remove_keynote_slide.rs"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_DELETE_IMPLEMENTATION_SOURCES,
+            (
+                Path("crates/litchi-keynote/src/slide/delete.rs"),
+                Path("crates/litchi-keynote/src/package/slide_delete.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_DELETE_EXPORT_SOURCES,
+            (
+                Path("crates/litchi-keynote/src/lib.rs"),
+                Path("crates/litchi-keynote/src/package.rs"),
+                Path("crates/litchi-keynote/src/slide.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_DELETE_CANONICAL_TYPES,
+            ("Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind", "Path"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_DELETE_PACKAGE_METHODS,
+            ("edit_slide_deletion", "apply_slide_deletion"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_DELETE_EDIT_METHODS,
+            ("remove_slide",),
+        )
+
+    def test_retired_iwa_keynote_slide_delete_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            retired = root / boundaries.RETIRED_IWA_KEYNOTE_SLIDE_DELETE_SOURCE
+            retired.parent.mkdir(parents=True)
+            retired.write_text("pub fn remove_slide() {}\n", encoding="utf-8")
+            nested = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "legacy/delete.rs"
+            nested.parent.mkdir(parents=True)
+            nested.write_text(
+                "pub(in crate::keynote) async unsafe fn r#remove_slide() {}\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.write_text("pub(crate) mod r#slide_delete;\n", encoding="utf-8")
+            example = root / boundaries.RETIRED_IWA_KEYNOTE_SLIDE_DELETE_EXAMPLE
+            example.parent.mkdir(parents=True)
+            example.write_text("// retired example\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_delete_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Keynote slide-delete example returned: "
+                        "crates/litchi-iwa/examples/remove_keynote_slide.rs",
+                        "retired litchi-iwa Keynote slide-delete method remove_slide: "
+                        "crates/litchi-iwa/src/keynote/editor/slide_delete.rs:1",
+                        "retired litchi-iwa Keynote slide-delete method remove_slide: "
+                        "crates/litchi-iwa/src/keynote/legacy/delete.rs:1",
+                        "retired litchi-iwa Keynote slide-delete module slide_delete: "
+                        "crates/litchi-iwa/src/keynote/editor.rs:1",
+                        "retired litchi-iwa Keynote slide-delete source returned: "
+                        "crates/litchi-iwa/src/keynote/editor/slide_delete.rs",
+                    ]
+                ),
+            )
+
+    def test_retired_iwa_keynote_slide_delete_readme_calls_and_example(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.parent.mkdir(parents=True)
+            readme.write_text(
+                "editor.r#remove_slide(0)?;\n"
+                "KeynoteEditor::remove_slide(&mut editor, 0)?;\n"
+                "Run `remove_keynote_slide` or remove_keynote_slide.rs.\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_delete_source_topology(root),
+                [
+                    "retired litchi-iwa Keynote slide-delete README call remove_slide: "
+                    "crates/litchi-iwa/README.md:1",
+                    "retired litchi-iwa Keynote slide-delete README call remove_slide: "
+                    "crates/litchi-iwa/README.md:2",
+                    "retired litchi-iwa Keynote slide-delete README example reference "
+                    "remove_keynote_slide: crates/litchi-iwa/README.md:3",
+                ],
+            )
+
+    def test_iwa_keynote_slide_delete_policy_ignores_near_names_and_non_code(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            legacy = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "legacy/delete.rs"
+            legacy.parent.mkdir(parents=True)
+            legacy.write_text(
+                "// pub fn remove_slide() {}\n"
+                'const NOTE: &str = "fn remove_slide() {}";\n'
+                "pub fn remove_slides() {}\n"
+                "pub fn remove_slide_movie() {}\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.write_text(
+                "// mod slide_delete;\nmod slide_deletes;\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.write_text(
+                "keynote.remove_slides();\n"
+                "keynote.remove_slide_movie(0, selector);\n"
+                "edit.remove_slide(SlideSelector::name(\"Appendix\"))?;\n"
+                "remove_keynote_slides.rs\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_delete_source_topology(root), []
+            )
+
+    def test_focused_keynote_slide_delete_requires_exact_topology(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_slide_delete_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_delete_facade_source_topology(root), []
+            )
+
+            (root / boundaries.KEYNOTE_SLIDE_DELETE_SEMANTIC_SOURCE).unlink()
+            violations = (
+                boundaries.audit_keynote_slide_delete_facade_source_topology(root)
+            )
+            for name in boundaries.KEYNOTE_SLIDE_DELETE_CANONICAL_TYPES:
+                self.assertTrue(
+                    any(
+                        f"canonical slide::delete type {name}" in item
+                        for item in violations
+                    )
+                )
+            self.assertTrue(any("Edit::remove_slide" in item for item in violations))
+
+    def test_focused_keynote_slide_delete_rejects_ids_bytes_proto_and_raw_types(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_slide_delete_canonical_scaffold(root)
+            semantic = root / boundaries.KEYNOTE_SLIDE_DELETE_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "pub fn by_object_id(object_id: u64) -> RawMessage { todo!() }\n"
+                + "pub fn from_source_bytes(source_bytes: &[u8]) "
+                "-> kn::SlideArchive { todo!() }\n"
+                + "pub fn protobuf(value: prost_types::MessageInfo) "
+                "-> wire::WireView { todo!() }\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_keynote_slide_delete_facade_source_topology(root)
+            )
+            for fragment in (
+                "raw identifier object_id",
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "archive/IWA type RawMessage",
+                "protobuf type kn",
+                "archive/IWA type SlideArchive",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+                "wire type wire",
+                "wire type WireView",
+            ):
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in item for item in violations),
+                        msg=f"missing focused slide-delete leak: {fragment}",
+                    )
+
+    def test_focused_keynote_slide_delete_rejects_all_flat_and_root_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_slide_delete_canonical_scaffold(root)
+            semantic = root / boundaries.KEYNOTE_SLIDE_DELETE_SEMANTIC_SOURCE
+            aliases = sorted(boundaries.KEYNOTE_SLIDE_DELETE_FLAT_ALIASES)
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "".join(f"pub type {alias} = Edit;\n" for alias in aliases),
+                encoding="utf-8",
+            )
+            lib = root / boundaries.KEYNOTE_SLIDE_DELETE_EXPORT_SOURCES[0]
+            root_aliases = sorted(boundaries.KEYNOTE_SLIDE_DELETE_SHORT_NAMES)
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use crate::slide::delete::{"
+                + ", ".join(root_aliases)
+                + "};\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_keynote_slide_delete_facade_source_topology(root)
+            )
+            for alias in aliases:
+                self.assertTrue(
+                    any(f"flat alias {alias}" in item for item in violations)
+                )
+            for alias in root_aliases:
+                self.assertTrue(
+                    any(f"root alias {alias}" in item for item in violations)
+                )
+            self.assertTrue(
+                any("public slide-delete owner alias" in item for item in violations)
+            )
+
+    def test_focused_keynote_slide_delete_rejects_public_package_module(self) -> None:
+        for declaration in (
+            "pub mod slide_delete;",
+            "pub mod r#slide_delete;",
+            "pub mod slide_delete {}",
+            "pub\nmod\nr#slide_delete\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_slide_delete_canonical_scaffold(root)
+                    package = root / boundaries.KEYNOTE_SLIDE_DELETE_EXPORT_SOURCES[1]
+                    package.write_text(declaration + "\n", encoding="utf-8")
+
+                    self.assertIn(
+                        "focused litchi-keynote slide-delete public API exposes "
+                        "duplicate package::slide_delete module: "
+                        "crates/litchi-keynote/src/package.rs:1",
+                        boundaries.audit_keynote_slide_delete_facade_source_topology(
+                            root
+                        ),
                     )
 
     def test_keynote_placeholder_visibility_boundary_inventories_are_exact(

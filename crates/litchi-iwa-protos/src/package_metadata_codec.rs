@@ -186,6 +186,167 @@ pub struct ExternalReferenceAddition<'source> {
     is_weak: Option<bool>,
 }
 
+/// One exact current-component object-to-UUID registry removal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ObjectUuidRemoval<'source> {
+    component: ComponentSelector<'source>,
+    object_identifier: u64,
+    expected_uuid: UuidBits,
+}
+
+impl<'source> ObjectUuidRemoval<'source> {
+    #[must_use]
+    pub const fn new(
+        component: ComponentSelector<'source>,
+        object_identifier: u64,
+        expected_uuid: UuidBits,
+    ) -> Self {
+        Self {
+            component,
+            object_identifier,
+            expected_uuid,
+        }
+    }
+    #[must_use]
+    pub const fn component(self) -> ComponentSelector<'source> {
+        self.component
+    }
+    #[must_use]
+    pub const fn object_identifier(self) -> u64 {
+        self.object_identifier
+    }
+    #[must_use]
+    pub const fn expected_uuid(self) -> UuidBits {
+        self.expected_uuid
+    }
+}
+
+/// One exact current, unversioned component external-reference removal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExternalReferenceRemoval<'source> {
+    source: ComponentSelector<'source>,
+    target: ComponentSelector<'source>,
+    object_identifier: u64,
+    expected_is_weak: Option<bool>,
+}
+
+/// One exact ComponentDataReference owner removal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataReferenceOwnerRemoval<'source> {
+    component: ComponentSelector<'source>,
+    data_identifier: u64,
+    object_identifier: u64,
+    expected_count: u32,
+}
+
+impl<'source> DataReferenceOwnerRemoval<'source> {
+    #[must_use]
+    pub const fn new(
+        component: ComponentSelector<'source>,
+        data_identifier: u64,
+        object_identifier: u64,
+        expected_count: u32,
+    ) -> Self {
+        Self {
+            component,
+            data_identifier,
+            object_identifier,
+            expected_count,
+        }
+    }
+    #[must_use]
+    pub const fn component(self) -> ComponentSelector<'source> {
+        self.component
+    }
+    #[must_use]
+    pub const fn data_identifier(self) -> u64 {
+        self.data_identifier
+    }
+    #[must_use]
+    pub const fn object_identifier(self) -> u64 {
+        self.object_identifier
+    }
+    #[must_use]
+    pub const fn expected_count(self) -> u32 {
+        self.expected_count
+    }
+}
+
+impl<'source> ExternalReferenceRemoval<'source> {
+    #[must_use]
+    pub const fn new(
+        source: ComponentSelector<'source>,
+        target: ComponentSelector<'source>,
+        object_identifier: u64,
+        expected_is_weak: Option<bool>,
+    ) -> Self {
+        Self {
+            source,
+            target,
+            object_identifier,
+            expected_is_weak,
+        }
+    }
+    #[must_use]
+    pub const fn source(self) -> ComponentSelector<'source> {
+        self.source
+    }
+    #[must_use]
+    pub const fn target(self) -> ComponentSelector<'source> {
+        self.target
+    }
+    #[must_use]
+    pub const fn object_identifier(self) -> u64 {
+        self.object_identifier
+    }
+    #[must_use]
+    pub const fn expected_is_weak(self) -> Option<bool> {
+        self.expected_is_weak
+    }
+}
+
+/// Borrowed atomic removal request. The last object identifier is retained.
+#[derive(Debug, Clone, Copy)]
+pub struct RemovalBatch<'source> {
+    expected_last_object_identifier: u64,
+    object_uuids: &'source [ObjectUuidRemoval<'source>],
+    external_references: &'source [ExternalReferenceRemoval<'source>],
+    data_reference_owners: &'source [DataReferenceOwnerRemoval<'source>],
+}
+
+impl<'source> RemovalBatch<'source> {
+    #[must_use]
+    pub const fn new(
+        expected_last_object_identifier: u64,
+        object_uuids: &'source [ObjectUuidRemoval<'source>],
+        external_references: &'source [ExternalReferenceRemoval<'source>],
+        data_reference_owners: &'source [DataReferenceOwnerRemoval<'source>],
+    ) -> Self {
+        Self {
+            expected_last_object_identifier,
+            object_uuids,
+            external_references,
+            data_reference_owners,
+        }
+    }
+    #[must_use]
+    pub const fn expected_last_object_identifier(self) -> u64 {
+        self.expected_last_object_identifier
+    }
+    #[must_use]
+    pub const fn object_uuids(self) -> &'source [ObjectUuidRemoval<'source>] {
+        self.object_uuids
+    }
+    #[must_use]
+    pub const fn external_references(self) -> &'source [ExternalReferenceRemoval<'source>] {
+        self.external_references
+    }
+    #[must_use]
+    pub const fn data_reference_owners(self) -> &'source [DataReferenceOwnerRemoval<'source>] {
+        self.data_reference_owners
+    }
+}
+
 impl<'source> ExternalReferenceAddition<'source> {
     #[must_use]
     pub const fn new(
@@ -274,6 +435,7 @@ pub struct RewriteReport {
     references_scanned: usize,
     source_references_scanned: usize,
     additions: usize,
+    removals: usize,
     allocations: usize,
     retained_bytes: usize,
     scratch_bytes: usize,
@@ -298,6 +460,7 @@ impl RewriteReport {
         (references_scanned, usize),
         (source_references_scanned, usize),
         (additions, usize),
+        (removals, usize),
         (allocations, usize),
         (retained_bytes, usize),
         (scratch_bytes, usize)
@@ -487,6 +650,11 @@ pub enum InvalidReason {
     ExistingUuidCollision,
     ExistingReferenceCollision,
     ConflictingWeakness,
+    RemovalNotFound,
+    DuplicateRemoval,
+    RemovalMismatch,
+    VersionedRemoval,
+    CrossComponentRemoval,
     Verification,
 }
 
@@ -676,6 +844,21 @@ mod tests {
         }
         if let Some(weak) = weak {
             put_varint_field(&mut reference, 3, weak);
+        }
+        reference
+    }
+
+    fn data_reference(data: u64, owners: &[(u64, u32)], unknown: bool) -> Vec<u8> {
+        let mut reference = Vec::new();
+        if unknown {
+            put_varint_field(&mut reference, 30, 99);
+        }
+        put_varint_field(&mut reference, 1, data);
+        for (object, count) in owners {
+            let mut owner = Vec::new();
+            put_varint_field(&mut owner, 1, *object);
+            put_varint_field(&mut owner, 2, u64::from(*count));
+            bytes_field(&mut reference, 2, &owner);
         }
         reference
     }
@@ -1327,6 +1510,192 @@ mod tests {
             assert!(eight.allocations() * 100 <= four.allocations().max(1) * 220);
         }
     }
+
+    #[test]
+    fn removal_preserves_unrelated_raw_records_and_last_identifier() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let target = ComponentSelector::new(2, "b.iwa");
+        let selected_uuid = UuidBits::new(10, 20);
+        let mut a = component(
+            1,
+            "a.iwa",
+            None,
+            &[(5, selected_uuid), (6, UuidBits::new(30, 40))],
+            &[(6, 2, Some(5), Some(0)), (6, 2, Some(6), Some(1))],
+        );
+        let unrelated_ownerless = data_reference(70, &[], true);
+        let selected_data = data_reference(71, &[(5, 2), (6, 3)], true);
+        bytes_field(&mut a, 7, &unrelated_ownerless);
+        bytes_field(&mut a, 7, &selected_data);
+        put_key(&mut a, 53, 0);
+        a.extend_from_slice(&[0x81, 0x00]);
+        let noncanonical_unknown = [0xa8, 0x03, 0x81, 0x00];
+        put_key(&mut a, 52, 3);
+        put_varint_field(&mut a, 1, 0);
+        put_key(&mut a, 52, 4);
+        let b = component(2, "b.iwa", None, &[], &[]);
+        let source = metadata(10, &[a, b.clone()], &[]);
+        let uuids = [ObjectUuidRemoval::new(selector, 5, selected_uuid)];
+        let externals = [ExternalReferenceRemoval::new(
+            selector,
+            target,
+            5,
+            Some(false),
+        )];
+        let owners = [DataReferenceOwnerRemoval::new(selector, 71, 5, 2)];
+        let output = remove_package_metadata(
+            &source,
+            RemovalBatch::new(10, &uuids, &externals, &owners),
+            options(&source),
+        )
+        .unwrap();
+        assert_eq!(output.report().removals(), 3);
+        assert_eq!(output.report().additions(), 0);
+        assert!(
+            output
+                .bytes()
+                .windows(unrelated_ownerless.len())
+                .any(|window| window == unrelated_ownerless)
+        );
+        assert!(output.bytes().windows(b.len()).any(|window| window == b));
+        assert!(
+            output
+                .bytes()
+                .windows(noncanonical_unknown.len())
+                .any(|window| window == noncanonical_unknown)
+        );
+        let inspection = inspect_package_metadata_with_visitor(
+            output.bytes(),
+            options(output.bytes()),
+            &mut Facts::default(),
+        )
+        .unwrap();
+        assert_eq!(inspection.last_object_identifier(), 10);
+    }
+
+    #[test]
+    fn removal_rejects_versioned_ambiguous_and_cross_kind_occurrences() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let uuid = UuidBits::new(10, 20);
+        let removals = [ObjectUuidRemoval::new(selector, 5, uuid)];
+        let batch = RemovalBatch::new(10, &removals, &[], &[]);
+        let current = component(1, "a.iwa", None, &[(5, uuid)], &[]);
+
+        let versioned = component(9, "old.iwa", None, &[(5, uuid)], &[]);
+        let source = metadata(10, core::slice::from_ref(&current), &[versioned]);
+        assert_eq!(
+            reason(remove_package_metadata(&source, batch, options(&source)).unwrap_err()),
+            InvalidReason::VersionedRemoval
+        );
+
+        let mut ambiguous = current.clone();
+        put_varint_field(&mut ambiguous, 20, 5);
+        let source = metadata(10, &[ambiguous], &[]);
+        assert_eq!(
+            reason(remove_package_metadata(&source, batch, options(&source)).unwrap_err()),
+            InvalidReason::CrossComponentRemoval
+        );
+
+        let hostile_external = component(1, "a.iwa", None, &[(5, uuid)], &[(6, 2, Some(5), None)]);
+        let source = metadata(10, &[hostile_external], &[]);
+        assert_eq!(
+            reason(remove_package_metadata(&source, batch, options(&source)).unwrap_err()),
+            InvalidReason::CrossComponentRemoval
+        );
+
+        let mut hostile_owner = current;
+        bytes_field(&mut hostile_owner, 7, &data_reference(7, &[(5, 1)], false));
+        let source = metadata(10, &[hostile_owner], &[]);
+        assert_eq!(
+            reason(remove_package_metadata(&source, batch, options(&source)).unwrap_err()),
+            InvalidReason::CrossComponentRemoval
+        );
+    }
+
+    #[test]
+    fn removal_drops_an_empty_selected_data_reference() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let uuid = UuidBits::new(10, 20);
+        let selected = data_reference(71, &[(5, 2)], true);
+        let mut current = component(1, "a.iwa", None, &[(5, uuid)], &[]);
+        bytes_field(&mut current, 7, &selected);
+        let source = metadata(10, &[current], &[]);
+        let uuids = [ObjectUuidRemoval::new(selector, 5, uuid)];
+        let owners = [DataReferenceOwnerRemoval::new(selector, 71, 5, 2)];
+        let output = remove_package_metadata(
+            &source,
+            RemovalBatch::new(10, &uuids, &[], &owners),
+            options(&source),
+        )
+        .unwrap();
+        assert!(
+            !output
+                .bytes()
+                .windows(selected.len())
+                .any(|window| window == selected)
+        );
+    }
+
+    #[test]
+    fn removal_output_limit_is_inclusive_and_max_minus_one_precedes_allocation() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let uuid = UuidBits::new(10, 20);
+        let current = component(1, "a.iwa", None, &[(5, uuid)], &[]);
+        let source = metadata(10, &[current], &[]);
+        let uuids = [ObjectUuidRemoval::new(selector, 5, uuid)];
+        let batch = RemovalBatch::new(10, &uuids, &[], &[]);
+        let baseline = remove_package_metadata(&source, batch, options(&source)).unwrap();
+        let report = baseline.report();
+        let exact = RewriteOptions::new(
+            source.len(),
+            report.output_bytes(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.removals(),
+        );
+        assert_eq!(
+            remove_package_metadata(&source, batch, exact)
+                .unwrap()
+                .report(),
+            report
+        );
+        let limited = RewriteOptions::new(
+            source.len(),
+            report.output_bytes() - 1,
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.removals(),
+        );
+        let allocations = OUTPUT_ALLOCATIONS.load(Ordering::Relaxed);
+        let error = remove_package_metadata(&source, batch, limited).unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(RewriteLimit::OutputBytes { .. })
+        ));
+        assert_eq!(OUTPUT_ALLOCATIONS.load(Ordering::Relaxed), allocations);
+
+        let work_limited = RewriteOptions::new(
+            source.len(),
+            report.output_bytes(),
+            report.fields(),
+            report.work_bytes() - 1,
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.removals(),
+        );
+        let error = remove_package_metadata(&source, batch, work_limited).unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(RewriteLimit::Work { .. })
+        ));
+    }
 }
 
 /// Strictly inspect PackageMetadata without materializing generated messages.
@@ -1513,6 +1882,864 @@ pub fn rewrite_package_metadata(
         bytes: candidate,
         report,
     })
+}
+
+#[derive(Default, Clone, Copy)]
+struct RemovalMatchCount {
+    current: usize,
+}
+
+struct RemovalScanState {
+    selectors: Vec<SelectorCount>,
+    objects: Vec<RemovalMatchCount>,
+    externals: Vec<RemovalMatchCount>,
+    data_owners: Vec<RemovalMatchCount>,
+}
+
+impl RemovalScanState {
+    fn new(batch: RemovalBatch<'_>, budget: &mut Budget) -> Result<Self, RewriteError> {
+        let selector_count = batch
+            .object_uuids
+            .len()
+            .checked_add(
+                batch
+                    .external_references
+                    .len()
+                    .checked_mul(2)
+                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+            )
+            .and_then(|count| count.checked_add(batch.data_reference_owners.len()))
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+        Ok(Self {
+            selectors: zeroed_vec(selector_count, budget)?,
+            objects: zeroed_vec(batch.object_uuids.len(), budget)?,
+            externals: zeroed_vec(batch.external_references.len(), budget)?,
+            data_owners: zeroed_vec(batch.data_reference_owners.len(), budget)?,
+        })
+    }
+
+    fn validate_source(&self) -> Result<(), RewriteError> {
+        if self
+            .selectors
+            .iter()
+            .any(|count| count.identifier != 1 || count.locator != 1 || count.exact != 1)
+        {
+            return Err(RewriteError::invalid(InvalidReason::ComponentMismatch));
+        }
+        if self
+            .objects
+            .iter()
+            .chain(self.externals.iter())
+            .chain(self.data_owners.iter())
+            .any(|count| count.current == 0)
+        {
+            return Err(RewriteError::invalid(InvalidReason::RemovalNotFound));
+        }
+        if self
+            .objects
+            .iter()
+            .chain(self.externals.iter())
+            .chain(self.data_owners.iter())
+            .any(|count| count.current != 1)
+        {
+            return Err(RewriteError::invalid(InvalidReason::DuplicateRemoval));
+        }
+        Ok(())
+    }
+
+    fn validate_candidate(&self) -> Result<(), RewriteError> {
+        if self
+            .selectors
+            .iter()
+            .any(|count| count.identifier != 1 || count.locator != 1 || count.exact != 1)
+            || self
+                .objects
+                .iter()
+                .chain(self.externals.iter())
+                .chain(self.data_owners.iter())
+                .any(|count| count.current != 0)
+        {
+            return Err(RewriteError::invalid(InvalidReason::Verification));
+        }
+        Ok(())
+    }
+}
+
+/// Strictly remove exact current registry records while retaining the last identifier.
+pub fn remove_package_metadata(
+    source: &[u8],
+    batch: RemovalBatch<'_>,
+    options: RewriteOptions,
+) -> Result<RewriteOutput, RewriteError> {
+    validate_removal_batch(batch, options)?;
+    let mut budget = Budget::new_inspection(source, options)?;
+    budget.removals = batch
+        .object_uuids
+        .len()
+        .checked_add(batch.external_references.len())
+        .and_then(|count| count.checked_add(batch.data_reference_owners.len()))
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+
+    let mut source_state = RemovalScanState::new(batch, &mut budget)?;
+    scan_removal_metadata(source, batch, &mut source_state, &mut budget, false)?;
+    source_state.validate_source()?;
+
+    let output_size = removal_output_size(source, batch, &mut budget)?;
+    budget.output_size(output_size)?;
+
+    // Charge the exact rewrite traversal before constructing the sole owned candidate.
+    let measured = budget.clone();
+    charge_removal_rewrite(source, batch, &mut budget)?;
+    budget.preflight_repeat_delta(&measured)?;
+    budget.source_phase = false;
+
+    let mut candidate = Vec::new();
+    #[cfg(test)]
+    OUTPUT_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+    candidate
+        .try_reserve_exact(output_size)
+        .map_err(|_error| RewriteError::allocation(output_size))?;
+    budget.allocation(0)?;
+    rewrite_removals_into(source, batch, &mut candidate, &mut budget)?;
+    if candidate.len() != output_size {
+        return Err(RewriteError::invalid(InvalidReason::Verification));
+    }
+
+    let mut verified = RemovalScanState::new(batch, &mut budget)?;
+    scan_removal_metadata(&candidate, batch, &mut verified, &mut budget, true)?;
+    verified.validate_candidate()?;
+    budget.output_bytes = candidate.len();
+    budget.retained_bytes = candidate.len();
+    Ok(RewriteOutput {
+        bytes: candidate,
+        report: budget.report(),
+    })
+}
+
+fn validate_removal_batch(
+    batch: RemovalBatch<'_>,
+    options: RewriteOptions,
+) -> Result<(), RewriteError> {
+    let removals = batch
+        .object_uuids
+        .len()
+        .checked_add(batch.external_references.len())
+        .and_then(|count| count.checked_add(batch.data_reference_owners.len()))
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    if removals == 0 {
+        return Err(RewriteError::invalid(InvalidReason::RemovalNotFound));
+    }
+    if removals > options.max_additions {
+        return Err(RewriteError::limited(RewriteLimit::Additions {
+            observed: removals,
+            maximum: options.max_additions,
+        }));
+    }
+    if batch.expected_last_object_identifier == 0 {
+        return Err(RewriteError::invalid(InvalidReason::InvalidIdentifier));
+    }
+    for (index, removal) in batch.object_uuids.iter().enumerate() {
+        validate_selector(removal.component)?;
+        if removal.object_identifier == 0 || removal.expected_uuid == UuidBits::new(0, 0) {
+            return Err(RewriteError::invalid(InvalidReason::InvalidIdentifier));
+        }
+        if batch.object_uuids[..index].iter().any(|prior| {
+            prior.object_identifier == removal.object_identifier
+                || prior.expected_uuid == removal.expected_uuid
+        }) {
+            return Err(RewriteError::invalid(InvalidReason::DuplicateRemoval));
+        }
+    }
+    for (index, removal) in batch.external_references.iter().enumerate() {
+        validate_selector(removal.source)?;
+        validate_selector(removal.target)?;
+        if removal.object_identifier == 0 {
+            return Err(RewriteError::invalid(InvalidReason::InvalidIdentifier));
+        }
+        if batch.external_references[..index].iter().any(|prior| {
+            prior.source == removal.source
+                && prior.target == removal.target
+                && prior.object_identifier == removal.object_identifier
+        }) {
+            return Err(RewriteError::invalid(InvalidReason::DuplicateRemoval));
+        }
+    }
+    for (index, removal) in batch.data_reference_owners.iter().enumerate() {
+        validate_selector(removal.component)?;
+        if removal.data_identifier == 0
+            || removal.object_identifier == 0
+            || removal.expected_count == 0
+        {
+            return Err(RewriteError::invalid(InvalidReason::InvalidIdentifier));
+        }
+        if batch.data_reference_owners[..index].iter().any(|prior| {
+            prior.component == removal.component
+                && prior.data_identifier == removal.data_identifier
+                && prior.object_identifier == removal.object_identifier
+        }) {
+            return Err(RewriteError::invalid(InvalidReason::DuplicateRemoval));
+        }
+    }
+    Ok(())
+}
+
+fn removal_selector_count(batch: RemovalBatch<'_>) -> usize {
+    batch.object_uuids.len()
+        + batch.external_references.len() * 2
+        + batch.data_reference_owners.len()
+}
+
+fn removal_selector_at<'source>(
+    batch: RemovalBatch<'source>,
+    index: usize,
+) -> ComponentSelector<'source> {
+    if index < batch.object_uuids.len() {
+        return batch.object_uuids[index].component;
+    }
+    let shifted = index - batch.object_uuids.len();
+    let external_selectors = batch.external_references.len() * 2;
+    if shifted >= external_selectors {
+        return batch.data_reference_owners[shifted - external_selectors].component;
+    }
+    let removal = batch.external_references[shifted / 2];
+    if shifted % 2 == 0 {
+        removal.source
+    } else {
+        removal.target
+    }
+}
+
+fn scan_removal_metadata(
+    source: &[u8],
+    batch: RemovalBatch<'_>,
+    state: &mut RemovalScanState,
+    budget: &mut Budget,
+    candidate: bool,
+) -> Result<(), RewriteError> {
+    budget.message(source, 1)?;
+    let mut last = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        match field.number {
+            1 => set_once(&mut last, field.varint()?)?,
+            3 | 11 => scan_removal_component(
+                field.bytes()?,
+                field.number == 3,
+                batch,
+                state,
+                budget,
+                candidate,
+                2,
+            )?,
+            _ => {},
+        }
+    }
+    if last != Some(batch.expected_last_object_identifier) {
+        return Err(RewriteError::invalid(if candidate {
+            InvalidReason::Verification
+        } else {
+            InvalidReason::LastIdentifierMismatch
+        }));
+    }
+    budget.message(source, 1)?;
+    let view: projection::PackageMetadataArchiveLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    if !view.has_last_object_identifier()
+        || view.last_object_identifier != batch.expected_last_object_identifier
+    {
+        return Err(RewriteError::invalid(InvalidReason::MalformedWire));
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn scan_removal_component(
+    source: &[u8],
+    current: bool,
+    batch: RemovalBatch<'_>,
+    state: &mut RemovalScanState,
+    budget: &mut Budget,
+    candidate: bool,
+    depth: u32,
+) -> Result<(), RewriteError> {
+    budget.component()?;
+    let (identifier, locator) = component_header(source, budget, depth)?;
+    budget.message(source, depth)?;
+    if current {
+        for index in 0..removal_selector_count(batch) {
+            budget.work(1)?;
+            let selector = removal_selector_at(batch, index);
+            let count = &mut state.selectors[index];
+            if identifier == selector.identifier {
+                count.identifier = checked_add(count.identifier, 1)?;
+            }
+            if locator == selector.locator {
+                count.locator = checked_add(count.locator, 1)?;
+            }
+            if identifier == selector.identifier && locator == selector.locator {
+                count.exact = checked_add(count.exact, 1)?;
+            }
+        }
+    }
+    let child_depth = depth
+        .checked_add(1)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            6 | 18 => {
+                let reference = decode_external_reference(field.bytes()?, budget, child_depth)?;
+                let deleted_object = reference.object.is_some_and(|object| {
+                    batch
+                        .object_uuids
+                        .iter()
+                        .any(|removal| removal.object_identifier == object)
+                });
+                let mut authorized = false;
+                for (index, removal) in batch.external_references.iter().enumerate() {
+                    budget.work(1)?;
+                    if reference.object != Some(removal.object_identifier) {
+                        continue;
+                    }
+                    let full = current
+                        && field.number == 6
+                        && identifier == removal.source.identifier
+                        && locator == removal.source.locator
+                        && reference.target == removal.target.identifier;
+                    if !full {
+                        return Err(RewriteError::invalid(if !current || field.number == 18 {
+                            InvalidReason::VersionedRemoval
+                        } else {
+                            InvalidReason::CrossComponentRemoval
+                        }));
+                    }
+                    if reference.is_weak != removal.expected_is_weak {
+                        return Err(RewriteError::invalid(InvalidReason::RemovalMismatch));
+                    }
+                    authorized = true;
+                    state.externals[index].current =
+                        checked_add(state.externals[index].current, 1)?;
+                }
+                if deleted_object && !authorized {
+                    return Err(RewriteError::invalid(if !current || field.number == 18 {
+                        InvalidReason::VersionedRemoval
+                    } else {
+                        InvalidReason::CrossComponentRemoval
+                    }));
+                }
+            },
+            7 => scan_data_reference_removals(
+                field.bytes()?,
+                identifier,
+                locator,
+                current,
+                batch,
+                state,
+                budget,
+                child_depth,
+            )?,
+            11 => {
+                let entry = decode_object_uuid(field.bytes()?, budget, child_depth)?;
+                for (index, removal) in batch.object_uuids.iter().enumerate() {
+                    budget.work(1)?;
+                    let selected = entry.object == removal.object_identifier
+                        || entry.uuid == removal.expected_uuid;
+                    if !selected {
+                        continue;
+                    }
+                    let full = current
+                        && identifier == removal.component.identifier
+                        && locator == removal.component.locator
+                        && entry.object == removal.object_identifier
+                        && entry.uuid == removal.expected_uuid;
+                    if !full {
+                        return Err(RewriteError::invalid(if !current {
+                            InvalidReason::VersionedRemoval
+                        } else if entry.object == removal.object_identifier
+                            || entry.uuid == removal.expected_uuid
+                        {
+                            InvalidReason::CrossComponentRemoval
+                        } else {
+                            InvalidReason::RemovalMismatch
+                        }));
+                    }
+                    state.objects[index].current = checked_add(state.objects[index].current, 1)?;
+                }
+            },
+            20 => scan_ambiguous_ids(field, batch, budget)?,
+            _ => {},
+        }
+    }
+    if candidate {
+        // Candidate scans use the same global collision rules; exact selected
+        // records must simply no longer occur.
+    }
+    Ok(())
+}
+
+fn scan_data_reference_removals(
+    source: &[u8],
+    component: u64,
+    locator: &str,
+    current: bool,
+    batch: RemovalBatch<'_>,
+    state: &mut RemovalScanState,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), RewriteError> {
+    budget.reference()?;
+    budget.message(source, depth)?;
+    let mut data_identifier = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number == 1 {
+            set_once(&mut data_identifier, field.varint()?)?;
+        }
+    }
+    let data_identifier = data_identifier
+        .filter(|value| *value != 0)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::InvalidIdentifier))?;
+    let child_depth = depth
+        .checked_add(1)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number != 2 {
+            continue;
+        }
+        let (object, count) = decode_data_owner(field.bytes()?, budget, child_depth)?;
+        let deleted_object = batch
+            .object_uuids
+            .iter()
+            .any(|removal| removal.object_identifier == object);
+        let mut authorized = false;
+        for (index, removal) in batch.data_reference_owners.iter().enumerate() {
+            budget.work(1)?;
+            if object != removal.object_identifier {
+                continue;
+            }
+            let full = current
+                && component == removal.component.identifier
+                && locator == removal.component.locator
+                && data_identifier == removal.data_identifier;
+            if !full {
+                return Err(RewriteError::invalid(if !current {
+                    InvalidReason::VersionedRemoval
+                } else {
+                    InvalidReason::CrossComponentRemoval
+                }));
+            }
+            if count != removal.expected_count {
+                return Err(RewriteError::invalid(InvalidReason::RemovalMismatch));
+            }
+            authorized = true;
+            state.data_owners[index].current = checked_add(state.data_owners[index].current, 1)?;
+        }
+        if deleted_object && !authorized {
+            return Err(RewriteError::invalid(if !current {
+                InvalidReason::VersionedRemoval
+            } else {
+                InvalidReason::CrossComponentRemoval
+            }));
+        }
+    }
+    Ok(())
+}
+
+fn decode_data_owner(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(u64, u32), RewriteError> {
+    budget.reference()?;
+    budget.message(source, depth)?;
+    let mut object = None;
+    let mut count = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => set_once(&mut object, field.varint()?)?,
+            2 => set_once(
+                &mut count,
+                u32::try_from(field.varint()?)
+                    .map_err(|_error| RewriteError::invalid(InvalidReason::MalformedWire))?,
+            )?,
+            _ => {},
+        }
+    }
+    Ok((
+        object
+            .filter(|value| *value != 0)
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::InvalidIdentifier))?,
+        count
+            .filter(|value| *value != 0)
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::InvalidIdentifier))?,
+    ))
+}
+
+fn scan_ambiguous_ids(
+    field: Field<'_>,
+    batch: RemovalBatch<'_>,
+    budget: &mut Budget,
+) -> Result<(), RewriteError> {
+    let matches = |identifier: u64| {
+        batch
+            .object_uuids
+            .iter()
+            .any(|removal| removal.object_identifier == identifier)
+            || batch
+                .external_references
+                .iter()
+                .any(|removal| removal.object_identifier == identifier)
+            || batch
+                .data_reference_owners
+                .iter()
+                .any(|removal| removal.object_identifier == identifier)
+    };
+    match field.wire {
+        0 => {
+            budget.reference()?;
+            budget.work(1)?;
+            if matches(field.varint()?) {
+                Err(RewriteError::invalid(InvalidReason::CrossComponentRemoval))
+            } else {
+                Ok(())
+            }
+        },
+        2 => {
+            let mut packed = field.bytes()?;
+            while !packed.is_empty() {
+                budget.reference()?;
+                budget.work(1)?;
+                if matches(take_varint(&mut packed)?) {
+                    return Err(RewriteError::invalid(InvalidReason::CrossComponentRemoval));
+                }
+            }
+            Ok(())
+        },
+        _ => Err(RewriteError::invalid(InvalidReason::MalformedWire)),
+    }
+}
+
+fn removal_output_size(
+    source: &[u8],
+    batch: RemovalBatch<'_>,
+    budget: &mut Budget,
+) -> Result<usize, RewriteError> {
+    budget.message(source, 1)?;
+    let mut size = 0usize;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        if field.number != 3 {
+            size = checked_add(size, field.raw.len())?;
+            continue;
+        }
+        let payload = field.bytes()?;
+        let (identifier, locator) = component_header(payload, budget, 2)?;
+        let new_len = removal_component_size(payload, identifier, locator, batch, budget, 2)?;
+        size = checked_add(
+            size,
+            if new_len == payload.len() {
+                field.raw.len()
+            } else {
+                length_delimited_field_len(3, new_len)?
+            },
+        )?;
+    }
+    Ok(size)
+}
+
+fn removal_component_size(
+    source: &[u8],
+    component: u64,
+    locator: &str,
+    batch: RemovalBatch<'_>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<usize, RewriteError> {
+    budget.message(source, depth)?;
+    let mut size = 0usize;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        let keep = match field.number {
+            6 => !external_field_selected(
+                field.bytes()?,
+                component,
+                locator,
+                batch,
+                budget,
+                depth + 1,
+            )?,
+            7 => {
+                let rewrite = data_reference_rewrite(
+                    field.bytes()?,
+                    component,
+                    locator,
+                    batch,
+                    budget,
+                    depth + 1,
+                )?;
+                if rewrite.selected == 0 {
+                    size = checked_add(size, field.raw.len())?;
+                } else if rewrite.surviving_owners != 0 {
+                    size = checked_add(size, length_delimited_field_len(7, rewrite.payload_size)?)?;
+                }
+                false
+            },
+            11 => !object_field_selected(
+                field.bytes()?,
+                component,
+                locator,
+                batch,
+                budget,
+                depth + 1,
+            )?,
+            _ => true,
+        };
+        if keep {
+            size = checked_add(size, field.raw.len())?;
+        }
+    }
+    Ok(size)
+}
+
+fn object_field_selected(
+    source: &[u8],
+    component: u64,
+    locator: &str,
+    batch: RemovalBatch<'_>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<bool, RewriteError> {
+    let entry = decode_object_uuid(source, budget, depth)?;
+    Ok(batch.object_uuids.iter().any(|removal| {
+        removal.component.identifier == component
+            && removal.component.locator == locator
+            && removal.object_identifier == entry.object
+            && removal.expected_uuid == entry.uuid
+    }))
+}
+
+fn external_field_selected(
+    source: &[u8],
+    component: u64,
+    locator: &str,
+    batch: RemovalBatch<'_>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<bool, RewriteError> {
+    let reference = decode_external_reference(source, budget, depth)?;
+    Ok(batch.external_references.iter().any(|removal| {
+        removal.source.identifier == component
+            && removal.source.locator == locator
+            && removal.target.identifier == reference.target
+            && Some(removal.object_identifier) == reference.object
+            && removal.expected_is_weak == reference.is_weak
+    }))
+}
+
+#[derive(Clone, Copy)]
+struct DataReferenceRewrite {
+    payload_size: usize,
+    selected: usize,
+    surviving_owners: usize,
+}
+
+fn data_reference_rewrite(
+    source: &[u8],
+    component: u64,
+    locator: &str,
+    batch: RemovalBatch<'_>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<DataReferenceRewrite, RewriteError> {
+    budget.message(source, depth)?;
+    let mut data_identifier = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number == 1 {
+            set_once(&mut data_identifier, field.varint()?)?;
+        }
+    }
+    let data_identifier =
+        data_identifier.ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    let mut size = 0usize;
+    let mut selected_count = 0usize;
+    let mut surviving_owners = 0usize;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number != 2 {
+            size = checked_add(size, field.raw.len())?;
+            continue;
+        }
+        let (object, count) = decode_data_owner(field.bytes()?, budget, depth + 1)?;
+        let selected = batch.data_reference_owners.iter().any(|removal| {
+            removal.component.identifier == component
+                && removal.component.locator == locator
+                && removal.data_identifier == data_identifier
+                && removal.object_identifier == object
+                && removal.expected_count == count
+        });
+        if !selected {
+            surviving_owners = checked_add(surviving_owners, 1)?;
+            size = checked_add(size, field.raw.len())?;
+        } else {
+            selected_count = checked_add(selected_count, 1)?;
+        }
+    }
+    Ok(DataReferenceRewrite {
+        payload_size: size,
+        selected: selected_count,
+        surviving_owners,
+    })
+}
+
+fn charge_removal_rewrite(
+    source: &[u8],
+    batch: RemovalBatch<'_>,
+    budget: &mut Budget,
+) -> Result<(), RewriteError> {
+    budget.message(source, 1)?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        if field.number == 3 {
+            let payload = field.bytes()?;
+            let (component, locator) = component_header(payload, budget, 2)?;
+            let _size = removal_component_size(payload, component, locator, batch, budget, 2)?;
+        }
+    }
+    Ok(())
+}
+
+fn rewrite_removals_into(
+    source: &[u8],
+    batch: RemovalBatch<'_>,
+    output: &mut Vec<u8>,
+    budget: &mut Budget,
+) -> Result<(), RewriteError> {
+    budget.message(source, 1)?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        if field.number != 3 {
+            output.extend_from_slice(field.raw);
+            continue;
+        }
+        let payload = field.bytes()?;
+        let (component, locator) = component_header(payload, budget, 2)?;
+        let new_len = removal_component_size(payload, component, locator, batch, budget, 2)?;
+        if new_len == payload.len() {
+            output.extend_from_slice(field.raw);
+            continue;
+        }
+        budget.changed_component()?;
+        put_key(output, 3, 2);
+        put_varint(
+            output,
+            u64::try_from(new_len)
+                .map_err(|_error| RewriteError::invalid(InvalidReason::MalformedWire))?,
+        );
+        rewrite_removal_component(payload, component, locator, batch, output, budget, 2)?;
+    }
+    Ok(())
+}
+
+fn rewrite_removal_component(
+    source: &[u8],
+    component: u64,
+    locator: &str,
+    batch: RemovalBatch<'_>,
+    output: &mut Vec<u8>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), RewriteError> {
+    budget.message(source, depth)?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            6 if external_field_selected(
+                field.bytes()?,
+                component,
+                locator,
+                batch,
+                budget,
+                depth + 1,
+            )? => {},
+            11 if object_field_selected(
+                field.bytes()?,
+                component,
+                locator,
+                batch,
+                budget,
+                depth + 1,
+            )? => {},
+            7 => rewrite_data_reference_field(
+                field,
+                component,
+                locator,
+                batch,
+                output,
+                budget,
+                depth + 1,
+            )?,
+            _ => output.extend_from_slice(field.raw),
+        }
+    }
+    Ok(())
+}
+
+fn rewrite_data_reference_field(
+    field: Field<'_>,
+    component: u64,
+    locator: &str,
+    batch: RemovalBatch<'_>,
+    output: &mut Vec<u8>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), RewriteError> {
+    let source = field.bytes()?;
+    let rewrite = data_reference_rewrite(source, component, locator, batch, budget, depth)?;
+    if rewrite.selected == 0 {
+        output.extend_from_slice(field.raw);
+        return Ok(());
+    }
+    if rewrite.surviving_owners == 0 {
+        return Ok(());
+    }
+    let mut data_identifier = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number == 1 {
+            set_once(&mut data_identifier, field.varint()?)?;
+        }
+    }
+    let data_identifier =
+        data_identifier.ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    put_key(output, 7, 2);
+    put_varint(
+        output,
+        u64::try_from(rewrite.payload_size)
+            .map_err(|_error| RewriteError::invalid(InvalidReason::MalformedWire))?,
+    );
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number == 2 {
+            let (object, count) = decode_data_owner(field.bytes()?, budget, depth + 1)?;
+            if batch.data_reference_owners.iter().any(|removal| {
+                removal.component.identifier == component
+                    && removal.component.locator == locator
+                    && removal.data_identifier == data_identifier
+                    && removal.object_identifier == object
+                    && removal.expected_count == count
+            }) {
+                continue;
+            }
+        }
+        output.extend_from_slice(field.raw);
+    }
+    Ok(())
 }
 
 fn validate_batch(batch: Batch<'_>, options: RewriteOptions) -> Result<(), RewriteError> {
@@ -2416,6 +3643,7 @@ struct Budget {
     references_scanned: usize,
     source_references_scanned: usize,
     additions: usize,
+    removals: usize,
     allocations: usize,
     retained_bytes: usize,
     scratch_bytes: usize,
@@ -2466,6 +3694,7 @@ impl Budget {
             references_scanned: 0,
             source_references_scanned: 0,
             additions: 0,
+            removals: 0,
             allocations: 0,
             retained_bytes: 0,
             scratch_bytes: 0,
@@ -2661,6 +3890,7 @@ impl Budget {
             references_scanned: self.references_scanned,
             source_references_scanned: self.source_references_scanned,
             additions: self.additions,
+            removals: self.removals,
             allocations: self.allocations,
             retained_bytes: self.retained_bytes,
             scratch_bytes: self.scratch_bytes,
@@ -2679,7 +3909,11 @@ struct Field<'source> {
 impl<'source> Field<'source> {
     fn varint(self) -> Result<u64, RewriteError> {
         match self.value {
-            Value::Varint(value) if self.wire == 0 => Ok(value),
+            Value::Varint(value, encoded_len)
+                if self.wire == 0 && encoded_varint_len(value) == encoded_len =>
+            {
+                Ok(value)
+            },
             _ => Err(RewriteError::invalid(InvalidReason::MalformedWire)),
         }
     }
@@ -2693,7 +3927,7 @@ impl<'source> Field<'source> {
 
 #[derive(Clone, Copy)]
 enum Value<'source> {
-    Varint(u64),
+    Varint(u64, usize),
     Fixed64,
     Bytes(&'source [u8]),
     Group,
@@ -2736,7 +3970,10 @@ fn parse_field<'source>(
         return Err(RewriteError::invalid(InvalidReason::MalformedWire));
     }
     let value = match wire {
-        0 => Value::Varint(take_varint(source)?),
+        0 => {
+            let (value, encoded_len) = take_varint_relaxed(source)?;
+            Value::Varint(value, encoded_len)
+        },
         1 => {
             take(source, 8)?;
             Value::Fixed64
@@ -2796,6 +4033,14 @@ fn take<'source>(source: &mut &'source [u8], amount: usize) -> Result<&'source [
 }
 
 fn take_varint(source: &mut &[u8]) -> Result<u64, RewriteError> {
+    let (value, consumed) = take_varint_relaxed(source)?;
+    if encoded_varint_len(value) != consumed {
+        return Err(RewriteError::invalid(InvalidReason::MalformedWire));
+    }
+    Ok(value)
+}
+
+fn take_varint_relaxed(source: &mut &[u8]) -> Result<(u64, usize), RewriteError> {
     let original = *source;
     let mut value = 0u64;
     for index in 0..10usize {
@@ -2808,11 +4053,8 @@ fn take_varint(source: &mut &[u8]) -> Result<u64, RewriteError> {
         value |= u64::from(byte & 0x7f) << (index * 7);
         if byte & 0x80 == 0 {
             let consumed = index + 1;
-            if encoded_varint_len(value) != consumed {
-                return Err(RewriteError::invalid(InvalidReason::MalformedWire));
-            }
             *source = &original[consumed..];
-            return Ok(value);
+            return Ok((value, consumed));
         }
     }
     Err(RewriteError::invalid(InvalidReason::MalformedWire))

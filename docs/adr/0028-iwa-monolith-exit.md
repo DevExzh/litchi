@@ -2510,3 +2510,66 @@ implementation adds `litchi-numbers -> litchi-iwa-text-wire`; topology is 64
 packages, 238 internal declarations, 14 `litchi-iwa` declarations, and 14
 ordered debts. The Numbers host debt remains because the retained editor is
 much broader than this cell slice.
+
+## 2026-08-12 amendment: Keynote existing-slide deletion host exit
+
+Deletion gate 3 advances for one structural Keynote operation. The concrete
+package now owns deletion of one existing, non-final slide through
+`slide::delete::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Path}` and
+`Package::{edit_slide_deletion, apply_slide_deletion}`. The selector is an
+exact navigator name or checked position; the host's raw-index method is not
+retained as an alias or shim.
+
+The focused owner admits only a unique flat rooted
+Document -> Show/SlideTree -> SlideNode -> Slide path. Exact aggregate
+references and any optional field attribution, package-wide exclusive inbound
+ownership, one selected Node message, one selected Slide message, absence of
+merge/base/diff state, and exact current PackageMetadata
+component/UUID/external-edge/data-owner facts are all changed-operation
+preconditions. Unsupported hierarchy,
+deprecated or secondary slide roots, duplicate or cross-component ownership,
+versioned records, aliases, contradictory locators/counts, and malformed
+metadata refuse before publication.
+
+The accepted transition removes the selected Show reference, Node and Slide
+objects, their two object-to-UUID records, the one unversioned Node-component
+external reference to the Slide object when that ownership form is present,
+and the exact data-owner/count entries attributed to those two objects. The
+supported component-level edge remains instead. Component registrations, the
+last-object identifier, co-located objects, global data-catalog records, data
+payloads, and all unrelated PackageMetadata fields remain. A component
+data-reference record remains with surviving owners or is removed with its
+final owner.
+Exact root previews are invalidated, one package is reassembled and reopened,
+semantic order is read back, and the exact inverse restores the source.
+
+This exit deliberately supersedes the old host's orphaned-media-reclamation
+behavior. Slide deletion is not package GC: no slide component, global
+data-catalog record, `Data/` member, or media payload is reclaimed. Shared,
+uncertain, or newly unreachable media remains preserved. A later GC owner must
+establish a separate complete reachability/disposition proof and native
+evidence before it can remove any such content.
+
+The host cut removes `KeynoteEditor::remove_slide`, the entire
+`keynote/editor/slide_delete.rs` source and module declaration, the direct
+`remove_keynote_slide` example, and obsolete direct deletion assertions. The
+retained source-free regression is creation-only and does not claim its
+child-to-parent-slide backlink topology is deletable; the focused transaction
+correctly refuses that surviving owner as `AmbiguousOwnership`. No
+compatibility method or public bridge alias replaces the retired host method.
+This retires direct existing-slide deletion only; creation, insert/duplicate,
+layout, drawable, chart/table, media, soundtrack-item, and remaining editor
+ownership stays in the host.
+
+Accordingly debt 014 (`litchi-iwa -> litchi-keynote`) and its manifest edge
+remain. The boundary suite passes 204/204; focused and retired-surface audits
+each report zero findings, and the full checker reports exactly the 14
+established unrelated findings. Native hashes/UI observations and
+PackageMetadata generated evidence are frozen in ADR 0008. The final topology
+is 64 workspace packages, 238 internal dependency declarations, 14
+`litchi-iwa` dependency declarations, and 14 explicit ordered debts. Keynote
+passes 235/235 all-features tests and 9/9 doctests; the retained host library
+passes 1,418/1,418, including permanent atomic refusal coverage for the
+generated child-to-parent-slide backlink. These results close the focused
+existing-slide deletion gate. The broader monolith exit and debt 014 remain
+open, and the 14 established unrelated full-checker findings are unchanged.

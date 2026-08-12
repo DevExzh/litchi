@@ -1077,7 +1077,7 @@ fn package_member_preserved(
         )
 }
 
-fn selected_package_member_preserved(
+pub(super) fn selected_package_member_preserved(
     source: &litchi_iwa_archive::package::Entry,
     candidate: &litchi_iwa_archive::package::Entry,
 ) -> bool {

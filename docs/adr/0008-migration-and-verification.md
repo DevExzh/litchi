@@ -9980,3 +9980,146 @@ migration without restoring the retired API.
 The neutral `litchi-numbers -> litchi-iwa-text-wire` edge leaves topology at
 64 packages, 238 internal declarations, 14 `litchi-iwa` declarations, and 14
 ordered debts.
+
+## 2026-08-12 amendment: focused Keynote existing-slide deletion cutover
+
+The secure cutover moves existing-slide deletion from the `litchi-iwa`
+migration host to the selector-first `litchi-keynote` package transaction.
+`slide::delete::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Path}` and
+`Package::{edit_slide_deletion, apply_slide_deletion}` are the only supported
+surface. Exact navigator names and checked semantic positions replace the
+host's raw index-to-native-ID operation, and the final slide cannot be
+deleted.
+
+Changed admission proves the unique supported rooted
+Document -> Show/SlideTree `[3, 2]` -> SlideNode `[2]` -> Slide path and exact
+aggregate reference occurrence. `FieldInfo` attribution is optional, but if
+present it must occur exactly once at the canonical path with object-reference
+typing. The selected Node and Slide each have one supported message. A
+package-wide scan rejects another inbound owner, duplicate reference
+occurrence, selected IDs appearing as data references, noncanonical field
+typing, or any merge/base/diff state. Deprecated root-node, secondary
+slide-list, hierarchy, and other non-flat topologies are `UnsupportedTopology`;
+malformed or contradictory evidence is `InvalidSource`; a surviving owner is
+`AmbiguousOwnership`.
+
+The PackageMetadata preflight is an exact transition proof, not a best-effort
+registry cleanup. It streams the single type-11006 payload, requires unique
+current component identifier/effective-locator matches, requires the exact
+Node and Slide UUID bindings, and requires exactly one supported unversioned
+Node-component-to-Slide-component edge: either an object-specific external
+reference to the Slide object, with matching optional weakness, or a
+component-level reference. Aggregate selected data references are
+authoritative; optional field attribution must match them exactly, and every
+reference must have its exact object owner/count record. Publication removes
+precisely those two UUID bindings, the object-specific external reference when
+present, and selected data-owner records. A component-level edge is retained.
+It retains the last-object identifier, current component registrations, global
+data-catalog records and payload bytes, unrelated current/versioned metadata,
+and raw unknown fields. A component data-reference record is retained with
+surviving owners or removed when none survive. Candidate scanning verifies
+every requested record is absent and every selector still denotes the same
+retained component.
+
+The physical transaction removes the Show's selected Node reference and the
+two selected objects, not their IWA components. Other objects co-located in a
+selected component remain byte-exact. The exact root preview names are deleted
+as stale derived rendering state, while case-distinct and nested preview-like
+members remain. All unrelated ZIP members retain data and physical records,
+and the rewritten members retain their package metadata. The candidate is
+reassembled once, reopened once under the source limits, fully validated, and
+must expose the exact navigator-name sequence with the selected position
+removed. Forward apply reproduces the committed exact target; inverse apply
+restores the exact source.
+
+This is deliberately not media GC. PackageMetadata owner/count records for
+the deleted objects are removed, and an ownerless component data-reference
+record can disappear with them, but no component registration, global
+data-catalog record, `Data/` member, or media payload is reclaimed. Shared,
+uncertain, and newly unreachable media remains preserved. The earlier host
+implementation's conditional orphan-media removal is not part of the focused
+parity contract; reclamation requires a separate reachability owner and native
+gate.
+
+The PackageMetadata Buffa projection remains private and non-encoding. It is
+five generated files / 145,681 bytes, has zero repeated generated views, and
+has SHA-256
+`ee49927f75c6b632c83055f9b7e647920b389be41bec10e25871a6ef7b56ab31`.
+The removal API extends codec/provenance behavior without changing the schema
+file. Raw records remain the rewrite and preservation authority. The focused
+codec gate passes 11/11 and focused slide-deletion integration tests pass
+10/10. The security matrix covers
+missing/duplicate/wrong/versioned UUID and external-reference ownership,
+duplicate/mismatched/versioned data-owner records, ambiguous identifiers and
+component locators, aggregate/field disagreement, extra selected messages,
+surviving inbound references, stale patches, exact preview-name matching, and
+content-free public values.
+
+Deterministic production instrumentation covers two independent scaling axes.
+For 4,096 -> 8,192 package objects, objects scanned, transaction work,
+allocation events, and peak scratch bytes must each remain at or below 2.20x.
+For 4,096 -> 8,192 reference occurrences, object scans remain constant while
+references, transaction work, allocation events, and peak scratch bytes must
+remain at or below 2.20x. Each successful case performs one output allocation
+and one candidate reopen and deletes zero components. A required-minus-one
+work ceiling refuses before component deletion, output allocation, or reopen.
+The object axis reports objects 4,096 -> 8,192 (2.0000x), references 54 -> 54,
+work 20,460 -> 36,844 (1.8008x), allocations 13 -> 13, and peak scratch 240 ->
+240 bytes. With eight objects fixed, the reference axis reports references
+8,246 -> 16,438 (1.9934x), work 12,300 -> 20,492 (1.6660x), allocations 13 ->
+13, and peak scratch 240 -> 240 bytes. Every successful case reports one
+output allocation, one reopen, and zero component deletions. The maximum-work
+success consumes 36,846; a ceiling of 36,845 refuses with observed 36,846 and
+zero component deletion, output allocation, or reopen. These are deterministic
+work/allocation counters, not a latency, throughput, or RSS claim; the
+temporary instrumentation is not retained in the production surface.
+The focused performance gate passes 4/4.
+
+The final native oracle begins with a 511,554-byte source, SHA-256
+`49c7ee349cddb9fcd4671b7cd36c90008a76e457311cd3bb70d4b765f217b3df`.
+The 471,837-byte Rust candidate is
+`aae1026b91f454abae3a35aac395f2f8e433e070d89a7825be649a29036e1cf5`;
+focused reread reports two slides, 989 objects, and exact navigator order A/C,
+while inverse application restores the exact source bytes. Members change
+60 -> 57 by removing only the exact root previews. Of the retained members,
+Document changes 8,710 -> 8,629 bytes, Metadata 32,690 -> 32,624, and the
+selected Slide component 975 -> 810; the other 54 retained members are exact.
+
+Keynote 14.4 build 7043.0.93 opened the Rust candidate without warning,
+completed Save As and close, and reopened the exact output path without
+warning. The 503,213-byte native resave is
+`0c1a7750dba9c1bda43a287251096fe55a5ae05a5e7adddd07b69b79f2e64ea4`;
+focused reread reports two slides, 975 objects, exact A/C navigator order, and
+a clean ZIP. The 82,966-byte `ui-after-saveas.jpeg` screenshot is
+`99c6d1b80ef93ddeec31c25ec2317f7dcf0bb0c9e2a597ca8207ffcb6adac702`,
+and the 82,608-byte `ui-after-reopen.jpeg` screenshot is
+`e807af871bef5addbd28ecd5f24765c619ae33c3707db5029a6dc6de9e4048cb`;
+both show the exact two-slide A/C navigator and selected C body/title.
+
+The host retirement deletes `KeynoteEditor::remove_slide`, its complete
+`keynote/editor/slide_delete.rs` module/source, the direct
+`remove_keynote_slide` example, and obsolete direct host deletion tests. The
+retained generated-presentation regression is creation-only. Its generated
+slide has a child-object-to-parent-slide backlink, so focused deletion refuses
+that topology as `AmbiguousOwnership`; it is not evidence that all
+host-generated slides are deletable. No compatibility method or public bridge
+alias replaces the retired host method. The boundary suite passes 204/204.
+The `litchi-keynote` all-features gate passes 235/235 tests: 104 library tests
+plus 131 tests across the integration targets. Its doctests pass 9/9. The
+focused and retired-surface audits each report zero findings, while the full
+boundary checker reports exactly the 14 established unrelated findings. The
+full retained `litchi-iwa` library gate passes 1,418/1,418. Its permanent
+`focused_slide_deletion_rejects_generated_child_backlinks_atomically`
+regression proves the generated object-111-to-slide-110 backlink, the typed
+`AmbiguousOwnership` refusal, and byte-exact source preservation.
+
+These frozen results close the focused existing-slide deletion cut. They do
+not close debt 014 or claim that the full checker is free of its established
+unrelated findings.
+
+Debt 014 (`litchi-iwa -> litchi-keynote`) and the manifest edge remain because
+broader Keynote creation, drawable, chart, table, media, soundtrack-item,
+example/test/fuzz, durable-patch, and atomic-save ownership still lives in or
+depends on the migration host. Final topology is
+64 workspace packages, 238 internal dependency declarations, 14 `litchi-iwa`
+dependency declarations, and 14 explicit ordered debt items.

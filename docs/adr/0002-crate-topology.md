@@ -3062,3 +3062,65 @@ storage/wire/cache/formula support, Pages/Keynote paths, builders, and narrow
 new neutral `litchi-numbers -> litchi-iwa-text-wire` edge leaves topology at
 64 packages, 238 internal declarations, 14 `litchi-iwa` declarations, and 14
 ordered debts; no host debt closes.
+
+## 2026-08-12 amendment: focused Keynote existing-slide deletion ownership
+
+Existing-slide deletion now belongs to the concrete `litchi-keynote` package
+owner. Its canonical nested surface is
+`slide::delete::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Path}`,
+entered through `Package::{edit_slide_deletion, apply_slide_deletion}`. The
+public transaction accepts an exact navigator name or checked semantic
+position and exposes neither native object identifiers, component locators,
+PackageMetadata records, nor wire/protobuf values.
+
+The physical owner proves one supported flat chain before output: the rooted
+Document reaches one Show; Show/SlideTree field path `[3, 2]` reaches the
+selected SlideNode; and SlideNode field path `[2]` reaches the selected Slide.
+Each selected reference must occur exactly once in aggregate metadata;
+`FieldInfo` attribution may be absent, but when present it must occur exactly
+once at that path with object-reference typing. The selected Node and Slide
+each have one supported message, no merge/base/diff state exists anywhere in
+the package, and a package-wide scan must find their only inbound owners at
+those two rooted edges. Deprecated root-slide-node, secondary slide-list,
+hierarchical, duplicate, aliased, or otherwise ambiguous topology fails
+closed.
+
+The adjacent strict PackageMetadata owner then proves unique current component
+identifier/effective-locator pairs and the exact Node and Slide object-to-UUID
+bindings. Exactly one supported Node-component-to-Slide-component edge must
+exist: either one unversioned object-specific reference to the Slide object,
+including its optional weakness, or one unversioned component-level reference.
+Only the object-specific form is ownership and is removed; the component-level
+form remains. For every selected Node or Slide data reference, aggregate
+MessageInfo metadata is authoritative; optional field-specific attribution,
+when present, must match it exactly, and PackageMetadata must contain the exact
+owner/count record. Changed publication removes the Show's one selected Node
+reference, the Node object, the Slide object, both UUID bindings, any exact
+object-specific external reference, and only those exact data-owner records. A
+component data-reference record is retained with its surviving owners or
+removed when none survive.
+Component registrations, the PackageMetadata last-object identifier, global
+data-catalog records, all data payloads, and unrelated metadata remain.
+
+This is object deletion, not component reclamation. Co-located objects and
+their raw records survive exactly. Shared or merely outbound layout, style,
+theme, soundtrack, and media state remains exact. `Data/` members and media
+whose exclusive ownership is uncertain are preserved even when the deletion
+leaves them unreachable. Reclamation remains a separate `gc` concern and is
+not owned or claimed by this slice.
+
+The host cut retires `KeynoteEditor::remove_slide`, the complete
+`keynote/editor/slide_delete.rs` source and module declaration, the direct
+`remove_keynote_slide` example, and the obsolete direct host deletion
+assertions. The retained source-free regression is creation-only; it does not
+claim focused deletion support for its generated topology. No compatibility
+method or public bridge alias replaces the retired host method. Slide
+creation, insertion, duplication, layouts, arbitrary drawable graphs,
+soundtrack/media item CRUD, and other Keynote host paths remain separate
+owners.
+
+No dependency edge closes. Ordered debt 014
+(`litchi-iwa -> litchi-keynote`) remains. The final topology is 64 workspace
+packages, 238 internal dependency declarations, 14 `litchi-iwa` dependency
+declarations, and 14 explicit ordered debt items. The boundary suite passes
+204/204; both the focused and retired-surface audits report zero findings.

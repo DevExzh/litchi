@@ -52,7 +52,7 @@ mod types;
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 pub use cell_merge::CellMerge;
 pub use doc::Document;
-#[cfg(feature = "docx")]
+#[cfg(all(feature = "docx", feature = "markdown"))]
 pub(crate) use doc::docx_unknown_is_section_properties;
 pub use element::DocumentElement;
 pub use paragraph::Paragraph;

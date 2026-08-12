@@ -7,14 +7,20 @@
 //! - concrete DOC and PPT packages map their storage topology onto those views.
 //!
 //! ```no_run
-//! use litchi::images::{Convert, Options, doc, ppt};
-//!
 //! # fn main() -> Result<(), litchi::Error> {
-//! for image in doc("document.doc")? {
-//!     std::fs::write(image.out_name(), image.extract(Options::default())?)?;
+//! #[cfg(feature = "doc")]
+//! {
+//!     use litchi::images::{Convert, Options, doc};
+//!     for image in doc("document.doc")? {
+//!         std::fs::write(image.out_name(), image.extract(Options::default())?)?;
+//!     }
 //! }
-//! for image in ppt("presentation.ppt")? {
-//!     std::fs::write(image.out_name(), image.extract(Options::default())?)?;
+//! #[cfg(feature = "ppt")]
+//! {
+//!     use litchi::images::{Convert, Options, ppt};
+//!     for image in ppt("presentation.ppt")? {
+//!         std::fs::write(image.out_name(), image.extract(Options::default())?)?;
+//!     }
 //! }
 //! # Ok(())
 //! # }

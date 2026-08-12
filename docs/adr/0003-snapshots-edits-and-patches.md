@@ -1300,3 +1300,63 @@ refresh proof. The completed host cut retires the three direct
 `NumbersEditor` cell writers, two raw-ID model writers,
 `TableCellBatch::apply_numbers`, 15 obsolete direct tests, and the legacy
 example while retaining shared attached-table and fixture-only adapters.
+
+## 2026-08-12 amendment: Keynote existing-slide deletion patches
+
+`Package::edit_slide_deletion()` creates a one-operation immutable
+`slide::delete::Edit`. `Edit::remove_slide` resolves an exact navigator name or
+checked zero-based `Position` against the base semantic snapshot and stores
+only that semantic position. Missing and ambiguous names, missing positions, a
+second staged operation, an empty edit, and deletion of the presentation's
+final slide are typed refusals. Deletion has no semantic no-op: every accepted
+commit removes exactly one existing slide.
+
+Commit first validates the complete source and proves the selected flat
+Document -> Show/SlideTree -> SlideNode -> Slide ownership path. Exact
+aggregate occurrences and any present `FieldInfo` attribution, package-wide
+exclusive inbound ownership, single-message selected objects, absence of
+merge/base/diff state, and exact current PackageMetadata component, UUID,
+external-edge, and data-owner records are preconditions. Unsupported hierarchy,
+a deprecated root-node or secondary slide-list topology, duplicate identities
+or references, surviving inbound ownership, versioned ownership, mismatched
+locators/counts, and malformed or ambiguous metadata refuse before publication.
+
+A changed commit removes the one raw Show slide-reference field record while
+preserving its siblings, deletes the selected Node and Slide objects while
+retaining co-located objects and component registrations, and applies the
+exact PackageMetadata transition: two object-to-UUID entries, one unversioned
+Node-component-to-Slide-component object reference when that ownership form is
+present, and each selected Node/Slide data-reference owner/count entry are
+removed. A supported component-level edge is preserved instead. The last-object
+identifier, the component records themselves, global data-catalog records and
+payloads, unrelated ownership, and unknown records remain exact. A component
+data-reference record remains with its surviving owners or is removed when no
+owners survive. The exact root preview names are invalidated; a case-distinct
+or nested near-name is not.
+
+One package reassembly and complete reopen must reproduce the source order
+minus the selected semantic position before the immutable candidate is
+published.
+
+`slide::delete::Patch` is a directional, process-local capability. Publicly it
+exposes the resolved position and diagnostic fingerprints; privately it keeps
+the exact source/target artifacts, complete before/after slide counts and
+navigator-name sequence, and locality evidence. `Package::apply_slide_deletion`
+requires the exact directional source, reopens and validates the retained
+target, and checks the complete semantic sequence. `inverse()` swaps the same
+exact artifacts and restores the accepted source byte-for-byte. Fingerprints
+are diagnostic only; stale, unrelated, or wrong-direction application is
+`PatchConflict`.
+
+This patch does not serialize a semantic operation or satisfy ADR 0003's
+durable JSON, versioning, composition, merge, history, or library-owned atomic
+filesystem publication goals. The focused example supplies synchronized
+sibling-temporary, distinct-output, no-clobber publication, but that command is
+not the library durability contract.
+
+Deletion is not `gc`. Data-reference ownership records attached to the two
+deleted objects are removed only after exact proof, while every `Data/` member
+and global PackageMetadata data-catalog record stays preserved. Shared or
+uncertain media may therefore remain physically present and unreachable. A
+future reclamation transaction needs its own package-wide reachability and
+disposition proof.

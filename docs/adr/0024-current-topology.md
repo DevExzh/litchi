@@ -1943,3 +1943,62 @@ regressions pass 196/196. The neutral private rich-text wire edge
 `litchi-numbers -> litchi-iwa-text-wire` leaves the current inventory at 64
 workspace packages, 238 internal declarations, 14 `litchi-iwa` declarations,
 and 14 ordered debts.
+
+## 2026-08-12 current-status amendment: Keynote existing-slide deletion
+
+`litchi-keynote` now contains the focused existing-slide deletion owner at
+`slide::delete`, exposed only through the canonical nested
+`Edit`/`Patch`/`Commit`/`Diagnostics`/`Error`/`LimitKind`/`Path` vocabulary and
+`Package::{edit_slide_deletion, apply_slide_deletion}`. Exact navigator names
+and checked semantic positions are the public identities. Native object IDs,
+component locators, PackageMetadata identifiers, and wire values remain
+private.
+
+The changed path supports one exact flat Document -> Show/SlideTree ->
+SlideNode -> Slide ownership chain. It proves aggregate and field-specific
+reference agreement when optional field attribution is present, unique
+package-wide inbound ownership, single selected messages, no merge/base/diff
+state, unique current PackageMetadata components, exact Node/Slide UUID
+bindings, exactly one supported object-specific or component-level
+Node-to-Slide external edge, and exact selected data-reference owner/count
+records. Unsupported
+hierarchy or legacy alternate slide roots, ambiguous ownership, versioned or
+contradictory registry state, and malformed metadata refuse before output.
+
+Publication removes one Show slide-reference record, the Node and Slide
+objects, two UUID bindings, any exact object-specific external-reference
+record, and the selected data-owner records. A component-level edge remains.
+It does not remove an IWA component. Co-located objects, component
+registrations, the PackageMetadata last-object identifier, global data-catalog
+records, and all data payloads remain. A component
+data-reference record remains with surviving owners or is removed when none
+survive. Exact root previews are invalidated; near-name previews and unrelated
+ZIP/IWA state remain exact. The candidate is reassembled and reopened once,
+and the exact patch inverse restores the accepted source.
+
+This owner performs no media garbage collection. `Data/` members and shared,
+uncertain, or newly unreachable media are preserved; reclamation remains a
+separate future reachability transaction. Slide creation, duplication,
+layouts, drawable graphs, and media or soundtrack-item CRUD also remain
+outside this focused owner.
+
+The host no longer contains `KeynoteEditor::remove_slide`, its
+`slide_delete` module/source, its direct example, or its direct deletion tests.
+A retained generated-presentation regression is creation-only and does not
+claim its backlink topology is deletable; focused deletion refuses the
+surviving child-to-parent-slide reference as `AmbiguousOwnership`. No public
+bridge alias replaces the retired host method. Debt 014
+(`litchi-iwa -> litchi-keynote`) nevertheless remains, and no manifest edge
+is removed. The boundary suite passes 204/204; focused and retired-surface
+audits each report zero findings, and the full checker reports only the 14
+established unrelated findings. PackageMetadata
+generated evidence is five files / 145,681 bytes / zero repeated views / SHA-256
+`ee49927f75c6b632c83055f9b7e647920b389be41bec10e25871a6ef7b56ab31`.
+Native Save As/reopen evidence is frozen in ADR 0008. The final topology is 64
+workspace packages, 238 internal dependency declarations, 14 `litchi-iwa`
+dependency declarations, and 14 explicit ordered debts. Keynote passes 235/235
+all-features tests and 9/9 doctests; the retained host library passes
+1,418/1,418. The permanent generated-child-backlink regression proves typed
+`AmbiguousOwnership` refusal and byte-exact source preservation. The focused
+existing-slide deletion cut is green; broader host ownership and debt 014
+remain.

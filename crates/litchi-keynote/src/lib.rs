@@ -43,6 +43,33 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
+//! # Delete one slide
+//!
+//! Deletion accepts only an exact navigator name or a checked semantic
+//! position. It refuses to delete the final slide, preserves unselected
+//! presentation content, and its inverse is accepted only by the exact
+//! committed package snapshot. It removes the selected slide and slide-node
+//! objects but does not garbage-collect media: data payloads remain preserved
+//! even when their former owner was on the deleted slide. Only the supported
+//! flat native ownership topology is admitted; a surviving child backlink or
+//! other inbound owner is refused as ambiguous ownership.
+//!
+//! ```no_run
+//! use litchi_keynote::{Package, SlideSelector};
+//!
+//! let package = Package::open("input.key")?;
+//! let mut edit = package.edit_slide_deletion();
+//! edit.remove_slide(SlideSelector::name("Appendix"))?;
+//! let commit = edit.commit()?;
+//! assert_eq!(commit.package().show()?.slides().len() + 1, package.show()?.slides().len());
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_deletion(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().show()?.slides().len(), package.show()?.slides().len());
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
 //! # Edit presentation settings
 //!
 //! Read or stage dimensions and playback behavior without native identifiers

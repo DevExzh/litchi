@@ -320,7 +320,7 @@ required-features = ["doc"]
 
 [[example]]
 name = "debug_parse_concat"
-required-features = ["docx"]
+required-features = ["sheet", "eval"]
 
 [[example]]
 name = "doc_headers_footers"

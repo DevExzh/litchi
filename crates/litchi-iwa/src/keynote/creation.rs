@@ -2048,7 +2048,7 @@ mod tests {
     }
 
     #[test]
-    fn generated_presentation_can_add_and_remove_slides() {
+    fn generated_presentation_can_add_slides() {
         let mut editor = KeynoteEditor::create().unwrap();
         let layout = editor.default_slide_layout().unwrap();
         let created = editor.add_slide(layout).unwrap();
@@ -2070,20 +2070,40 @@ mod tests {
         notes.set("Created notes").unwrap();
         let notes = notes.commit().unwrap();
 
-        let mut editor = KeynoteEditor::from_bytes(&focused_bytes(notes.package())).unwrap();
+        let editor = KeynoteEditor::from_bytes(&focused_bytes(notes.package())).unwrap();
         let slides = editor.slides().unwrap();
         let created = &slides[1];
         assert_eq!(created.title.as_deref(), Some("Second — 東京"));
         assert_eq!(created.body.as_deref(), Some("Created body"));
         assert_eq!(created.notes.as_deref(), Some("Created notes"));
+    }
 
-        let removed = editor.remove_slide(0).unwrap();
-        assert_eq!(removed.title.as_deref(), Some(DEFAULT_TITLE));
-        let remaining = editor.slides().unwrap();
-        assert_eq!(remaining.len(), 1);
-        assert_eq!(remaining[0].title.as_deref(), Some("Second — 東京"));
-        assert_eq!(remaining[0].body.as_deref(), Some("Created body"));
-        assert_eq!(remaining[0].notes.as_deref(), Some("Created notes"));
+    #[test]
+    fn focused_slide_deletion_rejects_generated_child_backlinks_atomically() {
+        let mut editor = KeynoteEditor::create().unwrap();
+        let layout = editor.default_slide_layout().unwrap();
+        editor.add_slide(layout).unwrap();
+
+        let slide_archive = editor.package().archive("Index/Slide-14.iwa").unwrap();
+        let live_title = slide_archive.object(LIVE_TITLE).unwrap();
+        assert!(
+            live_title.archive_info.message_infos[0]
+                .object_references
+                .contains(&LIVE_SLIDE),
+            "the generated title placeholder retains its child-to-slide parent backlink"
+        );
+
+        let source = editor.to_bytes().unwrap();
+        let focused = FocusedKeynotePackage::from_bytes(&source).unwrap();
+        let before = focused_bytes(&focused);
+        let mut deletion = focused.edit_slide_deletion();
+        deletion.remove_slide(SlideSelector::index(0)).unwrap();
+        assert!(matches!(
+            deletion.commit(),
+            Err(litchi_keynote::slide::delete::Error::AmbiguousOwnership)
+        ));
+        assert_eq!(focused_bytes(&focused), before);
+        assert_eq!(before, source);
     }
 
     #[test]
