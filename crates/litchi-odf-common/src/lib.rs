@@ -23,3 +23,9 @@ pub mod package;
 pub mod rdf;
 pub mod signature;
 pub mod style;
+pub mod validation;
+
+pub use validation::{
+    DEFAULT_ODF_VALIDATION_LIMITS, OdfValidationError, OdfValidationLimits, validate_package,
+    validate_package_with_limits,
+};
