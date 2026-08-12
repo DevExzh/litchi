@@ -79,6 +79,8 @@ const XLSX_CONDITIONAL_FORMATTING_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-conditional-formatting-source-edit-media-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
 const ODT_MEDIA_CORPUS_GENERATOR: &str = "litchi-odt-media-paragraph-publication-v1";
+const ODT_RESOURCE_BATCH_CORPUS_GENERATOR: &str =
+    "litchi-odt-embedded-resource-batch-publication-v1";
 const ODT_MEDIA_APPEND_RUN_TEXT: &str = " appended run";
 const ODT_MEDIA_APPEND_HYPERLINK_HREF: &str = "https://example.invalid/performance";
 const ODT_MEDIA_APPEND_HYPERLINK_TEXT: &str = " performance link";
@@ -100,6 +102,8 @@ const PPTX_SOURCE_SLIDE_COUNT: usize = 200;
 const PPTX_SOURCE_TEXT_BOXES_PER_SLIDE: usize = 8;
 const PPTX_MULTI_SLIDE_BATCH_COUNT: usize = 8;
 const ODP_TEXT_BOX_BATCH_COUNT: usize = 8;
+const ODT_RESOURCE_BATCH_COUNT: usize = 64;
+const ODT_RESOURCE_PAYLOAD_BYTES: usize = 4 * 1024;
 const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const ODP_MEDIA_TEXT_BOX_NAME: &str = "litchi-perf-media-text-box";
@@ -509,6 +513,8 @@ enum Case {
     OdtMediaAppendHyperlinkEditSave,
     OdtMediaInsertParagraphEditSave,
     OdtMediaRemoveParagraphEditSave,
+    OdtEmbeddedResourceScalarReplaceSave,
+    OdtEmbeddedResourceBatchReplaceSave,
     OdsSemanticOpen,
     OdsSemanticListSheets,
     OdsSemanticOneCell,
@@ -733,6 +739,10 @@ impl Case {
             Self::OdtMediaAppendHyperlinkEditSave => "odt_media_append_hyperlink_edit_save",
             Self::OdtMediaInsertParagraphEditSave => "odt_media_insert_paragraph_edit_save",
             Self::OdtMediaRemoveParagraphEditSave => "odt_media_remove_paragraph_edit_save",
+            Self::OdtEmbeddedResourceScalarReplaceSave => {
+                "odt_embedded_resource_scalar_replace_save"
+            },
+            Self::OdtEmbeddedResourceBatchReplaceSave => "odt_embedded_resource_batch_replace_save",
             Self::OdsSemanticOpen => "ods_semantic_open",
             Self::OdsSemanticListSheets => "ods_semantic_list_sheets",
             Self::OdsSemanticOneCell => "ods_semantic_one_cell",
@@ -943,6 +953,13 @@ impl Case {
                 | Self::OdtMediaAppendHyperlinkEditSave
                 | Self::OdtMediaInsertParagraphEditSave
                 | Self::OdtMediaRemoveParagraphEditSave
+        )
+    }
+
+    const fn uses_odt_resource_batch(self) -> bool {
+        matches!(
+            self,
+            Self::OdtEmbeddedResourceScalarReplaceSave | Self::OdtEmbeddedResourceBatchReplaceSave
         )
     }
 
@@ -1917,6 +1934,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_pptx()
                     && !case.uses_semantic_odt()
                     && !case.uses_odt_media()
+                    && !case.uses_odt_resource_batch()
                     && !case.uses_semantic_ods()
                     && !case.uses_ods_media()
                     && !case.uses_semantic_odp()
@@ -2432,6 +2450,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_odt_resource_batch())
+    {
+        let corpus = build_odt_resource_batch_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .filter(|case| case.uses_odt_resource_batch())
+        {
+            results.push(run_case_with_config(
+                *case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
+        }
+    }
+
     if options.cases.iter().any(|case| case.uses_ods_media()) {
         let corpus = build_ods_media_corpus()?;
         for case in options.cases.iter().filter(|case| case.uses_ods_media()) {
@@ -2879,6 +2918,12 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_media_append_hyperlink_edit_save" => Some(Case::OdtMediaAppendHyperlinkEditSave),
         "odt_media_insert_paragraph_edit_save" => Some(Case::OdtMediaInsertParagraphEditSave),
         "odt_media_remove_paragraph_edit_save" => Some(Case::OdtMediaRemoveParagraphEditSave),
+        "odt_embedded_resource_scalar_replace_save" => {
+            Some(Case::OdtEmbeddedResourceScalarReplaceSave)
+        },
+        "odt_embedded_resource_batch_replace_save" => {
+            Some(Case::OdtEmbeddedResourceBatchReplaceSave)
+        },
         "ods_semantic_open" => Some(Case::OdsSemanticOpen),
         "ods_semantic_list_sheets" => Some(Case::OdsSemanticListSheets),
         "ods_semantic_one_cell" => Some(Case::OdsSemanticOneCell),
@@ -3053,6 +3098,8 @@ fn print_usage() {
                                        odt_media_append_hyperlink_edit_save,\n\
                                        odt_media_insert_paragraph_edit_save,\n\
                                        odt_media_remove_paragraph_edit_save,\n\
+                                       odt_embedded_resource_scalar_replace_save,\n\
+                                       odt_embedded_resource_batch_replace_save,\n\
                                        ods_semantic_open,\n\
                                        ods_semantic_list_sheets,ods_semantic_one_cell,\n\
                                        ods_semantic_cell_sweep,\n\
@@ -4267,6 +4314,41 @@ fn odt_media_payload(index: usize) -> Vec<u8> {
     )
 }
 
+fn odt_resource_batch_name(index: usize) -> String {
+    format!("litchi-perf-odt-resource-owner-{index:02}")
+}
+
+fn odt_resource_batch_path(index: usize, updated: bool) -> String {
+    let state = if updated { "target" } else { "source" };
+    format!("Pictures/litchi-perf-odt-resource-{state}-{index:02}.png")
+}
+
+fn odt_resource_batch_payload(index: usize, updated: bool) -> Vec<u8> {
+    let seed = if updated { 50_000 } else { 40_000 };
+    payload_bytes(
+        PayloadKind::Incompressible,
+        seed + index,
+        ODT_RESOURCE_PAYLOAD_BYTES,
+    )
+}
+
+fn odt_resource_batch_image(
+    index: usize,
+    updated: bool,
+) -> litchi_odt::package::embedded::EmbeddedResource {
+    litchi_odt::package::embedded::EmbeddedResource {
+        kind: litchi_odt::package::embedded::EmbeddedResourceKind::Image,
+        source: litchi_odt::package::embedded::EmbeddedResourceSource::PackageFile {
+            bytes: odt_resource_batch_payload(index, updated),
+            media_type: "image/png".to_owned(),
+            preferred_path: Some(odt_resource_batch_path(index, updated)),
+        },
+        frame_name: Some(odt_resource_batch_name(index)),
+        xml_id: None,
+        class_id: None,
+    }
+}
+
 fn odt_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
     let mut document = litchi_odt::mutable::MutableDocument::new();
     for index in 0..SemanticShape::Medium.docx_paragraphs() {
@@ -4291,6 +4373,47 @@ fn odt_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
         )?;
     }
     Ok(writer.finish_to_bytes()?)
+}
+
+fn odt_resource_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
+    let base = odt_media_archive()?;
+    let source = ArchiveReader::new(&base)?;
+    let mut content = String::from_utf8(source.read("content.xml")?)?;
+    let insertion = content
+        .rfind("</office:text>")
+        .ok_or("ODT embedded-resource corpus office:text close tag is missing")?;
+    let frames = (0..ODT_RESOURCE_BATCH_COUNT)
+        .map(|index| {
+            format!(
+                r#"<draw:frame xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" draw:name="{}"><draw:image draw:mime-type="image/png" xlink:href="{}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"></draw:image></draw:frame>"#,
+                odt_resource_batch_name(index),
+                odt_resource_batch_path(index, false),
+            )
+        })
+        .collect::<String>();
+    content.insert_str(insertion, &frames);
+
+    let mut writer = litchi_odt::core::PackageWriter::new();
+    writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
+    for path in source.file_names() {
+        if matches!(path, "mimetype" | "META-INF/manifest.xml" | "content.xml")
+            || path.ends_with('/')
+        {
+            continue;
+        }
+        writer.add_file(path, &source.read(path)?)?;
+    }
+    writer.add_file("content.xml", content.as_bytes())?;
+    for index in 0..ODT_RESOURCE_BATCH_COUNT {
+        writer.add_file_with_media_type(
+            &odt_resource_batch_path(index, false),
+            &odt_resource_batch_payload(index, false),
+            "image/png",
+        )?;
+    }
+    let archive = writer.finish_to_bytes()?;
+    verify_odt_resource_batch_archive(&archive, false)?;
+    Ok(archive)
 }
 
 fn semantic_ods_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
@@ -4545,6 +4668,57 @@ fn build_odt_media_corpus() -> Result<Corpus, Box<dyn Error>> {
         },
         archive,
         target_name: format!("paragraph:{target}"),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn build_odt_resource_batch_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let shape = SemanticShape::Medium;
+    let archive = odt_resource_batch_archive()?;
+    verify_odt_resource_batch_archive(&archive, false)?;
+    let target_payload = odt_resource_batch_payload(0, false);
+    let paragraph_bytes = (0..shape.docx_paragraphs()).try_fold(0usize, |total, index| {
+        total
+            .checked_add(semantic_odt_text(index, false).len())
+            .ok_or("ODT embedded-resource corpus text byte count overflows usize")
+    })?;
+    let retained_media_bytes = ODS_MEDIA_ENTRY_COUNT
+        .checked_mul(ODS_MEDIA_ENTRY_BYTES)
+        .ok_or("ODT embedded-resource retained-media byte count overflows usize")?;
+    let resource_bytes = ODT_RESOURCE_BATCH_COUNT
+        .checked_mul(ODT_RESOURCE_PAYLOAD_BYTES)
+        .ok_or("ODT embedded-resource payload byte count overflows usize")?;
+    let entry_count = shape
+        .docx_paragraphs()
+        .checked_add(ODS_MEDIA_ENTRY_COUNT)
+        .and_then(|count| count.checked_add(ODT_RESOURCE_BATCH_COUNT))
+        .ok_or("ODT embedded-resource logical entry count overflows usize")?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: "odt-embedded-resource-batch-publication".to_owned(),
+            generator: ODT_RESOURCE_BATCH_CORPUS_GENERATOR,
+            package_format: "ODT/ODF/ZIP",
+            shape: "media-rich-64-image-owners",
+            payload_kind: "deterministic-incompressible-media-and-image-resources",
+            compression: "deflate",
+            entry_count,
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: ODT_RESOURCE_PAYLOAD_BYTES,
+            uncompressed_payload_bytes: paragraph_bytes
+                .checked_add(retained_media_bytes)
+                .and_then(|total| total.checked_add(resource_bytes))
+                .ok_or("ODT embedded-resource aggregate byte count overflows usize")?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: format!("image:0/{}", odt_resource_batch_path(0, false)),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: odt_resource_batch_name(0),
         target_payload,
         xlsx: None,
     })
@@ -5376,6 +5550,9 @@ fn run_case_with_config(
         Case::OdtMediaInsertParagraphEditSave | Case::OdtMediaRemoveParagraphEditSave => {
             run_odt_media_structural_paragraph_edit_save(case, corpus, warmup_iterations, samples)
         },
+        Case::OdtEmbeddedResourceScalarReplaceSave | Case::OdtEmbeddedResourceBatchReplaceSave => {
+            run_odt_embedded_resource_publication(case, corpus, warmup_iterations, samples)
+        },
         Case::OdsSemanticOpen
         | Case::OdsSemanticListSheets
         | Case::OdsSemanticOneCell
@@ -6153,6 +6330,106 @@ fn verify_odt_media_structural_paragraph_archive(
         }
         if package.get_file(&path)? != odt_media_payload(index) {
             return Err(format!("media-rich ODT payload differs for '{path}'").into());
+        }
+    }
+    Ok(())
+}
+
+type OdtResourceProjection = (String, Vec<(String, String, String, String)>);
+
+fn verify_odt_resource_batch_archive(
+    bytes: &[u8],
+    updated: bool,
+) -> Result<OdtResourceProjection, Box<dyn Error>> {
+    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    verify_semantic_odt(&document, SemanticShape::Medium, &[])?;
+    if !document.embedded_objects()?.is_empty() {
+        return Err("ODT embedded-resource corpus unexpectedly contains objects".into());
+    }
+    let images = document.images()?;
+    if images.len() != ODT_RESOURCE_BATCH_COUNT {
+        return Err("ODT embedded-resource image count differs from specification".into());
+    }
+
+    let package = litchi_odt::core::OwnedPackage::from_bytes(bytes.to_vec())?;
+    let package = package.package()?;
+    let mut projection = Vec::with_capacity(ODT_RESOURCE_BATCH_COUNT);
+    for (index, image) in images.iter().enumerate() {
+        let name = odt_resource_batch_name(index);
+        let path = odt_resource_batch_path(index, updated);
+        let litchi_odf_common::media::Source::PackagePart {
+            href,
+            path: actual_path,
+            manifest_media_type,
+        } = &image.source
+        else {
+            return Err(format!("ODT embedded-resource image {index} is not packaged").into());
+        };
+        if image.part != litchi_odf_common::drawing::Part::Content
+            || image.frame.as_ref().and_then(|frame| frame.name.as_deref()) != Some(name.as_str())
+            || image.xml_id.is_some()
+            || image.declared_media_type.as_deref() != Some("image/png")
+            || image.alternative_index != 0
+            || href != &path
+            || actual_path != &path
+            || manifest_media_type.as_deref() != Some("image/png")
+            || package.manifest().get_media_type(&path) != Some("image/png")
+        {
+            return Err(format!("ODT embedded-resource owner {index} differs").into());
+        }
+        let actual_payload = package.get_file(&path)?;
+        let expected_payload = odt_resource_batch_payload(index, updated);
+        let actual_digest = sha256_hex(&actual_payload);
+        let expected_digest = sha256_hex(&expected_payload);
+        if actual_payload.len() != ODT_RESOURCE_PAYLOAD_BYTES || actual_digest != expected_digest {
+            return Err(
+                format!("ODT embedded-resource payload digest differs for '{path}'").into(),
+            );
+        }
+        projection.push((name, path, "image/png".to_owned(), actual_digest));
+    }
+    if updated {
+        for index in 0..ODT_RESOURCE_BATCH_COUNT {
+            let path = odt_resource_batch_path(index, false);
+            if package.manifest().get_media_type(&path) != Some("image/png")
+                || sha256_hex(&package.get_file(&path)?)
+                    != sha256_hex(&odt_resource_batch_payload(index, false))
+            {
+                return Err(format!(
+                    "ODT embedded-resource displaced source payload differs for '{path}'"
+                )
+                .into());
+            }
+        }
+    }
+    for index in 0..ODS_MEDIA_ENTRY_COUNT {
+        let path = odt_media_path(index);
+        if package.manifest().get_media_type(&path) != Some("application/octet-stream")
+            || sha256_hex(&package.get_file(&path)?) != sha256_hex(&odt_media_payload(index))
+        {
+            return Err(
+                format!("ODT embedded-resource retained media differs for '{path}'").into(),
+            );
+        }
+    }
+    Ok((document.text()?, projection))
+}
+
+fn verify_odt_resource_batch_raw_members(
+    source: &[u8],
+    published: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let identical = litchi_odf_common::package::raw_identical_members(source, published)
+        .ok_or("ODT embedded-resource raw-member comparison failed")?;
+    if identical.contains("content.xml") {
+        return Err("ODT embedded-resource content.xml remained raw-identical".into());
+    }
+    for path in ArchiveReader::new(source)?.file_names() {
+        if !matches!(path, "content.xml" | "META-INF/manifest.xml") && !identical.contains(path) {
+            return Err(format!(
+                "ODT embedded-resource publication changed untouched raw member '{path}'; identical={identical:?}"
+            )
+            .into());
         }
     }
     Ok(())
@@ -8114,6 +8391,175 @@ fn run_odt_media_structural_paragraph_edit_save(
     }
     let mut measured = result(case, corpus, elapsed, None);
     measured.output_sha256 = expected_output_digest;
+    Ok(measured)
+}
+
+fn publish_odt_embedded_resources(
+    case: Case,
+    source: &litchi_odt::transaction::Snapshot,
+    replacements: &[litchi_odt::package::embedded::EmbeddedResource],
+    changes: &[litchi_odt::package::embedded::EmbeddedResourceChange],
+) -> Result<litchi_odt::transaction::Commit, Box<dyn Error>> {
+    let mut edit = source.edit();
+    match case {
+        Case::OdtEmbeddedResourceScalarReplaceSave => {
+            for (index, replacement) in replacements.iter().enumerate() {
+                edit.replace_embedded_image(index, replacement)?;
+            }
+        },
+        Case::OdtEmbeddedResourceBatchReplaceSave => {
+            edit.edit_embedded_resources(changes)?;
+        },
+        _ => return Err("non-resource ODT case passed to resource publisher".into()),
+    }
+    Ok(edit.commit()?)
+}
+
+fn verify_odt_embedded_resource_commit(
+    case: Case,
+    source: &litchi_odt::transaction::Snapshot,
+    commit: &litchi_odt::transaction::Commit,
+    expected: &[u8],
+) -> Result<OdtResourceProjection, Box<dyn Error>> {
+    let results_match = match case {
+        Case::OdtEmbeddedResourceScalarReplaceSave => {
+            commit.results().len() == ODT_RESOURCE_BATCH_COUNT
+                && commit
+                    .results()
+                    .iter()
+                    .all(|result| result == &litchi_odt::transaction::OperationResult::Unit)
+        },
+        Case::OdtEmbeddedResourceBatchReplaceSave => {
+            commit.results() == [litchi_odt::transaction::OperationResult::Indices(Vec::new())]
+        },
+        _ => false,
+    };
+    if commit.snapshot().as_bytes() != expected || expected == source.as_bytes() || !results_match {
+        return Err(format!(
+            "ODT embedded-resource commit differs: exact_output={}, changed={}, results={:?}",
+            commit.snapshot().as_bytes() == expected,
+            expected != source.as_bytes(),
+            commit.results()
+        )
+        .into());
+    }
+    let projection = verify_odt_resource_batch_archive(expected, true)?;
+    verify_odt_resource_batch_raw_members(source.as_bytes(), expected)?;
+
+    let replayed = commit.patch().apply(source)?;
+    if replayed.as_bytes() != expected {
+        return Err("ODT embedded-resource volatile replay differs from publication".into());
+    }
+    if commit.patch().inverse().apply(&replayed)?.as_bytes() != source.as_bytes() {
+        return Err("ODT embedded-resource volatile inverse did not restore source".into());
+    }
+    if commit.patch().apply(&replayed).is_ok() {
+        return Err("ODT embedded-resource volatile patch accepted stale source".into());
+    }
+
+    let durable_json = commit.patch().durable()?.to_deterministic_json()?;
+    let durable = litchi_odt::transaction::DurablePatch::from_deterministic_json(&durable_json)?;
+    let durable_replayed = durable.apply(source)?;
+    if durable_replayed.as_bytes() != expected {
+        return Err("ODT embedded-resource durable replay differs from publication".into());
+    }
+    if durable.inverse().apply(&durable_replayed)?.as_bytes() != source.as_bytes() {
+        return Err("ODT embedded-resource durable inverse did not restore source".into());
+    }
+    if durable.apply(&durable_replayed).is_ok() {
+        return Err("ODT embedded-resource durable patch accepted stale source".into());
+    }
+    Ok(projection)
+}
+
+fn run_odt_embedded_resource_publication(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !case.uses_odt_resource_batch() {
+        return Err("non-resource ODT case passed to resource publication runner".into());
+    }
+    let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+    let replacements = (0..ODT_RESOURCE_BATCH_COUNT)
+        .map(|index| odt_resource_batch_image(index, true))
+        .collect::<Vec<_>>();
+    let changes = replacements
+        .iter()
+        .enumerate()
+        .map(|(index, replacement)| {
+            litchi_odt::package::embedded::EmbeddedResourceChange::replace_image(
+                Position::new(index),
+                replacement,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let batch = publish_odt_embedded_resources(
+        Case::OdtEmbeddedResourceBatchReplaceSave,
+        &source,
+        &replacements,
+        &changes,
+    )?;
+    let expected_batch = batch.snapshot().as_bytes().to_vec();
+    let batch_projection = verify_odt_embedded_resource_commit(
+        Case::OdtEmbeddedResourceBatchReplaceSave,
+        &source,
+        &batch,
+        &expected_batch,
+    )?;
+    let scalar = publish_odt_embedded_resources(
+        Case::OdtEmbeddedResourceScalarReplaceSave,
+        &source,
+        &replacements,
+        &changes,
+    )?;
+    let expected_scalar = scalar.snapshot().as_bytes().to_vec();
+    let scalar_projection = verify_odt_embedded_resource_commit(
+        Case::OdtEmbeddedResourceScalarReplaceSave,
+        &source,
+        &scalar,
+        &expected_scalar,
+    )?;
+    if scalar_projection != batch_projection {
+        return Err("matched ODT scalar and batch resource projections differ".into());
+    }
+    let expected = match case {
+        Case::OdtEmbeddedResourceScalarReplaceSave => expected_scalar,
+        Case::OdtEmbeddedResourceBatchReplaceSave => expected_batch,
+        _ => return Err("non-resource ODT case reached output selection".into()),
+    };
+
+    let sink_ceiling = u64::try_from(expected.len())?;
+    let expected_digest = sha256_hex(&expected);
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sinks = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut sink = CountingSink::bounded(sink_ceiling, sink_ceiling);
+        sink.reserve_budget()?;
+        let started = Instant::now();
+        let commit = publish_odt_embedded_resources(case, &source, &replacements, &changes)?;
+        sink.write_all(commit.snapshot().as_bytes())?;
+        let duration = started.elapsed();
+
+        if sink.bytes != expected {
+            return Err("measured ODT embedded-resource publication differs from oracle".into());
+        }
+        let replayed = commit.patch().apply(&source)?;
+        if replayed.as_bytes() != expected
+            || commit.patch().inverse().apply(&replayed)?.as_bytes() != source.as_bytes()
+            || commit.patch().apply(&replayed).is_ok()
+        {
+            return Err("measured ODT embedded-resource patch contract differs".into());
+        }
+        sinks.push(sink.summary());
+        std::hint::black_box(commit);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let sink = deterministic_sink_summary(&sinks, "ODT embedded-resource publication")?;
+    let mut measured = result(case, corpus, elapsed, Some(sink));
+    measured.output_sha256 = Some(expected_digest);
     Ok(measured)
 }
 
@@ -14083,10 +14529,11 @@ mod tests {
 
     use super::{
         Case, CorpusShape, CountingSink, InstrumentedSource, ODP_TEXT_BOX_BATCH_COUNT,
-        PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RangeSimulationConfig, RequestSizeBuckets,
-        RtfSemanticVariant, SemanticShape, SimulatedRangeSource, SourceBackedPackage, WriterShape,
-        XlsxShape, build_cfb_corpus, build_docx_source_edit_corpus, build_odp_media_corpus,
-        build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
+        ODT_RESOURCE_BATCH_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RangeSimulationConfig,
+        RequestSizeBuckets, RtfSemanticVariant, SemanticShape, SimulatedRangeSource,
+        SourceBackedPackage, WriterShape, XlsxShape, build_cfb_corpus,
+        build_docx_source_edit_corpus, build_odp_media_corpus, build_odp_text_box_batch_corpus,
+        build_ods_media_corpus, build_odt_media_corpus, build_odt_resource_batch_corpus,
         build_ole_common_corpus, build_opc_corpus, build_pptx_source_edit_corpus,
         build_rtf_lifecycle_corpus, build_semantic_docx_corpus, build_semantic_odp_corpus,
         build_semantic_ods_corpus, build_semantic_odt_corpus, build_semantic_pptx_corpus,
@@ -15403,6 +15850,55 @@ mod tests {
                 assert!(identical.contains(&super::odt_media_path(index)));
             }
         }
+    }
+
+    #[test]
+    fn media_rich_odt_scalar_and_batch_resource_replacements_are_matched() {
+        let first = build_odt_resource_batch_corpus().unwrap();
+        let second = build_odt_resource_batch_corpus().unwrap();
+        assert_eq!(first.archive, second.archive);
+        assert_eq!(first.manifest.entry_count, 272);
+        assert_eq!(first.manifest.archive_member_count, 77);
+        assert_eq!(first.manifest.archive_bytes, 17_061_898);
+        assert_eq!(
+            first.manifest.archive_sha256,
+            "7b0ddd1c00ef91d24e60f30bf4a0ca0045807d537329e213f2f03020dfb0750b"
+        );
+        assert_eq!(first.manifest.shape, "media-rich-64-image-owners");
+        assert_eq!(
+            first.manifest.generator,
+            "litchi-odt-embedded-resource-batch-publication-v1"
+        );
+
+        let scalar = run_case(Case::OdtEmbeddedResourceScalarReplaceSave, &first, 0, 1).unwrap();
+        let batch = run_case(Case::OdtEmbeddedResourceBatchReplaceSave, &first, 0, 1).unwrap();
+        assert_eq!(
+            scalar.output_sha256.as_deref(),
+            Some("2da19ec3aff1f8cf76a2690a498bb9582b604c0aab25cd40c3b688efa5888a1d")
+        );
+        assert_eq!(
+            batch.output_sha256.as_deref(),
+            Some("fa71c846111de90d5cfed8e6a95493126baad291f4ef4d9f4905bf65fc54e896")
+        );
+        for (measured, expected_bytes) in [(scalar, 17_336_931), (batch, 17_336_924)] {
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            assert!(measured.source.is_none());
+            assert!(measured.output_sha256.is_some());
+            let sink = measured.sink.unwrap();
+            assert_eq!(sink.write_calls, 1);
+            assert_eq!(sink.accepted_bytes, expected_bytes);
+            assert_eq!(sink.largest_write, expected_bytes);
+        }
+
+        let document = litchi_odt::Document::from_bytes(first.archive.clone()).unwrap();
+        assert_eq!(document.images().unwrap().len(), ODT_RESOURCE_BATCH_COUNT);
+        assert!(document.images().unwrap().iter().all(|image| {
+            image
+                .frame
+                .as_ref()
+                .and_then(|frame| frame.name.as_deref())
+                .is_some_and(|name| name.starts_with("litchi-perf-odt-resource-owner-"))
+        }));
     }
 
     #[test]

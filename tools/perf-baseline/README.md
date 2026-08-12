@@ -28,7 +28,7 @@ range cases, two execution-scaling cases, one low-level source-overlay save
 case, one source-backed DOCX semantic publication case, one source-backed
 media-rich PPTX semantic publication case, four matched same-slide/multi-slide
 PPTX batch cases, two matched cross-slide ODP text-box publication cases, one
-XLSX commit/read attribution case,
+matched ODT embedded-resource publication pair, one XLSX commit/read attribution case,
 two matched XLSX calculation-metadata publication cases, two matched XLSX
 defined-name publication cases, two matched XLSX
 page-break publication cases, two matched XLSX page-margin publication cases,
@@ -39,8 +39,8 @@ two matched XLSX data-validation publication cases,
 two matched XLSX auto-filter/sort-state publication cases,
 two matched XLSX conditional-formatting publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
-DOCX/PPTX semantic cases, 13 RTF semantic cases, and 34 ODF semantic cases
-are opt-in, for 160 selectable cases in total:
+DOCX/PPTX semantic cases, 13 RTF semantic cases, and 36 ODF semantic cases
+are opt-in, for 162 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -439,6 +439,16 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/odt-media-structural-paragraph-publication.json
 ```
 
+Run the matched ODT existing embedded-image replacement cases over a fixed
+64-owner extension of the media-rich corpus:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 \
+  --case odt_embedded_resource_scalar_replace_save,odt_embedded_resource_batch_replace_save \
+  --json target/perf/odt-embedded-resource-publication.json
+```
+
 Run the matched ODP cross-slide existing-text-box publication cases over a
 fixed media-rich corpus:
 
@@ -680,6 +690,33 @@ Harness regressions additionally prove raw local/central record identity for
 all untouched core and media members, including styled and unstyled run and
 hyperlink publication. These cases do not vary with `--semantic-shape` and are
 opt-in.
+
+`odt_embedded_resource_scalar_replace_save` and
+`odt_embedded_resource_batch_replace_save` share a deterministic extension of
+that fixed-medium corpus: the same 200 paragraphs and eight 2 MiB opaque
+resources plus 64 existing, uniquely named package-backed image owners with
+4 KiB payloads. Replacement values and the immutable snapshot are prepared
+outside timing. Both intervals create one transaction, replace the same 64
+existing image owners onto corresponding fixed same-length target paths without
+renaming frames, commit once,
+and copy the complete published snapshot to one pre-reserved bounded sink. The
+scalar control calls `replace_embedded_image` 64 times; the bounded case calls
+`edit_embedded_resources` once with 64 base-snapshot selectors. Replacement
+does not add, remove, or reorder owners, so scalar selector shifting is not a
+factor. The displaced fixed source payloads remain packaged, as required by the
+production replacement contract.
+
+Outside timing, both paths reopen all 200 paragraphs and all 64 image owners,
+verify every frame name/path/media type and source/replacement payload SHA-256,
+verify all eight retained 2 MiB resources and raw identity for every untouched
+ZIP member, and require the same complete semantic projection. Volatile and
+deterministic-JSON durable forward replay, inverse restoration, and stale-source
+refusal are checked for both paths. Case-specific deterministic output hashes
+and exact one-write sink counters are retained. The owned ODT transaction API
+exposes no positional source-read or logical-part materialization diagnostics,
+so the report omits them. These cases are selectable evidence only: no latency,
+instruction, allocation, memory, or materialization improvement is claimed
+without a frozen CPU-pinned balanced ABBA capture.
 
 `odp_media_textbox_edit_save` is a separate fixed-medium source-backed
 publication corpus: 12 slides plus eight deterministic 2 MiB resources under
