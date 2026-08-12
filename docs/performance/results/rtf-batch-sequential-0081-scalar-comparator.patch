@@ -1,0 +1,17 @@
+diff --git a/tools/perf-baseline/src/main.rs b/tools/perf-baseline/src/main.rs
+--- a/tools/perf-baseline/src/main.rs
++++ b/tools/perf-baseline/src/main.rs
+@@ -6834,7 +6834,12 @@ fn run_semantic_rtf(
+                     },
+                     Case::RtfSemanticOnePercentEditSave => {
+                         let mut edit = document.edit();
+-                        edit.replace_body_paragraph_texts(&replacements)?;
++                        for replacement in &replacements {
++                            edit.replace_paragraph_text(
++                                replacement.position(),
++                                replacement.replacement(),
++                            )?;
++                        }
+                         let commit = edit.commit()?;
+                         if !commit.diagnostics().changed()
+                             || commit.diagnostics().operation_count() != updated.len()

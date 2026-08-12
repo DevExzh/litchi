@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 
-This is a coverage map, not a completion claim. It compares the 152 selectable
+This is a coverage map, not a completion claim. It compares the 154 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -16,13 +16,13 @@ performance claim.
 | Read one cell/paragraph/slide/image/Part | Partial | XLS/XLSX/ODS cells, DOC/RTF/DOCX paragraphs, indexed ODT paragraphs, PPT/PPTX/ODP text objects and generic OPC Part; semantic image selection remains missing |
 | Scan all cells/paragraphs/slides | Covered for generated native/OOXML/RTF/ODF text corpora | XLS/XLSX/ODS cell scans, including the isolated ODS public-cell sweep; DOC/RTF/DOCX/ODT paragraph enumeration and PPT/PPTX/ODP slide/text enumeration |
 | Full text extraction | Covered for generated DOC/PPT/RTF/DOCX/PPTX/ODT/ODS/ODP | Complete deterministic text or row-major cell text is checked; RTF additionally verifies raw CP-1252/LZFu text and the body plus public header-shape projection of a real-producer watermark; ODT consuming block ownership is measured in change 0023; broader real-producer/media-heavy corpora remain missing |
-| Semantic conversion to sequential sink | Partial | API-only: RTF writes semantic body text to a bounded forward-only, non-seek UTF-8 sink with configurable paragraph separators and typed partial-write progress; no selectable conversion benchmark or other-format semantic sink exists |
+| Semantic conversion to sequential sink | Partial | Measured: RTF writes semantic body text to a bounded forward-only, non-seek UTF-8 sink with configurable paragraph separators; output and sink counters are fully verified outside timing. Production correctness tests, rather than the timing sink, cover partial/interrupted/write-zero behavior. No other-format semantic sink benchmark exists |
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring; large/streaming creation remains missing |
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
 | Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication; signed/extension corpora remain missing |
 | One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT separately measures paragraph replacement, inline line-break/run/hyperlink insertion, and structural paragraph insertion/removal while ODT, ODS and ODP verify eight exact 2 MiB resources and manifest media types; source-backed DOCX/PPTX and narrow XLSX calculation-metadata/defined-name/sheet-protection/data-validation/auto-filter publication likewise verify eight exact 2 MiB media Parts after one semantic edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
-| About 1% semantic update and save | Covered for XLSX/DOCX/PPTX/ODT/ODS generated corpora | Deterministic evenly spaced `ceil(1%)` cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch, ODT coalesces ordinary scalar durable replacements internally, and ODS partitions flat cell positions by worksheet into bounded atomic `set_cells` calls; each commits once and reopens the package, but the new ODS case has no comparative latency claim |
-| Bulk update matching objects | Partial | Measured: PPTX has a bounded atomic batch across up to 32 existing slides, with up to 256 unique nonoverlapping shape-text selectors per slide. API-only correctness coverage: ODS updates up to 4,096 cells on one selected sheet; native PPT updates up to 256 persisted shape-text targets; RTF replaces a bounded ordered paragraph set; XLS updates up to 256 existing comment author/text owners on one worksheet; XLSX replaces or clears a complete core conditional-formatting collection; ODT batches up to 256 embedded object/image changes; ODP batches up to 256 cross-slide text-box models. These APIs are not selectable timing evidence |
+| About 1% semantic update and save | Covered for XLSX/DOCX/PPTX/RTF/ODT/ODS generated corpora | Deterministic evenly spaced `ceil(1%)` cell, paragraph and shape changes; DOCX and RTF use one canonical atomic paragraph batch, ODT coalesces ordinary scalar durable replacements internally, and ODS partitions flat cell positions by worksheet into bounded atomic `set_cells` calls; each commits once and reopens the package. The new ODS case has no comparative latency claim; the RTF batch case has a matched scalar-loop comparison recorded in change 0081 |
+| Bulk update matching objects | Partial | Measured: PPTX has a bounded atomic batch across up to 32 existing slides, with up to 256 unique nonoverlapping shape-text selectors per slide; RTF measures one bounded ordered paragraph batch. API-only correctness coverage: ODS updates up to 4,096 cells on one selected sheet; native PPT updates up to 256 persisted shape-text targets; XLS updates up to 256 existing comment author/text owners on one worksheet; XLSX replaces or clears a complete core conditional-formatting collection; ODT batches up to 256 embedded object/image changes; ODP batches up to 256 cross-slide text-box models. These remaining APIs are not selectable timing evidence |
 | Clear/remove/hide/detach/GC distinctions | Partial | Measured: ODT exact paragraph removal intentionally preserves orphaned resources. API-only: OLE2 deletes one or a bounded stream set while retaining storages and unrelated streams; RTF removes or moves one ordinary paragraph on its narrow plain-source closure; XLSX shows, hides, very-hides or activates tabs and clears conditional formatting; DOCX detaches selected external hyperlink wrappers; ODT removes selected resource owners while retaining package payloads and unknown frame children. Explicit resource GC remains missing; XLS comment deletion and visibility mutation are deliberately refused |
 | Sanitization and irreversible redaction | Partial | API-only: DOCX has a non-mutating plan/apply/inverse flow for main-document relationship-backed external `w:hyperlink` wrapper detachment. Visible children, relationship records and target URLs are retained, so this is not URL removal, personal-data cleanup, general sanitization or irreversible redaction |
 | Copy object with dependency closure | Missing | No measured format case |
@@ -39,8 +39,8 @@ latency/range effects. The bounded source-backed OPC publisher accepts a
 forward-only sink and records complete positional input plus bounded output,
 but this is not semantic conversion or memory-bounded authoring. RTF and DOCX
 final serialization also accept and test a forward-only non-seek sink. RTF
-semantic body-text output independently accepts a bounded forward-only sink,
-but it has no selectable conversion benchmark.
+semantic body-text output independently has a selectable bounded forward-only
+sink benchmark.
 Borrowed-byte comparisons, filesystem positional cold reads, atomic-save
 timing, broad structural PPTX streaming output, and non-seek semantic
 conversion for other formats remain.
@@ -59,8 +59,9 @@ conversion for other formats remain.
    preserving exact run identity/order and both readback layers;
    preserve exact-source patch/inverse and the rejected DOC move as independent
    guardrails.
-2. Measure the correctness-covered RTF paragraph batch/remove/move and bounded
-   sequential semantic-text APIs. Extend native RTF beyond the raw CP-1252,
+2. Measure the correctness-covered RTF paragraph remove/move APIs and extend
+   native RTF beyond the now-measured paragraph batch and bounded sequential
+   semantic-text cases, raw CP-1252,
    LZFu and watermark read/no-op matrix, retained story-length/sparse-selection
    query handoffs and narrow real-producer shape-text native chain: formatting
    and media semantics, malformed/security cases, more producers and broader
@@ -498,8 +499,10 @@ for bounded ODS cells, OLE2 stream deletion, RTF paragraph batch/lifecycle,
 XLSX conditional formatting and tab state, native PPT shape-text batches, DOCX
 external-hyperlink wrapper detachment, XLS existing-comment author/text edits,
 ODT embedded resources, ODP text-box models and RTF sequential semantic text.
-Only the ODS `ceil(1%)` addition is a new selectable performance case, and no
-before/after latency claim is made for it or the other API-only additions.
+ODS `ceil(1%)`, RTF `ceil(1%)`, and RTF semantic text-to-sink are new selectable
+performance cases. Change 0081 records a matched scalar-loop comparison for
+the RTF batch; no before/after latency claim is made for ODS, text-to-sink, or
+the other API-only additions.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
