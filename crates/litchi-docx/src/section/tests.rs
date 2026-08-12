@@ -150,3 +150,194 @@ fn malformed_and_unbounded_fragments_are_rejected() {
     )
     .is_err());
 }
+
+#[test]
+fn inventory_reports_zero_one_and_multiple_logical_sections() {
+    let empty = Inventory::parse(
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#,
+    )
+    .unwrap();
+    assert_eq!(empty.sections().len(), 1);
+    assert_eq!(empty.sections()[0].ownership(), Ownership::Implicit);
+    assert!(empty.sections()[0].paragraphs().is_empty());
+
+    let one = Inventory::parse(
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body></w:document>"#,
+    )
+    .unwrap();
+    assert_eq!(one.sections().len(), 1);
+    assert_eq!(one.sections()[0].ownership(), Ownership::BodyFinal);
+    assert_eq!(one.sections()[0].paragraphs().len(), 1);
+    assert_eq!(
+        one.property(0, Property::PageSize),
+        Some(PropertyValue::PageSize(Some(PageSize {
+            width: Some(Emu::from_twips(12240)),
+            height: Some(Emu::from_twips(15840)),
+            orientation: Orientation::Portrait,
+        })))
+    );
+
+    let multiple = Inventory::parse(
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:sectPr><w:type w:val="continuous"/></w:sectPr></w:pPr></w:p><w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl><w:p/><w:sectPr/></w:body></w:document>"#,
+    )
+    .unwrap();
+    assert_eq!(multiple.sections().len(), 2);
+    assert_eq!(
+        multiple.sections()[0].ownership(),
+        Ownership::Paragraph(litchi_core::Position::new(0))
+    );
+    assert_eq!(multiple.sections()[0].paragraphs().len(), 1);
+    assert_eq!(multiple.sections()[1].paragraphs().len(), 2);
+    assert_eq!(
+        multiple
+            .section(Selector::paragraph(litchi_core::Position::new(0)))
+            .unwrap()
+            .start(),
+        Some(Start::Continuous)
+    );
+    assert!(multiple.section(9).is_none());
+    assert!(multiple.section(Ownership::Implicit).is_none());
+}
+
+#[test]
+fn inventory_selects_mce_and_keeps_header_footer_references_inert() {
+    let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><w:body><w:p/><mc:AlternateContent><mc:Choice Requires="x"><w:sectPr><w:headerReference w:type="default" r:id="active-unsafe"/></w:sectPr></mc:Choice><mc:Fallback><w:sectPr><w:headerReference w:type="first" r:id="rHeader"/><w:footerReference w:type="even" r:id="rFooter"/><x:opaque/></w:sectPr></mc:Fallback></mc:AlternateContent></w:body></w:document>"#;
+    let inventory = Inventory::parse(xml).unwrap();
+    assert_eq!(inventory.sections().len(), 1);
+    assert_eq!(inventory.sections()[0].ownership(), Ownership::BodyFinal);
+    assert_eq!(
+        inventory.sections()[0].headers()[0].relationship_id,
+        "rHeader"
+    );
+    assert_eq!(
+        inventory.sections()[0].footers()[0].relationship_id,
+        "rFooter"
+    );
+    let clone = inventory.clone();
+    assert!(inventory.shares_allocation_with(&clone));
+}
+
+#[test]
+fn inventory_accepts_strict_and_refuses_bad_topology_and_section_grammar() {
+    let strict = Inventory::parse(
+        br#"<s:document xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:body><s:p><s:pPr><s:sectPr/></s:pPr></s:p><s:sectPr><s:type s:val="oddPage"/></s:sectPr></s:body></s:document>"#,
+    )
+    .unwrap();
+    assert_eq!(strict.sections().len(), 2);
+    assert_eq!(strict.sections()[1].start(), Some(Start::OddPage));
+
+    for malformed in [
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sectPr/><w:p/></w:body></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sectPr/><w:sectPr/></w:body></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:sectPr/></w:p></w:body></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:sectPr/><w:spacing/></w:pPr></w:p></w:body></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sectPr><w:pgMar/><w:pgSz/></w:sectPr></w:body></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sectPr><w:pgSz/><w:pgSz/></w:sectPr></w:body></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sectPr><w:type w:val="hostile"/></w:sectPr></w:body></w:document>"#.as_slice(),
+    ] {
+        assert!(Inventory::parse(malformed).is_err());
+    }
+}
+
+#[test]
+fn inventory_enforces_caller_limits_and_snapshot_selection() {
+    let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/><w:sectPr/></w:body></w:document>"#;
+    let inventory = Inventory::parse(xml).unwrap();
+    let mut limits = Limits {
+        max_sections: 1,
+        max_paragraphs: 1,
+        max_input_bytes: xml.len(),
+        ..Limits::default()
+    };
+    assert!(Inventory::parse_with_limits(xml, &limits).is_ok());
+
+    limits.max_paragraphs = 0;
+    assert!(Inventory::parse_with_limits(xml, &limits).is_err());
+    limits.max_paragraphs = 1;
+    limits.max_input_bytes -= 1;
+    assert!(matches!(
+        Inventory::parse_with_limits(xml, &limits),
+        Err(crate::Error::SectionInventoryLimit { .. })
+    ));
+
+    assert!(inventory.property(8, Property::Margins).is_none());
+    let snapshot = Snapshot::from_xml(xml.to_vec()).unwrap();
+    assert!(snapshot.source_version().is_none());
+    assert!(snapshot.section(Selector::body_final()).is_some());
+    let clone = snapshot.clone();
+    assert!(snapshot.shares_allocation_with(&clone));
+}
+
+#[test]
+fn inventory_rejects_spoofed_attributes_and_malformed_document_structure() {
+    let spoofed = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:foreign"><w:body><w:sectPr><w:headerReference x:type="default" x:id="spoof"/><w:pgSz x:w="12240" w:h="15840"/></w:sectPr></w:body></w:document>"#;
+    assert!(Inventory::parse(spoofed).is_err());
+
+    let foreign_width = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:foreign"><w:body><w:sectPr><w:pgSz x:w="12240" w:h="15840"/></w:sectPr></w:body></w:document>"#;
+    let inventory = Inventory::parse(foreign_width).unwrap();
+    assert_eq!(inventory.sections()[0].page_size().unwrap().width, None);
+
+    for malformed in [
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p></w:body></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>trailing"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></x:document>"#.as_slice(),
+    ] {
+        assert!(Inventory::parse(malformed).is_err());
+    }
+}
+
+#[test]
+fn inventory_preflights_reference_limits_before_semantic_retention() {
+    // The invalid type after the large relationship would win during semantic
+    // decoding. Receiving the limit error proves the original-resolver
+    // preflight rejects the ID before constructing the Section/Reference.
+    let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:sectPr><w:headerReference w:type="default" r:id="relationship-id"/><w:type w:val="invalid"/></w:sectPr></w:body></w:document>"#;
+    let limits = Limits {
+        max_reference_bytes: "relationship-id".len() - 1,
+        ..Limits::default()
+    };
+    assert!(matches!(
+        Inventory::parse_with_limits(xml, &limits),
+        Err(crate::Error::SectionInventoryLimit {
+            resource: "header/footer reference bytes",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn inventory_bounds_inherited_namespace_materialization() {
+    let section = br#"<w:sectPr><w:headerReference w:type="default" rel:id="header"/></w:sectPr>"#;
+    let mut xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>"#.to_vec();
+    xml.extend_from_slice(section);
+    xml.extend_from_slice(b"</w:body></w:document>");
+    let limits = Limits {
+        max_section_bytes: section.len(),
+        ..Limits::default()
+    };
+    assert!(matches!(
+        Inventory::parse_with_limits(&xml, &limits),
+        Err(crate::Error::SectionInventoryLimit {
+            resource: "section bytes",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn inventory_uses_original_namespace_aliases_and_ignores_nested_story_paragraphs() {
+    let xml = br#"<word:document xmlns:word="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><word:body><word:p><word:r><word:drawing><word:txbxContent><word:p><word:pPr><word:sectPr/></word:pPr></word:p></word:txbxContent></word:drawing></word:r></word:p><word:p><word:pPr><word:sectPr><word:headerReference word:type="default" rel:id="aliased-header"/></word:sectPr></word:pPr></word:p><word:sectPr/></word:body></word:document>"#;
+    let inventory = Inventory::parse(xml).unwrap();
+    assert_eq!(inventory.paragraph_count(), 2);
+    assert_eq!(inventory.sections().len(), 2);
+    assert_eq!(
+        inventory.sections()[0].ownership(),
+        Ownership::Paragraph(litchi_core::Position::new(1))
+    );
+    assert_eq!(inventory.sections()[0].paragraphs().len(), 2);
+    assert_eq!(
+        inventory.sections()[0].headers()[0].relationship_id,
+        "aliased-header"
+    );
+    assert!(inventory.sections()[1].paragraphs().is_empty());
+}

@@ -130,6 +130,17 @@ pub enum Error {
         actual: usize,
     },
 
+    /// A bounded main-document section inventory ceiling was exceeded.
+    #[error("DOCX section inventory {resource} limit exceeded: {actual} > {maximum}")]
+    SectionInventoryLimit {
+        /// Bounded resource.
+        resource: &'static str,
+        /// Maximum accepted value.
+        maximum: usize,
+        /// Observed value.
+        actual: usize,
+    },
+
     /// A source-bound external hyperlink patch was applied to a foreign closure.
     #[error("DOCX external hyperlink detachment patch conflicts with the supplied source")]
     ExternalHyperlinkDetachmentConflict,
