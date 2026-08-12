@@ -2002,3 +2002,16 @@ all-features tests and 9/9 doctests; the retained host library passes
 `AmbiguousOwnership` refusal and byte-exact source preservation. The focused
 existing-slide deletion cut is green; broader host ownership and debt 014
 remain.
+
+## 2026-08-12 current-status amendment: private Numbers formula-cache foundation
+
+The current tree's bounded private Numbers cell-cache planner preserves an
+unrelated cycle marker byte-for-byte, refuses when an impacted marked formula
+survives the final same-batch overlay, and succeeds when that overlay removes
+it. Graph work has exact max-minus-one refusal coverage; scratch and allocation
+remain bounded by the planner limits.
+
+There is still no focused public formula-authoring surface. Production host
+formula setters and raw formula vocabulary remain, so the crate graph,
+manifest edges, and ordered debts are unchanged. No formula-native or
+formula-authoring performance gate is claimed.

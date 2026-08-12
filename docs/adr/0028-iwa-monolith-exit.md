@@ -2573,3 +2573,16 @@ passes 1,418/1,418, including permanent atomic refusal coverage for the
 generated child-to-parent-slide backlink. These results close the focused
 existing-slide deletion gate. The broader monolith exit and debt 014 remain
 open, and the 14 established unrelated full-checker findings are unchanged.
+
+## 2026-08-12 amendment: Numbers formula-cache prerequisite, not exit
+
+The bounded internal cache planner preserves unrelated cycle markers
+byte-for-byte, refuses when an impacted marked formula survives the final
+same-batch overlay, and succeeds when that overlay removes it. Exact graph-work
+max-minus-one refusal coverage, together with bounded scratch and allocation,
+reduces prerequisites without moving the production surface.
+
+The formula exit gate is not satisfied: public focused authoring has not
+landed, production host formula setters and raw formula vocabulary remain, and
+no dependency edge or ordered debt closes. This amendment accepts no native
+formula-authoring or formula-authoring performance evidence.

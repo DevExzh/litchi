@@ -1632,6 +1632,7 @@ pub(super) fn plan_final_cache(
 
     let mut edges = Vec::new();
     let mut dependency_hosts = Vec::new();
+    let mut cycle_hosts = Vec::new();
     let mut selected_owner_seen = false;
     for owner_reference in engine_stage.owner_references.iter().copied() {
         let payload = indexed_payload(
@@ -1679,6 +1680,13 @@ pub(super) fn plan_final_cache(
             limits,
             &mut usage,
         )?;
+        append_cycle_hosts(
+            &mut cycle_hosts,
+            owner.internal_formula_owner_id(),
+            &stage.records,
+            limits,
+            &mut usage,
+        )?;
 
         for tile_reference in stage.tile_references.iter().copied() {
             let tile_payload = indexed_payload(
@@ -1710,6 +1718,13 @@ pub(super) fn plan_final_cache(
             )?;
             append_formula_hosts(
                 &mut dependency_hosts,
+                tile.internal_owner_id(),
+                &tile_stage.records,
+                limits,
+                &mut usage,
+            )?;
+            append_cycle_hosts(
+                &mut cycle_hosts,
                 tile.internal_owner_id(),
                 &tile_stage.records,
                 limits,
@@ -1765,14 +1780,28 @@ pub(super) fn plan_final_cache(
             add_usage(&mut usage.dependency_range_candidates, 1)?;
             let formula_position = find_formula(&formula_index, edge.target, &mut usage, limits)?
                 .ok_or(Failure::UnsupportedDependency(Unsupported::Formula))?;
+            if overlay_has(overlay, edge.target, &mut usage, limits)? {
+                continue;
+            }
             if edge.target_is_in_cycle {
                 return Err(Failure::UnsupportedDependency(Unsupported::Formula));
             }
-            if overlay_has(overlay, edge.target, &mut usage, limits)? || dirty[formula_position] {
+            if dirty[formula_position] {
                 continue;
             }
             dirty[formula_position] = true;
             closure.push(edge.target);
+        }
+    }
+    graph_step(&mut usage, sort_work(cycle_hosts.len())?, limits)?;
+    cycle_hosts.sort_unstable();
+    graph_step(&mut usage, cycle_hosts.len(), limits)?;
+    cycle_hosts.dedup();
+    for host in &cycle_hosts {
+        let target = find_formula(&formula_index, *host, &mut usage, limits)?
+            .ok_or(Failure::UnsupportedDependency(Unsupported::Formula))?;
+        if dirty[target] && !overlay_has(overlay, *host, &mut usage, limits)? {
+            return Err(Failure::UnsupportedDependency(Unsupported::Formula));
         }
     }
 
@@ -2357,6 +2386,27 @@ fn append_formula_hosts(
     Ok(())
 }
 
+fn append_cycle_hosts(
+    output: &mut Vec<FormulaKey>,
+    owner: u32,
+    records: &[CapturedRecord],
+    limits: CacheLimits,
+    usage: &mut CacheUsage,
+) -> Result<(), Failure> {
+    for record in records.iter().filter(|record| record.is_in_cycle) {
+        let observed = output.len().checked_add(1).ok_or(Failure::InvalidSource)?;
+        check_limit(observed, limits.graph_nodes)?;
+        graph_step(usage, 1, limits)?;
+        scratch_allocation::<FormulaKey>(usage, 1, limits)?;
+        reserve(output, 1)?;
+        output.push(FormulaKey {
+            owner,
+            coordinate: record.coordinate,
+        });
+    }
+    Ok(())
+}
+
 fn validate_dependency_hosts(
     hosts: &mut Vec<FormulaHost>,
     formulas: &[FormulaIndex],
@@ -2461,9 +2511,6 @@ fn validate_formula_edges(
     limits: CacheLimits,
     usage: &mut CacheUsage,
 ) -> Result<(), Failure> {
-    if dependency_edges.iter().any(|edge| edge.target_is_in_cycle) {
-        return Err(Failure::UnsupportedDependency(Unsupported::Formula));
-    }
     let mut formula_edges = Vec::new();
     for formula in formulas.iter().copied() {
         let evaluator_limits = remaining_limits(limits, usage)?;
@@ -3437,6 +3484,118 @@ mod tests {
             &Baseline(Vec::new()),
             evaluator,
         )
+    }
+
+    #[test]
+    fn cycle_marker_only_refuses_an_impacted_surviving_formula() {
+        #[derive(Default)]
+        struct MarkedAcyclicEvaluator {
+            evaluations: usize,
+        }
+        impl CacheEvaluator for MarkedAcyclicEvaluator {
+            fn analyze(
+                &mut self,
+                _formula: FormulaCell,
+                _limits: CacheLimits,
+            ) -> Result<FormulaAnalysis, Failure> {
+                Ok(FormulaAnalysis {
+                    precedents: vec![FormulaPrecedent {
+                        owner: OWNER,
+                        coordinate: coordinate(0),
+                    }],
+                    usage: FormulaEvaluationUsage::default(),
+                })
+            }
+
+            fn evaluate(
+                &mut self,
+                _formula: FormulaCell,
+                _values: &dyn CacheValues,
+                _limits: CacheLimits,
+            ) -> Result<Evaluation, Failure> {
+                self.evaluations += 1;
+                Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            }
+        }
+
+        let (engine, owner) = encoded_graph(vec![record(1, &[0], true)], false);
+        let formulas = [formula(1, 20)];
+        let unrelated = [FinalCell {
+            table: TABLE,
+            coordinate: coordinate(2),
+            value: FinalValue::number(FiniteF64::new(9.0).expect("finite")),
+        }];
+        let mut evaluator = MarkedAcyclicEvaluator::default();
+        let preserved = plan(
+            &engine,
+            &owner,
+            &formulas,
+            &unrelated,
+            limits(),
+            &mut evaluator,
+        )
+        .expect("unrelated structurally proven cycle remains byte-exact");
+        assert!(preserved.rewrites.is_empty());
+        assert_eq!(evaluator.evaluations, 0);
+        let exact = usize::try_from(preserved.usage.graph_work).expect("test work fits usize");
+        let mut one_short = limits();
+        one_short.graph_work = exact - 1;
+        assert!(matches!(
+            plan(
+                &engine,
+                &owner,
+                &formulas,
+                &unrelated,
+                one_short,
+                &mut evaluator,
+            ),
+            Err(Failure::LimitExceeded { maximum, .. })
+                if maximum == preserved.usage.graph_work - 1
+        ));
+        assert_eq!(evaluator.evaluations, 0);
+
+        let impacted = [FinalCell {
+            table: TABLE,
+            coordinate: coordinate(0),
+            value: FinalValue::number(FiniteF64::new(9.0).expect("finite")),
+        }];
+        assert!(matches!(
+            plan(
+                &engine,
+                &owner,
+                &formulas,
+                &impacted,
+                limits(),
+                &mut evaluator,
+            ),
+            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+        ));
+        assert_eq!(evaluator.evaluations, 0);
+
+        let replaced = [
+            FinalCell {
+                table: TABLE,
+                coordinate: coordinate(0),
+                value: FinalValue::number(FiniteF64::new(9.0).expect("finite")),
+            },
+            FinalCell {
+                table: TABLE,
+                coordinate: coordinate(1),
+                value: FinalValue::clear(),
+            },
+        ];
+        let replacement = plan(
+            &engine,
+            &owner,
+            &formulas,
+            &replaced,
+            limits(),
+            &mut evaluator,
+        )
+        .expect("a final overlay may remove the marked formula");
+        assert_eq!(replacement.removals.len(), 1);
+        assert!(replacement.rewrites.is_empty());
+        assert_eq!(evaluator.evaluations, 0);
     }
 
     #[test]
