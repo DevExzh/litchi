@@ -169,8 +169,8 @@ Confirmed source facts:
   relationship and differential-format count so value/color/DXF filters and
   sorts cannot publish dangling style references. It replaces one direct
   worksheet filter/sort subtree, refuses MCE-selected or protected state, and
-  raw-copies all unrelated Parts. The media-rich control improves p50 97.82%,
-  instructions 73.48%, and materializations 12 -> 3.
+  raw-copies all unrelated Parts. The media-rich control improves p50 97.75%,
+  instructions 73.57%, and materializations 12 -> 3.
 - One first cell access parses the entire selected worksheet. The non-evicting
   `OnceLock` retains it for the snapshot lifetime.
 - The sparse cell store is row-major and supports binary-search point lookup.
