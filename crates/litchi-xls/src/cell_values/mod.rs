@@ -64,6 +64,13 @@ const NUMBER_PAYLOAD_BYTES: usize = 14;
 const NUMBER_VALUE_OFFSET: usize = 6;
 const MAX_STAGED_CHANGES: usize = 4_096;
 
+pub(crate) fn replace_workbook_ranges_and_adjust_bounds(
+    workbook: &mut Vec<u8>,
+    replacements: &[(usize, usize, Vec<u8>)],
+) -> Result<()> {
+    structural::replace_ranges_and_adjust_bounds(workbook, replacements)
+}
+
 /// A checked zero-based BIFF8 cell reference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Reference {
