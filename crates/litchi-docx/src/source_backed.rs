@@ -8,6 +8,8 @@
 //! transactions retain the raw XML and may be published to a sequential sink
 //! while raw-copying every unselected ZIP member.
 
+pub mod paragraph_copy;
+
 use crate::document::{Commit, Edit, Snapshot, TransactionResult};
 use crate::error::{Error, Result};
 use crate::package::validate_document_main_content_type;
