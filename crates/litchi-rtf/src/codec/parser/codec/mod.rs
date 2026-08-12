@@ -1630,6 +1630,10 @@ pub(crate) struct Parser<'a> {
     bookmark_spans: Vec<BookmarkSpan>,
     /// UTF-8 byte length of body text emitted into style blocks.
     body_text_len: usize,
+    /// Accepted visible root-body paragraph breaks.
+    body_paragraph_breaks: usize,
+    /// UTF-8 position immediately after the last accepted paragraph break.
+    body_after_last_paragraph_break: usize,
     /// Structural paragraph and line breaks retained independently from text.
     body_boundaries: Vec<crate::story::Boundary>,
     /// Stable source order for bookmark ranges.
@@ -2144,6 +2148,7 @@ pub(crate) struct ParsedDocument<'a> {
     pub shapes: Vec<super::super::shape::Shape<'a>>,
     /// Exact source order of non-background root drawings in the body story.
     pub drawing_order: Vec<crate::StoryDrawing>,
+    pub body_paragraph_count: usize,
     pub body_boundaries: Vec<crate::story::Boundary>,
     pub body_story_events: Vec<crate::BodyStoryEvent>,
     /// Index in `shapes` owned by the unique document-background destination.

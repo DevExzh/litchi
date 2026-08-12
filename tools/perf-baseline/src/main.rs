@@ -421,7 +421,9 @@ enum Case {
     OpcOpenSessionScaling,
     CfbBulkReadScaling,
     RtfSemanticOpen,
+    RtfSemanticParagraphCount,
     RtfSemanticListParagraphs,
+    RtfSemanticCollectParagraphs,
     RtfSemanticOneParagraph,
     RtfSemanticFullText,
     RtfSemanticStreamSave,
@@ -601,7 +603,9 @@ impl Case {
             Self::OpcOpenSessionScaling => "opc_open_session_scaling",
             Self::CfbBulkReadScaling => "cfb_bulk_read_scaling",
             Self::RtfSemanticOpen => "rtf_semantic_open",
+            Self::RtfSemanticParagraphCount => "rtf_semantic_paragraph_count",
             Self::RtfSemanticListParagraphs => "rtf_semantic_list_paragraphs",
+            Self::RtfSemanticCollectParagraphs => "rtf_semantic_collect_paragraphs",
             Self::RtfSemanticOneParagraph => "rtf_semantic_one_paragraph",
             Self::RtfSemanticFullText => "rtf_semantic_full_text",
             Self::RtfSemanticStreamSave => "rtf_semantic_stream_save",
@@ -780,7 +784,9 @@ impl Case {
         matches!(
             self,
             Self::RtfSemanticOpen
+                | Self::RtfSemanticParagraphCount
                 | Self::RtfSemanticListParagraphs
+                | Self::RtfSemanticCollectParagraphs
                 | Self::RtfSemanticOneParagraph
                 | Self::RtfSemanticFullText
                 | Self::RtfSemanticStreamSave
@@ -2431,7 +2437,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_open_session_scaling" => Some(Case::OpcOpenSessionScaling),
         "cfb_bulk_read_scaling" => Some(Case::CfbBulkReadScaling),
         "rtf_semantic_open" => Some(Case::RtfSemanticOpen),
+        "rtf_semantic_paragraph_count" => Some(Case::RtfSemanticParagraphCount),
         "rtf_semantic_list_paragraphs" => Some(Case::RtfSemanticListParagraphs),
+        "rtf_semantic_collect_paragraphs" => Some(Case::RtfSemanticCollectParagraphs),
         "rtf_semantic_one_paragraph" => Some(Case::RtfSemanticOneParagraph),
         "rtf_semantic_full_text" => Some(Case::RtfSemanticFullText),
         "rtf_semantic_stream_save" => Some(Case::RtfSemanticStreamSave),
@@ -2593,7 +2601,8 @@ fn print_usage() {
                                        xlsx_range_source_first_cell,\n\
                                        xlsx_range_source_narrow_column_range_scan,\n\
                                        opc_open_session_scaling,cfb_bulk_read_scaling,\n\
-                                       rtf_semantic_open,rtf_semantic_list_paragraphs,\n\
+                                       rtf_semantic_open,rtf_semantic_paragraph_count,\n\
+                                       rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,\n\
                                        rtf_semantic_one_paragraph,rtf_semantic_full_text,\n\
                                        rtf_semantic_stream_save,rtf_semantic_noop_edit_save,\n\
                                        rtf_semantic_one_edit_save,\n\
@@ -4542,7 +4551,9 @@ fn run_case_with_config(
             )
         },
         Case::RtfSemanticOpen
+        | Case::RtfSemanticParagraphCount
         | Case::RtfSemanticListParagraphs
+        | Case::RtfSemanticCollectParagraphs
         | Case::RtfSemanticOneParagraph
         | Case::RtfSemanticFullText
         | Case::RtfSemanticStreamSave
@@ -5983,6 +5994,18 @@ fn run_semantic_rtf(
                 std::hint::black_box(document);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
+            Case::RtfSemanticParagraphCount => {
+                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let started = Instant::now();
+                let count = document.paragraph_count();
+                let duration = started.elapsed();
+                if count != paragraph_count {
+                    return Err("semantic RTF paragraph count differs from specification".into());
+                }
+                verify_semantic_rtf(&document, shape, variant, None)?;
+                std::hint::black_box(count);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
             Case::RtfSemanticListParagraphs => {
                 let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
                 let started = Instant::now();
@@ -5993,6 +6016,20 @@ fn run_semantic_rtf(
                 }
                 verify_semantic_rtf(&document, shape, variant, None)?;
                 std::hint::black_box(count);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::RtfSemanticCollectParagraphs => {
+                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let started = Instant::now();
+                let paragraphs = document.body().paragraphs().collect::<Vec<_>>();
+                let duration = started.elapsed();
+                if paragraphs.len() != paragraph_count {
+                    return Err(
+                        "semantic RTF paragraph collection differs from specification".into(),
+                    );
+                }
+                verify_semantic_rtf(&document, shape, variant, None)?;
+                std::hint::black_box(paragraphs);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticOneParagraph => {
@@ -10544,13 +10581,9 @@ mod tests {
         let eager =
             run_xlsx_page_margin_edit_save(Case::XlsxEagerPageMarginEditSave, &corpus, 0, 1)
                 .unwrap();
-        let source_backed = run_xlsx_page_margin_edit_save(
-            Case::XlsxSourceBackedPageMarginEditSave,
-            &corpus,
-            0,
-            1,
-        )
-        .unwrap();
+        let source_backed =
+            run_xlsx_page_margin_edit_save(Case::XlsxSourceBackedPageMarginEditSave, &corpus, 0, 1)
+                .unwrap();
         assert_eq!(eager.case, "xlsx_eager_page_margin_edit_save");
         assert_eq!(
             source_backed.case,
@@ -10673,7 +10706,9 @@ mod tests {
     fn semantic_rtf_tiny_variants_are_deterministic_and_capability_bounded() {
         let cases = [
             Case::RtfSemanticOpen,
+            Case::RtfSemanticParagraphCount,
             Case::RtfSemanticListParagraphs,
+            Case::RtfSemanticCollectParagraphs,
             Case::RtfSemanticOneParagraph,
             Case::RtfSemanticFullText,
             Case::RtfSemanticStreamSave,
@@ -10740,7 +10775,7 @@ mod tests {
                 .flat_map(|variant| cases.iter().map(move |case| (*variant, *case)))
                 .filter(|(variant, case)| variant.supports_case(*case))
                 .count(),
-            25
+            33
         );
     }
 

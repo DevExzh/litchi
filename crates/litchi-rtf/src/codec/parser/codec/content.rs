@@ -70,6 +70,20 @@ impl<'a> Parser<'a> {
                         };
                         self.body_boundaries
                             .push(crate::story::Boundary::new(self.body_text_len, kind));
+                        if kind == crate::text::Break::Paragraph {
+                            self.body_paragraph_breaks =
+                                self.body_paragraph_breaks.checked_add(1).ok_or_else(|| {
+                                    RtfError::MalformedDocument(
+                                        "RTF body paragraph count overflow".to_string(),
+                                    )
+                                })?;
+                            self.body_after_last_paragraph_break =
+                                self.body_text_len.checked_add(1).ok_or_else(|| {
+                                    RtfError::MalformedDocument(
+                                        "RTF body paragraph position overflow".to_string(),
+                                    )
+                                })?;
+                        }
                     }
                     text_buffer.push(b'\n');
                 }

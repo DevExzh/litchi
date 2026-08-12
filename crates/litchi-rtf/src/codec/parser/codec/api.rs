@@ -185,6 +185,8 @@ impl<'a> Parser<'a> {
             open_bookmarks: HashMap::new(),
             bookmark_spans: Vec::new(),
             body_text_len: 0,
+            body_paragraph_breaks: 0,
+            body_after_last_paragraph_break: 0,
             body_boundaries: Vec::new(),
             next_bookmark_order: 0,
             shapes: Vec::new(),
@@ -513,6 +515,14 @@ impl<'a> Parser<'a> {
         self.finalize_editable_regions()?;
         self.finalize_annotations()?;
         crate::story::validate_boundaries(&self.blocks, &self.body_boundaries)?;
+        let body_paragraph_count = self
+            .body_paragraph_breaks
+            .checked_add(usize::from(
+                self.body_text_len > self.body_after_last_paragraph_break,
+            ))
+            .ok_or_else(|| {
+                RtfError::MalformedDocument("RTF body paragraph count overflow".to_string())
+            })?;
         let body_story_events = self.finalize_body_story_events()?;
 
         let revision_save = if self.saw_revision_save_table || self.saw_revision_save_root {
@@ -627,6 +637,7 @@ impl<'a> Parser<'a> {
             bookmarks: self.bookmarks,
             shapes: self.shapes,
             drawing_order: self.drawing_order,
+            body_paragraph_count,
             body_boundaries: self.body_boundaries,
             body_story_events,
             background_shape_index: self.background_shape_index,
