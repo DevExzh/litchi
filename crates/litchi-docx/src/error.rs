@@ -130,6 +130,17 @@ pub enum Error {
         actual: usize,
     },
 
+    /// A bounded irreversible external-hyperlink redaction ceiling was exceeded.
+    #[error("DOCX external hyperlink redaction {resource} limit exceeded: {actual} > {maximum}")]
+    ExternalHyperlinkRedactionLimit {
+        /// Bounded resource.
+        resource: &'static str,
+        /// Maximum accepted value.
+        maximum: usize,
+        /// Observed value.
+        actual: usize,
+    },
+
     /// A bounded main-document section inventory ceiling was exceeded.
     #[error("DOCX section inventory {resource} limit exceeded: {actual} > {maximum}")]
     SectionInventoryLimit {
@@ -144,6 +155,10 @@ pub enum Error {
     /// A source-bound external hyperlink patch was applied to a foreign closure.
     #[error("DOCX external hyperlink detachment patch conflicts with the supplied source")]
     ExternalHyperlinkDetachmentConflict,
+
+    /// A forward-only external-hyperlink redaction was applied to a foreign source.
+    #[error("DOCX external hyperlink redaction conflicts with the supplied exact source")]
+    ExternalHyperlinkRedactionConflict,
 
     /// A source-backed document-variable patch does not match its exact source.
     #[error("DOCX document-variable patch conflicts with the supplied source")]

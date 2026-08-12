@@ -15,6 +15,7 @@ use crate::paragraph::Paragraph;
 use crate::parts::document_part::{
     document_paragraph, document_paragraph_count, document_paragraphs, visible_document_xml,
 };
+use crate::redact;
 use crate::sanitize::{self, RelationshipState};
 use crate::settings::DocumentSettings;
 use crate::variables;
@@ -385,6 +386,61 @@ impl Package {
             .plan())
     }
 
+    /// Capture the exact main-document closure for explicit irreversible
+    /// external-hyperlink redaction.
+    ///
+    /// Unlike reversible wrapper detachment, this inventory is intended for a
+    /// later consuming publication that removes relationship records. It
+    /// refuses external link owners outside the main document, external
+    /// relationship forms outside `w:hyperlink`, protection, signatures, and
+    /// unsupported owner syntax. No target is fetched or executed.
+    pub fn external_hyperlink_redaction_snapshot(&self) -> Result<redact::Snapshot> {
+        self.external_hyperlink_redaction_snapshot_with_limits(sanitize::Limits::default())
+    }
+
+    /// Capture an irreversible redaction inventory with explicit XML limits.
+    pub fn external_hyperlink_redaction_snapshot_with_limits(
+        &self,
+        limits: sanitize::Limits,
+    ) -> Result<redact::Snapshot> {
+        let (_, document) = self
+            .main_document_snapshot("external_hyperlink_redaction_snapshot")
+            .map_err(transaction_error_to_document)?;
+        self.refuse_protected_external_hyperlink_detachment()?;
+        self.refuse_external_hyperlink_redaction_topology()?;
+        let main = self.package.main_document_part()?;
+        let mut relationships = Vec::new();
+        relationships
+            .try_reserve_exact(main.rels().len())
+            .map_err(|source| Error::Allocation {
+                resource: "external-hyperlink redaction relationship closure",
+                source,
+            })?;
+        for relationship in main.rels().iter() {
+            relationships.push(RelationshipState::new(
+                relationship.r_id().to_owned(),
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.is_external(),
+            ));
+        }
+        let source_version = self.package.source_version()?;
+        let source_fingerprint = self.package.source_artifact().fingerprint()?;
+        redact::Snapshot::from_source(
+            document.shared_xml(),
+            relationships,
+            source_version,
+            source_fingerprint,
+            limits,
+        )
+    }
+
+    /// Build a non-mutating forward-only plan for exact target URL values.
+    pub fn plan_external_hyperlink_redaction(&self, target_urls: &[&str]) -> Result<redact::Plan> {
+        self.external_hyperlink_redaction_snapshot()?
+            .plan_target_urls(target_urls)
+    }
+
     /// Publish one exact-source-checked main-document commit to a sequential
     /// stream while preserving every other physical ZIP member.
     ///
@@ -458,6 +514,37 @@ impl Package {
         self.package
             .write_part_overlay_to_stream(writer, &main, target.xml_bytes().to_vec())?;
         Ok(target)
+    }
+
+    /// Irreversibly publish a source-checked external-hyperlink redaction.
+    ///
+    /// Selected wrappers are unwrapped, selected external relationship records
+    /// are removed, visible children are retained, and every other ZIP member
+    /// is raw-copied. This operation consumes the package and exposes no inverse
+    /// API. It is never called by ordinary save or detachment operations.
+    pub fn publish_external_hyperlink_redaction_to_stream<W: Write>(
+        self,
+        writer: W,
+        commit: &redact::Commit,
+    ) -> Result<redact::EffectReport> {
+        let main = self.package.main_document_part()?.partname().clone();
+        let current =
+            self.external_hyperlink_redaction_snapshot_with_limits(commit.patch().limits())?;
+        commit.patch().validate_source(&current)?;
+        let report = commit.effect_report();
+        if report.is_noop() {
+            self.package.source_artifact().write_to_stream(writer)?;
+            return Ok(report);
+        }
+        let (replacement, removed_ids) = redact::publication_parts(commit);
+        self.package
+            .write_part_overlay_with_external_relationship_removals_to_stream(
+                writer,
+                &main,
+                replacement,
+                removed_ids,
+            )?;
+        Ok(report)
     }
 
     fn main_document_snapshot(
@@ -621,6 +708,64 @@ impl Package {
                 operation: "external_hyperlink_wrapper_detachment",
                 reason: "document or write protection is enforced",
             });
+        }
+        Ok(())
+    }
+
+    fn refuse_external_hyperlink_redaction_topology(&self) -> Result<()> {
+        const SIGNATURE_TYPES: &[&str] = &[
+            "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin",
+            "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
+            "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/certificate",
+        ];
+        let main = self.package.main_document_part()?;
+        if self
+            .package
+            .rels()
+            .iter()
+            .any(|relationship| SIGNATURE_TYPES.contains(&relationship.reltype()))
+        {
+            return Err(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy.into());
+        }
+        if self
+            .package
+            .rels()
+            .iter()
+            .any(|relationship| relationship.is_external())
+        {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "external_hyperlink_redaction",
+                reason: "a package-level relationship has an external target outside the redaction closure",
+            });
+        }
+        for part in self.package.iter_parts() {
+            if part.partname().as_str().starts_with("/_xmlsignatures/")
+                || matches!(
+                    part.content_type(),
+                    ct::OPC_DIGITAL_SIGNATURE_ORIGIN
+                        | ct::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE
+                        | ct::OPC_DIGITAL_SIGNATURE_CERTIFICATE
+                )
+                || part
+                    .rels()
+                    .iter()
+                    .any(|relationship| SIGNATURE_TYPES.contains(&relationship.reltype()))
+            {
+                return Err(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy.into());
+            }
+            if part.partname() != main.partname()
+                && part
+                    .rels()
+                    .iter()
+                    .any(|relationship| relationship.is_external())
+            {
+                return Err(Error::UnsafeEdit {
+                    format: "DOCX",
+                    operation: "external_hyperlink_redaction",
+                    reason: "a non-main-document part owns an external hyperlink relationship",
+                });
+            }
         }
         Ok(())
     }
