@@ -180,6 +180,52 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
         );
         assert!(commit.patch().apply(commit.snapshot()).is_err());
     }
+
+    let mut edit = snapshot.edit();
+    edit.append_hyperlink(
+        Position::new(0),
+        "https://example.invalid/content-only",
+        " linked",
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.snapshot().as_bytes()).unwrap();
+    assert!(!identical.contains("content.xml"));
+    for path in [
+        "mimetype",
+        "styles.xml",
+        "meta.xml",
+        "META-INF/manifest.xml",
+        MEDIA_PATH,
+    ] {
+        assert!(identical.contains(path), "{path}");
+    }
+    let reopened = commit.snapshot().document().unwrap();
+    assert_eq!(
+        reopened.paragraphs().unwrap()[0].text().unwrap(),
+        "Before linked"
+    );
+    assert_eq!(
+        reopened.hyperlinks().unwrap(),
+        [(
+            " linked".to_string(),
+            "https://example.invalid/content-only".to_string(),
+        )]
+    );
+    assert_eq!(
+        commit.patch().apply(&snapshot).unwrap().as_bytes(),
+        commit.snapshot().as_bytes()
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        source_bytes
+    );
+    assert!(commit.patch().apply(commit.snapshot()).is_err());
 }
 
 #[test]

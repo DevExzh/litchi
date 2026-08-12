@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-12",
+  "production_base": "eba9ff256a640181d09b53e1ced4993b299563af",
+  "control_binary_sha256": "4ac963b520f2e8e5cf025121e28344ccbb11d42803d3e6c6a2a124d7d592079a",
+  "candidate_binary_sha256": "b87ec233282fb0cddd49602039fd1c23014d941e1c4a9005472bf28c4a47b43a",
+  "environment": {
+    "cpu": "AMD EPYC 9575F VM",
+    "cpu_affinity": 2,
+    "kernel": "Linux 6.8.0-101-generic x86_64",
+    "rustc": "1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "perf_event_paranoid": 1
+  },
+  "corpus": {
+    "generator": "litchi-odt-media-paragraph-publication-v1",
+    "archive_sha256": "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed",
+    "archive_bytes": 16786287,
+    "logical_payload_bytes": 16787016,
+    "paragraphs": 200,
+    "media_members": 8,
+    "media_member_bytes": 2097152,
+    "zip_members": 13,
+    "target": "paragraph:100",
+    "hyperlink_text": " performance link",
+    "hyperlink_href": "https://example.invalid/performance",
+    "output_sha256": "5c55c1e220a434868fd7d57d967b9bc0b84ad31711aebb16da05074bd3608f8d"
+  },
+  "protocol": {
+    "order": [
+      "control_a",
+      "candidate_a",
+      "candidate_b",
+      "control_b"
+    ],
+    "warmups_per_leg": 50,
+    "samples_per_leg": 500,
+    "pooled_samples_per_state": 1000
+  },
+  "legs_ns": {
+    "control_a": {
+      "p50": 221712661,
+      "mean": 221828745.67800006,
+      "p95": 226645943,
+      "p99": 233706924
+    },
+    "candidate_a": {
+      "p50": 3950005,
+      "mean": 3969825.2260000003,
+      "p95": 4217731,
+      "p99": 4682639
+    },
+    "candidate_b": {
+      "p50": 4040423,
+      "mean": 4083623.3479999998,
+      "p95": 4452441,
+      "p99": 4746315
+    },
+    "control_b": {
+      "p50": 221156740,
+      "mean": 221599812.55599996,
+      "p95": 227996306,
+      "p99": 234301584
+    }
+  },
+  "pooled_ns": {
+    "control": {
+      "samples": 1000,
+      "min": 214292184,
+      "p50": 221443456,
+      "mean": 221714279.117,
+      "mean_ci95": [
+        221492677.88066065,
+        221935880.35333937
+      ],
+      "p95": 227046029,
+      "p99": 234301584,
+      "max": 241769332
+    },
+    "candidate": {
+      "samples": 1000,
+      "min": 3576586,
+      "p50": 3988377.5,
+      "mean": 4026724.287,
+      "mean_ci95": [
+        4013180.590356056,
+        4040267.983643944
+      ],
+      "p95": 4376305,
+      "p99": 4833447,
+      "max": 6456646
+    },
+    "delta_percent": {
+      "p50": -98.1989183279365,
+      "mean": -98.18382275465665,
+      "p95": -98.07250317511608,
+      "p99": -97.937083088606
+    },
+    "speedup": {
+      "p50": 55.52219066525172,
+      "mean": 55.05700583634223,
+      "p95": 51.88188011009215,
+      "p99": 48.47506295724398
+    }
+  },
+  "between_leg_drift_percent": {
+    "control_p50": -0.2507394018422815,
+    "control_mean": -0.10320264008182312,
+    "candidate_p50": 2.2890603935944442,
+    "candidate_mean": 2.866577633057732
+  },
+  "isolated_regression_guards_percent": {
+    "large_open": {
+      "p50": 1.924242291765177,
+      "mean": 2.2326293673878617,
+      "p95": 4.898906094135325
+    },
+    "large_list_paragraphs": {
+      "p50": 3.403384560032885,
+      "mean": 3.519649024125693,
+      "p95": 7.583430486193321
+    },
+    "large_one_paragraph": {
+      "p50": 1.1054181627466075,
+      "mean": 2.4225351731990585,
+      "p95": 8.32444608857681
+    },
+    "large_full_text": {
+      "p50": 3.4518425590547297,
+      "mean": 4.1205993073346825,
+      "p95": 5.978905719118832
+    },
+    "large_exact_noop_edit_save": {
+      "p50": -0.4110152075626816,
+      "mean": -2.215272660463985,
+      "p95": 2.2509848058525517
+    },
+    "large_one_edit_save": {
+      "p50": 1.1156039707176824,
+      "mean": 1.152020733832626,
+      "p95": 4.073624829264699
+    },
+    "large_one_percent_edit_save": {
+      "p50": 1.0425883750623033,
+      "mean": 1.0405732825715885,
+      "p95": 1.42509217603084
+    },
+    "media_paragraph_edit_save": {
+      "p50": -2.452079833306331,
+      "mean": -2.925708061744947,
+      "p95": -6.338510502155037
+    },
+    "media_line_break_edit_save": {
+      "p50": -1.9979764683655366,
+      "mean": -1.902577727870447,
+      "p95": -1.441253508553375
+    },
+    "media_append_run_edit_save": {
+      "p50": -4.188182710754528,
+      "mean": -5.585850596307407,
+      "p95": -10.17955530114002
+    }
+  },
+  "heaptrack_one_sample": {
+    "allocation_calls": {
+      "control": 19805,
+      "candidate": 18421
+    },
+    "temporary_allocations": {
+      "control": 3651,
+      "candidate": 3134
+    },
+    "peak_heap_mib": {
+      "control": 107.19,
+      "candidate": 107.16
+    },
+    "peak_rss_mib": {
+      "control": 119.57,
+      "candidate": 117.68
+    },
+    "leaked_kib": {
+      "control": 1.78,
+      "candidate": 1.78
+    }
+  },
+  "gnu_time_two_process_mean_max_rss_kib": {
+    "control": 112634,
+    "candidate": 111536
+  },
+  "perf_stat_three_repeat_mean_two_warmups_ten_samples": {
+    "control": {
+      "task_clock_ms": 3600.22,
+      "cpu_migrations": 0,
+      "page_faults": 230508,
+      "cycles": 17655752613,
+      "instructions": 44640236469.667,
+      "branches": 7605660313.333,
+      "branch_misses": 163979000.667,
+      "cache_references": 1190521002,
+      "cache_misses": 23256560
+    },
+    "candidate": {
+      "task_clock_ms": 925.173,
+      "cpu_migrations": 0,
+      "page_faults": 160164,
+      "cycles": 4536552608.667,
+      "instructions": 9671046036,
+      "branches": 1284667066,
+      "branch_misses": 13991927.333,
+      "cache_references": 306309557.333,
+      "cache_misses": 15171351.333
+    }
+  },
+  "perf_record_ten_samples": {
+    "lost_samples": {
+      "control": 0,
+      "candidate": 0
+    },
+    "sampled_cycles": {
+      "control": 17598926592,
+      "candidate": 4499503021
+    },
+    "deflate_medium_exclusive_percent": {
+      "control": 52.55,
+      "candidate": 15.89
+    },
+    "longest_match_exclusive_percent": {
+      "control": 16.97,
+      "candidate": 5.02
+    },
+    "approximate_absolute_sampled_cycle_delta_percent": {
+      "deflate_medium": -92.269109,
+      "longest_match": -92.436893
+    }
+  }
+}
