@@ -13,7 +13,7 @@ pub struct Patch {
 }
 
 impl Patch {
-    pub(super) const fn new(before: Snapshot, after: Snapshot) -> Self {
+    pub(crate) const fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
     }
 

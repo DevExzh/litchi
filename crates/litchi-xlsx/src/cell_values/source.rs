@@ -140,12 +140,21 @@ impl SourceBackedEditor {
         } else {
             commit.patch().after().clone()
         };
+        self.write_snapshot_overlay_to_stream(writer, &target)?;
+        Ok(target)
+    }
+
+    pub(crate) fn write_snapshot_overlay_to_stream<W: Write>(
+        self,
+        writer: W,
+        target: &Snapshot,
+    ) -> Result<()> {
         self.package.write_part_overlay_to_stream(
             writer,
             target.worksheet_part_name(),
             target.source_xml().to_vec(),
         )?;
-        Ok(target)
+        Ok(())
     }
 }
 
