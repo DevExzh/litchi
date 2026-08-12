@@ -5,7 +5,7 @@ ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
 public-API XLSX snapshot/edit/save flows, and opt-in DOC/XLS/PPT,
 DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows. It creates every corpus in memory; it also exercises
 source-backed XLSX catalog, worksheet reads, and guarded calculation-metadata,
-defined-name, page-break/page-margin/page-setup/print-options/sheet-protection/data-validation
+defined-name, page-break/page-margin/page-setup/print-options/sheet-protection/data-validation/auto-filter
 publication over positional I/O. It does not
 depend on untracked office files, network state, or randomness. ODP builder
 timestamps are replaced with fixed metadata before measurement. The JSON
@@ -35,9 +35,10 @@ two matched XLSX page-setup publication cases,
 two matched XLSX print-options publication cases,
 two matched XLSX sheet-protection publication cases,
 two matched XLSX data-validation publication cases,
+two matched XLSX auto-filter/sort-state publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, nine RTF semantic cases, and 31 ODF semantic cases
-are opt-in, for 149 selectable cases in total:
+are opt-in, for 151 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -292,6 +293,23 @@ Parts; the source-backed path materializes only the workbook catalog and
 selected worksheet. Complete validation readback, calculation metadata,
 topology, worksheet relationships, media, output hash, and sink bounds are
 verified outside timing.
+
+Measure the matched XLSX auto-filter and sort-state publication controls on
+their fixed media-rich archive:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 \
+  --case xlsx_eager_auto_filter_edit_save,xlsx_source_backed_auto_filter_edit_save \
+  --json target/perf/xlsx-auto-filter-edit.json
+```
+
+Both paths replace the same typed value filter and sort state on `Sheet1`.
+The eager control materializes all twelve ordinary Parts; the source-backed
+path materializes the workbook catalog, selected worksheet, and styles Part.
+Complete typed readback, calculation metadata, topology, worksheet
+relationships, media, output hash, and sink bounds are verified outside
+timing.
 
 For just the end-to-end legacy writer packaging runs:
 
@@ -1047,6 +1065,13 @@ The two XLSX data-validation publication cases use an equivalent twelve-Part
 media-rich archive seeded with core and Office 2010 collections. Their
 eager/source-backed materialization counts are twelve and two, respectively,
 and their complete typed readback and output hashes are required to match.
+
+The two XLSX auto-filter publication cases use an equivalent twelve-Part
+media-rich archive seeded with a value filter and sort state. Their
+eager/source-backed materialization counts are twelve and three, respectively,
+because both controls validate the styles relationship needed by authored
+color/DXF filters and sorts; their complete typed readback and output hashes
+are required to match.
 
 ## External profiling
 

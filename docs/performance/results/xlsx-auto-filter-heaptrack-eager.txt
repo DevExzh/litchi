@@ -1,0 +1,10 @@
+reading file "/tmp/litchi-auto-filter-eager-final.heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: tools/perf-baseline/target/release/litchi-perf-baseline --warmup 0 --samples 1 --case xlsx_eager_auto_filter_edit_save --json /tmp/litchi-auto-filter-eager-heap-final.json
+finished reading file, now analyzing data:
+
+total runtime: 1.119000s.
+calls to allocation functions: 16822 (15033/s)
+temporary memory allocations: 2181 (1949/s)
+peak heap memory consumption: 152.84M
+peak RSS (including heaptrack overhead): 168.34M
+total memory leaked: 1.78K

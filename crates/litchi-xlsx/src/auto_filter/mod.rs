@@ -7,6 +7,9 @@
 mod codec;
 mod model;
 mod package;
+mod patch;
+mod snapshot;
+mod source;
 
 #[cfg(test)]
 mod tests;
@@ -17,4 +20,7 @@ pub use model::{
     DynamicType, Grouping, Icon, IconSet, Item, Operator, Payload, Range, State, Top10,
     UnknownAttribute, UnknownElement, Values,
 };
-pub use package::parse_auto_filter;
+pub use package::{parse_auto_filter, replace_auto_filter};
+pub use patch::{Commit, Diagnostics, Patch};
+pub use snapshot::Snapshot;
+pub use source::{SourceBackedEditor, SourceEdit};

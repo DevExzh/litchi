@@ -220,7 +220,7 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **149
+The stage-1 records above are retained unchanged. The current harness has **151
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
@@ -229,7 +229,7 @@ one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
 PPTX semantic publication case, four opt-in matched same-slide/multi-slide
 PPTX batch cases, six opt-in media-rich ODT paragraph,
 line-break, inline-run, hyperlink, insertion, and removal publication cases,
-16 opt-in matched XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation
+18 opt-in matched XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation/auto-filter
 publication cases, 16 opt-in DOCX/PPTX semantic
 cases, nine opt-in RTF semantic case names across four capability-bounded
 variants (33 tiny / 58 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
@@ -349,6 +349,14 @@ incomplete program and CRUD matrix.
   byte-identical output. Allocation calls remain within policy and peak
   heap/RSS are flat; see
   [`0079`](changes/0079-xlsx-source-backed-data-validation-publication.md).
+- The guarded XLSX auto-filter editor binds the workbook, selected worksheet,
+  complete outbound worksheet relationships, and the styles Part plus DXF
+  count when present. It replaces or clears the direct typed filter/sort state,
+  while MCE-selected, protected, stale, foreign, relationship-mutated and
+  changed signed sources refuse. On the media-rich control, p50 falls from
+  218.438 to 4.755 ms (-97.82%), instructions fall 73.48%, and semantic
+  materializations fall 12 -> 3 with byte-identical output; see
+  [`0080`](changes/0080-xlsx-source-backed-auto-filter-publication.md).
 - Consecutive packaged ODT plain-text replacements now share one mutable
   candidate, content publication, reopen and compact audit while retaining
   ordinary scalar durable operations. The large 100-edit/save p50 falls from

@@ -94,6 +94,50 @@ fn authored_filter_payloads_round_trip_through_shared_serializer() {
 }
 
 #[test]
+fn authored_sort_state_round_trips_and_strict_splice_preserves_neighbors() {
+    use crate::sort::SortBy;
+
+    let condition = Condition::new(Range::new("B2:B20").unwrap(), true, SortBy::Value);
+    let state = State::new(
+        Range::new("A2:C20").unwrap(),
+        false,
+        true,
+        Some(SortMethod::None),
+        vec![condition],
+    )
+    .unwrap();
+    let mut definition = Definition::new(Some(Range::new("A1:C20").unwrap()));
+    definition.set_sort_state(Some(state)).unwrap();
+
+    let xml = br#"<s:worksheet xmlns:s="http://purl.oclc.org/ooxml/spreadsheetml/main"><s:sheetData/><!--keep--><s:mergeCells count="0"/></s:worksheet>"#;
+    let changed = super::package::replace_auto_filter(xml, Some(&definition)).unwrap();
+    assert!(
+        changed
+            .windows(b"<!--keep-->".len())
+            .any(|v| v == b"<!--keep-->")
+    );
+    let strict_filter = b"<x:autoFilter xmlns:x=\"http://purl.oclc.org/ooxml/spreadsheetml/main\"";
+    assert!(
+        changed
+            .windows(strict_filter.len())
+            .any(|value| value == strict_filter)
+    );
+    assert_eq!(
+        parse_auto_filter(&changed).unwrap(),
+        Some(definition.clone())
+    );
+    let cleared = super::package::replace_auto_filter(&changed, None).unwrap();
+    assert_eq!(cleared, xml);
+}
+
+#[test]
+fn source_publication_refuses_mce_selected_auto_filter() {
+    let xml = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><sheetData/><mc:AlternateContent><mc:Choice Requires="x14"><autoFilter ref="A1:A2"/></mc:Choice><mc:Fallback/></mc:AlternateContent></worksheet>"#;
+    let definition = Definition::new(Some(Range::new("A1:B2").unwrap()));
+    assert!(super::package::replace_auto_filter(xml, Some(&definition)).is_err());
+}
+
+#[test]
 fn rejects_malformed_and_security_cases() {
     for xml in [
         r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><autoFilter ref="B2:A1"/></worksheet>"#,
@@ -113,4 +157,61 @@ fn rejects_malformed_and_security_cases() {
         "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><autoFilter><sortState ref=\"A1\">{conditions}</sortState></autoFilter></worksheet>"
     );
     assert!(parse_auto_filter(xml.as_bytes()).is_err());
+}
+
+#[test]
+fn worksheet_replacement_preserves_dialect_and_unrelated_bytes() {
+    let strict = br#"<s:worksheet xmlns:s="http://purl.oclc.org/ooxml/spreadsheetml/main"><s:sheetData/><!--keep--><s:pageMargins left="1" right="1" top="1" bottom="1" header="0" footer="0"/></s:worksheet>"#;
+    let mut value = Definition::new(Some(Range::new("A1:C9").unwrap()));
+    let mut column = Column::new(0).unwrap();
+    column.set_payload(Some(Payload::Values(
+        Values::new(
+            false,
+            Calendar::None,
+            vec![Item::Value("violet".to_owned())],
+        )
+        .unwrap(),
+    )));
+    value.columns.push(column);
+    let output = super::package::replace_auto_filter(strict, Some(&value)).unwrap();
+    assert!(
+        output
+            .windows(b"<!--keep-->".len())
+            .any(|v| v == b"<!--keep-->")
+    );
+    let strict_filter = b"<x:autoFilter xmlns:x=\"http://purl.oclc.org/ooxml/spreadsheetml/main\"";
+    assert!(
+        output
+            .windows(strict_filter.len())
+            .any(|value| value == strict_filter)
+    );
+    assert_eq!(parse_auto_filter(&output).unwrap(), Some(value.clone()));
+    assert_eq!(
+        super::package::replace_auto_filter(&output, Some(&value)).unwrap(),
+        output
+    );
+    let cleared = super::package::replace_auto_filter(&output, None).unwrap();
+    assert_eq!(parse_auto_filter(&cleared).unwrap(), None);
+    assert!(
+        cleared
+            .windows(b"<!--keep-->".len())
+            .any(|v| v == b"<!--keep-->")
+    );
+}
+
+#[test]
+fn worksheet_replacement_refuses_mce_and_bounded_hostile_input() {
+    let mce = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x14="urn:test"><sheetData/><mc:AlternateContent><mc:Choice Requires="x14"><autoFilter ref="A1"/></mc:Choice><mc:Fallback/></mc:AlternateContent></worksheet>"#;
+    let value = Definition::new(Some(Range::new("A1").unwrap()));
+    assert!(super::package::replace_auto_filter(mce, Some(&value)).is_err());
+    assert!(
+        super::package::replace_auto_filter(&vec![b'x'; 32 * 1024 * 1024 + 1], Some(&value))
+            .is_err()
+    );
+    let nested = format!(
+        "<worksheet xmlns=\"{}\"><sheetData/>{}</worksheet>",
+        std::str::from_utf8(CORE).unwrap(),
+        "<extLst>".repeat(129)
+    );
+    assert!(super::package::replace_auto_filter(nested.as_bytes(), Some(&value)).is_err());
 }

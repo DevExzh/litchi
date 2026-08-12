@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "scenario": "xlsx auto-filter and sort-state publication",
+  "cpu_affinity": 2,
+  "order": [
+    "before_a",
+    "after_a",
+    "after_b",
+    "before_b"
+  ],
+  "warmup_per_leg": 10,
+  "samples_per_leg": 100,
+  "binary_sha256": "871856f3f7993428a9a7e667a20e9033d71292101bd275bee835232dcdc677a8",
+  "corpus": {
+    "name": "xlsx-auto-filter-media",
+    "generator": "litchi-xlsx-auto-filter-source-edit-media-v1",
+    "package_format": "XLSX/OPC/ZIP",
+    "shape": "media-rich",
+    "payload_kind": "deterministic-incompressible-media",
+    "compression": "deflate",
+    "entry_count": 12,
+    "archive_member_count": 17,
+    "entry_bytes": 2097152,
+    "uncompressed_payload_bytes": 16782720,
+    "archive_bytes": 16786945,
+    "archive_sha256": "57678991c8cabfceda63b278f4e50fee87fd7f540f0c2f0eff8cb048f457d421",
+    "target_entry": "worksheet:Sheet1:autoFilter",
+    "target_payload_bytes": 515,
+    "target_payload_sha256": "c916650b71b30ac1accb6a85431cb352b9fa87bf0a42acfc009533a539bfffd5",
+    "xlsx": null
+  },
+  "output_sha256": "34893a3eaf685f20569a6ea383de022825b0fcb434ff49039eaa27bb262b8561",
+  "output_bytes": 16786968,
+  "materializations": {
+    "eager": 12,
+    "source_backed": 3
+  },
+  "eager": {
+    "samples": 200,
+    "min_ns": 213332798,
+    "p50_ns": 218438110.5,
+    "p95_ns": 224811860,
+    "p99_ns": 234039598,
+    "max_ns": 251351997,
+    "mean_ns": 219123183.555,
+    "standard_deviation_ns": 4016097.197729819,
+    "confidence_interval_95_ns": {
+      "lower": 218563173.10929096,
+      "upper": 219683194.00070906
+    }
+  },
+  "source_backed": {
+    "samples": 200,
+    "min_ns": 4228324,
+    "p50_ns": 4754533.5,
+    "p95_ns": 5077663,
+    "p99_ns": 5141010,
+    "max_ns": 5193312,
+    "mean_ns": 4737950.035,
+    "standard_deviation_ns": 212403.12776114518,
+    "confidence_interval_95_ns": {
+      "lower": 4708332.233340531,
+      "upper": 4767567.83665947
+    }
+  },
+  "delta_percent": {
+    "p50_ns": -97.82339561117931,
+    "mean_ns": -97.83776871158373,
+    "p95_ns": -97.74137227457662,
+    "p99_ns": -97.80335889997555
+  },
+  "same_state_leg_p50_drift_percent": {
+    "eager": 0.10883580073881571,
+    "source_backed": 0.6911728454689792
+  }
+}
