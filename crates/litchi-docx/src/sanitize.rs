@@ -187,6 +187,22 @@ impl RelationshipState {
             external,
         }
     }
+
+    pub(crate) fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub(crate) fn relationship_type(&self) -> &str {
+        &self.relationship_type
+    }
+
+    pub(crate) fn target(&self) -> &str {
+        &self.target
+    }
+
+    pub(crate) const fn is_external(&self) -> bool {
+        self.external
+    }
 }
 
 /// Immutable exact-source snapshot for external relationship-backed wrapper
@@ -242,6 +258,22 @@ impl Snapshot {
     #[must_use]
     pub fn shares_xml_allocation_with(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.xml, &other.xml)
+    }
+
+    pub(crate) fn relationships(&self) -> &[RelationshipState] {
+        &self.relationships
+    }
+
+    pub(crate) fn wrappers(&self) -> &[Wrapper] {
+        &self.wrappers
+    }
+
+    pub(crate) const fn limits(&self) -> Limits {
+        self.limits
+    }
+
+    pub(crate) fn shared_xml(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.xml)
     }
 
     /// Build a non-mutating plan for detaching every selected external
@@ -427,9 +459,10 @@ impl Patch {
 }
 
 #[derive(Debug, Clone)]
-struct Wrapper {
-    open: Range<usize>,
-    close: Option<Range<usize>>,
+pub(crate) struct Wrapper {
+    pub(crate) open: Range<usize>,
+    pub(crate) close: Option<Range<usize>>,
+    pub(crate) relationship_id: String,
 }
 
 #[derive(Debug)]
@@ -519,12 +552,13 @@ fn scan(
                     if let Some(relationship_id) =
                         external_relationship_id(&element, decoder, &resolver, relationships)?
                     {
-                        record_relationship(&mut distinct_relationships, relationship_id)?;
+                        record_relationship(&mut distinct_relationships, &relationship_id)?;
                         push_wrapper(
                             &mut wrappers,
                             Wrapper {
                                 open: start..end,
                                 close: None,
+                                relationship_id,
                             },
                             limits,
                         )?;
@@ -544,12 +578,13 @@ fn scan(
                         ));
                     }
                     if let Some(relationship_id) = open.relationship_id {
-                        record_relationship(&mut distinct_relationships, relationship_id)?;
+                        record_relationship(&mut distinct_relationships, &relationship_id)?;
                         push_wrapper(
                             &mut wrappers,
                             Wrapper {
                                 open: open.open,
                                 close: Some(start..end),
+                                relationship_id,
                             },
                             limits,
                         )?;
@@ -609,14 +644,14 @@ fn scan(
     Ok((wrappers, report))
 }
 
-fn record_relationship(relationships: &mut Vec<String>, relationship_id: String) -> Result<()> {
+fn record_relationship(relationships: &mut Vec<String>, relationship_id: &str) -> Result<()> {
     relationships
         .try_reserve(1)
         .map_err(|source| Error::Allocation {
             resource: "external-hyperlink relationship effects",
             source,
         })?;
-    relationships.push(relationship_id);
+    relationships.push(relationship_id.to_owned());
     Ok(())
 }
 
@@ -801,7 +836,7 @@ fn push_wrapper(wrappers: &mut Vec<Wrapper>, wrapper: Wrapper, limits: Limits) -
     Ok(())
 }
 
-fn rewrite(xml: &[u8], wrappers: &[Wrapper]) -> Result<Vec<u8>> {
+pub(crate) fn rewrite(xml: &[u8], wrappers: &[Wrapper]) -> Result<Vec<u8>> {
     let removed = wrappers.iter().try_fold(0usize, |total, wrapper| {
         let total = total
             .checked_add(wrapper.open.len())

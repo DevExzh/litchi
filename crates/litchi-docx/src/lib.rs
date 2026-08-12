@@ -34,6 +34,7 @@ pub mod numbering;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
+pub mod redact;
 pub mod revision;
 pub mod run_effects;
 pub mod run_symbols;
