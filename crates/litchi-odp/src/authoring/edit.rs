@@ -804,6 +804,47 @@ impl Transaction {
         })
     }
 
+    /// Atomically replace a bounded set of existing source-backed text boxes.
+    ///
+    /// Every page/object selector is resolved against the same immutable
+    /// staged `content.xml`. Duplicate, overlapping, noncanonical, protected,
+    /// or colliding owners are refused before any package bytes change. Caller
+    /// order does not affect output bytes, and an all-no-op batch retains the
+    /// exact source snapshot.
+    ///
+    /// Returns the number of owners whose complete models changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for more than 256 replacements, invalid or ambiguous
+    /// selectors, duplicate selections/destination names, unsafe opaque owner
+    /// shapes, malformed models, exhausted limits, or failed complete readback.
+    pub fn replace_text_box_models(
+        &mut self,
+        replacements: &[crate::content::TextBoxModelReplacement<'_>],
+    ) -> Result<usize> {
+        if replacements.len() > crate::content::MAX_TEXT_BOX_MODEL_REPLACEMENTS {
+            return invalid(format!(
+                "ODP text-box replacement count exceeds {}",
+                crate::content::MAX_TEXT_BOX_MODEL_REPLACEMENTS
+            ));
+        }
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(replacements.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODP text-box batch replacements",
+                source,
+            })?;
+        owned.extend(
+            replacements
+                .iter()
+                .copied()
+                .map(crate::content::OwnedTextBoxModelReplacement::from_borrowed),
+        );
+        self.stage_text_box_models(owned)
+    }
+
     /// Remove a named rich-text box.
     ///
     /// # Errors
@@ -2137,6 +2178,37 @@ impl Transaction {
         draft.bytes = bytes;
         draft.operations.push(operation);
         Ok(())
+    }
+
+    fn stage_text_box_models(
+        &mut self,
+        replacements: Vec<crate::content::OwnedTextBoxModelReplacement>,
+    ) -> Result<usize> {
+        let current = self.content_bytes()?;
+        let package = OwnedPackage::from_shared_bytes(current)?;
+        let (bytes, changed) =
+            crate::content::apply_text_box_model_replacements(&package, &replacements)?;
+        let Some(bytes) = bytes else {
+            return Ok(0);
+        };
+        if bytes.len() > MAX_PACKAGE_BYTES {
+            return invalid("ODP semantic-content transaction exceeds the 128 MiB package limit");
+        }
+        let bytes = Arc::new(bytes);
+        let presentation = Presentation::from_shared_bytes(Arc::clone(&bytes))?;
+        crate::content::verify_text_box_model_replacements(
+            presentation.owned_package(),
+            &replacements,
+        )?;
+        let draft = self
+            .content
+            .as_mut()
+            .ok_or_else(|| invalid_error("ODP semantic-content draft initialization failed"))?;
+        draft.bytes = bytes;
+        draft
+            .operations
+            .push(crate::content::Operation::ReplaceTextBoxModels { replacements });
+        Ok(changed)
     }
 
     fn annotation_bytes(&self) -> Result<Arc<Vec<u8>>> {
