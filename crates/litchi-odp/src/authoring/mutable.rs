@@ -10,7 +10,24 @@ use crate::model::legacy_animation::validate_legacy_animation_root;
 use crate::model::media::{EmbeddedMedia, embed_media, validate_package_media_path};
 use crate::{Presentation, Reference, Shape, Slide};
 use litchi_core::{Result, xml::escape_xml};
+use quick_xml::{Reader, events::Event};
 use std::collections::{BTreeMap, BTreeSet};
+
+const MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES: usize = 64 * 1024;
+const MAX_DEPENDENCY_FREE_COPY_NAME_BYTES: usize = 4 * 1024;
+
+pub(super) struct DependencyFreeBlankSlideCopy {
+    slide: Slide,
+    page: String,
+    page_metadata: crate::model::page_metadata::Collection,
+    source_origin: usize,
+}
+
+impl DependencyFreeBlankSlideCopy {
+    pub(super) fn resource_bytes(&self) -> usize {
+        self.page.len()
+    }
+}
 
 /// A mutable ODP presentation that supports in-place modifications.
 ///
@@ -66,6 +83,11 @@ pub(super) struct MutablePresentation {
     source_slides: Vec<Slide>,
     /// Exact source-page identity for every staged slide; inserted slides have no source origin.
     origins: Vec<Option<usize>>,
+    /// Owned exact page fragments for dependency-free blank-slide copies.
+    ///
+    /// Ordinary source pages continue to borrow their fragment through
+    /// `origins`; a copied page owns only the minimally renamed duplicate.
+    page_overrides: Vec<Option<String>>,
     /// Declaration state exactly as parsed; changing it rewrites every page.
     source_declarations: Option<crate::model::declaration::Collection>,
     /// Lazy result of the current writer's whole-content publication audit.
@@ -137,6 +159,7 @@ impl MutablePresentation {
         } else {
             vec![None; slides.len()]
         };
+        let page_overrides = (0..slides.len()).map(|_| None).collect();
 
         Ok(Self {
             slides,
@@ -151,6 +174,7 @@ impl MutablePresentation {
             content_source: retained_source,
             source_slides,
             origins,
+            page_overrides,
             slide_move_supported: None,
         })
     }
@@ -206,6 +230,153 @@ impl MutablePresentation {
             ));
         }
         Ok(())
+    }
+
+    /// Prepare an append-only exact-fragment copy of a dependency-free blank page.
+    ///
+    /// The admitted XML shape is deliberately tiny: one self-closing
+    /// `draw:page` whose only non-namespace attribute is `draw:name`. This
+    /// excludes every style, master, layout, ID/navigation, hyperlink, event,
+    /// protection, MCE, script, child-content, and opaque dependency surface.
+    pub(super) fn prepare_dependency_free_blank_slide_copy(
+        &mut self,
+        index: usize,
+    ) -> Result<DependencyFreeBlankSlideCopy> {
+        self.check_slide_move_supported()?;
+        let source_origin = self.origins.get(index).copied().flatten().ok_or_else(|| {
+            litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide copy requires an exact retained source page"
+                    .to_string(),
+            )
+        })?;
+        if self
+            .page_overrides
+            .get(index)
+            .and_then(Option::as_ref)
+            .is_some()
+        {
+            return Err(litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide copy cannot use an already copied page"
+                    .to_string(),
+            ));
+        }
+        let source = self.content_source.as_ref().ok_or_else(|| {
+            litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide copy requires retained content.xml fragments"
+                    .to_string(),
+            )
+        })?;
+        let page = source.page(source_origin).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "ODP retained page origin is outside content.xml coverage".to_string(),
+            )
+        })?;
+        if page.len() > MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP dependency-free blank page exceeds {MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES} bytes"
+            )));
+        }
+        let name_value = dependency_free_blank_name_value(page)?;
+        let metadata = self
+            .page_metadata
+            .as_ref()
+            .and_then(|value| value.page(index))
+            .ok_or_else(|| {
+                litchi_core::Error::Unsupported(
+                    "ODP dependency-free blank-slide copy requires parsed draw:name metadata"
+                        .to_string(),
+                )
+            })?;
+        let old_name = metadata.name.as_deref().ok_or_else(|| {
+            litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide copy requires draw:name".to_string(),
+            )
+        })?;
+        if old_name.len() > MAX_DEPENDENCY_FREE_COPY_NAME_BYTES {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP dependency-free blank page name exceeds {MAX_DEPENDENCY_FREE_COPY_NAME_BYTES} bytes"
+            )));
+        }
+        let names = crate::model::page_metadata::effective_page_names(
+            self.page_metadata.as_ref(),
+            self.slides.len(),
+        )?;
+        let new_name = dependency_free_copy_name(old_name, &names)?;
+        let escaped_name = escape_xml(&new_name);
+        let new_page_len = page
+            .len()
+            .checked_sub(name_value.end - name_value.start)
+            .and_then(|value| value.checked_add(escaped_name.len()))
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(
+                    "ODP dependency-free blank page size overflow".to_string(),
+                )
+            })?;
+        if new_page_len > MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP dependency-free copied page exceeds {MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES} bytes"
+            )));
+        }
+        let mut copied_page = String::new();
+        copied_page
+            .try_reserve_exact(new_page_len)
+            .map_err(|source| litchi_core::Error::Allocation {
+                resource: "ODP dependency-free blank page fragment",
+                source,
+            })?;
+        copied_page.push_str(&page[..name_value.start]);
+        copied_page.push_str(&escaped_name);
+        copied_page.push_str(&page[name_value.end..]);
+
+        let page_metadata = crate::model::page_metadata::metadata_after_dependency_free_page_copy(
+            self.page_metadata.as_ref(),
+            self.slides.len(),
+            index,
+            new_name,
+        )?;
+        let mut slide = self.slides.get(index).cloned().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!(
+                "ODP dependency-free blank-slide copy index {index} is out of bounds"
+            ))
+        })?;
+        slide.index = self.slides.len();
+        Ok(DependencyFreeBlankSlideCopy {
+            slide,
+            page: copied_page,
+            page_metadata,
+            source_origin,
+        })
+    }
+
+    /// Atomically append a prevalidated dependency-free blank-page copy.
+    pub(super) fn apply_dependency_free_blank_slide_copy(
+        &mut self,
+        copy: DependencyFreeBlankSlideCopy,
+    ) -> Result<usize> {
+        self.slides
+            .try_reserve_exact(1)
+            .map_err(|source| litchi_core::Error::Allocation {
+                resource: "ODP copied slide projection",
+                source,
+            })?;
+        self.origins
+            .try_reserve_exact(1)
+            .map_err(|source| litchi_core::Error::Allocation {
+                resource: "ODP copied slide origins",
+                source,
+            })?;
+        self.page_overrides.try_reserve_exact(1).map_err(|source| {
+            litchi_core::Error::Allocation {
+                resource: "ODP copied slide fragments",
+                source,
+            }
+        })?;
+        let index = self.slides.len();
+        self.slides.push(copy.slide);
+        self.origins.push(Some(copy.source_origin));
+        self.page_overrides.push(Some(copy.page));
+        self.page_metadata = Some(copy.page_metadata);
+        Ok(index)
     }
 
     /// Add a package-contained audio or video payload.
@@ -313,6 +484,7 @@ impl MutablePresentation {
             };
             self.slides.insert(index, slide);
             self.origins.insert(index, None);
+            self.page_overrides.insert(index, None);
             self.page_metadata = Some(candidate_metadata);
 
             // Update indices of subsequent slides
@@ -382,6 +554,7 @@ impl MutablePresentation {
             )?;
             let slide = self.slides.remove(index);
             self.origins.remove(index);
+            self.page_overrides.remove(index);
             self.page_metadata = candidate_metadata;
 
             // Update indices of subsequent slides
@@ -430,6 +603,8 @@ impl MutablePresentation {
         self.slides.insert(to, slide);
         let origin = self.origins.remove(from);
         self.origins.insert(to, origin);
+        let page_override = self.page_overrides.remove(from);
+        self.page_overrides.insert(to, page_override);
         self.page_metadata = candidate_metadata;
         for (index, slide) in self.slides.iter_mut().enumerate() {
             slide.index = index;
@@ -599,6 +774,13 @@ impl MutablePresentation {
         self.source_slides
             .get(source_index)
             .filter(|candidate| slide_content_eq(candidate, slide))?;
+        if let Some(page) = self
+            .page_overrides
+            .get(slide_index)
+            .and_then(Option::as_deref)
+        {
+            return Some(page);
+        }
         source.page(source_index)
     }
 
@@ -866,6 +1048,149 @@ impl MutablePresentation {
 
         writer.finish_to_bounded_bytes()
     }
+}
+
+fn dependency_free_copy_name(old_name: &str, names: &[String]) -> Result<String> {
+    let used = names.iter().map(String::as_str).collect::<BTreeSet<_>>();
+    for ordinal in 1..=65_536usize {
+        let suffix = if ordinal == 1 {
+            " Copy".to_string()
+        } else {
+            format!(" Copy {ordinal}")
+        };
+        let candidate_len = old_name.len().checked_add(suffix.len()).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "ODP dependency-free copied page name size overflow".to_string(),
+            )
+        })?;
+        if candidate_len > MAX_DEPENDENCY_FREE_COPY_NAME_BYTES {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP dependency-free copied page name exceeds {MAX_DEPENDENCY_FREE_COPY_NAME_BYTES} bytes"
+            )));
+        }
+        let mut candidate = String::new();
+        candidate
+            .try_reserve_exact(candidate_len)
+            .map_err(|source| litchi_core::Error::Allocation {
+                resource: "ODP dependency-free copied page name",
+                source,
+            })?;
+        candidate.push_str(old_name);
+        candidate.push_str(&suffix);
+        if !used.contains(candidate.as_str()) {
+            return Ok(candidate);
+        }
+    }
+    Err(litchi_core::Error::InvalidFormat(
+        "ODP dependency-free copied page name space is exhausted".to_string(),
+    ))
+}
+
+fn dependency_free_blank_name_value(page: &str) -> Result<std::ops::Range<usize>> {
+    let mut reader = Reader::from_str(page);
+    reader.config_mut().check_end_names = true;
+    let event = reader.read_event().map_err(|error| {
+        litchi_core::Error::InvalidFormat(format!(
+            "invalid ODP dependency-free blank page fragment: {error}"
+        ))
+    })?;
+    let Event::Empty(element) = event else {
+        return Err(litchi_core::Error::Unsupported(
+            "ODP dependency-free blank-slide copy requires a self-closing page with no children"
+                .to_string(),
+        ));
+    };
+    if element.name().as_ref() != b"draw:page" {
+        return Err(litchi_core::Error::Unsupported(
+            "ODP dependency-free blank-slide copy requires the canonical draw:page prefix"
+                .to_string(),
+        ));
+    }
+    let mut saw_name = false;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| {
+            litchi_core::Error::InvalidFormat(format!(
+                "invalid ODP dependency-free blank page attribute: {error}"
+            ))
+        })?;
+        let key = attribute.key.as_ref();
+        if key == b"draw:name" {
+            if saw_name {
+                return Err(litchi_core::Error::InvalidFormat(
+                    "duplicate draw:name on ODP dependency-free blank page".to_string(),
+                ));
+            }
+            saw_name = true;
+        } else if key != b"xmlns" && !key.starts_with(b"xmlns:") {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP dependency-free blank-slide copy refuses attribute '{}'",
+                String::from_utf8_lossy(key)
+            )));
+        }
+    }
+    if !saw_name {
+        return Err(litchi_core::Error::Unsupported(
+            "ODP dependency-free blank-slide copy requires draw:name".to_string(),
+        ));
+    }
+    if !matches!(reader.read_event(), Ok(Event::Eof)) {
+        return Err(litchi_core::Error::Unsupported(
+            "ODP dependency-free blank-slide copy refuses content outside the page tag".to_string(),
+        ));
+    }
+    locate_attribute_value(page, "draw:name").ok_or_else(|| {
+        litchi_core::Error::InvalidFormat(
+            "cannot locate draw:name in ODP dependency-free blank page".to_string(),
+        )
+    })
+}
+
+fn locate_attribute_value(tag: &str, wanted: &str) -> Option<std::ops::Range<usize>> {
+    let bytes = tag.as_bytes();
+    let mut index = b"<draw:page".len();
+    while index < bytes.len() {
+        while bytes.get(index).is_some_and(u8::is_ascii_whitespace) {
+            index += 1;
+        }
+        if bytes.get(index..index + 2) == Some(b"/>") {
+            return None;
+        }
+        let name_start = index;
+        while bytes.get(index).is_some_and(|byte| {
+            !byte.is_ascii_whitespace() && *byte != b'=' && *byte != b'/' && *byte != b'>'
+        }) {
+            index += 1;
+        }
+        let name = tag.get(name_start..index)?;
+        while bytes.get(index).is_some_and(u8::is_ascii_whitespace) {
+            index += 1;
+        }
+        if bytes.get(index) != Some(&b'=') {
+            return None;
+        }
+        index += 1;
+        while bytes.get(index).is_some_and(u8::is_ascii_whitespace) {
+            index += 1;
+        }
+        let quote = *bytes.get(index)?;
+        if quote != b'\'' && quote != b'"' {
+            return None;
+        }
+        index += 1;
+        let value_start = index;
+        while bytes.get(index) != Some(&quote) {
+            index += 1;
+            if index >= bytes.len() {
+                return None;
+            }
+        }
+        let value_end = index;
+        index += 1;
+        if name == wanted {
+            return Some(value_start..value_end);
+        }
+    }
+    None
 }
 
 /// Compare two slides ignoring their position in the deck.

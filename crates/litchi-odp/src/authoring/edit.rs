@@ -304,6 +304,7 @@ impl Snapshot {
             resource_bytes: self.resource_bytes,
             source_resource_bytes: self.resource_bytes,
             slide_order_changed: false,
+            dependency_free_slide_copy_changed: false,
         })
     }
 
@@ -364,6 +365,7 @@ pub struct Transaction {
     resource_bytes: usize,
     source_resource_bytes: usize,
     slide_order_changed: bool,
+    dependency_free_slide_copy_changed: bool,
 }
 
 #[derive(Clone)]
@@ -670,6 +672,11 @@ impl Transaction {
     where
         S: Into<Selector<'a>>,
     {
+        if self.dependency_free_slide_copy_changed {
+            return unsupported(
+                "ODP slide move cannot be staged after a dependency-free blank-slide copy",
+            );
+        }
         let Some(from) = select(self.draft.slides(), selector.into())? else {
             return Ok(None);
         };
@@ -693,6 +700,61 @@ impl Transaction {
         self.slide_order_changed = true;
         self.changed = true;
         Ok(Some(()))
+    }
+
+    /// Append an exact-fragment copy of one dependency-free blank source slide.
+    ///
+    /// This is intentionally not a general slide-copy API. It accepts only a
+    /// compact, self-closing `draw:page` whose sole non-namespace attribute is
+    /// `draw:name`. Consequently the source has no slide-local content, style,
+    /// master, layout, identifier/navigation, hyperlink, event, script, MCE,
+    /// protection, or opaque dependency closure to duplicate. The source page
+    /// fragment is preserved byte-for-byte except for a deterministic unique
+    /// name (`" Copy"`, then `" Copy 2"`, and so on).
+    ///
+    /// The operation is append-only. A transaction may contain at most one
+    /// dependency-free blank-slide copy and cannot combine it with other slide
+    /// or page-indexed operations. RDF edits remain position-independent and
+    /// may be composed. A missing selector returns `Ok(None)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an ambiguous selector, a non-retained/non-compact
+    /// page, any dependency-bearing page markup, a read-only source, or an
+    /// exhausted slide, name, fragment, draft, or package bound. Refusal leaves
+    /// the transaction unchanged.
+    pub fn copy_dependency_free_blank_slide<'a, S>(&mut self, selector: S) -> Result<Option<usize>>
+    where
+        S: Into<Selector<'a>>,
+    {
+        if self.dependency_free_slide_copy_changed {
+            return unsupported(
+                "ODP transaction already contains a dependency-free blank-slide copy",
+            );
+        }
+        if self.slide_order_changed {
+            return unsupported(
+                "ODP dependency-free blank-slide copy cannot be staged after a slide move",
+            );
+        }
+        let Some(index) = select(self.draft.slides(), selector.into())? else {
+            return Ok(None);
+        };
+        if self.changed || self.has_page_indexed_operations() {
+            return unsupported(
+                "ODP dependency-free blank-slide copy cannot combine with slide or page-indexed operations",
+            );
+        }
+        if self.draft.slides().len() == MAX_SLIDES {
+            return invalid("ODP transaction exceeds the slide-count limit");
+        }
+        let copy = self.draft.prepare_dependency_free_blank_slide_copy(index)?;
+        let candidate = self.resource_candidate(0, copy.resource_bytes())?;
+        let copied_index = self.draft.apply_dependency_free_blank_slide_copy(copy)?;
+        self.resource_bytes = candidate;
+        self.dependency_free_slide_copy_changed = true;
+        self.changed = true;
+        Ok(Some(copied_index))
     }
 
     /// Append a typed shape to one supported slide.
@@ -2359,8 +2421,17 @@ impl Transaction {
     }
 
     fn check_page_indexed_move_conflict(&self) -> Result<()> {
-        let conflict = self
-            .charts
+        let conflict = self.has_page_indexed_operations();
+        if conflict {
+            return unsupported(
+                "ODP slide move conflicts with already-staged page-indexed operations",
+            );
+        }
+        Ok(())
+    }
+
+    fn has_page_indexed_operations(&self) -> bool {
+        self.charts
             .as_ref()
             .is_some_and(|draft| !draft.operations.is_empty())
             || self
@@ -2374,19 +2445,18 @@ impl Transaction {
             || self
                 .content
                 .as_ref()
-                .is_some_and(|draft| !draft.operations.is_empty());
-        if conflict {
-            return unsupported(
-                "ODP slide move conflicts with already-staged page-indexed operations",
-            );
-        }
-        Ok(())
+                .is_some_and(|draft| !draft.operations.is_empty())
     }
 
     fn check_no_slide_order_change(&self, operation: &str) -> Result<()> {
         if self.slide_order_changed {
             return unsupported(format!(
                 "ODP {operation} operation cannot be staged after a slide move"
+            ));
+        }
+        if self.dependency_free_slide_copy_changed {
+            return unsupported(format!(
+                "ODP {operation} operation cannot be staged after a dependency-free blank-slide copy"
             ));
         }
         Ok(())
