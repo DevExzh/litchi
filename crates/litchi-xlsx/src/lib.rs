@@ -232,6 +232,12 @@ pub use phonetic_properties::{
 pub use print_options::{PrintOptions, parse_print_options};
 // Query-table semantic types remain under the contextual `query_table` owner;
 // package operations are also available at this convenience facade.
+pub use data_validation::{
+    Commit as DataValidationCommit, Diagnostics as DataValidationDiagnostics,
+    Patch as DataValidationPatch, Snapshot as DataValidationSnapshot,
+    SourceBackedEditor as SourceBackedDataValidationEditor,
+    SourceEdit as SourceBackedDataValidationEdit,
+};
 pub use query_table::{
     QUERY_TABLE_CONTENT_TYPE, QUERY_TABLE_RELATIONSHIP_TYPE, STRICT_QUERY_TABLE_RELATIONSHIP_TYPE,
     add_worksheet_query_table, find_worksheet_query_table, is_query_table_relationship_type,

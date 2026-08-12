@@ -220,7 +220,7 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **147
+The stage-1 records above are retained unchanged. The current harness has **149
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
@@ -229,7 +229,7 @@ one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
 PPTX semantic publication case, four opt-in matched same-slide/multi-slide
 PPTX batch cases, six opt-in media-rich ODT paragraph,
 line-break, inline-run, hyperlink, insertion, and removal publication cases,
-14 opt-in matched XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection
+16 opt-in matched XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation
 publication cases, 16 opt-in DOCX/PPTX semantic
 cases, nine opt-in RTF semantic case names across four capability-bounded
 variants (33 tiny / 58 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
@@ -342,6 +342,13 @@ incomplete program and CRUD matrix.
   output. MCE-selected protection, stale/foreign or relationship-mutated
   closures, chartsheets and changed signed sources refuse before output. See
   [`0078`](changes/0078-xlsx-source-backed-sheet-protection-publication.md).
+- The guarded XLSX data-validation editor binds the same complete worksheet
+  closure and replaces typed core plus Office 2010 validation collections. Its
+  media-rich p50 falls from 222.945 to 5.009 ms (-97.75%, 44.51x),
+  instructions fall 73.43%, and materializations fall 12 -> 2 with
+  byte-identical output. Allocation calls remain within policy and peak
+  heap/RSS are flat; see
+  [`0079`](changes/0079-xlsx-source-backed-data-validation-publication.md).
 - Consecutive packaged ODT plain-text replacements now share one mutable
   candidate, content publication, reopen and compact audit while retaining
   ordinary scalar durable operations. The large 100-edit/save p50 falls from

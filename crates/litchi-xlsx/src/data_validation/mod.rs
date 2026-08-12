@@ -6,6 +6,9 @@
 mod codec;
 mod model;
 mod package;
+mod patch;
+mod snapshot;
+mod source;
 
 pub use codec::{
     parse_data_validation_collections, validate_data_validation_collections,
@@ -17,6 +20,10 @@ pub use model::{
     ValidationErrorStyle, ValidationImeMode, ValidationOperator, ValidationType,
 };
 pub use package::replace_data_validation_collections;
+pub(crate) use package::replace_data_validation_collections_with_readback;
+pub use patch::{Commit, Diagnostics, Patch};
+pub use snapshot::Snapshot;
+pub use source::{SourceBackedEditor, SourceEdit};
 
 pub(crate) const CORE_URI: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 pub(crate) const STRICT_URI: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
