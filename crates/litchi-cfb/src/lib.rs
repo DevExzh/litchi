@@ -18,11 +18,16 @@
 pub mod consts;
 mod directory_name;
 mod file;
+mod overlay;
 mod shared;
 mod shared_bulk;
 pub mod writer;
 
 pub use file::{DirectoryEntry, OleError, OleFile, is_ole_file};
+pub use overlay::{
+    ArtifactFingerprint, OutputProgress, OverlayError, OverlayLimits, PublishReport,
+    SameLengthStreamOverlay, ValidatedOverlayPlan,
+};
 pub use shared::{SharedOleFile, SharedOleFileLimits};
 pub use shared_bulk::{SharedOleBulkError, SharedOleBulkRead};
 pub use writer::OleWriter;
@@ -31,3 +36,5 @@ pub use writer::OleWriter;
 mod allocation_validation_tests;
 #[cfg(test)]
 mod directory_validation_tests;
+#[cfg(test)]
+mod overlay_tests;

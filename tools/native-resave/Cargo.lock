@@ -923,6 +923,7 @@ version = "0.0.1"
 dependencies = [
  "fixedbitset",
  "litchi-core",
+ "sha2 0.11.0",
  "smallvec",
  "zerocopy",
  "zerocopy-derive",

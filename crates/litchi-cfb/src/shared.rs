@@ -62,9 +62,9 @@ impl Default for SharedOleFileLimits {
 /// cursor or reader lock. Mini-stream bytes remain lazy and are initialized at
 /// most once, with failures left retryable.
 pub struct SharedOleFile {
-    source: Arc<dyn ReadAt>,
-    expected_version: SourceVersion,
-    index: Arc<ParsedOleIndex>,
+    pub(crate) source: Arc<dyn ReadAt>,
+    pub(crate) expected_version: SourceVersion,
+    pub(crate) index: Arc<ParsedOleIndex>,
     /// Serializes only lazy mini-stream initialization. Regular streams never
     /// acquire this lock or any shared cursor lock.
     ministream: Mutex<Option<Arc<[u8]>>>,
@@ -156,6 +156,13 @@ impl SharedOleFile {
         self.index.file_size
     }
 
+    /// Returns the captured positional source identity after checking that it
+    /// is still current.
+    pub fn source_version(&self) -> Result<SourceVersion, OleError> {
+        self.check_source_version()?;
+        Ok(self.expected_version)
+    }
+
     /// Returns the declared length of a stream without reading its contents.
     ///
     /// # Errors
@@ -173,6 +180,12 @@ impl SharedOleFile {
     #[must_use]
     pub fn exists(&self, path: &[&str]) -> bool {
         self.find_entry(path).is_ok()
+    }
+
+    /// Iterates the already-validated directory index without allocating or
+    /// reading stream payloads.
+    pub fn directory_entries(&self) -> impl Iterator<Item = &DirectoryEntry> {
+        self.index.dir_entries.iter().filter_map(Option::as_ref)
     }
 
     /// Materializes one stream through immutable positional reads.
@@ -204,7 +217,7 @@ impl SharedOleFile {
         result
     }
 
-    fn check_source_version(&self) -> Result<(), OleError> {
+    pub(crate) fn check_source_version(&self) -> Result<(), OleError> {
         let observed = self.source.version()?;
         if observed == self.expected_version {
             Ok(())
@@ -409,7 +422,7 @@ impl SharedOleFile {
         Ok(())
     }
 
-    fn find_entry(&self, path: &[&str]) -> Result<&DirectoryEntry, OleError> {
+    pub(crate) fn find_entry(&self, path: &[&str]) -> Result<&DirectoryEntry, OleError> {
         if path.is_empty() {
             return self.index.root.as_ref().ok_or(OleError::StreamNotFound);
         }

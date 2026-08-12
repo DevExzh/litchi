@@ -1,9 +1,10 @@
 //! Shared mutation guards for protected CFB containers.
 
-use litchi_cfb::{OleError, OleFile};
+use litchi_cfb::{OleError, OleFile, SharedOleFile};
 use std::io::{Read, Seek};
 
 const STORAGE_ENTRY: u8 = 1;
+const ROOT_ENTRY: u8 = 5;
 
 /// Returns whether a CFB path component marks signed, encrypted, or DRM
 /// content that mutation-capable format crates must preserve unchanged.
@@ -69,6 +70,32 @@ pub(crate) fn reject_protected_container<R: Read + Seek>(
                 pending.push(child);
             }
         }
+    }
+    Ok(())
+}
+
+pub(crate) fn reject_protected_shared_container(
+    ole: &SharedOleFile,
+    operation: &'static str,
+) -> Result<(), OleError> {
+    if ole
+        .directory_entries()
+        .any(|entry| entry.entry_type != ROOT_ENTRY && is_protected_component(&entry.name))
+    {
+        let prefix = "signed, encrypted, or DRM containers are not eligible for ";
+        // Both are live string slices, so their combined length necessarily
+        // fits the address space even before the fallible allocation below.
+        let capacity = prefix.len() + operation.len();
+        let mut message = String::new();
+        message
+            .try_reserve_exact(capacity)
+            .map_err(|source| OleError::Allocation {
+                resource: "protected-container refusal",
+                source,
+            })?;
+        message.push_str(prefix);
+        message.push_str(operation);
+        return Err(OleError::InvalidFormat(message));
     }
     Ok(())
 }
