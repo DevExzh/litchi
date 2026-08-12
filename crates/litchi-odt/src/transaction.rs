@@ -955,7 +955,7 @@ impl Edit {
                 } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.append_semantic_hyperlink(*paragraph, href, text)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
                     OperationResult::Unit
                 },
                 Operation::AppendLineBreak { index } => {
