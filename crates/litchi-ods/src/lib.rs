@@ -54,6 +54,7 @@ pub mod annotations;
 pub mod authoring;
 pub mod charts;
 pub mod codec;
+pub mod content_validation;
 pub mod data_pilot;
 pub mod definitions;
 pub mod document;

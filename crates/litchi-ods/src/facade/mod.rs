@@ -455,6 +455,20 @@ impl Spreadsheet {
         crate::source_features::Snapshot::parse(self.package.content_xml())
     }
 
+    /// Inspect the source-backed content-validation catalog and compact cell bindings.
+    ///
+    /// This is a read-only ownership inventory. It does not authorize mutation or
+    /// publication of the catalog.
+    ///
+    /// # Errors
+    /// Returns a typed error for malformed ownership, unsupported MCE selection,
+    /// allocation failure, or a resource-limit excess.
+    pub fn content_validations(
+        &self,
+    ) -> crate::content_validation::Result<crate::content_validation::Snapshot<'_>> {
+        crate::content_validation::Snapshot::parse(self.package.content_xml())
+    }
+
     /// Discover package, inline, missing, and inert linked embedded objects.
     ///
     /// # Errors
