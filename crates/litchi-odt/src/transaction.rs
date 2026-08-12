@@ -41,6 +41,7 @@ const MAX_PACKAGE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_OPERATIONS: usize = 1_024;
 const MAX_WIRE_JSON_BYTES: usize = 192 * 1024 * 1024;
 const MAX_SEMANTIC_TEXT_BYTES: usize = 1024 * 1024;
+const MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS: usize = 4_096;
 const DURABLE_FORMAT: &str = "litchi.odt";
 const RESTORE_OPERATION: &str = "snapshot.restore";
 const NOOP_OPERATION: &str = "transaction.noop";
@@ -200,6 +201,30 @@ impl Edit {
     pub fn remove_paragraph(&mut self, position: Position) -> Result<&mut Self> {
         self.push(Operation::RemoveParagraph {
             index: position.get(),
+        })
+    }
+
+    /// Stages an exact-fragment move of one direct, plain `office:text` paragraph.
+    ///
+    /// Both positions refer to the paragraph order before the move. The
+    /// selected fragment is removed and inserted at `to`; equal positions are
+    /// an exact no-op. Documents with structured body children, rich paragraph
+    /// markup, active content, protection, or unsafe package envelopes are
+    /// refused when the transaction commits.
+    pub fn move_plain_paragraph(&mut self, from: Position, to: Position) -> Result<&mut Self> {
+        if from.get() >= MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS
+            || to.get() >= MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS
+        {
+            return Err(Error::InvalidFormat(format!(
+                "ODT plain paragraph move position exceeds {MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS}"
+            )));
+        }
+        if from == to {
+            return Ok(self);
+        }
+        self.push(Operation::MovePlainParagraph {
+            from: from.get(),
+            to: to.get(),
         })
     }
 
@@ -960,6 +985,14 @@ impl Edit {
                     document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
                     OperationResult::Unit
                 },
+                Operation::MovePlainParagraph { from, to } => {
+                    let snapshot = Snapshot::from_document(&document)?;
+                    let moved = crate::package::paragraph_move::move_plain_paragraph(
+                        &snapshot, *from, *to,
+                    )?;
+                    document = moved.document()?;
+                    OperationResult::Unit
+                },
                 Operation::AppendRun {
                     paragraph,
                     text,
@@ -1413,7 +1446,13 @@ impl Edit {
                     OperationResult::Unit
                 },
             };
-            audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
+            // The paragraph mover publishes several individually audited,
+            // source-provenance XML splices. A reordered producer document can
+            // retain formatting whitespace and therefore need not reduce to
+            // the single maximal splice recognized by this fallback audit.
+            if !matches!(operation, Operation::MovePlainParagraph { .. }) {
+                audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
+            }
             results.push(result);
             operation_index += 1;
         }
@@ -1680,6 +1719,10 @@ enum Operation {
     },
     RemoveParagraph {
         index: usize,
+    },
+    MovePlainParagraph {
+        from: usize,
+        to: usize,
     },
     AppendRun {
         paragraph: usize,
@@ -2939,6 +2982,11 @@ fn semantic_patch_operation(
             format!("/body/paragraphs/{index}"),
             Value::Null,
         ),
+        Operation::MovePlainParagraph { from, to } => (
+            "paragraph.move_plain_fragment",
+            "/body/paragraphs/order".to_string(),
+            serde_json::json!({"from": from, "to": to}),
+        ),
         Operation::AppendRun {
             paragraph,
             text,
@@ -3497,6 +3545,32 @@ fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> 
         "paragraph.remove" if operation.value.is_null() => Ok(Operation::RemoveParagraph {
             index: index("/body/paragraphs/", "")?,
         }),
+        "paragraph.move_plain_fragment" if operation.target == "/body/paragraphs/order" => {
+            let value = operation
+                .value
+                .as_object()
+                .ok_or_else(invalid_durable_patch)?;
+            if value.len() != 2 {
+                return Err(invalid_durable_patch());
+            }
+            let from = value
+                .get("from")
+                .and_then(Value::as_u64)
+                .and_then(|value| usize::try_from(value).ok())
+                .ok_or_else(invalid_durable_patch)?;
+            let to = value
+                .get("to")
+                .and_then(Value::as_u64)
+                .and_then(|value| usize::try_from(value).ok())
+                .ok_or_else(invalid_durable_patch)?;
+            if from == to
+                || from >= MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS
+                || to >= MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS
+            {
+                return Err(invalid_durable_patch());
+            }
+            Ok(Operation::MovePlainParagraph { from, to })
+        },
         "run.append" => {
             let value = operation
                 .value
@@ -4658,6 +4732,12 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
             Operation::InsertParagraph { index, .. } | Operation::RemoveParagraph { index } => {
                 writes.push("/body/paragraphs/order".to_string());
                 writes.push(format!("/body/paragraphs/{index}/content"));
+            },
+            Operation::MovePlainParagraph { from, to } => {
+                writes.push("/body/paragraphs/order".to_string());
+                for index in (*from).min(*to)..=(*from).max(*to) {
+                    writes.push(format!("/body/paragraphs/{index}/content"));
+                }
             },
             Operation::ReplaceParagraph { index, .. } => {
                 writes.push(format!("/body/paragraphs/{index}/content"));
