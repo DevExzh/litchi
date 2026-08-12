@@ -11,8 +11,14 @@ use std::ops::Range;
 /// Maximum number of standalone picture payloads in one atomic batch.
 pub const MAX_PICTURE_PAYLOAD_OPERATIONS: usize = 64;
 
+/// Maximum number of standalone picture groups in one atomic removal batch.
+pub const MAX_PICTURE_REMOVAL_OPERATIONS: usize = 64;
+
 /// Maximum decoded size of one payload accepted by this exact-source seam.
 const MAX_EDITABLE_PICTURE_BYTES: usize = 64 * 1024;
+
+/// Hex transport plus a small, finite metadata/control allowance.
+const MAX_EDITABLE_PICTURE_GROUP_BYTES: usize = MAX_EDITABLE_PICTURE_BYTES * 2 + 4 * 1024;
 
 /// One source-relative replacement in an atomic picture payload batch.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,6 +60,24 @@ pub(super) struct StagedPicturePayload {
     pub(super) after_transport: Vec<u8>,
 }
 
+#[derive(Debug, Clone)]
+pub(super) struct StagedPictureRemoval {
+    pub(super) position: usize,
+    pub(super) group_start: usize,
+    pub(super) group: Vec<u8>,
+}
+
+impl StagedPictureRemoval {
+    pub(super) fn inverse_change(&self) -> super::Change {
+        super::Change::PictureRemoval {
+            position: self.position,
+            group_start: self.group_start,
+            group: self.group.clone(),
+            removing: false,
+        }
+    }
+}
+
 impl StagedPicturePayload {
     pub(super) fn inverse(&self) -> Self {
         Self {
@@ -69,6 +93,8 @@ impl StagedPicturePayload {
 
 #[derive(Debug)]
 struct LocatedPicture {
+    group_span: Range<usize>,
+    group_transport: Vec<u8>,
     payload_span: Range<usize>,
     payload_transport: Vec<u8>,
     image_type: ImageType,
@@ -76,6 +102,81 @@ struct LocatedPicture {
 }
 
 impl Edit {
+    /// Stages removal of one zero-based standalone body picture group.
+    ///
+    /// The selector resolves against the immutable source. The complete group
+    /// is removed byte-for-byte; surrounding source is never reserialized.
+    /// Binary pictures, nested pictures, compatibility wrappers, fields,
+    /// shapes, objects, protected documents, and unknown syntax are refused.
+    ///
+    /// # Errors
+    /// Returns a typed selector, conflict, limit, or unsupported-source error.
+    pub fn remove_picture(&mut self, position: usize) -> Result<&mut Self, Error> {
+        self.remove_pictures(&[position])
+    }
+
+    /// Atomically stages source-relative removal of standalone body pictures.
+    ///
+    /// Positions must be strictly increasing and are interpreted against the
+    /// immutable source, so deleting an earlier picture never renumbers a
+    /// later selector within the same batch.
+    ///
+    /// # Errors
+    /// Returns a typed batch, selector, conflict, limit, or unsupported-source error.
+    pub fn remove_pictures(&mut self, positions: &[usize]) -> Result<&mut Self, Error> {
+        if positions.is_empty() {
+            return Err(Error::EmptyPictureRemovalBatch);
+        }
+        if positions.len() > MAX_PICTURE_REMOVAL_OPERATIONS {
+            return Err(Error::OperationLimit {
+                observed: positions.len(),
+                limit: MAX_PICTURE_REMOVAL_OPERATIONS,
+            });
+        }
+        for pair in positions.windows(2) {
+            let previous = pair.first().copied().ok_or(Error::UnsupportedSource(
+                "picture removal ordering became inconsistent",
+            ))?;
+            let incoming = pair.get(1).copied().ok_or(Error::UnsupportedSource(
+                "picture removal ordering became inconsistent",
+            ))?;
+            if incoming <= previous {
+                return Err(Error::PictureRemovalBatchOutOfOrder { previous, incoming });
+            }
+        }
+        if !self.operations.is_empty() {
+            return Err(Error::Conflict {
+                existing: 0,
+                incoming: self.operations.len(),
+            });
+        }
+        self.ensure_operation_room_for(positions.len())?;
+
+        let located = locate_standalone_pictures(&self.source)?;
+        let mut staged = Vec::new();
+        staged
+            .try_reserve(positions.len())
+            .map_err(|_error| allocation_error("staged picture removals", positions.len()))?;
+        let mut removed_before = 0usize;
+        for &position in positions {
+            let picture = located.get(position).ok_or(Error::PictureOutOfRange {
+                position,
+                count: located.len(),
+            })?;
+            let group_start = picture.group_span.start.checked_sub(removed_before).ok_or(
+                Error::UnsupportedSource("picture removal provenance overlaps"),
+            )?;
+            staged.push(Operation::PictureRemoval(StagedPictureRemoval {
+                position,
+                group_start,
+                group: picture.group_transport.clone(),
+            }));
+            removed_before = removed_before.saturating_add(picture.group_span.len());
+        }
+        self.operations.append(&mut staged);
+        Ok(self)
+    }
+
     /// Stages a same-length payload update for an existing standalone PNG or JPEG picture.
     ///
     /// The exact hexadecimal digit positions, whitespace, group controls, dimensions,
@@ -290,6 +391,73 @@ pub(super) fn commit(edit: Edit, operation_count: usize) -> Result<Commit, Error
     ))
 }
 
+pub(super) fn commit_removals(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    if operation_count > MAX_PICTURE_REMOVAL_OPERATIONS {
+        return Err(Error::OperationLimit {
+            observed: operation_count,
+            limit: MAX_PICTURE_REMOVAL_OPERATIONS,
+        });
+    }
+    super::ensure_changed_publication_allowed(&edit.source)?;
+    let located = locate_standalone_pictures(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let mut removals = Vec::new();
+    removals
+        .try_reserve(operation_count)
+        .map_err(|_error| allocation_error("located picture removals", operation_count))?;
+    for operation in &edit.operations {
+        let Operation::PictureRemoval(operation) = operation else {
+            return Err(Error::BodyDestinationConflict);
+        };
+        let picture = located
+            .get(operation.position)
+            .ok_or(Error::PictureOutOfRange {
+                position: operation.position,
+                count: located.len(),
+            })?;
+        if picture.group_transport != operation.group {
+            return Err(Error::StalePrecondition("picture group differs"));
+        }
+        removals.push(picture.group_span.clone());
+    }
+
+    let removed_bytes = removals.iter().fold(0usize, |total, range| {
+        total.saturating_add(range.end.saturating_sub(range.start))
+    });
+    let candidate_len = source_bytes.len().saturating_sub(removed_bytes);
+    let mut candidate_bytes = Vec::new();
+    candidate_bytes
+        .try_reserve(candidate_len)
+        .map_err(|_error| allocation_error("picture removal candidate", candidate_len))?;
+    let mut cursor = 0usize;
+    for range in &removals {
+        let retained = source_bytes
+            .get(cursor..range.start)
+            .ok_or(Error::UnsupportedSource(
+                "picture group provenance overlaps or leaves the source",
+            ))?;
+        candidate_bytes.extend_from_slice(retained);
+        cursor = range.end;
+    }
+    candidate_bytes.extend_from_slice(source_bytes.get(cursor..).ok_or(
+        Error::UnsupportedSource("picture group provenance leaves the source"),
+    )?);
+
+    let snapshot = Snapshot::from_bytes_with_limits(&candidate_bytes, edit.source.limits())?;
+    verify_removal_candidate(&edit.source, &snapshot, &edit.operations)?;
+    let changes = super::semantic_changes(&edit.operations, &[]);
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        true,
+        operation_count,
+        changes,
+    ))
+}
+
 pub(super) fn durable_operation(
     limits: litchi_core::patch::PatchLimits,
     operation: &StagedPicturePayload,
@@ -320,6 +488,278 @@ pub(super) fn durable_operation(
         preconditions,
         Value::Object(value),
     )
+}
+
+pub(super) fn durable_removal_operation(
+    limits: litchi_core::patch::PatchLimits,
+    position: usize,
+    group_start: usize,
+    group: &[u8],
+    removing: bool,
+    source: &[u8],
+) -> Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    let mut preconditions = std::collections::BTreeMap::new();
+    preconditions.insert(
+        "artifact_sha256".to_string(),
+        Value::String(litchi_core::patch::BlobId::of(source).as_hex()),
+    );
+    if removing {
+        preconditions.insert(
+            "group_sha256".to_string(),
+            Value::String(litchi_core::patch::BlobId::of(group).as_hex()),
+        );
+        litchi_core::patch::PatchOperation::new(
+            limits,
+            "picture.remove",
+            format!("body:picture:{position}"),
+            preconditions,
+            Value::Null,
+        )
+    } else {
+        preconditions.insert(
+            "byte_offset".to_string(),
+            Value::String(group_start.to_string()),
+        );
+        litchi_core::patch::PatchOperation::new(
+            limits,
+            "picture.insert-exact",
+            format!("body:picture:{position}"),
+            preconditions,
+            Value::String(super::hex_encode(group)),
+        )
+    }
+}
+
+pub(super) fn apply_durable_removal_patch(
+    source: &Snapshot,
+    operations: &[litchi_core::patch::PatchOperation],
+    source_hash: &str,
+) -> Result<Snapshot, Error> {
+    if operations.is_empty() || operations.len() > MAX_PICTURE_REMOVAL_OPERATIONS {
+        return Err(Error::OperationLimit {
+            observed: operations.len(),
+            limit: MAX_PICTURE_REMOVAL_OPERATIONS,
+        });
+    }
+    let located = locate_standalone_pictures(source)?;
+    let mut positions = Vec::new();
+    positions
+        .try_reserve(operations.len())
+        .map_err(|_error| allocation_error("durable picture removals", operations.len()))?;
+    for operation in operations {
+        if operation.op != "picture.remove"
+            || operation.preconditions.len() != 2
+            || !operation.value.is_null()
+        {
+            return Err(Error::DurablePatch(
+                "picture removal operation has an invalid shape".to_string(),
+            ));
+        }
+        require_artifact_hash(operation, source_hash)?;
+        let position = parse_picture_target(&operation.target)?;
+        let picture = located.get(position).ok_or(Error::PictureOutOfRange {
+            position,
+            count: located.len(),
+        })?;
+        let expected = operation
+            .preconditions
+            .get("group_sha256")
+            .and_then(Value::as_str)
+            .ok_or_else(|| Error::DurablePatch("missing picture group digest".to_string()))?;
+        if litchi_core::patch::BlobId::of(&picture.group_transport).as_hex() != expected {
+            return Err(Error::StalePrecondition("picture group differs"));
+        }
+        positions.push(position);
+    }
+    positions.sort_unstable();
+    if positions.windows(2).any(|pair| pair.first() == pair.get(1)) {
+        return Err(Error::DurablePatch(
+            "durable picture removal targets are duplicated".to_string(),
+        ));
+    }
+    let mut edit = source.edit();
+    edit.remove_pictures(&positions)?;
+    Ok(edit.commit()?.into_snapshot())
+}
+
+pub(super) fn apply_durable_insertion_patch(
+    source: &Snapshot,
+    operations: &[litchi_core::patch::PatchOperation],
+    source_hash: &str,
+) -> Result<Snapshot, Error> {
+    if operations.is_empty() || operations.len() > MAX_PICTURE_REMOVAL_OPERATIONS {
+        return Err(Error::OperationLimit {
+            observed: operations.len(),
+            limit: MAX_PICTURE_REMOVAL_OPERATIONS,
+        });
+    }
+    // Reuse the same closure proof for every picture already in the artifact.
+    let _ = locate_standalone_pictures(source)?;
+    let source_bytes = source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let mut insertions = Vec::new();
+    insertions
+        .try_reserve(operations.len())
+        .map_err(|_error| allocation_error("durable picture insertions", operations.len()))?;
+    let final_count = source.pictures().len().saturating_add(operations.len());
+    for operation in operations {
+        if operation.op != "picture.insert-exact" || operation.preconditions.len() != 2 {
+            return Err(Error::DurablePatch(
+                "exact picture insertion operation has an invalid shape".to_string(),
+            ));
+        }
+        require_artifact_hash(operation, source_hash)?;
+        let position = parse_picture_target(&operation.target)?;
+        if position >= final_count {
+            return Err(Error::PictureOutOfRange {
+                position,
+                count: final_count,
+            });
+        }
+        let offset = operation
+            .preconditions
+            .get("byte_offset")
+            .and_then(Value::as_str)
+            .and_then(|value| value.parse::<usize>().ok())
+            .ok_or_else(|| Error::DurablePatch("invalid picture insertion offset".to_string()))?;
+        if offset > source_bytes.len() {
+            return Err(Error::DurablePatch(
+                "picture insertion offset is outside the artifact".to_string(),
+            ));
+        }
+        let encoded = operation.value.as_str().ok_or_else(|| {
+            Error::DurablePatch("exact picture group must be hexadecimal".to_string())
+        })?;
+        let group = decode_hex(encoded, MAX_EDITABLE_PICTURE_GROUP_BYTES)?;
+        insertions.push((offset, position, group));
+    }
+    let mut final_positions = insertions
+        .iter()
+        .map(|(_, position, _)| *position)
+        .collect::<Vec<_>>();
+    final_positions.sort_unstable();
+    if final_positions
+        .windows(2)
+        .any(|pair| pair.first() == pair.get(1))
+    {
+        return Err(Error::DurablePatch(
+            "durable picture insertion targets are duplicated".to_string(),
+        ));
+    }
+    insertions.sort_unstable_by_key(|(offset, position, _)| (*offset, *position));
+    let inserted_bytes = insertions.iter().fold(0usize, |total, insertion| {
+        total.saturating_add(insertion.2.len())
+    });
+    let candidate_len = source_bytes.len().saturating_add(inserted_bytes);
+    if candidate_len > source.limits().max_source_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: candidate_len,
+            limit: source.limits().max_source_bytes(),
+        });
+    }
+    let mut candidate = Vec::new();
+    candidate
+        .try_reserve(candidate_len)
+        .map_err(|_error| allocation_error("picture insertion candidate", candidate_len))?;
+    let mut cursor = 0usize;
+    for (offset, _, group) in &insertions {
+        candidate.extend_from_slice(source_bytes.get(cursor..*offset).ok_or_else(|| {
+            Error::DurablePatch("picture insertion offsets are not monotonic".to_string())
+        })?);
+        cursor = *offset;
+        candidate.extend_from_slice(group);
+    }
+    candidate.extend_from_slice(
+        source_bytes.get(cursor..).ok_or_else(|| {
+            Error::DurablePatch("picture insertion cursor is invalid".to_string())
+        })?,
+    );
+    let snapshot = Snapshot::from_bytes_with_limits(&candidate, source.limits())?;
+    verify_insertion_candidate(source, &snapshot, &insertions)?;
+    let mut removal_positions = insertions
+        .iter()
+        .map(|(_, position, _)| *position)
+        .collect::<Vec<_>>();
+    removal_positions.sort_unstable();
+    let mut inverse_proof = snapshot.edit();
+    inverse_proof.remove_pictures(&removal_positions)?;
+    let round_trip = inverse_proof.commit()?.into_snapshot();
+    if round_trip.source_bytes() != source.source_bytes() {
+        return Err(Error::DurablePatch(
+            "exact picture insertion is not the inverse of a supported removal".to_string(),
+        ));
+    }
+    Ok(snapshot)
+}
+
+fn require_artifact_hash(
+    operation: &litchi_core::patch::PatchOperation,
+    source_hash: &str,
+) -> Result<(), Error> {
+    let expected = operation
+        .preconditions
+        .get("artifact_sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| Error::DurablePatch("missing artifact digest".to_string()))?;
+    if expected != source_hash {
+        return Err(Error::PatchConflict);
+    }
+    Ok(())
+}
+
+fn verify_insertion_candidate(
+    source: &Snapshot,
+    candidate: &Snapshot,
+    insertions: &[(usize, usize, Vec<u8>)],
+) -> Result<(), Error> {
+    if source.text() != candidate.text() {
+        return Err(Error::UnsupportedSource(
+            "exact picture restoration changed visible document text",
+        ));
+    }
+    let located = locate_standalone_pictures(candidate)?;
+    let mut source_position = 0usize;
+    for position in 0..candidate.pictures().len() {
+        if let Some((_, _, group)) = insertions
+            .iter()
+            .find(|(_, inserted_position, _)| *inserted_position == position)
+        {
+            let actual = located.get(position).ok_or(Error::UnsupportedSource(
+                "restored picture has no exact group provenance",
+            ))?;
+            if actual.group_transport != *group {
+                return Err(Error::UnsupportedSource(
+                    "restored picture group differs from durable bytes",
+                ));
+            }
+        } else {
+            let before = source
+                .pictures()
+                .get(source_position)
+                .ok_or(Error::UnsupportedSource(
+                    "picture restoration changed picture ordering",
+                ))?;
+            let after = candidate
+                .pictures()
+                .get(position)
+                .ok_or(Error::UnsupportedSource(
+                    "picture restoration lost a retained picture",
+                ))?;
+            if before != after {
+                return Err(Error::UnsupportedSource(
+                    "picture restoration changed an existing picture",
+                ));
+            }
+            source_position = source_position.saturating_add(1);
+        }
+    }
+    if source_position != source.pictures().len() {
+        return Err(Error::UnsupportedSource(
+            "picture restoration did not retain every existing picture",
+        ));
+    }
+    Ok(())
 }
 
 pub(super) fn apply_durable_operation(
@@ -604,8 +1044,28 @@ fn locate_picture_group(
             "picture payload provenance differs from parsed media bytes",
         ));
     }
+    let group_span = spans
+        .get(open_index)
+        .and_then(|open| spans.get(cursor).map(|close| open.start..close.end))
+        .ok_or(Error::UnsupportedSource(
+            "picture group has no exact source provenance",
+        ))?;
+    if group_span.len() > MAX_EDITABLE_PICTURE_GROUP_BYTES {
+        return Err(Error::InputTooLarge {
+            observed: group_span.len(),
+            limit: MAX_EDITABLE_PICTURE_GROUP_BYTES,
+        });
+    }
+    let group_transport = source
+        .get(group_span.clone())
+        .ok_or(Error::UnsupportedSource(
+            "picture group provenance is outside the source",
+        ))?
+        .to_vec();
     Ok((
         LocatedPicture {
+            group_span,
+            group_transport,
             payload_span: start..end,
             payload_transport: transport,
             image_type: semantic.image_type,
@@ -613,6 +1073,40 @@ fn locate_picture_group(
         },
         cursor,
     ))
+}
+
+fn verify_removal_candidate(
+    source: &Snapshot,
+    candidate: &Snapshot,
+    operations: &[Operation],
+) -> Result<(), Error> {
+    if source.text() != candidate.text() {
+        return Err(Error::UnsupportedSource(
+            "picture removal changed visible document text",
+        ));
+    }
+    let mut expected = Vec::new();
+    expected
+        .try_reserve(source.pictures().len().saturating_sub(operations.len()))
+        .map_err(|_error| {
+            allocation_error(
+                "expected retained pictures",
+                source.pictures().len().saturating_sub(operations.len()),
+            )
+        })?;
+    for (position, picture) in source.pictures().iter().enumerate() {
+        if !operations.iter().any(|operation| {
+            matches!(operation, Operation::PictureRemoval(removal) if removal.position == position)
+        }) {
+            expected.push(picture.clone());
+        }
+    }
+    if expected != candidate.pictures() {
+        return Err(Error::UnsupportedSource(
+            "picture removal changed an unselected picture or unrelated semantics",
+        ));
+    }
+    Ok(())
 }
 
 fn validate_supported_image(image_type: ImageType, payload: &[u8]) -> Result<(), Error> {
