@@ -24,6 +24,7 @@ use crate::{Cell, CellValue, Row, Sheet, package::Package};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const NUMBER: &str = "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0";
 const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -36,6 +37,7 @@ const CALCEXT: &str = "urn:org:documentfoundation:names:experimental:calc:xmlns:
 const CONTENT_PATH: &str = "content.xml";
 const MAX_ELEMENTS: usize = 1_048_576;
 const MAX_LOGICAL_ROW_EDITS: usize = 4_096;
+const MAX_SHEET_MOVE_SHEETS: usize = 1_024;
 
 /// One rich-text inline in a spreadsheet cell paragraph.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1891,6 +1893,246 @@ pub(crate) fn remove_sheet(source: &[u8], sheet: &str, max_output: usize) -> Res
         Vec::new(),
         max_output,
     )
+}
+
+/// Reorder one complete worksheet owner while retaining every source fragment byte.
+///
+/// This closure is deliberately narrower than general spreadsheet editing.  It
+/// accepts only ordinary, independent sheets and refuses every known owner of
+/// sheet names or ordinal coordinates before constructing the replacement.
+pub(crate) fn move_sheet(
+    source: &[u8],
+    sheet: &str,
+    final_position: usize,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    if source.len() > max_output {
+        return invalid(format!(
+            "ODS source exceeds the {max_output} byte sheet-move output limit"
+        ));
+    }
+    let package = Package::from_bytes(source.to_vec())?;
+    let xml = package.content_xml().to_string();
+    let spans = scan(&xml)?;
+    let spreadsheet = one(&spans, OFFICE, "spreadsheet")?;
+    let tables = children(&spans, spreadsheet, TABLE, "table");
+    if tables.is_empty() || tables.len() > MAX_SHEET_MOVE_SHEETS {
+        return invalid(format!(
+            "ODS sheet move requires 1..={MAX_SHEET_MOVE_SHEETS} worksheets"
+        ));
+    }
+    if final_position >= tables.len() {
+        return invalid(format!(
+            "ODS sheet move destination {final_position} exceeds sheet count {}",
+            tables.len()
+        ));
+    }
+    let selected = select_sheet(&xml, &spans, sheet)?;
+    let from = tables
+        .iter()
+        .position(|candidate| *candidate == selected)
+        .ok_or_else(|| invalid_error("ODS selected sheet is outside the spreadsheet owner"))?;
+    if from == final_position {
+        return Ok(source.to_vec());
+    }
+
+    audit_sheet_move_package(&package, &xml, &spans, spreadsheet)?;
+
+    // The table slots remain at their exact lexical positions.  Only the
+    // complete table fragments occupying those slots are permuted; whitespace
+    // and all bytes between slots remain in their original positions.
+    let first = spans[tables[0]].start;
+    let last = spans[*tables
+        .last()
+        .ok_or_else(|| invalid_error("ODS sheet inventory unexpectedly became empty"))?]
+    .end;
+    let mut order = Vec::new();
+    order
+        .try_reserve_exact(tables.len())
+        .map_err(|_error| invalid_error("ODS sheet-move order allocation failed"))?;
+    order.extend(0..tables.len());
+    let moved = order.remove(from);
+    order.insert(final_position, moved);
+    let replaced_len = last
+        .checked_sub(first)
+        .ok_or_else(|| invalid_error("ODS sheet-move span is invalid"))?;
+    let mut replacement = Vec::new();
+    replacement
+        .try_reserve_exact(replaced_len)
+        .map_err(|_error| invalid_error("ODS sheet-move replacement allocation failed"))?;
+    for (slot, origin) in order.into_iter().enumerate() {
+        let origin_span = &spans[tables[origin]];
+        replacement.extend_from_slice(
+            xml.as_bytes()
+                .get(origin_span.start..origin_span.end)
+                .ok_or_else(|| invalid_error("ODS sheet source fragment is invalid"))?,
+        );
+        if slot + 1 < tables.len() {
+            let gap_start = spans[tables[slot]].end;
+            let gap_end = spans[tables[slot + 1]].start;
+            replacement.extend_from_slice(
+                xml.as_bytes()
+                    .get(gap_start..gap_end)
+                    .ok_or_else(|| invalid_error("ODS sheet interstitial span is invalid"))?,
+            );
+        }
+    }
+    if replacement.len() != replaced_len {
+        return invalid("ODS sheet move changed the checked content span length");
+    }
+    splice_content(source, first..last, replacement, max_output)
+}
+
+fn audit_sheet_move_package(
+    package: &Package,
+    xml: &str,
+    spans: &[Span],
+    spreadsheet: usize,
+) -> Result<()> {
+    for path in package.package().files()? {
+        if path.eq_ignore_ascii_case("settings.xml")
+            || path.eq_ignore_ascii_case("manifest.rdf")
+            || path.eq_ignore_ascii_case("scripts.xml")
+            || starts_with_ascii_case_insensitive(&path, "scripts/")
+            || starts_with_ascii_case_insensitive(&path, "basic/")
+            || starts_with_ascii_case_insensitive(&path, "configurations2/")
+            || contains_ascii_case_insensitive(&path, "tracked")
+            || starts_with_ascii_case_insensitive(&path, "object")
+            || ends_with_ascii_case_insensitive(&path, "/content.xml")
+        {
+            return invalid(format!(
+                "ODS sheet move refuses dependent package member '{path}'"
+            ));
+        }
+    }
+
+    if spans
+        .iter()
+        .any(|span| !sheet_move_namespace_supported(span.namespace.as_deref()))
+    {
+        return invalid("ODS sheet move refuses MCE or unknown namespace owners");
+    }
+    audit_sheet_move_attributes(xml)?;
+    if spans
+        .iter()
+        .any(|span| span.parent == Some(spreadsheet) && !is_element(span, TABLE, "table"))
+    {
+        return invalid("ODS sheet move refuses non-sheet spreadsheet owners");
+    }
+
+    const BLOCKERS: [&str; 28] = [
+        "markup-compatibility",
+        "alternatecontent",
+        "office:scripts",
+        "script:",
+        "table:formula",
+        ":formula=",
+        "cell-range-address",
+        "base-cell-address",
+        "target-range-address",
+        "print-ranges",
+        "named-expressions",
+        "named-range",
+        "database-ranges",
+        "database-range",
+        "content-validations",
+        "content-validation",
+        "validation-name",
+        "tracked-changes",
+        "change-track",
+        "label-ranges",
+        "label-range",
+        "dde-links",
+        "table:scenario",
+        "table:detective",
+        "table:protected",
+        ":protected=",
+        "protection-key",
+        "table:calculation-settings",
+    ];
+    if let Some(blocker) = BLOCKERS
+        .iter()
+        .find(|blocker| contains_ascii_case_insensitive(xml, blocker))
+    {
+        return invalid(format!(
+            "ODS sheet move refuses sheet-order dependency owner '{blocker}'"
+        ));
+    }
+    Ok(())
+}
+
+fn sheet_move_namespace_supported(namespace: Option<&str>) -> bool {
+    matches!(namespace, Some(OFFICE | TABLE | TEXT | STYLE | NUMBER))
+}
+
+fn audit_sheet_move_attributes(xml: &str) -> Result<()> {
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    loop {
+        let (_namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| invalid_error(format!("invalid ODS sheet-move XML: {error}")))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                for raw in element.attributes().with_checks(true) {
+                    let raw = raw.map_err(|error| {
+                        invalid_error(format!("invalid ODS sheet-move attribute: {error}"))
+                    })?;
+                    if raw.key.as_ref() == b"xmlns" || raw.key.as_ref().starts_with(b"xmlns:") {
+                        continue;
+                    }
+                    match reader.resolver().resolve_attribute(raw.key).0 {
+                        ResolveResult::Unbound => {},
+                        ResolveResult::Bound(Namespace(uri))
+                            if std::str::from_utf8(uri).is_ok_and(|namespace| {
+                                sheet_move_namespace_supported(Some(namespace))
+                                    || namespace == "http://www.w3.org/XML/1998/namespace"
+                            }) => {},
+                        ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+                            return invalid(
+                                "ODS sheet move refuses MCE or unknown attribute namespace owners",
+                            );
+                        },
+                    }
+                }
+            },
+            Event::DocType(_) => {
+                return invalid("ODS sheet move refuses document type declarations");
+            },
+            Event::Eof => break,
+            Event::End(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::Comment(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
+    }
+    Ok(())
+}
+
+fn starts_with_ascii_case_insensitive(value: &str, prefix: &str) -> bool {
+    value
+        .as_bytes()
+        .get(..prefix.len())
+        .is_some_and(|candidate| candidate.eq_ignore_ascii_case(prefix.as_bytes()))
+}
+
+fn ends_with_ascii_case_insensitive(value: &str, suffix: &str) -> bool {
+    value
+        .as_bytes()
+        .get(value.len().saturating_sub(suffix.len())..)
+        .is_some_and(|candidate| candidate.eq_ignore_ascii_case(suffix.as_bytes()))
+}
+
+fn contains_ascii_case_insensitive(value: &str, needle: &str) -> bool {
+    value
+        .as_bytes()
+        .windows(needle.len())
+        .any(|candidate| candidate.eq_ignore_ascii_case(needle.as_bytes()))
 }
 
 pub(crate) fn put_cell_style(

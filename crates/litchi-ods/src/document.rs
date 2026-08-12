@@ -36,6 +36,18 @@ pub use crate::advanced::{
     TextProperties, TextStyleNode,
 };
 
+/// Final position of a worksheet after one checked move.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SheetPosition {
+    /// Move the selected worksheet to the first position.
+    First,
+    /// Move the selected worksheet to the last position.
+    Last,
+    /// Move the selected worksheet to this final zero-based position.
+    Index(usize),
+}
+
 const FORMAT: &str = "litchi.ods.document";
 const MAX_PATH_BYTES: usize = 4_096;
 const DOCUMENT_SIGNATURE_PATH: &str = "META-INF/documentsignatures.xml";
@@ -1039,6 +1051,45 @@ impl Edit {
             self.before.limits.package_bytes,
         )?;
         self.stage_spliced("sheet.remove", sheet, bytes)
+    }
+
+    /// Move one complete, dependency-free worksheet to a checked final position.
+    ///
+    /// The selected worksheet's exact XML fragment travels as one owner. This
+    /// deliberately refuses formulas, named/database/validation/print ranges,
+    /// settings, scripts, tracked changes, embedded objects, protection, MCE,
+    /// foreign namespaces, and other sheet-order/name dependencies rather than
+    /// leaving an ordinal or name binding stale. Unselected package members and
+    /// XML outside the table-owner span remain source exact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or duplicate selector, invalid position,
+    /// unsupported dependency owner, source/output bound, or provenance splice
+    /// failure. Every refusal leaves the edit unchanged.
+    pub fn move_sheet(&mut self, sheet: &str, position: SheetPosition) -> Result<()> {
+        let package = Package::from_bytes(self.candidate.clone())?;
+        let count = crate::Spreadsheet::from_package(package)?.sheets().len();
+        if count == 0 {
+            return invalid("ODS sheet move requires a non-empty workbook");
+        }
+        let final_position = match position {
+            SheetPosition::First => 0,
+            SheetPosition::Last => count - 1,
+            SheetPosition::Index(index) if index < count => index,
+            SheetPosition::Index(index) => {
+                return invalid(format!(
+                    "ODS sheet move destination {index} exceeds sheet count {count}"
+                ));
+            },
+        };
+        let bytes = crate::advanced::move_sheet(
+            &self.candidate,
+            sheet,
+            final_position,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("sheet.move", sheet, bytes)
     }
 
     /// Add one compact automatic table-cell style to `content.xml`.
@@ -2571,6 +2622,7 @@ fn known_operation(operation: &str) -> bool {
             | "column.remove"
             | "sheet.insert"
             | "sheet.remove"
+            | "sheet.move"
             | "style.put"
             | "style-graph.put"
             | "style-graph.replace"
