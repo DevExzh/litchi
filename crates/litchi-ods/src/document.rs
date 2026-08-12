@@ -1092,6 +1092,60 @@ impl Edit {
         self.stage_spliced("sheet.move", sheet, bytes)
     }
 
+    /// Copy one complete, dependency-free worksheet to a checked final position and name.
+    ///
+    /// The source worksheet's exact table fragment is cloned within the same document. Only the
+    /// cloned `table:name` value is authored. Same-document style references, including a style
+    /// that hides a sheet, remain valid; formulas, ranges, validation bindings, drawings, forms,
+    /// scripts/events, protection, tracked changes, external links, IDs, MCE, unknown markup,
+    /// signatures, encryption, and ambiguous names are refused before staging.
+    ///
+    /// `SheetPosition::Index(index)` names the copied sheet's final zero-based insertion slot and
+    /// may equal the source sheet count to append.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or duplicate selector, invalid/colliding destination name,
+    /// invalid position, unsupported dependency owner, finite work/output bound, or provenance
+    /// splice failure. Every refusal leaves the edit unchanged.
+    pub fn copy_sheet(
+        &mut self,
+        source_sheet: &str,
+        destination_name: &str,
+        position: SheetPosition,
+    ) -> Result<()> {
+        let package = Package::from_bytes(self.candidate.clone())?;
+        let count = crate::Spreadsheet::from_package(package)?.sheets().len();
+        if count == 0 {
+            return invalid("ODS sheet copy requires a non-empty workbook");
+        }
+        let final_position = match position {
+            SheetPosition::First => 0,
+            SheetPosition::Last => count,
+            SheetPosition::Index(index) if index <= count => index,
+            SheetPosition::Index(index) => {
+                return invalid(format!(
+                    "ODS sheet copy destination {index} exceeds final sheet count {}",
+                    count + 1
+                ));
+            },
+        };
+        let bytes = crate::advanced::copy_sheet(
+            &self.candidate,
+            source_sheet,
+            destination_name,
+            final_position,
+            self.before.limits.package_bytes,
+        )?;
+        let source_id = DiagnosticFingerprint::of(source_sheet.as_bytes()).as_hex();
+        let destination_id = DiagnosticFingerprint::of(destination_name.as_bytes()).as_hex();
+        self.stage_spliced(
+            "sheet.copy",
+            &format!("sha256:{source_id}->sha256:{destination_id}@{final_position}"),
+            bytes,
+        )
+    }
+
     /// Add one compact automatic table-cell style to `content.xml`.
     ///
     /// # Errors
@@ -2623,6 +2677,7 @@ fn known_operation(operation: &str) -> bool {
             | "sheet.insert"
             | "sheet.remove"
             | "sheet.move"
+            | "sheet.copy"
             | "style.put"
             | "style-graph.put"
             | "style-graph.replace"

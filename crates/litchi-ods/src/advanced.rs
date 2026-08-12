@@ -38,6 +38,9 @@ const CONTENT_PATH: &str = "content.xml";
 const MAX_ELEMENTS: usize = 1_048_576;
 const MAX_LOGICAL_ROW_EDITS: usize = 4_096;
 const MAX_SHEET_MOVE_SHEETS: usize = 1_024;
+const MAX_SHEET_COPY_NAME_BYTES: usize = 1_024;
+const MAX_SHEET_COPY_EVENTS: usize = 4_194_304;
+const MAX_SHEET_COPY_DEPTH: usize = 256;
 
 /// One rich-text inline in a spreadsheet cell paragraph.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1981,6 +1984,547 @@ pub(crate) fn move_sheet(
         return invalid("ODS sheet move changed the checked content span length");
     }
     splice_content(source, first..last, replacement, max_output)
+}
+
+/// Clone one dependency-free worksheet owner and rename only its copied name attribute.
+///
+/// The source table fragment remains byte-exact apart from the required `table:name`
+/// value replacement. All semantic audits run before the replacement allocation or
+/// package publication.
+pub(crate) fn copy_sheet(
+    source: &[u8],
+    source_sheet: &str,
+    destination_name: &str,
+    final_position: usize,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    if source.len() > max_output {
+        return invalid(format!(
+            "ODS source exceeds the {max_output} byte sheet-copy output limit"
+        ));
+    }
+    if destination_name.len() > MAX_SHEET_COPY_NAME_BYTES {
+        return invalid(format!(
+            "ODS copied sheet name exceeds the {MAX_SHEET_COPY_NAME_BYTES} byte limit"
+        ));
+    }
+    let _validated_name = Sheet::new(destination_name)?;
+
+    let package = Package::from_bytes(source.to_vec())?;
+    let xml = package.content_xml().to_string();
+    let spans = scan(&xml)?;
+    let spreadsheet = one(&spans, OFFICE, "spreadsheet")?;
+    let tables = children(&spans, spreadsheet, TABLE, "table");
+    if tables.is_empty() || tables.len() >= MAX_SHEET_MOVE_SHEETS {
+        return invalid(format!(
+            "ODS sheet copy requires 1..{} source worksheets",
+            MAX_SHEET_MOVE_SHEETS - 1
+        ));
+    }
+    if final_position > tables.len() {
+        return invalid(format!(
+            "ODS sheet copy destination {final_position} exceeds final sheet count {}",
+            tables.len() + 1
+        ));
+    }
+
+    let selected = select_sheet(&xml, &spans, source_sheet)?;
+    for table in &tables {
+        if resolved_attribute(&xml, &spans, *table, TABLE, "name")?.as_deref()
+            == Some(destination_name)
+        {
+            return invalid(format!(
+                "ODS copied sheet name '{destination_name}' already exists"
+            ));
+        }
+    }
+
+    let name_range = audit_sheet_copy(&package, &xml, &spans, spreadsheet, selected)?;
+    let selected_span = spans
+        .get(selected)
+        .ok_or_else(|| invalid_error("ODS selected sheet span is missing"))?;
+    let fragment = xml
+        .as_bytes()
+        .get(selected_span.start..selected_span.end)
+        .ok_or_else(|| invalid_error("ODS copied sheet fragment is invalid"))?;
+    let relative_name = name_range
+        .start
+        .checked_sub(selected_span.start)
+        .and_then(|start| {
+            name_range
+                .end
+                .checked_sub(selected_span.start)
+                .map(|end| start..end)
+        })
+        .filter(|range| range.start <= range.end && range.end <= fragment.len())
+        .ok_or_else(|| invalid_error("ODS copied sheet name span is invalid"))?;
+    let escaped_name = escape_sheet_name_attribute(destination_name);
+    let replacement_len = fragment
+        .len()
+        .checked_sub(relative_name.len())
+        .and_then(|length| length.checked_add(escaped_name.len()))
+        .ok_or_else(|| invalid_error("ODS copied sheet fragment length overflows"))?;
+    let final_content_len = xml
+        .len()
+        .checked_add(replacement_len)
+        .ok_or_else(|| invalid_error("ODS copied content length overflows"))?;
+    if final_content_len > max_output {
+        return invalid(format!(
+            "ODS sheet copy exceeds the {max_output} byte content/output limit"
+        ));
+    }
+
+    let mut replacement = Vec::new();
+    replacement
+        .try_reserve_exact(replacement_len)
+        .map_err(|_error| invalid_error("ODS sheet-copy fragment allocation failed"))?;
+    replacement.extend_from_slice(&fragment[..relative_name.start]);
+    replacement.extend_from_slice(escaped_name.as_bytes());
+    replacement.extend_from_slice(&fragment[relative_name.end..]);
+
+    let insertion = if final_position == tables.len() {
+        spans[*tables
+            .last()
+            .ok_or_else(|| invalid_error("ODS sheet inventory unexpectedly became empty"))?]
+        .end
+    } else {
+        spans[tables[final_position]].start
+    };
+    splice_content(source, insertion..insertion, replacement, max_output)
+}
+
+fn escape_sheet_name_attribute(value: &str) -> String {
+    escape_xml(value)
+        .replace('\t', "&#x9;")
+        .replace('\n', "&#xA;")
+        .replace('\r', "&#xD;")
+}
+
+fn audit_sheet_copy(
+    package: &Package,
+    xml: &str,
+    spans: &[Span],
+    spreadsheet: usize,
+    selected: usize,
+) -> Result<Range<usize>> {
+    let reader = package.package().package()?;
+    if reader.manifest().has_encrypted_entries() {
+        return invalid("ODS sheet copy refuses encrypted package members");
+    }
+    for path in reader.files()? {
+        let lower = path.to_ascii_lowercase();
+        if lower == "settings.xml"
+            || lower == "manifest.rdf"
+            || lower == "scripts.xml"
+            || lower.starts_with("scripts/")
+            || lower.starts_with("basic/")
+            || lower.starts_with("configurations2/")
+            || lower.starts_with("pictures/")
+            || lower.starts_with("object")
+            || lower.starts_with("links/")
+            || lower.ends_with("/content.xml")
+            || lower.contains("signature")
+            || lower.contains("tracked")
+        {
+            return invalid(format!(
+                "ODS sheet copy refuses dependent package member '{path}'"
+            ));
+        }
+    }
+
+    if spans
+        .iter()
+        .any(|span| !sheet_move_namespace_supported(span.namespace.as_deref()))
+    {
+        return invalid("ODS sheet copy refuses MCE or unknown namespace owners");
+    }
+    if spans
+        .iter()
+        .any(|span| span.parent == Some(spreadsheet) && !is_element(span, TABLE, "table"))
+    {
+        return invalid("ODS sheet copy refuses non-sheet spreadsheet owners");
+    }
+    let selected_span = spans
+        .get(selected)
+        .ok_or_else(|| invalid_error("ODS selected sheet span is missing"))?;
+    if let Some(span) = spans.iter().find(|span| {
+        span.start >= selected_span.start
+            && span.end <= selected_span.end
+            && !sheet_copy_element_supported(span)
+    }) {
+        return invalid(format!(
+            "ODS sheet copy refuses unsupported selected-sheet element '{}'",
+            span.local
+        ));
+    }
+
+    const FORBIDDEN_TABLE_ELEMENTS: [&str; 25] = [
+        "calculation-settings",
+        "cell-range-source",
+        "change-deletion",
+        "change-track-table-cell",
+        "content-validation",
+        "content-validations",
+        "database-range",
+        "database-ranges",
+        "dde-link",
+        "dde-links",
+        "detective",
+        "label-range",
+        "label-ranges",
+        "named-expression",
+        "named-expressions",
+        "named-range",
+        "scenario",
+        "shapes",
+        "table-source",
+        "tracked-changes",
+        "insertion",
+        "deletion",
+        "movement",
+        "cut-offs",
+        "dependencies",
+    ];
+    const FORBIDDEN_OFFICE_ELEMENTS: [&str; 4] =
+        ["event-listeners", "forms", "scripts", "tracked-changes"];
+    if let Some(span) = spans.iter().find(|span| {
+        (span.namespace.as_deref() == Some(TABLE)
+            && FORBIDDEN_TABLE_ELEMENTS.contains(&span.local.as_str()))
+            || (span.namespace.as_deref() == Some(OFFICE)
+                && FORBIDDEN_OFFICE_ELEMENTS.contains(&span.local.as_str()))
+    }) {
+        return invalid(format!(
+            "ODS sheet copy refuses dependency owner '{}:{}'",
+            if span.namespace.as_deref() == Some(TABLE) {
+                "table"
+            } else {
+                "office"
+            },
+            span.local
+        ));
+    }
+
+    audit_sheet_copy_attributes(xml, spans, selected)
+}
+
+fn sheet_copy_element_supported(span: &Span) -> bool {
+    match span.namespace.as_deref() {
+        Some(TABLE) => matches!(
+            span.local.as_str(),
+            "table"
+                | "table-column"
+                | "table-columns"
+                | "table-header-columns"
+                | "table-column-group"
+                | "table-row"
+                | "table-rows"
+                | "table-header-rows"
+                | "table-row-group"
+                | "table-cell"
+                | "covered-table-cell"
+        ),
+        Some(TEXT) => matches!(
+            span.local.as_str(),
+            "p" | "span" | "s" | "tab" | "line-break" | "soft-page-break"
+        ),
+        Some(OFFICE | STYLE | NUMBER) | None => false,
+        Some(_) => false,
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SheetCopyNamespace {
+    Office,
+    Table,
+    Text,
+    Style,
+    Number,
+    Xml,
+    Other,
+}
+
+fn sheet_copy_namespace(uri: &[u8]) -> SheetCopyNamespace {
+    match uri {
+        value if value == OFFICE.as_bytes() => SheetCopyNamespace::Office,
+        value if value == TABLE.as_bytes() => SheetCopyNamespace::Table,
+        value if value == TEXT.as_bytes() => SheetCopyNamespace::Text,
+        value if value == STYLE.as_bytes() => SheetCopyNamespace::Style,
+        value if value == NUMBER.as_bytes() => SheetCopyNamespace::Number,
+        b"http://www.w3.org/XML/1998/namespace" => SheetCopyNamespace::Xml,
+        _ => SheetCopyNamespace::Other,
+    }
+}
+
+fn sheet_copy_attribute_supported(
+    element_namespace: SheetCopyNamespace,
+    element_local: &[u8],
+    attribute_namespace: SheetCopyNamespace,
+    attribute_local: &[u8],
+) -> bool {
+    match (element_namespace, element_local, attribute_namespace) {
+        (SheetCopyNamespace::Table, b"table", SheetCopyNamespace::Table) => matches!(
+            attribute_local,
+            b"name" | b"style-name" | b"display" | b"print"
+        ),
+        (SheetCopyNamespace::Table, b"table-column", SheetCopyNamespace::Table) => matches!(
+            attribute_local,
+            b"style-name" | b"default-cell-style-name" | b"number-columns-repeated" | b"visibility"
+        ),
+        (SheetCopyNamespace::Table, b"table-row", SheetCopyNamespace::Table) => matches!(
+            attribute_local,
+            b"style-name" | b"default-cell-style-name" | b"number-rows-repeated" | b"visibility"
+        ),
+        (
+            SheetCopyNamespace::Table,
+            b"table-column-group" | b"table-row-group",
+            SheetCopyNamespace::Table,
+        ) => attribute_local == b"display",
+        (
+            SheetCopyNamespace::Table,
+            b"table-cell" | b"covered-table-cell",
+            SheetCopyNamespace::Table,
+        ) => matches!(
+            attribute_local,
+            b"style-name"
+                | b"number-columns-repeated"
+                | b"number-columns-spanned"
+                | b"number-rows-spanned"
+        ),
+        (SheetCopyNamespace::Table, b"table-cell", SheetCopyNamespace::Office) => matches!(
+            attribute_local,
+            b"value-type"
+                | b"value"
+                | b"boolean-value"
+                | b"date-value"
+                | b"time-value"
+                | b"string-value"
+                | b"currency"
+        ),
+        (SheetCopyNamespace::Text, b"p" | b"span", SheetCopyNamespace::Text) => {
+            attribute_local == b"style-name"
+        },
+        (SheetCopyNamespace::Text, b"s", SheetCopyNamespace::Text) => attribute_local == b"c",
+        (SheetCopyNamespace::Text, b"p" | b"span", SheetCopyNamespace::Xml) => {
+            matches!(attribute_local, b"lang" | b"space")
+        },
+        _ => false,
+    }
+}
+
+fn audit_sheet_copy_attributes(xml: &str, spans: &[Span], selected: usize) -> Result<Range<usize>> {
+    let selected_span = spans
+        .get(selected)
+        .ok_or_else(|| invalid_error("ODS selected sheet span is missing"))?;
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut events = 0usize;
+    let mut depth = 0usize;
+    let mut name_key = None::<Vec<u8>>;
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid_error("ODS sheet-copy XML event count overflows"))?;
+        if events > MAX_SHEET_COPY_EVENTS {
+            return invalid(format!(
+                "ODS sheet copy exceeds the {MAX_SHEET_COPY_EVENTS} XML event limit"
+            ));
+        }
+        let (element_namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| invalid_error(format!("invalid ODS sheet-copy XML: {error}")))?;
+        let element_namespace = if matches!(&event, Event::Start(_) | Event::Empty(_)) {
+            Some(match element_namespace {
+                ResolveResult::Bound(Namespace(uri)) => sheet_copy_namespace(uri),
+                ResolveResult::Unbound => {
+                    return invalid("ODS sheet copy refuses unbound element ownership");
+                },
+                ResolveResult::Unknown(_) => {
+                    return invalid("ODS sheet copy refuses unbound element prefixes");
+                },
+            })
+        } else {
+            None
+        };
+        let opens_depth = matches!(&event, Event::Start(_));
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let element_namespace = element_namespace.ok_or_else(|| {
+                    invalid_error("ODS sheet-copy element namespace classification is missing")
+                })?;
+                let tag_end = position(&reader)?;
+                let tag_start = tag_start(xml, tag_end)?;
+                let selected_start = tag_start == selected_span.start;
+                let within_selected =
+                    tag_start >= selected_span.start && tag_end <= selected_span.end;
+                let element_local = element.local_name();
+                for raw in element.attributes().with_checks(true) {
+                    let raw = raw.map_err(|error| {
+                        invalid_error(format!("invalid ODS sheet-copy attribute: {error}"))
+                    })?;
+                    if raw.key.as_ref() == b"xmlns" || raw.key.as_ref().starts_with(b"xmlns:") {
+                        continue;
+                    }
+                    let local = raw.key.local_name();
+                    let resolved = reader.resolver().resolve_attribute(raw.key).0;
+                    match resolved {
+                        ResolveResult::Unbound => {
+                            return invalid("ODS sheet copy refuses unbound attribute ownership");
+                        },
+                        ResolveResult::Bound(Namespace(uri)) => {
+                            let namespace = sheet_copy_namespace(uri);
+                            if namespace == SheetCopyNamespace::Other {
+                                return invalid(
+                                    "ODS sheet copy refuses MCE or unknown attribute namespace owners",
+                                );
+                            }
+                            if namespace == SheetCopyNamespace::Table
+                                && matches!(
+                                    local.as_ref(),
+                                    b"formula"
+                                        | b"cell-range-address"
+                                        | b"base-cell-address"
+                                        | b"target-range-address"
+                                        | b"source-cell-range-address"
+                                        | b"source-range-address"
+                                        | b"print-ranges"
+                                        | b"content-validation-name"
+                                        | b"protected"
+                                        | b"structure-protected"
+                                        | b"protection-key"
+                                        | b"protection-key-digest-algorithm"
+                                        | b"protection-key-digest-algorithm-2"
+                                )
+                            {
+                                return invalid(
+                                    "ODS sheet copy refuses name/range/protection attributes",
+                                );
+                            }
+                            if namespace == SheetCopyNamespace::Xml && local.as_ref() == b"id" {
+                                return invalid("ODS sheet copy refuses duplicated xml:id owners");
+                            }
+                            if within_selected
+                                && !sheet_copy_attribute_supported(
+                                    element_namespace,
+                                    element_local.as_ref(),
+                                    namespace,
+                                    local.as_ref(),
+                                )
+                            {
+                                return invalid(
+                                    "ODS sheet copy refuses unsupported selected-sheet attributes",
+                                );
+                            }
+                            if selected_start
+                                && namespace == SheetCopyNamespace::Table
+                                && local.as_ref() == b"name"
+                            {
+                                if name_key.replace(raw.key.as_ref().to_vec()).is_some() {
+                                    return invalid(
+                                        "ODS copied sheet has duplicate name attributes",
+                                    );
+                                }
+                            }
+                        },
+                        ResolveResult::Unknown(_) => {
+                            return invalid(
+                                "ODS sheet copy refuses MCE or unknown attribute namespace owners",
+                            );
+                        },
+                    }
+                }
+                if opens_depth {
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid_error("ODS sheet-copy XML depth overflows"))?;
+                    if depth > MAX_SHEET_COPY_DEPTH {
+                        return invalid(format!(
+                            "ODS sheet copy exceeds the {MAX_SHEET_COPY_DEPTH} XML depth limit"
+                        ));
+                    }
+                }
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid_error("ODS sheet-copy XML depth underflows"))?;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return invalid(
+                    "ODS sheet copy refuses document types and processing instructions",
+                );
+            },
+            Event::Eof => break,
+            Event::Decl(_)
+            | Event::Comment(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
+    }
+    if depth != 0 {
+        return invalid("ODS sheet-copy XML has an unclosed element");
+    }
+    let key =
+        name_key.ok_or_else(|| invalid_error("ODS copied sheet name attribute is missing"))?;
+    lexical_attribute_value_range(xml, selected_span.start..selected_span.tag_end, &key)
+}
+
+fn lexical_attribute_value_range(xml: &str, tag: Range<usize>, key: &[u8]) -> Result<Range<usize>> {
+    let bytes = xml
+        .as_bytes()
+        .get(tag.clone())
+        .ok_or_else(|| invalid_error("ODS copied sheet start-tag span is invalid"))?;
+    let mut cursor = 1usize;
+    while cursor < bytes.len() && !bytes[cursor].is_ascii_whitespace() && bytes[cursor] != b'>' {
+        cursor += 1;
+    }
+    while cursor < bytes.len() {
+        while cursor < bytes.len() && bytes[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= bytes.len() || matches!(bytes[cursor], b'/' | b'>') {
+            break;
+        }
+        let name_start = cursor;
+        while cursor < bytes.len()
+            && !bytes[cursor].is_ascii_whitespace()
+            && !matches!(bytes[cursor], b'=' | b'/' | b'>')
+        {
+            cursor += 1;
+        }
+        let name_end = cursor;
+        while cursor < bytes.len() && bytes[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if bytes.get(cursor) != Some(&b'=') {
+            return invalid("ODS copied sheet attribute has no equals sign");
+        }
+        cursor += 1;
+        while cursor < bytes.len() && bytes[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        let quote = *bytes
+            .get(cursor)
+            .filter(|quote| matches!(quote, b'\'' | b'"'))
+            .ok_or_else(|| invalid_error("ODS copied sheet attribute is not quoted"))?;
+        cursor += 1;
+        let value_start = cursor;
+        while cursor < bytes.len() && bytes[cursor] != quote {
+            cursor += 1;
+        }
+        if cursor >= bytes.len() {
+            return invalid("ODS copied sheet attribute value is unterminated");
+        }
+        let value_end = cursor;
+        cursor += 1;
+        if bytes.get(name_start..name_end) == Some(key) {
+            return Ok((tag.start + value_start)..(tag.start + value_end));
+        }
+    }
+    invalid("ODS copied sheet name attribute lexical span was not found")
 }
 
 fn audit_sheet_move_package(
