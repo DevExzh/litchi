@@ -498,6 +498,7 @@ enum Case {
     OdsSemanticCreateSmall,
     OdsSemanticNoopEditSave,
     OdsSemanticOneEditSave,
+    OdsSemanticOnePercentEditSave,
     OdsMediaOneEditSave,
     OdpSemanticOpen,
     OdpSemanticListSlides,
@@ -709,6 +710,7 @@ impl Case {
             Self::OdsSemanticCreateSmall => "ods_semantic_create_small",
             Self::OdsSemanticNoopEditSave => "ods_semantic_noop_edit_save",
             Self::OdsSemanticOneEditSave => "ods_semantic_one_edit_save",
+            Self::OdsSemanticOnePercentEditSave => "ods_semantic_one_percent_edit_save",
             Self::OdsMediaOneEditSave => "ods_media_one_edit_save",
             Self::OdpSemanticOpen => "odp_semantic_open",
             Self::OdpSemanticListSlides => "odp_semantic_list_slides",
@@ -911,6 +913,7 @@ impl Case {
                 | Self::OdsSemanticCreateSmall
                 | Self::OdsSemanticNoopEditSave
                 | Self::OdsSemanticOneEditSave
+                | Self::OdsSemanticOnePercentEditSave
         )
     }
 
@@ -2761,6 +2764,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_semantic_create_small" => Some(Case::OdsSemanticCreateSmall),
         "ods_semantic_noop_edit_save" => Some(Case::OdsSemanticNoopEditSave),
         "ods_semantic_one_edit_save" => Some(Case::OdsSemanticOneEditSave),
+        "ods_semantic_one_percent_edit_save" => Some(Case::OdsSemanticOnePercentEditSave),
         "ods_media_one_edit_save" => Some(Case::OdsMediaOneEditSave),
         "odp_semantic_open" => Some(Case::OdpSemanticOpen),
         "odp_semantic_list_slides" => Some(Case::OdpSemanticListSlides),
@@ -2925,6 +2929,7 @@ fn print_usage() {
                                        ods_semantic_cell_sweep,\n\
                                        ods_semantic_full_cell_text,ods_semantic_create_small,\n\
                                        ods_semantic_noop_edit_save,ods_semantic_one_edit_save,\n\
+                                       ods_semantic_one_percent_edit_save,\n\
                                        ods_media_one_edit_save,\n\
                                        odp_semantic_open,odp_semantic_list_slides,\n\
                                        odp_semantic_one_slide,odp_semantic_full_text,\n\
@@ -5050,7 +5055,8 @@ fn run_case_with_config(
         | Case::OdsSemanticFullCellText
         | Case::OdsSemanticCreateSmall
         | Case::OdsSemanticNoopEditSave
-        | Case::OdsSemanticOneEditSave => {
+        | Case::OdsSemanticOneEditSave
+        | Case::OdsSemanticOnePercentEditSave => {
             run_semantic_ods(case, corpus, warmup_iterations, samples)
         },
         Case::OdsMediaOneEditSave => {
@@ -5724,22 +5730,23 @@ fn semantic_ods_cell_sweep(
     Ok(stored_cells)
 }
 
-fn expected_semantic_ods_full_cell_text(shape: SemanticShape, updated: bool) -> String {
-    let middle_sheet = shape.ods_sheet_count() / 2;
-    let middle_row = shape.ods_rows_per_sheet() / 2;
-    let middle_column = shape.ods_columns_per_sheet() / 2;
+fn semantic_ods_flat_index(shape: SemanticShape, sheet: usize, row: usize, column: usize) -> usize {
+    sheet * shape.ods_rows_per_sheet() * shape.ods_columns_per_sheet()
+        + row * shape.ods_columns_per_sheet()
+        + column
+}
+
+fn expected_semantic_ods_full_cell_text(shape: SemanticShape, updated_indices: &[usize]) -> String {
     let mut values = Vec::with_capacity(shape.ods_cell_count());
     for sheet in 0..shape.ods_sheet_count() {
         for row in 0..shape.ods_rows_per_sheet() {
             for column in 0..shape.ods_columns_per_sheet() {
+                let index = semantic_ods_flat_index(shape, sheet, row, column);
                 values.push(semantic_ods_text(
                     sheet,
                     row,
                     column,
-                    updated
-                        && sheet == middle_sheet
-                        && row == middle_row
-                        && column == middle_column,
+                    updated_indices.binary_search(&index).is_ok(),
                 ));
             }
         }
@@ -5752,12 +5759,27 @@ fn verify_semantic_ods(
     shape: SemanticShape,
     updated: bool,
 ) -> Result<(), Box<dyn Error>> {
+    let updated_indices = if updated {
+        vec![semantic_ods_flat_index(
+            shape,
+            shape.ods_sheet_count() / 2,
+            shape.ods_rows_per_sheet() / 2,
+            shape.ods_columns_per_sheet() / 2,
+        )]
+    } else {
+        Vec::new()
+    };
+    verify_semantic_ods_updates(spreadsheet, shape, &updated_indices)
+}
+
+fn verify_semantic_ods_updates(
+    spreadsheet: &litchi_ods::Spreadsheet,
+    shape: SemanticShape,
+    updated_indices: &[usize],
+) -> Result<(), Box<dyn Error>> {
     if spreadsheet.sheets().len() != shape.ods_sheet_count() {
         return Err("semantic ODS sheet count differs from specification".into());
     }
-    let middle_sheet = shape.ods_sheet_count() / 2;
-    let middle_row = shape.ods_rows_per_sheet() / 2;
-    let middle_column = shape.ods_columns_per_sheet() / 2;
     for sheet in 0..shape.ods_sheet_count() {
         let name = semantic_ods_sheet_name(sheet);
         let sheet_value = spreadsheet
@@ -5770,10 +5792,8 @@ fn verify_semantic_ods(
         }
         for row in 0..shape.ods_rows_per_sheet() {
             for column in 0..shape.ods_columns_per_sheet() {
-                let is_updated = updated
-                    && sheet == middle_sheet
-                    && row == middle_row
-                    && column == middle_column;
+                let index = semantic_ods_flat_index(shape, sheet, row, column);
+                let is_updated = updated_indices.binary_search(&index).is_ok();
                 let cell = spreadsheet
                     .cell(&name, row, column)
                     .ok_or("semantic ODS sheet is missing")?;
@@ -5787,7 +5807,7 @@ fn verify_semantic_ods(
         }
     }
     if semantic_ods_full_cell_text(spreadsheet, shape)?
-        != expected_semantic_ods_full_cell_text(shape, updated)
+        != expected_semantic_ods_full_cell_text(shape, updated_indices)
     {
         return Err("semantic ODS full cell text differs from specification".into());
     }
@@ -7405,6 +7425,8 @@ fn run_semantic_ods(
     let row = shape.ods_rows_per_sheet() / 2;
     let column = shape.ods_columns_per_sheet() / 2;
     let sheet_name = semantic_ods_sheet_name(sheet);
+    let single_update = [semantic_ods_flat_index(shape, sheet, row, column)];
+    let one_percent_updates = semantic_update_indices(shape.ods_cell_count())?;
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         match case {
@@ -7479,13 +7501,20 @@ fn run_semantic_ods(
                 std::hint::black_box(text);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
-            Case::OdsSemanticNoopEditSave | Case::OdsSemanticOneEditSave => {
+            Case::OdsSemanticNoopEditSave
+            | Case::OdsSemanticOneEditSave
+            | Case::OdsSemanticOnePercentEditSave => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
                 let snapshot = litchi_ods::document::Snapshot::from_bytes(owned)?;
                 let mut edit = snapshot.edit();
-                let updated = matches!(case, Case::OdsSemanticOneEditSave);
-                if updated {
+                let updated_indices = match case {
+                    Case::OdsSemanticNoopEditSave => &[][..],
+                    Case::OdsSemanticOneEditSave => &single_update[..],
+                    Case::OdsSemanticOnePercentEditSave => &one_percent_updates,
+                    _ => unreachable!("ODS edit/save case was matched above"),
+                };
+                if case == Case::OdsSemanticOneEditSave {
                     let text = semantic_ods_text(sheet, row, column, true);
                     edit.worksheets(|worksheets| {
                         worksheets
@@ -7505,17 +7534,67 @@ fn run_semantic_ods(
                             })?;
                         Ok(())
                     })?;
+                } else if case == Case::OdsSemanticOnePercentEditSave {
+                    let rows_per_sheet = shape.ods_rows_per_sheet();
+                    let columns_per_sheet = shape.ods_columns_per_sheet();
+                    let cells_per_sheet = rows_per_sheet * columns_per_sheet;
+                    edit.worksheets(|worksheets| {
+                        let mut changed = 0usize;
+                        for selected_sheet in 0..shape.ods_sheet_count() {
+                            let start = selected_sheet * cells_per_sheet;
+                            let end = start + cells_per_sheet;
+                            let changes = updated_indices
+                                .iter()
+                                .copied()
+                                .filter(|index| (start..end).contains(index))
+                                .map(|index| {
+                                    let local = index - start;
+                                    let selected_row = local / columns_per_sheet;
+                                    let selected_column = local % columns_per_sheet;
+                                    let text = semantic_ods_text(
+                                        selected_sheet,
+                                        selected_row,
+                                        selected_column,
+                                        true,
+                                    );
+                                    litchi_ods::worksheet::CellChange::new(
+                                        selected_row,
+                                        selected_column,
+                                        litchi_ods::Cell::new(
+                                            litchi_ods::CellValue::Text(text.clone()),
+                                            text,
+                                        ),
+                                    )
+                                })
+                                .collect();
+                            let selected_sheet_name = semantic_ods_sheet_name(selected_sheet);
+                            changed += worksheets
+                                .set_cells(selected_sheet_name.as_str(), changes)?
+                                .ok_or_else(|| {
+                                    litchi_core::Error::InvalidFormat(
+                                        "semantic ODS selected sheet is missing".to_owned(),
+                                    )
+                                })?;
+                        }
+                        if changed != updated_indices.len() {
+                            return Err(litchi_core::Error::InvalidFormat(
+                                "semantic ODS 1% batch changed an unexpected cell count".to_owned(),
+                            ));
+                        }
+                        Ok(())
+                    })?;
                 }
                 let commit = edit.commit()?;
                 let bytes = commit.snapshot().as_bytes().to_vec();
                 let duration = started.elapsed();
+                let updated = !updated_indices.is_empty();
                 if (bytes != corpus.archive) != updated || commit.changed() != updated {
                     return Err(
                         "semantic ODS edit/save changed-state differs from specification".into(),
                     );
                 }
                 let reopened = litchi_ods::Spreadsheet::from_bytes(bytes.clone())?;
-                verify_semantic_ods(&reopened, shape, updated)?;
+                verify_semantic_ods_updates(&reopened, shape, updated_indices)?;
                 std::hint::black_box(bytes);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
@@ -13484,6 +13563,7 @@ mod tests {
         assert_eq!(ods.manifest.entry_count, 64);
         run_case(Case::OdsSemanticCellSweep, &ods, 0, 1).unwrap();
         run_case(Case::OdsSemanticOneEditSave, &ods, 0, 1).unwrap();
+        run_case(Case::OdsSemanticOnePercentEditSave, &ods, 0, 1).unwrap();
 
         let odp = build_semantic_odp_corpus(SemanticShape::Tiny).unwrap();
         assert_eq!(
@@ -13504,6 +13584,17 @@ mod tests {
         let result = run_case(Case::OdtSemanticOnePercentEditSave, &odt, 0, 1).unwrap();
 
         assert_eq!(result.case, "odt_semantic_one_percent_edit_save");
+        assert!(result.sink.is_none());
+    }
+
+    #[test]
+    fn semantic_ods_medium_one_percent_edit_exercises_atomic_cell_batches() {
+        let ods = build_semantic_ods_corpus(SemanticShape::Medium).unwrap();
+        assert_eq!(ods.manifest.entry_count, 2_048);
+
+        let result = run_case(Case::OdsSemanticOnePercentEditSave, &ods, 0, 1).unwrap();
+
+        assert_eq!(result.case, "ods_semantic_one_percent_edit_save");
         assert!(result.sink.is_none());
     }
 
