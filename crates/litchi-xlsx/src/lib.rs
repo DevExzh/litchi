@@ -257,10 +257,14 @@ pub use scenarios::{
 };
 pub use sheet::{Name, NameError};
 pub use sheet_protection::{
-    Metadata, ProtectedRange, ProtectedRangeCollection, ProtectedRangeSource, Protection,
-    ProtectionPasswordVerifier, ProtectionRangeReference, ProtectionRangeReferenceKind,
-    ProtectionRangeSqref, StrongProtectionPasswordVerifier, parse_protection, replace_protection,
-    validate_metadata, write_core, write_extensions, write_protection,
+    Commit as SheetProtectionCommit, Diagnostics as SheetProtectionDiagnostics, Metadata,
+    Patch as SheetProtectionPatch, ProtectedRange, ProtectedRangeCollection, ProtectedRangeSource,
+    Protection, ProtectionPasswordVerifier, ProtectionRangeReference, ProtectionRangeReferenceKind,
+    ProtectionRangeSqref, Snapshot as SheetProtectionSnapshot,
+    SourceBackedEditor as SourceBackedSheetProtectionEditor,
+    SourceEdit as SourceBackedSheetProtectionEdit, StrongProtectionPasswordVerifier,
+    parse_protection, replace_protection, validate_metadata, write_core, write_extensions,
+    write_protection,
 };
 pub use sheet_view::parse_worksheet_views;
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};

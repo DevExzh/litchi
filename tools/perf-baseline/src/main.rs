@@ -68,6 +68,8 @@ const XLSX_PAGE_SETUP_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-page-setup-source-edit-media-v1";
 const XLSX_PRINT_OPTIONS_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-print-options-source-edit-media-v1";
+const XLSX_SHEET_PROTECTION_SOURCE_EDIT_CORPUS_GENERATOR: &str =
+    "litchi-xlsx-sheet-protection-source-edit-media-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
 const ODT_MEDIA_CORPUS_GENERATOR: &str = "litchi-odt-media-paragraph-publication-v1";
 const ODT_MEDIA_APPEND_RUN_TEXT: &str = " appended run";
@@ -379,6 +381,8 @@ enum Case {
     XlsxSourceBackedPageSetupEditSave,
     XlsxEagerPrintOptionsEditSave,
     XlsxSourceBackedPrintOptionsEditSave,
+    XlsxEagerSheetProtectionEditSave,
+    XlsxSourceBackedSheetProtectionEditSave,
     CfbOpen,
     CfbListStreams,
     CfbReadOne,
@@ -577,6 +581,10 @@ impl Case {
             Self::XlsxEagerPrintOptionsEditSave => "xlsx_eager_print_options_edit_save",
             Self::XlsxSourceBackedPrintOptionsEditSave => {
                 "xlsx_source_backed_print_options_edit_save"
+            },
+            Self::XlsxEagerSheetProtectionEditSave => "xlsx_eager_sheet_protection_edit_save",
+            Self::XlsxSourceBackedSheetProtectionEditSave => {
+                "xlsx_source_backed_sheet_protection_edit_save"
             },
             Self::CfbOpen => "cfb_open",
             Self::CfbListStreams => "cfb_list_streams",
@@ -987,6 +995,13 @@ impl Case {
         matches!(
             self,
             Self::XlsxEagerPrintOptionsEditSave | Self::XlsxSourceBackedPrintOptionsEditSave
+        )
+    }
+
+    const fn is_xlsx_sheet_protection_edit_save(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxEagerSheetProtectionEditSave | Self::XlsxSourceBackedSheetProtectionEditSave
         )
     }
 }
@@ -1825,6 +1840,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_page_margin_edit_save()
                     && !case.is_xlsx_page_setup_edit_save()
                     && !case.is_xlsx_print_options_edit_save()
+                    && !case.is_xlsx_sheet_protection_edit_save()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
                     cfb_corpus
@@ -1923,6 +1939,26 @@ fn main() -> Result<(), Box<dyn Error>> {
             .filter(|case| case.is_xlsx_print_options_edit_save())
         {
             results.push(run_xlsx_print_options_edit_save(
+                *case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_xlsx_sheet_protection_edit_save())
+    {
+        let corpus = build_xlsx_sheet_protection_edit_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .filter(|case| case.is_xlsx_sheet_protection_edit_save())
+        {
+            results.push(run_xlsx_sheet_protection_edit_save(
                 *case,
                 &corpus,
                 options.warmup_iterations,
@@ -2534,6 +2570,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_backed_print_options_edit_save" => {
             Some(Case::XlsxSourceBackedPrintOptionsEditSave)
         },
+        "xlsx_eager_sheet_protection_edit_save" => Some(Case::XlsxEagerSheetProtectionEditSave),
+        "xlsx_source_backed_sheet_protection_edit_save" => {
+            Some(Case::XlsxSourceBackedSheetProtectionEditSave)
+        },
         "cfb_open" => Some(Case::CfbOpen),
         "cfb_list_streams" => Some(Case::CfbListStreams),
         "cfb_read_one" => Some(Case::CfbReadOne),
@@ -2740,6 +2780,8 @@ fn print_usage() {
                                        xlsx_source_backed_page_setup_edit_save,\n\
                                        xlsx_eager_print_options_edit_save,\n\
                                        xlsx_source_backed_print_options_edit_save,\n\
+                                       xlsx_eager_sheet_protection_edit_save,\n\
+                                       xlsx_source_backed_sheet_protection_edit_save,\n\
                                        cfb_open,cfb_list_streams,cfb_read_one,\n\
                                        cfb_create_stream_borrowed,cfb_create_stream_owned,\n\
                                        ole_common_open,ole_common_put_stream_publish,\n\
@@ -3786,6 +3828,21 @@ fn build_xlsx_print_options_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     Ok(corpus)
 }
 
+fn build_xlsx_sheet_protection_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
+    let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
+    corpus.manifest.name = "xlsx-sheet-protection-media".to_owned();
+    corpus.manifest.generator = XLSX_SHEET_PROTECTION_SOURCE_EDIT_CORPUS_GENERATOR;
+    corpus.manifest.target_entry = "worksheet:Sheet1:protection".to_owned();
+    corpus.manifest.target_payload_bytes = target_payload.len();
+    corpus.manifest.target_payload_sha256 = sha256_hex(&target_payload);
+    corpus.target_name = "xl/worksheets/sheet1.xml".to_owned();
+    corpus.target_payload = target_payload;
+    Ok(corpus)
+}
+
 fn semantic_pptx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut package = litchi_pptx::Package::new()?;
     let presentation = package.presentation_mut()?;
@@ -4667,6 +4724,9 @@ fn run_case_with_config(
         },
         Case::XlsxEagerPrintOptionsEditSave | Case::XlsxSourceBackedPrintOptionsEditSave => {
             run_xlsx_print_options_edit_save(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsxEagerSheetProtectionEditSave | Case::XlsxSourceBackedSheetProtectionEditSave => {
+            run_xlsx_sheet_protection_edit_save(case, corpus, warmup_iterations, samples)
         },
         Case::CfbOpen => run_cfb_open(corpus, warmup_iterations, samples),
         Case::CfbListStreams => run_cfb_list_streams(corpus, warmup_iterations, samples),
@@ -10898,6 +10958,243 @@ fn run_xlsx_print_options_edit_save(
     })
 }
 
+fn xlsx_sheet_protection_target() -> Result<litchi_xlsx::sheet_protection::Metadata, Box<dyn Error>>
+{
+    use litchi_xlsx::sheet_protection::{
+        Metadata, ProtectedRange, ProtectedRangeCollection, ProtectedRangeSource, Protection,
+        ProtectionPasswordVerifier, ProtectionRangeSqref, StrongProtectionPasswordVerifier,
+    };
+
+    let mut protection = Protection::new();
+    protection.set_verifier(Some(ProtectionPasswordVerifier::Legacy(0x83af)))?;
+    protection.set_sheet_locked(true);
+    protection.set_objects_locked(true);
+    protection.set_scenarios_locked(true);
+    protection.set_auto_filter_locked(false);
+    protection.set_sort_locked(false);
+
+    let mut input_range = ProtectedRange::new(
+        ProtectedRangeSource::Core,
+        "Input cells",
+        ProtectionRangeSqref::parse("A1:B4 D6")?,
+    )?;
+    input_range.set_verifier(Some(ProtectionPasswordVerifier::Legacy(0x1a2b)))?;
+    let mut review_range = ProtectedRange::new(
+        ProtectedRangeSource::Office2010,
+        "Review cells",
+        ProtectionRangeSqref::parse("C3:E7")?,
+    )?;
+    review_range.set_verifier(Some(ProtectionPasswordVerifier::Strong(
+        StrongProtectionPasswordVerifier::new(
+            "SHA-512",
+            (0_u8..64).collect(),
+            (64_u8..80).collect(),
+            100_000,
+        )?,
+    )))?;
+    review_range.set_security_descriptor(Some("D:(A;;FA;;;SY)".to_owned()))?;
+
+    let mut metadata = Metadata::new();
+    metadata.set_sheet_protection(Some(protection))?;
+    metadata.set_protected_range_collections(vec![
+        ProtectedRangeCollection::new(ProtectedRangeSource::Core, vec![input_range])?,
+        ProtectedRangeCollection::new(ProtectedRangeSource::Office2010, vec![review_range])?,
+    ])?;
+    Ok(metadata)
+}
+
+fn verify_xlsx_sheet_protection_edit_output(
+    corpus: &Corpus,
+    output: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let reopened = litchi_xlsx::Package::from_slice(output)?;
+    let workbook = reopened.workbook()?;
+    let sheet = workbook
+        .sheet("Sheet1")?
+        .ok_or("XLSX sheet-protection output has no Sheet1")?;
+    if sheet.protection()? != xlsx_sheet_protection_target()? {
+        return Err("XLSX sheet-protection output has unexpected authored metadata".into());
+    }
+    if reopened
+        .calculation_metadata()?
+        .properties()
+        .ok_or("XLSX sheet-protection output has no calcPr")?
+        .calculation_id()
+        != 7
+    {
+        return Err("XLSX sheet-protection output changed calculation metadata".into());
+    }
+
+    let source = OpcPackage::from_bytes(&corpus.archive)?;
+    let candidate = OpcPackage::from_bytes(output)?;
+    if source.part_count() != corpus.manifest.entry_count
+        || candidate.part_count() != source.part_count()
+        || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
+    {
+        return Err("XLSX sheet-protection package topology differs from source".into());
+    }
+    let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
+    for source_part in source.iter_parts() {
+        let candidate_part = candidate.get_part(source_part.partname())?;
+        if candidate_part.content_type() != source_part.content_type()
+            || relationship_signatures(candidate_part.rels())
+                != relationship_signatures(source_part.rels())
+        {
+            return Err("XLSX sheet-protection Part metadata differs from source".into());
+        }
+        if source_part.partname() == &target_uri {
+            if source_part.blob() == candidate_part.blob() {
+                return Err("XLSX sheet-protection worksheet XML did not change".into());
+            }
+        } else if source_part.blob() != candidate_part.blob() {
+            return Err("XLSX sheet-protection edit changed an unselected Part payload".into());
+        }
+    }
+    for index in 0..XLSX_CALC_MEDIA_ENTRY_COUNT {
+        let uri = PackURI::new(format!("/xl/media/image{}.png", index + 1))?;
+        if candidate.get_part(&uri)?.blob() != xlsx_calculation_media_payload(index) {
+            return Err("XLSX sheet-protection media readback differs from specification".into());
+        }
+    }
+    Ok(())
+}
+
+fn publish_xlsx_sheet_protection_edit<W: Write>(
+    source: Arc<dyn ReadAt>,
+    writer: W,
+    source_backed: bool,
+) -> Result<usize, Box<dyn Error>> {
+    let metadata = xlsx_sheet_protection_target()?;
+    if source_backed {
+        let editor = litchi_xlsx::sheet_protection::SourceBackedEditor::from_read_at(source)?;
+        let mut edit = editor.edit("Sheet1")?;
+        if !edit.set(metadata)? {
+            return Err("XLSX source-backed sheet-protection edit reported an exact no-op".into());
+        }
+        let commit = edit.commit()?;
+        if !commit.changed() || commit.patch().is_empty() {
+            return Err(
+                "XLSX source-backed sheet-protection edit produced an invalid patch".into(),
+            );
+        }
+        let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
+        let published = editor.publish_commit_to_stream(writer, &commit)?;
+        if published.source_xml() != commit.snapshot().source_xml()
+            || published.metadata() != commit.snapshot().metadata()
+        {
+            return Err(
+                "XLSX source-backed sheet-protection edit published another snapshot".into(),
+            );
+        }
+        Ok(materializations)
+    } else {
+        let package = SourceBackedPackage::from_read_at(source)?;
+        let mut opc = package.into_opc_package()?;
+        let materializations = opc.part_count();
+        let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+        let updated = litchi_xlsx::sheet_protection::replace_protection(
+            opc.get_part(&worksheet_uri)?.blob(),
+            &metadata,
+        )?;
+        opc.get_part_mut(&worksheet_uri)?.set_blob(updated);
+        PackageWriter::write_to_stream(writer, &opc)?;
+        Ok(materializations)
+    }
+}
+
+fn run_xlsx_sheet_protection_edit_save(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != XLSX_SHEET_PROTECTION_SOURCE_EDIT_CORPUS_GENERATOR
+        || !case.is_xlsx_sheet_protection_edit_save()
+    {
+        return Err("XLSX sheet-protection case requires its fixed media-rich corpus".into());
+    }
+    let source_backed = case == Case::XlsxSourceBackedSheetProtectionEditSave;
+    let expected_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+    let mut expected = Vec::new();
+    let expected_materializations =
+        publish_xlsx_sheet_protection_edit(expected_source, &mut expected, source_backed)?;
+    let required_materializations = if source_backed {
+        2
+    } else {
+        corpus.manifest.entry_count
+    };
+    if expected == corpus.archive || expected_materializations != required_materializations {
+        return Err("XLSX sheet-protection edit materialized an unexpected Part count".into());
+    }
+    verify_xlsx_sheet_protection_edit_output(corpus, &expected)?;
+    let expected_digest = sha256_hex(&expected);
+    let maximum = u64::try_from(expected.len())?
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("XLSX sheet-protection sequential output ceiling overflows u64")?;
+    let payload_ranges = xlsx_calculation_payload_ranges(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut measured_digests = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = Arc::new(InstrumentedSource::new(
+            corpus.archive.clone(),
+            payload_ranges.clone(),
+        ));
+        let read_at: Arc<dyn ReadAt> = source.clone();
+        let mut sink = CountingSink::bounded(maximum, 64 * 1024);
+        sink.reserve_budget()?;
+        let started = Instant::now();
+        let materializations =
+            publish_xlsx_sheet_protection_edit(read_at, &mut sink, source_backed)?;
+        let duration = started.elapsed();
+
+        if materializations != expected_materializations || sink.bytes != expected {
+            return Err("XLSX sheet-protection edit differs between iterations".into());
+        }
+        if sink.summary().largest_write > 64 * 1024 {
+            return Err(
+                "XLSX sheet-protection edit exceeded the sequential sink write bound".into(),
+            );
+        }
+        verify_xlsx_sheet_protection_edit_output(corpus, &sink.bytes)?;
+        let digest = sha256_hex(&sink.bytes);
+        if digest != expected_digest {
+            return Err("XLSX sheet-protection output digest differs from expected output".into());
+        }
+        let metrics = source.snapshot();
+        if metrics.ordinary_payload_read_calls == 0 || metrics.ordinary_payload_read_bytes == 0 {
+            return Err("XLSX sheet-protection edit performed no ordinary source reads".into());
+        }
+        if iteration >= warmup_iterations {
+            source_summary.record_opc(metrics, u64::try_from(materializations)?);
+            sink_summaries.push(sink.summary());
+            measured_digests.push(digest);
+        }
+        std::hint::black_box(&sink.bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let sink = deterministic_sink_summary(&sink_summaries, case.name())?;
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("XLSX sheet-protection measured output digests are not stable".into());
+    }
+    Ok(CaseResult {
+        case: case.name(),
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: Some(expected_digest),
+    })
+}
+
 fn run_opc_open(
     corpus: &Corpus,
     warmup_iterations: usize,
@@ -11826,16 +12123,16 @@ mod tests {
         build_xlsx_calculation_metadata_edit_corpus, build_xlsx_corpus,
         build_xlsx_defined_names_edit_corpus, build_xlsx_page_break_edit_corpus,
         build_xlsx_page_margin_edit_corpus, build_xlsx_page_setup_edit_corpus,
-        build_xlsx_print_options_edit_corpus, expected_opc_overlay_output,
-        ole_common_changed_output, opc_overlay_replacement_payload, payload_bytes,
-        resolve_execution_workers, run_case, run_case_with_config,
+        build_xlsx_print_options_edit_corpus, build_xlsx_sheet_protection_edit_corpus,
+        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
+        payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
         run_docx_source_backed_one_edit_save, run_opc_source_overlay_one_part_save,
         run_pptx_batch_edit_save, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_one_edit_save, run_scaling_case,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_defined_names_edit_save,
         run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
-        run_xlsx_page_setup_edit_save, run_xlsx_print_options_edit_save, sha256_hex,
-        simulated_request_delay, statistics,
+        run_xlsx_page_setup_edit_save, run_xlsx_print_options_edit_save,
+        run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
     };
 
     #[test]
@@ -11899,6 +12196,8 @@ mod tests {
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedPageSetupEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxEagerPrintOptionsEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedPrintOptionsEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsxEagerSheetProtectionEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedSheetProtectionEditSave));
     }
 
     #[test]
@@ -12225,6 +12524,46 @@ mod tests {
         assert_eq!(
             source_backed.case,
             "xlsx_source_backed_page_setup_edit_save"
+        );
+        assert_eq!(eager.output_sha256, source_backed.output_sha256);
+        assert_eq!(
+            eager.source.unwrap().ordinary_payload_materializations,
+            Some(vec![corpus.manifest.entry_count as u64])
+        );
+        assert_eq!(
+            source_backed
+                .source
+                .unwrap()
+                .ordinary_payload_materializations,
+            Some(vec![2])
+        );
+    }
+
+    #[test]
+    fn xlsx_sheet_protection_edit_controls_are_deterministic_and_equivalent() {
+        let corpus = build_xlsx_sheet_protection_edit_corpus().unwrap();
+        let again = build_xlsx_sheet_protection_edit_corpus().unwrap();
+        assert_eq!(corpus.archive, again.archive);
+        assert_eq!(corpus.manifest.archive_sha256, sha256_hex(&corpus.archive));
+
+        let eager = run_xlsx_sheet_protection_edit_save(
+            Case::XlsxEagerSheetProtectionEditSave,
+            &corpus,
+            0,
+            1,
+        )
+        .unwrap();
+        let source_backed = run_xlsx_sheet_protection_edit_save(
+            Case::XlsxSourceBackedSheetProtectionEditSave,
+            &corpus,
+            0,
+            1,
+        )
+        .unwrap();
+        assert_eq!(eager.case, "xlsx_eager_sheet_protection_edit_save");
+        assert_eq!(
+            source_backed.case,
+            "xlsx_source_backed_sheet_protection_edit_save"
         );
         assert_eq!(eager.output_sha256, source_backed.output_sha256);
         assert_eq!(

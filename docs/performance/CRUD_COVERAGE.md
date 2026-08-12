@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 
-This is a coverage map, not a completion claim. It compares the 145 selectable
+This is a coverage map, not a completion claim. It compares the 147 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -18,7 +18,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring; large/streaming creation remains missing |
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
 | Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication; signed/extension corpora remain missing |
-| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT separately measures paragraph replacement, inline line-break/run/hyperlink insertion, and structural paragraph insertion/removal while ODT, ODS and ODP verify eight exact 2 MiB resources and manifest media types; source-backed DOCX/PPTX and narrow XLSX calculation-metadata/defined-name publication likewise verify eight exact 2 MiB media Parts after one semantic edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
+| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT separately measures paragraph replacement, inline line-break/run/hyperlink insertion, and structural paragraph insertion/removal while ODT, ODS and ODP verify eight exact 2 MiB resources and manifest media types; source-backed DOCX/PPTX and narrow XLSX calculation-metadata/defined-name/sheet-protection publication likewise verify eight exact 2 MiB media Parts after one semantic edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
 | About 1% semantic update and save | Covered for XLSX/DOCX/PPTX/ODT generated corpora | Deterministic evenly spaced cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch, while ODT coalesces ordinary scalar durable replacements internally; both reopen the package |
 | Bulk update matching objects | Partial | PPTX has a bounded atomic batch across up to 32 existing slides, with up to 256 unique nonoverlapping shape-text selectors per slide; structural and other-format bulk updates remain missing |
 | Clear/remove/hide/detach/GC distinctions | Partial | ODT now has a measured exact paragraph-removal transaction that intentionally preserves orphaned resources; clear, hide, detach, explicit GC, and other-format distinctions remain missing |
@@ -29,7 +29,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS-row preservation, and exact raw ODT/ODS/ODP auxiliary/media members during neighboring paragraph/cell/text-box edits; broader format-semantic extension corpora remain missing |
-| Replace one or a bounded set of low-level Parts, preserve the rest | Covered for owned OPC, bounded source-backed OPC, guarded DOCX main-document semantics, guarded PPTX selected/multi-slide semantics, and XLSX calculation metadata/defined names/page breaks/page margins/print options/relationship-free page setup | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; changes 0037/0077 add consuming one-Part/bounded multi-Part publishers; changes 0039, 0044/0063/0077, 0046, 0061, 0067, 0070, 0073 and 0076 integrate guarded semantic transactions while refusing unsafe MCE, signatures, stale closure, topology and printer-reference cases before output; general XLSX cell/formula, printer graph and structural PPTX editing remain outside the closure |
+| Replace one or a bounded set of low-level Parts, preserve the rest | Covered for owned OPC, bounded source-backed OPC, guarded DOCX main-document semantics, guarded PPTX selected/multi-slide semantics, and XLSX calculation metadata/defined names/page breaks/page margins/print options/relationship-free page setup/sheet protection | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; changes 0037/0077 add consuming one-Part/bounded multi-Part publishers; changes 0039, 0044/0063/0077, 0046, 0061, 0067, 0070, 0073, 0076 and 0078 integrate guarded semantic transactions while refusing unsafe MCE, signatures, stale closure, topology, relationship and printer-reference cases before output; general XLSX cell/formula, printer graph and structural PPTX editing remain outside the closure |
 
 The source/output matrix is also incomplete. Owned bytes and instrumented
 `ReadAt` exist for OPC/XLSX, and the deterministic range simulator covers
@@ -65,8 +65,8 @@ conversion remain.
    writer-local action regrouping was measured and rejected in change 0030;
    broader coverage must not present that immaterial prototype as a solution.
 5. Broaden the accepted narrow XLSX calculation-metadata, defined-name,
-   page-break and page-margin/print-options/page-setup source transactions
-   beyond changes 0046/0061/0067/0070/0073/0076 only where a
+   page-break, page-margin/print-options/page-setup and sheet-protection source
+   transactions beyond changes 0046/0061/0067/0070/0073/0076/0078 only where a
    complete one-Part semantic closure can be proved; general
    cell/formula/chains still need a wider publication design.
    Broaden DOCX/PPTX beyond changes 0039/0044 with real producers, MCE-aware
@@ -261,6 +261,15 @@ for five boolean flags, and raw-copies the other ten Parts. Exact signed no-ops,
 patch/inverse, retargeting, MCE, limits and partial-sink behavior remain checked;
 printer-setting relationships and general worksheet contents remain outside the
 capability.
+
+Change 0078 applies the complete workbook/worksheet/outbound-relationship
+closure to direct typed worksheet protection. It atomically replaces or clears
+the complete core and Office 2010 protection metadata, uses the exact
+byte-preserving rewriter, and materializes only workbook plus selected
+worksheet on the media-rich save. Add/replace/clear/no-op, patch/inverse,
+relationships, MCE, chartsheets, signed sources, limits, partial sinks and
+strong/legacy verifier metadata remain checked. Password verification, cells,
+topology changes and relationship editing remain outside the capability.
 
 Change 0047 makes the existing ODT one-paragraph benchmark a direct public
 indexed query. It retains only the requested structured paragraph while

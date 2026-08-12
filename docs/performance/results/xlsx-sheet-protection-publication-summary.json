@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-12",
+  "corpus_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+  "corpus_bytes": 16786830,
+  "logical_part_bytes": 16782412,
+  "ordinary_parts": 12,
+  "zip_members": 17,
+  "output_sha256": "76b3a48e9682479a7dc75b047e37f221c52dc6953c10168e20995adbf992b8f3",
+  "output_bytes": 16787247,
+  "frozen_prechange_binary_sha256": "d4d88556fddf6225944c2313113f04c62a5fd34e3eb2ded36a229ab80f5d1e12",
+  "candidate_binary_sha256": "ff053c52889f79172a240c72aa16dd9e58bf5a21ec7cf5b464bec89c24c9a75a",
+  "final_binary_sha256": "98e9b1dad757a477388e301937719dd39db0ada8d182851b40409c0bafc3342d",
+  "protocol": {
+    "cpu": 2,
+    "order": "eager A, source-backed A, source-backed B, eager B",
+    "warmups_per_leg": 10,
+    "samples_per_leg": 100,
+    "formal_pooled_samples_per_state": 200,
+    "supplementary_balanced_pairs": 2,
+    "supplementary_total_samples_per_state": 600
+  },
+  "formal_abba": {
+    "eager_ns": {
+      "p50": 221876993.5,
+      "mean": 222777876.13500002,
+      "p95": 229135052.5,
+      "p99": 234878043
+    },
+    "source_backed_ns": {
+      "p50": 4981525,
+      "mean": 5010471.699999999,
+      "p95": 5324239.5,
+      "p99": 5510376
+    },
+    "delta_percent": {
+      "p50": -97.75482580621862,
+      "mean": -97.75091145183387,
+      "p95": -97.67637494049497,
+      "p99": -97.65394162450511
+    }
+  },
+  "all_three_balanced_pairs": {
+    "eager_leg_mean_p50_ns": 221597286.33333334,
+    "source_backed_leg_mean_p50_ns": 4391651.333333333,
+    "p50_delta_percent": -98.01818361316606,
+    "candidate_wins": "6 of 6 legs"
+  },
+  "ordinary_payload_materializations": {
+    "eager": 12,
+    "source_backed": 2
+  },
+  "sequential_sink": {
+    "eager_write_calls": 630,
+    "source_backed_write_calls": 547,
+    "largest_write_bytes": 32768
+  },
+  "heaptrack_one_sample": {
+    "scope": "whole process including deterministic corpus construction and untimed verification",
+    "eager_allocation_calls": 13524,
+    "source_backed_allocation_calls": 13893,
+    "allocation_call_delta_percent": 2.728482697426797,
+    "eager_peak_heap_mib": 152.84,
+    "source_backed_peak_heap_mib": 152.81,
+    "peak_heap_delta_percent": -0.019628369536771224
+  },
+  "gnu_time_max_rss_kib": {
+    "eager": 141528,
+    "source_backed": 141980,
+    "delta_percent": 0.319371431801481
+  },
+  "perf_stat_five_repeats": {
+    "eager_cycles": 19434968251,
+    "source_backed_cycles": 5517687902,
+    "cycles_delta_percent": -71.60948332541734,
+    "eager_instructions": 48096430982,
+    "source_backed_instructions": 10641341257,
+    "instructions_delta_percent": -77.87498772833581,
+    "eager_branches": 8154822767,
+    "source_backed_branches": 1384199903,
+    "branches_delta_percent": -83.02599648638078,
+    "eager_branch_misses": 176618268,
+    "source_backed_branch_misses": 14483167,
+    "branch_miss_delta_percent": -91.79973444196611,
+    "eager_cache_references": 1367159395,
+    "source_backed_cache_references": 403859614,
+    "cache_reference_delta_percent": -70.45994669846087,
+    "eager_cache_misses": 29160222,
+    "source_backed_cache_misses": 20570727,
+    "cache_miss_delta_percent": -29.456205786087637
+  }
+}
