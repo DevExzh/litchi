@@ -106,6 +106,7 @@ pub mod raw;
 pub mod revisions;
 pub mod rich_values;
 pub mod row;
+pub mod row_visibility;
 pub mod scenarios;
 pub mod shapes;
 pub mod sheet;

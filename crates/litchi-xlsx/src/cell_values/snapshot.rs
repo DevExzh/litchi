@@ -26,7 +26,7 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    pub(super) fn load_source_backed<'a>(
+    pub(crate) fn load_source_backed<'a>(
         package: &SourceBackedPackage,
         selector: impl Into<Selector<'a>>,
     ) -> Result<Self> {
@@ -196,7 +196,7 @@ impl Snapshot {
         })
     }
 
-    pub(super) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
         validation::worksheet_xml(&bytes)?;
         let cells = raw::worksheet::parse(&bytes, || Ok(None))?;
         let mut result = source.clone();
@@ -250,7 +250,7 @@ impl Snapshot {
         Arc::clone(&self.source.worksheet.bytes)
     }
 
-    pub(super) fn same_source(&self, other: &Self) -> bool {
+    pub(crate) fn same_source(&self, other: &Self) -> bool {
         self.sheet_name == other.sheet_name
             && self.sheet_position == other.sheet_position
             && self.source.same_owner(&other.source)
