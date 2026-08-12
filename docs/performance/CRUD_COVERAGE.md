@@ -391,6 +391,15 @@ and trailing text. Parsing, exact no-op/save, edits, patches, variants and
 candidate readback are unchanged. It adds no index, cache, structured edit,
 format/media capability, security policy, conversion or producer coverage.
 
+Change 0068 leaves the ODS CRUD and publication surface unchanged. The
+existing unified worksheet edit moves and shares its exact archive allocation
+through the nested worksheet snapshot, patch, private package reader and
+candidate validation. Tests prove allocation identity and exact byte/pointer
+rollback after a staged closure failure; complete row-splice provenance,
+compact/package/media readback, durable patch/inverse, limits and
+signed/encrypted policy remain. It adds no structural/resource edit, new patch
+wire, security capability, producer, streaming or positional-I/O coverage.
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.

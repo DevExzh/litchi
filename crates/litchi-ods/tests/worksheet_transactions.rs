@@ -203,3 +203,35 @@ fn unified_row_local_commit_retains_raw_package_members() -> litchi_core::Result
     ));
     Ok(())
 }
+
+#[test]
+fn unified_worksheet_handoff_restores_the_candidate_after_failure() -> litchi_core::Result<()> {
+    let source = row_splice_package()?;
+    let snapshot = litchi_ods::document::Snapshot::from_bytes(source)?;
+    let mut edit = snapshot.edit();
+    let before = edit.as_bytes().to_vec();
+    let before_pointer = edit.as_bytes().as_ptr();
+
+    let result = edit.worksheets(|worksheets| {
+        worksheets
+            .set_cell(
+                "Data",
+                1,
+                0,
+                Cell::new(CellValue::Text("discarded".to_string()), "discarded"),
+            )?
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(
+                    "the selected rollback worksheet is missing".to_string(),
+                )
+            })?;
+        Err(litchi_core::Error::InvalidFormat(
+            "forced worksheet staging failure".to_string(),
+        ))
+    });
+
+    assert!(result.is_err());
+    assert_eq!(edit.as_bytes(), before);
+    assert_eq!(edit.as_bytes().as_ptr(), before_pointer);
+    Ok(())
+}
