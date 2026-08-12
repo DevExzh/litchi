@@ -34,11 +34,11 @@ const X14: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ma
 
 const XM: &[u8] = b"http://schemas.microsoft.com/office/excel/2006/main";
 
-const MAX_FORMULA_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_FORMULA_BYTES: usize = 1024 * 1024;
 
 const MAX_FRAGMENT_BYTES: usize = 16 * 1024 * 1024;
 
-const MAX_RULES: usize = 1_000_000;
+pub(crate) const MAX_RULES: usize = 1_000_000;
 
 #[derive(Debug)]
 pub(crate) struct Captured {
@@ -942,7 +942,7 @@ fn validate_rule_shape(rule: &Rule) -> Result<()> {
     Ok(())
 }
 
-fn validate_and_associate(values: &mut [Formatting], dxf_count: usize) -> Result<()> {
+pub(crate) fn validate_and_associate(values: &mut [Formatting], dxf_count: usize) -> Result<()> {
     let mut priorities = HashSet::new();
     let mut ids = HashMap::new();
     for (ci, container) in values.iter().enumerate() {
@@ -1170,7 +1170,7 @@ fn is_color_element(name: &[u8]) -> bool {
     )
 }
 
-fn parse_sqref(raw: &str) -> Result<Vec<Range>> {
+pub(crate) fn parse_sqref(raw: &str) -> Result<Vec<Range>> {
     if raw.trim().is_empty() {
         return Err(invalid("conditionalFormatting sqref is empty"));
     }
