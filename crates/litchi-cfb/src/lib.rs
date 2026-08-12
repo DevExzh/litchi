@@ -22,6 +22,7 @@ mod overlay;
 mod shared;
 mod shared_bulk;
 mod splice;
+mod validation;
 pub mod writer;
 
 pub use file::{DirectoryEntry, OleError, OleFile, is_ole_file};
@@ -32,6 +33,7 @@ pub use overlay::{
 pub use shared::{SharedOleFile, SharedOleFileLimits};
 pub use shared_bulk::{SharedOleBulkError, SharedOleBulkRead};
 pub use splice::{SameLengthStreamSplice, StreamSpliceLimits};
+pub use validation::{CfbValidationError, validate_source, validate_source_with_limits};
 pub use writer::OleWriter;
 
 #[cfg(test)]
@@ -42,3 +44,5 @@ mod directory_validation_tests;
 mod overlay_tests;
 #[cfg(test)]
 mod splice_tests;
+#[cfg(test)]
+mod validation_tests;
