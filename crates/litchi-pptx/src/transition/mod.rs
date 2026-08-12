@@ -32,6 +32,8 @@ pub use model::{
 pub use reader::{Limits, read, read_with};
 pub use writer::{write, write_to};
 
+pub(crate) use model::{preserved_effect_xml, semantic_clone};
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
