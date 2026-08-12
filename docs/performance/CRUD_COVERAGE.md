@@ -20,19 +20,19 @@ performance claim.
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring; large/streaming creation remains missing |
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
 | Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication; signed/extension corpora remain missing |
-| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT separately measures paragraph replacement, inline line-break/run/hyperlink insertion, structural paragraph insertion/removal, and matched existing-image replacement while ODT, ODS and ODP verify exact retained resources and manifest media types; source-backed DOCX/PPTX and narrow XLSX calculation-metadata/defined-name/sheet-protection/data-validation/auto-filter/conditional-formatting publication likewise verify eight exact 2 MiB media Parts after one semantic edit. Correctness-only ODS coverage clone-stages content-validation catalog add/set/update/same-name replace/remove/clear/rollback through unified `content.xml` publication with exact patch/inverse and complete reopen; referenced remove/clear, dangling changed commits, unsafe rename, opaque/MCE/DTD owners, bounds and changed signed packages refuse. Correctness-only source-backed PPTX coverage additionally sets or replaces one existing slide's direct standard transition through the selected slide Part; inherited or extension transitions remain outside that closure. A separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
+| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT separately measures paragraph replacement, inline line-break/run/hyperlink insertion, structural paragraph insertion/removal, and matched existing-image replacement while ODT, ODS and ODP verify exact retained resources and manifest media types; source-backed DOCX/PPTX and narrow XLSX calculation-metadata/defined-name/sheet-protection/data-validation/auto-filter/conditional-formatting publication likewise verify eight exact 2 MiB media Parts after one semantic edit. Correctness-only additions include source-backed XLSX existing scalar-cell set/clear/remove and row visibility, XLS worksheet visibility, RTF direct paragraph-layout updates and same-length standalone PNG/JPEG payload replacement, and ODT plain-paragraph moves. ODS content-validation catalog CRUD and direct PPTX transition edits retain their previously documented narrow closures. A separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
 | About 1% semantic update and save | Covered for XLSX/DOCX/PPTX/RTF/ODT/ODS generated corpora | Deterministic evenly spaced `ceil(1%)` cell, paragraph and shape changes; DOCX and RTF use one canonical atomic paragraph batch, ODT coalesces ordinary scalar durable replacements internally, and ODS partitions flat cell positions by worksheet into bounded atomic `set_cells` calls; each commits once and reopens the package. The new ODS case has no comparative latency claim; the RTF batch case has a matched scalar-loop comparison recorded in change 0081 |
 | Bulk update matching objects | Partial | Selectable: PPTX has a bounded atomic batch across up to 32 existing slides, with up to 256 unique nonoverlapping shape-text selectors per slide; RTF measures one bounded ordered paragraph batch; XLSX replaces a complete three-owner core conditional-formatting collection through matched eager/source-backed controls; ODP measures eight fixed-name existing text boxes across eight slides; ODT replaces 64 fixed existing image owners through matched scalar/bounded-batch controls. These evidence additions make no latency claim pending frozen ABBA. API-only correctness coverage: ODS updates up to 4,096 cells on one selected sheet; native PPT updates up to 256 persisted shape-text targets; XLS updates up to 256 existing comment author/text owners on one worksheet; XLSX also clears the complete conditional-formatting collection; ODT correctness extends to the exact 256-change embedded object/image bound; ODP correctness extends to the exact 256-owner batch bound. These remaining APIs are not selectable timing evidence |
-| Clear/remove/hide/detach/GC distinctions | Partial | Measured: ODT exact paragraph removal intentionally preserves orphaned resources, and RTF removes one exact middle ordinary paragraph on its narrow generated plain-source closure. API-only: OLE2 deletes one or a bounded stream set while retaining storages and unrelated streams; ODS clears only an unbound content-validation catalog and refuses referenced definitions; PPTX clears one existing slide's direct standard transition without rewriting inherited layout/master state; XLSX shows, hides, very-hides or activates tabs and clears conditional formatting; DOCX detaches selected external hyperlink wrappers; ODT removes selected resource owners while retaining package payloads and unknown frame children. Separately, correctness-only opt-in ODT GC plans and applies exact-source reversible deletion for explicitly named detached package files/subdocuments; signed, encrypted, protected, and unknown-reference cases refuse. RTF paragraph reorder is separately selectable but is not removal/GC. XLS comment deletion and visibility mutation are deliberately refused |
-| Sanitization and irreversible redaction | Partial | API-only: DOCX has a non-mutating plan/apply/inverse flow for main-document relationship-backed external `w:hyperlink` wrapper detachment. Visible children, relationship records and target URLs are retained, so this is not URL removal, personal-data cleanup, general sanitization or irreversible redaction |
-| Copy object with dependency closure | Missing | No measured format case |
+| Clear/remove/hide/detach/GC distinctions | Partial | Measured: ODT exact paragraph removal intentionally preserves orphaned resources, and RTF removes one exact middle ordinary paragraph on its narrow generated plain-source closure. API-only: OLE2 deletes one or a bounded stream set while retaining storages and unrelated streams; XLS shows/hides/very-hides worksheets, while XLSX additionally shows/hides/very-hides/activates tabs, hides/unhides existing rows, clears scalar cell values without deleting owners, or physically removes supported existing scalar `<c>` owners; ODS clears only unbound validation definitions; DOCX removes direct plain main-document paragraphs; PPTX and ODP remove only dependency-free supported slides; RTF removes standalone PNG/JPEG picture groups; ODT removes selected resource owners while retaining payloads. DOCX reversible hyperlink-wrapper detachment remains distinct from irreversible relationship/URL redaction. Opt-in ODT GC remains exact-source and explicit-name only. General cascading delete, orphan collection and dependency-aware removal remain missing |
+| Sanitization and irreversible redaction | Partial | API-only: DOCX now has two deliberately separate exact-source flows. Reversible detachment unwraps selected main-document external `w:hyperlink` owners but retains relationship records and target URLs. Irreversible redaction inventories and selects exact target URLs, unwraps their visible owners, removes the corresponding external hyperlink relationships, exposes effects before publication, and intentionally provides no inverse. It is bounded, fail-closed and main-document-only; it is not general personal-data cleanup, field/DDE sanitization, embedded-object cleanup or package-wide external-reference removal |
+| Copy object with dependency closure | Partial (correctness only) | PPTX atomically applies a bounded in-package slide-copy plan for its supported finite owned dependency graph while reusing shared layout dependencies and refusing unsupported/shared ownership; ODP copies only dependency-free blank slides; ODS copies only dependency-free worksheets; DOCX copies only direct plain main-document paragraphs. These APIs have reopen and preservation tests but no selectable timing evidence. General cross-document copy, arbitrary charts/media/themes/notes/formulas/styles, name-collision reconciliation and complete dependency closure remain missing |
 | Merge and split | Missing | No measured format case |
-| Patch encode/apply/invert/merge | Partial | DOCX and ODT coalesced replacement correctness covers deterministic durable encode/decode/apply/inverse; ODS edit timing includes shared reversible-patch construction and tests exact wire/inverse BlobIds, but not encode/apply lifecycle timing. The selectable RTF remove/move cases verify deterministic durable encode/decode, forward/inverse and stale-source refusal outside timing; correctness-only durable/reversible coverage also includes RTF paragraph batches, native PPT shape batches, XLS existing-comment edits and ODT embedded-resource batches. PPTX direct-transition, XLSX conditional-formatting/tab-state and DOCX hyperlink-detachment edits have source-bound apply/inverse coverage. Broader formats and merge/join remain incomplete |
-| Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
+| Patch encode/apply/invert/merge | Partial | Durable encode/decode/apply/inverse coverage now also includes exact DOCX plain-paragraph copy/removal, ODT plain-paragraph move, PPTX dependency-free slide removal, ODS worksheet move/copy, XLS worksheet visibility, and RTF picture-payload/removal edits. Source-backed XLSX scalar-cell and row-visibility edits and RTF paragraph-layout edits have source-bound apply/inverse but no durable wire claim. The selectable RTF paragraph remove/move cases still keep durable work outside timing. DOCX irreversible hyperlink redaction intentionally has no inverse. Patch merge/join/three-way conflict resolution remains incomplete and unmeasured |
+| Validate without mutation | Partial (correctness only) | Distinct bounded reports now exist for CFB, OPC and generic ODF. CFB reruns canonical container ingress; OPC reports ZIP/catalog/loaded-relationship/signature-presence capabilities with exact failure attribution; ODF indexes bounded ZIP metadata and materializes only `mimetype`, the manifest and `content.xml` to report package declarations, root XML and encryption/signature/macro/external-reference presence. These are API correctness tests, not selectable benchmarks. They do not validate DOC/XLS/PPT or OOXML/ODF family semantics, decrypt content, verify signatures, execute macros, fetch links or offer repair |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS rows/members, and exact raw ODT/ODS/ODP auxiliary/media members during neighboring edits; ODT resource replacement retains frame attributes and unknown children while removal retains payload files; ODP model batches retain unselected producer content; the new XLSX closures raw-copy unselected Parts and refuse selected MCE/unknown owners. This is narrow fail-closed preservation, not general extension-aware editing |
 | Replace one or a bounded set of low-level Parts, preserve the rest | Covered for owned OPC, bounded source-backed OPC, guarded DOCX main-document semantics, guarded PPTX selected/multi-slide semantics, and guarded XLSX worksheet/workbook semantics | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; changes 0037/0077 add consuming one-Part/bounded multi-Part publishers; changes 0039, 0044/0063/0077, 0046, 0061, 0067, 0070, 0073, 0076, 0078, 0079 and 0080 integrate accepted measured guarded semantic transactions while refusing unsafe MCE, signatures, stale closure, topology, relationship, style-reference and printer-reference cases before output. Change 0082 adds matched selectable XLSX conditional-formatting publication through one selected worksheet after workbook/relationship/styles validation, with no latency claim before ABBA. Correctness-only guarded closures add direct standard PPTX transition set/replace/clear through one selected slide Part, XLSX tab-state publication through the workbook alone or the workbook plus old/new active worksheets, and DOCX main-document-only hyperlink-wrapper detachment. General XLSX cell/formula/table-filter, printer graph and structural/inherited/extension-transition PPTX editing remain outside the closure |
-| Replace existing same-length OLE2 stream bytes | Substrate correctness only | `litchi-cfb` resolves existing logical streams through validated FAT/MiniFAT chains, refuses length/topology changes, duplicates, overlaps and finite-bound violations, fully reopens the composed CFB before output, and publishes either to a direct sequential sink with typed partial progress or through a synced sibling temporary file plus atomic rename. `litchi-ole-common` retains signing/encryption/DRM refusals. This is not generic CFB semantic format coverage and has no adopted DOC/XLS/PPT end-to-end speed claim |
+| Same-length OLE2 stream edits and metadata moves | Substrate correctness only | `litchi-cfb` resolves existing logical streams through validated FAT/MiniFAT chains for bounded same-length whole-stream overlays and byte-range splices, and can move existing stream directory entries without copying payload sectors. Its writer also moves storage subtrees atomically while retaining descendant payload allocations and order. Exact source/version and target checks, overlap/duplicate/path/topology limits, complete reopen, direct sequential publication and atomic path output are covered where exposed. `litchi-ole-common` retains signing/encryption/DRM refusals. These are generic CFB/OLE2 substrate APIs, not DOC/XLS/PPT semantic CRUD or adopted end-to-end performance evidence |
 
 The source/output matrix is also incomplete. Owned bytes and instrumented
 `ReadAt` exist for OPC/XLSX, and the deterministic range simulator covers
@@ -63,17 +63,17 @@ conversion for other formats remain.
    preserve exact-source patch/inverse and the rejected DOC move as independent
    guardrails.
 2. Extend native RTF beyond the now-measured paragraph batch, remove/move and
-   bounded sequential semantic-text cases, raw CP-1252,
-   LZFu and watermark read/no-op matrix, retained story-length/sparse-selection
-   query handoffs and narrow real-producer shape-text native chain: formatting
-   and media semantics, malformed/security cases, more producers and broader
-   edits remain open.
+   bounded sequential semantic-text cases, and the correctness-only direct
+   paragraph-layout and standalone PNG/JPEG payload replace/remove closures.
+   Rich formatting/media ownership, malformed/security cases, more producers
+   and broader edits remain open.
 3. Separate logical authoring/append time from final serialization and reopen
    for DOCX, PPTX and XLSX.
-4. Measure broader XLSX cell/formula bulk and deletion semantics. Conditional
-   formatting replacement is now selectable without an ABBA claim; clear and
-   tab show/hide/very-hide remain correctness-covered but unmeasured. Direct
-   writer-local action regrouping was measured and rejected
+4. Measure broader XLSX cell/formula bulk and deletion semantics. Existing
+   scalar-cell set/clear/physical-remove and row visibility are now
+   source-backed correctness coverage only. Conditional-formatting replacement
+   is selectable without an ABBA claim; tab visibility remains unmeasured.
+   Direct writer-local action regrouping was measured and rejected
    in change 0030; broader coverage must not present that immaterial prototype
    as a solution.
 5. Broaden the accepted narrow XLSX calculation-metadata, defined-name,
@@ -89,12 +89,16 @@ conversion for other formats remain.
    correctness-covered through one selected slide Part but remains unmeasured;
    inherited layout/master transitions, sounds and extension forms are refused.
 6. Unknown OOXML extension and media preservation during a known semantic edit.
-7. Durable PPTX patch produce/encode/decode/apply/inverse/join/three-way flows,
-   including stale-base and conflict cases.
-8. PPTX dependency-closure transfer and slide split/removal with charts, media,
-   themes and collision names.
-9. Validate/security matrix for valid, malformed-within-limits, encrypted,
-   macro-enabled, protected and external-link fixtures.
+7. Broaden durable PPTX patch coverage beyond direct transitions and the
+   narrow dependency-free slide-removal patch into common
+   produce/encode/decode/apply/inverse/join/three-way flows.
+8. Broaden the supported PPTX slide-copy dependency closure and
+   dependency-free PPTX/ODP slide removals across real-producer charts, media,
+   themes, notes and collision-name reconciliation; slide split remains
+   missing.
+9. Extend the new bounded CFB/OPC/generic-ODF reports into format-semantic
+   DOC/XLS/PPT, OOXML and ODF-family validation/security matrices, signature
+   verification and explicit repair planning.
 10. Smart detection versus prepared-source reuse. OOXML smart results retain an
    adoptable parsed OPC package; ODF detection/handoff remains unmeasured.
 11. Broaden ODF beyond generated text/grid/deck and accepted compact ODT/ODS/ODP
@@ -108,7 +112,9 @@ conversion for other formats remain.
    finalization by change 0052, content-only line-break publication by change
    0071, existing-style inline-run publication by change 0072, inert hyperlink
    publication by change 0074, and plain paragraph insertion/removal by change
-   0075; new style creation, general extension preservation and broader
+   0075. Plain ODT paragraph move, ODS worksheet move/dependency-free copy, and
+   ODP dependency-free blank-slide copy/removal are correctness-only; new style
+   creation, general dependency closure, extension preservation and broader
    structural operations remain.
    iWork is deliberately deferred while the `iwa-*` crates change separately.
 
@@ -553,6 +559,23 @@ counters remain outside timing. Owned ODT exposes no positional-source or
 logical-Part materialization diagnostics, so none are fabricated. This is
 selectable evidence only, with no latency, allocation, memory, I/O, or
 materialization claim before frozen CPU-pinned ABBA.
+
+The 2026-08-12 non-iWork wave from `cb797b382` through `f6bbdf19c` adds
+correctness-only bounded validation reports for CFB, OPC and generic ODF;
+exact CFB stream/storage moves; reversible DOCX plain-paragraph copy/removal
+and irreversible external-hyperlink
+relationship/URL redaction; PPTX supported-closure slide copy and
+dependency-free removal; ODP dependency-free blank-slide copy/removal; ODS
+worksheet move and dependency-free copy; source-backed XLSX scalar-cell
+set/clear/remove and row visibility; XLS worksheet visibility; ODT plain
+paragraph move; and RTF paragraph layout plus standalone picture
+replace/removal. These commits add no selectable case to the 162-case harness
+and make no latency, allocation, memory, I/O or materialization claim. Large
+streaming authoring, general dependency closure, merge/split, repair,
+format-semantic validation, broad real-producer/security evidence and matching
+benchmarks remain open. The matrix also records the immediately preceding
+`cbf581c91` same-length CFB stream-splice substrate under the same
+correctness-only restraint.
 
 Production commit `c4c52c7ec` separately adds correctness-only ODS
 content-validation catalog CRUD. Its supported closure is clone-staged
