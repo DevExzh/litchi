@@ -1,0 +1,14 @@
+Protocol: CPU 3, perf stat, 2 warmups and 10 samples per process, three
+processes per state. Values below are process means.
+
+Counter                  Eager               Source-backed       Delta
+task-clock (ms)           6,186.41            1,892.27            -69.41%
+context switches             54.00               34.67            -35.80%
+CPU migrations                1.00                1.00              exact
+page faults              424,684.33          299,447.00           -29.49%
+cycles                30,256,439,700       9,319,761,434.33       -69.20%
+instructions          76,781,030,806      23,347,836,620.33       -69.59%
+branches              13,452,955,975.33    4,006,511,534.67       -70.22%
+branch misses            188,294,974          21,100,340.33       -88.79%
+cache references       1,718,808,737.67      549,034,187.67       -68.06%
+cache misses             43,373,593.33       27,235,602.00       -37.20%

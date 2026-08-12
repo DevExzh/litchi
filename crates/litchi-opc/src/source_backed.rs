@@ -22,6 +22,17 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 
 const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
+const MAX_SOURCE_OVERLAY_PARTS: usize = 64;
+
+struct PendingOverlay {
+    target: usize,
+    replacement: Vec<u8>,
+}
+
+struct ChangedOverlay {
+    target: usize,
+    replacement: Arc<Vec<u8>>,
+}
 
 /// Validation failure returned by [`SourceCacheLimits::new`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -583,10 +594,10 @@ fn remove_flight(state: &mut CacheState, entry_id: EntryId, flight: &Arc<LoadFli
 ///
 /// Opening reads and validates ZIP metadata, content types, and relationship
 /// XML, but never reads ordinary part payloads. The ordinary view is immutable.
-/// [`Self::write_part_overlay_to_stream`] is a narrow, consuming publisher for
-/// one same-topology Part replacement that raw-copies every other ZIP member;
-/// call [`Self::into_opc_package`] when a general owning mutable package is
-/// needed.
+/// [`Self::write_part_overlays_to_stream`] is a narrow, consuming publisher for
+/// a bounded same-topology Part replacement set that raw-copies every other
+/// ZIP member; call [`Self::into_opc_package`] when a general owning mutable
+/// package is needed.
 pub struct SourceBackedPackage {
     source: SourceSnapshot,
     archive: IndexedArchive<SourceReader>,
@@ -815,53 +826,137 @@ impl SourceBackedPackage {
         partname: &PackURI,
         replacement: Vec<u8>,
     ) -> Result<()> {
-        let target = self
-            .parts_by_name
-            .get(partname)
-            .copied()
-            .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
-        self.validate_overlay_limits(target, replacement.len())?;
+        self.write_part_overlays_to_stream(writer, vec![(partname.clone(), replacement)])
+    }
 
-        // Reading the selected closure proves its local framing, compression,
-        // declared size and CRC before either preserving it as an exact no-op
-        // or replacing it. Unselected ordinary payloads remain unread.
-        let original = self.read_part(target)?;
-        if original.as_bytes() == replacement.as_slice() {
+    /// Replace a bounded set of existing ordinary Parts and publish to a
+    /// sequential stream.
+    ///
+    /// The replacement set is sorted and checked for duplicate Part URIs. Its
+    /// maximum size is 64. Part URIs, content types, relationships, the package
+    /// catalog, and physical member topology are immutable. Every unselected
+    /// ZIP member and every selected exact no-op member is raw-copied.
+    ///
+    /// If every replacement is byte-identical to its source payload, the
+    /// complete source artifact is copied byte for byte, including signatures
+    /// and unsupported physical details. A real change to a signed package is
+    /// refused because this operation accepts no signature policy.
+    ///
+    /// All selected payloads, aggregate limits, signatures, changed XML, and
+    /// the preservation plan are validated before the first output byte.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed source, limit, duplicate-Part, Part, signature,
+    /// XML-publication, ZIP, or sink error. If a non-atomic sink accepts bytes
+    /// before failing, the error is [`OpcError::IncompleteOutput`].
+    pub fn write_part_overlays_to_stream<W: Write>(
+        self,
+        writer: W,
+        mut replacements: Vec<(PackURI, Vec<u8>)>,
+    ) -> Result<()> {
+        if replacements.len() > MAX_SOURCE_OVERLAY_PARTS {
+            return Err(overlay_unavailable(format!(
+                "replacement set exceeds the {MAX_SOURCE_OVERLAY_PARTS}-Part bound"
+            )));
+        }
+        if replacements.is_empty() {
             return self.write_exact_source(writer);
         }
+        replacements.sort_unstable_by(|left, right| left.0.as_str().cmp(right.0.as_str()));
+        if let Some(duplicate) = replacements.windows(2).find(|pair| pair[0].0 == pair[1].0) {
+            return Err(OpcError::DuplicatePartName(duplicate[0].0.to_string()));
+        }
 
+        let mut overlays = Vec::new();
+        overlays
+            .try_reserve_exact(replacements.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC replacement plan",
+                source,
+            })?;
+        for (partname, replacement) in replacements {
+            let target = self
+                .parts_by_name
+                .get(&partname)
+                .copied()
+                .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
+            overlays.push(PendingOverlay {
+                target,
+                replacement,
+            });
+        }
+        self.validate_overlay_limits(&overlays)?;
+
+        let mut changed = Vec::new();
+        changed
+            .try_reserve_exact(overlays.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC changed replacement plan",
+                source,
+            })?;
+        for overlay in overlays {
+            // Reading every selected closure proves its local framing,
+            // compression, declared size, and CRC before output.
+            let original = self.read_part(overlay.target)?;
+            if original.as_bytes() != overlay.replacement.as_slice() {
+                changed.push((overlay, original));
+            }
+        }
+        if changed.is_empty() {
+            return self.write_exact_source(writer);
+        }
         if self.has_signature_infrastructure() {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
-        let target_part = &self.parts[target];
-        if xml_minifier::audit::package::is_xml_part(
-            target_part.partname.as_str(),
-            &target_part.content_type,
-        ) {
-            validate_overlay_xml(target_part.partname.as_str(), original.as_bytes())?;
-            validate_overlay_xml(target_part.partname.as_str(), &replacement)?;
+
+        let mut replacements = Vec::new();
+        replacements
+            .try_reserve_exact(changed.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC changed payloads",
+                source,
+            })?;
+        for (overlay, original) in changed {
+            let target_part = &self.parts[overlay.target];
+            if xml_minifier::audit::package::is_xml_part(
+                target_part.partname.as_str(),
+                &target_part.content_type,
+            ) {
+                validate_overlay_xml(target_part.partname.as_str(), original.as_bytes())?;
+                validate_overlay_xml(target_part.partname.as_str(), &overlay.replacement)?;
+            }
+            replacements.push(ChangedOverlay {
+                target: overlay.target,
+                replacement: Arc::new(overlay.replacement),
+            });
         }
-        drop(original);
-        self.write_changed_overlay(writer, target, Arc::new(replacement))
+        self.write_changed_overlays(writer, &replacements)
     }
 
-    fn validate_overlay_limits(&self, target: usize, replacement_bytes: usize) -> Result<()> {
-        let replacement_bytes = replacement_bytes as u64;
-        self.limits.check(
-            ReadResource::PartBytes,
-            replacement_bytes,
-            self.limits.max_part_bytes(),
-        )?;
-        self.limits.check(
-            ReadResource::ArchiveEntryBytes,
-            replacement_bytes,
-            self.limits.max_archive_entry_bytes(),
-        )?;
+    fn validate_overlay_limits(&self, overlays: &[PendingOverlay]) -> Result<()> {
+        for overlay in overlays {
+            let replacement_bytes =
+                u64::try_from(overlay.replacement.len()).map_err(|_| OpcError::ReadLimit {
+                    resource: ReadResource::PartBytes,
+                    actual: u64::MAX,
+                    maximum: self.limits.max_part_bytes(),
+                })?;
+            self.limits.check(
+                ReadResource::PartBytes,
+                replacement_bytes,
+                self.limits.max_part_bytes(),
+            )?;
+            self.limits.check(
+                ReadResource::ArchiveEntryBytes,
+                replacement_bytes,
+                self.limits.max_archive_entry_bytes(),
+            )?;
+        }
 
         let mut part_total = 0_u64;
         let mut archive_total = 0_u64;
-        let mut target_bytes = None;
-        for (index, part) in self.parts.iter().enumerate() {
+        for part in &self.parts {
             let bytes = self
                 .archive
                 .metadata_for(part.entry_id)?
@@ -872,9 +967,6 @@ impl SourceBackedPackage {
                 ReadResource::TotalPartBytes,
                 self.limits.max_total_part_bytes(),
             )?;
-            if index == target {
-                target_bytes = Some(bytes);
-            }
         }
         for name in self.archive.file_names() {
             archive_total = checked_overlay_total(
@@ -884,26 +976,33 @@ impl SourceBackedPackage {
                 self.limits.max_archive_total_bytes(),
             )?;
         }
-        let target_bytes =
-            target_bytes.ok_or_else(|| OpcError::PartNotFound(target.to_string()))?;
-        let adjusted_parts = adjusted_overlay_total(
-            part_total,
-            target_bytes,
-            replacement_bytes,
-            ReadResource::TotalPartBytes,
-            self.limits.max_total_part_bytes(),
-        )?;
+        let mut adjusted_parts = part_total;
+        let mut adjusted_archive = archive_total;
+        for overlay in overlays {
+            let target_bytes = self
+                .archive
+                .metadata_for(self.parts[overlay.target].entry_id)?
+                .uncompressed_size();
+            let replacement_bytes = overlay.replacement.len() as u64;
+            adjusted_parts = adjusted_overlay_total(
+                adjusted_parts,
+                target_bytes,
+                replacement_bytes,
+                ReadResource::TotalPartBytes,
+                self.limits.max_total_part_bytes(),
+            )?;
+            adjusted_archive = adjusted_overlay_total(
+                adjusted_archive,
+                target_bytes,
+                replacement_bytes,
+                ReadResource::ArchiveTotalBytes,
+                self.limits.max_archive_total_bytes(),
+            )?;
+        }
         self.limits.check(
             ReadResource::TotalPartBytes,
             adjusted_parts,
             self.limits.max_total_part_bytes(),
-        )?;
-        let adjusted_archive = adjusted_overlay_total(
-            archive_total,
-            target_bytes,
-            replacement_bytes,
-            ReadResource::ArchiveTotalBytes,
-            self.limits.max_archive_total_bytes(),
         )?;
         self.limits.check(
             ReadResource::ArchiveTotalBytes,
@@ -979,11 +1078,10 @@ impl SourceBackedPackage {
         finish_source_publication(result, &self.source, written)
     }
 
-    fn write_changed_overlay<W: Write>(
+    fn write_changed_overlays<W: Write>(
         self,
         writer: W,
-        target: usize,
-        replacement: Arc<Vec<u8>>,
+        replacements: &[ChangedOverlay],
     ) -> Result<()> {
         self.source.monitor_publication();
         self.source.ensure_current()?;
@@ -1004,21 +1102,27 @@ impl SourceBackedPackage {
         };
         self.source.ensure_current()?;
 
-        let target_name = self.parts[target].partname.membername();
-        let target_entries = index
-            .entries()
-            .iter()
-            .filter(|entry| entry.raw_name_bytes() == target_name.as_bytes())
-            .count();
-        if target_entries != 1 {
-            return Err(overlay_unavailable(
-                "selected Part does not have one canonical UTF-8 source member",
-            ));
+        let mut replacement_bytes = 0_u64;
+        for replacement in replacements {
+            let target_name = self.parts[replacement.target].partname.membername();
+            let target_entries = index
+                .entries()
+                .iter()
+                .filter(|entry| entry.raw_name_bytes() == target_name.as_bytes())
+                .count();
+            if target_entries != 1 {
+                return Err(overlay_unavailable(
+                    "selected Part does not have one canonical UTF-8 source member",
+                ));
+            }
+            replacement_bytes = replacement_bytes
+                .checked_add(replacement.replacement.len() as u64)
+                .ok_or_else(|| overlay_unavailable("replacement byte total overflows u64"))?;
         }
         let conservative_output_bound = self
             .source
             .length
-            .checked_add((replacement.len() as u64).saturating_mul(2))
+            .checked_add(replacement_bytes.saturating_mul(2))
             .and_then(|bytes| bytes.checked_add(SOURCE_PUBLICATION_CHUNK_BYTES as u64));
         if conservative_output_bound.is_none_or(|bytes| bytes > u64::from(u32::MAX)) {
             return Err(overlay_unavailable(
@@ -1028,12 +1132,19 @@ impl SourceBackedPackage {
 
         let mut plan = soapberry_zip::PreservationPlan::new();
         for entry in index.entries() {
-            if entry.raw_name_bytes() == target_name.as_bytes() {
+            if let Some(replacement) = replacements.iter().find(|replacement| {
+                entry.raw_name_bytes()
+                    == self.parts[replacement.target]
+                        .partname
+                        .membername()
+                        .as_bytes()
+            }) {
+                let target_name = self.parts[replacement.target].partname.membername();
                 plan.push(soapberry_zip::PreservationAction::Regenerate {
                     id: entry.id(),
                     entry: soapberry_zip::RegeneratedEntry::new_shared(
                         target_name,
-                        Arc::clone(&replacement),
+                        Arc::clone(&replacement.replacement),
                     )
                     .compression_method(soapberry_zip::CompressionMethod::Deflate),
                 });
@@ -1385,7 +1496,9 @@ mod tests {
             .write_stored("_rels/.rels", root_relationships)
             .unwrap();
         writer.write_stored("word/document.xml", document).unwrap();
-        writer.write_stored("custom/orphan.xml", b"orphan").unwrap();
+        writer
+            .write_stored("custom/orphan.xml", b"<orphan/>")
+            .unwrap();
         if include_junk {
             writer.write_stored("scratch.bin", b"not a part").unwrap();
         }
@@ -1767,6 +1880,150 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn multi_part_overlay_changes_only_selected_raw_members_and_reopens() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
+        let source_raw = raw_records(&source_bytes);
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes))).unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let orphan = PackURI::new("/custom/orphan.xml").unwrap();
+        let mut output = Vec::new();
+        package
+            .write_part_overlays_to_stream(
+                &mut output,
+                vec![
+                    (orphan.clone(), b"<orphan-after/>".to_vec()),
+                    (document.clone(), b"<document-after/>".to_vec()),
+                ],
+            )
+            .unwrap();
+
+        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        assert_eq!(
+            reopened.get_part(&document).unwrap().blob(),
+            b"<document-after/>"
+        );
+        assert_eq!(
+            reopened.get_part(&orphan).unwrap().blob(),
+            b"<orphan-after/>"
+        );
+        let output_raw = raw_records(&output);
+        assert_eq!(output_raw.len(), source_raw.len());
+        for (name, source_record) in source_raw {
+            if matches!(name.as_slice(), b"word/document.xml" | b"custom/orphan.xml") {
+                assert_ne!(output_raw[&name].local, source_record.local, "{name:?}");
+            } else {
+                assert_eq!(output_raw[&name].local, source_record.local, "{name:?}");
+                assert_eq!(
+                    central_without_local_offset(&output_raw[&name].central),
+                    central_without_local_offset(&source_record.central),
+                    "{name:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn multi_part_overlay_checks_set_bounds_duplicates_and_aggregate_limits() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let orphan = PackURI::new("/custom/orphan.xml").unwrap();
+
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+                .unwrap();
+        let mut output = Vec::new();
+        assert!(matches!(
+            package.write_part_overlays_to_stream(
+                &mut output,
+                vec![
+                    (document.clone(), b"<first/>".to_vec()),
+                    (document.clone(), b"<second/>".to_vec()),
+                ],
+            ),
+            Err(OpcError::DuplicatePartName(_))
+        ));
+        assert!(output.is_empty());
+
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+                .unwrap();
+        let oversized_set = (0..=MAX_SOURCE_OVERLAY_PARTS)
+            .map(|_| (document.clone(), b"<changed/>".to_vec()))
+            .collect();
+        assert!(matches!(
+            package.write_part_overlays_to_stream(&mut output, oversized_set),
+            Err(OpcError::SourceBackedOverlayUnavailable { .. })
+        ));
+        assert!(output.is_empty());
+
+        let limits = ReadLimits::builder()
+            .max_part_bytes(20)
+            .unwrap()
+            .max_total_part_bytes(21)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = SourceBackedPackage::from_read_at_with_limits(
+            Arc::new(CountingSource::new(source_bytes)),
+            limits,
+        )
+        .unwrap();
+        assert!(matches!(
+            package.write_part_overlays_to_stream(
+                &mut output,
+                vec![
+                    (document, b"<document/>".to_vec()),
+                    (orphan, b"<orphan-2/>".to_vec()),
+                ],
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::TotalPartBytes,
+                ..
+            })
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn multi_part_overlay_all_noop_preserves_signed_source_identity() {
+        let source_bytes = signed_archive(b"<signed/>");
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let signature = PackURI::new("/signature/origin.xml").unwrap();
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+                .unwrap();
+        let mut output = Vec::new();
+        package
+            .write_part_overlays_to_stream(
+                &mut output,
+                vec![
+                    (document.clone(), b"<signed/>".to_vec()),
+                    (signature.clone(), b"<origin/>".to_vec()),
+                ],
+            )
+            .unwrap();
+        assert_eq!(output, source_bytes);
+
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            signed_archive(b"<signed/>"),
+        )))
+        .unwrap();
+        output.clear();
+        assert!(matches!(
+            package.write_part_overlays_to_stream(
+                &mut output,
+                vec![
+                    (document, b"<changed/>".to_vec()),
+                    (signature, b"<origin/>".to_vec()),
+                ],
+            ),
+            Err(OpcError::SignedSourceRequiresExplicitPolicy)
+        ));
+        assert!(output.is_empty());
     }
 
     #[test]

@@ -1,0 +1,15 @@
+Protocol: CPU 3, perf record at 999 Hz with DWARF call graphs, 2 warmups and 10
+samples per process.
+
+Samples lost: 0 in both profiles.
+Approximate sampled cycles: eager 29,971,529,184; source-backed 9,204,724,908.
+
+Frame                                      Eager share     Source share
+zlib_rs::deflate_medium                    34.07%           7.68%
+
+Cycle-weighted deflate_medium attribution falls about 93.08%. The eager frame
+is dominated by ordinary PPTX/OPC package publication; the candidate's
+remaining deflate samples are chiefly deterministic corpus construction.
+These whole-process profiles include corpus construction and complete untimed
+output verification, so their total-cycle delta understates the scoped
+operation-latency delta.

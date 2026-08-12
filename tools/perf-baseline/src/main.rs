@@ -87,6 +87,7 @@ const PPTX_SOURCE_MEDIA_ENTRY_COUNT: usize = 8;
 const PPTX_SOURCE_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const PPTX_SOURCE_SLIDE_COUNT: usize = 200;
 const PPTX_SOURCE_TEXT_BOXES_PER_SLIDE: usize = 8;
+const PPTX_MULTI_SLIDE_BATCH_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const ODP_MEDIA_TEXT_BOX_NAME: &str = "litchi-perf-media-text-box";
@@ -364,6 +365,8 @@ enum Case {
     PptxSourceBackedOneEditSave,
     PptxEagerBatchEditSave,
     PptxSourceBackedBatchEditSave,
+    PptxEagerMultiSlideBatchEditSave,
+    PptxSourceBackedMultiSlideBatchEditSave,
     XlsxEagerCalculationMetadataEditSave,
     XlsxSourceBackedCalculationMetadataEditSave,
     XlsxEagerDefinedNamesEditSave,
@@ -551,6 +554,10 @@ impl Case {
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
             Self::PptxEagerBatchEditSave => "pptx_eager_batch_edit_save",
             Self::PptxSourceBackedBatchEditSave => "pptx_source_backed_batch_edit_save",
+            Self::PptxEagerMultiSlideBatchEditSave => "pptx_eager_multi_slide_batch_edit_save",
+            Self::PptxSourceBackedMultiSlideBatchEditSave => {
+                "pptx_source_backed_multi_slide_batch_edit_save"
+            },
             Self::XlsxEagerCalculationMetadataEditSave => {
                 "xlsx_eager_calculation_metadata_edit_save"
             },
@@ -935,6 +942,8 @@ impl Case {
             Self::PptxSourceBackedOneEditSave
                 | Self::PptxEagerBatchEditSave
                 | Self::PptxSourceBackedBatchEditSave
+                | Self::PptxEagerMultiSlideBatchEditSave
+                | Self::PptxSourceBackedMultiSlideBatchEditSave
         )
     }
 
@@ -1980,6 +1989,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                         options.samples,
                     )?
                 },
+                Case::PptxEagerMultiSlideBatchEditSave
+                | Case::PptxSourceBackedMultiSlideBatchEditSave => {
+                    run_pptx_multi_slide_batch_edit_save(
+                        *case,
+                        &corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                    )?
+                },
                 _ => unreachable!("filtered PPTX source-edit case"),
             });
         }
@@ -2490,6 +2508,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_source_backed_one_edit_save" => Some(Case::PptxSourceBackedOneEditSave),
         "pptx_eager_batch_edit_save" => Some(Case::PptxEagerBatchEditSave),
         "pptx_source_backed_batch_edit_save" => Some(Case::PptxSourceBackedBatchEditSave),
+        "pptx_eager_multi_slide_batch_edit_save" => Some(Case::PptxEagerMultiSlideBatchEditSave),
+        "pptx_source_backed_multi_slide_batch_edit_save" => {
+            Some(Case::PptxSourceBackedMultiSlideBatchEditSave)
+        },
         "xlsx_eager_calculation_metadata_edit_save" => {
             Some(Case::XlsxEagerCalculationMetadataEditSave)
         },
@@ -2704,6 +2726,8 @@ fn print_usage() {
                                        pptx_source_backed_one_edit_save,\n\
                                        pptx_eager_batch_edit_save,\n\
                                        pptx_source_backed_batch_edit_save,\n\
+                                       pptx_eager_multi_slide_batch_edit_save,\n\
+                                       pptx_source_backed_multi_slide_batch_edit_save,\n\
                                        xlsx_eager_calculation_metadata_edit_save,\n\
                                        xlsx_source_backed_calculation_metadata_edit_save,\n\
                                        xlsx_eager_defined_names_edit_save,\n\
@@ -4622,6 +4646,9 @@ fn run_case_with_config(
         Case::PptxEagerBatchEditSave | Case::PptxSourceBackedBatchEditSave => {
             run_pptx_batch_edit_save(case, corpus, warmup_iterations, samples)
         },
+        Case::PptxEagerMultiSlideBatchEditSave | Case::PptxSourceBackedMultiSlideBatchEditSave => {
+            run_pptx_multi_slide_batch_edit_save(case, corpus, warmup_iterations, samples)
+        },
         Case::XlsxEagerCalculationMetadataEditSave
         | Case::XlsxSourceBackedCalculationMetadataEditSave => {
             run_xlsx_calculation_metadata_edit_save(case, corpus, warmup_iterations, samples)
@@ -5162,11 +5189,18 @@ fn verify_pptx_source_edit_semantics(
     package: &litchi_pptx::Package,
     updated_shapes: usize,
 ) -> Result<(), Box<dyn Error>> {
+    let target_slide = PPTX_SOURCE_SLIDE_COUNT / 2;
+    verify_pptx_source_edit_semantics_for(package, &[(target_slide, updated_shapes)])
+}
+
+fn verify_pptx_source_edit_semantics_for(
+    package: &litchi_pptx::Package,
+    updated_slides: &[(usize, usize)],
+) -> Result<(), Box<dyn Error>> {
     let presentation = package.presentation()?;
     if presentation.slide_count()? != PPTX_SOURCE_SLIDE_COUNT {
         return Err("PPTX source-edit slide count differs from specification".into());
     }
-    let target_slide = PPTX_SOURCE_SLIDE_COUNT / 2;
     let mut presentation_text = Vec::with_capacity(PPTX_SOURCE_SLIDE_COUNT);
     for slide_index in 0..PPTX_SOURCE_SLIDE_COUNT {
         let slide = presentation
@@ -5187,7 +5221,11 @@ fn verify_pptx_source_edit_semantics(
         }
         let mut slide_text = Vec::with_capacity(PPTX_SOURCE_TEXT_BOXES_PER_SLIDE);
         for (shape_index, actual) in text_shapes.into_iter().enumerate() {
-            let is_updated = slide_index == target_slide && shape_index < updated_shapes;
+            let updated_shapes = updated_slides
+                .iter()
+                .find_map(|&(position, count)| (position == slide_index).then_some(count))
+                .unwrap_or_default();
+            let is_updated = shape_index < updated_shapes;
             let expected = semantic_pptx_text(slide_index, shape_index, is_updated);
             if actual != expected {
                 return Err("PPTX source-edit shape text differs from specification".into());
@@ -9170,6 +9208,55 @@ fn verify_pptx_source_edit_output(
     Ok(())
 }
 
+const fn pptx_multi_slide_positions() -> [usize; PPTX_MULTI_SLIDE_BATCH_COUNT] {
+    [0, 28, 57, 85, 114, 142, 171, 199]
+}
+
+fn verify_pptx_multi_slide_edit_output(
+    corpus: &Corpus,
+    output: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let positions = pptx_multi_slide_positions();
+    let updated = positions.map(|position| (position, PPTX_SOURCE_TEXT_BOXES_PER_SLIDE));
+    let reopened = litchi_pptx::Package::from_bytes(output)?;
+    verify_pptx_source_edit_semantics_for(&reopened, &updated)?;
+
+    let source = OpcPackage::from_bytes(&corpus.archive)?;
+    let candidate = OpcPackage::from_bytes(output)?;
+    if source.part_count() != corpus.manifest.entry_count
+        || candidate.part_count() != source.part_count()
+        || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
+    {
+        return Err("PPTX multi-slide package topology differs from source".into());
+    }
+    let selected = positions
+        .map(|position| PackURI::new(format!("/ppt/slides/slide{}.xml", position + 1)))
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+    for source_part in source.iter_parts() {
+        let candidate_part = candidate.get_part(source_part.partname())?;
+        if candidate_part.content_type() != source_part.content_type()
+            || relationship_signatures(candidate_part.rels())
+                != relationship_signatures(source_part.rels())
+        {
+            return Err("PPTX multi-slide Part metadata differs from source".into());
+        }
+        let is_selected = selected.contains(source_part.partname());
+        if is_selected == (source_part.blob() == candidate_part.blob()) {
+            return Err("PPTX multi-slide changed the wrong Part payload set".into());
+        }
+    }
+    for index in 0..PPTX_SOURCE_MEDIA_ENTRY_COUNT {
+        let uri = PackURI::new(format!(
+            "/ppt/media/litchi-perf-source-media-{index:02}.png"
+        ))?;
+        if candidate.get_part(&uri)?.blob() != pptx_source_media_payload(index) {
+            return Err("PPTX multi-slide media readback differs from specification".into());
+        }
+    }
+    Ok(())
+}
+
 fn publish_pptx_source_edit<W: Write>(
     source: Arc<dyn ReadAt>,
     writer: &mut W,
@@ -9452,6 +9539,180 @@ fn run_pptx_batch_edit_save(
     })
 }
 
+fn publish_pptx_multi_slide_batch_edit<W: Write>(
+    source: Arc<dyn ReadAt>,
+    writer: &mut W,
+    source_backed: bool,
+) -> Result<usize, Box<dyn Error>> {
+    if source_backed {
+        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(source)?;
+        let mut edit = editor.edit_slides();
+        for slide_position in pptx_multi_slide_positions() {
+            let texts = (0..PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)
+                .map(|shape| semantic_pptx_text(slide_position, shape, true))
+                .collect::<Vec<_>>();
+            let replacements = pptx_batch_replacements(&texts);
+            if edit.set_shape_texts(slide_position, &replacements)?
+                != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE
+            {
+                return Err(
+                    "PPTX source-backed multi-slide batch changed an unexpected shape count".into(),
+                );
+            }
+        }
+        let commit = edit.commit()?;
+        if !commit.is_changed() {
+            return Err("PPTX source-backed multi-slide batch produced no changes".into());
+        }
+        let replayed = commit.patch().apply(commit.patch().source())?;
+        if commit.patch().inverse().apply(&replayed).is_err() {
+            return Err("PPTX source-backed multi-slide inverse rejected its candidate".into());
+        }
+        let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
+        let published = editor.publish_slide_batch_commit_to_stream(writer, &commit)?;
+        if commit.patch().inverse().apply(&published).is_err()
+            || commit.patch().apply(&published).is_ok()
+        {
+            return Err("PPTX source-backed multi-slide published another snapshot".into());
+        }
+        return Ok(materializations);
+    }
+
+    let package = SourceBackedPackage::from_read_at(source)?;
+    let opc = package.into_opc_package()?;
+    let materializations = opc.part_count();
+    let mut package = litchi_pptx::Package::from_opc_package(opc)?;
+    let mut edit = package.opened_presentation_transaction()?;
+    for slide_position in pptx_multi_slide_positions() {
+        let texts = (0..PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)
+            .map(|shape| semantic_pptx_text(slide_position, shape, true))
+            .collect::<Vec<_>>();
+        let replacements = pptx_batch_replacements(&texts);
+        if edit.set_shape_texts(slide_position, &replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE
+        {
+            return Err("PPTX eager multi-slide batch changed an unexpected shape count".into());
+        }
+    }
+    let commit = edit.commit()?;
+    if !commit.is_changed() {
+        return Err("PPTX eager multi-slide batch produced an unchanged commit".into());
+    }
+    let inverse = commit.patch().inverse();
+    let published = package.apply_opened_presentation_commit(commit)?;
+    if package
+        .apply_opened_presentation_patch(&inverse)
+        .and_then(|_| package.apply_opened_presentation_patch(&inverse.inverse()))
+        .is_err()
+    {
+        return Err("PPTX eager multi-slide batch inverse/forward replay failed".into());
+    }
+    if published.slides().len() != PPTX_SOURCE_SLIDE_COUNT {
+        return Err("PPTX eager multi-slide batch changed the slide graph".into());
+    }
+    let output = package.to_bytes()?;
+    for chunk in output.chunks(64 * 1024) {
+        writer.write_all(chunk)?;
+    }
+    Ok(materializations)
+}
+
+fn run_pptx_multi_slide_batch_edit_save(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != PPTX_SOURCE_EDIT_CORPUS_GENERATOR
+        || !matches!(
+            case,
+            Case::PptxEagerMultiSlideBatchEditSave | Case::PptxSourceBackedMultiSlideBatchEditSave
+        )
+    {
+        return Err("PPTX multi-slide batch requires its fixed media-rich corpus".into());
+    }
+    if sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256 {
+        return Err("PPTX multi-slide source digest differs from corpus manifest".into());
+    }
+    let expected_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+    let mut expected = Vec::new();
+    let source_backed = case == Case::PptxSourceBackedMultiSlideBatchEditSave;
+    let expected_materializations =
+        publish_pptx_multi_slide_batch_edit(expected_source, &mut expected, source_backed)?;
+    let required_materializations = if source_backed {
+        PPTX_MULTI_SLIDE_BATCH_COUNT + 1
+    } else {
+        corpus.manifest.entry_count
+    };
+    if expected == corpus.archive || expected_materializations != required_materializations {
+        return Err("PPTX multi-slide materialized an unexpected Part count".into());
+    }
+    verify_pptx_multi_slide_edit_output(corpus, &expected)?;
+    let expected_digest = sha256_hex(&expected);
+    let maximum = u64::try_from(expected.len())?
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("PPTX multi-slide sequential output ceiling overflows u64")?;
+    let payload_ranges = pptx_source_payload_ranges(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut measured_digests = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = Arc::new(InstrumentedSource::new(
+            corpus.archive.clone(),
+            payload_ranges.clone(),
+        ));
+        let read_at: Arc<dyn ReadAt> = source.clone();
+        let mut sink = CountingSink::bounded(maximum, 64 * 1024);
+        sink.reserve_budget()?;
+        let started = Instant::now();
+        let materializations =
+            publish_pptx_multi_slide_batch_edit(read_at, &mut sink, source_backed)?;
+        let duration = started.elapsed();
+
+        if materializations != expected_materializations || sink.bytes != expected {
+            return Err("PPTX multi-slide batch differs between iterations".into());
+        }
+        if sink.summary().largest_write > 64 * 1024 {
+            return Err("PPTX multi-slide batch exceeded the sink write bound".into());
+        }
+        verify_pptx_multi_slide_edit_output(corpus, &sink.bytes)?;
+        let digest = sha256_hex(&sink.bytes);
+        if digest != expected_digest {
+            return Err("PPTX multi-slide output digest differs from expected".into());
+        }
+        let metrics = source.snapshot();
+        if metrics.ordinary_payload_read_calls == 0 || metrics.ordinary_payload_read_bytes == 0 {
+            return Err("PPTX multi-slide batch performed no ordinary source reads".into());
+        }
+        if iteration >= warmup_iterations {
+            source_summary.record_opc(metrics, u64::try_from(materializations)?);
+            sink_summaries.push(sink.summary());
+            measured_digests.push(digest);
+        }
+        std::hint::black_box(&sink.bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let sink = deterministic_sink_summary(&sink_summaries, case.name())?;
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("PPTX multi-slide measured output digests are not stable".into());
+    }
+    Ok(CaseResult {
+        case: case.name(),
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: Some(expected_digest),
+    })
+}
+
 fn xlsx_defined_names_target() -> Vec<litchi_xlsx::raw::DefinedName> {
     vec![
         litchi_xlsx::raw::DefinedName {
@@ -9577,11 +9838,8 @@ fn run_xlsx_defined_names_edit_save(
     let source_backed = case == Case::XlsxSourceBackedDefinedNamesEditSave;
     let expected_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
     let mut expected = Vec::new();
-    let expected_materializations = publish_xlsx_defined_names_edit(
-        expected_source,
-        &mut expected,
-        source_backed,
-    )?;
+    let expected_materializations =
+        publish_xlsx_defined_names_edit(expected_source, &mut expected, source_backed)?;
     let required_materializations = if source_backed {
         1
     } else {
@@ -9611,8 +9869,7 @@ fn run_xlsx_defined_names_edit_save(
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let started = Instant::now();
-        let materializations =
-            publish_xlsx_defined_names_edit(read_at, &mut sink, source_backed)?;
+        let materializations = publish_xlsx_defined_names_edit(read_at, &mut sink, source_backed)?;
         let duration = started.elapsed();
 
         if materializations != expected_materializations || sink.bytes != expected {
@@ -11558,26 +11815,27 @@ mod tests {
     use litchi_core::ReadAt;
 
     use super::{
-        Case, CorpusShape, CountingSink, InstrumentedSource, PayloadKind, RangeSimulationConfig,
-        RequestSizeBuckets, RtfSemanticVariant, SemanticShape, SimulatedRangeSource,
-        SourceBackedPackage, WriterShape, XlsxShape, build_cfb_corpus,
+        Case, CorpusShape, CountingSink, InstrumentedSource, PPTX_MULTI_SLIDE_BATCH_COUNT,
+        PayloadKind, RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
+        SimulatedRangeSource, SourceBackedPackage, WriterShape, XlsxShape, build_cfb_corpus,
         build_docx_source_edit_corpus, build_odp_media_corpus, build_ods_media_corpus,
         build_odt_media_corpus, build_ole_common_corpus, build_opc_corpus,
         build_pptx_source_edit_corpus, build_semantic_docx_corpus, build_semantic_odp_corpus,
         build_semantic_ods_corpus, build_semantic_odt_corpus, build_semantic_pptx_corpus,
         build_semantic_rtf_corpus, build_writer_corpus,
         build_xlsx_calculation_metadata_edit_corpus, build_xlsx_corpus,
-        build_xlsx_defined_names_edit_corpus,
-        build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
-        build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
-        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
-        payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
+        build_xlsx_defined_names_edit_corpus, build_xlsx_page_break_edit_corpus,
+        build_xlsx_page_margin_edit_corpus, build_xlsx_page_setup_edit_corpus,
+        build_xlsx_print_options_edit_corpus, expected_opc_overlay_output,
+        ole_common_changed_output, opc_overlay_replacement_payload, payload_bytes,
+        resolve_execution_workers, run_case, run_case_with_config,
         run_docx_source_backed_one_edit_save, run_opc_source_overlay_one_part_save,
-        run_pptx_batch_edit_save, run_pptx_source_backed_one_edit_save, run_scaling_case,
-        run_xlsx_calculation_metadata_edit_save, run_xlsx_page_break_edit_save,
-        run_xlsx_defined_names_edit_save,
-        run_xlsx_page_margin_edit_save, run_xlsx_page_setup_edit_save,
-        run_xlsx_print_options_edit_save, sha256_hex, simulated_request_delay, statistics,
+        run_pptx_batch_edit_save, run_pptx_multi_slide_batch_edit_save,
+        run_pptx_source_backed_one_edit_save, run_scaling_case,
+        run_xlsx_calculation_metadata_edit_save, run_xlsx_defined_names_edit_save,
+        run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
+        run_xlsx_page_setup_edit_save, run_xlsx_print_options_edit_save, sha256_hex,
+        simulated_request_delay, statistics,
     };
 
     #[test]
@@ -11736,6 +11994,44 @@ mod tests {
     }
 
     #[test]
+    fn pptx_multi_slide_controls_are_deterministic_and_equivalent() {
+        let corpus = build_pptx_source_edit_corpus().unwrap();
+        let eager = run_pptx_multi_slide_batch_edit_save(
+            Case::PptxEagerMultiSlideBatchEditSave,
+            &corpus,
+            0,
+            1,
+        )
+        .unwrap();
+        let source_backed = run_pptx_multi_slide_batch_edit_save(
+            Case::PptxSourceBackedMultiSlideBatchEditSave,
+            &corpus,
+            0,
+            1,
+        )
+        .unwrap();
+        assert_eq!(eager.case, "pptx_eager_multi_slide_batch_edit_save");
+        assert_eq!(
+            source_backed.case,
+            "pptx_source_backed_multi_slide_batch_edit_save"
+        );
+        assert_eq!(eager.elapsed_ns.samples.len(), 1);
+        assert_eq!(source_backed.elapsed_ns.samples.len(), 1);
+        assert_eq!(eager.output_sha256, source_backed.output_sha256);
+        assert_eq!(
+            eager.source.unwrap().ordinary_payload_materializations,
+            Some(vec![corpus.manifest.entry_count as u64])
+        );
+        assert_eq!(
+            source_backed
+                .source
+                .unwrap()
+                .ordinary_payload_materializations,
+            Some(vec![(PPTX_MULTI_SLIDE_BATCH_COUNT + 1) as u64])
+        );
+    }
+
+    #[test]
     fn xlsx_calculation_edit_controls_are_deterministic_and_equivalent() {
         let corpus = build_xlsx_calculation_metadata_edit_corpus().unwrap();
         let again = build_xlsx_calculation_metadata_edit_corpus().unwrap();
@@ -11785,13 +12081,9 @@ mod tests {
         assert_eq!(corpus.archive, again.archive);
         assert_eq!(corpus.manifest.archive_sha256, sha256_hex(&corpus.archive));
 
-        let eager = run_xlsx_defined_names_edit_save(
-            Case::XlsxEagerDefinedNamesEditSave,
-            &corpus,
-            0,
-            1,
-        )
-        .unwrap();
+        let eager =
+            run_xlsx_defined_names_edit_save(Case::XlsxEagerDefinedNamesEditSave, &corpus, 0, 1)
+                .unwrap();
         let source_backed = run_xlsx_defined_names_edit_save(
             Case::XlsxSourceBackedDefinedNamesEditSave,
             &corpus,

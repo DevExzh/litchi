@@ -220,13 +220,14 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **143
+The stage-1 records above are retained unchanged. The current harness has **145
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
-PPTX semantic publication case, six opt-in media-rich ODT paragraph,
+PPTX semantic publication case, four opt-in matched same-slide/multi-slide
+PPTX batch cases, six opt-in media-rich ODT paragraph,
 line-break, inline-run, hyperlink, insertion, and removal publication cases,
 12 opt-in matched XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup
 publication cases, 16 opt-in DOCX/PPTX semantic
@@ -283,6 +284,13 @@ incomplete program and CRUD matrix.
   PPTX guard is neutral. See
   [`0044`](changes/0044-pptx-source-backed-semantic-publication.md) and
   [`0063`](changes/0063-pptx-atomic-source-backed-shape-text-batch.md).
+- The bounded multi-slide PPTX extension publishes eight selected slide Parts
+  through one source-backed OPC preservation plan. Against the same 229-Part
+  media-rich archive, pooled p50 falls from 331.362 to 13.997 ms (-95.78%,
+  23.67x), allocation calls fall 32.54%, and semantic materializations fall
+  229 -> 9 with byte-identical output. Duplicate, stale, foreign, signed,
+  topology-changing and MCE-projected batches refuse before output. See
+  [`0077`](changes/0077-pptx-source-backed-multi-slide-batch-publication.md).
 - The guarded XLSX calculation-metadata editor now carries exact raw
   `xl/workbook.xml` transactions through the one-Part publisher. On the fixed
   12-Part, eight-media corpus, pooled p50 falls from 215.457 to 1.612 ms

@@ -16,6 +16,9 @@ use litchi_opc::{
 use crate::parts::{PresentationPart, SlidePart, SlideReference};
 use crate::{Error, Result};
 
+/// Maximum number of existing slides in one source-backed batch edit.
+pub const MAX_SOURCE_BACKED_SLIDE_BATCH: usize = 32;
+
 struct SourceSlideData {
     position: usize,
     part_uri: PackURI,
@@ -128,6 +131,32 @@ pub struct SourceBackedSlidePatch {
 pub struct SourceBackedSlideCommit {
     snapshot: SourceBackedSlideSnapshot,
     patch: SourceBackedSlidePatch,
+}
+
+/// A bounded multi-slide shape-text edit borrowing its deferred source.
+pub struct SourceBackedSlideBatchEdit<'a> {
+    editor: &'a SourceBackedPresentationEditor,
+    commits: Vec<SourceBackedSlideCommit>,
+    text_bytes: usize,
+}
+
+/// An immutable exact-source snapshot of a selected slide set.
+#[derive(Clone)]
+pub struct SourceBackedSlideBatchSnapshot {
+    slides: Box<[SourceBackedSlideSnapshot]>,
+}
+
+/// A reversible, exact-source-checked multi-slide XML patch.
+#[derive(Clone)]
+pub struct SourceBackedSlideBatchPatch {
+    before: SourceBackedSlideBatchSnapshot,
+    after: SourceBackedSlideBatchSnapshot,
+}
+
+/// A checked source-backed multi-slide edit ready for publication.
+pub struct SourceBackedSlideBatchCommit {
+    snapshot: SourceBackedSlideBatchSnapshot,
+    patch: SourceBackedSlideBatchPatch,
 }
 
 impl SourceBackedPresentation {
@@ -259,6 +288,20 @@ impl SourceBackedPresentationEditor {
         Ok(self.slide_snapshot_for(position, "edit_slide")?.edit())
     }
 
+    /// Begin an atomic, bounded shape-text edit across existing slides.
+    ///
+    /// Each selected slide may receive one nonempty same-slide shape batch.
+    /// The edit supports at most [`MAX_SOURCE_BACKED_SLIDE_BATCH`] distinct
+    /// slides and the ordinary opened-presentation aggregate text budget.
+    #[must_use]
+    pub fn edit_slides(&self) -> SourceBackedSlideBatchEdit<'_> {
+        SourceBackedSlideBatchEdit {
+            editor: self,
+            commits: Vec::new(),
+            text_bytes: 0,
+        }
+    }
+
     /// Publish one exact-source-checked slide commit to a sequential stream.
     ///
     /// The publisher replaces only the selected existing slide XML part and
@@ -283,12 +326,65 @@ impl SourceBackedPresentationEditor {
         Ok(target)
     }
 
+    /// Publish one exact-source-checked multi-slide commit to a stream.
+    ///
+    /// Only changed selected slide XML members are regenerated. Selected
+    /// no-ops and every unselected member retain their raw ZIP records. An
+    /// all-no-op commit reproduces the complete source artifact byte for byte.
+    pub fn publish_slide_batch_commit_to_stream<W: Write>(
+        self,
+        writer: W,
+        commit: &SourceBackedSlideBatchCommit,
+    ) -> Result<SourceBackedSlideBatchSnapshot> {
+        let catalog = source_catalog(&self.package)?;
+        let mut slides = Vec::new();
+        slides
+            .try_reserve_exact(commit.patch.source().slide_count())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed slide batch publication snapshot",
+                source,
+            })?;
+        for source in commit.patch.source().slides() {
+            slides.push(self.slide_snapshot_from_catalog(
+                &catalog,
+                source.position,
+                "publish_slide_batch_commit_to_stream",
+            )?);
+        }
+        let current = SourceBackedSlideBatchSnapshot {
+            slides: slides.into_boxed_slice(),
+        };
+        let target = commit.patch.apply(&current)?;
+        let mut replacements = Vec::new();
+        replacements
+            .try_reserve_exact(target.slide_count())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed slide batch publication payloads",
+                source,
+            })?;
+        for slide in target.slides() {
+            replacements.push((slide.part_uri.clone(), slide.xml.as_ref().clone()));
+        }
+        self.package
+            .write_part_overlays_to_stream(writer, replacements)?;
+        Ok(target)
+    }
+
     fn slide_snapshot_for(
         &self,
         position: usize,
         operation: &'static str,
     ) -> Result<SourceBackedSlideSnapshot> {
         let catalog = source_catalog(&self.package)?;
+        self.slide_snapshot_from_catalog(&catalog, position, operation)
+    }
+
+    fn slide_snapshot_from_catalog(
+        &self,
+        catalog: &SourceCatalog,
+        position: usize,
+        operation: &'static str,
+    ) -> Result<SourceBackedSlideSnapshot> {
         let data = catalog
             .slides
             .get(position)
@@ -312,9 +408,9 @@ impl SourceBackedPresentationEditor {
             part_uri: data.part_uri.clone(),
             xml: raw,
             closure: SlideClosure {
-                package_relationships: catalog.package_relationships,
-                presentation: catalog.presentation_binding,
-                presentation_xml: catalog.presentation_xml,
+                package_relationships: catalog.package_relationships.clone(),
+                presentation: catalog.presentation_binding.clone(),
+                presentation_xml: Arc::clone(&catalog.presentation_xml),
                 slide: data.binding.clone(),
             },
             max_output_bytes: source_slide_output_limit(self.limits),
@@ -480,6 +576,210 @@ impl SourceBackedSlideCommit {
     }
 
     /// Whether the selected slide XML changes.
+    #[must_use]
+    pub fn is_changed(&self) -> bool {
+        self.patch.is_changed()
+    }
+}
+
+impl SourceBackedSlideBatchEdit<'_> {
+    /// Atomically replace visible text in one bounded shape set on one slide.
+    ///
+    /// A slide position may be selected only once in the outer batch. An empty
+    /// shape batch is a no-op and does not select the slide. The return value
+    /// is the number of shapes whose text bytes changed.
+    pub fn set_shape_texts(
+        &mut self,
+        position: usize,
+        replacements: &[crate::opened::ShapeTextReplacement<'_>],
+    ) -> Result<usize> {
+        if replacements.is_empty() {
+            return Ok(0);
+        }
+        if position >= self.editor.slide_count() {
+            return Err(Error::SlideIndexOutOfBounds {
+                index: position,
+                len: self.editor.slide_count(),
+            });
+        }
+        if self
+            .commits
+            .iter()
+            .any(|commit| commit.snapshot.position == position)
+        {
+            return Err(Error::UnsafeEdit {
+                operation: "set_shape_texts",
+                reason: "a source-backed slide batch may select each slide only once",
+            });
+        }
+        if self.commits.len() >= MAX_SOURCE_BACKED_SLIDE_BATCH {
+            return Err(Error::Limit {
+                resource: "source-backed slide batch selections",
+                limit: MAX_SOURCE_BACKED_SLIDE_BATCH,
+            });
+        }
+        let added_text_bytes = replacements
+            .iter()
+            .try_fold(0_usize, |total, replacement| {
+                total
+                    .checked_add(replacement.text().len())
+                    .ok_or(Error::Limit {
+                        resource: "source-backed slide batch replacement text",
+                        limit: crate::opened::Limits::default().max_text_bytes(),
+                    })
+            })?;
+        let text_bytes = self
+            .text_bytes
+            .checked_add(added_text_bytes)
+            .ok_or(Error::Limit {
+                resource: "source-backed slide batch replacement text",
+                limit: crate::opened::Limits::default().max_text_bytes(),
+            })?;
+        if text_bytes > crate::opened::Limits::default().max_text_bytes() {
+            return Err(Error::Limit {
+                resource: "source-backed slide batch replacement text",
+                limit: crate::opened::Limits::default().max_text_bytes(),
+            });
+        }
+
+        let mut edit = self.editor.edit_slide(position)?;
+        let changed = edit.set_shape_texts(replacements)?;
+        self.commits
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed slide batch edits",
+                source,
+            })?;
+        self.commits.push(edit.commit());
+        self.text_bytes = text_bytes;
+        Ok(changed)
+    }
+
+    /// Validate and freeze this selected slide set for publication.
+    pub fn commit(mut self) -> Result<SourceBackedSlideBatchCommit> {
+        if self.commits.is_empty() {
+            return Err(Error::UnsafeEdit {
+                operation: "commit_slide_batch",
+                reason: "a source-backed slide batch requires at least one selected slide",
+            });
+        }
+        self.commits
+            .sort_unstable_by_key(|commit| commit.snapshot.position);
+        let mut before = Vec::new();
+        let mut after = Vec::new();
+        before
+            .try_reserve_exact(self.commits.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed slide batch source snapshot",
+                source,
+            })?;
+        after
+            .try_reserve_exact(self.commits.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed slide batch target snapshot",
+                source,
+            })?;
+        for commit in self.commits {
+            before.push(commit.patch.before);
+            after.push(commit.patch.after);
+        }
+        let before = SourceBackedSlideBatchSnapshot {
+            slides: before.into_boxed_slice(),
+        };
+        let after = SourceBackedSlideBatchSnapshot {
+            slides: after.into_boxed_slice(),
+        };
+        let patch = SourceBackedSlideBatchPatch {
+            before,
+            after: after.clone(),
+        };
+        Ok(SourceBackedSlideBatchCommit {
+            snapshot: after,
+            patch,
+        })
+    }
+}
+
+impl SourceBackedSlideBatchSnapshot {
+    /// Number of selected slides in this exact-source snapshot.
+    #[must_use]
+    pub const fn slide_count(&self) -> usize {
+        self.slides.len()
+    }
+
+    /// Selected slide snapshots in ascending presentation order.
+    pub fn slides(&self) -> impl ExactSizeIterator<Item = &SourceBackedSlideSnapshot> {
+        self.slides.iter()
+    }
+
+    fn same_source(&self, other: &Self) -> bool {
+        self.slides.len() == other.slides.len()
+            && self
+                .slides
+                .iter()
+                .zip(other.slides.iter())
+                .all(|(left, right)| left.same_source(right))
+    }
+}
+
+impl SourceBackedSlideBatchPatch {
+    /// Exact immutable selected slide set required by this patch.
+    #[must_use]
+    pub const fn source(&self) -> &SourceBackedSlideBatchSnapshot {
+        &self.before
+    }
+
+    /// Exact immutable selected slide set produced by this patch.
+    #[must_use]
+    pub const fn target(&self) -> &SourceBackedSlideBatchSnapshot {
+        &self.after
+    }
+
+    /// Whether any selected slide XML bytes change.
+    #[must_use]
+    pub fn is_changed(&self) -> bool {
+        !self.before.same_source(&self.after)
+    }
+
+    /// Return the exact inverse multi-slide patch.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: self.after.clone(),
+            after: self.before.clone(),
+        }
+    }
+
+    /// Apply only to the exact selected slide set captured by this patch.
+    pub fn apply(
+        &self,
+        source: &SourceBackedSlideBatchSnapshot,
+    ) -> Result<SourceBackedSlideBatchSnapshot> {
+        if !source.same_source(&self.before) {
+            return Err(Error::StaleSource);
+        }
+        Ok(if self.is_changed() {
+            self.after.clone()
+        } else {
+            source.clone()
+        })
+    }
+}
+
+impl SourceBackedSlideBatchCommit {
+    /// Candidate selected slide set after this edit.
+    #[must_use]
+    pub const fn snapshot(&self) -> &SourceBackedSlideBatchSnapshot {
+        &self.snapshot
+    }
+
+    /// Exact-source multi-slide patch for this edit.
+    #[must_use]
+    pub const fn patch(&self) -> &SourceBackedSlideBatchPatch {
+        &self.patch
+    }
+
+    /// Whether any selected slide XML bytes change.
     #[must_use]
     pub fn is_changed(&self) -> bool {
         self.patch.is_changed()

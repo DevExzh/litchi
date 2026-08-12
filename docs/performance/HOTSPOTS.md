@@ -3,7 +3,7 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0076`](changes/0076-xlsx-source-backed-defined-names-publication.md)
+[`change 0077`](changes/0077-pptx-source-backed-multi-slide-batch-publication.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -54,8 +54,9 @@ Current work shape:
   semantically unchanged ZIP member; topology changes, borrowed ingress, and
   unsupported ZIP layouts still use the complete rewrite.
 - The immutable source-backed package now also has one consuming low-level
-  same-topology publisher. It validates/materializes only the selected existing
-  Part, regenerates that member, raw-copies every other physical member, and
+  same-topology publisher. It accepts at most 64 unique selected existing
+  Parts, validates/materializes that bounded set, regenerates only changed
+  selected members, raw-copies every other physical member, and
   monitors source version through bounded sequential output. Signed real
   changes and unsupported layouts return typed zero-output refusals. DOCX now
   exposes a guarded exact-source main-document transaction over that publisher:
@@ -63,7 +64,9 @@ Current work shape:
   refused. PPTX now exposes the analogous guarded exact-source selected-slide
   transaction: its raw package/presentation/slide relationship closure is
   bound into the snapshot, MCE-rewritten slides and more than one shape edit
-  are refused. XLSX now has a narrower guarded transaction for typed
+  per selected slide are refused. A bounded outer batch now composes up to 32
+  exact slide snapshots into one atomic multi-Part publication. XLSX now has a
+  narrower guarded transaction for typed
   calculation properties/features or the direct defined-name catalog in
   `xl/workbook.xml`; cells, formulas, chains and topology remain outside those
   capabilities. Selected-worksheet
@@ -94,7 +97,10 @@ Current work shape:
   removes eager ownership and recompression of 227 unselected Parts in the
   fixed media-rich one-slide edit/save case: p50 falls 97.12%, instructions
   67.91%, and semantic materializations 229 -> 2 with byte-identical output;
-  see change 0044. The XLSX calculation-metadata integration removes eager
+  see change 0044. The atomic eight-slide follow-up regenerates eight selected
+  slide members in one plan, cuts p50 95.78%, allocations 32.54%, peak heap
+  8.94%, and materializations 229 -> 9 while preserving byte-identical output;
+  see change 0077. The XLSX calculation-metadata integration removes eager
   ownership and recompression of 11 unselected Parts in its fixed media-rich
   edit/save case: p50 falls 99.2519% (133.67x), instructions 77.78%, and
   semantic materializations 12 -> 1 with byte-identical output; see change
@@ -641,7 +647,7 @@ pattern elsewhere.
 | 3 | Superseded for source-backed OPC: finite weighted LRU, per-entry single-flight and content-free diagnostics exist; legacy eager open does not use that cache. | Cache bytes are not yet charged to the hierarchical Budget; add contention and retention measurements. |
 | 4 | Measured: ordinary OPC open is serial and explicit eager open has a local bounded session. Six large ZIP tasks reach 4.52x p50 at 12 CPUs; small tasks regress. | Broader real-package scaling and threshold tuning. |
 | 5 | Confirmed: stored entries are CRC-checked then copied. | Stored-media one-Part read and package-open copied-byte/RSS deltas. |
-| 6 | Refined by measurement: exact unchanged saves copy the source; owned same-topology mutations raw-copy unchanged entries; changed Parts share their immutable logical payload and validated generated local span without extra copies; the narrow source-backed publisher materializes only its target and raw-copies the rest; guarded DOCX, atomic same-slide PPTX shape-text batches, and XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup facades consume it; borrowed/topology-changing paths rewrite fully, while unsupported source-backed layouts refuse. | Real media-heavy multi-Part updates, broader semantic closures, signature/topology policies, and attribution of the remaining selected-Part/compressor-buffer memory cost. |
+| 6 | Refined by measurement: exact unchanged saves copy the source; owned same-topology mutations raw-copy unchanged entries; changed Parts share their immutable logical payload and validated generated local span without extra copies; the bounded source-backed publisher materializes only selected targets and raw-copies the rest; guarded DOCX, atomic same-slide and multi-slide PPTX shape-text batches, and XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup facades consume it; borrowed/topology-changing paths rewrite fully, while unsupported source-backed layouts refuse. | Real-producer media-heavy multi-Part updates, broader semantic closures, signature/topology policies, and attribution of the remaining selected-Part/compressor-buffer memory cost. |
 | 7 | Confirmed structurally: duplicate indexes, boxed Parts, source-XML map, and linear fallback exist. | Allocation profiles, type sizes, cache counters and repeated noncanonical lookup. |
 | 8 | Refined: source-backed XLSX structural open/list avoids timed reads; selected first/range reads physically overlap only the selected worksheet; guarded calculation-metadata, defined-name, worksheet page-break, page-margin, print-options and relationship-free page-setup edits materialize only their one- or two-Part semantic closures. | Broader source-backed selectors, general cell/formula edits and real workbook matrices. |
 | 9 | Refined by measurement: small XLSX edits scan/rebuild/reparse the complete touched sheet; bounded commits can reuse the validation store for first read, while large sheets fall back cold. Direct writer-local action regrouping was immaterial and reverted. | Attribute larger semantic-planning/emission/readback passes, first/middle/last cells, distinct bulk actions, structural edits, large-sheet retention and commit-versus-save separation without reviving direct regrouping alone. |
@@ -658,8 +664,8 @@ The order below is provisional until baseline measurements are recorded.
 
 | Rank | Candidate | Expected CRUD reach | Risk | ADR fit |
 |---:|---|---|---|---|
-| 1 | Extend source-backed OPC from selective reads and the narrow consuming publisher to broad query/edit/patch coverage. | All OOXML selective read/query/edit paths; offsets eager full-package work. | High | Positional source/descriptors and one low-level one-Part publication path are implemented; cache Budget charging and semantic CRUD coverage remain. |
-| 2 | Broaden the accepted source-backed DOCX/PPTX and XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup transactions only where complete semantic closures can be proved, with real media/signature/topology matrices. | Targeted OOXML save, especially media-heavy packages; avoids eager all-Part inflate/recompression where the same-topology proof applies. | High | DOCX is accepted in change 0039, guarded one-slide PPTX in 0044/0063, XLSX calculation metadata in 0046, page breaks in 0061, page margins in 0067, print options in 0070, relationship-free page setup in 0073, and defined names in 0076. General XLSX cells/formulas/chains, printer settings and multi-slide PPTX require wider closures; all accepted facades still need real-producer and broader topology/signature policy matrices. |
+| 1 | Extend source-backed OPC from selective reads and the bounded consuming publisher to broad query/edit/patch coverage. | All OOXML selective read/query/edit paths; offsets eager full-package work. | High | Positional source/descriptors and low-level one-Part/bounded multi-Part publication paths are implemented; cache Budget charging and broader semantic CRUD coverage remain. |
+| 2 | Broaden the accepted source-backed DOCX/PPTX and XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup transactions only where complete semantic closures can be proved, with real media/signature/topology matrices. | Targeted OOXML save, especially media-heavy packages; avoids eager all-Part inflate/recompression where the same-topology proof applies. | High | DOCX is accepted in change 0039, guarded same-slide PPTX in 0044/0063 and bounded multi-slide PPTX in 0077, XLSX calculation metadata in 0046, page breaks in 0061, page margins in 0067, print options in 0070, relationship-free page setup in 0073, and defined names in 0076. General XLSX cells/formulas/chains, printer settings and structural PPTX edits require wider closures; all accepted facades still need real-producer and broader topology/signature policy matrices. |
 | 3 | Tune explicit bounded-session thresholds and complete remaining I/O budget policy. | Large multi-Part open/save/validation. | Medium-high | 1/2/4/8/12 evidence exists; large tasks scale, small tasks regress; no hidden Rayon path remains. |
 | 4 | Build one validated OPC publication plan and reuse its generated XML and Part order during emission. | Every rewritten OPC save. | Low-medium | Implemented; see `changes/0001-opc-publication-plan.md`. |
 | 5 | Exact owned-source OPC no-op publication. | Owned DOCX/PPTX/XLSX open/read/no-op save. | Medium | Implemented; same-topology mutations now use targeted preservation. See changes 0004 and 0008. |

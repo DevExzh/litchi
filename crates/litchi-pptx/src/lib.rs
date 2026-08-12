@@ -154,9 +154,10 @@ pub use modern_comments::*;
 pub use opened::{MAX_SHAPE_TEXT_REPLACEMENTS, ShapeTextReplacement};
 pub use package::Package;
 pub use presentation::{
-    Presentation, SourceBackedPresentation, SourceBackedPresentationEditor,
-    SourceBackedSlideCommit, SourceBackedSlideEdit, SourceBackedSlidePatch,
-    SourceBackedSlideSnapshot, SourceSlide,
+    MAX_SOURCE_BACKED_SLIDE_BATCH, Presentation, SourceBackedPresentation,
+    SourceBackedPresentationEditor, SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit,
+    SourceBackedSlideBatchPatch, SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit,
+    SourceBackedSlideEdit, SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceSlide,
 };
 pub use presentation_properties::{
     BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,
