@@ -35,6 +35,7 @@ const FO: &str = "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
 const CALCEXT: &str = "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0";
 const CONTENT_PATH: &str = "content.xml";
 const MAX_ELEMENTS: usize = 1_048_576;
+const MAX_LOGICAL_ROW_EDITS: usize = 4_096;
 
 /// One rich-text inline in a spreadsheet cell paragraph.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -498,6 +499,39 @@ pub struct ChartObject {
     pub content_xml: String,
 }
 
+/// One logical-row structural operation evaluated against the result of the
+/// preceding operation in the same batch.
+///
+/// Row positions are zero based. A move destination is expressed in the grid
+/// after the moved range is removed, which makes `at == to` an exact no-op.
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub enum LogicalRowEdit {
+    /// Insert the supplied physical row runs before one logical row position.
+    Insert {
+        /// Logical insertion position, including one-past-the-end.
+        at: usize,
+        /// Bounded physical row runs to insert atomically.
+        rows: Vec<Row>,
+    },
+    /// Remove a non-empty half-open logical row range.
+    Remove {
+        /// First logical row to remove.
+        at: usize,
+        /// Number of logical rows to remove.
+        count: usize,
+    },
+    /// Move a non-empty logical row range before another logical position.
+    Move {
+        /// First logical row to move.
+        at: usize,
+        /// Number of logical rows to move.
+        count: usize,
+        /// Destination in the grid after removal, including one-past-the-end.
+        to: usize,
+    },
+}
+
 #[derive(Clone, Debug)]
 struct Span {
     namespace: Option<String>,
@@ -611,7 +645,7 @@ pub(crate) fn remove_row(
     let index = *rows
         .get(physical_position)
         .ok_or_else(|| invalid_error("ODS physical row position is out of bounds"))?;
-    if attribute(&xml, &spans[index], b"table:number-rows-repeated")?
+    if resolved_attribute(&xml, &spans, index, TABLE, "number-rows-repeated")?
         .is_some_and(|value| value != "1")
     {
         return invalid("ODS row removal refuses repeated physical runs");
@@ -620,6 +654,1166 @@ pub(crate) fn remove_row(
         source,
         spans[index].start..spans[index].end,
         Vec::new(),
+        max_output,
+    )
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct PlannedRow {
+    row: Row,
+    origin: Option<usize>,
+}
+
+#[derive(Clone, Debug)]
+struct SourceRowLexical {
+    span: Range<usize>,
+    original_repeat: usize,
+    repeat_qname: Option<String>,
+    namespaces: std::collections::BTreeMap<String, String>,
+    declared_prefixes: std::collections::BTreeSet<String>,
+}
+
+/// Apply one bounded atomic batch of logical row edits to an ordinary,
+/// dependency-free worksheet.
+///
+/// This deliberately narrow closure refuses any coordinate-bearing or opaque
+/// spreadsheet owner rather than leaving formulas, ranges, merges, annotations,
+/// drawings, validation bindings, or tracked changes stale. Repeated row runs
+/// are split and compacted without expanding them into logical-row objects.
+pub(crate) fn edit_logical_rows(
+    source: &[u8],
+    sheet: &str,
+    edits: &[LogicalRowEdit],
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    if edits.len() > MAX_LOGICAL_ROW_EDITS {
+        return invalid(format!(
+            "ODS logical row edit count exceeds the {MAX_LOGICAL_ROW_EDITS} limit"
+        ));
+    }
+    if edits.is_empty() {
+        return Ok(source.to_vec());
+    }
+    if source.len() > max_output {
+        return invalid(format!(
+            "ODS source exceeds the {max_output} byte logical-row output limit"
+        ));
+    }
+
+    let spreadsheet = crate::Spreadsheet::from_bytes(source.to_vec())?;
+    let sheet_model = spreadsheet
+        .sheet(sheet)
+        .ok_or_else(|| invalid_error(format!("ODS sheet '{sheet}' was not found")))?;
+    if validate_trivial_logical_row_edits(edits, sheet_model.logical_row_count())? {
+        return Ok(source.to_vec());
+    }
+
+    let package = Package::from_bytes(source.to_vec())?;
+    audit_logical_row_package(&package)?;
+    let xml = package.content_xml().to_string();
+    let spans = scan(&xml)?;
+    let table = select_sheet(&xml, &spans, sheet)?;
+    audit_ordinary_row_content(&xml, sheet)?;
+    audit_table_row_layout(&spans, table)?;
+    let row_spans = children(&spans, table, TABLE, "table-row");
+    if row_spans.len() != sheet_model.rows.len() {
+        return invalid("ODS ordinary-row physical source inventory is inconsistent");
+    }
+
+    let mut source_rows = Vec::new();
+    source_rows
+        .try_reserve_exact(row_spans.len())
+        .map_err(|_error| invalid_error("ODS source-row inventory allocation failed"))?;
+    let mut planned = Vec::new();
+    planned
+        .try_reserve_exact(row_spans.len())
+        .map_err(|_error| invalid_error("ODS logical-row plan allocation failed"))?;
+    for (origin, (span_index, row)) in row_spans.iter().copied().zip(&sheet_model.rows).enumerate()
+    {
+        audit_inserted_row(row)?;
+        source_rows.push(source_row_lexical(&xml, &spans, span_index, row.repeat())?);
+        planned.push(PlannedRow {
+            row: row.clone(),
+            origin: Some(origin),
+        });
+    }
+    let original = planned.clone();
+
+    for edit in edits {
+        apply_logical_row_edit(&mut planned, edit)?;
+    }
+    compact_planned_rows(&mut planned)?;
+    validate_planned_rows(&planned)?;
+    if planned == original {
+        return Ok(source.to_vec());
+    }
+
+    let prefix = original
+        .iter()
+        .zip(&planned)
+        .take_while(|(left, right)| left == right)
+        .count();
+    let suffix = original[prefix..]
+        .iter()
+        .rev()
+        .zip(planned[prefix..].iter().rev())
+        .take_while(|(left, right)| left == right)
+        .count();
+    let old_end = original.len() - suffix;
+    let new_end = planned.len() - suffix;
+
+    if row_spans.is_empty() {
+        return replace_empty_table(
+            source,
+            &xml,
+            &spans[table],
+            sheet,
+            &planned,
+            &source_rows,
+            max_output,
+        );
+    }
+
+    let range = if prefix == old_end {
+        let position = row_spans.get(prefix).map_or(
+            spans[*row_spans.last().ok_or_else(|| {
+                invalid_error("ODS source row inventory unexpectedly became empty")
+            })?]
+            .end,
+            |index| spans[*index].start,
+        );
+        position..position
+    } else {
+        spans[row_spans[prefix]].start..spans[row_spans[old_end - 1]].end
+    };
+    let replacement =
+        render_planned_rows(&xml, &planned[prefix..new_end], &source_rows, max_output)?;
+    splice_content(source, range, replacement, max_output)
+}
+
+fn validate_trivial_logical_row_edits(
+    edits: &[LogicalRowEdit],
+    logical_count: usize,
+) -> Result<bool> {
+    for edit in edits {
+        match edit {
+            LogicalRowEdit::Insert { at, rows } if rows.is_empty() => {
+                if *at > logical_count {
+                    return invalid("ODS logical row insertion position is out of bounds");
+                }
+            },
+            LogicalRowEdit::Remove { at, count: 0 } => {
+                if *at > logical_count {
+                    return invalid("ODS logical row removal position is out of bounds");
+                }
+            },
+            LogicalRowEdit::Move { at, count: 0, to } => {
+                if *at > logical_count || *to > logical_count {
+                    return invalid("ODS logical row move position is out of bounds");
+                }
+            },
+            LogicalRowEdit::Move { at, count, to } if at == to => {
+                let end = at
+                    .checked_add(*count)
+                    .ok_or_else(|| invalid_error("ODS logical row move range overflows"))?;
+                if end > logical_count || *to > logical_count - count {
+                    return invalid("ODS logical row move range is out of bounds");
+                }
+            },
+            _ => return Ok(false),
+        }
+    }
+    Ok(true)
+}
+
+fn audit_table_row_layout(spans: &[Span], table: usize) -> Result<()> {
+    let mut seen_row = false;
+    for span in spans.iter().filter(|span| span.parent == Some(table)) {
+        if is_element(span, TABLE, "table-row") {
+            seen_row = true;
+        } else if is_element(span, TABLE, "table-column") {
+            if seen_row {
+                return invalid(
+                    "ODS ordinary logical-row edits require columns to precede every row",
+                );
+            }
+        } else {
+            return invalid("ODS ordinary logical-row table contains an unsupported direct child");
+        }
+    }
+    Ok(())
+}
+
+fn apply_logical_row_edit(rows: &mut Vec<PlannedRow>, edit: &LogicalRowEdit) -> Result<()> {
+    let logical_count = planned_logical_count(rows)?;
+    match edit {
+        LogicalRowEdit::Insert { at, rows: inserted } => {
+            if *at > logical_count {
+                return invalid("ODS logical row insertion position is out of bounds");
+            }
+            if inserted.is_empty() {
+                return Ok(());
+            }
+            for row in inserted {
+                audit_inserted_row(row)?;
+            }
+            let inserted_count = inserted.iter().try_fold(0usize, |total, row| {
+                total
+                    .checked_add(row.repeat())
+                    .ok_or_else(|| invalid_error("ODS inserted logical row count overflows"))
+            })?;
+            let final_count = logical_count
+                .checked_add(inserted_count)
+                .ok_or_else(|| invalid_error("ODS logical row count overflows"))?;
+            if final_count > crate::worksheet::validation::MAX_LOGICAL_ROWS {
+                return invalid("ODS logical row insertion exceeds the worksheet row limit");
+            }
+            let position = split_planned_boundary(rows, *at)?;
+            rows.try_reserve(inserted.len())
+                .map_err(|_error| invalid_error("ODS inserted-row plan allocation failed"))?;
+            rows.splice(
+                position..position,
+                inserted
+                    .iter()
+                    .cloned()
+                    .map(|row| PlannedRow { row, origin: None }),
+            );
+        },
+        LogicalRowEdit::Remove { at, count } => {
+            if *count == 0 {
+                if *at > logical_count {
+                    return invalid("ODS logical row removal position is out of bounds");
+                }
+                return Ok(());
+            }
+            let end = at
+                .checked_add(*count)
+                .ok_or_else(|| invalid_error("ODS logical row removal range overflows"))?;
+            if end > logical_count {
+                return invalid("ODS logical row removal range is out of bounds");
+            }
+            let start_index = split_planned_boundary(rows, *at)?;
+            let end_index = split_planned_boundary(rows, end)?;
+            rows.drain(start_index..end_index);
+        },
+        LogicalRowEdit::Move { at, count, to } => {
+            if *count == 0 {
+                if *at > logical_count || *to > logical_count {
+                    return invalid("ODS logical row move position is out of bounds");
+                }
+                return Ok(());
+            }
+            let end = at
+                .checked_add(*count)
+                .ok_or_else(|| invalid_error("ODS logical row move range overflows"))?;
+            if end > logical_count {
+                return invalid("ODS logical row move range is out of bounds");
+            }
+            let remaining = logical_count - count;
+            if *to > remaining {
+                return invalid("ODS logical row move destination is out of bounds");
+            }
+            if *at == *to {
+                return Ok(());
+            }
+            let start_index = split_planned_boundary(rows, *at)?;
+            let end_index = split_planned_boundary(rows, end)?;
+            let moved = rows.drain(start_index..end_index).collect::<Vec<_>>();
+            let destination = split_planned_boundary(rows, *to)?;
+            rows.try_reserve(moved.len())
+                .map_err(|_error| invalid_error("ODS moved-row plan allocation failed"))?;
+            rows.splice(destination..destination, moved);
+        },
+    }
+    compact_planned_rows(rows)
+}
+
+fn planned_logical_count(rows: &[PlannedRow]) -> Result<usize> {
+    rows.iter().try_fold(0usize, |total, row| {
+        total
+            .checked_add(row.row.repeat())
+            .ok_or_else(|| invalid_error("ODS logical row count overflows"))
+    })
+}
+
+fn split_planned_boundary(rows: &mut Vec<PlannedRow>, target: usize) -> Result<usize> {
+    let mut start = 0usize;
+    for index in 0..rows.len() {
+        let count = rows[index].row.repeat();
+        let end = start
+            .checked_add(count)
+            .ok_or_else(|| invalid_error("ODS logical row address overflows"))?;
+        if target == start {
+            return Ok(index);
+        }
+        if target < end {
+            let offset = target - start;
+            let suffix = count - offset;
+            let origin = rows[index].origin;
+            let right = PlannedRow {
+                row: rows[index].row.with_repeat(suffix)?,
+                origin,
+            };
+            rows[index].row = rows[index].row.with_repeat(offset)?;
+            rows.try_reserve(1)
+                .map_err(|_error| invalid_error("ODS repeated-row split allocation failed"))?;
+            rows.insert(index + 1, right);
+            return Ok(index + 1);
+        }
+        start = end;
+    }
+    if target == start {
+        Ok(rows.len())
+    } else {
+        invalid("ODS logical row boundary is out of bounds")
+    }
+}
+
+fn compact_planned_rows(rows: &mut Vec<PlannedRow>) -> Result<()> {
+    let mut compacted = Vec::<PlannedRow>::new();
+    compacted
+        .try_reserve_exact(rows.len())
+        .map_err(|_error| invalid_error("ODS logical-row compaction allocation failed"))?;
+    for row in rows.drain(..) {
+        if let Some(previous) = compacted.last_mut()
+            && previous.origin == row.origin
+            && previous.row.equivalent_run(&row.row)
+        {
+            let repeat = previous
+                .row
+                .repeat()
+                .checked_add(row.row.repeat())
+                .ok_or_else(|| invalid_error("ODS row repetition overflows"))?;
+            previous.row = previous.row.with_repeat(repeat)?;
+        } else {
+            compacted.push(row);
+        }
+    }
+    *rows = compacted;
+    Ok(())
+}
+
+fn validate_planned_rows(rows: &[PlannedRow]) -> Result<()> {
+    if rows.len() > crate::worksheet::validation::MAX_PHYSICAL_RUNS {
+        return invalid("ODS logical row edit exceeds the physical row-run limit");
+    }
+    let mut planned_rows = Vec::new();
+    planned_rows
+        .try_reserve_exact(rows.len())
+        .map_err(|_error| invalid_error("ODS planned-row validation allocation failed"))?;
+    planned_rows.extend(rows.iter().map(|row| row.row.clone()));
+    let sheet = Sheet {
+        name: "litchi-row-plan".to_string(),
+        rows: planned_rows,
+        style_name: None,
+    };
+    crate::worksheet::validation::validate_sheet(&sheet)
+}
+
+fn audit_inserted_row(row: &Row) -> Result<()> {
+    let sheet = Sheet {
+        name: "litchi-inserted-row".to_string(),
+        rows: vec![row.clone()],
+        style_name: None,
+    };
+    crate::worksheet::validation::validate_sheet(&sheet)?;
+    if row.style_name.is_some()
+        || row.default_cell_style_name.is_some()
+        || row.cells.iter().any(|cell| {
+            cell.style_name.is_some()
+                || cell.formula.is_some()
+                || !matches!(cell.merge, crate::Merge::None)
+                || matches!(cell.value, CellValue::Unknown { .. })
+        })
+    {
+        return invalid(
+            "ODS ordinary logical-row edits refuse style references, formulas, merges, and unknown cell values",
+        );
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OrdinaryElement {
+    Root,
+    Body,
+    Spreadsheet,
+    Table,
+    Column,
+    Row,
+    Cell,
+    Paragraph,
+}
+
+fn audit_logical_row_package(package: &Package) -> Result<()> {
+    for path in package.package().files()? {
+        let lower = path.to_ascii_lowercase();
+        if matches!(
+            path.as_str(),
+            "mimetype"
+                | "content.xml"
+                | "meta.xml"
+                | "manifest.rdf"
+                | "META-INF/manifest.xml"
+                | "META-INF/documentsignatures.xml"
+                | "META-INF/macrosignatures.xml"
+        ) || path.ends_with('/')
+        {
+            continue;
+        }
+        if lower == "styles.xml"
+            || lower == "settings.xml"
+            || lower == "scripts.xml"
+            || lower.ends_with(".xml")
+            || lower.ends_with(".rdf")
+            || lower.starts_with("basic/")
+            || lower.starts_with("scripts/")
+            || lower.starts_with("configurations2/")
+            || lower.starts_with("object")
+        {
+            return invalid(format!(
+                "ODS ordinary logical-row edits refuse dependent package member '{path}'"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn audit_ordinary_row_content(xml: &str, selected_sheet: &str) -> Result<()> {
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut stack = Vec::<(OrdinaryElement, usize)>::new();
+    let mut selected = 0usize;
+    let mut roots = 0usize;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| invalid_error(format!("invalid ODS content XML: {error}")))?;
+        match event {
+            Event::Start(element) => {
+                let kind = ordinary_element(&namespace, element.local_name().as_ref())?;
+                audit_ordinary_parent(stack.last().map(|entry| entry.0), kind)?;
+                let name = audit_ordinary_attributes(&element, &reader, kind)?;
+                if kind == OrdinaryElement::Root {
+                    roots += 1;
+                }
+                if kind == OrdinaryElement::Table && name.as_deref() == Some(selected_sheet) {
+                    selected += 1;
+                }
+                if kind == OrdinaryElement::Paragraph
+                    && let Some((OrdinaryElement::Cell, paragraphs)) = stack.last_mut()
+                {
+                    *paragraphs += 1;
+                    if *paragraphs > 1 {
+                        return invalid(
+                            "ODS ordinary logical-row edits refuse multi-paragraph cells",
+                        );
+                    }
+                }
+                stack.push((kind, 0));
+                if stack.len() > 1_024 {
+                    return invalid("ODS ordinary logical-row XML depth exceeds the limit");
+                }
+            },
+            Event::Empty(element) => {
+                let kind = ordinary_element(&namespace, element.local_name().as_ref())?;
+                audit_ordinary_parent(stack.last().map(|entry| entry.0), kind)?;
+                let name = audit_ordinary_attributes(&element, &reader, kind)?;
+                if kind == OrdinaryElement::Root {
+                    roots += 1;
+                }
+                if kind == OrdinaryElement::Table && name.as_deref() == Some(selected_sheet) {
+                    selected += 1;
+                }
+                if kind == OrdinaryElement::Paragraph
+                    && let Some((OrdinaryElement::Cell, paragraphs)) = stack.last_mut()
+                {
+                    *paragraphs += 1;
+                    if *paragraphs > 1 {
+                        return invalid(
+                            "ODS ordinary logical-row edits refuse multi-paragraph cells",
+                        );
+                    }
+                }
+            },
+            Event::End(_) => {
+                stack.pop().ok_or_else(|| {
+                    invalid_error("ODS ordinary logical-row element stack underflow")
+                })?;
+            },
+            Event::Text(text) => {
+                let text_bytes: &[u8] = text.as_ref();
+                if stack.last().map(|entry| entry.0) != Some(OrdinaryElement::Paragraph)
+                    && !text_bytes.iter().all(u8::is_ascii_whitespace)
+                {
+                    return invalid(
+                        "ODS ordinary logical-row edits refuse text outside plain paragraphs",
+                    );
+                }
+            },
+            Event::GeneralRef(reference) => {
+                let reference_bytes: &[u8] = reference.as_ref();
+                let predefined =
+                    [b"amp".as_slice(), b"lt", b"gt", b"apos", b"quot"].contains(&reference_bytes);
+                if !predefined
+                    || stack.last().map(|entry| entry.0) != Some(OrdinaryElement::Paragraph)
+                {
+                    return invalid(
+                        "ODS ordinary logical-row edits refuse general entity references",
+                    );
+                }
+            },
+            Event::Decl(_) => {},
+            Event::Eof => break,
+            Event::DocType(_) => {
+                return invalid("ODS ordinary logical-row edits refuse document type declarations");
+            },
+            Event::Comment(_) | Event::PI(_) | Event::CData(_) => {
+                return invalid(
+                    "ODS ordinary logical-row edits refuse comments, processing instructions, and CDATA",
+                );
+            },
+        }
+        buffer.clear();
+    }
+    if !stack.is_empty() || roots != 1 {
+        return invalid("ODS ordinary logical-row content hierarchy is incomplete");
+    }
+    if selected != 1 {
+        return invalid("ODS ordinary logical-row sheet selector is missing or ambiguous");
+    }
+    Ok(())
+}
+
+fn ordinary_element(namespace: &ResolveResult<'_>, local: &[u8]) -> Result<OrdinaryElement> {
+    let uri = match namespace {
+        ResolveResult::Bound(Namespace(uri)) => uri,
+        ResolveResult::Unbound => {
+            return invalid("ODS ordinary logical-row edits refuse unqualified elements");
+        },
+        ResolveResult::Unknown(prefix) => {
+            return invalid(format!(
+                "ODS ordinary logical-row edits refuse unbound prefix '{}'",
+                String::from_utf8_lossy(prefix.as_ref())
+            ));
+        },
+    };
+    match (uri, local) {
+        (value, b"document-content") if *value == OFFICE.as_bytes() => Ok(OrdinaryElement::Root),
+        (value, b"body") if *value == OFFICE.as_bytes() => Ok(OrdinaryElement::Body),
+        (value, b"spreadsheet") if *value == OFFICE.as_bytes() => Ok(OrdinaryElement::Spreadsheet),
+        (value, b"table") if *value == TABLE.as_bytes() => Ok(OrdinaryElement::Table),
+        (value, b"table-column") if *value == TABLE.as_bytes() => Ok(OrdinaryElement::Column),
+        (value, b"table-row") if *value == TABLE.as_bytes() => Ok(OrdinaryElement::Row),
+        (value, b"table-cell") if *value == TABLE.as_bytes() => Ok(OrdinaryElement::Cell),
+        (value, b"p") if *value == crate::worksheet::codec::TEXT_NAMESPACE.as_bytes() => {
+            Ok(OrdinaryElement::Paragraph)
+        },
+        _ => invalid(format!(
+            "ODS ordinary logical-row edits refuse element '{}':{}",
+            String::from_utf8_lossy(uri),
+            String::from_utf8_lossy(local)
+        )),
+    }
+}
+
+fn audit_ordinary_parent(parent: Option<OrdinaryElement>, child: OrdinaryElement) -> Result<()> {
+    let valid = matches!(
+        (parent, child),
+        (None, OrdinaryElement::Root)
+            | (Some(OrdinaryElement::Root), OrdinaryElement::Body)
+            | (Some(OrdinaryElement::Body), OrdinaryElement::Spreadsheet)
+            | (Some(OrdinaryElement::Spreadsheet), OrdinaryElement::Table)
+            | (Some(OrdinaryElement::Table), OrdinaryElement::Column)
+            | (Some(OrdinaryElement::Table), OrdinaryElement::Row)
+            | (Some(OrdinaryElement::Row), OrdinaryElement::Cell)
+            | (Some(OrdinaryElement::Cell), OrdinaryElement::Paragraph)
+    );
+    if valid {
+        Ok(())
+    } else {
+        invalid("ODS ordinary logical-row edits refuse this element hierarchy")
+    }
+}
+
+fn audit_ordinary_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+    kind: OrdinaryElement,
+) -> Result<Option<String>> {
+    let mut table_name = None;
+    for raw in element.attributes().with_checks(true) {
+        let raw = raw.map_err(|error| invalid_error(format!("invalid ODS attribute: {error}")))?;
+        let qname = raw.key.as_ref();
+        if qname == b"xmlns" || qname.starts_with(b"xmlns:") {
+            continue;
+        }
+        let (namespace, local) = reader.resolver().resolve_attribute(raw.key);
+        let uri = match namespace {
+            ResolveResult::Bound(Namespace(uri)) => uri,
+            ResolveResult::Unbound => b"".as_slice(),
+            ResolveResult::Unknown(prefix) => {
+                return invalid(format!(
+                    "ODS ordinary logical-row edits refuse unbound attribute prefix '{}'",
+                    String::from_utf8_lossy(prefix.as_ref())
+                ));
+            },
+        };
+        let local = local.as_ref();
+        let allowed = match kind {
+            OrdinaryElement::Root => uri == OFFICE.as_bytes() && local == b"version",
+            OrdinaryElement::Body | OrdinaryElement::Spreadsheet => false,
+            OrdinaryElement::Table => uri == TABLE.as_bytes() && local == b"name",
+            OrdinaryElement::Column => {
+                uri == TABLE.as_bytes()
+                    && matches!(local, b"number-columns-repeated" | b"visibility")
+            },
+            OrdinaryElement::Row => {
+                uri == TABLE.as_bytes() && matches!(local, b"number-rows-repeated" | b"visibility")
+            },
+            OrdinaryElement::Cell => {
+                uri == TABLE.as_bytes() && local == b"number-columns-repeated"
+                    || uri == OFFICE.as_bytes()
+                        && matches!(
+                            local,
+                            b"value-type"
+                                | b"value"
+                                | b"date-value"
+                                | b"time-value"
+                                | b"boolean-value"
+                                | b"currency"
+                        )
+            },
+            OrdinaryElement::Paragraph => {
+                uri == b"http://www.w3.org/XML/1998/namespace" && local == b"space"
+            },
+        };
+        if !allowed {
+            return invalid(format!(
+                "ODS ordinary logical-row edits refuse attribute '{}'",
+                String::from_utf8_lossy(qname)
+            ));
+        }
+        if kind == OrdinaryElement::Table && uri == TABLE.as_bytes() && local == b"name" {
+            let value = raw
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, reader.decoder())
+                .map_err(|error| invalid_error(format!("invalid ODS table name: {error}")))?
+                .into_owned();
+            if table_name.replace(value).is_some() {
+                return invalid("ODS ordinary logical-row table name is duplicated");
+            }
+        }
+        if matches!(kind, OrdinaryElement::Row | OrdinaryElement::Column)
+            && uri == TABLE.as_bytes()
+            && local == b"visibility"
+        {
+            let value = raw
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, reader.decoder())
+                .map_err(|error| invalid_error(format!("invalid ODS visibility: {error}")))?;
+            let _visibility = crate::model::structure::Visibility::parse(&value)?;
+        }
+        if kind == OrdinaryElement::Paragraph
+            && uri == b"http://www.w3.org/XML/1998/namespace"
+            && local == b"space"
+        {
+            let value = raw
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, reader.decoder())
+                .map_err(|error| invalid_error(format!("invalid ODS xml:space: {error}")))?;
+            if !matches!(value.as_ref(), "default" | "preserve") {
+                return invalid("ODS ordinary logical-row paragraph xml:space is invalid");
+            }
+        }
+    }
+    if kind == OrdinaryElement::Table && table_name.is_none() {
+        return invalid("ODS ordinary logical-row table name is missing");
+    }
+    Ok(table_name)
+}
+
+fn source_row_lexical(
+    xml: &str,
+    spans: &[Span],
+    row_index: usize,
+    original_repeat: usize,
+) -> Result<SourceRowLexical> {
+    let span = spans
+        .get(row_index)
+        .ok_or_else(|| invalid_error("ODS source-row span is missing"))?;
+    let mut ancestors = Vec::new();
+    let mut parent = span.parent;
+    while let Some(index) = parent {
+        let ancestor = spans
+            .get(index)
+            .ok_or_else(|| invalid_error("ODS source-row ancestor span is missing"))?;
+        ancestors.push(ancestor);
+        parent = ancestor.parent;
+    }
+    let mut wrapped = String::new();
+    for ancestor in ancestors.iter().rev() {
+        bounded_append(
+            &mut wrapped,
+            xml.get(ancestor.start..ancestor.tag_end)
+                .ok_or_else(|| invalid_error("ODS source-row ancestor tag is invalid"))?,
+            crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+        )?;
+    }
+    bounded_append(
+        &mut wrapped,
+        xml.get(span.start..span.end)
+            .ok_or_else(|| invalid_error("ODS source-row range is invalid"))?,
+        crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+    )?;
+    for ancestor in &ancestors {
+        bounded_append(
+            &mut wrapped,
+            "</",
+            crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+        )?;
+        bounded_append(
+            &mut wrapped,
+            start_qname(xml, ancestor)?,
+            crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+        )?;
+        bounded_append(
+            &mut wrapped,
+            ">",
+            crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+        )?;
+    }
+
+    let mut reader = NsReader::from_str(&wrapped);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    let mut inside = false;
+    let mut depth = 0usize;
+    let mut namespaces = std::collections::BTreeMap::new();
+    let mut declared_prefixes = std::collections::BTreeSet::new();
+    let mut repeat_qname = None;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| invalid_error(format!("invalid ODS source-row XML: {error}")))?;
+        match event {
+            Event::Start(element) => {
+                let empty = false;
+                let is_row = matches!(
+                    &namespace,
+                    ResolveResult::Bound(Namespace(uri)) if *uri == TABLE.as_bytes()
+                ) && element.local_name().as_ref() == b"table-row";
+                if !inside && is_row {
+                    inside = true;
+                    depth = 0;
+                }
+                if inside {
+                    register_element_namespace(
+                        &mut namespaces,
+                        element.name().as_ref(),
+                        &namespace,
+                    )?;
+                    for raw in element.attributes().with_checks(true) {
+                        let raw = raw.map_err(|error| {
+                            invalid_error(format!("invalid ODS source-row attribute: {error}"))
+                        })?;
+                        let qname = raw.key.as_ref();
+                        if depth == 0 && (qname == b"xmlns" || qname.starts_with(b"xmlns:")) {
+                            let prefix = qname
+                                .strip_prefix(b"xmlns:")
+                                .map_or(b"".as_slice(), |value| value);
+                            declared_prefixes.insert(decode(prefix, "namespace prefix")?);
+                            continue;
+                        }
+                        let (attribute_namespace, local) =
+                            reader.resolver().resolve_attribute(raw.key);
+                        register_attribute_namespace(&mut namespaces, qname, &attribute_namespace)?;
+                        if depth == 0
+                            && matches!(
+                                &attribute_namespace,
+                                ResolveResult::Bound(Namespace(uri)) if *uri == TABLE.as_bytes()
+                            )
+                            && local.as_ref() == b"number-rows-repeated"
+                        {
+                            repeat_qname = Some(decode(qname, "row repeat attribute name")?);
+                        }
+                    }
+                    if !empty {
+                        depth = depth.checked_add(1).ok_or_else(|| {
+                            invalid_error("ODS source-row namespace depth overflows")
+                        })?;
+                    }
+                }
+            },
+            Event::Empty(element) => {
+                let empty = true;
+                let is_row = matches!(
+                    &namespace,
+                    ResolveResult::Bound(Namespace(uri)) if *uri == TABLE.as_bytes()
+                ) && element.local_name().as_ref() == b"table-row";
+                if !inside && is_row {
+                    inside = true;
+                    depth = 0;
+                }
+                if inside {
+                    register_element_namespace(
+                        &mut namespaces,
+                        element.name().as_ref(),
+                        &namespace,
+                    )?;
+                    for raw in element.attributes().with_checks(true) {
+                        let raw = raw.map_err(|error| {
+                            invalid_error(format!("invalid ODS source-row attribute: {error}"))
+                        })?;
+                        let qname = raw.key.as_ref();
+                        if depth == 0 && (qname == b"xmlns" || qname.starts_with(b"xmlns:")) {
+                            let prefix = qname
+                                .strip_prefix(b"xmlns:")
+                                .map_or(b"".as_slice(), |value| value);
+                            declared_prefixes.insert(decode(prefix, "namespace prefix")?);
+                            continue;
+                        }
+                        let (attribute_namespace, local) =
+                            reader.resolver().resolve_attribute(raw.key);
+                        register_attribute_namespace(&mut namespaces, qname, &attribute_namespace)?;
+                        if depth == 0
+                            && matches!(
+                                &attribute_namespace,
+                                ResolveResult::Bound(Namespace(uri)) if *uri == TABLE.as_bytes()
+                            )
+                            && local.as_ref() == b"number-rows-repeated"
+                        {
+                            repeat_qname = Some(decode(qname, "row repeat attribute name")?);
+                        }
+                    }
+                    if empty && depth == 0 {
+                        break;
+                    }
+                    if !empty {
+                        depth = depth.checked_add(1).ok_or_else(|| {
+                            invalid_error("ODS source-row namespace depth overflows")
+                        })?;
+                    }
+                }
+            },
+            Event::End(_) if inside => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid_error("ODS source-row namespace depth underflows"))?;
+                if depth == 0 {
+                    break;
+                }
+            },
+            Event::Eof => {
+                return invalid("ODS source-row namespace inventory ended early");
+            },
+            _ => {},
+        }
+        buffer.clear();
+    }
+    Ok(SourceRowLexical {
+        span: span.start..span.end,
+        original_repeat,
+        repeat_qname,
+        namespaces,
+        declared_prefixes,
+    })
+}
+
+fn register_element_namespace(
+    namespaces: &mut std::collections::BTreeMap<String, String>,
+    qname: &[u8],
+    namespace: &ResolveResult<'_>,
+) -> Result<()> {
+    if let ResolveResult::Bound(Namespace(uri)) = namespace {
+        register_namespace(namespaces, qname, uri)?;
+    }
+    Ok(())
+}
+
+fn register_attribute_namespace(
+    namespaces: &mut std::collections::BTreeMap<String, String>,
+    qname: &[u8],
+    namespace: &ResolveResult<'_>,
+) -> Result<()> {
+    match namespace {
+        ResolveResult::Bound(Namespace(uri)) => register_namespace(namespaces, qname, uri),
+        ResolveResult::Unbound => Ok(()),
+        ResolveResult::Unknown(prefix) => invalid(format!(
+            "ODS source-row attribute prefix '{}' is unbound",
+            String::from_utf8_lossy(prefix.as_ref())
+        )),
+    }
+}
+
+fn register_namespace(
+    namespaces: &mut std::collections::BTreeMap<String, String>,
+    qname: &[u8],
+    uri: &[u8],
+) -> Result<()> {
+    let prefix = qname
+        .iter()
+        .position(|byte| *byte == b':')
+        .map_or(b"".as_slice(), |index| &qname[..index]);
+    if prefix == b"xml" {
+        return Ok(());
+    }
+    let prefix = decode(prefix, "source-row namespace prefix")?;
+    let uri = decode(uri, "source-row namespace URI")?;
+    if let Some(previous) = namespaces.insert(prefix.clone(), uri.clone())
+        && previous != uri
+    {
+        return invalid(format!(
+            "ODS source-row prefix '{prefix}' resolves to multiple namespaces"
+        ));
+    }
+    Ok(())
+}
+
+fn start_qname<'a>(xml: &'a str, span: &Span) -> Result<&'a str> {
+    let tag = xml
+        .get(span.start..span.tag_end)
+        .ok_or_else(|| invalid_error("ODS element start tag is invalid"))?;
+    let bytes = tag.as_bytes();
+    let start = usize::from(bytes.first() == Some(&b'<'));
+    let end = bytes[start..]
+        .iter()
+        .position(|byte| byte.is_ascii_whitespace() || matches!(byte, b'>' | b'/'))
+        .map_or(bytes.len(), |offset| start + offset);
+    tag.get(start..end)
+        .ok_or_else(|| invalid_error("ODS element qualified name is invalid"))
+}
+
+fn render_planned_rows(
+    xml: &str,
+    rows: &[PlannedRow],
+    source_rows: &[SourceRowLexical],
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    let mut output = String::new();
+    for planned in rows {
+        let markup = if let Some(origin) = planned.origin {
+            render_source_row(
+                xml,
+                source_rows
+                    .get(origin)
+                    .ok_or_else(|| invalid_error("ODS source-row origin is missing"))?,
+                planned.row.repeat(),
+            )?
+        } else {
+            crate::worksheet::codec::write_rows_bounded(
+                std::slice::from_ref(&planned.row),
+                max_output,
+            )?
+        };
+        bounded_append(&mut output, &markup, max_output)?;
+    }
+    Ok(output.into_bytes())
+}
+
+fn render_source_row(xml: &str, source: &SourceRowLexical, repeat: usize) -> Result<String> {
+    let raw = xml
+        .get(source.span.clone())
+        .ok_or_else(|| invalid_error("ODS source-row bytes are missing"))?;
+    let repeated = if repeat == source.original_repeat {
+        raw.to_string()
+    } else {
+        let qname = source.repeat_qname.as_deref().ok_or_else(|| {
+            invalid_error("ODS repeated source row has no resolved repetition attribute")
+        })?;
+        replace_attribute_value(raw, qname, &repeat.to_string())?
+    };
+    bind_fragment_namespaces(&repeated, &source.namespaces, &source.declared_prefixes)
+}
+
+fn bind_fragment_namespaces(
+    markup: &str,
+    namespaces: &std::collections::BTreeMap<String, String>,
+    declared: &std::collections::BTreeSet<String>,
+) -> Result<String> {
+    let bytes = markup.as_bytes();
+    if bytes.first() != Some(&b'<') {
+        return invalid("ODS source-row fragment has no start tag");
+    }
+    let insertion = bytes[1..]
+        .iter()
+        .position(|byte| byte.is_ascii_whitespace() || matches!(byte, b'>' | b'/'))
+        .map_or(bytes.len(), |offset| offset + 1);
+    let extra = namespaces
+        .iter()
+        .filter(|(prefix, _)| !declared.contains(*prefix))
+        .try_fold(0usize, |total, (prefix, uri)| {
+            total
+                .checked_add(10)
+                .and_then(|value| value.checked_add(prefix.len()))
+                .and_then(|value| value.checked_add(uri.len()))
+                .ok_or_else(|| invalid_error("ODS namespace binding size overflows"))
+        })?;
+    let capacity = markup
+        .len()
+        .checked_add(extra)
+        .ok_or_else(|| invalid_error("ODS source-row fragment size overflows"))?;
+    let mut output = String::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|_error| invalid_error("ODS source-row fragment allocation failed"))?;
+    output.push_str(&markup[..insertion]);
+    for (prefix, uri) in namespaces {
+        if declared.contains(prefix) {
+            continue;
+        }
+        if prefix.is_empty() {
+            output.push_str(" xmlns=\"");
+        } else {
+            output.push_str(" xmlns:");
+            output.push_str(prefix);
+            output.push_str("=\"");
+        }
+        output.push_str(&escape_xml(uri));
+        output.push('"');
+    }
+    output.push_str(&markup[insertion..]);
+    Ok(output)
+}
+
+fn replace_attribute_value(markup: &str, qname: &str, replacement: &str) -> Result<String> {
+    let bytes = markup.as_bytes();
+    let tag_end = quote_aware_tag_end(bytes)?;
+    let mut cursor = bytes[1..tag_end]
+        .iter()
+        .position(u8::is_ascii_whitespace)
+        .map_or(tag_end, |offset| offset + 1);
+    while cursor < tag_end {
+        while cursor < tag_end && bytes[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= tag_end || bytes[cursor] == b'/' {
+            break;
+        }
+        let name_start = cursor;
+        while cursor < tag_end
+            && !bytes[cursor].is_ascii_whitespace()
+            && !matches!(bytes[cursor], b'=' | b'/' | b'>')
+        {
+            cursor += 1;
+        }
+        let name_end = cursor;
+        while cursor < tag_end && bytes[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= tag_end || bytes[cursor] != b'=' {
+            return invalid("ODS source-row attribute has no equals sign");
+        }
+        cursor += 1;
+        while cursor < tag_end && bytes[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        let quote = *bytes
+            .get(cursor)
+            .ok_or_else(|| invalid_error("ODS source-row attribute value is missing"))?;
+        if !matches!(quote, b'\'' | b'"') {
+            return invalid("ODS source-row attribute value is not quoted");
+        }
+        cursor += 1;
+        let value_start = cursor;
+        while cursor < tag_end && bytes[cursor] != quote {
+            cursor += 1;
+        }
+        if cursor >= tag_end {
+            return invalid("ODS source-row attribute quote is unclosed");
+        }
+        let value_end = cursor;
+        cursor += 1;
+        if &bytes[name_start..name_end] == qname.as_bytes() {
+            let capacity = markup
+                .len()
+                .checked_sub(value_end - value_start)
+                .and_then(|value| value.checked_add(replacement.len()))
+                .ok_or_else(|| invalid_error("ODS source-row attribute size overflows"))?;
+            let mut output = String::new();
+            output
+                .try_reserve_exact(capacity)
+                .map_err(|_error| invalid_error("ODS source-row attribute allocation failed"))?;
+            output.push_str(&markup[..value_start]);
+            output.push_str(replacement);
+            output.push_str(&markup[value_end..]);
+            return Ok(output);
+        }
+    }
+    invalid(format!("ODS source-row attribute '{qname}' was not found"))
+}
+
+fn quote_aware_tag_end(bytes: &[u8]) -> Result<usize> {
+    let mut quote = None;
+    for (index, byte) in bytes.iter().copied().enumerate() {
+        match (quote, byte) {
+            (Some(delimiter), current) if current == delimiter => quote = None,
+            (Some(_), _) => {},
+            (None, b'\'' | b'"') => quote = Some(byte),
+            (None, b'>') => return Ok(index),
+            _ => {},
+        }
+    }
+    invalid("ODS source-row start tag is incomplete")
+}
+
+fn bounded_append(output: &mut String, value: &str, max_output: usize) -> Result<()> {
+    let next = output
+        .len()
+        .checked_add(value.len())
+        .ok_or_else(|| invalid_error("ODS logical-row rendered size overflows"))?;
+    if next > max_output {
+        return invalid(format!(
+            "ODS logical-row rendering exceeds the {max_output} byte limit"
+        ));
+    }
+    output
+        .try_reserve(value.len())
+        .map_err(|_error| invalid_error("ODS logical-row rendering allocation failed"))?;
+    output.push_str(value);
+    Ok(())
+}
+
+fn replace_empty_table(
+    source: &[u8],
+    xml: &str,
+    table: &Span,
+    _sheet: &str,
+    rows: &[PlannedRow],
+    source_rows: &[SourceRowLexical],
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    let raw = xml
+        .get(table.start..table.end)
+        .ok_or_else(|| invalid_error("ODS empty table span is invalid"))?;
+    let rendered = render_planned_rows(xml, rows, source_rows, max_output)?;
+    let qname = start_qname(xml, table)?;
+    let mut replacement = String::new();
+    if let Some(opening) = raw.strip_suffix("/>") {
+        bounded_append(&mut replacement, opening, max_output)?;
+        bounded_append(&mut replacement, ">", max_output)?;
+    } else {
+        let opening = xml
+            .get(table.start..table.tag_end)
+            .ok_or_else(|| invalid_error("ODS empty table opening tag is invalid"))?;
+        bounded_append(&mut replacement, opening, max_output)?;
+        let retained_children = xml
+            .get(table.tag_end..table.close_start)
+            .ok_or_else(|| invalid_error("ODS empty table child span is invalid"))?;
+        bounded_append(&mut replacement, retained_children, max_output)?;
+    }
+    bounded_append(
+        &mut replacement,
+        std::str::from_utf8(&rendered)
+            .map_err(|_error| invalid_error("ODS rendered rows are not UTF-8"))?,
+        max_output,
+    )?;
+    bounded_append(&mut replacement, "</", max_output)?;
+    bounded_append(&mut replacement, qname, max_output)?;
+    bounded_append(&mut replacement, ">", max_output)?;
+    splice_content(
+        source,
+        table.start..table.end,
+        replacement.into_bytes(),
         max_output,
     )
 }
@@ -2531,7 +3725,7 @@ fn select_sheet(xml: &str, spans: &[Span], name: &str) -> Result<usize> {
     let mut selected = children(spans, spreadsheet, TABLE, "table")
         .into_iter()
         .filter(|index| {
-            attribute(xml, &spans[*index], b"table:name")
+            resolved_attribute(xml, spans, *index, TABLE, "name")
                 .ok()
                 .flatten()
                 .as_deref()
@@ -2544,6 +3738,124 @@ fn select_sheet(xml: &str, spans: &[Span], name: &str) -> Result<usize> {
         return invalid("ODS sheet selector is ambiguous");
     }
     Ok(result)
+}
+
+fn resolved_attribute(
+    xml: &str,
+    spans: &[Span],
+    index: usize,
+    namespace: &str,
+    local: &str,
+) -> Result<Option<String>> {
+    let span = spans
+        .get(index)
+        .ok_or_else(|| invalid_error("ODS resolved attribute element is missing"))?;
+    let mut ancestors = Vec::new();
+    let mut parent = span.parent;
+    while let Some(parent_index) = parent {
+        let ancestor = spans
+            .get(parent_index)
+            .ok_or_else(|| invalid_error("ODS resolved attribute ancestor is missing"))?;
+        ancestors.push(ancestor);
+        parent = ancestor.parent;
+    }
+    let mut wrapped = String::new();
+    for ancestor in ancestors.iter().rev() {
+        bounded_append(
+            &mut wrapped,
+            xml.get(ancestor.start..ancestor.tag_end)
+                .ok_or_else(|| invalid_error("ODS resolved attribute ancestor tag is invalid"))?,
+            crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+        )?;
+    }
+    bounded_append(
+        &mut wrapped,
+        xml.get(span.start..span.tag_end)
+            .ok_or_else(|| invalid_error("ODS resolved attribute start tag is invalid"))?,
+        crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+    )?;
+    if !wrapped.ends_with("/>") {
+        bounded_append(
+            &mut wrapped,
+            "</",
+            crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+        )?;
+        bounded_append(
+            &mut wrapped,
+            start_qname(xml, span)?,
+            crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+        )?;
+        bounded_append(
+            &mut wrapped,
+            ">",
+            crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+        )?;
+    }
+    for ancestor in &ancestors {
+        bounded_append(
+            &mut wrapped,
+            "</",
+            crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+        )?;
+        bounded_append(
+            &mut wrapped,
+            start_qname(xml, ancestor)?,
+            crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+        )?;
+        bounded_append(
+            &mut wrapped,
+            ">",
+            crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+        )?;
+    }
+    let mut reader = NsReader::from_str(&wrapped);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    loop {
+        let (element_namespace, event) =
+            reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| {
+                    invalid_error(format!("invalid ODS resolved attribute XML: {error}"))
+                })?;
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if matches!(
+                    &element_namespace,
+                    ResolveResult::Bound(Namespace(uri))
+                        if span.namespace.as_deref() == std::str::from_utf8(uri).ok()
+                ) && element.local_name().as_ref() == span.local.as_bytes() =>
+            {
+                for raw in element.attributes().with_checks(true) {
+                    let raw = raw.map_err(|error| {
+                        invalid_error(format!("invalid ODS resolved attribute: {error}"))
+                    })?;
+                    let (resolved, attribute_local) = reader.resolver().resolve_attribute(raw.key);
+                    if matches!(
+                        resolved,
+                        ResolveResult::Bound(Namespace(uri)) if uri == namespace.as_bytes()
+                    ) && attribute_local.as_ref() == local.as_bytes()
+                    {
+                        return raw
+                            .decoded_and_normalized_value(
+                                quick_xml::XmlVersion::Explicit1_0,
+                                reader.decoder(),
+                            )
+                            .map(|value| Some(value.into_owned()))
+                            .map_err(|error| {
+                                invalid_error(format!(
+                                    "invalid ODS resolved attribute value: {error}"
+                                ))
+                            });
+                    }
+                }
+                return Ok(None);
+            },
+            Event::Eof => return invalid("ODS resolved attribute element was not found"),
+            _ => {},
+        }
+        buffer.clear();
+    }
 }
 
 fn attribute(xml: &str, span: &Span, name: &[u8]) -> Result<Option<String>> {
