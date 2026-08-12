@@ -52,6 +52,8 @@ pub mod rel;
 #[cfg(feature = "sign")]
 pub mod sign;
 pub mod source_backed;
+/// Read-only, bounded OPC package validation.
+pub mod validation;
 
 // Re-export commonly used types
 pub use content_type::ContentType;
@@ -68,3 +70,4 @@ pub use source_backed::{
     PartData, PartView, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
     SourceCacheDiagnostics, SourceCacheLimitError, SourceCacheLimits,
 };
+pub use validation::{validate_read_at, validate_read_at_with_limits};

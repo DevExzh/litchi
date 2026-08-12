@@ -1196,11 +1196,11 @@ fn inspect_relationship_element(
             "relationship Type or Target is not a valid URI reference".to_string(),
         ));
     }
-    relationships.try_reserve(1).map_err(|source| {
-        OpcError::InvalidRelationshipsManifest(format!(
-            "unable to reserve relationship storage: {source}"
-        ))
-    })?;
+    relationships
+        .try_reserve(1)
+        .map_err(|_| OpcError::CollectionAllocation {
+            resource: "OPC relationships",
+        })?;
     ledger.add_relationship(limits)?;
     debug_assert_eq!(next_relationship_count, relationships.len() + 1);
     relationships.push(SerializedRelationship {

@@ -185,12 +185,45 @@ pub enum OpcError {
         #[source]
         source: TryReserveError,
     },
+
+    /// A fallible inline collection could not grow.
+    #[error("OPC allocation failed for {resource}")]
+    CollectionAllocation {
+        /// Resource whose bounded collection could not grow.
+        resource: &'static str,
+    },
+
+    /// A bounded, format-neutral validation report could not be constructed.
+    #[error("OPC validation report construction failed: {0}")]
+    ValidationReport(#[from] litchi_core::ValidationReportError),
 }
 
 impl From<soapberry_zip::Error> for OpcError {
     fn from(err: soapberry_zip::Error) -> Self {
         match err.kind() {
             soapberry_zip::ErrorKind::Cancelled => Self::Cancelled,
+            soapberry_zip::ErrorKind::LimitExceeded {
+                resource,
+                actual,
+                maximum,
+            } => Self::ReadLimit {
+                resource: match resource {
+                    soapberry_zip::LimitResource::FileCount => ReadResource::ArchiveMembers,
+                    soapberry_zip::LimitResource::MemberNameBytes => {
+                        ReadResource::ArchiveMemberNameBytes
+                    },
+                    soapberry_zip::LimitResource::MetadataBytes => {
+                        ReadResource::ArchiveMetadataBytes
+                    },
+                    soapberry_zip::LimitResource::CompressedSize => {
+                        ReadResource::ArchiveCompressedBytes
+                    },
+                    soapberry_zip::LimitResource::EntrySize => ReadResource::ArchiveEntryBytes,
+                    soapberry_zip::LimitResource::TotalSize => ReadResource::ArchiveTotalBytes,
+                },
+                actual: *actual,
+                maximum: *maximum,
+            },
             _ => Self::ZipError(err.to_string()),
         }
     }
@@ -217,6 +250,10 @@ impl From<OpcError> for litchi_core::Error {
             OpcError::Allocation { resource, source } => {
                 litchi_core::Error::Allocation { resource, source }
             },
+            OpcError::CollectionAllocation { resource } => {
+                litchi_core::Error::Other(format!("allocation failed for {resource}"))
+            },
+            OpcError::ValidationReport(error) => litchi_core::Error::Other(error.to_string()),
             OpcError::InvalidReadLimit { .. }
             | OpcError::ReadLimit { .. }
             | OpcError::Cancelled
