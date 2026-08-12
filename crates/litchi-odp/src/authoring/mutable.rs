@@ -23,6 +23,11 @@ pub(super) struct DependencyFreeBlankSlideCopy {
     source_origin: usize,
 }
 
+pub(super) struct DependencyFreeBlankSlideRemoval {
+    index: usize,
+    page_metadata: Option<crate::model::page_metadata::Collection>,
+}
+
 impl DependencyFreeBlankSlideCopy {
     pub(super) fn resource_bytes(&self) -> usize {
         self.page.len()
@@ -377,6 +382,160 @@ impl MutablePresentation {
         self.page_overrides.push(Some(copy.page));
         self.page_metadata = Some(copy.page_metadata);
         Ok(index)
+    }
+
+    /// Prepare exact removal of one retained dependency-free blank page.
+    ///
+    /// This admits the same deliberately tiny page grammar as exact copying,
+    /// then additionally proves that no other XML attribute in `content.xml`
+    /// carries the selected page name. The name scan is intentionally
+    /// conservative: even an unrelated containing attribute or fragment
+    /// hyperlink blocks removal.
+    pub(super) fn prepare_dependency_free_blank_slide_removal(
+        &mut self,
+        index: usize,
+    ) -> Result<DependencyFreeBlankSlideRemoval> {
+        if self.slides.len() <= 1 {
+            return Err(litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide removal refuses the final slide".to_string(),
+            ));
+        }
+        self.check_slide_move_supported()?;
+        self.check_dependency_free_removal_package_owners()?;
+
+        let source_origin = self.origins.get(index).copied().flatten().ok_or_else(|| {
+            litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide removal requires an exact retained source page"
+                    .to_string(),
+            )
+        })?;
+        if self
+            .page_overrides
+            .get(index)
+            .and_then(Option::as_ref)
+            .is_some()
+        {
+            return Err(litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide removal cannot use a copied page".to_string(),
+            ));
+        }
+        let source = self.content_source.as_ref().ok_or_else(|| {
+            litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide removal requires retained content.xml fragments"
+                    .to_string(),
+            )
+        })?;
+        let page = source.page(source_origin).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "ODP retained page origin is outside content.xml coverage".to_string(),
+            )
+        })?;
+        if page.len() > MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP dependency-free blank page exceeds {MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES} bytes"
+            )));
+        }
+        dependency_free_blank_name_value(page)?;
+
+        let metadata = self
+            .page_metadata
+            .as_ref()
+            .and_then(|value| value.page(index))
+            .ok_or_else(|| {
+                litchi_core::Error::Unsupported(
+                    "ODP dependency-free blank-slide removal requires parsed draw:name metadata"
+                        .to_string(),
+                )
+            })?;
+        let name = metadata.name.as_deref().ok_or_else(|| {
+            litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide removal requires draw:name".to_string(),
+            )
+        })?;
+        if name.is_empty() {
+            return Err(litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide removal requires a non-empty draw:name"
+                    .to_string(),
+            ));
+        }
+        if name.len() > MAX_DEPENDENCY_FREE_COPY_NAME_BYTES {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP dependency-free blank page name exceeds {MAX_DEPENDENCY_FREE_COPY_NAME_BYTES} bytes"
+            )));
+        }
+        self.check_dependency_free_removal_name_ownership(name)?;
+
+        let page_metadata = crate::model::page_metadata::metadata_after_page_remove(
+            self.page_metadata.as_ref(),
+            self.slides.len(),
+            index,
+        )?;
+        Ok(DependencyFreeBlankSlideRemoval {
+            index,
+            page_metadata,
+        })
+    }
+
+    /// Apply a fully prevalidated exact blank-page removal without another
+    /// fallible parse or allocation.
+    pub(super) fn apply_dependency_free_blank_slide_removal(
+        &mut self,
+        removal: DependencyFreeBlankSlideRemoval,
+    ) -> Slide {
+        let slide = self.slides.remove(removal.index);
+        self.origins.remove(removal.index);
+        self.page_overrides.remove(removal.index);
+        self.page_metadata = removal.page_metadata;
+        for (index, slide) in self.slides.iter_mut().enumerate().skip(removal.index) {
+            slide.index = index;
+        }
+        slide
+    }
+
+    fn check_dependency_free_removal_package_owners(&self) -> Result<()> {
+        let package = self.source_package.as_ref().ok_or_else(|| {
+            litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide removal requires a retained source package"
+                    .to_string(),
+            )
+        })?;
+        if package.files()?.iter().any(|path| {
+            let path = path.trim_start_matches('/');
+            path == "Basic"
+                || path.starts_with("Basic/")
+                || path == "Scripts"
+                || path.starts_with("Scripts/")
+        }) {
+            return Err(litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide removal refuses package macro owners".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn check_dependency_free_removal_name_ownership(&self, selected_name: &str) -> Result<()> {
+        let package = self.source_package.as_ref().ok_or_else(|| {
+            litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide removal requires a retained source package"
+                    .to_string(),
+            )
+        })?;
+        let mut selected_name_owners = 0usize;
+        let archive = package.package()?;
+        for path in archive
+            .files()?
+            .into_iter()
+            .filter(|path| is_xml_owner_part(path, archive.manifest().get_media_type(path)))
+        {
+            let bytes = archive.get_file(&path)?;
+            scan_dependency_owners(&path, &bytes, selected_name, &mut selected_name_owners)?;
+        }
+        if selected_name_owners != 1 {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP dependency-free blank-slide removal requires exactly one selected page-name owner; found {selected_name_owners}"
+            )));
+        }
+        Ok(())
     }
 
     /// Add a package-contained audio or video payload.
@@ -1048,6 +1207,124 @@ impl MutablePresentation {
 
         writer.finish_to_bounded_bytes()
     }
+}
+
+fn count_selected_name_owners(
+    reader: &Reader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+    selected_name: &str,
+    selected_name_owners: &mut usize,
+) -> Result<()> {
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| {
+            litchi_core::Error::InvalidFormat(format!(
+                "invalid ODP XML attribute during blank-slide ownership validation: {error}"
+            ))
+        })?;
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "invalid ODP XML attribute value during blank-slide ownership validation: {error}"
+                ))
+            })?;
+        let key = attribute.key.as_ref();
+        let local_key = attribute.key.local_name();
+        if matches!(local_key.as_ref(), b"macro-name" | b"language") {
+            return Err(litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide removal refuses macro binding attributes"
+                    .to_string(),
+            ));
+        }
+        if (key == b"href" || key.ends_with(b":href")) && value.contains('#') {
+            return Err(litchi_core::Error::Unsupported(
+                "ODP dependency-free blank-slide removal refuses fragment hyperlink owners"
+                    .to_string(),
+            ));
+        }
+        if value.contains(selected_name) {
+            *selected_name_owners = selected_name_owners.checked_add(1).ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(
+                    "ODP selected page ownership count overflow".to_string(),
+                )
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn scan_dependency_owners(
+    path: &str,
+    bytes: &[u8],
+    selected_name: &str,
+    selected_name_owners: &mut usize,
+) -> Result<()> {
+    let xml = std::str::from_utf8(bytes).map_err(|error| {
+        litchi_core::Error::InvalidFormat(format!(
+            "ODP XML part '{path}' is not UTF-8 during blank-slide ownership validation: {error}"
+        ))
+    })?;
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    loop {
+        match reader.read_event().map_err(|error| {
+            litchi_core::Error::InvalidFormat(format!(
+                "invalid ODP XML part '{path}' during blank-slide ownership validation: {error}"
+            ))
+        })? {
+            Event::Start(element) => {
+                let local_name = element.local_name();
+                if is_macro_owner_name(local_name.as_ref()) {
+                    return Err(litchi_core::Error::Unsupported(
+                        "ODP dependency-free blank-slide removal refuses content macro owners"
+                            .to_string(),
+                    ));
+                }
+                count_selected_name_owners(&reader, &element, selected_name, selected_name_owners)?;
+            },
+            Event::Empty(element) => {
+                let local_name = element.local_name();
+                if is_macro_owner_name(local_name.as_ref()) && local_name.as_ref() != b"scripts" {
+                    return Err(litchi_core::Error::Unsupported(
+                        "ODP dependency-free blank-slide removal refuses content macro owners"
+                            .to_string(),
+                    ));
+                }
+                count_selected_name_owners(&reader, &element, selected_name, selected_name_owners)?;
+            },
+            Event::DocType(_) => {
+                return Err(litchi_core::Error::Unsupported(
+                    "ODP dependency-free blank-slide removal refuses DTD/entity ownership"
+                        .to_string(),
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(())
+}
+
+fn is_macro_owner_name(local_name: &[u8]) -> bool {
+    matches!(local_name, b"scripts" | b"script" | b"event-listener")
+}
+
+fn is_xml_owner_part(path: &str, media_type: Option<&str>) -> bool {
+    let xml_extension = path.rsplit_once('.').is_some_and(|(_, extension)| {
+        extension.eq_ignore_ascii_case("xml") || extension.eq_ignore_ascii_case("rdf")
+    });
+    let xml_media_type = media_type.is_some_and(|value| {
+        let value = value
+            .split_once(';')
+            .map_or(value, |(media_type, _)| media_type)
+            .trim();
+        value.eq_ignore_ascii_case("text/xml")
+            || value.eq_ignore_ascii_case("application/xml")
+            || value
+                .get(value.len().saturating_sub(4)..)
+                .is_some_and(|suffix| suffix.eq_ignore_ascii_case("+xml"))
+    });
+    matches!(path, "content.xml" | "styles.xml") || xml_extension || xml_media_type
 }
 
 fn dependency_free_copy_name(old_name: &str, names: &[String]) -> Result<String> {
