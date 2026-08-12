@@ -251,7 +251,8 @@ pub(crate) use package::charts::EmbeddedChartStorage;
     reason = "ODT facade exposes inert embedded-resource updates"
 )]
 pub(crate) use package::embedded::{
-    EmbeddedResource, EmbeddedResourceFile, EmbeddedResourceKind, EmbeddedResourceSource,
+    EmbeddedResource, EmbeddedResourceChange, EmbeddedResourceFile, EmbeddedResourceKind,
+    EmbeddedResourceSelector, EmbeddedResourceSource,
 };
 #[allow(unused_imports, reason = "ODT facade exposes authored form operations")]
 pub(crate) use package::forms::{AuthoredForm, AuthoredFormControl, AuthoredFormNode};

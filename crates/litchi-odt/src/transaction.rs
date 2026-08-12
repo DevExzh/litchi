@@ -704,6 +704,28 @@ impl Edit {
         })
     }
 
+    /// Stages up to 256 base-snapshot embedded-resource changes for one
+    /// preflight and one package publication.
+    ///
+    /// Every selector is resolved against the document snapshot at batch
+    /// execution, after all previously staged operations. Selecting one owner
+    /// twice, selecting an unsupported owner, or any late resource/path/reference
+    /// failure refuses the entire transaction.
+    /// The corresponding [`OperationResult::Indices`] contains positions for
+    /// `Add` changes only, in batch order and within each resource family.
+    pub fn edit_embedded_resources(
+        &mut self,
+        changes: &[crate::package::embedded::EmbeddedResourceChange],
+    ) -> Result<&mut Self> {
+        crate::package::embedded::validate_batch_limits(changes)?;
+        if changes.is_empty() {
+            return Ok(self);
+        }
+        self.push(Operation::EmbeddedResourceBatch {
+            changes: changes.to_vec(),
+        })
+    }
+
     /// Stages replacement of an embedded object selected in document order.
     pub fn replace_embedded_object(
         &mut self,
@@ -1316,6 +1338,16 @@ impl Edit {
                 Operation::AddEmbeddedResource { resource } => {
                     OperationResult::Index(document.add_embedded_resource(resource)?)
                 },
+                Operation::EmbeddedResourceBatch { changes } => {
+                    let (bytes, indices) = crate::package::embedded::apply_batch(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        changes,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
+                    OperationResult::Indices(indices)
+                },
                 Operation::ReplaceEmbeddedObject { index, resource } => {
                     document.replace_embedded_object(*index, resource)?;
                     OperationResult::Unit
@@ -1807,6 +1839,9 @@ enum Operation {
     AddEmbeddedResource {
         resource: crate::package::embedded::EmbeddedResource,
     },
+    EmbeddedResourceBatch {
+        changes: Vec<crate::package::embedded::EmbeddedResourceChange>,
+    },
     ReplaceEmbeddedObject {
         index: usize,
         resource: crate::package::embedded::EmbeddedResource,
@@ -1899,6 +1934,8 @@ pub enum OperationResult {
     Unit,
     /// Semantic index allocated by an insertion operation.
     Index(usize),
+    /// Semantic indexes allocated by insertions in one bounded batch.
+    Indices(Vec<usize>),
     /// Package path allocated by a resource insertion operation.
     Path(String),
 }
@@ -3154,6 +3191,11 @@ fn semantic_patch_operation(
             "/package/embedded/-".to_string(),
             embedded_resource_value(resource, blobs)?,
         ),
+        Operation::EmbeddedResourceBatch { changes } => (
+            "resource.embedded.batch",
+            "/package/embedded/batch".to_string(),
+            embedded_resource_batch_value(changes, blobs)?,
+        ),
         Operation::ReplaceEmbeddedObject { index, resource } => (
             "resource.embedded.object.replace",
             format!("/package/embedded/objects/{index}"),
@@ -3650,6 +3692,11 @@ fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> 
                 resource: embedded_resource_from_value(&operation.value, blobs)?,
             })
         },
+        "resource.embedded.batch" if operation.target == "/package/embedded/batch" => {
+            Ok(Operation::EmbeddedResourceBatch {
+                changes: embedded_resource_batch_from_value(&operation.value, blobs)?,
+            })
+        },
         "resource.embedded.object.replace" => Ok(Operation::ReplaceEmbeddedObject {
             index: index("/package/embedded/objects/", "")?,
             resource: embedded_resource_from_value(&operation.value, blobs)?,
@@ -3932,6 +3979,113 @@ fn chart_content_from_value(
         _ => return Err(invalid_durable_patch()),
     };
     Ok((content, storage))
+}
+
+fn embedded_resource_batch_value(
+    changes: &[crate::package::embedded::EmbeddedResourceChange],
+    blobs: &mut BlobBundle,
+) -> Result<Value> {
+    use crate::package::embedded::{EmbeddedResourceChange, EmbeddedResourceSelector};
+    if changes.is_empty() || changes.len() > crate::package::embedded::MAX_BATCH_CHANGES {
+        return Err(invalid_durable_patch());
+    }
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(changes.len())
+        .map_err(|source| Error::Allocation {
+            resource: "embedded-resource durable batch",
+            source,
+        })?;
+    for change in changes {
+        values.push(match change {
+            EmbeddedResourceChange::Add(resource) => serde_json::json!({
+                "action": "add",
+                "resource": embedded_resource_value(resource, blobs)?,
+            }),
+            EmbeddedResourceChange::Replace { selector, resource } => {
+                let (kind, index) = match selector {
+                    EmbeddedResourceSelector::Object(position) => ("object", position.get()),
+                    EmbeddedResourceSelector::Image(position) => ("image", position.get()),
+                };
+                serde_json::json!({
+                    "action": "replace",
+                    "index": index,
+                    "kind": kind,
+                    "resource": embedded_resource_value(resource, blobs)?,
+                })
+            },
+            EmbeddedResourceChange::Remove(selector) => {
+                let (kind, index) = match selector {
+                    EmbeddedResourceSelector::Object(position) => ("object", position.get()),
+                    EmbeddedResourceSelector::Image(position) => ("image", position.get()),
+                };
+                serde_json::json!({
+                    "action": "remove",
+                    "index": index,
+                    "kind": kind,
+                })
+            },
+        });
+    }
+    Ok(Value::Array(values))
+}
+
+fn embedded_resource_batch_from_value(
+    value: &Value,
+    blobs: &BlobBundle,
+) -> Result<Vec<crate::package::embedded::EmbeddedResourceChange>> {
+    use crate::package::embedded::{EmbeddedResourceChange, EmbeddedResourceSelector};
+    let values = value.as_array().ok_or_else(invalid_durable_patch)?;
+    if values.is_empty() || values.len() > crate::package::embedded::MAX_BATCH_CHANGES {
+        return Err(invalid_durable_patch());
+    }
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(values.len())
+        .map_err(|source| Error::Allocation {
+            resource: "embedded-resource durable batch",
+            source,
+        })?;
+    for value in values {
+        let object = value.as_object().ok_or_else(invalid_durable_patch)?;
+        let action = object
+            .get("action")
+            .and_then(Value::as_str)
+            .ok_or_else(invalid_durable_patch)?;
+        if action == "add" && object.len() == 2 {
+            changes.push(EmbeddedResourceChange::Add(embedded_resource_from_value(
+                object.get("resource").ok_or_else(invalid_durable_patch)?,
+                blobs,
+            )?));
+            continue;
+        }
+        let expected_fields = if action == "replace" { 4 } else { 3 };
+        if object.len() != expected_fields {
+            return Err(invalid_durable_patch());
+        }
+        let index = object
+            .get("index")
+            .and_then(Value::as_u64)
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or_else(invalid_durable_patch)?;
+        let selector = match object.get("kind").and_then(Value::as_str) {
+            Some("object") => EmbeddedResourceSelector::Object(Position::new(index)),
+            Some("image") => EmbeddedResourceSelector::Image(Position::new(index)),
+            _ => return Err(invalid_durable_patch()),
+        };
+        match action {
+            "replace" => changes.push(EmbeddedResourceChange::Replace {
+                selector,
+                resource: embedded_resource_from_value(
+                    object.get("resource").ok_or_else(invalid_durable_patch)?,
+                    blobs,
+                )?,
+            }),
+            "remove" => changes.push(EmbeddedResourceChange::Remove(selector)),
+            _ => return Err(invalid_durable_patch()),
+        }
+    }
+    Ok(changes)
 }
 
 fn embedded_resource_value(
@@ -4532,6 +4686,49 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
             },
             Operation::AddEmbeddedResource { .. } => {
                 writes.push("/package/embedded/order".to_string());
+            },
+            Operation::EmbeddedResourceBatch { changes } => {
+                for change in changes {
+                    match change {
+                        crate::package::embedded::EmbeddedResourceChange::Add(_) => {
+                            writes.push("/package/embedded/order".to_string());
+                        },
+                        crate::package::embedded::EmbeddedResourceChange::Replace {
+                            selector,
+                            ..
+                        } => match selector {
+                            crate::package::embedded::EmbeddedResourceSelector::Object(
+                                position,
+                            ) => {
+                                writes
+                                    .push(format!("/package/embedded/objects/{}", position.get()));
+                            },
+                            crate::package::embedded::EmbeddedResourceSelector::Image(position) => {
+                                writes.push(format!("/package/embedded/images/{}", position.get()));
+                            },
+                        },
+                        crate::package::embedded::EmbeddedResourceChange::Remove(selector) => {
+                            match selector {
+                                crate::package::embedded::EmbeddedResourceSelector::Object(
+                                    position,
+                                ) => {
+                                    writes.push(format!(
+                                        "/package/embedded/objects/{}",
+                                        position.get()
+                                    ));
+                                },
+                                crate::package::embedded::EmbeddedResourceSelector::Image(
+                                    position,
+                                ) => {
+                                    writes.push(format!(
+                                        "/package/embedded/images/{}",
+                                        position.get()
+                                    ));
+                                },
+                            }
+                        },
+                    }
+                }
             },
             Operation::ReplaceEmbeddedObject { index, .. }
             | Operation::RemoveEmbeddedObject { index } => {
