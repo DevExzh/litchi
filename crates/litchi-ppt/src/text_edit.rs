@@ -469,6 +469,58 @@ pub(crate) struct RootPublication {
     replaced_slide_persist_id: u32,
 }
 
+/// One source-resolved shape-text replacement returned to the root owner.
+///
+/// Native identities remain private to this adapter. The root transaction
+/// records only the semantic target and exact before/after text in its patch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RootShapeTextChange {
+    target: Target,
+    before: String,
+    after: String,
+    slide_persist_id: u32,
+}
+
+impl RootShapeTextChange {
+    pub(crate) const fn target(&self) -> Target {
+        self.target
+    }
+
+    pub(crate) fn before(&self) -> &str {
+        &self.before
+    }
+
+    pub(crate) fn after(&self) -> &str {
+        &self.after
+    }
+
+    pub(crate) const fn slide_persist_id(&self) -> u32 {
+        self.slide_persist_id
+    }
+}
+
+/// One append-only publication containing replacements for several persisted
+/// slide records.
+pub(crate) struct RootBatchPublication {
+    source: Arc<[u8]>,
+    output: Arc<[u8]>,
+    changes: Vec<RootShapeTextChange>,
+}
+
+impl RootBatchPublication {
+    pub(crate) fn source(&self) -> &[u8] {
+        &self.source
+    }
+
+    pub(crate) fn changes(&self) -> &[RootShapeTextChange] {
+        &self.changes
+    }
+
+    pub(crate) fn into_parts(self) -> (Arc<[u8]>, Vec<RootShapeTextChange>) {
+        (self.output, self.changes)
+    }
+}
+
 impl RootPublication {
     pub(crate) fn source(&self) -> &[u8] {
         &self.source
@@ -697,12 +749,26 @@ fn resolve_with_shape_target(
 }
 
 fn resolved_from_location(target: Target, location: ShapeLocation) -> Result<Resolved> {
-    let text = inspect_slide(&location.slide_record, location.shape_id)?;
+    resolved_from_shared_location(
+        target,
+        location.persist_id,
+        location.shape_id,
+        Arc::from(location.slide_record.into_boxed_slice()),
+    )
+}
+
+fn resolved_from_shared_location(
+    target: Target,
+    slide_persist_id: u32,
+    native_shape_id: u32,
+    slide_record: Arc<[u8]>,
+) -> Result<Resolved> {
+    let text = inspect_slide(&slide_record, native_shape_id)?;
     Ok(Resolved {
         target,
-        slide_persist_id: location.persist_id,
-        native_shape_id: location.shape_id,
-        slide_record: Arc::from(location.slide_record.into_boxed_slice()),
+        slide_persist_id,
+        native_shape_id,
+        slide_record,
         kind: text.kind,
         payload: text.payload,
         text: text.text,
@@ -718,6 +784,13 @@ fn resolve_shape(bytes: &[u8], target: Target) -> Result<ShapeLocation> {
 
 fn resolve_shape_target(bytes: &[u8], target: Target) -> Result<(u32, u32)> {
     let presentation = presentation(bytes)?;
+    resolve_shape_target_in_presentation(&presentation, target)
+}
+
+fn resolve_shape_target_in_presentation(
+    presentation: &Presentation,
+    target: Target,
+) -> Result<(u32, u32)> {
     let slides = presentation.slides()?;
     let slide = slides
         .get(target.slide.get())
@@ -729,6 +802,189 @@ fn resolve_shape_target(bytes: &[u8], target: Target) -> Result<(u32, u32)> {
         .get(target.shape.get())
         .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
     Ok((slide.persist_id(), native_shape_id(shape)))
+}
+
+/// Replaces a bounded caller-preflighted set of semantic shape targets through
+/// one persisted-record editor and one full candidate reopen.
+///
+/// Callers retain the hard operation-count bound. This owner resolves every
+/// target and validates every encoding/dependency closure before staging any
+/// record in the editor. Distinct shapes on one slide are rewritten against
+/// the progressively staged slide record, while each rewrite retains the
+/// original atom payload as its exact source precondition.
+pub(crate) fn replace_shape_texts_batch(
+    source: Arc<[u8]>,
+    replacements: &[(Target, &str)],
+    max_output_bytes: usize,
+) -> Result<Option<RootBatchPublication>> {
+    let replacement_bytes =
+        replacements
+            .iter()
+            .try_fold(0usize, |total, (_target, replacement)| {
+                total.checked_add(replacement.len()).ok_or_else(|| {
+                    PackageError::ResourceLimit(
+                        "PPT shape-text batch replacement byte count overflow".into(),
+                    )
+                })
+            })?;
+    require_batch_text_budget(replacement_bytes, 0, max_output_bytes)?;
+
+    let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
+        source.clone(),
+        max_output_bytes,
+    )?;
+    let presentation = presentation_shared(source.clone())?;
+    let slides = presentation.slides()?;
+    let mut prepared = Vec::with_capacity(replacements.len());
+    let mut original_slides = BTreeMap::<u32, Arc<[u8]>>::new();
+    let mut encoded_bytes = 0usize;
+
+    // Complete semantic resolution and replacement validation before the
+    // editor receives its first staged mutation.
+    for (target, replacement) in replacements {
+        let slide =
+            slides
+                .get(target.slide.get())
+                .ok_or(Error::Refused(Refusal::SlideNotFound {
+                    position: target.slide,
+                }))?;
+        let shape = slide
+            .shapes()?
+            .get(target.shape.get())
+            .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+        let persist_id = slide.persist_id();
+        let shape_id = native_shape_id(shape);
+        let slide_record = match original_slides.get(&persist_id) {
+            Some(record) => record.clone(),
+            None => {
+                let record: Arc<[u8]> =
+                    Arc::from(editor.persisted_record(persist_id)?.into_boxed_slice());
+                original_slides.insert(persist_id, record.clone());
+                record
+            },
+        };
+        let resolved = resolved_from_shared_location(*target, persist_id, shape_id, slide_record)?;
+        let encoded_len = encoded_replacement_len(replacement, resolved.kind)?;
+        encoded_bytes = encoded_bytes.checked_add(encoded_len).ok_or_else(|| {
+            PackageError::ResourceLimit("PPT shape-text batch encoded byte count overflow".into())
+        })?;
+        require_batch_text_budget(replacement_bytes, encoded_bytes, max_output_bytes)?;
+        let encoded = encode_replacement(replacement, resolved.kind)?;
+        if encoded.len() != encoded_len {
+            return Err(PackageError::Corrupted(
+                "PPT shape-text batch replacement size preflight disagrees with encoding".into(),
+            )
+            .into());
+        }
+        if encoded.len() != resolved.payload.len() && !resolved.can_resize {
+            return Err(Error::Refused(Refusal::DependencyClosure));
+        }
+        if *replacement != resolved.text {
+            prepared.push((resolved, (*replacement).to_string(), encoded));
+        }
+    }
+    drop(slides);
+    drop(presentation);
+
+    if prepared.is_empty() {
+        return Ok(None);
+    }
+
+    // Input order is retained in the semantic change list. Each native slide
+    // record is progressively rewritten in memory and staged in the editor
+    // exactly once after all of its shape replacements succeed.
+    let mut staged_slides = BTreeMap::<u32, Vec<u8>>::new();
+    for (resolved, _replacement, encoded) in &prepared {
+        let staged = staged_slides
+            .entry(resolved.slide_persist_id)
+            .or_insert_with(|| resolved.slide_record.to_vec());
+        *staged = rewrite_slide(
+            staged,
+            resolved.native_shape_id,
+            resolved.kind,
+            &resolved.payload,
+            encoded,
+        )?;
+    }
+
+    for (persist_id, staged) in staged_slides {
+        let original = original_slides.get(&persist_id).ok_or_else(|| {
+            PackageError::Corrupted(
+                "PPT batch shape-text publication lost its original slide record".into(),
+            )
+        })?;
+        if editor.persisted_record(persist_id)?.as_slice() != original.as_ref() {
+            return Err(PackageError::Corrupted(
+                "PPT batch shape-text transaction source changed before publication".into(),
+            )
+            .into());
+        }
+        editor.replace_persisted_record(persist_id, staged)?;
+    }
+
+    let candidate = editor.finish()?;
+    crate::font::validate_unrelated_streams(&source, &candidate)?;
+    let output: Arc<[u8]> = Arc::from(candidate.into_boxed_slice());
+
+    // One complete reopen validates the publication and supplies all semantic
+    // readbacks without reopening the package once per shape.
+    let reopened = presentation_shared(output.clone())?;
+    let reopened_slides = reopened.slides()?;
+    let mut changes = Vec::with_capacity(prepared.len());
+    for (resolved, replacement, _encoded) in prepared {
+        let slide = reopened_slides
+            .get(resolved.target.slide.get())
+            .ok_or(Error::Refused(Refusal::SlideNotFound {
+                position: resolved.target.slide,
+            }))?;
+        if slide.persist_id() != resolved.slide_persist_id {
+            return Err(PackageError::Corrupted(
+                "published PPT batch shape text resolved a different slide".into(),
+            )
+            .into());
+        }
+        let shape = slide
+            .shapes()?
+            .get(resolved.target.shape.get())
+            .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+        if shape.text()? != replacement {
+            return Err(PackageError::Corrupted(
+                "published PPT batch shape text did not round-trip through its source shape".into(),
+            )
+            .into());
+        }
+        changes.push(RootShapeTextChange {
+            target: resolved.target,
+            before: resolved.text,
+            after: replacement,
+            slide_persist_id: resolved.slide_persist_id,
+        });
+    }
+
+    Ok(Some(RootBatchPublication {
+        source,
+        output,
+        changes,
+    }))
+}
+
+fn require_batch_text_budget(
+    replacement_bytes: usize,
+    encoded_bytes: usize,
+    max_bytes: usize,
+) -> Result<()> {
+    let retained_bytes = replacement_bytes
+        .checked_add(encoded_bytes)
+        .ok_or_else(|| {
+            PackageError::ResourceLimit("PPT shape-text batch retained byte count overflow".into())
+        })?;
+    if retained_bytes > max_bytes {
+        return Err(PackageError::ResourceLimit(format!(
+            "PPT shape-text batch retained bytes {retained_bytes} exceeds limit {max_bytes}"
+        ))
+        .into());
+    }
+    Ok(())
 }
 
 fn resolve_shape_record(
@@ -791,6 +1047,95 @@ pub(crate) fn replace_shape_anchor(
 pub(crate) fn inspect_shape_anchor(bytes: &[u8], target: Target) -> Result<crate::Anchor> {
     let location = resolve_shape(bytes, target)?;
     inspect_anchor(&location.slide_record, location.shape_id)
+}
+
+#[cfg(test)]
+pub(crate) fn shape_text_can_resize(bytes: &[u8], target: Target) -> Result<bool> {
+    resolve(bytes, target).map(|resolved| resolved.can_resize)
+}
+
+#[cfg(test)]
+pub(crate) fn add_unmodeled_text_dependency_for_test(
+    bytes: &[u8],
+    target: Target,
+) -> Result<Vec<u8>> {
+    fn inject_officeart(
+        record: &[u8],
+        shape_id: u32,
+        depth: usize,
+        matches: &mut usize,
+    ) -> Result<Vec<u8>> {
+        if depth >= 128 {
+            return Err(PackageError::Corrupted(
+                "OfficeArt nesting exceeds text-edit test limit".into(),
+            )
+            .into());
+        }
+        if record_type(record)? == OFFICEART_SP_CONTAINER && shape_id_of(record)? == Some(shape_id)
+        {
+            *matches += 1;
+            let mut textboxes = 0usize;
+            let mut data = Vec::with_capacity(drawing_payload(record)?.len() + PPT_HEADER_LEN);
+            for child_result in children(record)? {
+                let child = child_result?;
+                if record_type(child)? == OFFICEART_CLIENT_TEXTBOX {
+                    textboxes += 1;
+                    let mut textbox_data = drawing_payload(child)?.to_vec();
+                    textbox_data.extend_from_slice(&0_u16.to_le_bytes());
+                    // Unknown inert child: it is preserved by the reader but
+                    // deliberately makes the text-position dependency closure
+                    // ineligible for length-changing edits.
+                    textbox_data.extend_from_slice(&0x7ffe_u16.to_le_bytes());
+                    textbox_data.extend_from_slice(&0_u32.to_le_bytes());
+                    data.extend_from_slice(&rebuild(child, &textbox_data)?);
+                } else {
+                    data.extend_from_slice(child);
+                }
+            }
+            if textboxes != 1 {
+                return Err(Error::Refused(Refusal::AmbiguousTextbox));
+            }
+            return rebuild(record, &data).map_err(Into::into);
+        }
+        if record_version(record)? != 0xF {
+            return Ok(record.to_vec());
+        }
+        let mut data = Vec::with_capacity(drawing_payload(record)?.len() + PPT_HEADER_LEN);
+        for child_result in children(record)? {
+            data.extend_from_slice(&inject_officeart(
+                child_result?,
+                shape_id,
+                depth + 1,
+                matches,
+            )?);
+        }
+        rebuild(record, &data).map_err(Into::into)
+    }
+
+    let location = resolve_shape(bytes, target)?;
+    let mut drawings = 0usize;
+    let rewritten = rewrite_ppt_record(&location.slide_record, 0, &mut |record| {
+        if record_type(record)? != RecordType::PPDrawing as u16 {
+            return Ok(None);
+        }
+        drawings += 1;
+        let mut matches = 0usize;
+        let data = inject_officeart(drawing_payload(record)?, location.shape_id, 0, &mut matches)?;
+        if matches != 1 {
+            return Err(Error::Refused(Refusal::AmbiguousShape));
+        }
+        rebuild(record, &data).map(Some).map_err(Into::into)
+    })?
+    .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+    if drawings != 1 {
+        return Err(PackageError::Corrupted(
+            "selected slide has ambiguous PPDrawing ownership".into(),
+        )
+        .into());
+    }
+    let mut editor = crate::embedded::object::Editor::open_records(bytes.to_vec())?;
+    editor.replace_persisted_record(location.persist_id, rewritten)?;
+    editor.finish().map_err(Into::into)
 }
 
 fn native_shape_id(selected: &ShapeEnum<'_>) -> u32 {
@@ -1369,6 +1714,28 @@ fn encode_replacement(value: &str, kind: TextKind) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
+fn encoded_replacement_len(value: &str, kind: TextKind) -> Result<usize> {
+    if value.contains('\0') {
+        return Err(Error::Refused(Refusal::IncompatibleEncoding));
+    }
+    match kind {
+        TextKind::Bytes => value.chars().try_fold(0usize, |length, character| {
+            u8::try_from(u32::from(character))
+                .map_err(|_err| Error::Refused(Refusal::IncompatibleEncoding))?;
+            length.checked_add(1).ok_or_else(|| {
+                PackageError::ResourceLimit(
+                    "PPT shape-text replacement encoded length overflow".into(),
+                )
+                .into()
+            })
+        }),
+        TextKind::Chars => value.encode_utf16().count().checked_mul(2).ok_or_else(|| {
+            PackageError::ResourceLimit("PPT shape-text replacement encoded length overflow".into())
+                .into()
+        }),
+    }
+}
+
 fn text_units(kind: TextKind, byte_length: usize) -> Result<usize> {
     match kind {
         TextKind::Bytes => Ok(byte_length),
@@ -1526,6 +1893,21 @@ mod tests {
             256 * 1024,
             512 * 1024,
         )
+    }
+
+    #[test]
+    fn batch_text_budget_accepts_exact_limit_and_rejects_one_over_and_overflow() {
+        assert!(super::require_batch_text_budget(5, 7, 12).is_ok());
+        assert!(matches!(
+            super::require_batch_text_budget(5, 8, 12),
+            Err(Error::Package(crate::package::Error::ResourceLimit(message)))
+                if message.contains("13") && message.contains("12")
+        ));
+        assert!(matches!(
+            super::require_batch_text_budget(usize::MAX, 1, usize::MAX),
+            Err(Error::Package(crate::package::Error::ResourceLimit(message)))
+                if message.contains("overflow")
+        ));
     }
 
     #[test]

@@ -25,6 +25,12 @@ pub type History = litchi_core::patch::History<Snapshot>;
 /// Maximum automatic slide-advance delay permitted by `[MS-PPT]` 2.6.6.
 pub const MAX_SLIDE_ADVANCE_MS: u32 = 86_399_000;
 
+/// Maximum shape-text replacements accepted by one atomic batch.
+///
+/// The bound is checked from the slice length before target resolution,
+/// package parsing, or replacement encoding.
+pub const MAX_SHAPE_TEXT_REPLACEMENTS: usize = 256;
+
 /// Fixed-width manual and automatic advance state from one
 /// `SlideShowSlideInfoAtom`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -238,6 +244,8 @@ pub enum Refusal {
     UnsupportedSlideTransitionVisual { position: Position },
     /// A shape edit selected a slide inserted but not yet published.
     UncommittedSlideDependency,
+    /// One semantic shape target appeared more than once in one batch.
+    DuplicateShapeTextTarget { target: crate::text_edit::Target },
 }
 
 impl fmt::Display for Refusal {
@@ -287,6 +295,12 @@ impl fmt::Display for Refusal {
             ),
             Self::UncommittedSlideDependency => formatter
                 .write_str("PPT shape text cannot target an inserted slide before publication"),
+            Self::DuplicateShapeTextTarget { target } => write!(
+                formatter,
+                "PPT shape-text batch repeats slide {}/shape {}",
+                target.slide().get(),
+                target.shape().get()
+            ),
         }
     }
 }
@@ -492,6 +506,58 @@ impl Snapshot {
             limits: self.limits,
             has_review_history: self.has_review_history,
         })
+    }
+
+    fn adopt_text_edit_batch_publication(
+        &self,
+        publication: crate::text_edit::RootBatchPublication,
+    ) -> Result<(Self, Vec<crate::text_edit::RootShapeTextChange>)> {
+        if publication.source() != self.bytes() {
+            return Err(PackageError::Corrupted(
+                "PPT root batch text publication source changed before adoption".into(),
+            )
+            .into());
+        }
+        if publication.changes().is_empty() {
+            return Err(PackageError::Corrupted(
+                "changed PPT batch text publication has no semantic changes".into(),
+            )
+            .into());
+        }
+        if publication
+            .changes()
+            .iter()
+            .any(|change| change.slide_persist_id() == self.document_persist_id)
+        {
+            return Err(PackageError::Corrupted(
+                "PPT root batch text publication targeted the live document record".into(),
+            )
+            .into());
+        }
+
+        let (bytes, changes) = publication.into_parts();
+        if self.limits != RecordLimits::default() {
+            let reopened = Self::from_bytes_with_limits(bytes.to_vec(), self.limits)?;
+            return Ok((reopened, changes));
+        }
+        if bytes.len() > self.limits.max_package_bytes {
+            return Err(PackageError::ResourceLimit(format!(
+                "PPT slide-order source size {} exceeds limit {}",
+                bytes.len(),
+                self.limits.max_package_bytes
+            ))
+            .into());
+        }
+        Ok((
+            Self {
+                bytes,
+                document: self.document.clone(),
+                document_persist_id: self.document_persist_id,
+                limits: self.limits,
+                has_review_history: self.has_review_history,
+            },
+            changes,
+        ))
     }
 
     /// Exact bytes of the complete source or committed artifact.
@@ -848,6 +914,37 @@ pub struct ShapeTextChange {
     target: crate::text_edit::Target,
     before: String,
     after: String,
+}
+
+/// One contextual shape-text replacement for [`Transaction::set_shape_texts`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShapeTextReplacement {
+    target: crate::text_edit::Target,
+    text: String,
+}
+
+impl ShapeTextReplacement {
+    /// Creates a replacement for one shape in the transaction's projected
+    /// slide order.
+    #[must_use]
+    pub fn new(target: crate::text_edit::Target, text: impl Into<String>) -> Self {
+        Self {
+            target,
+            text: text.into(),
+        }
+    }
+
+    /// Semantic target in the transaction's projected slide order.
+    #[must_use]
+    pub const fn target(&self) -> crate::text_edit::Target {
+        self.target
+    }
+
+    /// Replacement text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
 }
 
 impl ShapeTextChange {
@@ -1482,6 +1579,107 @@ impl Transaction {
         self.text_changes.push(change.clone());
         self.formatting.push(FormattingChange::Text(change));
         Ok(())
+    }
+
+    /// Atomically replaces text in several existing native PPT shapes.
+    ///
+    /// All projected targets are resolved against the immutable working root
+    /// captured at entry. Encodings and dependency closures are validated for
+    /// the complete batch before publication. Changed shapes are grouped by
+    /// persisted slide, and all changed slide records are emitted through one
+    /// append-only PPT user edit. Semantic changes retain caller order; exact
+    /// no-ops are omitted and preserve the working source allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a resource-limit error before proportional work when more than
+    /// [`MAX_SHAPE_TEXT_REPLACEMENTS`] operations are supplied. Duplicate
+    /// semantic targets, missing targets, incompatible encodings, unsafe
+    /// dependency closures, and package publication failures leave this
+    /// transaction unchanged.
+    pub fn set_shape_texts(&mut self, replacements: &[ShapeTextReplacement]) -> Result<usize> {
+        if replacements.len() > MAX_SHAPE_TEXT_REPLACEMENTS {
+            return Err(PackageError::ResourceLimit(format!(
+                "PPT shape-text batch operation count {} exceeds limit {}",
+                replacements.len(),
+                MAX_SHAPE_TEXT_REPLACEMENTS
+            ))
+            .into());
+        }
+        if replacements.is_empty() {
+            return Ok(0);
+        }
+
+        let projected = self.document.slides()?;
+        let mut seen = BTreeSet::new();
+        let mut mapped = Vec::with_capacity(replacements.len());
+        let mut expected_persist_ids = BTreeMap::new();
+        for replacement in replacements {
+            let target = replacement.target();
+            if !seen.insert((target.slide().get(), target.shape().get())) {
+                return Err(Error::Refused(Refusal::DuplicateShapeTextTarget { target }));
+            }
+            let selected = projected.get(target.slide().get()).ok_or(Error::Refused(
+                Refusal::SlideNotFound {
+                    position: target.slide(),
+                },
+            ))?;
+            let persist_id = selected.persist_id();
+            let source_position = self
+                .source
+                .document
+                .slides()
+                .iter()
+                .position(|slide| slide.persist_id() == persist_id)
+                .map(Position::new)
+                .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
+            let source_target = crate::text_edit::Target::new(source_position, target.shape());
+            mapped.push((source_target, replacement.text()));
+            expected_persist_ids.insert(
+                (source_target.slide().get(), source_target.shape().get()),
+                persist_id,
+            );
+        }
+
+        let Some(publication) = crate::text_edit::replace_shape_texts_batch(
+            self.working.bytes.clone(),
+            &mapped,
+            self.source.limits.max_package_bytes,
+        )?
+        else {
+            return Ok(0);
+        };
+
+        // Validate the native publication identities against the projected
+        // targets before adopting either bytes or semantic patch state.
+        for change in publication.changes() {
+            let key = (change.target().slide().get(), change.target().shape().get());
+            if expected_persist_ids.get(&key).copied() != Some(change.slide_persist_id()) {
+                return Err(PackageError::Corrupted(
+                    "PPT batch text publication targeted an unexpected slide record".into(),
+                )
+                .into());
+            }
+        }
+
+        let (working, published_changes) = self
+            .working
+            .adopt_text_edit_batch_publication(publication)?;
+        let changes = published_changes
+            .into_iter()
+            .map(|change| ShapeTextChange {
+                target: change.target(),
+                before: change.before().to_string(),
+                after: change.after().to_string(),
+            })
+            .collect::<Vec<_>>();
+        let changed = changes.len();
+
+        self.working = working;
+        self.text_changes.extend(changes.iter().cloned());
+        self.formatting
+            .extend(changes.into_iter().map(FormattingChange::Text));
+        Ok(changed)
     }
 
     /// Replaces an existing shape's complete checked `PowerPoint` client anchor.
@@ -5874,6 +6072,47 @@ mod tests {
         output.into_inner()
     }
 
+    fn authored_batch_fixture() -> Vec<u8> {
+        let mut writer = crate::writer::Writer::new();
+        let first = writer.add_slide().unwrap();
+        writer
+            .add_textbox(first, 10, 10, 240, 40, "first shape")
+            .unwrap();
+        writer
+            .add_textbox(first, 10, 60, 240, 40, "second shape")
+            .unwrap();
+        let second = writer.add_slide().unwrap();
+        writer
+            .add_textbox(second, 10, 10, 240, 40, "third shape")
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    }
+
+    fn authored_many_shapes_fixture(count: usize) -> Vec<u8> {
+        let mut writer = crate::writer::Writer::new();
+        let slide = writer.add_slide().unwrap();
+        for index in 0..count {
+            let text = format!("shape {index}");
+            writer.add_textbox(slide, 10, 10, 240, 40, &text).unwrap();
+        }
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    }
+
+    fn shape_text(bytes: &[u8], target: crate::text_edit::Target) -> String {
+        let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+        let presentation = package.presentation().unwrap();
+        presentation.slides().unwrap()[target.slide().get()]
+            .shapes()
+            .unwrap()[target.shape().get()]
+        .text()
+        .unwrap()
+        .to_string()
+    }
+
     #[test]
     fn open_ole_live_document_inspection_matches_byte_ingress() {
         let bytes = authored_fixture();
@@ -6238,6 +6477,325 @@ mod tests {
         assert_eq!(commit.patch().shape_text_changes().len(), 2);
         assert!(slide_texts(reopened.bytes())[0].contains("first adopted text"));
         assert!(slide_texts(reopened.bytes())[1].contains("second adopted text"));
+    }
+
+    #[test]
+    fn shape_text_batch_rewrites_same_and_cross_slide_records_once_and_reverses() {
+        let source = Snapshot::from_bytes(authored_batch_fixture()).unwrap();
+        let first = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let second = crate::text_edit::Target::new(Position::new(0), Position::new(1));
+        let third = crate::text_edit::Target::new(Position::new(1), Position::new(0));
+        let replacements = [
+            ShapeTextReplacement::new(first, "first batch replacement"),
+            ShapeTextReplacement::new(second, "second batch replacement is longer"),
+            ShapeTextReplacement::new(third, "third batch replacement"),
+        ];
+        assert_eq!(replacements[0].target(), first);
+        assert_eq!(replacements[0].text(), "first batch replacement");
+
+        let mut edit = source.edit().unwrap();
+        assert_eq!(edit.set_shape_texts(&replacements).unwrap(), 3);
+        assert_eq!(
+            edit.shape_text_changes()
+                .iter()
+                .map(ShapeTextChange::target)
+                .collect::<Vec<_>>(),
+            [first, second, third]
+        );
+        let commit = edit.commit().unwrap();
+        assert_eq!(
+            shape_text(commit.snapshot().bytes(), first),
+            "first batch replacement"
+        );
+        assert_eq!(
+            shape_text(commit.snapshot().bytes(), second),
+            "second batch replacement is longer"
+        );
+        assert_eq!(
+            shape_text(commit.snapshot().bytes(), third),
+            "third batch replacement"
+        );
+        crate::font::validate_unrelated_streams(source.bytes(), commit.snapshot().bytes()).unwrap();
+        let fully_reopened = Snapshot::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+        assert_eq!(commit.snapshot(), &fully_reopened);
+        assert_eq!(commit.snapshot().document, source.document);
+        assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
+        assert_eq!(
+            commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+            source
+        );
+
+        let foreign = Snapshot::from_bytes(authored_fixture()).unwrap();
+        assert!(commit.patch().apply(&foreign).is_err());
+        let durable = commit.patch().to_durable(patch_limits()).unwrap();
+        let first_json = durable.to_deterministic_json().unwrap();
+        let second_json = durable.to_deterministic_json().unwrap();
+        assert_eq!(first_json, second_json);
+        let applied = source.apply_durable(&durable).unwrap();
+        assert_eq!(
+            shape_text(applied.bytes(), first),
+            "first batch replacement"
+        );
+        assert_eq!(
+            shape_text(applied.bytes(), second),
+            "second batch replacement is longer"
+        );
+        assert_eq!(
+            shape_text(applied.bytes(), third),
+            "third batch replacement"
+        );
+        let restored = applied.apply_durable(&durable.inverse()).unwrap();
+        assert_eq!(slide_texts(restored.bytes()), slide_texts(source.bytes()));
+
+        let mut reverse = source.edit().unwrap();
+        reverse
+            .set_shape_texts(&[
+                replacements[2].clone(),
+                replacements[1].clone(),
+                replacements[0].clone(),
+            ])
+            .unwrap();
+        let reverse_commit = reverse.commit().unwrap();
+        assert_eq!(reverse_commit.snapshot().bytes(), commit.snapshot().bytes());
+    }
+
+    #[test]
+    fn shape_text_batch_refusals_are_atomic_and_duplicate_is_deterministic() {
+        let source = Snapshot::from_bytes(authored_batch_fixture()).unwrap();
+        let valid = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let missing = crate::text_edit::Target::new(Position::new(1), Position::new(99));
+        let mut edit = source.edit().unwrap();
+        let source_ptr = edit.working.bytes.as_ptr();
+
+        let error = edit
+            .set_shape_texts(&[
+                ShapeTextReplacement::new(valid, "valid but unpublished"),
+                ShapeTextReplacement::new(valid, "duplicate"),
+            ])
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Refused(Refusal::DuplicateShapeTextTarget { target }) if target == valid
+        ));
+        assert_eq!(edit.working.bytes.as_ptr(), source_ptr);
+        assert!(edit.shape_text_changes().is_empty());
+
+        let error = edit
+            .set_shape_texts(&[
+                ShapeTextReplacement::new(valid, "valid but unpublished"),
+                ShapeTextReplacement::new(missing, "missing"),
+            ])
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Text(error)
+                if matches!(*error, crate::text_edit::Error::Refused(crate::text_edit::Refusal::ShapeNotFound))
+        ));
+        assert_eq!(edit.working.bytes.as_ptr(), source_ptr);
+        assert!(edit.shape_text_changes().is_empty());
+
+        let error = edit
+            .set_shape_texts(&[
+                ShapeTextReplacement::new(valid, "valid but unpublished"),
+                ShapeTextReplacement::new(
+                    crate::text_edit::Target::new(Position::new(0), Position::new(1)),
+                    "invalid\0encoding",
+                ),
+            ])
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Text(error)
+                if matches!(*error, crate::text_edit::Error::Refused(crate::text_edit::Refusal::IncompatibleEncoding))
+        ));
+        assert_eq!(edit.working.bytes.as_ptr(), source_ptr);
+        assert!(edit.shape_text_changes().is_empty());
+        assert_eq!(edit.commit().unwrap().snapshot(), &source);
+    }
+
+    #[test]
+    fn shape_text_batch_enforces_limit_before_resolution_and_filters_noops() {
+        let source = Snapshot::from_bytes(authored_batch_fixture()).unwrap();
+        let target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let over_limit = (0..=MAX_SHAPE_TEXT_REPLACEMENTS)
+            .map(|_| {
+                ShapeTextReplacement::new(
+                    crate::text_edit::Target::new(Position::new(usize::MAX), Position::new(0)),
+                    "never resolved",
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut edit = source.edit().unwrap();
+        let error = edit.set_shape_texts(&over_limit).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Package(PackageError::ResourceLimit(message))
+                if message.contains("257") && message.contains("256")
+        ));
+
+        let exact_limit = (0..MAX_SHAPE_TEXT_REPLACEMENTS)
+            .map(|_| ShapeTextReplacement::new(target, "first shape"))
+            .collect::<Vec<_>>();
+        assert!(matches!(
+            edit.set_shape_texts(&exact_limit),
+            Err(Error::Refused(Refusal::DuplicateShapeTextTarget { .. }))
+        ));
+
+        let before_ptr = edit.working.bytes.as_ptr();
+        assert_eq!(
+            edit.set_shape_texts(&[ShapeTextReplacement::new(target, "first shape")])
+                .unwrap(),
+            0
+        );
+        assert_eq!(edit.working.bytes.as_ptr(), before_ptr);
+        assert!(edit.shape_text_changes().is_empty());
+
+        let second = crate::text_edit::Target::new(Position::new(0), Position::new(1));
+        assert_eq!(
+            edit.set_shape_texts(&[
+                ShapeTextReplacement::new(target, "first shape"),
+                ShapeTextReplacement::new(second, "changed second shape"),
+            ])
+            .unwrap(),
+            1
+        );
+        assert_eq!(edit.shape_text_changes().len(), 1);
+        assert_eq!(edit.shape_text_changes()[0].target(), second);
+
+        let exact_source =
+            Snapshot::from_bytes(authored_many_shapes_fixture(MAX_SHAPE_TEXT_REPLACEMENTS))
+                .unwrap();
+        let exact_limit = (0..MAX_SHAPE_TEXT_REPLACEMENTS)
+            .map(|shape| {
+                ShapeTextReplacement::new(
+                    crate::text_edit::Target::new(Position::new(0), Position::new(shape)),
+                    format!("shape {shape}"),
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut exact_edit = exact_source.edit().unwrap();
+        let source_ptr = exact_edit.working.bytes.as_ptr();
+        assert_eq!(exact_edit.set_shape_texts(&exact_limit).unwrap(), 0);
+        assert_eq!(exact_edit.working.bytes.as_ptr(), source_ptr);
+        assert_eq!(exact_edit.commit().unwrap().snapshot(), &exact_source);
+    }
+
+    #[test]
+    fn shape_text_batch_late_dependency_refusal_leaves_transaction_unchanged() {
+        let safe = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let dependency = crate::text_edit::Target::new(Position::new(0), Position::new(1));
+        let bytes = crate::text_edit::add_unmodeled_text_dependency_for_test(
+            &authored_batch_fixture(),
+            dependency,
+        )
+        .unwrap();
+        let source = Snapshot::from_bytes(bytes).unwrap();
+        assert!(!crate::text_edit::shape_text_can_resize(source.bytes(), dependency).unwrap());
+        let dependency_before = shape_text(source.bytes(), dependency);
+        let mut edit = source.edit().unwrap();
+        let source_ptr = edit.working.bytes.as_ptr();
+        let error = edit
+            .set_shape_texts(&[
+                ShapeTextReplacement::new(safe, "valid but unpublished"),
+                ShapeTextReplacement::new(dependency, format!("{dependency_before} length change")),
+            ])
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Text(error)
+                if matches!(*error, crate::text_edit::Error::Refused(crate::text_edit::Refusal::DependencyClosure))
+        ));
+        assert_eq!(edit.working.bytes.as_ptr(), source_ptr);
+        assert!(edit.shape_text_changes().is_empty());
+        assert_eq!(edit.commit().unwrap().snapshot(), &source);
+    }
+
+    #[test]
+    fn shape_text_batch_oversized_late_replacement_is_atomic() {
+        let bytes = authored_batch_fixture();
+        let mut limits = RecordLimits::default();
+        limits.max_package_bytes = bytes.len();
+        let source = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
+        let first = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let second = crate::text_edit::Target::new(Position::new(0), Position::new(1));
+        let oversized = "x".repeat(limits.max_package_bytes);
+        let mut edit = source.edit().unwrap();
+        let source_ptr = edit.working.bytes.as_ptr();
+        let error = edit
+            .set_shape_texts(&[
+                ShapeTextReplacement::new(first, "valid but unpublished"),
+                ShapeTextReplacement::new(second, oversized),
+            ])
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Text(error)
+                if matches!(
+                    error.as_ref(),
+                    crate::text_edit::Error::Package(PackageError::ResourceLimit(message))
+                        if message.contains("shape-text batch retained bytes")
+                )
+        ));
+        assert_eq!(edit.working.bytes.as_ptr(), source_ptr);
+        assert!(edit.shape_text_changes().is_empty());
+        assert_eq!(edit.commit().unwrap().snapshot(), &source);
+    }
+
+    #[test]
+    fn shape_text_batch_composes_with_order_conflicts_and_custom_limits() {
+        let bytes = authored_batch_fixture();
+        let source = Snapshot::from_bytes(bytes.clone()).unwrap();
+        let projected_target = crate::text_edit::Target::new(Position::new(1), Position::new(0));
+        let mut edit = source.edit().unwrap();
+        edit.move_slide(Position::new(0), Position::new(1)).unwrap();
+        assert_eq!(
+            edit.set_shape_texts(&[ShapeTextReplacement::new(
+                projected_target,
+                "moved first shape",
+            )])
+            .unwrap(),
+            1
+        );
+        let commit = edit.commit().unwrap();
+        assert_eq!(
+            shape_text(commit.snapshot().bytes(), projected_target),
+            "moved first shape"
+        );
+
+        let original_target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let mut competing = source.edit().unwrap();
+        competing
+            .set_shape_text(original_target, "competing first shape")
+            .unwrap();
+        let competing = competing.commit().unwrap();
+        assert!(
+            source
+                .plan_three_way(commit.patch(), competing.patch())
+                .unwrap()
+                .conflicts()
+                .iter()
+                .any(|conflict| conflict.target() == "slide:0/shape:0/text")
+        );
+
+        let mut limits = RecordLimits::default();
+        limits.max_records -= 1;
+        let limited = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
+        let mut limited_edit = limited.edit().unwrap();
+        limited_edit
+            .set_shape_texts(&[
+                ShapeTextReplacement::new(original_target, "limited first shape"),
+                ShapeTextReplacement::new(
+                    crate::text_edit::Target::new(Position::new(1), Position::new(0)),
+                    "limited third shape",
+                ),
+            ])
+            .unwrap();
+        let limited_commit = limited_edit.commit().unwrap();
+        let fully_reopened =
+            Snapshot::from_bytes_with_limits(limited_commit.snapshot().bytes().to_vec(), limits)
+                .unwrap();
+        assert_eq!(limited_commit.snapshot(), &fully_reopened);
+        assert_eq!(limited_commit.snapshot().limits(), limits);
     }
 
     #[test]
