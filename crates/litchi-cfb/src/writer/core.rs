@@ -839,13 +839,13 @@ impl Default for OleWriter {
     }
 }
 
-fn parent_directory(path: &Path) -> &Path {
+pub(crate) fn parent_directory(path: &Path) -> &Path {
     path.parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."))
 }
 
-fn create_sibling_temp_file(path: &Path) -> Result<(PathBuf, File), OleError> {
+pub(crate) fn create_sibling_temp_file(path: &Path) -> Result<(PathBuf, File), OleError> {
     let file_name = path.file_name().ok_or_else(|| {
         OleError::Io(io::Error::new(
             ErrorKind::InvalidInput,
@@ -879,12 +879,12 @@ fn create_sibling_temp_file(path: &Path) -> Result<(PathBuf, File), OleError> {
 }
 
 #[cfg(not(windows))]
-fn atomic_replace(temporary_path: &Path, destination: &Path) -> io::Result<()> {
+pub(crate) fn atomic_replace(temporary_path: &Path, destination: &Path) -> io::Result<()> {
     fs::rename(temporary_path, destination)
 }
 
 #[cfg(unix)]
-fn sync_parent(parent: &Path) -> io::Result<()> {
+pub(crate) fn sync_parent(parent: &Path) -> io::Result<()> {
     match File::open(parent).and_then(|directory| directory.sync_all()) {
         Ok(()) => Ok(()),
         Err(error)
@@ -903,12 +903,12 @@ fn sync_parent(parent: &Path) -> io::Result<()> {
 // not provide the same portable directory-handle fsync contract as Unix, so
 // there is no separate parent-directory failure to report on this target.
 #[cfg(not(unix))]
-fn sync_parent(_parent: &Path) -> io::Result<()> {
+pub(crate) fn sync_parent(_parent: &Path) -> io::Result<()> {
     Ok(())
 }
 
 #[cfg(windows)]
-fn atomic_replace(temporary_path: &Path, destination: &Path) -> io::Result<()> {
+pub(crate) fn atomic_replace(temporary_path: &Path, destination: &Path) -> io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
 
     let temporary_path: Vec<u16> = temporary_path

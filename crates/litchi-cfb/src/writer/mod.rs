@@ -27,6 +27,7 @@ mod header;
 
 /// Core OLE writer implementation
 mod core;
+pub(crate) use core::{atomic_replace, create_sibling_temp_file, parent_directory, sync_parent};
 
 /// Integration tests for OLE writer
 #[cfg(test)]
