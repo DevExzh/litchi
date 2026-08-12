@@ -67,6 +67,7 @@ pub mod active_x;
 pub mod auto_filter;
 pub mod calculation_properties;
 pub mod cell;
+pub mod cell_values;
 pub mod cell_watches;
 pub mod chain;
 pub mod chart;
