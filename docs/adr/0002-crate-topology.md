@@ -3124,3 +3124,16 @@ No dependency edge closes. Ordered debt 014
 packages, 238 internal dependency declarations, 14 `litchi-iwa` dependency
 declarations, and 14 explicit ordered debt items. The boundary suite passes
 204/204; both the focused and retired-surface audits report zero findings.
+
+## 2026-08-12 amendment: private Numbers formula-cache hardening
+
+This cut hardens the internal cache planner for existing Numbers formulas. It
+preserves an unrelated cycle marker byte-for-byte, refuses when an impacted
+marked formula survives the final same-batch overlay, and succeeds when that
+overlay removes the marked formula. Graph work has an exact max-minus-one
+refusal gate; scratch and allocation remain bounded by the planner limits.
+This does not add a public formula-authoring API or change crate ownership.
+
+The production `litchi-iwa` formula setters and raw formula vocabulary remain.
+No dependency edge or ordered debt closes, and this amendment makes no native
+application or performance claim.

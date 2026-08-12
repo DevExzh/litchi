@@ -10123,3 +10123,16 @@ example/test/fuzz, durable-patch, and atomic-save ownership still lives in or
 depends on the migration host. Final topology is
 64 workspace packages, 238 internal dependency declarations, 14 `litchi-iwa`
 dependency declarations, and 14 explicit ordered debt items.
+
+## 2026-08-12 amendment: Numbers formula-cache foundation verification
+
+Internal cache-planner regressions prove byte-exact preservation of unrelated
+cycle markers, refusal when an impacted marked formula survives the final
+same-batch overlay, and success when that overlay removes the marked formula.
+Graph work has exact max-minus-one refusal coverage before publication;
+scratch and allocation remain bounded by the planner limits.
+
+These are foundation gates only. No focused public formula authoring is
+implemented or verified; the production host setters remain. No native
+Numbers formula-authoring run, candidate artifact, performance measurement,
+host retirement, dependency-edge removal, or debt closure is claimed.

@@ -1897,3 +1897,14 @@ distinct path, and uses synchronized sibling-temporary no-clobber publication.
 It demonstrates safe command-line publication without claiming that
 `Package::write_to` itself flushes, syncs, renames, or atomically replaces a
 filesystem destination.
+
+## 2026-08-12 amendment: no formula-authoring semantic facade yet
+
+The bounded internal Numbers cache planner preserves an unrelated cycle marker
+byte-for-byte, refuses when an impacted marked formula survives the final
+same-batch overlay, and succeeds when the overlay removes it. Graph work has
+exact max-minus-one refusal coverage; scratch and allocation remain bounded.
+This foundation exposes no supported semantic formula constructor, formula
+edit input, or focused formula mutation method. The production host formula
+API remains in place. No native application or formula-authoring performance
+evidence is accepted by this amendment.

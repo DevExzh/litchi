@@ -1360,3 +1360,16 @@ and global PackageMetadata data-catalog record stays preserved. Shared or
 uncertain media may therefore remain physically present and unreachable. A
 future reclamation transaction needs its own package-wide reachability and
 disposition proof.
+
+## 2026-08-12 amendment: formula-cache planning foundation only
+
+The internal Numbers cell-cache planner preserves an unrelated cycle marker
+byte-for-byte, refuses when a marked formula impacted by a scalar edit survives
+the final same-batch overlay, and succeeds when that overlay removes the marked
+formula. Graph work has an exact max-minus-one refusal regression, while
+scratch and allocation remain bounded by the planner limits. These checks
+remain implementation foundations for the existing scalar cell transaction;
+they do not create an `Edit`, `Patch`, or `Commit` formula-authoring operation.
+
+Public formula insertion, host retirement, formula-native validation, and
+formula-authoring performance evidence remain unclaimed.
