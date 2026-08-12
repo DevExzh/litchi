@@ -1,24 +1,24 @@
-//! Bounded, non-publishing planning for a future whole-slide copy operation.
+//! Bounded planning for an atomic same-package whole-slide copy operation.
 //!
 //! A slide is not an isolated XML part.  Its private charts, media, embedded
 //! packages, and diagram resources can be copied, while its layout is a shared
 //! presentation owner and notes/comments can depend on catalogs outside the
-//! slide's outgoing OPC graph.  This module inventories only the closure that
-//! the current package model can prove independent.  It deliberately exposes
-//! no copy verb: publication remains blocked until presentation-list insertion
-//! and the shared-owner policies can be validated as one atomic candidate.
+//! slide's outgoing OPC graph. This module inventories only the closure that
+//! the current package model can prove independent, then builds the complete
+//! exact-resource candidate without publishing it.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write as _;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::model::{Slide, Snapshot, invalid};
+use super::patch::Patch;
 use crate::{Error, Result, SlideCopyRefusal};
 
 const MIN_SLIDE_ID: u32 = 256;
@@ -83,9 +83,9 @@ impl SlideCopyPart {
     }
 }
 
-/// Immutable inventory for the largest currently proven whole-slide closure.
+/// Immutable source-bound plan for the largest proven whole-slide closure.
 ///
-/// The plan is intentionally non-publishing.  It proves a distinct slide ID,
+/// Planning is intentionally non-publishing. It proves a distinct slide ID,
 /// deterministic collision names, one reusable layout boundary, an acyclic
 /// private dependency graph, inert external relationships, and finite resource
 /// use.  Arbitrary equal parts are never deduplicated: byte equality alone does
@@ -100,6 +100,8 @@ pub struct SlideCopyPlan {
     reused_layout: PackURI,
     external_relationships: usize,
     planned_bytes: usize,
+    source_revision: [u8; 32],
+    patch: Patch,
 }
 
 impl SlideCopyPlan {
@@ -150,12 +152,22 @@ impl SlideCopyPlan {
     pub const fn planned_bytes(&self) -> usize {
         self.planned_bytes
     }
+
+    /// Fingerprint of the complete package graph against which this plan was built.
+    #[must_use]
+    pub const fn source_revision(&self) -> [u8; 32] {
+        self.source_revision
+    }
+
+    pub(crate) const fn patch(&self) -> &Patch {
+        &self.patch
+    }
 }
 
 impl Snapshot {
-    /// Inventory a dependency-closed copy of one existing slide without mutation.
+    /// Plan a dependency-closed copy of one existing slide without mutation.
     ///
-    /// This is the correctness prerequisite for a future atomic copy verb.  The
+    /// The returned plan contains a fully validated exact-resource candidate. The
     /// supported closure contains the raw slide plus acyclic image, audio,
     /// video, chart, chart-drawing, diagram, tag, theme-override, OLE, and
     /// embedded-package dependencies.  One existing layout is reused as a
@@ -253,17 +265,212 @@ impl Snapshot {
                 relationships: part.rels().len(),
             });
         }
+        let slide_id = next_slide_id(&self.slides)?;
+        let presentation_relationship_id = next_relationship_id(presentation.rels())?;
+        preflight_copy_candidate(self, &parts, presentation, planned_bytes)?;
+        let candidate = build_copy_candidate(
+            self,
+            &source,
+            position,
+            slide_id,
+            &presentation_relationship_id,
+            &reused_layout,
+            &parts,
+        )?;
+        let patch = Patch::capture(
+            self.package.as_ref(),
+            &candidate,
+            self.presentation_name.clone(),
+            self.limits,
+        )?;
         Ok(SlideCopyPlan {
             source,
             position,
-            slide_id: next_slide_id(&self.slides)?,
-            presentation_relationship_id: next_relationship_id(presentation.rels())?,
+            slide_id,
+            presentation_relationship_id,
             parts: parts.into_boxed_slice(),
             reused_layout,
             external_relationships,
             planned_bytes,
+            source_revision: self.revision,
+            patch,
         })
     }
+}
+
+fn preflight_copy_candidate(
+    snapshot: &Snapshot,
+    parts: &[SlideCopyPart],
+    presentation: &dyn Part,
+    planned_bytes: usize,
+) -> Result<()> {
+    let resulting_parts = snapshot
+        .package
+        .part_count()
+        .checked_add(parts.len())
+        .ok_or_else(|| invalid("slide-copy resulting part count overflow"))?;
+    if resulting_parts > snapshot.limits.max_parts() {
+        return Err(Error::Limit {
+            resource: "slide-copy resulting package parts",
+            limit: snapshot.limits.max_parts(),
+        });
+    }
+    let presentation_bytes = checked_plan_bytes(0, presentation)?;
+    let conservative_patch_bytes = planned_bytes
+        .checked_mul(2)
+        .and_then(|value| {
+            presentation_bytes
+                .checked_mul(2)
+                .and_then(|owner| value.checked_add(owner))
+        })
+        .and_then(|value| {
+            parts.iter().try_fold(value, |total, part| {
+                total
+                    .checked_add(part.target.as_str().len())
+                    .and_then(|next| next.checked_add(part.content_type.len()))
+            })
+        })
+        .and_then(|value| {
+            parts
+                .len()
+                .checked_mul(32)
+                .and_then(|n| value.checked_add(n))
+        })
+        .and_then(|value| value.checked_add(128))
+        .ok_or_else(|| invalid("slide-copy candidate byte count overflow"))?;
+    if conservative_patch_bytes > snapshot.limits.max_patch_bytes() {
+        return Err(Error::Limit {
+            resource: "slide-copy candidate patch bytes",
+            limit: snapshot.limits.max_patch_bytes(),
+        });
+    }
+    let mut targets = HashSet::new();
+    targets
+        .try_reserve(parts.len())
+        .map_err(|source| Error::Allocation {
+            resource: "slide-copy target identities",
+            source,
+        })?;
+    for part in parts {
+        snapshot.package.validate_new_part_name(&part.target)?;
+        if !targets.insert(part.target.clone()) {
+            return refusal(
+                SlideCopyRefusal::AmbiguousTopology,
+                "two copied resources selected the same target part name",
+            );
+        }
+    }
+    Ok(())
+}
+
+fn build_copy_candidate(
+    snapshot: &Snapshot,
+    source_slide: &Slide,
+    position: usize,
+    slide_id: u32,
+    presentation_relationship_id: &str,
+    reused_layout: &PackURI,
+    parts: &[SlideCopyPart],
+) -> Result<OpcPackage> {
+    let mut mapping = HashMap::new();
+    mapping
+        .try_reserve(parts.len())
+        .map_err(|source| Error::Allocation {
+            resource: "slide-copy part-name mapping",
+            source,
+        })?;
+    for part in parts {
+        if mapping
+            .insert(part.source.clone(), part.target.clone())
+            .is_some()
+        {
+            return refusal(
+                SlideCopyRefusal::AmbiguousTopology,
+                "the copied closure repeats a source part",
+            );
+        }
+    }
+    let copied_slide = mapping
+        .get(&source_slide.part_name)
+        .cloned()
+        .ok_or_else(|| invalid("slide-copy candidate omitted the selected slide"))?;
+
+    // All topology, byte, part-count, name, and ID checks have completed before
+    // this bounded graph clone. Blob allocations remain shared through Arc.
+    let mut candidate = snapshot.package.as_ref().clone();
+    for planned in parts {
+        let source = snapshot.package.get_part(&planned.source)?;
+        let mut copied = BlobPart::new_shared(
+            planned.target.clone(),
+            planned.content_type.clone(),
+            source.blob_arc(),
+        );
+        for relationship in source.rels().iter() {
+            let (target, mode) = if relationship.is_external() {
+                (relationship.target_ref().to_owned(), TargetMode::External)
+            } else {
+                let source_target = relationship.target_partname()?;
+                let copied_target = if source_target == *reused_layout
+                    && planned.source == source_slide.part_name
+                {
+                    reused_layout
+                } else {
+                    mapping
+                        .get(&source_target)
+                        .ok_or_else(|| Error::SlideCopyPlan {
+                            kind: SlideCopyRefusal::AmbiguousTopology,
+                            detail: "an internal copied relationship escaped the planned closure"
+                                .to_owned(),
+                        })?
+                };
+                (
+                    copied_target.relative_ref(planned.target.base_uri()),
+                    TargetMode::Internal,
+                )
+            };
+            copied.rels_mut().try_add_relationship(
+                relationship.reltype().to_owned(),
+                target,
+                relationship.r_id().to_owned(),
+                mode,
+            )?;
+        }
+        candidate.try_add_part(Box::new(copied))?;
+    }
+
+    let presentation = snapshot.package.get_part(&snapshot.presentation_name)?;
+    let source_relationship = presentation
+        .rels()
+        .get(&source_slide.relationship_id)
+        .ok_or_else(|| invalid("slide-copy source presentation relationship disappeared"))?;
+    let xml = super::xml::insert_slide(
+        presentation.blob(),
+        &snapshot.slides,
+        position,
+        slide_id,
+        presentation_relationship_id,
+    )?;
+    {
+        let staged = candidate.get_part_mut(&snapshot.presentation_name)?;
+        staged.rels_mut().try_add_relationship(
+            source_relationship.reltype().to_owned(),
+            copied_slide.relative_ref(snapshot.presentation_name.base_uri()),
+            presentation_relationship_id.to_owned(),
+            TargetMode::Internal,
+        )?;
+        staged.set_blob(xml);
+    }
+    let captured = super::model::capture(&candidate, snapshot.limits)?;
+    let published = captured
+        .slides
+        .get(position)
+        .ok_or_else(|| invalid("slide-copy candidate lost its insertion position"))?;
+    if published.id != slide_id || published.part_name != copied_slide {
+        return Err(invalid(
+            "slide-copy candidate did not publish the reserved slide identity",
+        ));
+    }
+    Ok(candidate)
 }
 
 type Closure = (

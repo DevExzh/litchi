@@ -1,6 +1,6 @@
 //! Opened-presentation transaction regression tests.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use litchi_opc::{BlobPart, PackURI, TargetMode};
 
@@ -429,6 +429,7 @@ fn slide_copy_plan_is_bounded_deterministic_and_non_publishing() -> Result<()> {
             .windows(2)
             .all(|pair| pair[0].source().as_str() < pair[1].source().as_str())
     );
+    assert_eq!(plan, snapshot.plan_slide_copy(0_usize, 1)?);
     assert_eq!(snapshot.revision(), revision);
     assert_eq!(part_states(&package), before);
     Ok(())
@@ -870,6 +871,170 @@ fn slide_copy_plan_accepts_the_strict_shared_layout_boundary() -> Result<()> {
         plan.reused_layout().as_str(),
         "/ppt/slideLayouts/slideLayout1.xml"
     );
+    let published = strict.apply_slide_copy_plan(&plan)?;
+    assert_eq!(published.slides().len(), 2);
+    let reopened = Package::from_bytes(&strict.to_bytes()?)?;
+    assert_eq!(reopened.opened_presentation()?.slides().len(), 2);
+    Ok(())
+}
+
+#[test]
+fn slide_copy_plan_applies_atomically_rewrites_ownership_and_reopens() -> Result<()> {
+    let mut authored = opened_plain_slide_package()?;
+    let chart = attach_copy_chart(
+        &mut authored,
+        br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#,
+    )?;
+    let image = PackURI::new("/ppt/media/copy-proof.png").map_err(Error::Invalid)?;
+    authored.opc.try_add_part(Box::new(BlobPart::new(
+        image.clone(),
+        "image/png".into(),
+        vec![137, 80, 78, 71, 4, 3, 2, 1],
+    )))?;
+    authored
+        .opc
+        .get_part_mut(&chart)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::IMAGE.into(),
+            image.relative_ref(chart.base_uri()),
+            "rIdImage".into(),
+            TargetMode::Internal,
+        )?;
+    authored
+        .opc
+        .get_part_mut(&chart)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::HYPERLINK.into(),
+            "https://example.invalid/inert".into(),
+            "rIdExternal".into(),
+            TargetMode::External,
+        )?;
+    let unrelated = PackURI::new("/ppt/media/unrelated.bin").map_err(Error::Invalid)?;
+    authored.opc.try_add_part(Box::new(BlobPart::new(
+        unrelated.clone(),
+        "application/octet-stream".into(),
+        vec![9, 9, 8, 8],
+    )))?;
+
+    let source_bytes = authored.to_bytes()?;
+    let mut package = Package::from_bytes(&source_bytes)?;
+    let before = part_states(&package);
+    let plan = package.opened_presentation()?.plan_slide_copy(0_usize, 1)?;
+    let durable_inverse = Patch::from_bytes(&plan.patch().inverse().to_bytes()?)?;
+    let mapping: HashMap<_, _> = plan
+        .parts()
+        .iter()
+        .map(|part| (part.source().clone(), part.target().clone()))
+        .collect();
+    let copied_slide = mapping
+        .get(plan.source().part_name())
+        .cloned()
+        .ok_or_else(|| Error::Invalid("planned slide target disappeared".into()))?;
+    let untouched = package.opc.get_part(&unrelated)?.blob().to_vec();
+
+    let published = package.apply_slide_copy_plan(&plan)?;
+    assert_eq!(published.slides().len(), 2);
+    assert_eq!(published.slides()[1].id(), plan.slide_id());
+    assert_eq!(published.slides()[1].part_name(), &copied_slide);
+    assert_eq!(package.opc.get_part(&unrelated)?.blob(), untouched);
+    for planned in plan.parts() {
+        let source = package.opc.get_part(planned.source())?;
+        let copied = package.opc.get_part(planned.target())?;
+        assert_eq!(copied.blob(), source.blob());
+        assert_ne!(copied.partname(), source.partname());
+        for relationship in copied.rels().iter() {
+            if relationship.is_external() {
+                assert_eq!(relationship.target_ref(), "https://example.invalid/inert");
+                continue;
+            }
+            let target = relationship.target_partname()?;
+            if target != *plan.reused_layout() {
+                assert!(
+                    mapping
+                        .values()
+                        .any(|planned_target| planned_target == &target),
+                    "copied relationship aliases source part {target}"
+                );
+                assert!(!mapping.contains_key(&target));
+            }
+            assert_eq!(
+                relationship.target_ref(),
+                target.relative_ref(copied.partname().base_uri())
+            );
+        }
+    }
+
+    let published_bytes = package.to_bytes()?;
+    let mut reopened = Package::from_bytes(&published_bytes)?;
+    let reopened_root = reopened.opened_presentation()?;
+    assert_eq!(reopened_root.slides().len(), 2);
+    assert_eq!(reopened_root.slides()[1].part_name(), &copied_slide);
+    reopened.apply_opened_presentation_patch(&durable_inverse)?;
+    assert_eq!(part_states(&reopened), before);
+    assert_eq!(reopened.to_bytes()?, source_bytes);
+    Ok(())
+}
+
+#[test]
+fn slide_copy_application_refuses_stale_complete_graph() -> Result<()> {
+    let mut package = opened_plain_slide_package()?;
+    let unrelated = PackURI::new("/ppt/media/stale-proof.bin").map_err(Error::Invalid)?;
+    package.opc.try_add_part(Box::new(BlobPart::new(
+        unrelated.clone(),
+        "application/octet-stream".into(),
+        vec![1, 2, 3],
+    )))?;
+    let plan = package.opened_presentation()?.plan_slide_copy(0_usize, 1)?;
+    package
+        .opc
+        .get_part_mut(&unrelated)?
+        .set_blob(vec![3, 2, 1]);
+    let before_apply = part_states(&package);
+    assert!(matches!(
+        package.apply_slide_copy_plan(&plan),
+        Err(Error::UnsafeEdit {
+            operation: "apply_slide_copy_plan",
+            ..
+        })
+    ));
+    assert_eq!(part_states(&package), before_apply);
+    Ok(())
+}
+
+#[test]
+fn slide_copy_application_refuses_result_limit_and_nonempty_slide_id() -> Result<()> {
+    let package = opened_plain_slide_package()?;
+    let current_parts = package.opc.part_count();
+    let limits = Limits::new(current_parts, 128 * 1024 * 1024, 1024, 1, 1024)
+        .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
+    assert!(matches!(
+        package
+            .opened_presentation_with_limits(limits)?
+            .plan_slide_copy(0_usize, 1),
+        Err(Error::Limit {
+            resource: "slide-copy resulting package parts",
+            ..
+        })
+    ));
+
+    let mut malformed = opened_plain_slide_package()?;
+    let presentation = PackURI::new("/ppt/presentation.xml").map_err(Error::Invalid)?;
+    let xml = std::str::from_utf8(malformed.opc.get_part(&presentation)?.blob())
+        .map_err(|error| Error::Invalid(error.to_string()))?;
+    let xml = xml
+        .replacen("/></p:sldIdLst>", "><p:ext/></p:sldId></p:sldIdLst>", 1)
+        .into_bytes();
+    malformed.opc.get_part_mut(&presentation)?.set_blob(xml);
+    let before = part_states(&malformed);
+    assert!(
+        malformed
+            .opened_presentation()?
+            .plan_slide_copy(0_usize, 1)
+            .is_err()
+    );
+    assert_eq!(part_states(&malformed), before);
     Ok(())
 }
 
