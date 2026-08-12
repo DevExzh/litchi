@@ -956,7 +956,7 @@ impl Edit {
                 Operation::AppendLineBreak { index } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.append_line_break_at(Position::new(*index))?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
                     OperationResult::Unit
                 },
                 Operation::InsertNote {

@@ -1,0 +1,7 @@
+Debuggee: odt_media_line_break_edit_save, candidate binary dc414be1, 0 warmups, 1 sample
+Total runtime: 0.440 s
+Allocation calls: 18,652
+Temporary allocations: 2,963
+Peak heap: 107.13 MiB
+Peak RSS including Heaptrack: 119.38 MiB
+Leaked profiler/runtime memory: 1.78 KiB
