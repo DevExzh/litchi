@@ -38,4 +38,4 @@ mod tests;
     clippy::module_name_repetitions,
     reason = "`OleWriter` is the established public API name; renaming it would break downstream crates"
 )]
-pub use core::OleWriter;
+pub use core::{OleWriter, StorageMoveLimits};

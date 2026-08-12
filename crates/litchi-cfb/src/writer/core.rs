@@ -58,12 +58,14 @@
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 use super::super::consts::{DIFSECT, ENDOFCHAIN, FATSECT, MAXREGSECT, NOSTREAM, STGTY_ROOT};
+use super::super::directory_name::{MAX_DIRECTORY_NAME_CODE_UNITS, directory_name_data};
 use super::super::file::OleError;
 use super::difat::DifatBuilder;
 use super::directory::DirectoryBuilder;
 use super::fat::FatBuilder;
 use super::header::HeaderBuilder;
 use super::minifat::MiniFatBuilder;
+use smallvec::SmallVec;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
@@ -91,6 +93,108 @@ unsafe extern "system" {
 struct StreamPlan {
     index: usize,
     start_sector: u32,
+}
+
+/// Work limits for one storage move or rename.
+///
+/// A move scans the writer's complete path index so that it can reject CFB
+/// case-insensitive name collisions before changing any state. Descendants are
+/// the explicitly registered storages and streams whose paths begin at the
+/// source storage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StorageMoveLimits {
+    max_entries_scanned: usize,
+    max_descendants: usize,
+    max_path_components: usize,
+}
+
+impl StorageMoveLimits {
+    /// Creates nonzero limits for storage moves.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidData`] if any limit is zero.
+    pub fn new(
+        max_entries_scanned: usize,
+        max_descendants: usize,
+        max_path_components: usize,
+    ) -> Result<Self, OleError> {
+        if max_entries_scanned == 0 || max_descendants == 0 || max_path_components == 0 {
+            return Err(OleError::InvalidData(
+                "CFB storage move limits must be nonzero".to_string(),
+            ));
+        }
+        Ok(Self {
+            max_entries_scanned,
+            max_descendants,
+            max_path_components,
+        })
+    }
+
+    /// Maximum number of stream and storage paths inspected by one move.
+    #[must_use]
+    pub const fn max_entries_scanned(self) -> usize {
+        self.max_entries_scanned
+    }
+
+    /// Maximum number of stream and storage paths changed by one move.
+    #[must_use]
+    pub const fn max_descendants(self) -> usize {
+        self.max_descendants
+    }
+
+    /// Maximum number of components in any source, destination, or moved path.
+    #[must_use]
+    pub const fn max_path_components(self) -> usize {
+        self.max_path_components
+    }
+}
+
+impl Default for StorageMoveLimits {
+    fn default() -> Self {
+        Self {
+            max_entries_scanned: 65_536,
+            max_descendants: 4_096,
+            max_path_components: 64,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct StoragePathMove {
+    old: Vec<String>,
+    new: Vec<String>,
+    canonical: CanonicalPath,
+}
+
+#[derive(Debug)]
+struct StreamPathMove {
+    index: usize,
+    new: Vec<String>,
+    canonical: CanonicalPath,
+}
+
+#[derive(Debug)]
+struct ClsidPathMove {
+    old: Vec<String>,
+    new: Vec<String>,
+    clsid: [u8; 16],
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+struct CanonicalPath(Vec<(usize, SmallVec<[u16; 32]>)>);
+
+#[derive(Debug)]
+struct IndexedStorage<'a> {
+    path: &'a Vec<String>,
+    canonical: CanonicalPath,
+}
+
+#[derive(Debug)]
+struct IndexedStream<'a> {
+    index: usize,
+    path: &'a Vec<String>,
+    canonical: CanonicalPath,
 }
 
 /// Represents a pending stream write operation
@@ -474,6 +578,290 @@ impl OleWriter {
             .retain(|candidate| !candidate.starts_with(owned_path.as_slice()));
         self.storage_clsids
             .retain(|candidate, _| !candidate.starts_with(owned_path.as_slice()));
+
+        Ok(())
+    }
+
+    /// Moves an explicitly registered storage and its complete subtree.
+    ///
+    /// Supplying a destination under the same parent renames the storage. CFB
+    /// sibling names are compared case-insensitively, but a case-only rename of
+    /// the source itself is accepted and updates the stored spelling. The
+    /// destination parent must already be an explicitly registered storage, or
+    /// the root when `destination` contains one component.
+    ///
+    /// The operation validates and allocates every replacement path before it
+    /// mutates the writer. Stream payload allocations and stream insertion
+    /// order are retained.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidData`] for an invalid path, a root or
+    /// self-descendant move, a missing destination parent, a CFB
+    /// case-insensitive destination collision, or a limit violation. Returns
+    /// [`OleError::InvalidFormat`] when `source` is not an explicitly
+    /// registered storage. Allocation failures are returned as
+    /// [`OleError::Allocation`].
+    pub fn move_storage(&mut self, source: &[&str], destination: &[&str]) -> Result<(), OleError> {
+        self.move_storage_with_limits(source, destination, StorageMoveLimits::default())
+    }
+
+    /// Moves a storage with explicit bounds on all inspected and changed paths.
+    ///
+    /// See [`Self::move_storage`] for the semantic closure and error behavior.
+    pub fn move_storage_with_limits(
+        &mut self,
+        source: &[&str],
+        destination: &[&str],
+        limits: StorageMoveLimits,
+    ) -> Result<(), OleError> {
+        if source.is_empty() || destination.is_empty() {
+            return Err(OleError::InvalidData(
+                "CFB storage move cannot target the root entry".to_string(),
+            ));
+        }
+        if source.len() > limits.max_path_components
+            || destination.len() > limits.max_path_components
+        {
+            return Err(storage_move_limit_error("path components"));
+        }
+
+        let requested_source = own_valid_cfb_path(source, "storage move source")?;
+        let requested_destination = own_valid_cfb_path(destination, "storage move destination")?;
+        let source_canonical = canonical_cfb_path(&requested_source)?;
+        let destination_canonical = canonical_cfb_path(&requested_destination)?;
+        if requested_destination.len() > requested_source.len()
+            && canonical_path_starts_with(&destination_canonical, &source_canonical)
+        {
+            return Err(OleError::InvalidData(
+                "CFB storage cannot be moved into its own subtree".to_string(),
+            ));
+        }
+
+        let entries_scanned = self
+            .streams
+            .len()
+            .checked_add(self.storages.len())
+            .ok_or_else(|| storage_move_limit_error("entries scanned"))?;
+        if entries_scanned > limits.max_entries_scanned {
+            return Err(storage_move_limit_error("entries scanned"));
+        }
+
+        // Read each registered path exactly once into a canonical index. Every
+        // subsequent planning pass uses this bounded snapshot rather than
+        // rescanning the writer tables.
+        let mut indexed_storages = Vec::new();
+        indexed_storages
+            .try_reserve_exact(self.storages.len())
+            .map_err(|error| OleError::allocation("storage move index", error))?;
+        for path in &self.storages {
+            if path.len() > limits.max_path_components {
+                return Err(storage_move_limit_error("path components"));
+            }
+            indexed_storages.push(IndexedStorage {
+                path,
+                canonical: canonical_cfb_path(path)?,
+            });
+        }
+        let mut indexed_streams = Vec::new();
+        indexed_streams
+            .try_reserve_exact(self.streams.len())
+            .map_err(|error| OleError::allocation("stream move index", error))?;
+        for (index, (path, _)) in self.streams.iter().enumerate() {
+            if path.len() > limits.max_path_components {
+                return Err(storage_move_limit_error("path components"));
+            }
+            indexed_streams.push(IndexedStream {
+                index,
+                path,
+                canonical: canonical_cfb_path(path)?,
+            });
+        }
+
+        // Refuse an already ambiguous writer model rather than choosing one of
+        // two entries with the same logical CFB path.
+        let mut existing_paths = HashSet::new();
+        existing_paths
+            .try_reserve(entries_scanned)
+            .map_err(|error| OleError::allocation("storage move source index", error))?;
+        for canonical in indexed_storages
+            .iter()
+            .map(|entry| &entry.canonical)
+            .chain(indexed_streams.iter().map(|entry| &entry.canonical))
+        {
+            if !existing_paths.insert(canonical) {
+                return Err(OleError::InvalidData(
+                    "CFB writer contains an ambiguous case-insensitive path".to_string(),
+                ));
+            }
+        }
+
+        let source = indexed_storages
+            .iter()
+            .find(|entry| entry.canonical == source_canonical)
+            .ok_or_else(|| {
+                OleError::InvalidFormat(format!(
+                    "CFB source storage {requested_source:?} does not exist"
+                ))
+            })?;
+        let source = try_clone_path(source.path, "storage move resolved source")?;
+
+        let requested_parent =
+            &requested_destination[..requested_destination.len().saturating_sub(1)];
+        let mut destination = if requested_parent.is_empty() {
+            Vec::new()
+        } else {
+            let parent_canonical = canonical_cfb_path(requested_parent)?;
+            let parent = indexed_storages
+                .iter()
+                .find(|entry| entry.canonical == parent_canonical)
+                .ok_or_else(|| {
+                    OleError::InvalidData(format!(
+                        "CFB destination parent {requested_parent:?} does not exist"
+                    ))
+                })?;
+            try_clone_path(parent.path, "storage move resolved destination parent")?
+        };
+        destination
+            .try_reserve_exact(1)
+            .map_err(|error| OleError::allocation("storage move destination path", error))?;
+        destination.push(try_clone_string(
+            requested_destination
+                .last()
+                .ok_or_else(|| OleError::InvalidData("empty destination path".to_string()))?,
+            "storage move destination component",
+        )?);
+
+        let storage_descendants = indexed_storages
+            .iter()
+            .filter(|entry| canonical_path_starts_with(&entry.canonical, &source_canonical))
+            .count();
+        let stream_descendants = indexed_streams
+            .iter()
+            .filter(|entry| canonical_path_starts_with(&entry.canonical, &source_canonical))
+            .count();
+        let descendants = storage_descendants
+            .checked_add(stream_descendants)
+            .ok_or_else(|| storage_move_limit_error("descendants"))?;
+        if descendants > limits.max_descendants {
+            return Err(storage_move_limit_error("descendants"));
+        }
+
+        let mut storage_moves = Vec::new();
+        storage_moves
+            .try_reserve_exact(storage_descendants)
+            .map_err(|error| OleError::allocation("storage move plan", error))?;
+        for entry in indexed_storages
+            .iter()
+            .filter(|entry| canonical_path_starts_with(&entry.canonical, &source_canonical))
+        {
+            let new = rebase_path(
+                entry.path,
+                source.len(),
+                &destination,
+                limits.max_path_components,
+            )?;
+            storage_moves.push(StoragePathMove {
+                old: try_clone_path(entry.path, "storage move source path")?,
+                canonical: canonical_cfb_path(&new)?,
+                new,
+            });
+        }
+
+        let mut stream_moves = Vec::new();
+        stream_moves
+            .try_reserve_exact(stream_descendants)
+            .map_err(|error| OleError::allocation("stream move plan", error))?;
+        for entry in indexed_streams
+            .iter()
+            .filter(|entry| canonical_path_starts_with(&entry.canonical, &source_canonical))
+        {
+            let new = rebase_path(
+                entry.path,
+                source.len(),
+                &destination,
+                limits.max_path_components,
+            )?;
+            {
+                stream_moves.push(StreamPathMove {
+                    index: entry.index,
+                    canonical: canonical_cfb_path(&new)?,
+                    new,
+                });
+            }
+        }
+
+        let mut clsid_moves = Vec::new();
+        clsid_moves
+            .try_reserve_exact(storage_moves.len())
+            .map_err(|error| OleError::allocation("storage CLSID move plan", error))?;
+        for path_move in &storage_moves {
+            if let Some(clsid) = self.storage_clsids.get(&path_move.old) {
+                clsid_moves.push(ClsidPathMove {
+                    old: try_clone_path(&path_move.old, "storage CLSID source path")?,
+                    new: try_clone_path(&path_move.new, "storage CLSID destination path")?,
+                    clsid: *clsid,
+                });
+            }
+        }
+
+        // Build the complete post-move path index before changing any table.
+        // The canonical keys use the exact MS-CFB sibling comparison rule.
+        let mut occupied = HashSet::new();
+        occupied
+            .try_reserve(entries_scanned)
+            .map_err(|error| OleError::allocation("storage move collision index", error))?;
+        for canonical in indexed_storages
+            .iter()
+            .filter(|entry| !canonical_path_starts_with(&entry.canonical, &source_canonical))
+            .map(|entry| &entry.canonical)
+            .chain(
+                indexed_streams
+                    .iter()
+                    .filter(|entry| {
+                        !canonical_path_starts_with(&entry.canonical, &source_canonical)
+                    })
+                    .map(|entry| &entry.canonical),
+            )
+        {
+            insert_unique_canonical(&mut occupied, canonical)?;
+        }
+        for canonical in storage_moves
+            .iter()
+            .map(|path_move| &path_move.canonical)
+            .chain(stream_moves.iter().map(|path_move| &path_move.canonical))
+        {
+            insert_unique_canonical(&mut occupied, canonical)?;
+        }
+
+        // Release all borrows into the writer before applying the infallible
+        // path swaps below.
+        drop(occupied);
+        drop(existing_paths);
+        drop(indexed_streams);
+        drop(indexed_storages);
+
+        // All fallible work is complete. Removing and reinserting the same
+        // number of hash entries stays within the tables' existing capacity.
+        for path_move in &storage_moves {
+            let removed = self.storages.remove(&path_move.old);
+            debug_assert!(removed);
+        }
+        for path_move in storage_moves {
+            let inserted = self.storages.insert(path_move.new);
+            debug_assert!(inserted);
+        }
+        for path_move in stream_moves {
+            self.streams[path_move.index].0 = path_move.new;
+        }
+        for path_move in &clsid_moves {
+            let removed = self.storage_clsids.remove(&path_move.old);
+            debug_assert_eq!(removed, Some(path_move.clsid));
+        }
+        for path_move in clsid_moves {
+            let replaced = self.storage_clsids.insert(path_move.new, path_move.clsid);
+            debug_assert!(replaced.is_none());
+        }
 
         Ok(())
     }
@@ -956,6 +1344,119 @@ fn own_path(
         owned.push(value);
     }
     Ok(owned)
+}
+
+fn own_valid_cfb_path(path: &[&str], resource: &'static str) -> Result<Vec<String>, OleError> {
+    // Reject oversized untrusted input before cloning it. Once the UTF-16
+    // length is at most 31, the UTF-8 byte length is also tightly bounded.
+    for component in path {
+        if component
+            .encode_utf16()
+            .take(MAX_DIRECTORY_NAME_CODE_UNITS + 1)
+            .count()
+            > MAX_DIRECTORY_NAME_CODE_UNITS
+        {
+            return Err(OleError::InvalidData(format!(
+                "CFB directory entry name exceeds {MAX_DIRECTORY_NAME_CODE_UNITS} UTF-16 code units"
+            )));
+        }
+        directory_name_data(component).map_err(|error| OleError::InvalidData(error.to_string()))?;
+    }
+    let owned = own_path(path, resource, "storage move path component")?;
+    Ok(owned)
+}
+
+fn try_clone_string(value: &str, resource: &'static str) -> Result<String, OleError> {
+    let mut cloned = String::new();
+    cloned
+        .try_reserve_exact(value.len())
+        .map_err(|error| OleError::allocation(resource, error))?;
+    cloned.push_str(value);
+    Ok(cloned)
+}
+
+fn try_clone_path(path: &[String], resource: &'static str) -> Result<Vec<String>, OleError> {
+    let mut cloned = Vec::new();
+    cloned
+        .try_reserve_exact(path.len())
+        .map_err(|error| OleError::allocation(resource, error))?;
+    for component in path {
+        cloned.push(try_clone_string(component, resource)?);
+    }
+    Ok(cloned)
+}
+
+fn rebase_path(
+    path: &[String],
+    source_len: usize,
+    destination: &[String],
+    max_path_components: usize,
+) -> Result<Vec<String>, OleError> {
+    let suffix = path.get(source_len..).ok_or_else(|| {
+        OleError::InvalidData("CFB storage move source is not a path prefix".to_string())
+    })?;
+    let component_count = destination
+        .len()
+        .checked_add(suffix.len())
+        .ok_or_else(|| storage_move_limit_error("path components"))?;
+    if component_count > max_path_components {
+        return Err(storage_move_limit_error("path components"));
+    }
+
+    let mut rebased = Vec::new();
+    rebased
+        .try_reserve_exact(component_count)
+        .map_err(|error| OleError::allocation("storage move destination path", error))?;
+    for component in destination.iter().chain(suffix) {
+        rebased.push(try_clone_string(
+            component,
+            "storage move destination component",
+        )?);
+    }
+    Ok(rebased)
+}
+
+fn canonical_cfb_path(path: &[String]) -> Result<CanonicalPath, OleError> {
+    let mut canonical = Vec::new();
+    canonical
+        .try_reserve_exact(path.len())
+        .map_err(|error| OleError::allocation("storage move canonical path", error))?;
+    for component in path {
+        if component
+            .encode_utf16()
+            .take(MAX_DIRECTORY_NAME_CODE_UNITS + 1)
+            .count()
+            > MAX_DIRECTORY_NAME_CODE_UNITS
+        {
+            return Err(OleError::InvalidData(format!(
+                "CFB directory entry name exceeds {MAX_DIRECTORY_NAME_CODE_UNITS} UTF-16 code units"
+            )));
+        }
+        let name = directory_name_data(component)
+            .map_err(|error| OleError::InvalidData(error.to_string()))?;
+        canonical.push((name.utf16.len(), name.comparison));
+    }
+    Ok(CanonicalPath(canonical))
+}
+
+fn canonical_path_starts_with(path: &CanonicalPath, prefix: &CanonicalPath) -> bool {
+    path.0.starts_with(&prefix.0)
+}
+
+fn insert_unique_canonical<'a>(
+    occupied: &mut HashSet<&'a CanonicalPath>,
+    canonical: &'a CanonicalPath,
+) -> Result<(), OleError> {
+    if !occupied.insert(canonical) {
+        return Err(OleError::InvalidData(
+            "CFB storage move destination collides with an existing logical path".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn storage_move_limit_error(limit: &str) -> OleError {
+    OleError::InvalidData(format!("CFB storage move exceeds the {limit} limit"))
 }
 
 fn reserve_hash_set_entry<T>(
@@ -1445,6 +1946,52 @@ mod tests {
         assert_eq!(writer.streams, streams_before);
         assert_eq!(writer.storages, storages_before);
         assert_eq!(writer.storage_clsids, clsids_before);
+    }
+
+    #[test]
+    fn move_storage_retains_stream_payload_allocations_and_insertion_order() {
+        let first = vec![0x41; 5_003];
+        let second = vec![0x42; 97];
+        let mut writer = OleWriter::new();
+        writer.create_storage(&["Source"]).unwrap();
+        writer
+            .create_stream_owned(&["Source", "First"], first)
+            .unwrap();
+        writer
+            .create_stream_owned(&["Source", "Second"], second)
+            .unwrap();
+
+        let before = writer
+            .streams
+            .iter()
+            .map(|(path, payload)| {
+                (
+                    path.last().unwrap().clone(),
+                    payload.as_ptr(),
+                    payload.len(),
+                )
+            })
+            .collect::<Vec<_>>();
+        writer.move_storage(&["Source"], &["Renamed"]).unwrap();
+        let after = writer
+            .streams
+            .iter()
+            .map(|(path, payload)| {
+                (
+                    path.last().unwrap().clone(),
+                    payload.as_ptr(),
+                    payload.len(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(after, before);
+        assert!(
+            writer
+                .streams
+                .iter()
+                .all(|(path, _)| path.first().is_some_and(|name| name == "Renamed"))
+        );
     }
 
     #[test]
