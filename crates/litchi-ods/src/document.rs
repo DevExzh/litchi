@@ -32,7 +32,8 @@ pub use crate::advanced::{
     BoundFormControl, CellProperties, CellStyle, CellStyleNode, ChartObject, DataStyleNode,
     Drawing, DrawingFrame, DrawingGeometry, DrawingGeometryKind, DrawingGroup, DrawingPoint,
     DrawingPolygon, DrawingTextBox, EffectiveCellStyle, FormControl, FormControlKind, FormEvent,
-    NumberStyleNode, RichFormControl, RichRun, RichText, StyleGraph, TextProperties, TextStyleNode,
+    LogicalRowEdit, NumberStyleNode, RichFormControl, RichRun, RichText, StyleGraph,
+    TextProperties, TextStyleNode,
 };
 
 const FORMAT: &str = "litchi.ods.document";
@@ -941,6 +942,37 @@ impl Edit {
             self.before.limits.package_bytes,
         )?;
         self.stage_spliced("row.remove", &format!("{sheet}#{physical_position}"), bytes)
+    }
+
+    /// Atomically insert, remove, or move logical rows in one ordinary,
+    /// dependency-free worksheet.
+    ///
+    /// Operations are interpreted in order against the result of the preceding
+    /// operation. Repeated physical row runs are split and compacted without
+    /// logical expansion. The deliberately narrow closure refuses formulas,
+    /// merges, named/database/label/validation ranges, filters, print ranges,
+    /// drawings, annotations, tracked changes, rich cell XML, MCE/foreign
+    /// extensions, scripts, and other coordinate owners rather than leaving
+    /// stale references. Untouched package members and XML outside the checked
+    /// row splice remain source exact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or ambiguous sheet, invalid sequential
+    /// coordinates, an unsafe dependency owner, unsupported source structure,
+    /// logical/physical/output bounds, or provenance publication failure. The
+    /// edit remains unchanged after every refusal.
+    pub fn edit_logical_rows(&mut self, sheet: &str, edits: &[LogicalRowEdit]) -> Result<()> {
+        if edits.is_empty() {
+            return Ok(());
+        }
+        let bytes = crate::advanced::edit_logical_rows(
+            &self.candidate,
+            sheet,
+            edits,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("row.logical-batch", sheet, bytes)
     }
 
     /// Append one compact structural column declaration.
@@ -2534,6 +2566,7 @@ fn known_operation(operation: &str) -> bool {
             | "cell.style"
             | "row.insert"
             | "row.remove"
+            | "row.logical-batch"
             | "column.insert"
             | "column.remove"
             | "sheet.insert"
