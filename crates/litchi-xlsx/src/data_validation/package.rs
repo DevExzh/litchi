@@ -34,6 +34,14 @@ pub fn replace_data_validation_collections(
     worksheet_xml: &[u8],
     values: &[Collection],
 ) -> Result<Vec<u8>> {
+    replace_data_validation_collections_with_readback(worksheet_xml, values)
+        .map(|(output, _)| output)
+}
+
+pub(crate) fn replace_data_validation_collections_with_readback(
+    worksheet_xml: &[u8],
+    values: &[Collection],
+) -> Result<(Vec<u8>, Vec<Collection>)> {
     let parsed = parse_data_validation_collections(worksheet_xml)?;
     validate_data_validation_collections(&parsed)?;
     validate_data_validation_collections(values)?;
@@ -125,7 +133,7 @@ fn data_validation_extension_wrapper(inner: &str, conformance: Conformance) -> R
 fn apply_data_validation_edits(
     xml: &[u8],
     mut edits: Vec<(ByteRange<usize>, Vec<u8>)>,
-) -> Result<Vec<u8>> {
+) -> Result<(Vec<u8>, Vec<Collection>)> {
     edits.sort_by_key(|(range, _)| (range.start, range.end));
     let mut output = Vec::new();
     reserve_vec(&mut output, xml.len(), "data-validation XML output")?;
@@ -141,7 +149,7 @@ fn apply_data_validation_edits(
     append_bounded_bytes(&mut output, &xml[cursor..])?;
     let reparsed = parse_data_validation_collections(&output)?;
     validate_data_validation_collections(&reparsed)?;
-    Ok(output)
+    Ok((output, reparsed))
 }
 
 fn push_scan_range(ranges: &mut Vec<ByteRange<usize>>, range: ByteRange<usize>) -> Result<()> {
