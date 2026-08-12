@@ -588,6 +588,7 @@ fn is_after_doc_vars(local_name: &[u8]) -> bool {
             | b"doNotIncludeSubdocsInStats"
             | b"doNotAutoCompressPictures"
             | b"forceUpgrade"
+            | b"mathPr"
             | b"captions"
             | b"readModeInkLockDown"
             | b"smartTagType"
