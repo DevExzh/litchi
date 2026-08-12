@@ -3,7 +3,7 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0080`](changes/0080-xlsx-source-backed-auto-filter-publication.md)
+[`change 0082`](changes/0082-xlsx-conditional-formatting-performance-evidence.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -73,8 +73,9 @@ Current work shape:
   variants now bind the workbook relationship and worksheet owner for direct
   typed page breaks, page margins, print options, relationship-free page
   setup, complete sheet-protection metadata, or typed core/Office 2010 data
-  validations; all materialize two Parts and refuse
-  wider worksheet/topology changes.
+  validations; all materialize two Parts and refuse wider worksheet/topology
+  changes. Auto-filter and core conditional-formatting variants additionally
+  bind styles/DXF state and materialize three Parts.
 - `PackageWriter` previously reconstructed generated XML and Part order during
   emission. The measured `PublicationPlan` change now constructs, audits, and
   reuses that state once. It reduced allocation calls by 37.0% in the profiled
@@ -171,6 +172,13 @@ Confirmed source facts:
   worksheet filter/sort subtree, refuses MCE-selected or protected state, and
   raw-copies all unrelated Parts. The media-rich control improves p50 97.75%,
   instructions 73.57%, and materializations 12 -> 3.
+- The additive source-backed conditional-formatting editor reuses that exact
+  workbook/worksheet/relationship/styles closure and atomically replaces the
+  complete direct core owner collection. Its matched selectable case uses the
+  same typed values and worksheet rewriter in eager and source-backed paths,
+  proves byte-identical publication, and records materializations 12 -> 3.
+  Balanced ABBA evidence has not yet been retained, so this is not a latency,
+  instruction, or allocation result.
 - One first cell access parses the entire selected worksheet. The non-evicting
   `OnceLock` retains it for the snapshot lifetime.
 - The sparse cell store is row-major and supports binary-search point lookup.
