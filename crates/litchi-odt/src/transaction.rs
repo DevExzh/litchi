@@ -867,6 +867,11 @@ impl Edit {
             ));
         }
 
+        self.commit_changed()
+    }
+
+    #[inline(never)]
+    fn commit_changed(self) -> Result<Commit> {
         ensure_editable_envelope(&self.source)?;
         let mut document = self.source.document()?;
         let mut results = Vec::new();
@@ -940,7 +945,7 @@ impl Edit {
                 } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.append_semantic_run(*paragraph, text, style_name.as_deref())?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
                     OperationResult::Unit
                 },
                 Operation::AppendHyperlink {

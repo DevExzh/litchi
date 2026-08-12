@@ -136,6 +136,50 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
             .as_bytes(),
         source_bytes
     );
+
+    for style_name in [None, Some("Emphasis")] {
+        let mut edit = snapshot.edit();
+        edit.append_run(Position::new(0), " appended", style_name)
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let identical = raw_identical_members(&source_bytes, commit.snapshot().as_bytes()).unwrap();
+        assert!(!identical.contains("content.xml"));
+        for path in [
+            "mimetype",
+            "styles.xml",
+            "meta.xml",
+            "META-INF/manifest.xml",
+            MEDIA_PATH,
+        ] {
+            assert!(identical.contains(path), "{path}");
+        }
+        let reopened = commit.snapshot().document().unwrap();
+        assert_eq!(
+            reopened.paragraphs().unwrap()[0].text().unwrap(),
+            "Before appended"
+        );
+        let content = std::str::from_utf8(&reopened.get_file("content.xml").unwrap())
+            .unwrap()
+            .to_owned();
+        assert_eq!(
+            content.contains("text:style-name=\"Emphasis\""),
+            style_name.is_some()
+        );
+        assert_eq!(
+            commit.patch().apply(&snapshot).unwrap().as_bytes(),
+            commit.snapshot().as_bytes()
+        );
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .as_bytes(),
+            source_bytes
+        );
+        assert!(commit.patch().apply(commit.snapshot()).is_err());
+    }
 }
 
 #[test]

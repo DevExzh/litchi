@@ -220,18 +220,18 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **133
+The stage-1 records above are retained unchanged. The current harness has **134
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
-PPTX semantic publication case, two opt-in media-rich ODT
-paragraph/line-break publication cases, eight opt-in matched XLSX calculation-metadata/page-break/page-margin/print-options
+PPTX semantic publication case, three opt-in media-rich ODT
+paragraph/line-break/inline-run publication cases, eight opt-in matched XLSX calculation-metadata/page-break/page-margin/print-options
 publication cases, 16 opt-in DOCX/PPTX semantic
 cases, nine opt-in RTF semantic case names across four capability-bounded
 variants (33 tiny / 58 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
-semantic cases, four fixed media-rich ODF cases, and 21 opt-in native
+semantic cases, five fixed media-rich ODF cases, and 21 opt-in native
 DOC/XLS/PPT semantic cases. It remains an
 incomplete program and CRUD matrix.
 
@@ -653,6 +653,14 @@ incomplete program and CRUD matrix.
   changes at the raw ZIP-member level; patch replay, exact inverse, stale
   refusal, complete media readback and deterministic output remain checked.
   See [`0071`](changes/0071-odt-content-only-line-break-publication.md).
+- A second matched case appends one unstyled inline run to the same middle
+  paragraph through the accepted content-only boundary. Pooled p50 falls from
+  225.431 to 3.635 ms (-98.39%, 62.01x), mean falls 98.38%, instructions fall
+  78.48%, and allocation calls fall 7.00% with flat peak heap/RSS. Styled and
+  unstyled regressions prove raw identity of every untouched member. Exact
+  no-op dispatch also avoids the changed-path frame while all changed commits
+  retain their prior validation body. See
+  [`0072`](changes/0072-odt-content-only-run-publication.md).
 - The opaque-heavy common OLE2 case now separates editor open, candidate
   `put_stream` publication, changed `finish` rendering, and the end-to-end
   control. Current p50 values are 1.382, 7.979, 5.473, and 26.086 ms; the
