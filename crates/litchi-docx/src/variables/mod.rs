@@ -23,3 +23,5 @@ pub use model::{
     Variables,
 };
 pub use transaction::{Commit, Patch, Snapshot, Transaction};
+
+pub(crate) use codec::{SettingsDialect, ensure_source_backed_rewrite_safe, inspect_source_policy};

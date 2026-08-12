@@ -65,6 +65,6 @@ pub use part::{BlobPart, Part, XmlPart};
 pub use pkgwriter::PackageWriter;
 pub use rel::{Relationship, Relationships, TargetMode};
 pub use source_backed::{
-    PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimitError,
-    SourceCacheLimits,
+    PartData, PartView, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
+    SourceCacheDiagnostics, SourceCacheLimitError, SourceCacheLimits,
 };

@@ -98,6 +98,12 @@ impl Variables {
                 "document variables exceed the {MAX_DOCUMENT_VARIABLES} entry limit"
             )));
         }
+        self.variables
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "document-variable collection",
+                source,
+            })?;
         self.variables.push((name, value));
         Ok(None)
     }
@@ -135,18 +141,33 @@ impl Variables {
 
     pub(super) fn push_parsed(&mut self, name: String, value: String) -> Result<()> {
         validate_document_variable(&name, &value)?;
-        if self.contains(&name) {
-            return Err(invalid(format!(
-                "duplicate document variable name {name:?}"
-            )));
-        }
         if self.variables.len() >= MAX_DOCUMENT_VARIABLES {
             return Err(invalid(format!(
                 "document variables exceed the {MAX_DOCUMENT_VARIABLES} entry limit"
             )));
         }
+        self.variables
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "parsed document-variable collection",
+                source,
+            })?;
         self.variables.push((name, value));
         Ok(())
+    }
+
+    pub(super) fn try_clone(&self) -> Result<Self> {
+        let mut variables = Vec::new();
+        variables
+            .try_reserve_exact(self.variables.len())
+            .map_err(|source| Error::Allocation {
+                resource: "document-variable edit collection",
+                source,
+            })?;
+        for (name, value) in &self.variables {
+            variables.push((try_clone_string(name)?, try_clone_string(value)?));
+        }
+        Ok(Self { variables })
     }
 }
 
@@ -169,6 +190,17 @@ fn validate_document_variable(name: &str, value: &str) -> Result<()> {
         )));
     }
     Ok(())
+}
+
+fn try_clone_string(value: &str) -> Result<String> {
+    let mut copy = String::new();
+    copy.try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "document-variable string clone",
+            source,
+        })?;
+    copy.push_str(value);
+    Ok(copy)
 }
 
 fn invalid(message: impl Into<String>) -> Error {
