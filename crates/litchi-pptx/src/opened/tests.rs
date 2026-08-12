@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, HashMap};
 
 use litchi_opc::{BlobPart, PackURI, TargetMode};
 
-use super::{History, Limits, Patch, Resolution, ShapeTextReplacement};
-use crate::{Error, Package, Result, SlideCopyRefusal};
+use super::{History, Limits, Patch, Resolution, ShapeTextReplacement, SlideRemovalPatch};
+use crate::{Error, Package, Result, SlideCopyRefusal, SlideRemovalRefusal};
 
 fn opened_two_slide_package() -> Result<Package> {
     let mut package = Package::new()?;
@@ -32,6 +32,39 @@ fn opened_plain_slide_package() -> Result<Package> {
         .set_title("Copy source");
     let bytes = package.to_bytes()?;
     Package::from_bytes(&bytes)
+}
+
+fn opened_plain_slides_package(count: usize) -> Result<Package> {
+    let mut package = Package::new()?;
+    for index in 0..count {
+        let title = format!("Removal source {index}");
+        package.presentation_mut()?.add_slide()?.set_title(&title);
+    }
+    let bytes = package.to_bytes()?;
+    Package::from_bytes(&bytes)
+}
+
+fn add_inbound_slide_owner(
+    package: &mut Package,
+    selected: &PackURI,
+    owner: &PackURI,
+) -> Result<()> {
+    package.opc.try_add_part(Box::new(BlobPart::new(
+        owner.clone(),
+        "application/octet-stream".into(),
+        b"late owner".to_vec(),
+    )))?;
+    package
+        .opc
+        .get_part_mut(owner)?
+        .rels_mut()
+        .try_add_relationship(
+            "urn:producer:late-slide-owner".into(),
+            selected.relative_ref(owner.base_uri()),
+            "rIdLateSlide".into(),
+            TargetMode::Internal,
+        )?;
+    Ok(())
 }
 
 fn make_package_strict(package: &mut Package) -> Result<()> {
@@ -170,6 +203,14 @@ fn part_states(package: &Package) -> BTreeMap<String, (Vec<u8>, Vec<String>)> {
             )
         })
         .collect()
+}
+
+fn zip_member(data: &[u8], name: &str) -> Result<Vec<u8>> {
+    let archive = soapberry_zip::office::ArchiveReader::new(data)
+        .map_err(|error| Error::Invalid(format!("cannot index test ZIP: {error}")))?;
+    archive
+        .read(name)
+        .map_err(|error| Error::Invalid(format!("cannot read test ZIP member {name}: {error}")))
 }
 
 fn attach_copy_chart(package: &mut Package, xml: &[u8]) -> Result<PackURI> {
@@ -1039,6 +1080,641 @@ fn slide_copy_application_refuses_result_limit_and_nonempty_slide_id() -> Result
 }
 
 #[test]
+fn slide_removal_plan_handles_first_middle_and_last_durably() -> Result<()> {
+    for position in [0_usize, 1, 3] {
+        let mut package = opened_plain_slides_package(4)?;
+        let source_bytes = package.to_bytes()?;
+        let before = part_states(&package);
+        let snapshot = package.opened_presentation()?;
+        let source_slides = snapshot.slides().to_vec();
+        let selected = source_slides[position].clone();
+        let plan = snapshot.plan_slide_removal(position)?;
+        let named_plan = snapshot.plan_slide_removal(selected.name())?;
+
+        assert_eq!(plan, named_plan);
+        assert_eq!(plan.position(), position);
+        assert_eq!(plan.source(), &selected);
+        assert_eq!(plan.source_revision(), snapshot.revision());
+        assert!(plan.planned_bytes() > 0);
+        assert_eq!(plan.patch().resource_count(), 2);
+        assert_eq!(
+            plan.patch()
+                .resources()
+                .map(PackURI::as_str)
+                .collect::<Vec<_>>(),
+            vec!["/ppt/presentation.xml", selected.part_name().as_str()]
+        );
+        assert!(package.opc.contains_part(plan.retained_layout()));
+        assert_eq!(part_states(&package), before, "planning must not publish");
+
+        let durable_inverse = SlideRemovalPatch::from_bytes(&plan.patch().inverse().to_bytes()?)?;
+        let published = package.apply_slide_removal_plan(&plan)?;
+        let expected: Vec<_> = source_slides
+            .iter()
+            .filter(|slide| slide.id() != selected.id())
+            .map(|slide| {
+                (
+                    slide.id(),
+                    slide.name().to_owned(),
+                    slide.part_name().clone(),
+                )
+            })
+            .collect();
+        let actual: Vec<_> = published
+            .slides()
+            .iter()
+            .map(|slide| {
+                (
+                    slide.id(),
+                    slide.name().to_owned(),
+                    slide.part_name().clone(),
+                )
+            })
+            .collect();
+        assert_eq!(actual, expected);
+        assert!(!package.opc.contains_part(selected.part_name()));
+        assert!(package.opc.contains_part(plan.retained_layout()));
+        let after = part_states(&package);
+        for (name, state) in &before {
+            if name != "/ppt/presentation.xml" && name != selected.part_name().as_str() {
+                assert_eq!(
+                    after.get(name),
+                    Some(state),
+                    "unselected part changed: {name}"
+                );
+            }
+        }
+
+        let published_bytes = package.to_bytes()?;
+        let source_content_types = zip_member(&source_bytes, "[Content_Types].xml")?;
+        let published_content_types = zip_member(&published_bytes, "[Content_Types].xml")?;
+        let selected_override = format!("PartName=\"{}\"", selected.part_name().as_str());
+        assert!(
+            std::str::from_utf8(&source_content_types)
+                .map_err(|error| Error::Xml(error.to_string()))?
+                .contains(&selected_override)
+        );
+        assert!(
+            !std::str::from_utf8(&published_content_types)
+                .map_err(|error| Error::Xml(error.to_string()))?
+                .contains(&selected_override),
+            "removed slide override survived [Content_Types].xml"
+        );
+        let mut reopened = Package::from_bytes(&published_bytes)?;
+        assert_eq!(reopened.opened_presentation()?.slides().len(), 3);
+        assert!(!reopened.opc.contains_part(selected.part_name()));
+        reopened.apply_slide_removal_patch(&durable_inverse)?;
+        assert_eq!(part_states(&reopened), before);
+        let restored_bytes = reopened.to_bytes()?;
+        assert_eq!(
+            zip_member(&restored_bytes, "[Content_Types].xml")?,
+            source_content_types,
+            "inverse must restore exact content-type defaults and overrides"
+        );
+        assert_eq!(restored_bytes, source_bytes);
+    }
+    Ok(())
+}
+
+#[test]
+fn slide_removal_plan_refuses_dependencies_shared_owners_and_hostile_layouts() -> Result<()> {
+    let dependency_cases = [
+        (
+            litchi_opc::constants::relationship_type::CHART,
+            litchi_opc::constants::content_type::DML_CHART,
+            "/ppt/charts/remove-refusal.xml",
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#
+                .as_slice(),
+        ),
+        (
+            litchi_opc::constants::relationship_type::IMAGE,
+            "image/png",
+            "/ppt/media/remove-refusal.png",
+            b"private-image".as_slice(),
+        ),
+        (
+            "urn:producer:custom-xml",
+            "application/xml",
+            "/ppt/customXml/remove-refusal.xml",
+            b"<opaque/>".as_slice(),
+        ),
+    ];
+    for (relationship_type, content_type, target_name, payload) in dependency_cases {
+        let mut package = opened_plain_slides_package(2)?;
+        let selected = package.opened_presentation()?.slides()[0]
+            .part_name()
+            .clone();
+        let target = PackURI::new(target_name).map_err(Error::Invalid)?;
+        package.opc.try_add_part(Box::new(BlobPart::new(
+            target.clone(),
+            content_type.into(),
+            payload.to_vec(),
+        )))?;
+        package
+            .opc
+            .get_part_mut(&selected)?
+            .rels_mut()
+            .try_add_relationship(
+                relationship_type.into(),
+                target.relative_ref(selected.base_uri()),
+                "rIdRemovalRefusal".into(),
+                TargetMode::Internal,
+            )?;
+        let before = part_states(&package);
+        assert!(matches!(
+            package.opened_presentation()?.plan_slide_removal(0_usize),
+            Err(Error::SlideRemovalPlan {
+                kind: SlideRemovalRefusal::UnsupportedRelationship,
+                ..
+            })
+        ));
+        assert_eq!(part_states(&package), before);
+    }
+
+    let mut external = opened_plain_slides_package(2)?;
+    let selected = external.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    external
+        .opc
+        .get_part_mut(&selected)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::HYPERLINK.into(),
+            "https://example.invalid/removal".into(),
+            "rIdExternalRemoval".into(),
+            TargetMode::External,
+        )?;
+    assert!(matches!(
+        external.opened_presentation()?.plan_slide_removal(0_usize),
+        Err(Error::SlideRemovalPlan {
+            kind: SlideRemovalRefusal::UnsupportedRelationship,
+            ..
+        })
+    ));
+
+    let mut shared = opened_plain_slides_package(2)?;
+    let slides = shared.opened_presentation()?.slides().to_vec();
+    shared
+        .opc
+        .get_part_mut(slides[1].part_name())?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::SLIDE.into(),
+            slides[0]
+                .part_name()
+                .relative_ref(slides[1].part_name().base_uri()),
+            "rIdSharedSlide".into(),
+            TargetMode::Internal,
+        )?;
+    assert!(matches!(
+        shared.opened_presentation()?.plan_slide_removal(0_usize),
+        Err(Error::SlideRemovalPlan {
+            kind: SlideRemovalRefusal::SharedOwner,
+            ..
+        })
+    ));
+
+    let mut arbitrary_owner = opened_plain_slides_package(2)?;
+    let selected = arbitrary_owner.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    let owner = PackURI::new("/ppt/customXml/removal-owner.bin").map_err(Error::Invalid)?;
+    arbitrary_owner.opc.try_add_part(Box::new(BlobPart::new(
+        owner.clone(),
+        "application/octet-stream".into(),
+        b"arbitrary owner".to_vec(),
+    )))?;
+    arbitrary_owner
+        .opc
+        .get_part_mut(&owner)?
+        .rels_mut()
+        .try_add_relationship(
+            "urn:producer:owns-slide".into(),
+            selected.relative_ref(owner.base_uri()),
+            "rIdOwnedSlide".into(),
+            TargetMode::Internal,
+        )?;
+    assert!(matches!(
+        arbitrary_owner
+            .opened_presentation()?
+            .plan_slide_removal(0_usize),
+        Err(Error::SlideRemovalPlan {
+            kind: SlideRemovalRefusal::SharedOwner,
+            ..
+        })
+    ));
+
+    let mut custom_show = opened_plain_slides_package(2)?;
+    let snapshot = custom_show.opened_presentation()?;
+    let selected_relationship = snapshot.slides()[0].relationship_id.clone();
+    let presentation = snapshot.presentation_name.clone();
+    let xml = std::str::from_utf8(custom_show.opc.get_part(&presentation)?.blob())
+        .map_err(|error| Error::Xml(error.to_string()))?
+        .replacen(
+            "</p:presentation>",
+            &format!(
+                "<p:custShowLst><p:custShow name=\"selected\" id=\"1\"><p:sldLst><p:sld r:id=\"{selected_relationship}\"/></p:sldLst></p:custShow></p:custShowLst></p:presentation>"
+            ),
+            1,
+        );
+    custom_show
+        .opc
+        .get_part_mut(&presentation)?
+        .set_blob(xml.into_bytes());
+    assert!(matches!(
+        custom_show
+            .opened_presentation()?
+            .plan_slide_removal(0_usize),
+        Err(Error::SlideRemovalPlan {
+            kind: SlideRemovalRefusal::SharedOwner,
+            ..
+        })
+    ));
+
+    for (start, end) in [(256, 258), (900, 999)] {
+        let mut slide_range = opened_plain_slides_package(3)?;
+        let presentation = slide_range.opened_presentation()?.presentation_name.clone();
+        let xml = std::str::from_utf8(slide_range.opc.get_part(&presentation)?.blob())
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .replacen(
+                "</p:presentation>",
+                &format!(
+                    "<p:showPr><p:sldRg st=\"{start}\" end=\"{end}\"/></p:showPr></p:presentation>"
+                ),
+                1,
+            );
+        slide_range
+            .opc
+            .get_part_mut(&presentation)?
+            .set_blob(xml.into_bytes());
+        let before = part_states(&slide_range);
+        assert!(matches!(
+            slide_range
+                .opened_presentation()?
+                .plan_slide_removal(1_usize),
+            Err(Error::SlideRemovalPlan {
+                kind: SlideRemovalRefusal::SharedOwner,
+                ..
+            })
+        ));
+        assert_eq!(part_states(&slide_range), before);
+    }
+
+    let mut hostile = opened_plain_slides_package(2)?;
+    let selected = hostile.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    let layout_relationship = hostile
+        .opc
+        .get_part(&selected)?
+        .rels()
+        .iter()
+        .next()
+        .ok_or_else(|| Error::Invalid("test slide has no layout relationship".into()))?
+        .r_id()
+        .to_owned();
+    let hostile_layout =
+        PackURI::new("/ppt/media/not-a-layout-owner.xml").map_err(Error::Invalid)?;
+    hostile.opc.try_add_part(Box::new(BlobPart::new(
+        hostile_layout.clone(),
+        litchi_opc::constants::content_type::PML_SLIDE_LAYOUT.into(),
+        br#"<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#
+            .to_vec(),
+    )))?;
+    hostile.opc.get_part_mut(&selected)?.rels_mut().retarget(
+        &layout_relationship,
+        hostile_layout.relative_ref(selected.base_uri()),
+    )?;
+    assert!(matches!(
+        hostile.opened_presentation()?.plan_slide_removal(0_usize),
+        Err(Error::SlideRemovalPlan {
+            kind: SlideRemovalRefusal::AmbiguousTopology,
+            ..
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Result<()> {
+    let sole = opened_plain_slide_package()?;
+    assert!(matches!(
+        sole.opened_presentation()?.plan_slide_removal(0_usize),
+        Err(Error::SlideRemovalPlan {
+            kind: SlideRemovalRefusal::FinalSlide,
+            ..
+        })
+    ));
+    assert!(matches!(
+        sole.opened_presentation()?.plan_slide_removal(1_usize),
+        Err(Error::SlideIndexOutOfBounds { index: 1, len: 1 })
+    ));
+
+    let mut root_fragment = opened_plain_slides_package(2)?;
+    root_fragment.opc.rels_mut().try_add_relationship(
+        "urn:producer:fragment-owner".into(),
+        "ppt/presentation.xml#opaque".into(),
+        "rIdRootFragment".into(),
+        TargetMode::Internal,
+    )?;
+    assert!(matches!(
+        root_fragment
+            .opened_presentation()?
+            .plan_slide_removal(0_usize),
+        Err(Error::SlideRemovalPlan {
+            kind: SlideRemovalRefusal::AmbiguousTopology,
+            ..
+        })
+    ));
+
+    for attributes in [
+        "futureOwner=\"opaque\"",
+        "xmlns:u=\"urn:producer:future\" u:future=\"opaque\"",
+        "u:future=\"opaque\"",
+    ] {
+        let mut unknown_attribute = opened_plain_slides_package(2)?;
+        let presentation = unknown_attribute
+            .opened_presentation()?
+            .presentation_name
+            .clone();
+        let xml = std::str::from_utf8(unknown_attribute.opc.get_part(&presentation)?.blob())
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .replacen(
+                "<p:presentation ",
+                &format!("<p:presentation {attributes} "),
+                1,
+            );
+        unknown_attribute
+            .opc
+            .get_part_mut(&presentation)?
+            .set_blob(xml.into_bytes());
+        let result = unknown_attribute
+            .opened_presentation()
+            .and_then(|snapshot| snapshot.plan_slide_removal(0_usize));
+        if attributes.starts_with("xmlns:") || !attributes.contains(':') {
+            assert!(matches!(
+                result,
+                Err(Error::SlideRemovalPlan {
+                    kind: SlideRemovalRefusal::UnknownSemanticSurface,
+                    ..
+                })
+            ));
+        } else {
+            assert!(matches!(
+                result,
+                Err(Error::Invalid(_) | Error::Xml(_))
+                    | Err(Error::SlideRemovalPlan {
+                        kind: SlideRemovalRefusal::UnknownSemanticSurface,
+                        ..
+                    })
+            ));
+        }
+    }
+
+    for default_text_style in [
+        r#"<p:defaultTextStyle><a:defPPr futureOwner="opaque"/></p:defaultTextStyle>"#,
+        r#"<p:defaultTextStyle><a:futureOwner/></p:defaultTextStyle>"#,
+    ] {
+        let mut unknown_drawingml = opened_plain_slides_package(2)?;
+        let presentation = unknown_drawingml
+            .opened_presentation()?
+            .presentation_name
+            .clone();
+        let xml = std::str::from_utf8(unknown_drawingml.opc.get_part(&presentation)?.blob())
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .replacen("<p:defaultTextStyle/>", default_text_style, 1);
+        unknown_drawingml
+            .opc
+            .get_part_mut(&presentation)?
+            .set_blob(xml.into_bytes());
+        assert!(matches!(
+            unknown_drawingml
+                .opened_presentation()?
+                .plan_slide_removal(0_usize),
+            Err(Error::SlideRemovalPlan {
+                kind: SlideRemovalRefusal::UnknownSemanticSurface,
+                ..
+            })
+        ));
+    }
+
+    let mut signed = opened_plain_slides_package(2)?;
+    signed.opc.rels_mut().try_add_relationship(
+        litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN.into(),
+        "_xmlsignatures/origin.sigs".into(),
+        "rIdRemovalSignature".into(),
+        TargetMode::Internal,
+    )?;
+    assert!(matches!(
+        signed.opened_presentation()?.plan_slide_removal(0_usize),
+        Err(Error::SlideRemovalPlan {
+            kind: SlideRemovalRefusal::SignedPackage,
+            ..
+        })
+    ));
+
+    let mut macros = opened_plain_slides_package(2)?;
+    let presentation = macros.opened_presentation()?.presentation_name.clone();
+    macros
+        .opc
+        .get_part_mut(&presentation)?
+        .set_content_type(litchi_opc::constants::content_type::PML_PRES_MACRO_MAIN.into())?;
+    assert!(matches!(
+        macros.opened_presentation()?.plan_slide_removal(0_usize),
+        Err(Error::SlideRemovalPlan {
+            kind: SlideRemovalRefusal::MacroEnabledPackage,
+            ..
+        })
+    ));
+
+    for mutate_slide in [false, true] {
+        let mut mce = opened_plain_slides_package(2)?;
+        let snapshot = mce.opened_presentation()?;
+        let target = if mutate_slide {
+            snapshot.slides()[0].part_name().clone()
+        } else {
+            snapshot.presentation_name.clone()
+        };
+        let xml = std::str::from_utf8(mce.opc.get_part(&target)?.blob())
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .replacen(
+                if mutate_slide { "<p:sld " } else { "<p:presentation " },
+                if mutate_slide {
+                    "<p:sld xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" "
+                } else {
+                    "<p:presentation xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" "
+                },
+                1,
+            );
+        mce.opc.get_part_mut(&target)?.set_blob(xml.into_bytes());
+        assert!(matches!(
+            mce.opened_presentation()?.plan_slide_removal(0_usize),
+            Err(Error::SlideRemovalPlan {
+                kind: SlideRemovalRefusal::MarkupCompatibility,
+                ..
+            })
+        ));
+    }
+
+    let mut protected = opened_plain_slides_package(2)?;
+    let presentation = protected.opened_presentation()?.presentation_name.clone();
+    let xml = std::str::from_utf8(protected.opc.get_part(&presentation)?.blob())
+        .map_err(|error| Error::Xml(error.to_string()))?
+        .replacen(
+            "</p:presentation>",
+            "<p:modifyVerifier cryptAlgorithmSid=\"14\" spinCount=\"1\" saltData=\"AA==\" hashData=\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\"/></p:presentation>",
+            1,
+        );
+    protected
+        .opc
+        .get_part_mut(&presentation)?
+        .set_blob(xml.into_bytes());
+    assert!(matches!(
+        protected.opened_presentation()?.plan_slide_removal(0_usize),
+        Err(Error::SlideRemovalPlan {
+            kind: SlideRemovalRefusal::ProtectedPresentation,
+            ..
+        })
+    ));
+
+    let limited = opened_plain_slides_package(2)?;
+    let limits = Limits::new(4_096, 1, 1024, 1, 1024)
+        .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
+    assert!(matches!(
+        limited
+            .opened_presentation_with_limits(limits)?
+            .plan_slide_removal(0_usize),
+        Err(Error::Limit {
+            resource: "slide-removal planned bytes",
+            limit: 1,
+        })
+    ));
+
+    let mut stale = opened_plain_slides_package(2)?;
+    let unrelated = PackURI::new("/ppt/media/removal-stale.bin").map_err(Error::Invalid)?;
+    stale.opc.try_add_part(Box::new(BlobPart::new(
+        unrelated.clone(),
+        "application/octet-stream".into(),
+        vec![1, 2, 3],
+    )))?;
+    let plan = stale.opened_presentation()?.plan_slide_removal(0_usize)?;
+    stale.opc.get_part_mut(&unrelated)?.set_blob(vec![3, 2, 1]);
+    let before_apply = part_states(&stale);
+    assert!(matches!(
+        stale.apply_slide_removal_plan(&plan),
+        Err(Error::UnsafeEdit {
+            operation: "apply_slide_removal_plan",
+            ..
+        })
+    ));
+    assert_eq!(part_states(&stale), before_apply);
+
+    let mut inbound_stale = opened_plain_slides_package(2)?;
+    let snapshot = inbound_stale.opened_presentation()?;
+    let selected = snapshot.slides()[0].part_name().clone();
+    let durable =
+        SlideRemovalPatch::from_bytes(&snapshot.plan_slide_removal(0_usize)?.patch().to_bytes()?)?;
+    let new_owner = PackURI::new("/ppt/customXml/late-owner.bin").map_err(Error::Invalid)?;
+    inbound_stale.opc.try_add_part(Box::new(BlobPart::new(
+        new_owner.clone(),
+        "application/octet-stream".into(),
+        b"late owner".to_vec(),
+    )))?;
+    inbound_stale
+        .opc
+        .get_part_mut(&new_owner)?
+        .rels_mut()
+        .try_add_relationship(
+            "urn:producer:late-slide-owner".into(),
+            selected.relative_ref(new_owner.base_uri()),
+            "rIdLateSlide".into(),
+            TargetMode::Internal,
+        )?;
+    let before_apply = part_states(&inbound_stale);
+    assert!(matches!(
+        inbound_stale.apply_slide_removal_patch(&durable),
+        Err(Error::UnsafeEdit {
+            operation: "apply_slide_removal_patch",
+            ..
+        })
+    ));
+    assert_eq!(part_states(&inbound_stale), before_apply);
+    assert!(inbound_stale.opc.contains_part(&selected));
+
+    let template = opened_plain_slides_package(2)?;
+    let template_snapshot = template.opened_presentation()?;
+    let selected = template_snapshot.slides()[0].part_name().clone();
+    let legitimate = template_snapshot.plan_slide_removal(0_usize)?;
+    let encoded = legitimate.patch().to_bytes()?;
+    let inner = Patch::from_bytes(&encoded[80..])?;
+    let owner = PackURI::new("/ppt/customXml/forged-owner.bin").map_err(Error::Invalid)?;
+    let mut forged_target = opened_plain_slides_package(2)?;
+    add_inbound_slide_owner(&mut forged_target, &selected, &owner)?;
+    let target_revision = forged_target
+        .apply_opened_presentation_patch(&inner)?
+        .revision();
+    let mut forged_source = opened_plain_slides_package(2)?;
+    add_inbound_slide_owner(&mut forged_source, &selected, &owner)?;
+    let source_revision = forged_source.opened_presentation()?.revision();
+    let inner_bytes = inner.to_bytes()?;
+    let mut forged_bytes = Vec::with_capacity(80 + inner_bytes.len());
+    forged_bytes.extend_from_slice(b"LPRM0001");
+    forged_bytes.extend_from_slice(&source_revision);
+    forged_bytes.extend_from_slice(&target_revision);
+    forged_bytes.extend_from_slice(
+        &u64::try_from(inner_bytes.len())
+            .map_err(|_error| Error::Invalid("test patch length exceeds u64".into()))?
+            .to_le_bytes(),
+    );
+    forged_bytes.extend_from_slice(&inner_bytes);
+    let forged = SlideRemovalPatch::from_bytes(&forged_bytes)?;
+    let before_apply = part_states(&forged_source);
+    assert!(forged_source.apply_slide_removal_patch(&forged).is_err());
+    assert_eq!(part_states(&forged_source), before_apply);
+    assert!(forged_source.opc.contains_part(&selected));
+
+    let mut corrupted_target = opened_plain_slides_package(2)?;
+    let source_state = part_states(&corrupted_target);
+    let mut encoded = corrupted_target
+        .opened_presentation()?
+        .plan_slide_removal(0_usize)?
+        .patch()
+        .to_bytes()?;
+    encoded[8 + 32] ^= 0x80;
+    let corrupted = SlideRemovalPatch::from_bytes(&encoded)?;
+    assert!(
+        corrupted_target
+            .apply_slide_removal_patch(&corrupted)
+            .is_err()
+    );
+    assert_eq!(part_states(&corrupted_target), source_state);
+    encoded.push(0);
+    assert!(SlideRemovalPatch::from_bytes(&encoded).is_err());
+
+    let mut patch_stale = opened_plain_slides_package(2)?;
+    let patch = patch_stale
+        .opened_presentation()?
+        .plan_slide_removal(0_usize)?
+        .patch()
+        .clone();
+    let presentation = patch_stale.opened_presentation()?.presentation_name.clone();
+    let mut xml = patch_stale.opc.get_part(&presentation)?.blob().to_vec();
+    xml.extend_from_slice(b" ");
+    patch_stale.opc.get_part_mut(&presentation)?.set_blob(xml);
+    let before_apply = part_states(&patch_stale);
+    assert!(matches!(
+        patch_stale.apply_slide_removal_patch(&patch),
+        Err(Error::UnsafeEdit {
+            operation: "apply_slide_removal_patch",
+            ..
+        })
+    ));
+    assert_eq!(part_states(&patch_stale), before_apply);
+    Ok(())
+}
+
+#[test]
 fn composes_order_shape_and_notes_in_one_durable_inverse_commit() -> Result<()> {
     let mut package = opened_two_slide_package()?;
     let source = package.opened_presentation()?;
@@ -1474,7 +2150,7 @@ fn slide_removal_and_dependency_transfer_are_durable_and_reversible() -> Result<
         .map(|relationship| relationship.r_id().to_owned())
         .ok_or_else(|| Error::Invalid("real chart fixture has no chart relationship".into()))?;
 
-    let mut destination = opened_two_slide_package()?;
+    let mut destination = opened_plain_slides_package(2)?;
     let destination_before = part_states(&destination);
     let destination_root = destination.opened_presentation()?;
     let mut transfer = destination_root.edit();

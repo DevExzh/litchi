@@ -127,7 +127,7 @@ pub use comments::{
     update_presentation_comment, update_presentation_comment_author, write_comment_authors,
     write_slide_comments,
 };
-pub use error::{Error, Result, ShapeTransferRefusal, SlideCopyRefusal};
+pub use error::{Error, Result, ShapeTransferRefusal, SlideCopyRefusal, SlideRemovalRefusal};
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
 #[cfg(feature = "encryption")]
@@ -151,7 +151,10 @@ pub use media_parts::{
     load_slide_media, parse_slide_media, store_slide_media, write_slide_media_pictures,
 };
 pub use modern_comments::*;
-pub use opened::{MAX_SHAPE_TEXT_REPLACEMENTS, ShapeTextReplacement, SlideCopyPart, SlideCopyPlan};
+pub use opened::{
+    MAX_SHAPE_TEXT_REPLACEMENTS, ShapeTextReplacement, SlideCopyPart, SlideCopyPlan,
+    SlideRemovalPatch, SlideRemovalPlan,
+};
 pub use package::Package;
 pub use presentation::{
     MAX_SOURCE_BACKED_SLIDE_BATCH, Presentation, SourceBackedPresentation,
