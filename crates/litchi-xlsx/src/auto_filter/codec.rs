@@ -61,10 +61,20 @@ pub fn parse_auto_filter_fragment(xml: &[u8]) -> Result<Definition> {
 }
 
 pub fn write_auto_filter_fragment(value: &Definition) -> Result<Vec<u8>> {
+    write_auto_filter_fragment_in(value, CORE)
+}
+
+pub(crate) fn write_auto_filter_fragment_in(
+    value: &Definition,
+    namespace: &[u8],
+) -> Result<Vec<u8>> {
+    if namespace != CORE && namespace != STRICT {
+        return Err(invalid("invalid autoFilter SpreadsheetML namespace"));
+    }
     let mut x = Vec::new();
-    x.extend_from_slice(
-        b"<x:autoFilter xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"",
-    );
+    x.extend_from_slice(b"<x:autoFilter xmlns:x=\"");
+    x.extend_from_slice(namespace);
+    x.push(b'\"');
     if let Some(r) = &value.reference {
         parse_range(r.as_str())?;
         a(&mut x, "ref", r.as_str());
@@ -1694,7 +1704,7 @@ fn push_sort(s: &mut (usize, SortBuilder), e: &BytesStart<'_>, d: Decoder) -> Re
     Ok(s.1.conditions.len() - 1)
 }
 
-fn validate_sort_condition(
+pub(crate) fn validate_sort_condition(
     state_reference: &str,
     column_sort: bool,
     condition_reference: &str,

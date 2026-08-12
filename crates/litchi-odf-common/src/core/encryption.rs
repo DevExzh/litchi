@@ -701,7 +701,8 @@ mod tests {
         let mut feedback = iv;
         let mut ciphertext = Vec::with_capacity(compressed.len());
         for &plaintext_byte in &compressed {
-            let mut block = Block::<Blowfish>::clone_from_slice(&feedback);
+            let mut block = Block::<Blowfish>::default();
+            block.copy_from_slice(&feedback);
             cipher.encrypt_block(&mut block);
             let ciphertext_byte = plaintext_byte ^ block[0];
             ciphertext.push(ciphertext_byte);

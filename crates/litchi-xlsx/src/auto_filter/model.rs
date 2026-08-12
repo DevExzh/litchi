@@ -930,6 +930,52 @@ pub struct Condition {
     pub(crate) opaque: Option<Box<OpaqueFields>>,
 }
 impl Condition {
+    /// Create an authored sort condition.
+    ///
+    /// Optional color, icon, and custom-list operands may be supplied with the
+    /// setters below before the condition is adopted by [`State::new`].
+    #[must_use]
+    pub fn new(reference: Range, descending: bool, sort_by: SortBy) -> Self {
+        Self {
+            reference,
+            descending,
+            sort_by,
+            custom_list: None,
+            differential_format_id: None,
+            icon_set: None,
+            icon_id: None,
+            opaque: None,
+        }
+    }
+
+    /// Set an optional custom value order.
+    pub fn set_custom_list(&mut self, value: Option<String>) -> Result<&mut Self> {
+        if let Some(value) = value.as_deref() {
+            bounded(value)?;
+        }
+        self.custom_list = value;
+        Ok(self)
+    }
+
+    /// Set the differential-format reference used by color sorts.
+    pub fn set_differential_format_id(&mut self, value: Option<u32>) -> &mut Self {
+        self.differential_format_id = value;
+        self
+    }
+
+    /// Set the icon operand used by icon sorts.
+    pub fn set_icon(&mut self, value: Option<(IconSet, u32)>) -> Result<&mut Self> {
+        if let Some((icon_set, icon_id)) = value {
+            Icon::new(icon_set, icon_id)?;
+            self.icon_set = Some(icon_set);
+            self.icon_id = Some(icon_id);
+        } else {
+            self.icon_set = None;
+            self.icon_id = None;
+        }
+        Ok(self)
+    }
+
     #[must_use]
     pub fn reference(&self) -> &Range {
         &self.reference
@@ -980,6 +1026,39 @@ pub struct State {
     pub(crate) opaque: Option<Box<OpaqueFields>>,
 }
 impl State {
+    /// Create and validate an authored worksheet sort state.
+    pub fn new(
+        reference: Range,
+        column_sort: bool,
+        case_sensitive: bool,
+        sort_method: Option<SortMethod>,
+        conditions: Vec<Condition>,
+    ) -> Result<Self> {
+        if conditions.len() > MAX_SORT_CONDITIONS {
+            return Err(invalid("too many auto-filter sort conditions"));
+        }
+        for condition in &conditions {
+            super::codec::validate_sort_condition(
+                reference.as_str(),
+                column_sort,
+                condition.reference.as_str(),
+                condition.sort_by,
+                condition.custom_list.is_some(),
+                condition.differential_format_id.is_some(),
+                condition.icon_set,
+                condition.icon_id,
+            )?;
+        }
+        Ok(Self {
+            reference,
+            column_sort,
+            case_sensitive,
+            sort_method,
+            conditions,
+            opaque: None,
+        })
+    }
+
     #[must_use]
     pub fn reference(&self) -> &Range {
         &self.reference
@@ -1040,6 +1119,20 @@ impl Definition {
     #[must_use]
     pub fn sort_state(&self) -> Option<&State> {
         self.sort_state.as_ref()
+    }
+
+    /// Replace the optional sort state after validating it in this filter's
+    /// worksheet context.
+    pub fn set_sort_state(&mut self, value: Option<State>) -> Result<&mut Self> {
+        let candidate = Self {
+            reference: self.reference.clone(),
+            columns: self.columns.clone(),
+            sort_state: value.clone(),
+            opaque: self.opaque.clone(),
+        };
+        super::package::validate_definition(&candidate)?;
+        self.sort_state = value;
+        Ok(self)
     }
 
     #[must_use]
