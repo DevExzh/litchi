@@ -1,10 +1,10 @@
-reading file "/tmp/litchi-auto-filter-source-final.heaptrack.zst" - please wait, this might take some time...
-Debuggee command was: tools/perf-baseline/target/release/litchi-perf-baseline --warmup 0 --samples 1 --case xlsx_source_backed_auto_filter_edit_save --json /tmp/litchi-auto-filter-source-heap-final.json
+reading file "/tmp/litchi-auto-filter-source-commit.heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-auto-filter-final-9e59dc431/tools/perf-baseline/target/release/litchi-perf-baseline --warmup 0 --samples 1 --case xlsx_source_backed_auto_filter_edit_save --json /tmp/litchi-auto-filter-source-heap-commit.json
 finished reading file, now analyzing data:
 
-total runtime: 0.675000s.
-calls to allocation functions: 16495 (24437/s)
-temporary memory allocations: 2171 (3216/s)
+total runtime: 0.682000s.
+calls to allocation functions: 16487 (24174/s)
+temporary memory allocations: 2166 (3175/s)
 peak heap memory consumption: 152.81M
-peak RSS (including heaptrack overhead): 151.64M
+peak RSS (including heaptrack overhead): 149.59M
 total memory leaked: 1.78K

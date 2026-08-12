@@ -57,7 +57,7 @@ relationships, content types, untouched Part/media bytes, hashing, source
 counters, and sink bounds remain outside timing.
 
 Both cases share frozen release binary SHA-256
-`871856f3f7993428a9a7e667a20e9033d71292101bd275bee835232dcdc677a8`.
+`7247f7ca88c34cfb70826361ade6616f6468ad9e8ad4b2aedd62957309650b07`.
 The retained CPU-2 ABBA order was eager A, source-backed A, source-backed B,
 eager B, with ten warmups and 100 samples per leg (200 per state). Raw reports
 are [`before A`](../results/abba-xlsx-auto-filter-before-a.json),
@@ -72,10 +72,10 @@ evidence is in the
 | Metric | Eager control | Source-backed | Delta |
 |---|---:|---:|---:|
 | pooled samples | 200 | 200 | — |
-| p50 | 218.438 ms | 4.755 ms | **-97.82% (45.94x)** |
-| mean | 219.123 ms | 4.738 ms | **-97.84% (46.25x)** |
-| p95 | 224.812 ms | 5.078 ms | **-97.74% (44.27x)** |
-| p99 | 234.040 ms | 5.141 ms | **-97.80% (45.52x)** |
+| p50 | 219.615 ms | 4.946 ms | **-97.75% (44.40x)** |
+| mean | 220.873 ms | 4.977 ms | **-97.75% (44.38x)** |
+| p95 | 231.288 ms | 5.341 ms | **-97.69% (43.31x)** |
+| p99 | 234.843 ms | 5.898 ms | **-97.49% (39.82x)** |
 | semantic Part materializations | 12 | 3 | -75.00% |
 | output bytes | 16,786,968 | 16,786,968 | exact |
 | sequential writes | 630 | 547 | -13.17% |
@@ -88,22 +88,22 @@ Parts remain compressed and are raw-copied into the sequential output.
 ## Allocation, counters and memory
 
 One-sample Heaptrack attribution covers the whole process, including corpus
-construction and untimed verification. Allocation calls are 16,822 eager
-versus 16,495 source-backed (-1.94%); temporary allocations are 2,181 versus
-2,171. Peak heap is 152.84 versus 152.81 MiB (flat). Uninstrumented maximum
-RSS is 143,964 versus 140,760 KiB (-2.23%). Heaptrack's profiler-inclusive RSS
+construction and untimed verification. Allocation calls are 16,814 eager
+versus 16,487 source-backed (-1.94%); temporary allocations are 2,173 versus
+2,166. Peak heap is 152.84 versus 152.81 MiB (flat). Uninstrumented maximum
+RSS is 142,428 versus 140,508 KiB (-1.35%). Heaptrack's profiler-inclusive RSS
 is recorded but is not used for acceptance.
 
 Three `perf stat` repeats per state used two warmups and ten samples:
 
 | Counter | Eager | Source-backed | Delta |
 |---|---:|---:|---:|
-| cycles | 20.176 billion | 6.386 billion | -68.35% |
-| instructions | 50.870 billion | 13.489 billion | -73.48% |
-| branches | 8.651 billion | 1.893 billion | -78.11% |
-| branch misses | 188.949 million | 26.952 million | -85.74% |
-| cache references | 1.435 billion | 472.267 million | -67.10% |
-| cache misses | 29.136 million | 18.682 million | -35.88% |
+| cycles | 20.176 billion | 6.514 billion | -67.72% |
+| instructions | 50.859 billion | 13.443 billion | -73.57% |
+| branches | 8.649 billion | 1.885 billion | -78.20% |
+| branch misses | 188.144 million | 26.821 million | -85.74% |
+| cache references | 1.445 billion | 474.356 million | -67.18% |
+| cache misses | 30.183 million | 20.092 million | -33.43% |
 
 Latency, materialization, instruction, allocation, peak-heap, and RSS gates all
 clear the acceptance thresholds.
@@ -118,12 +118,11 @@ conflicts, protection and MCE refusal, and partial-sink failure. Unit tests
 cover Strict output, sort-state round trips, schema-order insertion, unrelated
 byte preservation, DTD/MCE refusal, and the 32 MiB hostile-input bound.
 
-The complete XLSX all-feature suite, focused harness equivalence test,
-library-only XLSX denied-warning Clippy, harness denied-warning Clippy,
-formatting, CI deterministic hash/materialization assertions, workflow parse,
-and ADR aggregate pass. ODF-common tests, denied-warning Clippy, and rustdoc
-also pass. The full harness has one unrelated existing PPTX batch
-materialization failure; XLSX all-target Clippy and rustdoc remain blocked by
+The complete XLSX all-feature suite and the clean-commit 47-test performance
+harness pass. Library-only XLSX denied-warning Clippy, harness denied-warning
+Clippy, formatting, CI deterministic hash/materialization assertions, workflow
+parse, and the ADR aggregate also pass. ODF-common tests, denied-warning
+Clippy, and rustdoc pass. XLSX all-target Clippy and rustdoc remain blocked by
 unrelated existing test lints/private documentation links. The boundary audit
 reports only the repository's existing unclassified edges; this change adds no
 dependency edge.

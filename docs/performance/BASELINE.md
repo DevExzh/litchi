@@ -354,7 +354,7 @@ incomplete program and CRUD matrix.
   count when present. It replaces or clears the direct typed filter/sort state,
   while MCE-selected, protected, stale, foreign, relationship-mutated and
   changed signed sources refuse. On the media-rich control, p50 falls from
-  218.438 to 4.755 ms (-97.82%), instructions fall 73.48%, and semantic
+  219.615 to 4.946 ms (-97.75%), instructions fall 73.57%, and semantic
   materializations fall 12 -> 3 with byte-identical output; see
   [`0080`](changes/0080-xlsx-source-backed-auto-filter-publication.md).
 - Consecutive packaged ODT plain-text replacements now share one mutable
