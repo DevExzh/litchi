@@ -345,6 +345,61 @@ pub(crate) fn metadata_after_page_move(
     Collection::new(pages).map(Some)
 }
 
+/// Append metadata for an exact dependency-free copy of one blank page.
+pub(crate) fn metadata_after_dependency_free_page_copy(
+    metadata: Option<&Collection>,
+    slide_count: usize,
+    source_index: usize,
+    new_name: String,
+) -> Result<Collection> {
+    if source_index >= slide_count {
+        return Err(invalid(
+            "presentation dependency-free page copy index is out of bounds",
+        ));
+    }
+    let new_count = slide_count
+        .checked_add(1)
+        .ok_or_else(|| invalid("presentation page count overflow"))?;
+    if new_count > MAX_PAGES {
+        return Err(invalid("presentation exceeds 65536 pages"));
+    }
+    let source = metadata
+        .and_then(|value| value.page(source_index))
+        .ok_or_else(|| invalid("dependency-free page copy requires source metadata"))?;
+    if source.style_name.is_some()
+        || source.master_page_name.is_some()
+        || source.page_layout_name.is_some()
+        || source.draw_id.is_some()
+        || source.xml_id.is_some()
+        || source.href.is_some()
+        || !source.navigation_order.is_empty()
+    {
+        return Err(invalid(
+            "dependency-free page copy source contains dependent metadata",
+        ));
+    }
+    let names = effective_page_names(metadata, slide_count)?;
+    let mut pages = Vec::new();
+    pages
+        .try_reserve_exact(new_count)
+        .map_err(|source| Error::Allocation {
+            resource: "ODP dependency-free copied page metadata",
+            source,
+        })?;
+    for (index, name) in names.into_iter().enumerate() {
+        let mut page = metadata
+            .and_then(|value| value.page(index))
+            .cloned()
+            .unwrap_or_else(|| Page::new(index));
+        page.name.get_or_insert(name);
+        pages.push(page);
+    }
+    let mut copied = Page::new(slide_count);
+    copied.name = Some(new_name);
+    pages.push(copied);
+    Collection::new(pages)
+}
+
 fn fallback_page_name(slide_index: usize) -> Result<String> {
     let ordinal = slide_index
         .checked_add(1)
