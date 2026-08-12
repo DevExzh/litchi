@@ -1,5 +1,13 @@
 //! Immutable worksheet print-option metadata.
 
+mod patch;
+mod snapshot;
+mod source;
+
+pub use patch::{Commit, Diagnostics, Patch};
+pub use snapshot::Snapshot;
+pub use source::{SourceBackedEditor, SourceEdit};
+
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};

@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-12",
+  "production_base": "9670259f28c394ced897e9549a0c79c9e70c438d",
+  "binary_sha256": "d24f350ceceae47c48bc465a4089910cc2936de6c2c497f38d9506ceec6140aa",
+  "environment": {
+    "cpu": "AMD EPYC 9575F VM",
+    "cpu_affinity": 2,
+    "kernel": "Linux 6.8.0-101-generic x86_64",
+    "rustc": "1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator"
+  },
+  "corpus": {
+    "generator": "litchi-xlsx-print-options-source-edit-media-v1",
+    "archive_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+    "archive_bytes": 16786830,
+    "logical_part_bytes": 16782412,
+    "ordinary_parts": 12,
+    "zip_members": 17,
+    "output_sha256": "6eee37e1c0e4e9cdf1f364fdf1cbc90d58a6c25acc6fce222670f937abd5a74c",
+    "output_bytes": 16786886
+  },
+  "protocol": {
+    "order": ["eager_a", "source_a", "source_b", "eager_b"],
+    "warmups_per_leg": 50,
+    "samples_per_leg": 500,
+    "pooled_samples_per_state": 1000
+  },
+  "legs_ns": {
+    "eager_a": {"p50": 219514503, "mean": 220237815.77600014, "p95": 225600359, "p99": 233075949},
+    "source_a": {"p50": 4570828, "mean": 4624607.866000003, "p95": 5220996, "p99": 5377621},
+    "source_b": {"p50": 4688539, "mean": 4716568.382000002, "p95": 5032155, "p99": 5633395},
+    "eager_b": {"p50": 219102945, "mean": 219677662.048, "p95": 226062417, "p99": 231686579}
+  },
+  "pooled_ns": {
+    "eager": {
+      "samples": 1000,
+      "min": 214111177,
+      "p50": 219293831,
+      "mean": 219957738.912,
+      "mean_ci95": [219741916.2083138, 220173561.6156862],
+      "p95": 225746509,
+      "p99": 232393466,
+      "max": 249082273
+    },
+    "source_backed": {
+      "samples": 1000,
+      "min": 4070097,
+      "p50": 4667630,
+      "mean": 4670588.124,
+      "mean_ci95": [4652752.766289144, 4688423.481710856],
+      "p95": 5170277,
+      "p99": 5435439,
+      "max": 6337749
+    },
+    "delta_percent": {
+      "p50": -97.87151764428795,
+      "mean": -97.8765975013643,
+      "p95": -97.70969791608162,
+      "p99": -97.66110506738602
+    }
+  },
+  "publication_evidence": {
+    "ordinary_part_materializations": {"eager": 12, "source_backed": 2},
+    "ordinary_payload_read_calls": {"eager": 524, "source_backed": 525},
+    "ordinary_payload_read_bytes": {"eager": 16783429, "source_backed": 16783634},
+    "maximum_in_flight_reads": 1,
+    "sink_write_calls": {"eager": 630, "source_backed": 547},
+    "largest_sink_write": 32768
+  },
+  "heaptrack_one_sample": {
+    "allocation_calls": {"eager": 14290, "source_backed": 12561},
+    "temporary_allocations": {"eager": 1718, "source_backed": 1523},
+    "peak_heap_mib": {"eager": 152.84, "source_backed": 152.81},
+    "peak_rss_mib": {"eager": 148.66, "source_backed": 150.88},
+    "leaked_kib": {"eager": 1.78, "source_backed": 1.78}
+  },
+  "gnu_time_two_process_mean_max_rss_kib": {
+    "eager": 141462,
+    "source_backed": 141672
+  },
+  "perf_stat_two_warmups_ten_samples_two_process_mean": {
+    "eager": {
+      "task_clock_ms": 3895.50,
+      "cpu_migrations": 0,
+      "page_faults": 257968,
+      "cycles": 19217150895,
+      "instructions": 48187930505,
+      "branches": 8171013774,
+      "branch_misses": 175697094,
+      "cache_references": 1363020649,
+      "cache_misses": 25377158
+    },
+    "source_backed": {
+      "task_clock_ms": 1064.42,
+      "cpu_migrations": 0,
+      "page_faults": 215238,
+      "cycles": 5179532312,
+      "instructions": 10514378099,
+      "branches": 1362058102,
+      "branch_misses": 14358486,
+      "cache_references": 397997815,
+      "cache_misses": 16943486
+    }
+  }
+}

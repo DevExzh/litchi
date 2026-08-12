@@ -62,6 +62,8 @@ const XLSX_PAGE_BREAK_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-page-break-source-edit-media-v1";
 const XLSX_PAGE_MARGIN_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-page-margin-source-edit-media-v1";
+const XLSX_PRINT_OPTIONS_SOURCE_EDIT_CORPUS_GENERATOR: &str =
+    "litchi-xlsx-print-options-source-edit-media-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
 const ODT_MEDIA_CORPUS_GENERATOR: &str = "litchi-odt-media-paragraph-publication-v1";
 const SEMANTIC_ODS_CORPUS_GENERATOR: &str = "litchi-ods-semantic-v1";
@@ -360,6 +362,8 @@ enum Case {
     XlsxSourceBackedPageBreakEditSave,
     XlsxEagerPageMarginEditSave,
     XlsxSourceBackedPageMarginEditSave,
+    XlsxEagerPrintOptionsEditSave,
+    XlsxSourceBackedPrintOptionsEditSave,
     CfbOpen,
     CfbListStreams,
     CfbReadOne,
@@ -540,6 +544,10 @@ impl Case {
             Self::XlsxSourceBackedPageBreakEditSave => "xlsx_source_backed_page_break_edit_save",
             Self::XlsxEagerPageMarginEditSave => "xlsx_eager_page_margin_edit_save",
             Self::XlsxSourceBackedPageMarginEditSave => "xlsx_source_backed_page_margin_edit_save",
+            Self::XlsxEagerPrintOptionsEditSave => "xlsx_eager_print_options_edit_save",
+            Self::XlsxSourceBackedPrintOptionsEditSave => {
+                "xlsx_source_backed_print_options_edit_save"
+            },
             Self::CfbOpen => "cfb_open",
             Self::CfbListStreams => "cfb_list_streams",
             Self::CfbReadOne => "cfb_read_one",
@@ -913,6 +921,13 @@ impl Case {
         matches!(
             self,
             Self::XlsxEagerPageMarginEditSave | Self::XlsxSourceBackedPageMarginEditSave
+        )
+    }
+
+    const fn is_xlsx_print_options_edit_save(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxEagerPrintOptionsEditSave | Self::XlsxSourceBackedPrintOptionsEditSave
         )
     }
 }
@@ -1748,6 +1763,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_calculation_metadata_edit_save()
                     && !case.is_xlsx_page_break_edit_save()
                     && !case.is_xlsx_page_margin_edit_save()
+                    && !case.is_xlsx_print_options_edit_save()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
                     cfb_corpus
@@ -1826,6 +1842,26 @@ fn main() -> Result<(), Box<dyn Error>> {
             .filter(|case| case.is_xlsx_page_margin_edit_save())
         {
             results.push(run_xlsx_page_margin_edit_save(
+                *case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_xlsx_print_options_edit_save())
+    {
+        let corpus = build_xlsx_print_options_edit_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .filter(|case| case.is_xlsx_print_options_edit_save())
+        {
+            results.push(run_xlsx_print_options_edit_save(
                 *case,
                 &corpus,
                 options.warmup_iterations,
@@ -2374,6 +2410,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_backed_page_margin_edit_save" => {
             Some(Case::XlsxSourceBackedPageMarginEditSave)
         },
+        "xlsx_eager_print_options_edit_save" => Some(Case::XlsxEagerPrintOptionsEditSave),
+        "xlsx_source_backed_print_options_edit_save" => {
+            Some(Case::XlsxSourceBackedPrintOptionsEditSave)
+        },
         "cfb_open" => Some(Case::CfbOpen),
         "cfb_list_streams" => Some(Case::CfbListStreams),
         "cfb_read_one" => Some(Case::CfbReadOne),
@@ -2567,6 +2607,8 @@ fn print_usage() {
                                        xlsx_source_backed_page_break_edit_save,\n\
                                        xlsx_eager_page_margin_edit_save,\n\
                                        xlsx_source_backed_page_margin_edit_save,\n\
+                                       xlsx_eager_print_options_edit_save,\n\
+                                       xlsx_source_backed_print_options_edit_save,\n\
                                        cfb_open,cfb_list_streams,cfb_read_one,\n\
                                        cfb_create_stream_borrowed,cfb_create_stream_owned,\n\
                                        ole_common_open,ole_common_put_stream_publish,\n\
@@ -3571,6 +3613,21 @@ fn build_xlsx_page_margin_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     Ok(corpus)
 }
 
+fn build_xlsx_print_options_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
+    let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
+    corpus.manifest.name = "xlsx-print-options-media".to_owned();
+    corpus.manifest.generator = XLSX_PRINT_OPTIONS_SOURCE_EDIT_CORPUS_GENERATOR;
+    corpus.manifest.target_entry = "worksheet:Sheet1:printOptions".to_owned();
+    corpus.manifest.target_payload_bytes = target_payload.len();
+    corpus.manifest.target_payload_sha256 = sha256_hex(&target_payload);
+    corpus.target_name = "xl/worksheets/sheet1.xml".to_owned();
+    corpus.target_payload = target_payload;
+    Ok(corpus)
+}
+
 fn semantic_pptx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut package = litchi_pptx::Package::new()?;
     let presentation = package.presentation_mut()?;
@@ -4440,6 +4497,9 @@ fn run_case_with_config(
         },
         Case::XlsxEagerPageMarginEditSave | Case::XlsxSourceBackedPageMarginEditSave => {
             run_xlsx_page_margin_edit_save(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsxEagerPrintOptionsEditSave | Case::XlsxSourceBackedPrintOptionsEditSave => {
+            run_xlsx_print_options_edit_save(case, corpus, warmup_iterations, samples)
         },
         Case::CfbOpen => run_cfb_open(corpus, warmup_iterations, samples),
         Case::CfbListStreams => run_cfb_list_streams(corpus, warmup_iterations, samples),
@@ -9413,6 +9473,204 @@ fn run_xlsx_page_margin_edit_save(
     })
 }
 
+fn xlsx_print_options_target() -> litchi_xlsx::print_options::PrintOptions {
+    let mut options = litchi_xlsx::print_options::PrintOptions::new();
+    options
+        .set_horizontal_centered(true)
+        .set_print_headings(true)
+        .set_print_grid_lines(true);
+    options
+}
+
+fn verify_xlsx_print_options_edit_output(
+    corpus: &Corpus,
+    output: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let reopened = litchi_xlsx::Package::from_slice(output)?;
+    let workbook = reopened.workbook()?;
+    let sheet = workbook
+        .sheet("Sheet1")?
+        .ok_or("XLSX print-options output has no Sheet1")?;
+    if sheet.print_options()? != Some(xlsx_print_options_target()) {
+        return Err("XLSX print-options output has unexpected authored options".into());
+    }
+    if reopened
+        .calculation_metadata()?
+        .properties()
+        .ok_or("XLSX print-options output has no calcPr")?
+        .calculation_id()
+        != 7
+    {
+        return Err("XLSX print-options output changed calculation metadata".into());
+    }
+
+    let source = OpcPackage::from_bytes(&corpus.archive)?;
+    let candidate = OpcPackage::from_bytes(output)?;
+    if source.part_count() != corpus.manifest.entry_count
+        || candidate.part_count() != source.part_count()
+        || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
+    {
+        return Err("XLSX print-options package topology differs from source".into());
+    }
+    let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
+    for source_part in source.iter_parts() {
+        let candidate_part = candidate.get_part(source_part.partname())?;
+        if candidate_part.content_type() != source_part.content_type()
+            || relationship_signatures(candidate_part.rels())
+                != relationship_signatures(source_part.rels())
+        {
+            return Err("XLSX print-options Part metadata differs from source".into());
+        }
+        if source_part.partname() == &target_uri {
+            if source_part.blob() == candidate_part.blob() {
+                return Err("XLSX print-options worksheet XML did not change".into());
+            }
+        } else if source_part.blob() != candidate_part.blob() {
+            return Err("XLSX print-options edit changed an unselected Part payload".into());
+        }
+    }
+    for index in 0..XLSX_CALC_MEDIA_ENTRY_COUNT {
+        let uri = PackURI::new(format!("/xl/media/image{}.png", index + 1))?;
+        if candidate.get_part(&uri)?.blob() != xlsx_calculation_media_payload(index) {
+            return Err("XLSX print-options media readback differs from specification".into());
+        }
+    }
+    Ok(())
+}
+
+fn publish_xlsx_print_options_edit<W: Write>(
+    source: Arc<dyn ReadAt>,
+    writer: W,
+    source_backed: bool,
+) -> Result<usize, Box<dyn Error>> {
+    let options = xlsx_print_options_target();
+    if source_backed {
+        let editor = litchi_xlsx::print_options::SourceBackedEditor::from_read_at(source)?;
+        let mut edit = editor.edit("Sheet1")?;
+        if !edit.set(options) {
+            return Err("XLSX source-backed print-options edit reported an exact no-op".into());
+        }
+        let commit = edit.commit()?;
+        if !commit.changed() || commit.patch().is_empty() {
+            return Err("XLSX source-backed print-options edit produced an invalid patch".into());
+        }
+        let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
+        let published = editor.publish_commit_to_stream(writer, &commit)?;
+        if published.source_xml() != commit.snapshot().source_xml()
+            || published.print_options() != commit.snapshot().print_options()
+        {
+            return Err("XLSX source-backed print-options edit published another snapshot".into());
+        }
+        Ok(materializations)
+    } else {
+        let package = SourceBackedPackage::from_read_at(source)?;
+        let opc = package.into_opc_package()?;
+        let materializations = opc.part_count();
+        let package = litchi_xlsx::Package::from_opc(opc)?;
+        let workbook = package.into_workbook()?;
+        let mut edit = workbook.edit()?;
+        if edit.put_print_options("Sheet1", options)?.is_none() {
+            return Err("XLSX eager print-options worksheet selector did not resolve".into());
+        }
+        let commit = edit.commit()?;
+        if commit.patch().is_empty() {
+            return Err("XLSX eager print-options edit produced an empty patch".into());
+        }
+        commit.workbook().write_to(writer)?;
+        Ok(materializations)
+    }
+}
+
+fn run_xlsx_print_options_edit_save(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != XLSX_PRINT_OPTIONS_SOURCE_EDIT_CORPUS_GENERATOR
+        || !case.is_xlsx_print_options_edit_save()
+    {
+        return Err("XLSX print-options case requires its fixed media-rich corpus".into());
+    }
+    let source_backed = case == Case::XlsxSourceBackedPrintOptionsEditSave;
+    let expected_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+    let mut expected = Vec::new();
+    let expected_materializations =
+        publish_xlsx_print_options_edit(expected_source, &mut expected, source_backed)?;
+    let required_materializations = if source_backed {
+        2
+    } else {
+        corpus.manifest.entry_count
+    };
+    if expected == corpus.archive || expected_materializations != required_materializations {
+        return Err("XLSX print-options edit materialized an unexpected Part count".into());
+    }
+    verify_xlsx_print_options_edit_output(corpus, &expected)?;
+    let expected_digest = sha256_hex(&expected);
+    let maximum = u64::try_from(expected.len())?
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("XLSX print-options sequential output ceiling overflows u64")?;
+    let payload_ranges = xlsx_calculation_payload_ranges(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut measured_digests = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = Arc::new(InstrumentedSource::new(
+            corpus.archive.clone(),
+            payload_ranges.clone(),
+        ));
+        let read_at: Arc<dyn ReadAt> = source.clone();
+        let mut sink = CountingSink::bounded(maximum, 64 * 1024);
+        sink.reserve_budget()?;
+        let started = Instant::now();
+        let materializations = publish_xlsx_print_options_edit(read_at, &mut sink, source_backed)?;
+        let duration = started.elapsed();
+
+        if materializations != expected_materializations || sink.bytes != expected {
+            return Err("XLSX print-options edit differs between iterations".into());
+        }
+        if sink.summary().largest_write > 64 * 1024 {
+            return Err("XLSX print-options edit exceeded the sequential sink write bound".into());
+        }
+        verify_xlsx_print_options_edit_output(corpus, &sink.bytes)?;
+        let digest = sha256_hex(&sink.bytes);
+        if digest != expected_digest {
+            return Err("XLSX print-options output digest differs from expected output".into());
+        }
+        let metrics = source.snapshot();
+        if metrics.ordinary_payload_read_calls == 0 || metrics.ordinary_payload_read_bytes == 0 {
+            return Err("XLSX print-options edit performed no ordinary source reads".into());
+        }
+        if iteration >= warmup_iterations {
+            source_summary.record_opc(metrics, u64::try_from(materializations)?);
+            sink_summaries.push(sink.summary());
+            measured_digests.push(digest);
+        }
+        std::hint::black_box(&sink.bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let sink = deterministic_sink_summary(&sink_summaries, case.name())?;
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("XLSX print-options measured output digests are not stable".into());
+    }
+    Ok(CaseResult {
+        case: case.name(),
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: Some(expected_digest),
+    })
+}
+
 fn run_opc_open(
     corpus: &Corpus,
     warmup_iterations: usize,
@@ -10340,12 +10598,14 @@ mod tests {
         build_semantic_rtf_corpus, build_writer_corpus,
         build_xlsx_calculation_metadata_edit_corpus, build_xlsx_corpus,
         build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
-        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
-        payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
+        build_xlsx_print_options_edit_corpus, expected_opc_overlay_output,
+        ole_common_changed_output, opc_overlay_replacement_payload, payload_bytes,
+        resolve_execution_workers, run_case, run_case_with_config,
         run_docx_source_backed_one_edit_save, run_opc_source_overlay_one_part_save,
         run_pptx_batch_edit_save, run_pptx_source_backed_one_edit_save, run_scaling_case,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_page_break_edit_save,
-        run_xlsx_page_margin_edit_save, sha256_hex, simulated_request_delay, statistics,
+        run_xlsx_page_margin_edit_save, run_xlsx_print_options_edit_save, sha256_hex,
+        simulated_request_delay, statistics,
     };
 
     #[test]
@@ -10403,6 +10663,8 @@ mod tests {
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedPageBreakEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxEagerPageMarginEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedPageMarginEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsxEagerPrintOptionsEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedPrintOptionsEditSave));
     }
 
     #[test]
@@ -10588,6 +10850,42 @@ mod tests {
         assert_eq!(
             source_backed.case,
             "xlsx_source_backed_page_margin_edit_save"
+        );
+        assert_eq!(eager.output_sha256, source_backed.output_sha256);
+        assert_eq!(
+            eager.source.unwrap().ordinary_payload_materializations,
+            Some(vec![corpus.manifest.entry_count as u64])
+        );
+        assert_eq!(
+            source_backed
+                .source
+                .unwrap()
+                .ordinary_payload_materializations,
+            Some(vec![2])
+        );
+    }
+
+    #[test]
+    fn xlsx_print_options_edit_controls_are_deterministic_and_equivalent() {
+        let corpus = build_xlsx_print_options_edit_corpus().unwrap();
+        let again = build_xlsx_print_options_edit_corpus().unwrap();
+        assert_eq!(corpus.archive, again.archive);
+        assert_eq!(corpus.manifest.archive_sha256, sha256_hex(&corpus.archive));
+
+        let eager =
+            run_xlsx_print_options_edit_save(Case::XlsxEagerPrintOptionsEditSave, &corpus, 0, 1)
+                .unwrap();
+        let source_backed = run_xlsx_print_options_edit_save(
+            Case::XlsxSourceBackedPrintOptionsEditSave,
+            &corpus,
+            0,
+            1,
+        )
+        .unwrap();
+        assert_eq!(eager.case, "xlsx_eager_print_options_edit_save");
+        assert_eq!(
+            source_backed.case,
+            "xlsx_source_backed_print_options_edit_save"
         );
         assert_eq!(eager.output_sha256, source_backed.output_sha256);
         assert_eq!(

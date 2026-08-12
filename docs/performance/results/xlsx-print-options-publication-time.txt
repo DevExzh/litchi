@@ -1,0 +1,10 @@
+Frozen binary SHA-256: d24f350ceceae47c48bc465a4089910cc2936de6c2c497f38d9506ceec6140aa
+Protocol: CPU 2, GNU Time, 0 warmups and 1 sample per process
+
+Maximum RSS (KiB):
+eager A:          141,664
+source-backed A:  141,920
+source-backed B:  141,424
+eager B:          141,260
+
+Mean maximum RSS: eager 141,462 KiB; source-backed 141,672 KiB (+0.15%).

@@ -1,0 +1,13 @@
+Frozen binary SHA-256: d24f350ceceae47c48bc465a4089910cc2936de6c2c497f38d9506ceec6140aa
+Protocol: CPU 2, perf stat -r 2, 2 warmups and 10 samples per process
+
+Counter                         Eager control       Source-backed
+task-clock (ms)                 3,895.50            1,064.42
+cycles                          19,217,150,895      5,179,532,312
+instructions                    48,187,930,505      10,514,378,099
+branches                        8,171,013,774       1,362,058,102
+branch misses                   175,697,094         14,358,486
+cache references                1,363,020,649       397,997,815
+cache misses                    25,377,158          16,943,486
+page faults                     257,968             215,238
+CPU migrations                  0                   0

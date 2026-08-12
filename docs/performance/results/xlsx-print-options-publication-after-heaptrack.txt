@@ -1,0 +1,7 @@
+Debuggee: xlsx_source_backed_print_options_edit_save, frozen binary d24f350c, 0 warmups, 1 sample
+Total runtime: 0.461 s
+Allocation calls: 12,561
+Temporary allocations: 1,523
+Peak heap: 152.81 MiB
+Peak RSS including Heaptrack: 150.88 MiB
+Leaked profiler/runtime memory: 1.78 KiB

@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `59d1a17d85df086e90d7b0fd8cfb18267db106ed`
+Production base for the latest measured tranche: `9670259f28c394ced897e9549a0c79c9e70c438d`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,14 +13,14 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **130 selectable cases**: 36 default cases and 198 default
+harness contains **132 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in
 source-backed media-rich PPTX semantic publication case, one opt-in media-rich ODT
-paragraph-publication case, six opt-in matched XLSX
-calculation-metadata/page-break/page-margin publication cases, 16 opt-in DOCX/PPTX
+paragraph-publication case, eight opt-in matched XLSX
+calculation-metadata/page-break/page-margin/print-options publication cases, 16 opt-in DOCX/PPTX
 semantic cases, nine opt-in RTF semantic case names across four
 capability-bounded variants (33 tiny / 58 tiny-plus-large rows), 23
 shape-selected ODT/ODS/ODP semantic cases, three fixed media-rich ODF cases,
@@ -37,6 +37,7 @@ is still not broad program or CRUD coverage.
 | Source-backed XLSX calculation-metadata publication | Media-rich one-edit/save p50 **-99.2519%** (133.67x), mean **-99.2507%**; instructions **-77.78%**; materializations **12 -> 1**; byte-identical output | Existing `xl/workbook.xml` calculation properties/features only; cells, formulas, cached results, chains, relationships and topology remain outside the capability |
 | Source-backed XLSX page-break publication | Media-rich one-edit/save p50 **-97.86%** (46.65x), mean **-97.86%**; materializations **12 -> 2**; byte-identical output | One existing normal worksheet's page-break collections only; cells, formulas, styles, relationships, topology, and changed signed sources remain outside the capability |
 | Source-backed XLSX page-margin publication | Media-rich one-edit/save p50 **-97.93%** (48.26x), mean **-97.93%**; materializations **12 -> 2**; byte-identical output | One existing normal worksheet's direct six-value page-margin set only; cells, formulas, styles, relationships, topology, and changed signed sources remain outside the capability |
+| Source-backed XLSX print-options publication | Media-rich one-edit/save p50 **-97.87%** (46.98x), mean **-97.88%**; materializations **12 -> 2**; byte-identical output | One existing normal worksheet's direct five-flag print options only; cells, formulas, printer settings, relationships, topology, and changed signed sources remain outside the capability |
 | Deterministic range simulation | XLSX listing has zero timed requests; selected reads have zero unselected-sheet overlap; full physical size distributions recorded | Synthetic latency model, not a cold filesystem or ambient network |
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |
 | Coalesced DOCX paragraph edits | Large 100-edit/save p50 **-94.99% (19.97x)** and mean **-95.02%**; medium two-edit/save p50 **-12.98%**; scalar one-edit guardrail neutral | Direct-body, strictly ordered paragraph text replacement; generated corpus; scalar API remains separate |
@@ -44,7 +45,7 @@ is still not broad program or CRUD coverage.
 | RTF semantic baseline and text paths | Medium/large full-text p50 **-38.39% / -27.08%**; one-edit/save **-33.40% / -25.79%** | Generated native RTF text corpus; open guard +0.96% / +3.41%; formatting/media/security matrices remain missing |
 | RTF retained story length | Large paragraph-list p50 **-15.04%**, mean **-13.71%**; middle-paragraph p50 **-27.19%**, mean **-25.23%** | Already-open generated 10,000-block story queries only; exact parser-derived length, all allocation/peak-heap/RSS metrics flat, and open/full-text/save/no-op guards remain within 5% |
 | RTF sparse paragraph selection | Large middle-paragraph p50 **-47.87%**, mean **-47.95%**, p95 **-49.42%** | Explicit `Paragraphs::nth` only; remains linear and allocation-free, constructs the selected view once, preserves iterator state/formatting, and leaves open/list/full-text/save/edit guards within policy |
-| RTF retained paragraph cardinality | Large public paragraph-count p50 **-99.93%**, mean **-99.91%**, p95 **-99.83%** | Exact visible body count is retained only after full parser validation; allocation calls and peak heap are flat, collection p50 improves 1.96%, and open/list/read/save/edit guard p50/mean stay within policy |
+| RTF retained paragraph cardinality | Large public paragraph-count p50 **-99.93%**, mean **-99.91%**, p95 **-99.86%** | Exact visible body count is retained only after full parser validation; allocation calls and peak heap are flat, collection p50 improves 1.61%, and open/list/read/save/edit guard p50/mean stay within policy |
 | ODT shared transaction bytes | Medium/large no-op edit-save p50 **-27.05% / -18.51%**; exactly two allocations and one archive copy removed per snapshot | Existing-document snapshot handoff only; changed edit/save and open guardrails remain within 3%; changed publication still rewrites the package |
 | ODT consuming full-text blocks | Repeated large full-text p50 **-3.25%**, mean **-4.81%**; allocation calls **-15.48%**, temporary allocations **-45.52%** | Private full-text mode only; structured queries remain near neutral; unchanged open +3.94% p50/+4.17% mean and +10.95% p99 disclosed |
 | ODT indexed paragraph selector | Large middle-paragraph p50 **-48.56%**, mean **-48.33%**; allocation calls **-27.05%**; peak heap **-24.74%**; RSS **-10.93%** | Complete XML/limit validation remains; retains one paragraph, excludes headings from the index, and leaves the established list path neutral |
@@ -580,6 +581,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | Source-backed XLSX calculation-metadata publication, 12 Parts + 16 MiB media | 215.457 ms | 1.612 ms | **-99.2519% p50 (133.67x) / -99.2507% mean** | Materializations 12 -> 1; allocation calls -10.81%; peak heap flat; uninstrumented RSS -1.20% |
 | Source-backed XLSX page-break publication, 12 Parts + 16 MiB media | 216.789 ms | 4.647 ms | **-97.86% p50 (46.65x) / -97.86% mean** | Materializations 12 -> 2; allocation calls -15.95%; peak heap and uninstrumented RSS flat |
 | Source-backed XLSX page-margin publication, 12 Parts + 16 MiB media | 216.799 ms | 4.492 ms | **-97.93% p50 (48.26x) / -97.93% mean** | Materializations 12 -> 2; allocation calls -12.10%; peak heap and uninstrumented RSS flat |
+| Source-backed XLSX print-options publication, 12 Parts + 16 MiB media | 219.294 ms | 4.668 ms | **-97.87% p50 (46.98x) / -97.88% mean** | Materializations 12 -> 2; allocation calls -12.10%; peak heap and uninstrumented RSS flat |
 
 The underlying records are:
 
@@ -649,6 +651,7 @@ The underlying records are:
 - [`0067-xlsx-source-backed-page-margin-publication.md`](changes/0067-xlsx-source-backed-page-margin-publication.md)
 - [`0068-ods-shared-worksheet-archive-handoff.md`](changes/0068-ods-shared-worksheet-archive-handoff.md)
 - [`0069-rtf-retained-paragraph-count.md`](changes/0069-rtf-retained-paragraph-count.md)
+- [`0070-xlsx-source-backed-print-options-publication.md`](changes/0070-xlsx-source-backed-print-options-publication.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -790,7 +793,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 130 selectable cases and a 198-record default
+The standalone harness provides 132 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus
