@@ -25,6 +25,12 @@ pub enum CellValueEdit {
     Set { address: Address, value: Value },
     /// Remove the stored scalar payload while retaining the cell record.
     Clear { address: Address },
+    /// Remove the complete stored scalar cell record.
+    ///
+    /// Unlike [`Self::Clear`], this also removes cell-local type and style
+    /// attributes. The containing row and the producer's declared worksheet
+    /// dimension are retained conservatively.
+    Remove { address: Address },
 }
 
 impl CellValueEdit {
@@ -42,13 +48,28 @@ impl CellValueEdit {
         Self::Clear { address }
     }
 
+    /// Construct a complete scalar-cell owner removal.
+    #[must_use]
+    pub const fn remove(address: Address) -> Self {
+        Self::Remove { address }
+    }
+
     /// Target coordinate.
     #[must_use]
     pub const fn address(&self) -> Address {
         match self {
-            Self::Set { address, .. } | Self::Clear { address } => *address,
+            Self::Set { address, .. } | Self::Clear { address } | Self::Remove { address } => {
+                *address
+            },
         }
     }
+}
+
+#[derive(Clone, Debug)]
+enum StagedValueEdit {
+    Set(Value),
+    Clear,
+    Remove,
 }
 
 /// Owning source-backed editor for one exact XLSX artifact.
@@ -59,7 +80,7 @@ pub struct SourceBackedEditor {
 /// Clone-staged atomic changes over one exact source worksheet.
 pub struct SourceEdit {
     before: Snapshot,
-    staged: Vec<(Address, Option<Value>)>,
+    staged: Vec<(Address, StagedValueEdit)>,
 }
 
 impl SourceBackedEditor {
@@ -157,6 +178,14 @@ impl SourceEdit {
         self.apply_batch([CellValueEdit::clear(address)])
     }
 
+    /// Stage complete removal of one scalar `<c>` owner.
+    ///
+    /// The containing `<row>` is retained even when this is its last cell.
+    /// Repeated selectors are rejected.
+    pub fn remove(&mut self, address: Address) -> Result<()> {
+        self.apply_batch([CellValueEdit::remove(address)])
+    }
+
     /// Stage a bounded batch atomically.
     pub fn apply_batch(&mut self, edits: impl IntoIterator<Item = CellValueEdit>) -> Result<()> {
         let mut pending = Vec::new();
@@ -194,9 +223,10 @@ impl SourceEdit {
                     if matches!(value, Value::Date(_)) {
                         return Err(invalid("value-only batches currently refuse date cells"));
                     }
-                    Some(value)
+                    StagedValueEdit::Set(value)
                 },
-                CellValueEdit::Clear { .. } => None,
+                CellValueEdit::Clear { .. } => StagedValueEdit::Clear,
+                CellValueEdit::Remove { .. } => StagedValueEdit::Remove,
             };
             if matches!(source, Value::Date(_)) {
                 return Err(invalid("value-only batches currently refuse date cells"));
@@ -211,13 +241,16 @@ impl SourceEdit {
     pub fn commit(self) -> Result<Commit> {
         let mut actions = BTreeMap::new();
         for (address, value) in &self.staged {
-            if value.as_ref() == self.before.value(*address) {
-                continue;
-            }
-            let action = value.as_ref().map_or_else(
-                || Action::clear(false),
-                |value| Action::set(Content::Value(value.clone())),
-            );
+            let action = match value {
+                StagedValueEdit::Set(value) => {
+                    if Some(value) == self.before.value(*address) {
+                        continue;
+                    }
+                    Action::set(Content::Value(value.clone()))
+                },
+                StagedValueEdit::Clear => Action::clear(false),
+                StagedValueEdit::Remove => Action::Remove,
+            };
             actions.insert(*address, action);
         }
         if actions.is_empty() {
@@ -228,10 +261,14 @@ impl SourceEdit {
         let output = rewrite(self.before.source_xml(), self.before.sheet_name(), actions)?;
         let snapshot = Snapshot::from_rewritten_source(&self.before, output)?;
         for (address, expected) in &self.staged {
-            if snapshot.value(*address) != expected.as_ref() {
-                if expected.is_none() && snapshot.value(*address).is_none() {
-                    continue;
-                }
+            let matches = match expected {
+                StagedValueEdit::Set(value) => snapshot.value(*address) == Some(value),
+                StagedValueEdit::Clear => {
+                    snapshot.contains_cell(*address) && snapshot.value(*address).is_none()
+                },
+                StagedValueEdit::Remove => !snapshot.contains_cell(*address),
+            };
+            if !matches {
                 return Err(invalid(
                     "value-only publication readback differs from staged state",
                 ));

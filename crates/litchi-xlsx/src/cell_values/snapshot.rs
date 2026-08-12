@@ -226,6 +226,14 @@ impl Snapshot {
         }
     }
 
+    /// Whether an explicit `<c>` owner exists at this coordinate.
+    ///
+    /// This distinguishes a cleared cell record from a removed cell record.
+    #[must_use]
+    pub fn contains_cell(&self, address: litchi_sheet::Cell) -> bool {
+        self.cells.entry(address).is_some()
+    }
+
     /// Exact source worksheet XML.
     #[must_use]
     pub fn source_xml(&self) -> &[u8] {
@@ -585,13 +593,15 @@ fn capture_relationships(values: &Relationships) -> Result<Box<[SourceRelationsh
     for value in values.iter() {
         output.push(SourceRelationship::capture(value)?);
     }
+    output.sort_unstable_by(|left, right| left.id.cmp(&right.id));
     Ok(output.into_boxed_slice())
 }
 
 fn relationships_match(values: &Relationships, expected: &[SourceRelationship]) -> bool {
     values.len() == expected.len()
-        && values
-            .iter()
-            .zip(expected)
-            .all(|(value, expected)| expected.matches(value))
+        && values.iter().all(|value| {
+            expected
+                .binary_search_by(|item| item.id.as_ref().cmp(value.r_id()))
+                .is_ok_and(|index| expected[index].matches(value))
+        })
 }
