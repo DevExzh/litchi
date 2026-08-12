@@ -1,0 +1,9 @@
+Protocol: CPU 3, GNU Time, 0 warmups and 1 sample per process, A/B/B/A
+
+Maximum RSS (KiB):
+eager A:          143,564
+source-backed A:  141,704
+source-backed B:  143,520
+eager B:          143,432
+
+Mean maximum RSS: eager 143,498 KiB; source-backed 142,612 KiB (-0.62%).

@@ -79,6 +79,7 @@ pub mod custom;
 pub mod custom_data;
 pub mod data_consolidation;
 pub mod data_validation;
+pub mod defined_names;
 pub mod drawing;
 pub mod edit;
 mod error;

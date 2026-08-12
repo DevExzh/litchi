@@ -1,0 +1,13 @@
+Protocol: CPU 3, perf record, 2 warmups and 10 samples per process
+
+Samples lost: 0 in both profiles.
+Approximate sampled cycles: eager 19,007,798,701; source-backed 5,888,411,101.
+
+Frame                                      Eager share     Source share
+deflate_medium                             52.73%          12.43%
+longest_match                              17.46%           4.07%
+
+Cycle-weighted attribution falls about 92.70% in deflate_medium and 92.78% in
+longest_match. These whole-process profiles include deterministic corpus
+construction and untimed full-output verification, so their total-cycle delta
+understates the scoped operation-latency delta.

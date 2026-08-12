@@ -1,0 +1,8 @@
+Protocol: CPU 3, Heaptrack, 0 warmups and 1 sample per process
+
+Metric                         Eager control       Source-backed       Delta
+allocation calls               14,887              12,986              -12.77%
+temporary allocations          2,120               1,828               -13.77%
+peak heap                      152.83 MiB          152.80 MiB          -0.02%
+peak RSS including Heaptrack   150.70 MiB          148.77 MiB          -1.28%
+leaked profiler/runtime memory 1.78 KiB            1.78 KiB            flat
