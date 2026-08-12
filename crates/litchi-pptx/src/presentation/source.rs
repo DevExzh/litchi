@@ -90,7 +90,7 @@ pub struct SourceSlide {
     data: Arc<SourceSlideData>,
 }
 
-/// An owning, source-backed editor for one existing slide's shape text.
+/// An owning, source-backed editor for one existing slide.
 ///
 /// Unlike [`SourceBackedPresentation`], this type is intentionally not
 /// cloneable: publishing consumes its deferred OPC source to ensure that the
@@ -113,7 +113,7 @@ pub struct SourceBackedSlideSnapshot {
     max_output_bytes: usize,
 }
 
-/// An isolated edit of one exact-source slide snapshot.
+/// An isolated focused edit of one exact-source slide snapshot.
 pub struct SourceBackedSlideEdit {
     source: SourceBackedSlideSnapshot,
     working: Arc<Vec<u8>>,
@@ -229,7 +229,7 @@ impl SourceBackedPresentation {
 }
 
 impl SourceBackedPresentationEditor {
-    /// Open an ordinary PPTX source for a bounded one-slide text edit.
+    /// Open an ordinary PPTX source for a bounded one-slide edit.
     ///
     /// Opening validates the OPC catalog, presentation root, and slide graph
     /// without materializing ordinary slide payloads.
@@ -283,7 +283,7 @@ impl SourceBackedPresentationEditor {
         self.slide_snapshot_for(position, "slide_snapshot")
     }
 
-    /// Begin an isolated shape-text-only edit of one existing slide.
+    /// Begin an isolated focused edit of one existing slide.
     pub fn edit_slide(&self, position: usize) -> Result<SourceBackedSlideEdit> {
         Ok(self.slide_snapshot_for(position, "edit_slide")?.edit())
     }
@@ -425,7 +425,17 @@ impl SourceBackedSlideSnapshot {
         self.position
     }
 
-    /// Start an isolated text-only edit from this exact source snapshot.
+    /// Read this slide's direct standard transition, if present.
+    ///
+    /// Inherited layout/master transitions are intentionally outside this
+    /// direct-slide capability. Markup-compatibility and extension transition
+    /// forms return a typed refusal instead of being projected into a mutable
+    /// approximation.
+    pub fn transition(&self) -> Result<Option<crate::transition::Transition>> {
+        crate::presentation::transition::read_direct(self.xml.as_slice())
+    }
+
+    /// Start an isolated focused edit from this exact source snapshot.
     #[must_use]
     pub fn edit(&self) -> SourceBackedSlideEdit {
         SourceBackedSlideEdit {
@@ -452,6 +462,49 @@ impl SourceBackedSlideEdit {
     #[must_use]
     pub const fn source(&self) -> &SourceBackedSlideSnapshot {
         &self.source
+    }
+
+    /// Set or replace this existing slide's direct standard transition.
+    ///
+    /// This operation never changes relationships or package topology. The
+    /// supplied value must use only the standard direct transition vocabulary;
+    /// custom-duration, PowerPoint-extension, raw, and preserved-extension
+    /// values are refused. An equal modeled value is an exact byte no-op.
+    pub fn set_transition(&mut self, value: &crate::transition::Transition) -> Result<bool> {
+        self.stage_transition(Some(value), "set_transition")
+    }
+
+    /// Clear this existing slide's direct standard transition.
+    ///
+    /// An absent direct transition is an exact byte no-op. Inherited
+    /// layout/master state is not removed or rewritten.
+    pub fn clear_transition(&mut self) -> Result<bool> {
+        self.stage_transition(None, "clear_transition")
+    }
+
+    fn stage_transition(
+        &mut self,
+        value: Option<&crate::transition::Transition>,
+        operation: &'static str,
+    ) -> Result<bool> {
+        if self.operation_used {
+            return Err(Error::UnsafeEdit {
+                operation,
+                reason: "source-backed slide edits support one atomic semantic operation",
+            });
+        }
+        let (xml, changed) = crate::presentation::transition::stage(
+            self.working.as_slice(),
+            self.source.closure.presentation_xml.as_slice(),
+            value,
+            self.source.max_output_bytes,
+            operation,
+        )?;
+        if let Some(xml) = xml {
+            self.working = Arc::new(xml);
+        }
+        self.operation_used = true;
+        Ok(changed)
     }
 
     /// Replace all visible DrawingML text runs in one existing shape.

@@ -8,6 +8,7 @@ mod codec;
 mod model;
 mod package;
 mod source;
+mod transition;
 
 #[cfg(test)]
 mod tests;

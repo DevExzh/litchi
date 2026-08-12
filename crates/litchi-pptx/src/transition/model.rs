@@ -511,3 +511,13 @@ impl Transition {
             .map_or(&[], |preserved| preserved.after.as_ref())
     }
 }
+
+pub(crate) fn preserved_effect_xml(value: &Transition) -> Option<&str> {
+    value.effect_xml().map(Raw::xml)
+}
+
+pub(crate) fn semantic_clone(value: &Transition) -> Transition {
+    let mut value = value.clone();
+    value.preserved = None;
+    value
+}

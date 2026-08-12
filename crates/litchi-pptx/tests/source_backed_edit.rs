@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
+use litchi_pptx::transition::{Kind as TransitionKind, Ms, Side, Speed, Transition};
 use litchi_pptx::{
     Error, MAX_SHAPE_TEXT_REPLACEMENTS, MAX_SOURCE_BACKED_SLIDE_BATCH, ReadLimits,
     ShapeTextReplacement, SourceBackedPresentation, SourceBackedPresentationEditor,
@@ -86,6 +87,17 @@ fn shape_xml(pml: &str, text: &str) -> String {
     )
 }
 
+fn slide_with_tail(pml: &str, text: &str, tail: &str) -> String {
+    shape_xml(pml, text).replacen("</p:sld>", &format!("{tail}</p:sld>"), 1)
+}
+
+fn direct_transition(kind: TransitionKind) -> Transition {
+    Transition::new(kind)
+        .with_speed(Speed::Fast)
+        .with_click(false)
+        .with_after(Ms::new(750).unwrap())
+}
+
 fn mce_slide_xml() -> String {
     let shape = r#"<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>before</a:t></a:r></a:p></p:txBody></p:sp>"#;
     format!(
@@ -151,6 +163,38 @@ fn fixture_with_presentation_namespace(
         package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     }
     PackageWriter::to_bytes(&package).unwrap()
+}
+
+fn unchecked_slide_fixture(slide_xml: &[u8]) -> Vec<u8> {
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    writer
+        .write_stored(
+            "[Content_Types].xml",
+            br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/></Types>"#,
+        )
+        .unwrap();
+    writer
+        .write_stored(
+            "_rels/.rels",
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>"#,
+        )
+        .unwrap();
+    writer
+        .write_stored(
+            "ppt/presentation.xml",
+            format!(r#"<p:presentation xmlns:p="{PML}" xmlns:r="{REL}"><p:sldIdLst><p:sldId id="256" r:id="rIdSlide"/></p:sldIdLst></p:presentation>"#).as_bytes(),
+        )
+        .unwrap();
+    writer
+        .write_stored(
+            "ppt/_rels/presentation.xml.rels",
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdSlide" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>"#,
+        )
+        .unwrap();
+    writer
+        .write_stored("ppt/slides/slide1.xml", slide_xml)
+        .unwrap();
+    writer.finish_to_bytes().unwrap()
 }
 
 fn multi_fixture(slide_count: usize, signed: bool) -> Vec<u8> {
@@ -820,6 +864,353 @@ fn mce_limits_strict_and_partial_sink_are_checked() {
     )))
     .unwrap();
     let commit = edit_commit(&editor);
+    let mut sink = FailingSink {
+        accepted: 0,
+        limit: 128,
+    };
+    assert!(matches!(
+        editor.publish_slide_commit_to_stream(&mut sink, &commit),
+        Err(Error::Opc(OpcError::IncompleteOutput { .. }))
+    ));
+    assert_eq!(sink.accepted, 128);
+}
+
+#[test]
+fn direct_transition_set_replaces_clears_and_reopens_with_one_part_overlay() {
+    let slide = slide_with_tail(PML, "before", "<p:timing/><p:extLst/>");
+    let source_bytes = fixture("", slide.clone(), false);
+    let source_raw = raw_records(&source_bytes);
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source_bytes.clone(),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    assert!(edit.source().transition().unwrap().is_none());
+    let requested = direct_transition(TransitionKind::Push(Side::Left));
+    assert!(edit.set_transition(&requested).unwrap());
+    let commit = edit.commit();
+    assert!(commit.is_changed());
+    let replayed = commit.patch().apply(commit.patch().source()).unwrap();
+    assert!(commit.patch().inverse().apply(&replayed).is_ok());
+
+    let mut output = Vec::new();
+    let published = editor
+        .publish_slide_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert!(commit.patch().inverse().apply(&published).is_ok());
+    assert!(commit.patch().apply(&published).is_err());
+    let output_raw = raw_records(&output);
+    for (name, source_record) in source_raw {
+        if name.as_slice() == b"ppt/slides/slide1.xml" {
+            assert_ne!(output_raw[&name].local, source_record.local);
+        } else {
+            assert_eq!(output_raw[&name].local, source_record.local, "{name:?}");
+            assert_eq!(
+                central_without_local_offset(&output_raw[&name].central),
+                central_without_local_offset(&source_record.central),
+                "{name:?}"
+            );
+        }
+    }
+    let package = OpcPackage::from_bytes(&output).unwrap();
+    let changed_slide = package.get_part(&PackURI::new(SLIDE).unwrap()).unwrap();
+    let changed_xml = std::str::from_utf8(changed_slide.blob()).unwrap();
+    let fragment = litchi_pptx::transition::write(&requested).unwrap();
+    assert_eq!(
+        changed_xml,
+        slide.replacen("<p:timing/>", &format!("{fragment}<p:timing/>"), 1)
+    );
+    let reopened =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(output)))
+            .unwrap();
+    let readback = reopened
+        .slide_snapshot(0)
+        .unwrap()
+        .transition()
+        .unwrap()
+        .unwrap();
+    assert!(readback.same_semantics(&requested));
+
+    let mut replace = reopened.edit_slide(0).unwrap();
+    let mut replacement = readback;
+    replacement.set_speed(Speed::Slow);
+    assert!(replace.set_transition(&replacement).unwrap());
+    let replacement_commit = replace.commit();
+    let mut replaced = Vec::new();
+    reopened
+        .publish_slide_commit_to_stream(&mut replaced, &replacement_commit)
+        .unwrap();
+    let reopened =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(replaced)))
+            .unwrap();
+    assert!(
+        reopened
+            .slide_snapshot(0)
+            .unwrap()
+            .transition()
+            .unwrap()
+            .unwrap()
+            .same_semantics(&replacement)
+    );
+    let mut clear = reopened.edit_slide(0).unwrap();
+    assert!(clear.clear_transition().unwrap());
+    let clear_commit = clear.commit();
+    let mut cleared = Vec::new();
+    reopened
+        .publish_slide_commit_to_stream(&mut cleared, &clear_commit)
+        .unwrap();
+    let reopened =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(cleared)))
+            .unwrap();
+    assert!(
+        reopened
+            .slide_snapshot(0)
+            .unwrap()
+            .transition()
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn direct_transition_supports_strict_and_noncanonical_prefixes() {
+    let strict_slide = shape_xml(STRICT_PML, "before")
+        .replace("<p:", "<q:")
+        .replace("</p:", "</q:");
+    let strict_slide = strict_slide.replace("xmlns:p=", "xmlns:q=");
+    let source = fixture_with_presentation_namespace(STRICT_PML, "", strict_slide, false);
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+            .unwrap();
+    let requested = direct_transition(TransitionKind::Wipe(Side::Down));
+    let mut edit = editor.edit_slide(0).unwrap();
+    assert!(edit.set_transition(&requested).unwrap());
+    let commit = edit.commit();
+    let mut output = Vec::new();
+    editor
+        .publish_slide_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let package = OpcPackage::from_bytes(&output).unwrap();
+    let xml = std::str::from_utf8(
+        package
+            .get_part(&PackURI::new(SLIDE).unwrap())
+            .unwrap()
+            .blob(),
+    )
+    .unwrap();
+    assert!(xml.contains("<q:transition"));
+    assert!(!xml.contains("<p:transition"));
+    let reopened =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(output)))
+            .unwrap();
+    assert!(
+        reopened
+            .slide_snapshot(0)
+            .unwrap()
+            .transition()
+            .unwrap()
+            .unwrap()
+            .same_semantics(&requested)
+    );
+}
+
+#[test]
+fn direct_transition_semantic_noop_shares_signed_source_exactly() {
+    let slide = slide_with_tail(
+        PML,
+        "before",
+        "<p:transition spd=\"fast\" advClick=\"0\" advTm=\"750\"><p:push dir=\"l\"/></p:transition>",
+    );
+    let source = fixture("", slide, true);
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source.clone(),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    let requested = direct_transition(TransitionKind::Push(Side::Left));
+    assert!(!edit.set_transition(&requested).unwrap());
+    assert!(matches!(
+        edit.clear_transition(),
+        Err(Error::UnsafeEdit { .. })
+    ));
+    let commit = edit.commit();
+    assert!(!commit.is_changed());
+    let replayed = commit.patch().apply(commit.patch().source()).unwrap();
+    assert!(!commit.patch().inverse().is_changed());
+    assert!(
+        commit
+            .patch()
+            .inverse()
+            .apply(&replayed)
+            .unwrap()
+            .transition()
+            .unwrap()
+            .is_some()
+    );
+    let mut output = Vec::new();
+    editor
+        .publish_slide_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, source);
+
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+            .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    assert!(
+        edit.set_transition(&Transition::new(TransitionKind::Fade { black: None }))
+            .unwrap()
+    );
+    let commit = edit.commit();
+    output.clear();
+    assert!(matches!(
+        editor.publish_slide_commit_to_stream(&mut output, &commit),
+        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn direct_transition_refuses_extensions_sound_protection_and_unsafe_targets_atomically() {
+    let cases = [
+        "<p:transition><p:fade vendor=\"1\"/></p:transition>",
+        "<p:transition><p:sndAc><p:stSnd r:embed=\"rIdSound\"/></p:sndAc></p:transition>",
+        "<p:transition><p:extLst><p:ext uri=\"urn:vendor\"/></p:extLst></p:transition>",
+        "<p:transition><p14:ripple xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\"/></p:transition>",
+    ];
+    for transition in cases {
+        let source = fixture("", slide_with_tail(PML, "before", transition), false);
+        let editor =
+            SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+                .unwrap();
+        let mut edit = editor.edit_slide(0).unwrap();
+        assert!(matches!(
+            edit.set_transition(&Transition::new(TransitionKind::Fade { black: None })),
+            Err(Error::UnsafeEdit { .. })
+        ));
+        assert!(matches!(
+            edit.clear_transition(),
+            Err(Error::UnsafeEdit { .. })
+        ));
+    }
+
+    let protected = r#"<p:modifyVerifier cryptAlgorithmSid="14" spinCount="1" saltData="AA==" hashData="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="/>"#;
+    let source = fixture(protected, shape_xml(PML, "before"), false);
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+            .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    assert!(matches!(
+        edit.set_transition(&Transition::new(TransitionKind::Fade { black: None })),
+        Err(Error::UnsafeEdit { .. })
+    ));
+    assert!(!edit.clear_transition().unwrap());
+
+    let source = fixture("", shape_xml(PML, "before"), false);
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+            .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    let duration =
+        Transition::new(TransitionKind::Fade { black: None }).with_duration(Ms::new(900).unwrap());
+    assert!(matches!(
+        edit.set_transition(&duration),
+        Err(Error::UnsafeEdit { .. })
+    ));
+    let ripple = Transition::new(TransitionKind::Ripple(
+        litchi_pptx::transition::Ripple::Center,
+    ));
+    assert!(matches!(
+        edit.set_transition(&ripple),
+        Err(Error::UnsafeEdit { .. })
+    ));
+    assert!(
+        edit.set_transition(&Transition::new(TransitionKind::Fade { black: None }))
+            .unwrap()
+    );
+}
+
+#[test]
+fn direct_transition_rejects_malformed_dtd_limits_stale_source_and_partial_sink() {
+    let duplicate = slide_with_tail(
+        PML,
+        "before",
+        "<p:transition/><p:transition><p:fade/></p:transition>",
+    );
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        fixture("", duplicate, false),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    assert!(matches!(edit.clear_transition(), Err(Error::Invalid(_))));
+
+    let dtd = format!("<!DOCTYPE p:sld>{}", shape_xml(PML, "before"));
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        unchecked_slide_fixture(dtd.as_bytes()),
+    )))
+    .unwrap();
+    assert!(editor.edit_slide(0).is_err());
+
+    let slide = shape_xml(PML, "before").replacen(
+        "<p:cSld>",
+        &format!("<p:cSld><!--{}-->", "x".repeat(5_000)),
+        1,
+    );
+    let limits = ReadLimits::builder()
+        .max_part_bytes(slide.len() as u64)
+        .unwrap()
+        .build()
+        .unwrap();
+    let editor = SourceBackedPresentationEditor::from_read_at_with_limits(
+        Arc::new(VersionedSource::new(fixture("", slide, false))),
+        limits,
+    )
+    .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    assert!(matches!(
+        edit.set_transition(&Transition::new(TransitionKind::Fade { black: None })),
+        Err(Error::Limit { .. })
+    ));
+
+    let source_bytes = fixture("", shape_xml(PML, "before"), false);
+    let source = Arc::new(VersionedSource::new(source_bytes.clone()));
+    let editor = SourceBackedPresentationEditor::from_read_at(source.clone()).unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    edit.set_transition(&Transition::new(TransitionKind::Fade { black: None }))
+        .unwrap();
+    let commit = edit.commit();
+    let foreign = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        fixture("<p:extLst/>", shape_xml(PML, "before"), false),
+    )))
+    .unwrap();
+    let mut output = Vec::new();
+    assert!(matches!(
+        foreign.publish_slide_commit_to_stream(&mut output, &commit),
+        Err(Error::StaleSource)
+    ));
+    assert!(output.is_empty());
+
+    let source = Arc::new(VersionedSource::new(source_bytes));
+    let editor = SourceBackedPresentationEditor::from_read_at(source.clone()).unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    edit.set_transition(&Transition::new(TransitionKind::Fade { black: None }))
+        .unwrap();
+    let commit = edit.commit();
+    source.changed();
+    assert!(matches!(
+        editor.publish_slide_commit_to_stream(&mut output, &commit),
+        Err(Error::Opc(OpcError::SourceChanged { .. }))
+    ));
+    assert!(output.is_empty());
+
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        fixture("", shape_xml(PML, "before"), false),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    edit.set_transition(&Transition::new(TransitionKind::Fade { black: None }))
+        .unwrap();
+    let commit = edit.commit();
     let mut sink = FailingSink {
         accepted: 0,
         limit: 128,
