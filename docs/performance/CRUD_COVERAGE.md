@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 
-This is a coverage map, not a completion claim. It compares the 130 selectable
+This is a coverage map, not a completion claim. It compares the 132 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -29,7 +29,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Validate without mutation | Partial | Opens validate; no distinct validate-only matrix |
 | Explicit repair plan | Missing | No general public non-mutating repair-plan API |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS-row preservation, and exact raw ODT/ODS/ODP auxiliary/media members during neighboring paragraph/cell/text-box edits; broader format-semantic extension corpora remain missing |
-| Replace one low-level Part, preserve the rest | Covered for owned OPC, narrow source-backed OPC, guarded DOCX main-document semantics, guarded PPTX selected-slide semantics, and XLSX calculation metadata/page breaks/page margins | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; change 0037 adds the consuming source-backed one-Part publisher; changes 0039, 0044/0063, 0046, 0061 and 0067 integrate exact-source DOCX, atomic same-slide PPTX, XLSX calculation-metadata, worksheet-page-break and worksheet-page-margin transactions while refusing unsafe MCE, signature, stale/foreign and topology cases before output; general XLSX cell/formula and multi-slide PPTX editing remain outside the one-Part closure |
+| Replace one low-level Part, preserve the rest | Covered for owned OPC, narrow source-backed OPC, guarded DOCX main-document semantics, guarded PPTX selected-slide semantics, and XLSX calculation metadata/page breaks/page margins/print options | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; change 0037 adds the consuming source-backed one-Part publisher; changes 0039, 0044/0063, 0046, 0061, 0067 and 0070 integrate exact-source DOCX, atomic same-slide PPTX, XLSX calculation-metadata, worksheet-page-break, worksheet-page-margin and worksheet-print-options transactions while refusing unsafe MCE, signature, stale/foreign and topology cases before output; general XLSX cell/formula and multi-slide PPTX editing remain outside the one-Part closure |
 
 The source/output matrix is also incomplete. Owned bytes and instrumented
 `ReadAt` exist for OPC/XLSX, and the deterministic range simulator covers
@@ -65,7 +65,7 @@ conversion remain.
    writer-local action regrouping was measured and rejected in change 0030;
    broader coverage must not present that immaterial prototype as a solution.
 5. Broaden the accepted narrow XLSX calculation-metadata, page-break and
-   page-margin source transactions beyond changes 0046/0061/0067 only where a
+   page-margin/print-options source transactions beyond changes 0046/0061/0067/0070 only where a
    complete one-Part semantic closure can be proved; general
    cell/formula/chains still need a wider publication design.
    Broaden DOCX/PPTX beyond changes 0039/0044 with real producers, MCE-aware
@@ -225,6 +225,13 @@ zero lexical variants—preserve the complete archive; changed signed sources,
 chartsheets, retargeting, MCE-projected margins, stale/foreign closures, limits
 and partial sinks retain typed refusals. General worksheet contents and
 topology remain outside the capability.
+
+Change 0070 applies that closure to direct typed worksheet print options. It
+materializes the same workbook/selected-worksheet pair, exposes only set/remove
+for five boolean flags, and raw-copies the other ten Parts. Exact signed no-ops,
+patch/inverse, retargeting, MCE, limits and partial-sink behavior remain checked;
+printer-setting relationships and general worksheet contents remain outside the
+capability.
 
 Change 0047 makes the existing ODT one-paragraph benchmark a direct public
 indexed query. It retains only the requested structured paragraph while

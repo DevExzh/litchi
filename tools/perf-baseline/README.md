@@ -5,7 +5,7 @@ ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
 public-API XLSX snapshot/edit/save flows, and opt-in DOC/XLS/PPT,
 DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows. It creates every corpus in memory; it also exercises
 source-backed XLSX catalog, worksheet reads, and guarded calculation-metadata
-and page-break/page-margin publication over positional I/O. It does not
+and page-break/page-margin/print-options publication over positional I/O. It does not
 depend on untracked office files, network state, or randomness. ODP builder
 timestamps are replaced with fixed metadata before measurement. The JSON
 report contains the generator parameters and SHA-256 hashes for the generated
@@ -28,9 +28,10 @@ case, one source-backed DOCX semantic publication case, one source-backed
 media-rich PPTX semantic publication case, one XLSX commit/read attribution case,
 two matched XLSX calculation-metadata publication cases, two matched XLSX
 page-break publication cases, two matched XLSX page-margin publication cases,
+two matched XLSX print-options publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, nine RTF semantic cases, and 26 ODF semantic cases
-are opt-in, for 130 selectable cases in total:
+are opt-in, for 132 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -181,6 +182,24 @@ selected worksheet, then raw-copies every other ZIP member. Full page-margin
 readback, calculation-metadata stability, package topology, relationships,
 media payloads, output hash, and sequential-sink bounds are verified outside
 timing.
+
+Measure the matched XLSX print-options publication controls on the same fixed
+media-rich archive:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 \
+  --case xlsx_eager_print_options_edit_save,xlsx_source_backed_print_options_edit_save \
+  --json target/perf/xlsx-print-options-edit.json
+```
+
+Both paths enable the same typed horizontal-centering, headings, and gridline
+flags on `Sheet1` and change only `xl/worksheets/sheet1.xml`. The eager control
+materializes all twelve ordinary Parts; the source-backed path materializes
+only the workbook catalog and selected worksheet, then raw-copies every other
+ZIP member. Complete print-options readback, calculation metadata, topology,
+relationships, media, output hash, and sequential-sink bounds are verified
+outside timing.
 
 For just the end-to-end legacy writer packaging runs:
 
@@ -871,6 +890,10 @@ The two XLSX page-margin publication cases use the same twelve-Part media-rich
 archive and evidence contract. The eager control reports twelve semantic
 materializations per sample and the source-backed path reports two; their
 output hashes are required to match.
+
+The two XLSX print-options publication cases use that same matched evidence
+contract. Their eager/source-backed materialization counts are twelve and two,
+respectively, and their output hashes are required to match.
 
 ## External profiling
 

@@ -220,14 +220,14 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **130
+The stage-1 records above are retained unchanged. The current harness has **132
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
 PPTX semantic publication case, one opt-in media-rich ODT
-paragraph-publication case, six opt-in matched XLSX calculation-metadata/page-break/page-margin
+paragraph-publication case, eight opt-in matched XLSX calculation-metadata/page-break/page-margin/print-options
 publication cases, 16 opt-in DOCX/PPTX semantic
 cases, nine opt-in RTF semantic case names across four capability-bounded
 variants (33 tiny / 58 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
@@ -305,6 +305,12 @@ incomplete program and CRUD matrix.
   Chartsheets, MCE projection, relationship retargeting, changed signed
   sources and topology changes refuse before output. See
   [`0067`](changes/0067-xlsx-source-backed-page-margin-publication.md).
+- The guarded XLSX print-options editor binds the same exact selected-worksheet
+  closure and publishes only its direct five-flag element. On the fixed 16 MiB
+  media corpus, p50 falls from 219.294 to 4.668 ms (-97.87%, 46.98x), while
+  semantic materializations fall from 12 to 2 and output remains byte-identical
+  across eager/source controls. See
+  [`0070`](changes/0070-xlsx-source-backed-print-options-publication.md).
 - Consecutive packaged ODT plain-text replacements now share one mutable
   candidate, content publication, reopen and compact audit while retaining
   ordinary scalar durable operations. The large 100-edit/save p50 falls from
