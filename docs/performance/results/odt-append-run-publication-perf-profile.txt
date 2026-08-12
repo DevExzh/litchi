@@ -1,0 +1,16 @@
+Control binary SHA-256: 7eda79d72dfb9ea00ad1572f965d8f0c0ef3df579c73dbf6be2b9ab928adc537
+Candidate binary SHA-256: 7db856fff49eea43e7d08e0d889e536b21648bc723360e50426dcb59cdda8856
+Protocol: CPU 2, perf record at 999 Hz, userspace cycles, 2 warmups and 10 samples
+
+State         Samples   Approx. sampled cycles   Lost samples
+Full rebuild  ~3,000    16,651,733,071           0
+Content-only  876       3,751,559,525            0
+
+Exclusive symbol                               Full rebuild   Content-only
+zlib_rs::deflate::algorithm::medium::deflate_medium   57.79%   19.36%
+zlib_rs::deflate::longest_match::longest_match        17.42%    6.21%
+zlib_rs::deflate::Heap::pqdownheap                     3.90%    1.78%
+
+Share multiplied by sampled cycles estimates a 92.45% absolute-cycle reduction
+in deflate_medium and a 91.97% reduction in longest_match. Corpus generation and
+complete untimed output verification remain in both process-wide profiles.

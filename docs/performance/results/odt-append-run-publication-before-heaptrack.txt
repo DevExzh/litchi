@@ -1,0 +1,7 @@
+Debuggee: odt_media_append_run_edit_save, control binary 7eda79d7, 0 warmups, 1 sample
+Total runtime: 0.69 s
+Allocation calls: 19,767
+Temporary allocations: 3,644
+Peak heap: 107.17 MiB
+Peak RSS including Heaptrack: 119.26 MiB
+Leaked profiler/runtime memory: 1.78 KiB

@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 
-This is a coverage map, not a completion claim. It compares the 133 selectable
+This is a coverage map, not a completion claim. It compares the 134 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -85,8 +85,9 @@ conversion remain.
    structural publication, 1% and bulk edits, unknown extensions, real
    producers, richer media, security and source-backed I/O. The generated ODT
    1% paragraph case is covered by change 0045, changed-result byte
-   finalization by change 0052, and content-only line-break publication by
-   change 0071; formatted runs and broader bulk/structural operations remain.
+   finalization by change 0052, content-only line-break publication by change
+   0071, and existing-style inline-run publication by change 0072; new style
+   creation and broader bulk/structural operations remain.
    iWork is deliberately deferred while the `iwa-*` crates change separately.
 
 The former first item is complete for existing-document ODT transaction
@@ -183,6 +184,15 @@ that only `content.xml` changes, all untouched core/media members remain raw
 identical, and the line break survives complete reopen, patch replay, inverse,
 stale refusal, and deterministic output. It adds no arbitrary inline-format,
 structural, resource, real-producer, or positional-I/O capability.
+
+Change 0072 extends the boundary to the existing ODT `AppendRun` operation.
+The packaged regression covers both unstyled and existing-style runs and
+proves that only `content.xml` changes while core/media records stay raw
+identical. Its matched media-rich case retains complete reopen,
+patch/inverse/stale checks and deterministic output. It also isolates exact
+no-op commit dispatch from the changed-operation stack frame without adding a
+new semantic operation, style-creation API, structural edit, resource edit,
+real-producer fixture, or positional-I/O capability.
 
 Change 0036 separates the common OLE2 one-stream edit into editor-open,
 candidate-publication, final-render and end-to-end attribution cases over four

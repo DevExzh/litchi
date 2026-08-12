@@ -30,8 +30,8 @@ two matched XLSX calculation-metadata publication cases, two matched XLSX
 page-break publication cases, two matched XLSX page-margin publication cases,
 two matched XLSX print-options publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
-DOCX/PPTX semantic cases, nine RTF semantic cases, and 27 ODF semantic cases
-are opt-in, for 133 selectable cases in total:
+DOCX/PPTX semantic cases, nine RTF semantic cases, and 28 ODF semantic cases
+are opt-in, for 134 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -281,6 +281,14 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/odt-media-line-break-publication.json
 ```
 
+Run the matched ODT inline-run publication case over the same fixed corpus:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 --case odt_media_append_run_edit_save \
+  --json target/perf/odt-media-append-run-publication.json
+```
+
 Run the backward-compatible plain tiny semantic RTF smoke matrix (nine
 records):
 
@@ -486,17 +494,18 @@ timing it reopens the complete grid and verifies every resource path, manifest
 media type, exact payload and deterministic output. This case does not vary
 with `--semantic-shape` and is not part of the 23-record tiny ODF smoke matrix.
 
-`odt_media_paragraph_edit_save` and `odt_media_line_break_edit_save` share a
-separate fixed-medium corpus: 200 paragraphs plus eight deterministic 2 MiB
-resources under `Pictures/`. They time public snapshot open, respectively
-replace the middle paragraph or append one line break, commit, and materialize
-the output. Outside timing each case reopens every paragraph, verifies every
+`odt_media_paragraph_edit_save`, `odt_media_line_break_edit_save`, and
+`odt_media_append_run_edit_save` share a separate fixed-medium corpus: 200
+paragraphs plus eight deterministic 2 MiB resources under `Pictures/`. They
+time public snapshot open, respectively replace the middle paragraph, append
+one line break, or append one unstyled inline run, commit, and materialize the
+output. Outside timing each case reopens every paragraph, verifies every
 resource path, manifest media type and exact payload, checks patch replay,
 exact inverse and stale-source refusal, and requires deterministic output.
 The JSON's `output_sha256` makes that published artifact identity explicit.
 Harness regressions additionally prove raw local/central record identity for
-all untouched core and media members. These cases do not vary with
-`--semantic-shape` and are opt-in.
+all untouched core and media members, including styled and unstyled run
+publication. These cases do not vary with `--semantic-shape` and are opt-in.
 
 `odp_media_textbox_edit_save` is a separate fixed-medium source-backed
 publication corpus: 12 slides plus eight deterministic 2 MiB resources under
