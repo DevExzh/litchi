@@ -68,6 +68,9 @@ pub(super) struct MutablePresentation {
     origins: Vec<Option<usize>>,
     /// Declaration state exactly as parsed; changing it rewrites every page.
     source_declarations: Option<crate::model::declaration::Collection>,
+    /// Lazy result of the current writer's whole-content publication audit.
+    /// Repeated reorders in one transaction remain O(1) after the first scan.
+    slide_move_supported: Option<bool>,
 }
 
 impl MutablePresentation {
@@ -148,6 +151,7 @@ impl MutablePresentation {
             content_source: retained_source,
             source_slides,
             origins,
+            slide_move_supported: None,
         })
     }
 
@@ -166,6 +170,42 @@ impl MutablePresentation {
     /// Return whether structural edits would need declaration rebinding.
     pub(super) fn has_source_declarations(&self) -> bool {
         self.source_declarations.is_some()
+    }
+
+    /// Check whether the current package writer can publish a reordered copy
+    /// of every retained source page without reclassifying producer XML as
+    /// authored markup.
+    pub(super) fn check_slide_move_supported(&mut self) -> Result<()> {
+        if self.source_declarations.is_some() || self.settings.is_some() {
+            return Err(litchi_core::Error::Unsupported(
+                "ODP retained producer declarations or settings cannot yet be reordered losslessly"
+                    .to_string(),
+            ));
+        }
+        let supported = match self.slide_move_supported {
+            Some(supported) => supported,
+            None => {
+                let supported = if let Some(package) = &self.source_package {
+                    let content = package.get_file("content.xml")?;
+                    xml_minifier::audit::verify_authored(
+                        &content,
+                        xml_minifier::audit::Limits::default(),
+                    )
+                    .is_ok()
+                } else {
+                    true
+                };
+                self.slide_move_supported = Some(supported);
+                supported
+            },
+        };
+        if !supported {
+            return Err(litchi_core::Error::Unsupported(
+                "ODP retained producer pages cannot be reordered losslessly by the current writer"
+                    .to_string(),
+            ));
+        }
+        Ok(())
     }
 
     /// Add a package-contained audio or video payload.
@@ -357,6 +397,44 @@ impl MutablePresentation {
                 self.slides.len()
             )))
         }
+    }
+
+    /// Move one slide to a final zero-based position without regenerating it.
+    ///
+    /// All fallible metadata and settings checks complete before the slide,
+    /// source-fragment origin, or metadata order is changed.
+    pub(super) fn move_slide(&mut self, from: usize, to: usize) -> Result<()> {
+        if from >= self.slides.len() || to >= self.slides.len() {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "ODP slide move index is out of bounds (from: {from}, to: {to}, length: {})",
+                self.slides.len()
+            )));
+        }
+        if from == to {
+            return Ok(());
+        }
+
+        let candidate_metadata = crate::model::page_metadata::metadata_after_page_move(
+            self.page_metadata.as_ref(),
+            self.slides.len(),
+            from,
+            to,
+        )?;
+        let candidate_names = crate::model::page_metadata::effective_page_names(
+            candidate_metadata.as_ref(),
+            self.slides.len(),
+        )?;
+        crate::model::settings::validate_page_references(self.settings.as_ref(), &candidate_names)?;
+
+        let slide = self.slides.remove(from);
+        self.slides.insert(to, slide);
+        let origin = self.origins.remove(from);
+        self.origins.insert(to, origin);
+        self.page_metadata = candidate_metadata;
+        for (index, slide) in self.slides.iter_mut().enumerate() {
+            slide.index = index;
+        }
+        Ok(())
     }
 
     /// Update a slide at a specific index.
