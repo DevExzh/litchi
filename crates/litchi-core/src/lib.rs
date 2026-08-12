@@ -62,6 +62,8 @@ pub use patch::{
 };
 pub use selector::{Position, Selector};
 pub use shapes::{PlaceholderType, ShapeType};
+#[cfg(any(unix, windows))]
+pub use source::{FileSource, FileVersionPolicy};
 pub use source::{OwnedSource, ReadAt, SliceSource, SourceVersion};
 pub use style::{Length, RGBColor, VerticalPosition};
 pub use text_output::{

@@ -8,6 +8,12 @@ use std::{
     },
 };
 
+#[cfg(any(unix, windows))]
+mod file;
+
+#[cfg(any(unix, windows))]
+pub use file::{FileSource, FileVersionPolicy};
+
 static NEXT_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Opaque identity and revision for one stable source snapshot.
