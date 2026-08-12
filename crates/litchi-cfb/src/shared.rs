@@ -81,6 +81,14 @@ impl std::fmt::Debug for SharedOleFile {
 }
 
 impl SharedOleFile {
+    #[cfg(test)]
+    pub(crate) fn mini_stream_is_materialized(&self) -> bool {
+        self.ministream
+            .lock()
+            .map(|cached| cached.is_some())
+            .unwrap_or(true)
+    }
+
     /// Starts an explicit, bounded bulk-read session.
     ///
     /// This is the only shared-reader API that may schedule work. Normal
@@ -215,6 +223,156 @@ impl SharedOleFile {
         };
         self.check_source_version()?;
         result
+    }
+
+    /// Reads one already-bounded range without materializing a whole FAT
+    /// stream. This remains crate-private for checked overlay verification.
+    pub(crate) fn read_stream_range(
+        &self,
+        path: &[&str],
+        offset: u64,
+        output: &mut [u8],
+    ) -> Result<(), OleError> {
+        let (is_minifat, start_sector, size) = {
+            let entry = self.find_entry(path)?;
+            if entry.entry_type != STGTY_STREAM {
+                return Err(OleError::InvalidFormat("Not a stream".to_string()));
+            }
+            (entry.is_minifat, entry.start_sector, entry.size)
+        };
+        let end = offset
+            .checked_add(output.len() as u64)
+            .ok_or_else(|| OleError::InvalidData("stream range end overflow".to_string()))?;
+        if end > size {
+            return Err(OleError::InvalidData(format!(
+                "stream range {offset}..{end} exceeds length {size}"
+            )));
+        }
+        if output.is_empty() {
+            return self.check_source_version();
+        }
+
+        self.check_source_version()?;
+        if is_minifat {
+            let root = self.index.root.as_ref().ok_or_else(|| {
+                OleError::CorruptedFile("mini stream has no root entry".to_string())
+            })?;
+            let mini_sector_size = self.index.mini_sector_size;
+            let first_ordinal =
+                usize::try_from(offset / mini_sector_size as u64).map_err(|_error| {
+                    OleError::InvalidData("MiniFAT range sector does not fit usize".to_string())
+                })?;
+            let mut mini_sector = start_sector;
+            for _ in 0..first_ordinal {
+                mini_sector = next_chain_sector(&self.index.minifat, mini_sector, "MiniFAT")?;
+                if mini_sector == ENDOFCHAIN {
+                    return Err(OleError::CorruptedFile(
+                        "MiniFAT chain ends before stream range".to_string(),
+                    ));
+                }
+            }
+            let mut within =
+                usize::try_from(offset % mini_sector_size as u64).map_err(|_error| {
+                    OleError::InvalidData("MiniFAT range offset does not fit usize".to_string())
+                })?;
+            let mut written = 0_usize;
+            while written < output.len() {
+                let count = (mini_sector_size - within).min(output.len() - written);
+                let mini_offset = usize::try_from(mini_sector)
+                    .map_err(|_error| {
+                        OleError::CorruptedFile("mini-sector index does not fit usize".to_string())
+                    })?
+                    .checked_mul(mini_sector_size)
+                    .and_then(|value| value.checked_add(within))
+                    .ok_or_else(|| {
+                        OleError::CorruptedFile("mini-sector offset overflow".to_string())
+                    })?;
+                let mini_end = mini_offset.checked_add(count).ok_or_else(|| {
+                    OleError::CorruptedFile("mini-sector range end overflow".to_string())
+                })?;
+                let root_size = usize::try_from(root.size).map_err(|_error| {
+                    OleError::CorruptedFile(
+                        "root mini-stream length does not fit usize".to_string(),
+                    )
+                })?;
+                if mini_end > root_size {
+                    return Err(OleError::CorruptedFile(
+                        "mini-sector range exceeds root mini stream".to_string(),
+                    ));
+                }
+                let root_ordinal = mini_offset / self.index.sector_size;
+                let root_within = mini_offset % self.index.sector_size;
+                let mut root_sector = root.start_sector;
+                for _ in 0..root_ordinal {
+                    root_sector = next_chain_sector(&self.index.fat, root_sector, "FAT")?;
+                    if root_sector == ENDOFCHAIN {
+                        return Err(OleError::CorruptedFile(
+                            "root FAT chain ends before mini-stream range".to_string(),
+                        ));
+                    }
+                }
+                let physical = (u64::from(root_sector) + 1)
+                    .checked_mul(self.index.sector_size as u64)
+                    .and_then(|value| value.checked_add(root_within as u64))
+                    .ok_or_else(|| {
+                        OleError::CorruptedFile(
+                            "mini-stream range physical offset overflow".to_string(),
+                        )
+                    })?;
+                self.source
+                    .read_exact_at(physical, &mut output[written..written + count])?;
+                written += count;
+                within = 0;
+                if written < output.len() {
+                    mini_sector = next_chain_sector(&self.index.minifat, mini_sector, "MiniFAT")?;
+                    if mini_sector == ENDOFCHAIN {
+                        return Err(OleError::CorruptedFile(
+                            "MiniFAT chain ends within stream range".to_string(),
+                        ));
+                    }
+                }
+            }
+        } else {
+            let sector_size = self.index.sector_size;
+            let mut sector = start_sector;
+            let first_ordinal = usize::try_from(offset / sector_size as u64).map_err(|_error| {
+                OleError::InvalidData("FAT range sector does not fit usize".to_string())
+            })?;
+            for _ in 0..first_ordinal {
+                sector = next_chain_sector(&self.index.fat, sector, "FAT")?;
+                if sector == ENDOFCHAIN {
+                    return Err(OleError::CorruptedFile(
+                        "FAT chain ends before stream range".to_string(),
+                    ));
+                }
+            }
+            let mut within = usize::try_from(offset % sector_size as u64).map_err(|_error| {
+                OleError::InvalidData("FAT range offset does not fit usize".to_string())
+            })?;
+            let mut written = 0_usize;
+            while written < output.len() {
+                let count = (sector_size - within).min(output.len() - written);
+                let physical = (u64::from(sector) + 1)
+                    .checked_mul(sector_size as u64)
+                    .and_then(|value| value.checked_add(within as u64))
+                    .ok_or_else(|| {
+                        OleError::CorruptedFile("FAT range physical offset overflow".to_string())
+                    })?;
+                self.source
+                    .read_exact_at(physical, &mut output[written..written + count])?;
+                written += count;
+                within = 0;
+                if written < output.len() {
+                    sector = next_chain_sector(&self.index.fat, sector, "FAT")?;
+                    if sector == ENDOFCHAIN {
+                        return Err(OleError::CorruptedFile(
+                            "FAT chain ends within stream range".to_string(),
+                        ));
+                    }
+                }
+            }
+        }
+        self.check_source_version()
     }
 
     pub(crate) fn check_source_version(&self) -> Result<(), OleError> {

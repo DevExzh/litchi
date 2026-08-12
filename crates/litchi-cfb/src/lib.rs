@@ -21,15 +21,17 @@ mod file;
 mod overlay;
 mod shared;
 mod shared_bulk;
+mod splice;
 pub mod writer;
 
 pub use file::{DirectoryEntry, OleError, OleFile, is_ole_file};
 pub use overlay::{
-    ArtifactFingerprint, OutputProgress, OverlayError, OverlayLimits, PublishReport,
-    SameLengthStreamOverlay, ValidatedOverlayPlan,
+    ArtifactFingerprint, ComposedOverlaySource, OutputProgress, OverlayError, OverlayLimits,
+    PublishReport, SameLengthStreamOverlay, ValidatedOverlayPlan,
 };
 pub use shared::{SharedOleFile, SharedOleFileLimits};
 pub use shared_bulk::{SharedOleBulkError, SharedOleBulkRead};
+pub use splice::{SameLengthStreamSplice, StreamSpliceLimits};
 pub use writer::OleWriter;
 
 #[cfg(test)]
@@ -38,3 +40,5 @@ mod allocation_validation_tests;
 mod directory_validation_tests;
 #[cfg(test)]
 mod overlay_tests;
+#[cfg(test)]
+mod splice_tests;

@@ -198,6 +198,13 @@ pub enum OverlayError {
         expected: ArtifactFingerprint,
         observed: ArtifactFingerprint,
     },
+    /// An expected stream-relative byte range did not match the source.
+    PreconditionFailed {
+        /// Selected logical stream.
+        path: Vec<String>,
+        /// Stream-relative start of the failed range.
+        offset: u64,
+    },
     /// The composed artifact identity differed from the validated plan.
     TargetFingerprintChanged {
         expected: ArtifactFingerprint,
@@ -235,6 +242,10 @@ impl std::fmt::Display for OverlayError {
             Self::SourceFingerprintChanged { .. } => {
                 formatter.write_str("CFB overlay source fingerprint changed")
             },
+            Self::PreconditionFailed { path, offset } => write!(
+                formatter,
+                "CFB stream splice precondition failed for {path:?} at byte {offset}"
+            ),
             Self::TargetFingerprintChanged { .. } => {
                 formatter.write_str("CFB overlay target fingerprint changed")
             },
@@ -265,6 +276,7 @@ impl std::error::Error for OverlayError {
             Self::Unavailable { .. }
             | Self::SourceChanged { .. }
             | Self::SourceFingerprintChanged { .. }
+            | Self::PreconditionFailed { .. }
             | Self::TargetFingerprintChanged { .. } => None,
         }
     }
@@ -288,14 +300,14 @@ impl From<io::Error> for OverlayError {
 }
 
 #[derive(Clone)]
-struct SourceSnapshot {
-    source: Arc<dyn ReadAt>,
-    version: SourceVersion,
-    length: u64,
+pub(crate) struct SourceSnapshot {
+    pub(crate) source: Arc<dyn ReadAt>,
+    pub(crate) version: SourceVersion,
+    pub(crate) length: u64,
 }
 
 impl SourceSnapshot {
-    fn ensure_current(&self) -> Result<(), OverlayError> {
+    pub(crate) fn ensure_current(&self) -> Result<(), OverlayError> {
         let observed = self.source.version()?;
         if observed == self.version {
             Ok(())
@@ -307,7 +319,7 @@ impl SourceSnapshot {
         }
     }
 
-    fn ensure_length(&self) -> Result<(), OverlayError> {
+    pub(crate) fn ensure_length(&self) -> Result<(), OverlayError> {
         self.ensure_current()?;
         let length = self.source.len()?;
         self.ensure_current()?;
@@ -323,7 +335,7 @@ impl SourceSnapshot {
         }
     }
 
-    fn read_exact(&self, offset: u64, output: &mut [u8]) -> Result<(), OverlayError> {
+    pub(crate) fn read_exact(&self, offset: u64, output: &mut [u8]) -> Result<(), OverlayError> {
         self.ensure_current()?;
         self.source.read_exact_at(offset, output)?;
         self.ensure_current()
@@ -331,18 +343,18 @@ impl SourceSnapshot {
 }
 
 #[derive(Clone)]
-struct PhysicalSpan {
-    offset: u64,
-    replacement: Arc<[u8]>,
-    replacement_range: Range<usize>,
+pub(crate) struct PhysicalSpan {
+    pub(crate) offset: u64,
+    pub(crate) replacement: Arc<[u8]>,
+    pub(crate) replacement_range: Range<usize>,
 }
 
 impl PhysicalSpan {
-    fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.replacement_range.len()
     }
 
-    fn end(&self) -> Result<u64, OverlayError> {
+    pub(crate) fn end(&self) -> Result<u64, OverlayError> {
         self.offset
             .checked_add(self.len() as u64)
             .ok_or_else(|| unavailable("physical span end overflows u64"))
@@ -368,6 +380,61 @@ pub struct ValidatedOverlayPlan {
     spans: Vec<PhysicalSpan>,
     source_fingerprint: ArtifactFingerprint,
     target_fingerprint: ArtifactFingerprint,
+}
+
+/// Immutable positional view of a fully validated composed overlay target.
+///
+/// The view keeps the source snapshot and replacement spans alive, performs no
+/// whole-artifact copy, and supports concurrent positional reads. Creating it
+/// through [`ValidatedOverlayPlan::composed_source`] rechecks both complete
+/// artifact fingerprints before returning it.
+#[derive(Clone)]
+pub struct ComposedOverlaySource {
+    source: SourceSnapshot,
+    spans: Arc<[PhysicalSpan]>,
+    version: SourceVersion,
+}
+
+impl std::fmt::Debug for ComposedOverlaySource {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ComposedOverlaySource")
+            .field("length", &self.source.length)
+            .field("changed_spans", &self.spans.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl ReadAt for ComposedOverlaySource {
+    fn len(&self) -> io::Result<u64> {
+        self.source.ensure_length().map_err(overlay_io_error)?;
+        Ok(self.source.length)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        if output.is_empty() || offset >= self.source.length {
+            self.source.ensure_length().map_err(overlay_io_error)?;
+            return Ok(0);
+        }
+        self.source.ensure_current().map_err(overlay_io_error)?;
+        let count = usize::try_from((self.source.length - offset).min(output.len() as u64))
+            .map_err(|_| io::Error::other("composed overlay range does not fit usize"))?;
+        let read = self.source.source.read_at(offset, &mut output[..count])?;
+        if read > count {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "positional source reported more bytes than requested",
+            ));
+        }
+        apply_spans(&mut output[..read], offset, &self.spans).map_err(overlay_io_error)?;
+        self.source.ensure_current().map_err(overlay_io_error)?;
+        Ok(read)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        self.source.ensure_length().map_err(overlay_io_error)?;
+        Ok(self.version)
+    }
 }
 
 impl std::fmt::Debug for ValidatedOverlayPlan {
@@ -536,6 +603,21 @@ impl ValidatedOverlayPlan {
         self.target_fingerprint
     }
 
+    /// Returns a checked, read-only positional view of the composed target.
+    ///
+    /// Planning has already reopened the complete candidate through the normal
+    /// CFB validator. This method additionally rechecks the complete source and
+    /// target fingerprints, so a stale or dishonest source adapter cannot hand
+    /// a caller an unvalidated view.
+    pub fn composed_source(&self) -> Result<ComposedOverlaySource, OverlayError> {
+        self.preflight_fingerprints()?;
+        Ok(composed_source(
+            self.source.clone(),
+            Arc::from(self.spans.clone()),
+            self.target_fingerprint,
+        ))
+    }
+
     /// Streams the complete composed artifact to a sequential sink.
     ///
     /// The full source and target fingerprints are rechecked before the first
@@ -671,6 +753,67 @@ impl ValidatedOverlayPlan {
             source_fingerprint: self.source_fingerprint,
             target_fingerprint: self.target_fingerprint,
         })
+    }
+}
+
+pub(crate) fn finish_overlay_plan<F>(
+    source: SourceSnapshot,
+    spans: Vec<PhysicalSpan>,
+    verify: F,
+) -> Result<ValidatedOverlayPlan, OverlayError>
+where
+    F: FnOnce(&SourceSnapshot, &SharedOleFile) -> Result<(), OverlayError>,
+{
+    let (source_fingerprint, target_fingerprint) = fingerprints(&source, &spans)?;
+    let view = composed_source(source.clone(), Arc::from(spans.clone()), target_fingerprint);
+    let candidate = SharedOleFile::open(Arc::new(view))?;
+    // Bracket caller-specific preconditions with complete fingerprints. This
+    // ties checked logical ranges to the same stable source bytes retained by
+    // the returned plan, even for adapters whose version token dishonestly
+    // remains unchanged while bytes mutate.
+    verify(&source, &candidate)?;
+    let (observed_source, observed_target) = fingerprints(&source, &spans)?;
+    if observed_source != source_fingerprint {
+        return Err(OverlayError::SourceFingerprintChanged {
+            expected: source_fingerprint,
+            observed: observed_source,
+        });
+    }
+    if observed_target != target_fingerprint {
+        return Err(OverlayError::TargetFingerprintChanged {
+            expected: target_fingerprint,
+            observed: observed_target,
+        });
+    }
+    Ok(ValidatedOverlayPlan {
+        source,
+        spans,
+        source_fingerprint,
+        target_fingerprint,
+    })
+}
+
+fn composed_source(
+    source: SourceSnapshot,
+    spans: Arc<[PhysicalSpan]>,
+    target: ArtifactFingerprint,
+) -> ComposedOverlaySource {
+    let digest = target.as_bytes();
+    let id = source.version.id()
+        ^ u64::from_le_bytes(digest[..8].try_into().expect("fixed digest prefix"));
+    let revision = source.version.revision()
+        ^ u64::from_le_bytes(digest[8..16].try_into().expect("fixed digest prefix"));
+    ComposedOverlaySource {
+        source,
+        spans,
+        version: SourceVersion::new(id, revision),
+    }
+}
+
+fn overlay_io_error(error: OverlayError) -> io::Error {
+    match error {
+        OverlayError::Io(source) => source,
+        other => io::Error::other(other.to_string()),
     }
 }
 
@@ -820,7 +963,7 @@ fn span_matches_source(
     Ok(true)
 }
 
-fn validate_and_coalesce_spans(
+pub(crate) fn validate_and_coalesce_spans(
     source: &SourceSnapshot,
     limits: OverlayLimits,
     spans: &mut Vec<PhysicalSpan>,
@@ -925,7 +1068,7 @@ fn fingerprints(
     ))
 }
 
-fn path_refs(path: &[String]) -> Result<Vec<&str>, OverlayError> {
+pub(crate) fn path_refs(path: &[String]) -> Result<Vec<&str>, OverlayError> {
     let mut refs = Vec::new();
     refs.try_reserve_exact(path.len())
         .map_err(|source| OverlayError::Allocation {
@@ -970,7 +1113,7 @@ fn apply_spans(bytes: &mut [u8], offset: u64, spans: &[PhysicalSpan]) -> Result<
     Ok(())
 }
 
-fn collect_chain_exact(
+pub(crate) fn collect_chain_exact(
     table: &[u32],
     start: u32,
     expected: usize,
@@ -1020,7 +1163,7 @@ fn collect_chain_exact(
     Ok(chain)
 }
 
-fn sector_offset(sector: u32, sector_size: usize) -> Result<u64, OverlayError> {
+pub(crate) fn sector_offset(sector: u32, sector_size: usize) -> Result<u64, OverlayError> {
     (u64::from(sector) + 1)
         .checked_mul(sector_size as u64)
         .ok_or_else(|| unavailable("physical sector offset overflow"))
@@ -1124,7 +1267,7 @@ fn strip_staging_progress(error: OverlayError) -> OverlayError {
     }
 }
 
-fn unavailable(reason: impl Into<String>) -> OverlayError {
+pub(crate) fn unavailable(reason: impl Into<String>) -> OverlayError {
     OverlayError::Unavailable {
         reason: reason.into(),
     }
