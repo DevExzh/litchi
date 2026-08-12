@@ -13,17 +13,17 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **151 selectable cases**: 36 default cases and 198 default
+harness contains **158 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in
 source-backed media-rich PPTX semantic publication case, four opt-in matched
 same-slide/multi-slide PPTX batch cases, six opt-in media-rich ODT
-paragraph/line-break/inline-run/hyperlink/insertion/removal publication cases, 18 opt-in matched XLSX
-calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation/auto-filter publication cases, 16 opt-in DOCX/PPTX
-semantic cases, nine opt-in RTF semantic case names across four
-capability-bounded variants (33 tiny / 58 tiny-plus-large rows), 23
+paragraph/line-break/inline-run/hyperlink/insertion/removal publication cases, 20 opt-in matched XLSX
+calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation/auto-filter/conditional-formatting publication cases, 16 opt-in DOCX/PPTX
+semantic cases, 13 opt-in RTF semantic case names across four
+capability-bounded variants (39 tiny / 70 tiny-plus-large rows), 24
 shape-selected ODT/ODS/ODP semantic cases, eight fixed media-rich ODF cases,
 and 21 opt-in native DOC/XLS/PPT semantic cases. It
 is still not broad program or CRUD coverage.
@@ -899,7 +899,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 151 selectable cases and a 198-record default
+The standalone harness provides 158 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus

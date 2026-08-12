@@ -3,7 +3,7 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0082`](changes/0082-xlsx-conditional-formatting-performance-evidence.md)
+[`change 0083`](changes/0083-rtf-paragraph-lifecycle-performance-evidence.md)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the

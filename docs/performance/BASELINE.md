@@ -220,7 +220,7 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **156
+The stage-1 records above are retained unchanged. The current harness has **158
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
@@ -231,8 +231,8 @@ PPTX batch cases, six opt-in media-rich ODT paragraph,
 line-break, inline-run, hyperlink, insertion, and removal publication cases,
 20 opt-in matched XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation/auto-filter/conditional-formatting
 publication cases, 16 opt-in DOCX/PPTX semantic
-cases, nine opt-in RTF semantic case names across four capability-bounded
-variants (33 tiny / 58 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
+cases, 13 opt-in RTF semantic case names across four capability-bounded
+variants (39 tiny / 70 tiny-plus-large rows), 24 shape-selected ODT/ODS/ODP
 semantic cases, eight fixed media-rich ODF cases, and 21 opt-in native
 DOC/XLS/PPT semantic cases. It remains an
 incomplete program and CRUD matrix.
@@ -367,6 +367,16 @@ incomplete program and CRUD matrix.
   checked outside timing. No latency claim is made before balanced ABBA
   evidence is retained; see
   [`0082`](changes/0082-xlsx-conditional-formatting-performance-evidence.md).
+- Native RTF middle-paragraph removal and first-to-final reordering now have
+  independently selectable cases over the same deterministic plain corpus.
+  Their intervals include edit/stage/commit, a constant-size diagnostics
+  assertion, one shared snapshot-handle clone and bounded serialization.
+  Full projection after reopen, volatile and durable forward/inverse replay,
+  stale conflict, exact equal-position move no-op, bounded sink counters and
+  output hashes are untimed gates. Changed CP-1252, LZFu, watermark and
+  opaque/formatted inputs remain fail-closed. This adds coverage only and
+  makes no latency or materialization claim; see
+  [`0083`](changes/0083-rtf-paragraph-lifecycle-performance-evidence.md).
 - Consecutive packaged ODT plain-text replacements now share one mutable
   candidate, content publication, reopen and compact audit while retaining
   ordinary scalar durable operations. The large 100-edit/save p50 falls from
