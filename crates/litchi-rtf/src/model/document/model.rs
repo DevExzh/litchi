@@ -135,6 +135,8 @@ pub struct RtfDocument<'a> {
     blocks: Vec<StyleBlock<'a>>,
     /// Total UTF-8 bytes across `blocks`, retained without flattening their text.
     text_len: usize,
+    /// Exact visible paragraph cardinality retained by the parser.
+    body_paragraph_count: usize,
     /// Unsupported syntax retained as bounded inert source fragments.
     opaque_nodes: Vec<crate::opaque::Node>,
     /// Original transport for byte-exact writes of immutable snapshots containing opaque syntax.
@@ -548,6 +550,7 @@ impl<'a> RtfDocument<'a> {
             color_table: parsed.color_table,
             blocks: owned_blocks,
             text_len,
+            body_paragraph_count: parsed.body_paragraph_count,
             opaque_nodes: parsed.opaque_nodes,
             preserved_source: None,
             ordinary_body_source_span,
@@ -1041,6 +1044,10 @@ impl<'a> RtfDocument<'a> {
 
     pub(crate) const fn retained_text_len(&self) -> usize {
         self.text_len
+    }
+
+    pub(crate) const fn retained_body_paragraph_count(&self) -> usize {
+        self.body_paragraph_count
     }
 
     pub(crate) fn plain_body_text_editability(&self) -> Result<(), &'static str> {

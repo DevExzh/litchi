@@ -11,7 +11,6 @@ struct Inner {
     model: RtfDocument<'static>,
     limits: ParseLimits,
     text: OnceLock<Box<str>>,
-    paragraph_count: OnceLock<usize>,
 }
 
 /// Immutable, cheap-to-share RTF document snapshot.
@@ -103,7 +102,6 @@ impl Document {
                 model,
                 limits,
                 text: OnceLock::new(),
-                paragraph_count: OnceLock::new(),
             }),
         }
     }
@@ -134,13 +132,10 @@ impl Document {
 
     /// Number of logical body paragraphs.
     ///
-    /// The value is derived at most once per snapshot.
+    /// The parser retains this exact value with the immutable snapshot.
     #[must_use]
     pub fn paragraph_count(&self) -> usize {
-        *self
-            .inner
-            .paragraph_count
-            .get_or_init(|| self.body().paragraphs().count())
+        self.inner.model.retained_body_paragraph_count()
     }
 
     /// Borrow the main text story through lazy semantic views.
@@ -374,6 +369,7 @@ mod tests {
     fn assert_nth_matches_repeated_next(source: &str) {
         let document = Document::parse(source).unwrap();
         let paragraphs = document.body().paragraphs().count();
+        assert_eq!(document.paragraph_count(), paragraphs);
         for index in 0..=paragraphs {
             let mut repeated = document.body().paragraphs();
             let mut expected = None;
@@ -405,7 +401,7 @@ mod tests {
     fn semantic_story_traversal_does_not_flatten_the_snapshot() {
         let document = Document::parse(r"{\rtf1 one\line two\par three}").unwrap();
         assert!(document.inner.text.get().is_none());
-        assert!(document.inner.paragraph_count.get().is_none());
+        assert_eq!(document.paragraph_count(), 2);
 
         let run_bytes: usize = document
             .body()
@@ -416,20 +412,20 @@ mod tests {
 
         assert_eq!(run_bytes, "onetwothree".len());
         assert!(document.inner.text.get().is_none());
-        assert!(document.inner.paragraph_count.get().is_none());
+        assert_eq!(document.paragraph_count(), 2);
     }
 
     #[test]
-    fn valid_paragraph_edit_does_not_count_the_remaining_story() {
+    fn valid_paragraph_edit_preserves_retained_count() {
         let document = Document::parse(r"{\rtf1 one\par two\par three}").unwrap();
-        assert!(document.inner.paragraph_count.get().is_none());
+        assert_eq!(document.paragraph_count(), 3);
 
         document
             .edit()
             .replace_paragraph_text(1, "changed")
             .unwrap();
 
-        assert!(document.inner.paragraph_count.get().is_none());
+        assert_eq!(document.paragraph_count(), 3);
     }
 
     #[test]

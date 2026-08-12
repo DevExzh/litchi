@@ -220,7 +220,7 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **128
+The stage-1 records above are retained unchanged. The current harness has **130
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
@@ -229,8 +229,8 @@ one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
 PPTX semantic publication case, one opt-in media-rich ODT
 paragraph-publication case, six opt-in matched XLSX calculation-metadata/page-break/page-margin
 publication cases, 16 opt-in DOCX/PPTX semantic
-cases, seven opt-in RTF semantic case names across four capability-bounded
-variants (25 tiny / 44 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
+cases, nine opt-in RTF semantic case names across four capability-bounded
+variants (33 tiny / 58 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
 semantic cases, three fixed media-rich ODF cases, and 21 opt-in native
 DOC/XLS/PPT semantic cases. It remains an
 incomplete program and CRUD matrix.
@@ -514,6 +514,12 @@ incomplete program and CRUD matrix.
   588 allocations over 20 edits disappear. Candidate parse/readback and every
   conservative fallback/refusal remain. See
   [`0048`](changes/0048-rtf-retained-body-source-span.md).
+- The RTF parser now retains exact visible body paragraph cardinality while it
+  admits the already bounded root-body paragraph boundaries. A cold public
+  count on the generated 10,000-paragraph story falls from 28.898 us to 20 ns
+  p50 (-99.93%); full validation, transport variants, enumeration and save/edit
+  paths remain. See
+  [`0069`](changes/0069-rtf-retained-paragraph-count.md).
 - ODT changed-operation compactness audits now share the already validated
   predecessor and candidate packages instead of allocating and copying three
   complete archives. The fixed 16 MiB-media paragraph edit/save improves

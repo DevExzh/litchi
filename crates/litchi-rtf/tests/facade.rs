@@ -36,6 +36,25 @@ fn assert_snapshot_traits<T: Clone + Send + Sync>() {}
 fn assert_borrowed_view_traits<T: Copy + Send + Sync>() {}
 
 #[test]
+fn retained_paragraph_count_matches_hidden_and_structural_content() {
+    for source in [
+        r"{\rtf1\par}",
+        r"{\rtf1\line}",
+        r"{\rtf1{\*\revtbl{A;}}visible{\deleted\revauthdel0 hidden\par} tail}",
+        r"{\rtf1{\header hidden\par header tail}visible\par tail}",
+        r"{\rtf1{\*\unknown hidden\par}visible\par tail}",
+        r"{\rtf1\trowd\cellx1000\intbl cell\cell\row visible\par tail}",
+    ] {
+        let document = Document::parse(source).unwrap();
+        assert_eq!(
+            document.paragraph_count(),
+            document.body().paragraphs().count(),
+            "retained paragraph count differed for {source:?}"
+        );
+    }
+}
+
+#[test]
 fn document_is_a_small_shared_snapshot() {
     assert_snapshot_traits::<Document>();
     assert_borrowed_view_traits::<litchi_rtf::font::Catalog<'static>>();

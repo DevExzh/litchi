@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "change": "0069-rtf-retained-paragraph-count",
+  "environment": {
+    "date": "2026-08-12",
+    "kernel": "Linux 6.8.0-101-generic x86_64",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "pinned_cpu": 2,
+    "rustc": "1.95.0 (59807616e 2026-04-14)"
+  },
+  "binaries": {
+    "control": {
+      "production_base": "6604dd0215227086a7a0ea4a2fbfd4d3fd77519a",
+      "sha256": "360e98a4209c570949fabaff4d1438a6accc8cbcdea44217e739fa85d993259d"
+    },
+    "candidate": {
+      "sha256": "383771bcf213ee05fa2ef02036aa2977b91475ddc62a3cd363ef2f292a028dc5"
+    },
+    "harness_source_identical": true
+  },
+  "corpus": {
+    "name": "rtf-semantic-plain-large",
+    "paragraphs": 10000,
+    "retained_blocks": 10000,
+    "visible_text_bytes": 499999,
+    "source_bytes": 540051,
+    "archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e"
+  },
+  "protocol": {
+    "order": ["before-a", "after-a", "after-b", "before-b"],
+    "headline_warmups_per_leg": 100,
+    "headline_samples_per_leg": 1000,
+    "pooled_samples_per_state": 2000,
+    "guard_warmups_per_leg": 50,
+    "guard_samples_per_leg": 500
+  },
+  "paragraph_count_ns": {
+    "before": {
+      "p50": 28898,
+      "mean": 30302.071,
+      "mean_confidence_interval_95": [29731.588416508883, 30872.553583491117],
+      "p95": 36469,
+      "p99": 46532
+    },
+    "after": {
+      "p50": 20,
+      "mean": 27.0105,
+      "mean_confidence_interval_95": [26.075315406931903, 27.945684593068098],
+      "p95": 50,
+      "p99": 110
+    },
+    "delta_percent": {
+      "p50": -99.93079105820472,
+      "mean": -99.91086252817506,
+      "p95": -99.86289725520305,
+      "p99": -99.76360354164876
+    }
+  },
+  "paragraph_collection_guard_ns": {
+    "before": {
+      "p50": 61003,
+      "mean": 62806.796,
+      "p95": 71878,
+      "p99": 84013
+    },
+    "after": {
+      "p50": 60021,
+      "mean": 61748.259,
+      "p95": 69824,
+      "p99": 80438
+    },
+    "delta_percent": {
+      "p50": -1.609756897201775,
+      "mean": -1.6853860846523738,
+      "p95": -2.8576198558668886,
+      "p99": -4.255293823574924
+    }
+  },
+  "large_plain_guards_delta_percent": {
+    "rtf_semantic_open": {"p50": 2.041132334839535, "mean": 2.7947487336721366, "p95": 8.912532769231296, "p99": -22.05895024806489},
+    "rtf_semantic_list_paragraphs": {"p50": -0.24180455283429048, "mean": -1.1735526201868574, "p95": -1.250223254152527, "p99": 2.061140876142442},
+    "rtf_semantic_one_paragraph": {"p50": 0.8996851102114345, "mean": 0.30874116731642864, "p95": -4.490169181527204, "p99": 10.094764433093628},
+    "rtf_semantic_full_text": {"p50": -3.328859060402689, "mean": 1.2210531336941166, "p95": 3.3624096026243278, "p99": 10.532184185149474},
+    "rtf_semantic_stream_save": {"p50": -3.0716479748553516, "mean": -2.4993510394341723, "p95": -4.6614253106771475, "p99": -6.6037382477431965},
+    "rtf_semantic_noop_edit_save": {"p50": -10.80552576799344, "mean": -9.93445511892167, "p95": -12.0, "p99": -1.4910717532821804},
+    "rtf_semantic_one_edit_save": {"p50": 0.900186414015236, "mean": 1.3748870406198321, "p95": 3.399952135215911, "p99": 9.826665597269347}
+  },
+  "heaptrack_100_samples": {
+    "allocation_calls": {"before": 4087128, "after": 4087128},
+    "temporary_allocations": {"before": 1020414, "after": 1020415},
+    "peak_heap_megabytes": {"before": 14.30, "after": 14.30},
+    "heaptrack_inclusive_rss_megabytes": {"before": 25.96, "after": 26.04},
+    "leaked_bytes": {"before": 544, "after": 544}
+  },
+  "gnu_time_1000_samples": {
+    "maximum_rss_kib": {
+      "before": [30976, 30848],
+      "after": [30976, 30976]
+    }
+  },
+  "perf_stat_three_repeats": {
+    "task_clock_ms": {"before": 3030.18, "after": 3073.38},
+    "cycles": {"before": 14900719593, "after": 15150195051},
+    "instructions": {"before": 67870619235, "after": 67062297204},
+    "branches": {"before": 14870238554, "after": 14735512785},
+    "branch_misses": {"before": 6664971, "after": 6870738},
+    "cache_references": {"before": 1559335547, "after": 1499216870},
+    "cache_misses": {"before": 58393790, "after": 55229322},
+    "cpu_migrations": {"before": 0, "after": 0}
+  },
+  "perf_record_5000_samples": {
+    "lost_samples": {"before": 0, "after": 0},
+    "paragraphs_next_exclusive_percent": {"before": 0.99, "after": 0.23},
+    "note": "Whole-process profiles include corpus generation, parsing, and complete untimed verification; the after profile still traverses paragraphs during verification."
+  }
+}

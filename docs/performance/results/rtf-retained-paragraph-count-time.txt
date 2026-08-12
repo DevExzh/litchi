@@ -1,0 +1,7 @@
+Uninstrumented GNU Time, 10 warmups and 1,000 large-plain paragraph-count samples per process.
+
+State     Leg  User s  System s  Elapsed s  Maximum RSS KiB  Minor faults  Major faults
+before    A      3.00      0.05       3.05            30976         15008             0
+after     A      3.03      0.05       3.06            30976         15014             0
+after     B      2.92      0.04       2.95            30976         15008             0
+before    B      3.06      0.05       3.09            30848         15024             0

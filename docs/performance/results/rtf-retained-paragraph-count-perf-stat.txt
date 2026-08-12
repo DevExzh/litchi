@@ -1,0 +1,14 @@
+Three process-wide `perf stat` repeats per state, pinned to CPU 2, with 10 warmups and 1,000 large-plain paragraph-count samples.
+
+Counter                 Before          After
+task clock (ms)          3030.18         3073.38
+cycles                   14900719593     15150195051
+instructions             67870619235     67062297204
+branches                 14870238554     14735512785
+branch misses            6664971         6870738
+cache references         1559335547      1499216870
+cache misses             58393790        55229322
+page faults              14925           14925
+CPU migrations           0               0
+
+These whole-process counters include deterministic corpus construction, 1,010 complete parses, and full verification, so they dilute the 29-microsecond scoped query removal. Instructions, branches, cache references, and cache misses fall; task clock/cycles and branch misses remain within 3.1%.

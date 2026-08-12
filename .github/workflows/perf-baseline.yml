@@ -474,7 +474,7 @@ jobs:
           cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
             --warmup 0 \
             --samples 1 \
-            --case rtf_semantic_open,rtf_semantic_list_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save \
+            --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save \
             --semantic-shape tiny \
             --rtf-variant plain,byte1252,lzfu,watermark \
             --json target/perf/rtf-semantic-smoke.json
@@ -487,8 +487,8 @@ jobs:
           assert report["configuration"]["rtf_variants"] == [
               "plain", "byte1252", "lzfu", "watermark"
           ]
-          assert len(report["results"]) == 25
-          assert len({item["case"] for item in report["results"]}) == 7
+          assert len(report["results"]) == 33
+          assert len({item["case"] for item in report["results"]}) == 9
           assert len({
               (item["case"], item["corpus"]["rtf_variant"], item["corpus"]["shape"])
               for item in report["results"]
@@ -890,7 +890,7 @@ jobs:
         run: |
           cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
             --samples 15 \
-            --case rtf_semantic_open,rtf_semantic_list_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save \
+            --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save \
             --semantic-shape tiny,large \
             --rtf-variant plain,byte1252,lzfu,watermark \
             --json target/perf/rtf-semantic-baseline.json
@@ -903,12 +903,12 @@ jobs:
           assert report["configuration"]["rtf_variants"] == [
               "plain", "byte1252", "lzfu", "watermark"
           ]
-          assert len(report["results"]) == 44
-          assert len({item["case"] for item in report["results"]}) == 7
+          assert len(report["results"]) == 58
+          assert len({item["case"] for item in report["results"]}) == 9
           assert len({
               (item["case"], item["corpus"]["rtf_variant"], item["corpus"]["shape"])
               for item in report["results"]
-          }) == 44
+          }) == 58
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 15
               assert item["corpus"]["archive_sha256"]

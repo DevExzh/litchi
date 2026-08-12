@@ -1,0 +1,15 @@
+Command: perf record -F 999 -g -- target/perf/frozen/rtf-paragraph-count-after-working --warmup 10 --samples 5000 --semantic-shape large --rtf-variant plain --case rtf_semantic_paragraph_count
+
+Event: cycles:P
+Samples: 14,917
+Lost samples: 0
+
+Exclusive overhead  Samples  Symbol
+18.87%              2814     __memmove_avx512_unaligned_erms
+13.69%              2041     litchi_rtf::codec::lexer::codec::lexer::Lexer::tokenize_with_spans
+7.12%               1062     litchi_rtf::api::story::Paragraph::to_text
+4.25%                633     litchi_perf_baseline::verify_semantic_rtf
+0.23%                 35     <litchi_rtf::api::story::Paragraphs as Iterator>::next
+
+The remaining paragraph traversal belongs to complete untimed verification.
+Kernel symbols were restricted; user-space symbols resolved and no samples were lost.

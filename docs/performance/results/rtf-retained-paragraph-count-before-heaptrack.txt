@@ -1,0 +1,8 @@
+Command: target/perf/frozen/rtf-paragraph-count-before-6604dd021 --warmup 0 --samples 100 --semantic-shape large --rtf-variant plain --case rtf_semantic_paragraph_count
+
+total runtime: 1.092000s
+calls to allocation functions: 4087128
+temporary memory allocations: 1020414
+peak heap memory consumption: 14.30M
+peak RSS (including heaptrack overhead): 25.96M
+total memory leaked: 544B

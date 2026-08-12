@@ -13,7 +13,7 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **128 selectable cases**: 36 default cases and 198 default
+harness contains **130 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
@@ -21,8 +21,8 @@ one opt-in source-backed DOCX semantic publication case, one opt-in
 source-backed media-rich PPTX semantic publication case, one opt-in media-rich ODT
 paragraph-publication case, six opt-in matched XLSX
 calculation-metadata/page-break/page-margin publication cases, 16 opt-in DOCX/PPTX
-semantic cases, seven opt-in RTF semantic case names across four
-capability-bounded variants (25 tiny / 44 tiny-plus-large rows), 23
+semantic cases, nine opt-in RTF semantic case names across four
+capability-bounded variants (33 tiny / 58 tiny-plus-large rows), 23
 shape-selected ODT/ODS/ODP semantic cases, three fixed media-rich ODF cases,
 and 21 opt-in native DOC/XLS/PPT semantic cases. It
 is still not broad program or CRUD coverage.
@@ -44,6 +44,7 @@ is still not broad program or CRUD coverage.
 | RTF semantic baseline and text paths | Medium/large full-text p50 **-38.39% / -27.08%**; one-edit/save **-33.40% / -25.79%** | Generated native RTF text corpus; open guard +0.96% / +3.41%; formatting/media/security matrices remain missing |
 | RTF retained story length | Large paragraph-list p50 **-15.04%**, mean **-13.71%**; middle-paragraph p50 **-27.19%**, mean **-25.23%** | Already-open generated 10,000-block story queries only; exact parser-derived length, all allocation/peak-heap/RSS metrics flat, and open/full-text/save/no-op guards remain within 5% |
 | RTF sparse paragraph selection | Large middle-paragraph p50 **-47.87%**, mean **-47.95%**, p95 **-49.42%** | Explicit `Paragraphs::nth` only; remains linear and allocation-free, constructs the selected view once, preserves iterator state/formatting, and leaves open/list/full-text/save/edit guards within policy |
+| RTF retained paragraph cardinality | Large public paragraph-count p50 **-99.93%**, mean **-99.91%**, p95 **-99.83%** | Exact visible body count is retained only after full parser validation; allocation calls and peak heap are flat, collection p50 improves 1.96%, and open/list/read/save/edit guard p50/mean stay within policy |
 | ODT shared transaction bytes | Medium/large no-op edit-save p50 **-27.05% / -18.51%**; exactly two allocations and one archive copy removed per snapshot | Existing-document snapshot handoff only; changed edit/save and open guardrails remain within 3%; changed publication still rewrites the package |
 | ODT consuming full-text blocks | Repeated large full-text p50 **-3.25%**, mean **-4.81%**; allocation calls **-15.48%**, temporary allocations **-45.52%** | Private full-text mode only; structured queries remain near neutral; unchanged open +3.94% p50/+4.17% mean and +10.95% p99 disclosed |
 | ODT indexed paragraph selector | Large middle-paragraph p50 **-48.56%**, mean **-48.33%**; allocation calls **-27.05%**; peak heap **-24.74%**; RSS **-10.93%** | Complete XML/limit validation remains; retains one paragraph, excludes headings from the index, and leaves the established list path neutral |
@@ -452,6 +453,13 @@ state for the already-open middle-paragraph query. Reverse-order read/save,
 variant verification, allocation, RSS and process-wide profile records are
 indexed in [`change 0066`](changes/0066-rtf-sparse-paragraph-nth.md).
 
+The retained RTF paragraph-cardinality evidence pools two 1,000-sample legs
+per state for a cold public count query and separately guards complete
+collection. Seven large read/save/edit cases use 1,000 samples per state;
+allocation, heap, RSS, `perf stat`, `perf record`, variant verification and
+binary provenance are indexed in
+[`change 0069`](changes/0069-rtf-retained-paragraph-count.md).
+
 The DOC PAPX-containment evidence pools five balanced pairs for both the
 already-open snapshot paragraph list and complete one-edit/save path, retaining
 every sample in the
@@ -540,6 +548,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | RTF bounded body-block reservation, one paragraph edit/save | 5.585 ms | 5.503 ms | **-1.46% p50 / -1.75% mean** | p95 -1.87%, p99 -4.11%; complete candidate parse/readback unchanged |
 | RTF paragraph list, already-open 10,000-block story | 29.692 us | 25.225 us | **-15.04% p50 / -13.71% mean** | p95 -8.64%; reuses the parser-owned exact text length; allocations and peak heap/RSS flat |
 | RTF middle paragraph, already-open 10,000-block story | 18.926 us | 13.780 us | **-27.19% p50 / -25.23% mean** | p95 -14.46%; paragraph boundaries, formatting, exact no-op and complete verification unchanged |
+| RTF public paragraph count, already-open 10,000-block story | 28.898 us | 0.020 us | **-99.93% p50 / -99.91% mean** | p95 -99.86%; full parser validation retained; allocations and peak heap flat; collection p50 -1.61% |
 | ODT no-op edit/save, 10,000 paragraphs | 3.950 us | 3.219 us | -18.51% p50 / -29.58% mean | Exactly two allocations and one 28.42 KiB archive copy removed per snapshot; peak heap/RSS flat |
 | ODT full text, 10,000 blocks | 4.127 ms | 3.993 ms | **-3.25% p50 / -4.81% mean** | Allocation calls -15.48%, temporary allocations -45.52%; peak heap/RSS flat; open guard disclosed |
 | ODT middle paragraph, 10,000 paragraphs | 3.202 ms | 1.647 ms | **-48.56% p50 / -48.33% mean** | Allocation calls -27.05%; peak heap -24.74%; uninstrumented RSS -10.93%; complete EOF validation retained |
@@ -639,6 +648,7 @@ The underlying records are:
 - [`0066-rtf-sparse-paragraph-nth.md`](changes/0066-rtf-sparse-paragraph-nth.md)
 - [`0067-xlsx-source-backed-page-margin-publication.md`](changes/0067-xlsx-source-backed-page-margin-publication.md)
 - [`0068-ods-shared-worksheet-archive-handoff.md`](changes/0068-ods-shared-worksheet-archive-handoff.md)
+- [`0069-rtf-retained-paragraph-count.md`](changes/0069-rtf-retained-paragraph-count.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -780,7 +790,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 128 selectable cases and a 198-record default
+The standalone harness provides 130 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus

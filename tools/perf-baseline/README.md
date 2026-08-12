@@ -29,8 +29,8 @@ media-rich PPTX semantic publication case, one XLSX commit/read attribution case
 two matched XLSX calculation-metadata publication cases, two matched XLSX
 page-break publication cases, two matched XLSX page-margin publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
-DOCX/PPTX semantic cases, seven RTF semantic cases, and 26 ODF semantic cases
-are opt-in, for 128 selectable cases in total:
+DOCX/PPTX semantic cases, nine RTF semantic cases, and 26 ODF semantic cases
+are opt-in, for 130 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -254,24 +254,24 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/odt-media-paragraph-publication.json
 ```
 
-Run the backward-compatible plain tiny semantic RTF smoke matrix (seven
+Run the backward-compatible plain tiny semantic RTF smoke matrix (nine
 records):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 --semantic-shape tiny \
-  --case rtf_semantic_open,rtf_semantic_list_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save \
+  --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save \
   --json target/perf/semantic-rtf-smoke.json
 ```
 
 Select all transport and producer variants for the complete tiny RTF coverage
-matrix (25 records):
+matrix (33 records):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 --semantic-shape tiny \
   --rtf-variant plain,byte1252,lzfu,watermark \
-  --case rtf_semantic_open,rtf_semantic_list_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save \
+  --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save \
   --json target/perf/semantic-rtf-variants-smoke.json
 ```
 
@@ -718,8 +718,11 @@ remain distinguishable.
   shapes, and text. The public API has no save-to-sink method.
 - `rtf_semantic_open`: parse deterministic owned transport bytes through
   public `Document::from_bytes`.
+- `rtf_semantic_paragraph_count`: query the public exact paragraph cardinality.
+- `rtf_semantic_collect_paragraphs`: collect all lazy paragraph views so the
+  allocation behavior is guarded separately from traversal.
 - `rtf_semantic_list_paragraphs`, `rtf_semantic_one_paragraph`, and
-  `rtf_semantic_full_text`: enumerate lazy body paragraph views, resolve and
+  `rtf_semantic_full_text`: traverse lazy body paragraph views, resolve and
   flatten one middle paragraph, or materialize the snapshot's cached complete
   text for the first time.
 - `rtf_semantic_stream_save`: stream the immutable snapshot through public
