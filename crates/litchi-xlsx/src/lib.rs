@@ -123,6 +123,7 @@ pub mod smart_tags;
 pub mod sort;
 pub mod style;
 pub mod survey;
+pub mod tab_state;
 pub mod table;
 pub mod task_panes;
 pub mod threaded_comments;
