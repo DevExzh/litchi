@@ -432,6 +432,35 @@ fn creates_first_owner_in_existing_transitional_and_strict_settings() {
 }
 
 #[test]
+fn creates_first_owner_before_math_properties_without_rsids() {
+    let settings = format!(r#"<w:settings xmlns:w="{W}"><w:mathPr/></w:settings>"#);
+    let source_bytes = fixture(Fixture::transitional(settings.as_bytes()));
+    let package = open_source(source_bytes);
+    let mut edit = package.edit_document_variables().unwrap();
+    edit.set("first", "created").unwrap();
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    package
+        .publish_document_variables_commit_to_stream(&mut output, &commit)
+        .unwrap();
+
+    let opc = OpcPackage::from_bytes(&output).unwrap();
+    let settings = std::str::from_utf8(
+        opc.get_part(&PackURI::new(format!("/{SETTINGS}")).unwrap())
+            .unwrap()
+            .blob(),
+    )
+    .unwrap();
+    assert!(settings.find("<w:docVars>").unwrap() < settings.find("<w:mathPr/>").unwrap());
+
+    let reopened = Package::from_reader(io::Cursor::new(&output)).unwrap();
+    assert_eq!(
+        reopened.document_variables().unwrap().unwrap().get("first"),
+        Some("created")
+    );
+}
+
+#[test]
 fn absent_multiple_external_wrong_type_and_mce_settings_fail_closed() {
     let xml = variables_xml(W);
     for fixture_bytes in [
