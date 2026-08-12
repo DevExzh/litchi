@@ -36,9 +36,10 @@ two matched XLSX print-options publication cases,
 two matched XLSX sheet-protection publication cases,
 two matched XLSX data-validation publication cases,
 two matched XLSX auto-filter/sort-state publication cases,
+two matched XLSX conditional-formatting publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, 11 RTF semantic cases, and 32 ODF semantic cases
-are opt-in, for 154 selectable cases in total:
+are opt-in, for 156 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -310,6 +311,26 @@ path materializes the workbook catalog, selected worksheet, and styles Part.
 Complete typed readback, calculation metadata, topology, worksheet
 relationships, media, output hash, and sink bounds are verified outside
 timing.
+
+Measure the matched XLSX conditional-formatting publication controls on their
+fixed media-rich archive:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 \
+  --case xlsx_eager_conditional_formatting_edit_save,xlsx_source_backed_conditional_formatting_edit_save \
+  --json target/perf/xlsx-conditional-formatting-edit.json
+```
+
+Both paths replace the same complete ordered collection of three typed core
+conditional-formatting owners on `Sheet1` through the same worksheet rewriter.
+The eager control materializes all twelve ordinary Parts; the source-backed
+path materializes the workbook catalog, selected worksheet, and styles Part.
+Complete typed reopen, exact patch/inverse replay, calculation metadata,
+topology, worksheet relationships, all unselected Part/media payloads, raw ZIP
+members, output hash, source reads, and sequential-sink bounds are verified
+outside timing. This selectable evidence makes no latency claim until a
+balanced ABBA measurement is retained.
 
 For just the end-to-end legacy writer packaging runs:
 

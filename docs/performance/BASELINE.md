@@ -220,7 +220,7 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **151
+The stage-1 records above are retained unchanged. The current harness has **156
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
@@ -229,7 +229,7 @@ one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
 PPTX semantic publication case, four opt-in matched same-slide/multi-slide
 PPTX batch cases, six opt-in media-rich ODT paragraph,
 line-break, inline-run, hyperlink, insertion, and removal publication cases,
-18 opt-in matched XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation/auto-filter
+20 opt-in matched XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation/auto-filter/conditional-formatting
 publication cases, 16 opt-in DOCX/PPTX semantic
 cases, nine opt-in RTF semantic case names across four capability-bounded
 variants (33 tiny / 58 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
@@ -357,6 +357,16 @@ incomplete program and CRUD matrix.
   219.615 to 4.946 ms (-97.75%), instructions fall 73.57%, and semantic
   materializations fall 12 -> 3 with byte-identical output; see
   [`0080`](changes/0080-xlsx-source-backed-auto-filter-publication.md).
+- The guarded XLSX conditional-formatting editor now has selectable matched
+  eager/source-backed publication evidence over the same 12-Part, eight-media
+  corpus shape. Both paths replace the same complete three-owner typed core
+  collection through the same worksheet rewriter and produce byte-identical
+  output. The source-backed path materializes workbook, selected worksheet and
+  styles (12 -> 3); exact patch/inverse, complete reopen, all unselected Part
+  and media payloads, raw ZIP members, hashes, source reads and sink bounds are
+  checked outside timing. No latency claim is made before balanced ABBA
+  evidence is retained; see
+  [`0082`](changes/0082-xlsx-conditional-formatting-performance-evidence.md).
 - Consecutive packaged ODT plain-text replacements now share one mutable
   candidate, content publication, reopen and compact audit while retaining
   ordinary scalar durable operations. The large 100-edit/save p50 falls from
