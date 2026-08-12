@@ -4,19 +4,24 @@
 //! executable form behavior. Package mutation is owned by [`crate::edit`].
 
 use litchi_core::{Error, Result, xml::escape_xml};
+use litchi_odf_common::core::{AuthoredXmlFragment, XmlSourcePart, XmlSplicePublication};
 use litchi_odf_common::package::{
-    is_linked_href, rebuild_package, replace_content_xml, resolve_package_path, splice,
+    is_linked_href, rebuild_package, replace_content_xml, replace_content_xml_spliced,
+    resolve_package_path, splice,
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::cmp::Reverse;
+use std::collections::{BTreeMap as OrderedMap, BTreeSet as OrderedSet};
 
 const MAX_NAME_BYTES: usize = 4 * 1024;
 const MAX_TEXT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_CHILDREN: usize = 65_536;
 const MAX_XML_DEPTH: usize = 512;
+const MAX_CONTENT_XML_BYTES: usize = 128 * 1024 * 1024;
+const MAX_SCAN_EVENTS: usize = 1_000_000;
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const FORM_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:form:1.0";
@@ -25,6 +30,9 @@ const STYLE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const TABLE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const TEXT_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XLINK_NS: &[u8] = b"http://www.w3.org/1999/xlink";
+
+/// Maximum source-backed text-box models accepted by one atomic replacement batch.
+pub const MAX_TEXT_BOX_MODEL_REPLACEMENTS: usize = 256;
 
 #[derive(Clone)]
 pub(crate) struct ResourceDependency {
@@ -136,6 +144,9 @@ pub(crate) enum Operation {
         new_name: String,
         xml: String,
     },
+    ReplaceTextBoxModels {
+        replacements: Vec<OwnedTextBoxModelReplacement>,
+    },
     RemoveObject {
         kind: ObjectKind,
         name: String,
@@ -162,6 +173,33 @@ pub(crate) enum Operation {
     AddResources {
         resources: Vec<ResourceDependency>,
     },
+}
+
+#[derive(Clone)]
+pub(crate) enum OwnedPageSelector {
+    Index(usize),
+    Name(String),
+}
+
+#[derive(Clone)]
+pub(crate) struct OwnedTextBoxModelReplacement {
+    page: OwnedPageSelector,
+    name: String,
+    model: TextBoxModel,
+}
+
+impl OwnedTextBoxModelReplacement {
+    pub(crate) fn from_borrowed(value: TextBoxModelReplacement<'_>) -> Self {
+        let page = match value.page {
+            crate::charts::Page::Index(index) => OwnedPageSelector::Index(index),
+            crate::charts::Page::Name(name) => OwnedPageSelector::Name(name.to_string()),
+        };
+        Self {
+            page,
+            name: value.name.to_string(),
+            model: value.model.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -277,6 +315,60 @@ pub struct TextBoxModel {
     xml: String,
     paragraphs: usize,
     lists: usize,
+}
+
+/// One borrowed page/object/model tuple in an atomic text-box replacement batch.
+///
+/// The page and exact drawing name select an existing source owner. The model
+/// supplies the complete replacement frame and may retain producer-specific
+/// attributes and children that are outside the typed rich-text vocabulary.
+#[derive(Clone, Copy, Debug)]
+pub struct TextBoxModelReplacement<'a> {
+    page: crate::charts::Page<'a>,
+    name: &'a str,
+    model: &'a TextBoxModel,
+}
+
+impl<'a> TextBoxModelReplacement<'a> {
+    /// Build one replacement from a checked page selector and exact object name.
+    #[must_use]
+    pub const fn new(
+        page: crate::charts::Page<'a>,
+        name: &'a str,
+        model: &'a TextBoxModel,
+    ) -> Self {
+        Self { page, name, model }
+    }
+
+    /// Select an object by checked zero-based page position and exact name.
+    #[must_use]
+    pub const fn at(page: usize, name: &'a str, model: &'a TextBoxModel) -> Self {
+        Self::new(crate::charts::Page::Index(page), name, model)
+    }
+
+    /// Select an object by exact page name and exact object name.
+    #[must_use]
+    pub const fn on(page: &'a str, name: &'a str, model: &'a TextBoxModel) -> Self {
+        Self::new(crate::charts::Page::Name(page), name, model)
+    }
+
+    /// Page selector resolved against the immutable staged package.
+    #[must_use]
+    pub const fn page(self) -> crate::charts::Page<'a> {
+        self.page
+    }
+
+    /// Exact producer-visible drawing name of the existing owner.
+    #[must_use]
+    pub const fn name(self) -> &'a str {
+        self.name
+    }
+
+    /// Complete validated source-backed replacement model.
+    #[must_use]
+    pub const fn model(self) -> &'a TextBoxModel {
+        self.model
+    }
 }
 
 impl TextBoxModel {
@@ -2135,6 +2227,10 @@ fn resolve_package_href(base_path: &str, href: &str) -> Result<String> {
 }
 
 pub(crate) fn apply(source: &crate::core::OwnedPackage, operation: &Operation) -> Result<Vec<u8>> {
+    if let Operation::ReplaceTextBoxModels { replacements } = operation {
+        return apply_text_box_model_replacements(source, replacements)
+            .map(|(bytes, _changed)| bytes.unwrap_or_else(|| source.as_bytes().to_vec()));
+    }
     let content = String::from_utf8(source.get_file("content.xml")?)
         .map_err(|cause| Error::InvalidFormat(format!("ODP content.xml is not UTF-8: {cause}")))?;
     let (updated, resources) = match operation {
@@ -2153,6 +2249,9 @@ pub(crate) fn apply(source: &crate::core::OwnedPackage, operation: &Operation) -
             replace_object(&content, *kind, name, new_name, xml)?,
             Vec::new(),
         ),
+        Operation::ReplaceTextBoxModels { .. } => {
+            return invalid("ODP text-box batch dispatch reached an invalid internal state");
+        },
         Operation::RemoveObject { kind, name } => {
             (remove_object(&content, *kind, name)?, Vec::new())
         },
@@ -2199,6 +2298,748 @@ pub(crate) fn apply(source: &crate::core::OwnedPackage, operation: &Operation) -
         Vec::new(),
         Vec::new(),
     )
+}
+
+/// Apply one bounded text-box batch while preserving every unrelated package member.
+///
+/// `None` means every selected owner was an exact semantic no-op and the caller
+/// must retain its existing shared package allocation.
+pub(crate) fn apply_text_box_model_replacements(
+    source: &crate::core::OwnedPackage,
+    replacements: &[OwnedTextBoxModelReplacement],
+) -> Result<(Option<Vec<u8>>, usize)> {
+    let source_part = XmlSourcePart::load(source, "content.xml")?;
+    let content = std::str::from_utf8(source_part.bytes()).map_err(|source| {
+        Error::InvalidFormat(format!("ODP content.xml is not UTF-8: {source}"))
+    })?;
+    let staged = stage_text_box_model_replacements(content, replacements)?;
+    let Some(updated) = staged.updated else {
+        return Ok((None, 0));
+    };
+    let mut publication = XmlSplicePublication::new(source_part.clone());
+    for (span, replacement) in staged.edits {
+        let expected = content
+            .as_bytes()
+            .get(span.start..span.end)
+            .ok_or_else(|| Error::InvalidFormat("invalid ODP text-box splice span".into()))?;
+        publication.replace(
+            source_part.checked_range(span.start..span.end, expected)?,
+            AuthoredXmlFragment::markup(replacement.into_bytes())?,
+        )?;
+    }
+    crate::authoring::edit::validate_raw_preserved_xml_parts(source)?;
+    Ok((
+        Some(replace_content_xml_spliced(source, &updated, publication)?),
+        staged.changed,
+    ))
+}
+
+pub(crate) fn verify_text_box_model_replacements(
+    source: &crate::core::OwnedPackage,
+    replacements: &[OwnedTextBoxModelReplacement],
+) -> Result<()> {
+    let source_part = XmlSourcePart::load(source, "content.xml")?;
+    let content = std::str::from_utf8(source_part.bytes()).map_err(|source| {
+        Error::InvalidFormat(format!("ODP content.xml is not UTF-8: {source}"))
+    })?;
+    let wanted_names = replacements
+        .iter()
+        .map(|replacement| replacement.model.name.as_str())
+        .collect::<OrderedSet<_>>();
+    let scan = scan_text_box_batch(content, &wanted_names)?;
+    for replacement in replacements {
+        let page = resolve_page_from_scan(&scan, &replacement.page)?;
+        let key = (page, replacement.model.name.clone());
+        let owner = unique_batch_owner(&scan, &key, "readback")?;
+        let source_fragment = content
+            .get(owner.span.start..owner.span.end)
+            .ok_or_else(|| Error::InvalidFormat("invalid ODP text-box readback span".into()))?;
+        let detached =
+            materialize_namespace_declarations(source_fragment, owner.namespaces.clone())?;
+        let actual = parse_text_box_model(page, detached)?;
+        if actual != replacement.model {
+            return invalid("ODP text-box batch readback differs from the staged model");
+        }
+    }
+    Ok(())
+}
+
+struct BatchOwner {
+    page: usize,
+    name: String,
+    span: Span,
+    namespaces: Vec<(String, String)>,
+    root_local: Vec<u8>,
+    direct_children: usize,
+    direct_text_boxes: usize,
+    text_boxes: usize,
+    protected: bool,
+    processing_instruction: bool,
+}
+
+struct ActiveBatchOwner {
+    page: usize,
+    name: String,
+    start: usize,
+    depth: usize,
+    qualified: Vec<u8>,
+    namespaces: Vec<(String, String)>,
+    root_local: Vec<u8>,
+    direct_children: usize,
+    direct_text_boxes: usize,
+    text_boxes: usize,
+    protected: bool,
+    processing_instruction: bool,
+}
+
+struct BatchScan {
+    page_count: usize,
+    page_names: OrderedMap<String, Option<usize>>,
+    named: OrderedSet<(usize, String)>,
+    owners: OrderedMap<(usize, String), Option<BatchOwner>>,
+}
+
+struct ResolvedTextBoxEdit<'a> {
+    owner: &'a BatchOwner,
+    replacement: &'a OwnedTextBoxModelReplacement,
+}
+
+struct PlannedTextBoxEdit<'a> {
+    span: Span,
+    replacement: &'a str,
+    changed: bool,
+}
+
+struct StagedTextBoxBatch {
+    updated: Option<String>,
+    edits: Vec<(Span, String)>,
+    changed: usize,
+}
+
+fn stage_text_box_model_replacements(
+    content: &str,
+    replacements: &[OwnedTextBoxModelReplacement],
+) -> Result<StagedTextBoxBatch> {
+    if replacements.is_empty() {
+        return Ok(StagedTextBoxBatch {
+            updated: None,
+            edits: Vec::new(),
+            changed: 0,
+        });
+    }
+    if replacements.len() > MAX_TEXT_BOX_MODEL_REPLACEMENTS {
+        return invalid(format!(
+            "ODP text-box replacement count exceeds {MAX_TEXT_BOX_MODEL_REPLACEMENTS}"
+        ));
+    }
+    let mut wanted_names = OrderedSet::new();
+    let mut replacement_xml_bytes = 0usize;
+    for replacement in replacements {
+        validate_name(replacement.name.clone(), "text-box selector")?;
+        validate_name(replacement.model.name.clone(), "text-box replacement")?;
+        replacement_xml_bytes = replacement_xml_bytes
+            .checked_add(replacement.model.xml.len())
+            .ok_or_else(|| Error::InvalidFormat("ODP text-box batch size overflow".into()))?;
+        if replacement_xml_bytes > MAX_CONTENT_XML_BYTES {
+            return invalid("ODP text-box batch replacement XML exceeds 128 MiB");
+        }
+        wanted_names.insert(replacement.name.as_str());
+        wanted_names.insert(replacement.model.name.as_str());
+    }
+
+    let scan = scan_text_box_batch(content, &wanted_names)?;
+    let mut selected = OrderedSet::new();
+    let mut destination_names = OrderedSet::new();
+    let mut resolved = Vec::new();
+    resolved
+        .try_reserve_exact(replacements.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODP text-box batch edit plan",
+            source,
+        })?;
+
+    for replacement in replacements {
+        let page = resolve_page_from_scan(&scan, &replacement.page)?;
+        if replacement.model.page != page {
+            return invalid("ODP text-box replacement model belongs to a different page");
+        }
+        if !selected.insert((page, replacement.name.clone())) {
+            return invalid("ODP text-box batch contains a duplicate selector");
+        }
+        if !destination_names.insert((page, replacement.model.name.clone())) {
+            return invalid("ODP text-box batch contains duplicate destination names");
+        }
+        let key = (page, replacement.name.clone());
+        let owner = unique_batch_owner(&scan, &key, "selector")?;
+        resolved.push(ResolvedTextBoxEdit { owner, replacement });
+    }
+
+    for edit in &resolved {
+        let page = edit.owner.page;
+        let target = (page, edit.replacement.model.name.clone());
+        if scan.named.contains(&target) && !selected.contains(&target) {
+            return invalid(format!(
+                "ODP text-box destination name '{}' collides on page {page}",
+                edit.replacement.model.name
+            ));
+        }
+    }
+
+    resolved.sort_unstable_by_key(|edit| (edit.owner.span.start, edit.owner.span.end));
+    for pair in resolved.windows(2) {
+        if pair[0].owner.span.end > pair[1].owner.span.start {
+            return invalid("ODP text-box batch selections overlap");
+        }
+    }
+
+    let mut plans = Vec::new();
+    plans
+        .try_reserve_exact(replacements.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODP text-box batch validated plan",
+            source,
+        })?;
+    for edit in resolved {
+        let owner = edit.owner;
+        let replacement = edit.replacement;
+        let source_fragment = content
+            .get(owner.span.start..owner.span.end)
+            .ok_or_else(|| Error::InvalidFormat("invalid ODP text-box source span".into()))?;
+        let detached =
+            materialize_namespace_declarations(source_fragment, owner.namespaces.clone())?;
+        let current = parse_text_box_model(owner.page, detached)?;
+        let changed = current != replacement.model;
+        if changed {
+            if owner.root_local.as_slice() != b"frame"
+                || owner.direct_children != 1
+                || owner.direct_text_boxes != 1
+                || owner.text_boxes != 1
+            {
+                return invalid("ODP text-box batch requires a canonical direct draw:frame owner");
+            }
+            let replacement_has_pi = validate_canonical_text_box_fragment(
+                replacement.model.xml(),
+                replacement.model.name(),
+            )?;
+            if owner.protected {
+                return invalid("ODP text-box batch refuses a protected drawing owner");
+            }
+            if owner.processing_instruction || replacement_has_pi {
+                return invalid(
+                    "ODP text-box batch cannot prove lossless mutation around processing instructions",
+                );
+            }
+        }
+        plans.push(PlannedTextBoxEdit {
+            span: owner.span,
+            replacement: replacement.model.xml(),
+            changed,
+        });
+    }
+    let changed = plans.iter().filter(|plan| plan.changed).count();
+    if changed == 0 {
+        return Ok(StagedTextBoxBatch {
+            updated: None,
+            edits: Vec::new(),
+            changed: 0,
+        });
+    }
+    let updated = apply_text_box_plans(content, &plans)?;
+    let edits = plans
+        .into_iter()
+        .filter(|plan| plan.changed)
+        .map(|plan| (plan.span, plan.replacement.to_string()))
+        .collect();
+    Ok(StagedTextBoxBatch {
+        updated: Some(updated),
+        edits,
+        changed,
+    })
+}
+
+fn apply_text_box_plans(content: &str, plans: &[PlannedTextBoxEdit<'_>]) -> Result<String> {
+    let mut removed = 0usize;
+    let mut added = 0usize;
+    for plan in plans.iter().filter(|plan| plan.changed) {
+        removed = removed
+            .checked_add(plan.span.end - plan.span.start)
+            .ok_or_else(|| {
+                Error::InvalidFormat("ODP text-box removed-byte count overflow".into())
+            })?;
+        added = added
+            .checked_add(plan.replacement.len())
+            .ok_or_else(|| Error::InvalidFormat("ODP text-box added-byte count overflow".into()))?;
+    }
+    let capacity = content
+        .len()
+        .checked_sub(removed)
+        .and_then(|size| size.checked_add(added))
+        .ok_or_else(|| Error::InvalidFormat("ODP text-box output size overflow".into()))?;
+    if capacity > MAX_CONTENT_XML_BYTES {
+        return invalid("ODP text-box batch output exceeds 128 MiB");
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|source| Error::Allocation {
+            resource: "ODP text-box batch output",
+            source,
+        })?;
+    let mut cursor = 0usize;
+    for plan in plans.iter().filter(|plan| plan.changed) {
+        if plan.span.start < cursor || plan.span.end > content.len() {
+            return invalid("ODP text-box batch source range is invalid");
+        }
+        output.push_str(&content[cursor..plan.span.start]);
+        output.push_str(plan.replacement);
+        cursor = plan.span.end;
+    }
+    output.push_str(&content[cursor..]);
+    debug_assert_eq!(output.len(), capacity);
+    Ok(output)
+}
+
+fn resolve_page_from_scan(scan: &BatchScan, selector: &OwnedPageSelector) -> Result<usize> {
+    match selector {
+        OwnedPageSelector::Index(index) if *index < scan.page_count => Ok(*index),
+        OwnedPageSelector::Index(_) => invalid("ODP text-box page index is out of bounds"),
+        OwnedPageSelector::Name(name) => match scan.page_names.get(name) {
+            Some(Some(index)) => Ok(*index),
+            Some(None) => invalid("ODP text-box page name is ambiguous"),
+            None => invalid("ODP text-box page name did not match"),
+        },
+    }
+}
+
+fn unique_batch_owner<'a>(
+    scan: &'a BatchScan,
+    key: &(usize, String),
+    context: &str,
+) -> Result<&'a BatchOwner> {
+    match scan.owners.get(key) {
+        Some(Some(owner)) => Ok(owner),
+        Some(None) => invalid(format!(
+            "ODP text-box batch {context} '{}' is ambiguous on page {}",
+            key.1, key.0
+        )),
+        None => invalid(format!(
+            "ODP text-box batch {context} '{}' did not match page {}",
+            key.1, key.0
+        )),
+    }
+}
+
+fn scan_text_box_batch(content: &str, wanted_names: &OrderedSet<&str>) -> Result<BatchScan> {
+    if content.len() > MAX_CONTENT_XML_BYTES {
+        return invalid("ODP content.xml exceeds the 128 MiB text-box batch limit");
+    }
+    let mut reader = NsReader::from_str(content);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut events = 0usize;
+    let mut namespace_stack = Vec::<Vec<(String, String)>>::new();
+    let mut protection_stack = Vec::<bool>::new();
+    let mut page_count = 0usize;
+    let mut page_names = OrderedMap::new();
+    let mut named_owner_count = 0usize;
+    let mut named = OrderedSet::new();
+    let mut owners = OrderedMap::new();
+    let mut current_page: Option<(usize, usize, Vec<u8>)> = None;
+    let mut active = Vec::<ActiveBatchOwner>::new();
+
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("ODP text-box scan event overflow".into()))?;
+        if events > MAX_SCAN_EVENTS {
+            return invalid("ODP text-box scan exceeds one million XML events");
+        }
+        let start = usize::try_from(reader.buffer_position()).map_err(|source| {
+            Error::InvalidFormat(format!(
+                "ODP text-box position does not fit usize: {source}"
+            ))
+        })?;
+        let (resolved, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|source| Error::InvalidFormat(format!("invalid ODP content XML: {source}")))?;
+        let namespace = resolved_namespace(&resolved).map(<[u8]>::to_vec);
+        drop(resolved);
+        let end = usize::try_from(reader.buffer_position()).map_err(|source| {
+            Error::InvalidFormat(format!(
+                "ODP text-box position does not fit usize: {source}"
+            ))
+        })?;
+
+        match event {
+            Event::Start(element) => {
+                let local = element.local_name().as_ref().to_vec();
+                account_batch_child(&mut active, depth, namespace.as_deref(), &local)?;
+                let local_namespaces = element_namespace_declarations(&reader, &element)?;
+                let protected = effective_batch_protection(
+                    &reader,
+                    &element,
+                    namespace.as_deref(),
+                    protection_stack.last().copied().unwrap_or(false),
+                )?;
+                if namespace.as_deref() == Some(DRAW_NS) && local.as_slice() == b"page" {
+                    if current_page.is_some() {
+                        return invalid("ODP text-box batch found nested presentation pages");
+                    }
+                    if page_count >= MAX_CHILDREN {
+                        return invalid("ODP text-box batch exceeds the page limit");
+                    }
+                    let page = page_count;
+                    page_count += 1;
+                    let name = read_attribute(&reader, &element, DRAW_NS, b"name")?;
+                    record_batch_page_name(&mut page_names, name, page);
+                    current_page = Some((page, depth, element.name().as_ref().to_vec()));
+                } else if let Some((page, _, _)) = current_page.as_ref()
+                    && namespace.as_deref() == Some(DRAW_NS)
+                    && let Some(name) = read_attribute(&reader, &element, DRAW_NS, b"name")?
+                {
+                    if named_owner_count >= MAX_CHILDREN {
+                        return invalid("ODP text-box batch exceeds the named-owner limit");
+                    }
+                    named_owner_count += 1;
+                    named.insert((*page, name.clone()));
+                    if wanted_names.contains(name.as_str()) {
+                        active.push(ActiveBatchOwner {
+                            page: *page,
+                            name,
+                            start,
+                            depth,
+                            qualified: element.name().as_ref().to_vec(),
+                            namespaces: merged_namespace_declarations(
+                                &namespace_stack,
+                                &local_namespaces,
+                            ),
+                            root_local: local,
+                            direct_children: 0,
+                            direct_text_boxes: 0,
+                            text_boxes: 0,
+                            protected,
+                            processing_instruction: false,
+                        });
+                    }
+                }
+                namespace_stack.push(local_namespaces);
+                protection_stack.push(protected);
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormat("ODP text-box depth overflow".into()))?;
+                if depth > MAX_XML_DEPTH {
+                    return invalid("ODP text-box batch exceeds the XML depth limit");
+                }
+            },
+            Event::Empty(element) => {
+                let local = element.local_name().as_ref().to_vec();
+                account_batch_child(&mut active, depth, namespace.as_deref(), &local)?;
+                let local_namespaces = element_namespace_declarations(&reader, &element)?;
+                let protected = effective_batch_protection(
+                    &reader,
+                    &element,
+                    namespace.as_deref(),
+                    protection_stack.last().copied().unwrap_or(false),
+                )?;
+                if namespace.as_deref() == Some(DRAW_NS) && local.as_slice() == b"page" {
+                    if current_page.is_some() {
+                        return invalid("ODP text-box batch found nested presentation pages");
+                    }
+                    if page_count >= MAX_CHILDREN {
+                        return invalid("ODP text-box batch exceeds the page limit");
+                    }
+                    let page = page_count;
+                    page_count += 1;
+                    let name = read_attribute(&reader, &element, DRAW_NS, b"name")?;
+                    record_batch_page_name(&mut page_names, name, page);
+                } else if let Some((page, _, _)) = current_page.as_ref()
+                    && namespace.as_deref() == Some(DRAW_NS)
+                    && let Some(name) = read_attribute(&reader, &element, DRAW_NS, b"name")?
+                {
+                    if named_owner_count >= MAX_CHILDREN {
+                        return invalid("ODP text-box batch exceeds the named-owner limit");
+                    }
+                    named_owner_count += 1;
+                    named.insert((*page, name.clone()));
+                    if wanted_names.contains(name.as_str()) {
+                        record_batch_owner(
+                            &mut owners,
+                            BatchOwner {
+                                page: *page,
+                                name,
+                                span: Span { start, end },
+                                namespaces: merged_namespace_declarations(
+                                    &namespace_stack,
+                                    &local_namespaces,
+                                ),
+                                root_local: local,
+                                direct_children: 0,
+                                direct_text_boxes: 0,
+                                text_boxes: 0,
+                                protected,
+                                processing_instruction: false,
+                            },
+                        );
+                    }
+                }
+            },
+            Event::End(element) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("ODP text-box depth underflow".into()))?;
+                while active.last().is_some_and(|owner| owner.depth == depth) {
+                    let owner = active.pop().ok_or_else(|| {
+                        Error::InvalidFormat("ODP text-box owner state disappeared".into())
+                    })?;
+                    if owner.qualified.as_slice() != element.name().as_ref() {
+                        return invalid("ODP text-box owner end tag does not match");
+                    }
+                    record_batch_owner(
+                        &mut owners,
+                        BatchOwner {
+                            page: owner.page,
+                            name: owner.name,
+                            span: Span {
+                                start: owner.start,
+                                end,
+                            },
+                            namespaces: owner.namespaces,
+                            root_local: owner.root_local,
+                            direct_children: owner.direct_children,
+                            direct_text_boxes: owner.direct_text_boxes,
+                            text_boxes: owner.text_boxes,
+                            protected: owner.protected,
+                            processing_instruction: owner.processing_instruction,
+                        },
+                    );
+                }
+                if current_page
+                    .as_ref()
+                    .is_some_and(|(_, page_depth, qualified)| {
+                        *page_depth == depth && qualified.as_slice() == element.name().as_ref()
+                    })
+                {
+                    current_page = None;
+                }
+                namespace_stack.pop().ok_or_else(|| {
+                    Error::InvalidFormat("ODP text-box namespace depth underflow".into())
+                })?;
+                protection_stack.pop().ok_or_else(|| {
+                    Error::InvalidFormat("ODP text-box protection depth underflow".into())
+                })?;
+            },
+            Event::PI(_) => {
+                for owner in &mut active {
+                    owner.processing_instruction = true;
+                }
+            },
+            Event::DocType(_) => return invalid("DTDs are not allowed in ODP text-box batches"),
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
+    }
+    if depth != 0
+        || !namespace_stack.is_empty()
+        || !protection_stack.is_empty()
+        || current_page.is_some()
+        || !active.is_empty()
+    {
+        return invalid("ODP text-box batch source XML is unterminated");
+    }
+    Ok(BatchScan {
+        page_count,
+        page_names,
+        named,
+        owners,
+    })
+}
+
+fn effective_batch_protection(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    namespace: Option<&[u8]>,
+    inherited: bool,
+) -> Result<bool> {
+    if inherited || namespace != Some(DRAW_NS) {
+        return Ok(inherited);
+    }
+    Ok(read_attribute(reader, element, DRAW_NS, b"protect")?
+        .is_some_and(|value| !value.trim().is_empty()))
+}
+
+fn record_batch_page_name(
+    page_names: &mut OrderedMap<String, Option<usize>>,
+    name: Option<String>,
+    page: usize,
+) {
+    if let Some(name) = name {
+        page_names
+            .entry(name)
+            .and_modify(|resolution| *resolution = None)
+            .or_insert(Some(page));
+    }
+}
+
+fn record_batch_owner(
+    owners: &mut OrderedMap<(usize, String), Option<BatchOwner>>,
+    owner: BatchOwner,
+) {
+    let key = (owner.page, owner.name.clone());
+    owners
+        .entry(key)
+        .and_modify(|resolution| *resolution = None)
+        .or_insert(Some(owner));
+}
+
+fn account_batch_child(
+    active: &mut [ActiveBatchOwner],
+    depth: usize,
+    namespace: Option<&[u8]>,
+    local: &[u8],
+) -> Result<()> {
+    for owner in active {
+        if depth == owner.depth + 1 {
+            owner.direct_children = owner
+                .direct_children
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormat("ODP direct-child count overflow".into()))?;
+            if namespace == Some(DRAW_NS) && local == b"text-box" {
+                owner.direct_text_boxes =
+                    owner.direct_text_boxes.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODP direct text-box count overflow".into())
+                    })?;
+            }
+        }
+        if depth > owner.depth && namespace == Some(DRAW_NS) && local == b"text-box" {
+            owner.text_boxes = owner
+                .text_boxes
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormat("ODP text-box count overflow".into()))?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_canonical_text_box_fragment(xml: &str, expected_name: &str) -> Result<bool> {
+    if xml.len() > MAX_TEXT_BYTES {
+        return invalid("ODP source-backed text-box XML exceeds 16 MiB");
+    }
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut direct_children = 0usize;
+    let mut direct_text_boxes = 0usize;
+    let mut text_boxes = 0usize;
+    let mut processing_instruction = false;
+    loop {
+        let (resolved, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|source| {
+                Error::InvalidFormat(format!("invalid ODP text-box replacement XML: {source}"))
+            })?;
+        let namespace = resolved_namespace(&resolved).map(<[u8]>::to_vec);
+        drop(resolved);
+        match event {
+            Event::Start(element) => {
+                if depth == 0 {
+                    if root_seen
+                        || root_closed
+                        || namespace.as_deref() != Some(DRAW_NS)
+                        || element.local_name().as_ref() != b"frame"
+                        || read_attribute(&reader, &element, DRAW_NS, b"name")?.as_deref()
+                            != Some(expected_name)
+                    {
+                        return invalid("ODP text-box replacement must be one named draw:frame");
+                    }
+                    root_seen = true;
+                } else {
+                    if depth == 1 {
+                        direct_children = direct_children.checked_add(1).ok_or_else(|| {
+                            Error::InvalidFormat("ODP replacement child count overflow".into())
+                        })?;
+                        if namespace.as_deref() == Some(DRAW_NS)
+                            && element.local_name().as_ref() == b"text-box"
+                        {
+                            direct_text_boxes += 1;
+                        }
+                    }
+                    if namespace.as_deref() == Some(DRAW_NS)
+                        && element.local_name().as_ref() == b"text-box"
+                    {
+                        text_boxes += 1;
+                    }
+                }
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODP replacement XML depth overflow".into())
+                })?;
+                if depth > MAX_XML_DEPTH {
+                    return invalid("ODP replacement XML exceeds the depth limit");
+                }
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    return invalid("ODP text-box replacement frame cannot be empty");
+                }
+                if depth == 1 {
+                    direct_children = direct_children.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODP replacement child count overflow".into())
+                    })?;
+                    if namespace.as_deref() == Some(DRAW_NS)
+                        && element.local_name().as_ref() == b"text-box"
+                    {
+                        direct_text_boxes += 1;
+                    }
+                }
+                if namespace.as_deref() == Some(DRAW_NS)
+                    && element.local_name().as_ref() == b"text-box"
+                {
+                    text_boxes += 1;
+                }
+            },
+            Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODP replacement XML depth underflow".into())
+                })?;
+                if depth == 0 {
+                    root_closed = true;
+                }
+            },
+            Event::Text(value) if depth == 0 && !value.iter().all(u8::is_ascii_whitespace) => {
+                return invalid("ODP text-box replacement has text outside its root");
+            },
+            Event::CData(_) if depth == 0 => {
+                return invalid("ODP text-box replacement has CDATA outside its root");
+            },
+            Event::PI(_) => processing_instruction = true,
+            Event::DocType(_) => return invalid("DTDs are not allowed in ODP text-box models"),
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
+    }
+    if !root_seen
+        || !root_closed
+        || depth != 0
+        || direct_children != 1
+        || direct_text_boxes != 1
+        || text_boxes != 1
+    {
+        return invalid("ODP text-box replacement is not a canonical direct text box");
+    }
+    Ok(processing_instruction)
 }
 
 fn apply_object_transfer(
