@@ -580,18 +580,29 @@ impl Edit {
     where
         F: FnOnce(&mut crate::worksheet::Edit) -> Result<()>,
     {
-        let snapshot = crate::worksheet::Snapshot::from_bytes(self.candidate.clone())?;
-        let mut edit = snapshot.edit();
-        update(&mut edit)?;
-        let commit = edit.commit()?;
-        if !commit.changed() {
+        let source = Arc::new(std::mem::take(&mut self.candidate));
+        let outcome: Result<Option<(Arc<Vec<u8>>, bool)>> = (|| {
+            let snapshot = crate::worksheet::Snapshot::from_shared_bytes(Arc::clone(&source))?;
+            let mut edit = snapshot.edit();
+            update(&mut edit)?;
+            let commit = edit.commit()?;
+            if !commit.changed() {
+                return Ok(None);
+            }
+            let provenance_spliced = commit.content_provenance_spliced();
+            Ok(Some((
+                commit.into_snapshot().into_shared_bytes(),
+                provenance_spliced,
+            )))
+        })();
+        self.candidate = take_shared_bytes(source);
+        let Some((candidate, provenance_spliced)) = outcome? else {
             return Ok(());
-        }
-        let candidate = commit.snapshot().as_bytes().to_vec();
-        if commit.content_provenance_spliced() {
-            self.stage_spliced("worksheet.edit", "worksheets", candidate)
+        };
+        if provenance_spliced {
+            self.stage_spliced_shared("worksheet.edit", "worksheets", candidate)
         } else {
-            self.stage("worksheet.edit", "worksheets", candidate)
+            self.stage_shared("worksheet.edit", "worksheets", candidate)
         }
     }
 
@@ -1612,8 +1623,12 @@ impl Edit {
     }
 
     fn stage(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> Result<()> {
+        self.stage_shared(op, target, Arc::new(candidate))
+    }
+
+    fn stage_shared(&mut self, op: &str, target: &str, candidate: Arc<Vec<u8>>) -> Result<()> {
         validate_package_size(candidate.len(), self.before.limits)?;
-        let effects = changed_effects(&self.candidate, &candidate)?;
+        let effects = changed_effects(&self.candidate, candidate.as_slice())?;
         if effects.is_empty() {
             return Ok(());
         }
@@ -1622,8 +1637,9 @@ impl Edit {
                 self.spliced_parts.remove(path);
             }
         }
-        let _candidate = Package::from_bytes(candidate.clone())?;
-        self.candidate = candidate;
+        let validated = Package::from_shared_bytes(Arc::clone(&candidate))?;
+        drop(validated);
+        self.candidate = take_shared_bytes(candidate);
         self.steps.push(Step {
             op: op.to_string(),
             target: target.to_string(),
@@ -1637,6 +1653,21 @@ impl Edit {
         self.spliced_parts.insert("content.xml".to_string());
         Ok(())
     }
+
+    fn stage_spliced_shared(
+        &mut self,
+        op: &str,
+        target: &str,
+        candidate: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        self.stage_shared(op, target, candidate)?;
+        self.spliced_parts.insert("content.xml".to_string());
+        Ok(())
+    }
+}
+
+fn take_shared_bytes(bytes: Arc<Vec<u8>>) -> Vec<u8> {
+    Arc::try_unwrap(bytes).unwrap_or_else(|shared| (*shared).clone())
 }
 
 /// A durable, exact-source, reversible unified package patch.

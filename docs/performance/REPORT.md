@@ -72,6 +72,7 @@ is still not broad program or CRUD coverage.
 | ODS unchanged-media publication | Media-rich one-cell edit/save p50 **-4.73%**, mean **-5.73%**, p95 **-7.65%**; peak heap **-8.78%** | Compact `content.xml` replacements in ordinary unsigned/unencrypted ZIPs; every unproved layout/member retains logical rebuild or comparison fallback |
 | ODS shared durable-patch blobs | Media-rich one-cell edit/save p50 **-8.80%**, mean **-9.07%**, p95 **-13.85%**; 33.58 MB copy site removed; peak heap **-1.92%** | Shares only already retained immutable source/target package bytes with the forward/reverse semantic bundles; patch wire, limits, final reopen and media verification remain |
 | ODS row-splice raw publication | Media-rich one-cell edit/save p50 **-74.16%**, mean **-74.17%**, p95 **-74.11%**; instructions **-69.04%**; peak heap/RSS flat | Same-topology compact row replacements only; exact checked range provenance reaches raw ZIP emission, while structural, signed/encrypted and unsupported layouts retain established fallback/policy |
+| ODS shared worksheet archive handoff | Media-rich one-cell edit/save p50 **-21.32%**, mean **-21.30%**, p95 **-21.15%**; peak heap **-22.03%**, RSS **-20.57%** | Private nested worksheet snapshot/package/unified staging only; exact source lineage, failure rollback, durable patches and final readback remain |
 | ODP content-only unchanged-media publication | Media-rich text-box edit/save p50 **-94.44%**, mean **-94.43%**, p95 **-94.29%**; allocation calls **+0.52%**; peak heap/RSS flat | Source-backed content-only operations reuse accepted checked-splice/raw-copy publication; resource additions and unsupported/security-sensitive layouts retain logical rebuild |
 | ODS exact no-op handoff | Large exact-no-op p50 **-23.26%**, mean **-23.21%**; instructions **-10.54%**; peak heap flat | Exact no-op only; changed commits retain complete audit, preservation and readback paths; read-only link-layout trigger disclosed |
 | ODP indexed slide selector | Large middle-slide p50 **-4.09%**, mean **-4.20%**, p95 **-5.18%**; allocation calls **-3.86%**; peak heap/RSS flat | Full style/content EOF validation remains; tiny is neutral, medium p50 -1.55%, and unchanged list/save guards remain within thresholds |
@@ -264,6 +265,13 @@ in the
 Tiny, medium and large ordinary CRUD distributions, matched profiles,
 counters, Heaptrack, GNU Time and exact binary provenance are indexed in
 [`change 0057`](changes/0057-ods-row-splice-raw-publication.md).
+
+The ODS shared worksheet-ownership evidence pools 2,000 ABBA/reverse-BAAB
+samples per state in the
+[`summary`](results/ods-worksheet-shared-ownership-summary.json). Large
+ordinary guards, matched Heaptrack/GNU Time/perf evidence, exact binary
+provenance, and the rejected 4.01% intermediate are indexed in
+[`change 0068`](changes/0068-ods-shared-worksheet-archive-handoff.md).
 
 The ODP content-only publication evidence is
 [`before A`](results/abba-odp-media-textbox-before-a.json),
@@ -516,6 +524,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | ODS media-rich one-cell edit/save, 2,048 cells + 16 MiB media | 325.902 ms | 310.472 ms | **-4.73% p50 / -5.73% mean** | p95 -7.65%; peak heap -8.78%; existing no-media guard p50 -0.77% |
 | ODS durable-patch sharing, 2,048 cells + 16 MiB media | 326.694 ms | 297.958 ms | **-8.80% p50 / -9.07% mean** | p95 -13.85%; redundant package SHA stack absent; 33.58 MB copy site removed; peak heap -1.92%; RSS flat |
 | ODS checked row-splice raw publication, 2,048 cells + 16 MiB media | 287.766 ms | 74.365 ms | **-74.16% p50 / -74.17% mean** | p95 -74.11%; instructions -69.04%; unchanged-media rebuild/deflate subtree absent; peak heap/RSS flat |
+| ODS shared worksheet archive handoff, 2,048 cells + 16 MiB media | 76.440 ms | 60.140 ms | **-21.32% p50 / -21.30% mean** | p95 -21.15%; peak heap -22.03%; uninstrumented RSS -20.57% |
 | ODP media-rich text-box edit/save, 12 slides + 16 MiB media | 227.606 ms | 12.665 ms | **-94.44% p50 / -94.43% mean** | p95 -94.29%; allocation calls +0.52%; peak heap/RSS flat |
 | ODS public cell sweep, 32,768 cells | 2.049 ms | 0.374 ms | **-81.74% p50 / -80.72% mean** | Lazy 3,216-byte dense index; peak heap/RSS flat; allocation calls +0.0004% process-wide |
 | ODS full cell text, 32,768 cells | 3.047 ms | 1.443 ms | **-52.65% p50 / -52.30% mean** | Existing string clones/join remain; lookup work only is indexed |
@@ -629,6 +638,7 @@ The underlying records are:
 - [`0065-odp-final-snapshot-handoff.md`](changes/0065-odp-final-snapshot-handoff.md)
 - [`0066-rtf-sparse-paragraph-nth.md`](changes/0066-rtf-sparse-paragraph-nth.md)
 - [`0067-xlsx-source-backed-page-margin-publication.md`](changes/0067-xlsx-source-backed-page-margin-publication.md)
+- [`0068-ods-shared-worksheet-archive-handoff.md`](changes/0068-ods-shared-worksheet-archive-handoff.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -721,6 +731,11 @@ remain linked from change 0023.
   source ranges through that raw package publisher. They no longer fall back
   to recompressing unchanged media merely because the flattened result cannot
   be rediscovered as one conservative maximal diff.
+- The adjacent unified ODS worksheet handoff now moves and shares its exact
+  archive allocation across nested worksheet snapshots, package parsing,
+  commit readback and candidate validation instead of repeatedly copying it.
+  Failure paths restore the original bytes and allocation; durable patch and
+  final validation boundaries are unchanged.
 - RTF first full-text materialization retains only a byte count during parse,
   then allocates the final string once and copies blocks in one pass instead of
   allocating and joining a temporary fragment vector.
@@ -854,6 +869,10 @@ The ODS row-provenance follow-up reduces the same media-rich edit/save p50
 and branch misses 94.07%; allocation calls fall 1.26%, while peak heap and
 uninstrumented RSS remain flat. Tiny/medium/large open, read and no-op p50
 guards remain within the 3% gate or improve.
+The ODS shared-worksheet ownership follow-up reduces the remaining media-rich
+transaction p50/mean/p95 by 21.32%/21.30%/21.15%. Peak heap falls 22.03%,
+uninstrumented RSS 20.57%, cache misses 23.50% and page faults 27.31%; large
+ordinary open/no-op/one-edit guards remain within 1.6%.
 Lock-wait evidence remains missing.
 
 ## Remaining highest-impact work

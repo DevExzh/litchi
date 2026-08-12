@@ -35,7 +35,7 @@ impl From<usize> for Selector<'_> {
 /// An immutable worksheet graph bound to exact ODS package bytes.
 #[derive(Clone)]
 pub struct Snapshot {
-    source: Arc<[u8]>,
+    source: Arc<Vec<u8>>,
     sheets: Arc<[Sheet]>,
 }
 
@@ -56,11 +56,15 @@ impl Snapshot {
     ///
     /// Returns an error when the package or worksheet graph is invalid.
     pub fn from_bytes(source: Vec<u8>) -> Result<Self> {
-        Self::from_arc(Arc::from(source))
+        Self::from_arc(Arc::new(source))
     }
 
-    fn from_arc(source: Arc<[u8]>) -> Result<Self> {
-        let package = Package::from_bytes(source.as_ref().to_vec())?;
+    pub(crate) fn from_shared_bytes(source: Arc<Vec<u8>>) -> Result<Self> {
+        Self::from_arc(source)
+    }
+
+    fn from_arc(source: Arc<Vec<u8>>) -> Result<Self> {
+        let package = Package::from_shared_bytes(Arc::clone(&source))?;
         Ok(Self {
             source,
             sheets: Arc::from(package.sheets()?),
@@ -268,7 +272,7 @@ impl Edit {
         if self.draft.as_slice() == self.before.sheets() {
             return Ok(Commit::unchanged(self.before));
         }
-        let package = Package::from_bytes(self.before.source.as_ref().to_vec())?;
+        let package = Package::from_shared_bytes(Arc::clone(&self.before.source))?;
         let row_local = super::package::try_replace_changed_rows_spliced(
             package.package(),
             self.before.sheets(),
@@ -330,8 +334,8 @@ impl Edit {
 /// An exact-source, reversible worksheet patch.
 #[derive(Clone)]
 pub struct Patch {
-    source: Arc<[u8]>,
-    target: Arc<[u8]>,
+    source: Arc<Vec<u8>>,
+    target: Arc<Vec<u8>>,
 }
 
 impl fmt::Debug for Patch {
@@ -352,7 +356,7 @@ impl Patch {
 
     #[must_use]
     pub fn is_applicable_to(&self, snapshot: &Snapshot) -> bool {
-        self.source.as_ref() == snapshot.as_bytes()
+        self.source.as_slice() == snapshot.as_bytes()
     }
 
     /// Apply this patch to its exact source snapshot.
@@ -428,6 +432,12 @@ impl Commit {
     }
 }
 
+impl Snapshot {
+    pub(crate) fn into_shared_bytes(self) -> Arc<Vec<u8>> {
+        self.source
+    }
+}
+
 fn select(sheets: &[Sheet], selector: Selector<'_>) -> Result<Option<usize>> {
     match selector {
         Selector::Position(position) => {
@@ -453,4 +463,43 @@ fn bounds(position: usize, length: usize) -> Error {
     Error::InvalidFormat(format!(
         "ODS worksheet position {position} is outside sheet count {length}"
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Builder, CellValue};
+
+    #[test]
+    fn snapshot_and_package_share_the_exact_archive_allocation() -> Result<()> {
+        let mut sheet = Sheet::new("Data")?;
+        sheet.set_cell(
+            0,
+            0,
+            Cell::new(CellValue::Text("before".to_string()), "before"),
+        )?;
+        let mut builder = Builder::new();
+        builder.add_sheet(sheet)?;
+        let source = builder.build()?;
+        let source_pointer = source.as_ptr();
+
+        let snapshot = Snapshot::from_bytes(source)?;
+        assert_eq!(snapshot.source.as_slice().as_ptr(), source_pointer);
+        let package = Package::from_shared_bytes(Arc::clone(&snapshot.source))?;
+        assert!(Arc::ptr_eq(&snapshot.source, &package.shared_bytes()));
+
+        let mut edit = snapshot.edit();
+        assert!(
+            edit.set_cell(
+                "Data",
+                0,
+                0,
+                Cell::new(CellValue::Text("after".to_string()), "after"),
+            )?
+            .is_some()
+        );
+        let commit = edit.commit()?;
+        assert!(commit.content_provenance_spliced());
+        Ok(())
+    }
 }

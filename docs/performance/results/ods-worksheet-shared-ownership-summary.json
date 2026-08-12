@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-12",
+  "production_base": "3341b965dba2039638b28afd370d4518bb7b0b3e",
+  "control_binary_sha256": "397121615aba9308a2f5fb3f9126ab5436a00bb3932945aaab276f7523c4b7b1",
+  "candidate_binary_sha256": "5115bb29f7f18324a8ab262757b7db01baf87d6519a0e42cb34de93161bfba82",
+  "environment": {
+    "cpu": "AMD EPYC 9575F VM",
+    "cpu_affinity": 2,
+    "kernel": "Linux 6.8.0-101-generic x86_64",
+    "rustc": "1.95.0 (59807616e 2026-04-14)",
+    "llvm": "22.1.2",
+    "allocator": "Rust system allocator"
+  },
+  "corpus": {
+    "generator": "litchi-ods-media-publication-v1",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "uncompressed_payload_bytes": 16887808,
+    "logical_cells": 2048,
+    "media_members": 8,
+    "media_member_bytes": 2097152,
+    "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02"
+  },
+  "protocol": {
+    "order": [
+      "before_a",
+      "after_a",
+      "after_b",
+      "before_b",
+      "after_c",
+      "before_c",
+      "before_d",
+      "after_d"
+    ],
+    "balanced_sequences": ["ABBA", "reverse-BAAB"],
+    "warmups_per_leg": 50,
+    "samples_per_leg": 500
+  },
+  "legs_ns": {
+    "before_a": {"p50": 75958382, "mean": 76298483.1659999, "p95": 79522709},
+    "after_a": {"p50": 59769347, "mean": 59990078.70000002, "p95": 62096727},
+    "after_b": {"p50": 59909605, "mean": 60133894.938000016, "p95": 62220184},
+    "before_b": {"p50": 75993540, "mean": 76306429.776, "p95": 79411931},
+    "after_c": {"p50": 60406491, "mean": 60691831.814, "p95": 63615909},
+    "before_c": {"p50": 76777290, "mean": 76991559.16, "p95": 79287592},
+    "before_d": {"p50": 77004555, "mean": 77216678.71199998, "p95": 79520848},
+    "after_d": {"p50": 60499252, "mean": 60641294.466000006, "p95": 62374799}
+  },
+  "pooled_ns": {
+    "before": {
+      "samples": 2000,
+      "p50": 76440421,
+      "mean": 76703287.7035,
+      "mean_ci95": [76626459.32682122, 76780116.08017878],
+      "p95": 79504163,
+      "p99": 83001595
+    },
+    "after": {
+      "samples": 2000,
+      "p50": 60140386,
+      "mean": 60364274.9795,
+      "mean_ci95": [60304794.98996851, 60423754.9690315],
+      "p95": 62686992,
+      "p99": 64755446
+    }
+  },
+  "rejected_intermediate": {
+    "binary_sha256": "e1ebd46b29ef736654bd7dbb64a8b22169af55dd93879ded7e0b32b52ebf8137",
+    "scope": "worksheet snapshot and patch owners only",
+    "samples_per_state": 2000,
+    "p50_ns": {"before": 76119709, "after": 73070460},
+    "mean_ns": {"before": 76337570.9945, "after": 72798699.885},
+    "p95_ns": {"before": 79424692, "after": 76063648},
+    "decision": "superseded because the 4.01% p50 improvement was below the 5% acceptance threshold"
+  },
+  "large_ordinary_guards_ns": {
+    "open": {
+      "before": {"p50": 47921572, "mean": 48107551.33, "p95": 50244055},
+      "after": {"p50": 47732775, "mean": 48203979.82, "p95": 50795947}
+    },
+    "list_sheets": {
+      "before": {"p50": 61, "mean": 80.76, "p95": 170},
+      "after": {"p50": 60, "mean": 60.15, "p95": 141}
+    },
+    "one_cell": {
+      "before": {"p50": 1842, "mean": 1878.56, "p95": 2644},
+      "after": {"p50": 1602, "mean": 1660.63, "p95": 2563}
+    },
+    "cell_sweep": {
+      "before": {"p50": 422565, "mean": 425484.19, "p95": 509464},
+      "after": {"p50": 371964, "mean": 379451.01, "p95": 423847}
+    },
+    "full_cell_text": {
+      "before": {"p50": 1546338, "mean": 1548487.04, "p95": 1713228},
+      "after": {"p50": 1422777, "mean": 1426049.1, "p95": 1528493}
+    },
+    "noop_edit_save": {
+      "before": {"p50": 49353115, "mean": 49875218.3, "p95": 51507189},
+      "after": {"p50": 49809921, "mean": 50089403.05, "p95": 52288669}
+    },
+    "one_edit_save": {
+      "before": {"p50": 322275829, "mean": 323343620.01, "p95": 333418281},
+      "after": {"p50": 324223908, "mean": 324516516.77, "p95": 333766298}
+    }
+  },
+  "heaptrack_one_sample": {
+    "allocation_calls": {"before": 382532, "after": 382522},
+    "temporary_allocations": {"before": 85601, "after": 85601},
+    "peak_heap_mib": {"before": 140.05, "after": 109.20},
+    "peak_rss_mib": {"before": 164.66, "after": 132.46},
+    "leaked_kib": {"before": 1.78, "after": 1.78}
+  },
+  "gnu_time_four_process_mean_max_rss_kib": {
+    "before": 156855,
+    "after": 124590
+  },
+  "perf_stat_two_warmups_ten_samples_two_process_mean": {
+    "before": {
+      "task_clock_ms": 1827.08,
+      "cpu_migrations": 1,
+      "page_faults": 351947.5,
+      "cycles": 8910150410.5,
+      "instructions": 18032191707.5,
+      "branches": 2756931634,
+      "branch_misses": 16125759.5,
+      "cache_references": 677382538,
+      "cache_misses": 44280936
+    },
+    "after": {
+      "task_clock_ms": 1613.57,
+      "cpu_migrations": 1,
+      "page_faults": 255826,
+      "cycles": 7956309021.5,
+      "instructions": 17388331834,
+      "branches": 2651812710,
+      "branch_misses": 15733254,
+      "cache_references": 550668615.5,
+      "cache_misses": 33874590.5
+    }
+  }
+}

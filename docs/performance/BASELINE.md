@@ -378,6 +378,13 @@ incomplete program and CRUD matrix.
   encryption-sensitive/unsupported ZIP layouts and structural edits retain
   the established fallback. See
   [`0057`](changes/0057-ods-row-splice-raw-publication.md).
+- The unified ODS worksheet handoff now moves its current `Vec` into the nested
+  worksheet's exact `Arc<Vec<u8>>` owner, shares that owner with the private ODF
+  package, and moves the validated target back out. The same media-rich
+  edit/save falls from 76.440 to 60.140 ms p50 (-21.32%); peak heap and
+  uninstrumented RSS fall 22.03%/20.57%. Exact failure rollback, patch/inverse,
+  final reopen and security/layout fallbacks remain. See
+  [`0068`](changes/0068-ods-shared-worksheet-archive-handoff.md).
 - Exact unified ODS worksheet no-ops now stop at the nested worksheet handoff
   and construct their empty durable patch without reopening and diffing the
   same package again. Large exact-no-op p50 falls 23.26%, instructions fall

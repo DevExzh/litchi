@@ -5,6 +5,7 @@ use litchi_odf_common::package::{
     replace_content_xml as replace_package_content_xml, replace_content_xml_spliced,
 };
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::model::names::Definition;
 
@@ -39,6 +40,13 @@ impl Package {
     /// Returns an error when the operation cannot be completed.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let package = family::Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS")?;
+        crate::authoring::validate_content_xml(package.content_xml())?;
+        Ok(Self(package))
+    }
+
+    /// Adopt shared ODS bytes for an internal source-bound transaction.
+    pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
+        let package = family::Package::from_shared_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS")?;
         crate::authoring::validate_content_xml(package.content_xml())?;
         Ok(Self(package))
     }
@@ -108,6 +116,11 @@ impl Package {
     /// runs into one object per logical row or cell.
     pub(crate) fn sheets(&self) -> Result<Vec<crate::worksheet::Sheet>> {
         crate::worksheet::codec::parse(self.content_xml())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn shared_bytes(&self) -> Arc<Vec<u8>> {
+        self.0.shared_bytes()
     }
 
     /// Rebuild this package with a replacement `content.xml`.
