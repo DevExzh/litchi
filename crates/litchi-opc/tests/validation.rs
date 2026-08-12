@@ -12,6 +12,8 @@ use litchi_core::{CheckStatus, OwnedSource, ReadAt, SourceVersion, ValidationLim
 use litchi_opc::{OpcError, ReadLimits, validate_read_at, validate_read_at_with_limits};
 
 const CONTENT_TYPES: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
+const EMPTY_CONTENT_TYPES: &[u8] =
+    br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>"#;
 const ROOT_RELS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
 
 fn package_bytes(content_types: &[u8], relationships: &[u8], payload: &[u8]) -> Vec<u8> {
@@ -37,7 +39,7 @@ fn phase_vector(report: &litchi_core::ValidateReport) -> Vec<String> {
     [
         "opc.package.ingress",
         "opc.package.catalog",
-        "opc.package.reachable_relationship_graph",
+        "opc.package.loaded_relationship_manifests",
         "opc.package.signature_presence",
     ]
     .into_iter()
@@ -49,6 +51,25 @@ fn phase_vector(report: &litchi_core::ValidateReport) -> Vec<String> {
         _ => "unknown".to_owned(),
     })
     .collect()
+}
+
+fn assert_structural_phase(bytes: Vec<u8>, check: &str, phases: [&str; 4]) {
+    let report = validate_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    assert!(report.has_errors());
+    assert_eq!(report.issues().len(), 1);
+    assert_eq!(report.issues()[0].check().as_str(), check);
+    assert_eq!(phase_vector(&report), phases);
+}
+
+fn assert_limit_phase(bytes: Vec<u8>, read_limits: ReadLimits, phases: [&str; 4]) {
+    let report = validate_read_at_with_limits(
+        Arc::new(OwnedSource::new(bytes)),
+        read_limits,
+        ValidationLimits::default(),
+    )
+    .unwrap();
+    assert!(report.issues().is_empty());
+    assert_eq!(phase_vector(&report), phases);
 }
 
 #[test]
@@ -83,7 +104,7 @@ fn malformed_content_types_and_relationships_are_conclusive_issues() {
         (
             package_bytes(CONTENT_TYPES, b"<Relationships>", b"document"),
             "opc.relationships.invalid",
-            "opc.package.reachable_relationship_graph",
+            "opc.package.loaded_relationship_manifests",
             ["complete", "blocked", "complete", "blocked"],
         ),
     ] {
@@ -99,6 +120,203 @@ fn malformed_content_types_and_relationships_are_conclusive_issues() {
         assert_eq!(report.issues()[0].check().as_str(), expected_check);
         assert_eq!(phase_vector(&report), expected_phases);
     }
+}
+
+#[test]
+fn parser_errors_and_invalid_uris_keep_exact_manifest_phase() {
+    let catalog_phases = ["complete", "complete", "blocked", "blocked"];
+    let relationship_phases = ["complete", "blocked", "complete", "blocked"];
+
+    let malformed_content_types = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml></Types>"#;
+    assert_structural_phase(
+        package_bytes(malformed_content_types, ROOT_RELS, b"document"),
+        "opc.package.catalog",
+        catalog_phases,
+    );
+    let invalid_content_type_uri = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="relative.xml" ContentType="application/xml"/></Types>"#;
+    assert_structural_phase(
+        package_bytes(invalid_content_type_uri, ROOT_RELS, b"document"),
+        "opc.package.catalog",
+        catalog_phases,
+    );
+
+    let malformed_relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test" Target="word/document.xml></Relationships>"#;
+    assert_structural_phase(
+        package_bytes(EMPTY_CONTENT_TYPES, malformed_relationships, b"document"),
+        "opc.package.loaded_relationship_manifests",
+        relationship_phases,
+    );
+    let invalid_relationship_uri = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test" Target="../escape.xml"/></Relationships>"#;
+    assert_structural_phase(
+        package_bytes(EMPTY_CONTENT_TYPES, invalid_relationship_uri, b"document"),
+        "opc.package.loaded_relationship_manifests",
+        relationship_phases,
+    );
+}
+
+#[test]
+fn shared_xml_limits_keep_content_type_and_relationship_phase() {
+    let catalog_phases = [
+        "complete",
+        "blocked",
+        "stopped_by:opc.package.catalog",
+        "blocked",
+    ];
+    let relationship_phases = ["complete", "blocked", "blocked", "blocked"];
+
+    for limits in [
+        ReadLimits::builder()
+            .max_xml_events(1)
+            .unwrap()
+            .build()
+            .unwrap(),
+        ReadLimits::builder()
+            .max_xml_depth(1)
+            .unwrap()
+            .build()
+            .unwrap(),
+        ReadLimits::builder()
+            .max_xml_attribute_bytes(8)
+            .unwrap()
+            .max_relationship_target_bytes(8)
+            .unwrap()
+            .build()
+            .unwrap(),
+    ] {
+        let content_types = if limits.max_xml_depth() == 1 {
+            br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Wrapper><Default Extension="xml" ContentType="application/xml"/></Wrapper></Types>"#.as_slice()
+        } else {
+            CONTENT_TYPES
+        };
+        assert_limit_phase(
+            package_bytes(content_types, ROOT_RELS, b"document"),
+            limits,
+            catalog_phases,
+        );
+    }
+
+    let relationship_documents: [(&[u8], ReadLimits); 3] = [
+        (
+            ROOT_RELS,
+            ReadLimits::builder()
+                .max_xml_events(2)
+                .unwrap()
+                .build()
+                .unwrap(),
+        ),
+        (
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Wrapper><Relationship Id="rId1" Type="urn:test" Target="word/document.xml"/></Wrapper></Relationships>"#,
+            ReadLimits::builder()
+                .max_xml_depth(1)
+                .unwrap()
+                .build()
+                .unwrap(),
+        ),
+        (
+            ROOT_RELS,
+            ReadLimits::builder()
+                .max_xml_attribute_bytes(8)
+                .unwrap()
+                .max_relationship_target_bytes(8)
+                .unwrap()
+                .build()
+                .unwrap(),
+        ),
+    ];
+    for (relationships, limits) in relationship_documents {
+        assert_limit_phase(
+            package_bytes(EMPTY_CONTENT_TYPES, relationships, b"document"),
+            limits,
+            relationship_phases,
+        );
+    }
+}
+
+#[test]
+fn loaded_relationship_capability_includes_admitted_unreferenced_parts() {
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    writer
+        .write_stored("[Content_Types].xml", CONTENT_TYPES)
+        .unwrap();
+    writer.write_stored("_rels/.rels", ROOT_RELS).unwrap();
+    writer
+        .write_stored("word/document.xml", b"document")
+        .unwrap();
+    writer.write_stored("custom/item.xml", b"item").unwrap();
+    writer
+        .write_stored("custom/_rels/item.xml.rels", b"<Relationships>")
+        .unwrap();
+
+    assert_structural_phase(
+        writer.finish_to_bytes().unwrap(),
+        "opc.package.loaded_relationship_manifests",
+        ["complete", "blocked", "complete", "blocked"],
+    );
+}
+
+#[test]
+fn physical_relationship_part_limits_belong_to_catalog_admission() {
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    writer
+        .write_stored("[Content_Types].xml", CONTENT_TYPES)
+        .unwrap();
+    writer.write_stored("_rels/.rels", ROOT_RELS).unwrap();
+    writer
+        .write_stored("word/document.xml", b"document")
+        .unwrap();
+    writer
+        .write_stored(
+            "orphan/_rels/missing.xml.rels",
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#,
+        )
+        .unwrap();
+
+    assert_limit_phase(
+        writer.finish_to_bytes().unwrap(),
+        ReadLimits::builder()
+            .max_relationship_parts(1)
+            .unwrap()
+            .build()
+            .unwrap(),
+        [
+            "complete",
+            "blocked",
+            "stopped_by:opc.package.catalog",
+            "blocked",
+        ],
+    );
+}
+
+#[test]
+fn relationship_part_source_topology_belongs_to_catalog_admission() {
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    writer
+        .write_stored("[Content_Types].xml", CONTENT_TYPES)
+        .unwrap();
+    writer.write_stored("_rels/.rels", ROOT_RELS).unwrap();
+    writer
+        .write_stored("word/document.xml", b"document")
+        .unwrap();
+    writer
+        .write_stored(
+            "word/_rels/_rels/document.xml.rels.rels",
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#,
+        )
+        .unwrap();
+
+    let report = validate_read_at(Arc::new(OwnedSource::new(
+        writer.finish_to_bytes().unwrap(),
+    )))
+    .unwrap();
+    assert!(report.has_errors());
+    assert_eq!(report.issues().len(), 1);
+    assert_eq!(report.issues()[0].check().as_str(), "opc.package.catalog");
+    assert_eq!(report.issues()[0].code(), "opc.catalog.invalid");
+    assert_eq!(report.issues()[0].locations()[0].path(), Some("catalog"));
+    assert_eq!(
+        phase_vector(&report),
+        ["complete", "complete", "blocked", "blocked"]
+    );
 }
 
 #[test]
@@ -233,7 +451,7 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
     .unwrap();
     assert!(relationships.issues().is_empty());
     assert!(matches!(
-        status(&relationships, "opc.package.reachable_relationship_graph"),
+        status(&relationships, "opc.package.loaded_relationship_manifests"),
         CheckStatus::Blocked { .. }
     ));
     assert_eq!(

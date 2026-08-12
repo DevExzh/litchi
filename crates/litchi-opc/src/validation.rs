@@ -2,10 +2,11 @@
 //!
 //! Validation reuses the source-backed package catalog. Ordinary part
 //! payloads stay in the positional source: only ZIP metadata,
-//! `[Content_Types].xml`, and relationship manifests reachable through the
-//! package graph are read. Unowned physical `.rels` members and ordinary part
-//! payloads are outside this report. It does not validate application XML,
-//! execute macros, fetch external targets, verify signatures, or offer repairs.
+//! `[Content_Types].xml`, and relationship manifests actually loaded while
+//! traversing package relationships and cataloguing admitted typed parts are
+//! read. Unloaded orphan physical `.rels` members and ordinary part payloads
+//! are outside this report. It does not validate application XML, execute
+//! macros, fetch external targets, verify signatures, or offer repairs.
 
 use std::io;
 use std::sync::{Arc, Mutex};
@@ -17,11 +18,12 @@ use litchi_core::{
 };
 
 use crate::constants::{content_type, relationship_type};
-use crate::{OpcError, ReadLimits, ReadResource, Result, SourceBackedPackage};
+use crate::pkgreader::ValidationCatalogPhase;
+use crate::{OpcError, ReadLimits, Result, SourceBackedPackage};
 
 const INGRESS: &str = "opc.package.ingress";
 const CATALOG: &str = "opc.package.catalog";
-const REACHABLE_RELATIONSHIPS: &str = "opc.package.reachable_relationship_graph";
+const LOADED_RELATIONSHIPS: &str = "opc.package.loaded_relationship_manifests";
 const SIGNATURE_PRESENCE: &str = "opc.package.signature_presence";
 
 /// Validate an immutable positional OPC source under the default finite read
@@ -37,9 +39,10 @@ pub fn validate_read_at(source: Arc<dyn ReadAt>) -> Result<ValidateReport> {
 
 /// Validate an immutable positional OPC source with explicit finite policies.
 ///
-/// `read_limits` bounds ZIP indexing, manifest parsing, relationship graph
-/// traversal, and all bytes read by OPC ingress. `report_limits` bounds the
-/// retained diagnostic value. No operation mutates the source.
+/// `read_limits` bounds ZIP indexing, content-type parsing, the relationship
+/// manifests loaded during catalog admission, and all bytes read by OPC
+/// ingress. `report_limits` bounds the retained diagnostic value. No operation
+/// mutates the source.
 pub fn validate_read_at_with_limits(
     source: Arc<dyn ReadAt>,
     read_limits: ReadLimits,
@@ -48,15 +51,19 @@ pub fn validate_read_at_with_limits(
     let expected = source.version()?;
     let tracked = Arc::new(ValidationSource::new(Arc::clone(&source)));
     let ingress_source: Arc<dyn ReadAt> = tracked.clone();
-    let ingress = SourceBackedPackage::from_read_at_with_limits(ingress_source, read_limits);
+    let ingress = SourceBackedPackage::from_read_at_for_validation(ingress_source, read_limits);
     if let Some(error) = tracked.take_error() {
         return Err(OpcError::IoError(error));
     }
     let report = match ingress {
         Ok(package) => successful_report(&package, report_limits),
-        Err(OpcError::ReadLimit { resource, .. }) => blocked_report(resource, report_limits),
-        Err(error) if is_structural_rejection(&error) => structural_report(&error, report_limits),
-        Err(error) => Err(error),
+        Err(failure) if matches!(failure.error, OpcError::ReadLimit { .. }) => {
+            blocked_report(failure.phase, report_limits)
+        },
+        Err(failure) if is_structural_rejection(&failure.error) => {
+            structural_report(&failure.error, failure.phase, report_limits)
+        },
+        Err(failure) => Err(failure.error),
     }?;
     let actual = source.version()?;
     if actual != expected {
@@ -128,24 +135,29 @@ fn successful_report(
     } else {
         CheckStatus::Complete
     };
-    let checks = vec![
+    let checks = [
         check(INGRESS, CheckStatus::Complete, limits)?,
         check(CATALOG, CheckStatus::Complete, limits)?,
-        check(REACHABLE_RELATIONSHIPS, CheckStatus::Complete, limits)?,
+        check(LOADED_RELATIONSHIPS, CheckStatus::Complete, limits)?,
         check(SIGNATURE_PRESENCE, signature_status, limits)?,
     ];
-    let issues = if signature_count == 0 {
-        Vec::new()
-    } else {
-        vec![signature_presence_issue(signature_count, limits)?]
-    };
-    Ok(ValidateReport::try_new(checks, issues, limits)?)
+    let issue = (signature_count != 0)
+        .then(|| signature_presence_issue(signature_count, limits))
+        .transpose()?;
+    #[allow(
+        clippy::useless_conversion,
+        reason = "explicit Option::into_iter keeps zero-or-one report assembly visible"
+    )]
+    Ok(ValidateReport::try_new(checks, issue.into_iter(), limits)?)
 }
 
-fn structural_report(error: &OpcError, limits: ValidationLimits) -> Result<ValidateReport> {
-    let phase = structural_phase(error);
+fn structural_report(
+    error: &OpcError,
+    phase: ValidationCatalogPhase,
+    limits: ValidationLimits,
+) -> Result<ValidateReport> {
     let checks = match phase {
-        StructuralPhase::Ingress => vec![
+        ValidationCatalogPhase::Ingress => [
             check(INGRESS, CheckStatus::Complete, limits)?,
             check(
                 CATALOG,
@@ -153,7 +165,7 @@ fn structural_report(error: &OpcError, limits: ValidationLimits) -> Result<Valid
                 limits,
             )?,
             check(
-                REACHABLE_RELATIONSHIPS,
+                LOADED_RELATIONSHIPS,
                 CheckStatus::blocked("ZIP ingress was structurally rejected", limits)?,
                 limits,
             )?,
@@ -163,13 +175,13 @@ fn structural_report(error: &OpcError, limits: ValidationLimits) -> Result<Valid
                 limits,
             )?,
         ],
-        StructuralPhase::Catalog => vec![
+        ValidationCatalogPhase::Catalog => [
             check(INGRESS, CheckStatus::Complete, limits)?,
             check(CATALOG, CheckStatus::Complete, limits)?,
             check(
-                REACHABLE_RELATIONSHIPS,
+                LOADED_RELATIONSHIPS,
                 CheckStatus::blocked(
-                    "catalog rejection prevented relationship-graph completion",
+                    "catalog rejection prevented loaded-relationship completion",
                     limits,
                 )?,
                 limits,
@@ -183,21 +195,21 @@ fn structural_report(error: &OpcError, limits: ValidationLimits) -> Result<Valid
                 limits,
             )?,
         ],
-        StructuralPhase::Relationships => vec![
+        ValidationCatalogPhase::LoadedRelationships => [
             check(INGRESS, CheckStatus::Complete, limits)?,
             check(
                 CATALOG,
                 CheckStatus::blocked(
-                    "relationship rejection prevented catalog completion",
+                    "loaded-relationship rejection prevented catalog completion",
                     limits,
                 )?,
                 limits,
             )?,
-            check(REACHABLE_RELATIONSHIPS, CheckStatus::Complete, limits)?,
+            check(LOADED_RELATIONSHIPS, CheckStatus::Complete, limits)?,
             check(
                 SIGNATURE_PRESENCE,
                 CheckStatus::blocked(
-                    "relationship rejection prevented signature-presence cataloging",
+                    "loaded-relationship rejection prevented signature-presence cataloging",
                     limits,
                 )?,
                 limits,
@@ -208,33 +220,16 @@ fn structural_report(error: &OpcError, limits: ValidationLimits) -> Result<Valid
     Ok(ValidateReport::try_new(checks, [issue], limits)?)
 }
 
-fn blocked_report(resource: ReadResource, limits: ValidationLimits) -> Result<ValidateReport> {
-    let (blocked, reason) = match resource {
-        ReadResource::InputBytes
-        | ReadResource::ArchiveMembers
-        | ReadResource::ArchiveMemberNameBytes
-        | ReadResource::ArchiveMetadataBytes
-        | ReadResource::ArchiveCompressedBytes
-        | ReadResource::ArchiveEntryBytes
-        | ReadResource::ArchiveTotalBytes => (INGRESS, "OPC ZIP ingress resource ceiling reached"),
-        ReadResource::ContentTypesBytes
-        | ReadResource::ContentTypeMappings
-        | ReadResource::Parts
-        | ReadResource::PartBytes
-        | ReadResource::TotalPartBytes => (CATALOG, "OPC catalog resource ceiling reached"),
-        ReadResource::RelationshipParts
-        | ReadResource::RelationshipXmlBytes
-        | ReadResource::TotalRelationshipXmlBytes
-        | ReadResource::RelationshipsPerPart
-        | ReadResource::TotalRelationships
-        | ReadResource::RelationshipGraphNodes
-        | ReadResource::XmlEvents
-        | ReadResource::TotalRelationshipXmlEvents
-        | ReadResource::XmlDepth
-        | ReadResource::XmlAttributeBytes
-        | ReadResource::RelationshipTargetBytes => (
-            REACHABLE_RELATIONSHIPS,
-            "OPC reachable-relationship resource ceiling reached",
+fn blocked_report(
+    phase: ValidationCatalogPhase,
+    limits: ValidationLimits,
+) -> Result<ValidateReport> {
+    let (blocked, reason) = match phase {
+        ValidationCatalogPhase::Ingress => (INGRESS, "OPC ZIP ingress resource ceiling reached"),
+        ValidationCatalogPhase::Catalog => (CATALOG, "OPC catalog resource ceiling reached"),
+        ValidationCatalogPhase::LoadedRelationships => (
+            LOADED_RELATIONSHIPS,
+            "OPC loaded-relationship resource ceiling reached",
         ),
     };
 
@@ -243,14 +238,14 @@ fn blocked_report(resource: ReadResource, limits: ValidationLimits) -> Result<Va
     } else {
         CheckStatus::Complete
     };
-    let catalog = if blocked == CATALOG || blocked == REACHABLE_RELATIONSHIPS {
+    let catalog = if blocked == CATALOG || blocked == LOADED_RELATIONSHIPS {
         CheckStatus::blocked(reason, limits)?
     } else if blocked == INGRESS {
         CheckStatus::stopped_by(id(INGRESS, limits)?)
     } else {
         CheckStatus::Complete
     };
-    let relationships = if blocked == REACHABLE_RELATIONSHIPS {
+    let relationships = if blocked == LOADED_RELATIONSHIPS {
         CheckStatus::blocked(reason, limits)?
     } else if blocked == INGRESS {
         CheckStatus::stopped_by(id(INGRESS, limits)?)
@@ -260,10 +255,10 @@ fn blocked_report(resource: ReadResource, limits: ValidationLimits) -> Result<Va
         CheckStatus::Complete
     };
     let signature = CheckStatus::blocked(reason, limits)?;
-    let checks = vec![
+    let checks = [
         check(INGRESS, ingress, limits)?,
         check(CATALOG, catalog, limits)?,
-        check(REACHABLE_RELATIONSHIPS, relationships, limits)?,
+        check(LOADED_RELATIONSHIPS, relationships, limits)?,
         check(SIGNATURE_PRESENCE, signature, limits)?,
     ];
     Ok(ValidateReport::try_new(checks, [], limits)?)
@@ -271,7 +266,7 @@ fn blocked_report(resource: ReadResource, limits: ValidationLimits) -> Result<Va
 
 fn structural_issue(
     error: &OpcError,
-    phase: StructuralPhase,
+    phase: ValidationCatalogPhase,
     limits: ValidationLimits,
 ) -> Result<ValidationIssue> {
     let (code, message, path) = match error {
@@ -294,11 +289,15 @@ fn structural_issue(
         | OpcError::InvalidRelationshipsManifest(_)
         | OpcError::DuplicateRelationshipId(_)
         | OpcError::InvalidRelationshipTargetMode(_)
-        | OpcError::RelationshipPartCannotBeSource(_)
         | OpcError::MultipleCorePropertiesRelationships => (
             "opc.relationships.invalid",
-            "A manifest in the reachable OPC relationship graph is structurally invalid.",
-            "reachable-relationship-graph",
+            "An OPC relationship manifest loaded for the package catalog is structurally invalid.",
+            "loaded-relationship-manifests",
+        ),
+        OpcError::RelationshipPartCannotBeSource(_) => (
+            "opc.catalog.invalid",
+            "The OPC physical part topology is structurally invalid.",
+            "catalog",
         ),
         OpcError::DuplicatePartName(_)
         | OpcError::EquivalentPartNames { .. }
@@ -346,39 +345,13 @@ fn structural_issue(
     .map_err(Into::into)
 }
 
-#[derive(Clone, Copy)]
-enum StructuralPhase {
-    Ingress,
-    Catalog,
-    Relationships,
-}
-
-impl StructuralPhase {
+impl ValidationCatalogPhase {
     const fn capability(self) -> &'static str {
         match self {
             Self::Ingress => INGRESS,
             Self::Catalog => CATALOG,
-            Self::Relationships => REACHABLE_RELATIONSHIPS,
+            Self::LoadedRelationships => LOADED_RELATIONSHIPS,
         }
-    }
-}
-
-fn structural_phase(error: &OpcError) -> StructuralPhase {
-    match error {
-        OpcError::ZipError(_)
-        | OpcError::QuickXmlError(_)
-        | OpcError::InvalidPackUri(_)
-        | OpcError::XmlError(_)
-        | OpcError::Utf8Error(_)
-        | OpcError::ParseIntError(_)
-        | OpcError::AttrError(_) => StructuralPhase::Ingress,
-        OpcError::InvalidRelationship(_)
-        | OpcError::InvalidRelationshipsManifest(_)
-        | OpcError::DuplicateRelationshipId(_)
-        | OpcError::InvalidRelationshipTargetMode(_)
-        | OpcError::RelationshipPartCannotBeSource(_)
-        | OpcError::MultipleCorePropertiesRelationships => StructuralPhase::Relationships,
-        _ => StructuralPhase::Catalog,
     }
 }
 
