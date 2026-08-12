@@ -14,6 +14,7 @@ use crate::part::PartFactory;
 use crate::pkgreader::{PackageReader, SerializedRelationship, SourceCatalog};
 use crate::rel::Relationships;
 use litchi_core::{ReadAt, SourceVersion};
+use sha2::{Digest as _, Sha256};
 use soapberry_zip::ReaderAt as ZipReaderAt;
 use soapberry_zip::office::{EntryId, IndexedArchive};
 use std::collections::HashMap;
@@ -182,6 +183,69 @@ struct SourceSnapshot {
     monitor_reads: Arc<std::sync::atomic::AtomicBool>,
 }
 
+/// Exact immutable source artifact retained for a later reversible restore.
+#[derive(Clone)]
+pub struct SourceArtifact {
+    snapshot: SourceSnapshot,
+}
+
+/// SHA-256 identity of an exact source artifact.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SourceArtifactFingerprint([u8; 32]);
+
+impl SourceArtifactFingerprint {
+    /// Construct from a completed SHA-256 digest.
+    #[must_use]
+    pub const fn from_sha256(digest: [u8; 32]) -> Self {
+        Self(digest)
+    }
+}
+
+impl SourceArtifact {
+    /// Hash the exact current artifact without materializing it.
+    pub fn fingerprint(&self) -> Result<SourceArtifactFingerprint> {
+        self.snapshot.ensure_current()?;
+        let mut hasher = Sha256::new();
+        let mut buffer = Vec::new();
+        buffer
+            .try_reserve_exact(SOURCE_PUBLICATION_CHUNK_BYTES)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source artifact fingerprint buffer",
+                source,
+            })?;
+        buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
+        let mut offset = 0_u64;
+        while offset < self.snapshot.length {
+            let remaining =
+                usize::try_from((self.snapshot.length - offset).min(buffer.len() as u64))
+                    .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
+            let read = self
+                .snapshot
+                .source
+                .read_at(offset, &mut buffer[..remaining])?;
+            validate_source_read_count(read, remaining, "fingerprinting")?;
+            if read == 0 {
+                return Err(OpcError::IoError(std::io::Error::new(
+                    std::io::ErrorKind::UnexpectedEof,
+                    "source-backed OPC source ended during fingerprinting",
+                )));
+            }
+            self.snapshot.ensure_current()?;
+            hasher.update(&buffer[..read]);
+            offset = offset
+                .checked_add(read as u64)
+                .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+        }
+        self.snapshot.ensure_current()?;
+        Ok(SourceArtifactFingerprint(hasher.finalize().into()))
+    }
+
+    /// Copy the retained source artifact exactly to a sequential sink.
+    pub fn write_to_stream<W: Write>(&self, writer: W) -> Result<()> {
+        write_exact_snapshot(&self.snapshot, writer)
+    }
+}
+
 impl SourceSnapshot {
     fn ensure_current(&self) -> Result<()> {
         let actual = self.source.version()?;
@@ -222,6 +286,15 @@ struct Counted<'count, W> {
 impl<W: Write> Write for Counted<'_, W> {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
         let written = self.inner.write(bytes)?;
+        if written > bytes.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "source-backed OPC sink reported {written} bytes for a {}-byte write",
+                    bytes.len()
+                ),
+            ));
+        }
         *self.written = self.written.saturating_add(written as u64);
         Ok(written)
     }
@@ -782,6 +855,21 @@ impl SourceBackedPackage {
         self.cache.diagnostics()
     }
 
+    /// Return the exact process-local source identity and revision captured at
+    /// open after verifying that the positional source is still current.
+    pub fn source_version(&self) -> Result<SourceVersion> {
+        self.source.ensure_current()?;
+        Ok(self.source.version)
+    }
+
+    /// Retain an O(1) handle to the exact immutable source artifact.
+    #[must_use]
+    pub fn source_artifact(&self) -> SourceArtifact {
+        SourceArtifact {
+            snapshot: self.source.clone(),
+        }
+    }
+
     /// Fully materialize this immutable view into the existing mutable package type.
     pub fn into_opc_package(self) -> Result<OpcPackage> {
         self.source.ensure_current()?;
@@ -1027,55 +1115,7 @@ impl SourceBackedPackage {
     }
 
     fn write_exact_source<W: Write>(self, writer: W) -> Result<()> {
-        self.source.monitor_publication();
-        self.source.ensure_current()?;
-        let mut buffer = Vec::new();
-        buffer
-            .try_reserve_exact(SOURCE_PUBLICATION_CHUNK_BYTES)
-            .map_err(|source| OpcError::Allocation {
-                resource: "source-backed OPC publication buffer",
-                source,
-            })?;
-        buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
-        let mut written = 0_u64;
-        let result = {
-            let counted = Counted {
-                inner: writer,
-                written: &mut written,
-            };
-            let mut sink = SourceCheckedSink {
-                inner: counted,
-                snapshot: self.source.clone(),
-            };
-            let mut offset = 0_u64;
-            (|| {
-                while offset < self.source.length {
-                    let remaining =
-                        usize::try_from((self.source.length - offset).min(buffer.len() as u64))
-                            .map_err(|_| {
-                                overlay_unavailable("source range does not fit this platform")
-                            })?;
-                    let read = self
-                        .source
-                        .source
-                        .read_at(offset, &mut buffer[..remaining])?;
-                    if read == 0 {
-                        return Err(OpcError::IoError(std::io::Error::new(
-                            std::io::ErrorKind::UnexpectedEof,
-                            "source-backed OPC source ended during publication",
-                        )));
-                    }
-                    self.source.ensure_current()?;
-                    sink.write_all(&buffer[..read])?;
-                    offset = offset
-                        .checked_add(read as u64)
-                        .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
-                }
-                sink.flush()?;
-                Ok(())
-            })()
-        };
-        finish_source_publication(result, &self.source, written)
+        write_exact_snapshot(&self.source, writer)
     }
 
     fn write_changed_overlays<W: Write>(
@@ -1358,6 +1398,65 @@ fn finish_source_publication(
     }
 }
 
+fn write_exact_snapshot<W: Write>(source: &SourceSnapshot, writer: W) -> Result<()> {
+    source.monitor_publication();
+    source.ensure_current()?;
+    let mut buffer = Vec::new();
+    buffer
+        .try_reserve_exact(SOURCE_PUBLICATION_CHUNK_BYTES)
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC publication buffer",
+            source,
+        })?;
+    buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
+    let mut written = 0_u64;
+    let result = {
+        let counted = Counted {
+            inner: writer,
+            written: &mut written,
+        };
+        let mut sink = SourceCheckedSink {
+            inner: counted,
+            snapshot: source.clone(),
+        };
+        let mut offset = 0_u64;
+        (|| {
+            while offset < source.length {
+                let remaining = usize::try_from((source.length - offset).min(buffer.len() as u64))
+                    .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
+                let read = source.source.read_at(offset, &mut buffer[..remaining])?;
+                validate_source_read_count(read, remaining, "publication")?;
+                if read == 0 {
+                    return Err(OpcError::IoError(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "source-backed OPC source ended during publication",
+                    )));
+                }
+                source.ensure_current()?;
+                sink.write_all(&buffer[..read])?;
+                offset = offset
+                    .checked_add(read as u64)
+                    .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+            }
+            sink.flush()?;
+            Ok(())
+        })()
+    };
+    finish_source_publication(result, source, written)
+}
+
+fn validate_source_read_count(read: usize, requested: usize, operation: &str) -> Result<()> {
+    if read <= requested {
+        return Ok(());
+    }
+    Err(OpcError::IoError(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!(
+            "source-backed OPC source reported {read} bytes for a {requested}-byte {operation} read"
+        ),
+    )))
+}
+
 fn is_signature_relationship(kind: &str) -> bool {
     matches!(
         kind,
@@ -1394,7 +1493,7 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
     use std::sync::Barrier;
-    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
     use std::time::Duration;
 
     struct CountingSource {
@@ -1437,6 +1536,61 @@ mod tests {
 
         fn version(&self) -> std::io::Result<SourceVersion> {
             Ok(SourceVersion::new(42, self.revision.load(Ordering::SeqCst)))
+        }
+    }
+
+    struct OverReportingSource {
+        bytes: Vec<u8>,
+        overreport: AtomicBool,
+    }
+
+    impl OverReportingSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes,
+                overreport: AtomicBool::new(false),
+            }
+        }
+    }
+
+    impl ReadAt for OverReportingSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            if self.overreport.load(Ordering::SeqCst) {
+                return Ok(output.len().saturating_add(1));
+            }
+            let offset = usize::try_from(offset).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "offset too large")
+            })?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(93, 0))
+        }
+    }
+
+    struct OverReportingSink {
+        calls: usize,
+        accepted: usize,
+    }
+
+    impl Write for OverReportingSink {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.calls = self.calls.saturating_add(1);
+            Ok(bytes.len().saturating_add(1))
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
         }
     }
 
@@ -1503,6 +1657,51 @@ mod tests {
             writer.write_stored("scratch.bin", b"not a part").unwrap();
         }
         writer.finish_to_bytes().unwrap()
+    }
+
+    #[test]
+    fn source_artifact_paths_reject_overreported_read_counts_without_output() {
+        let source = Arc::new(OverReportingSource::new(archive_bytes(
+            root_relationships(),
+            b"<before/>",
+            false,
+        )));
+        let read_at: Arc<dyn ReadAt> = source.clone();
+        let package = SourceBackedPackage::from_read_at(read_at).unwrap();
+        let artifact = package.source_artifact();
+        source.overreport.store(true, Ordering::SeqCst);
+
+        assert!(matches!(
+            artifact.fingerprint(),
+            Err(OpcError::IoError(error)) if error.kind() == std::io::ErrorKind::InvalidData
+        ));
+
+        let mut output = Vec::new();
+        assert!(matches!(
+            artifact.write_to_stream(&mut output),
+            Err(OpcError::IoError(error)) if error.kind() == std::io::ErrorKind::InvalidData
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn source_artifact_copy_rejects_overreporting_sink_without_false_progress() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"<before/>", false),
+        )))
+        .unwrap();
+        let artifact = package.source_artifact();
+        let mut sink = OverReportingSink {
+            calls: 0,
+            accepted: 0,
+        };
+
+        assert!(matches!(
+            artifact.write_to_stream(&mut sink),
+            Err(OpcError::IoError(error)) if error.kind() == std::io::ErrorKind::InvalidData
+        ));
+        assert_eq!(sink.calls, 1);
+        assert_eq!(sink.accepted, 0);
     }
 
     fn root_relationships() -> &'static [u8] {

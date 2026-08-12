@@ -19,6 +19,7 @@ litchi-core   = { workspace = true }
 litchi-sign   = { workspace = true, optional = true }
 memchr        = { workspace = true }
 quick-xml     = { workspace = true }
+sha2          = { workspace = true }
 smallvec      = { workspace = true }
 soapberry-zip = { workspace = true }
 tempfile      = { workspace = true }

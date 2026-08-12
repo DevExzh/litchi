@@ -1,4 +1,5 @@
 use super::{MAX_DOCUMENT_VARIABLE_VALUE_CHARS, Snapshot, Variables};
+use std::sync::Arc;
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const STRICT_W: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
@@ -39,6 +40,17 @@ fn source_checked_edits_are_canonical_and_inverse_is_byte_exact() {
 
     let stale = Snapshot::from_xml(source.replace("urn:opaque", "urn:other").into_bytes()).unwrap();
     assert!(commit.patch().apply(&stale).is_err());
+}
+
+#[test]
+fn exact_noop_shares_the_retained_settings_allocation() {
+    let source = format!(r#"<w:settings xmlns:w="{W}"/>"#);
+    let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+    let source_xml = snapshot.shared_xml();
+    let commit = snapshot.edit().commit().unwrap();
+
+    assert!(!commit.changed());
+    assert!(Arc::ptr_eq(&source_xml, &commit.snapshot().shared_xml()));
 }
 
 #[test]
@@ -116,4 +128,23 @@ fn complete_collection_replacement_validates_before_publication() {
     let commit = edit.commit().unwrap();
     assert_eq!(commit.patch().before().get("old"), Some("value"));
     assert_eq!(commit.patch().after().get("new"), Some("value"));
+}
+
+#[test]
+fn aggregate_encoded_output_is_rejected_before_publication() {
+    let source = format!(r#"<w:settings xmlns:w="{W}"/>"#);
+    let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+    let mut replacement = Variables::new();
+    for index in 0..129 {
+        replacement
+            .insert(
+                format!("v{index}"),
+                "&".repeat(MAX_DOCUMENT_VARIABLE_VALUE_CHARS),
+            )
+            .unwrap();
+    }
+    assert!(replacement.to_xml().is_err());
+    let mut edit = snapshot.edit();
+    edit.replace(replacement).unwrap();
+    assert!(edit.commit().is_err());
 }

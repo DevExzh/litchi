@@ -17,9 +17,11 @@ use crate::parts::document_part::{
 };
 use crate::sanitize::{self, RelationshipState};
 use crate::settings::DocumentSettings;
+use crate::variables;
 use litchi_core::ReadAt;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, Part, SourceBackedPackage};
+use litchi_opc::{BlobPart, Part, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage};
+use sha2::{Digest as _, Sha256};
 use smallvec::SmallVec;
 use std::io::Write;
 use std::sync::Arc;
@@ -27,6 +29,55 @@ use std::sync::Arc;
 /// A DOCX package that leaves ordinary part bodies cold at open.
 pub struct Package {
     package: SourceBackedPackage,
+}
+
+struct DocumentVariablesSource {
+    partname: litchi_opc::PackURI,
+    snapshot: variables::Snapshot,
+    protected: bool,
+    unique_inbound_owner: bool,
+}
+
+/// Products of one exact source-backed document-variable publication.
+pub struct DocumentVariablesPublication {
+    snapshot: variables::Snapshot,
+    original_snapshot: variables::Snapshot,
+    original_artifact: SourceArtifact,
+    published_artifact: SourceArtifactFingerprint,
+}
+
+impl DocumentVariablesPublication {
+    /// Borrow the published settings snapshot.
+    #[must_use]
+    pub const fn snapshot(&self) -> &variables::Snapshot {
+        &self.snapshot
+    }
+}
+
+struct FingerprintingWriter<W> {
+    inner: W,
+    hasher: Sha256,
+}
+
+impl<W: Write> Write for FingerprintingWriter<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let written = self.inner.write(bytes)?;
+        if written > bytes.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "document-variable sink reported {written} bytes for a {}-byte write",
+                    bytes.len()
+                ),
+            ));
+        }
+        self.hasher.update(&bytes[..written]);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
 }
 
 impl Package {
@@ -100,6 +151,125 @@ impl Package {
     /// Returns the same failures as [`Self::document_snapshot`].
     pub fn edit_document(&self) -> TransactionResult<Edit> {
         Ok(self.document_snapshot()?.edit())
+    }
+
+    /// Capture document variables from the existing internal settings Part.
+    ///
+    /// This source-backed capability never creates a settings relationship or
+    /// Part. It accepts exactly one Strict or Transitional internal settings
+    /// relationship with the Word settings content type. Markup-compatibility
+    /// branch selection is refused so the semantic snapshot and publish bytes
+    /// cannot diverge.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed source, relationship, content-type, MCE, XML, or limit
+    /// error.
+    pub fn document_variables_snapshot(&self) -> Result<variables::Snapshot> {
+        Ok(self
+            .settings_document_variables_source("document_variables_snapshot")?
+            .snapshot)
+    }
+
+    /// Start an isolated edit of variables in the existing settings Part.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same failures as [`Self::document_variables_snapshot`].
+    pub fn edit_document_variables(&self) -> Result<variables::Transaction> {
+        self.document_variables_snapshot()?.try_edit()
+    }
+
+    /// Publish a source-checked document-variable commit to a sequential sink.
+    ///
+    /// Only the existing settings payload may change. Every other physical ZIP
+    /// member is raw-copied. Exact no-ops reproduce the complete source artifact
+    /// byte for byte, including signatures and protected settings. A real change
+    /// refuses signed, protected, MCE-selected, or unmodeled selected-variable
+    /// sources before output begins.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed source-conflict, relationship, content-type, protection,
+    /// preservation, signature, limit, XML-publication, or incomplete-output
+    /// error.
+    pub fn publish_document_variables_commit_to_stream<W: Write>(
+        self,
+        writer: W,
+        commit: &variables::Commit,
+    ) -> Result<DocumentVariablesPublication> {
+        let current =
+            self.settings_document_variables_source("publish_document_variables_commit_to_stream")?;
+        let target = commit.patch().apply(&current.snapshot)?;
+        if !commit.patch().is_empty() {
+            if !current.unique_inbound_owner {
+                return Err(Error::DocumentVariablesPreservation(
+                    "the settings Part has an additional internal inbound relationship",
+                ));
+            }
+            if current.protected {
+                return Err(Error::UnsafeEdit {
+                    format: "DOCX",
+                    operation: "publish_document_variables_commit_to_stream",
+                    reason: "document or write protection is enforced",
+                });
+            }
+            variables::ensure_source_backed_rewrite_safe(
+                current.snapshot.xml_bytes(),
+                current.snapshot.variables(),
+            )?;
+        }
+        let target_xml = target.shared_xml();
+        let mut replacement = Vec::new();
+        replacement
+            .try_reserve_exact(target_xml.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed document-variable replacement",
+                source,
+            })?;
+        replacement.extend_from_slice(target_xml.as_slice());
+        let original_artifact = self.package.source_artifact();
+        let mut output = FingerprintingWriter {
+            inner: writer,
+            hasher: Sha256::new(),
+        };
+        self.package
+            .write_part_overlay_to_stream(&mut output, &current.partname, replacement)?;
+        let published_artifact =
+            SourceArtifactFingerprint::from_sha256(output.hasher.finalize().into());
+        Ok(DocumentVariablesPublication {
+            snapshot: target,
+            original_snapshot: commit.patch().before_snapshot().clone(),
+            original_artifact,
+            published_artifact,
+        })
+    }
+
+    /// Apply the exact inverse of a completed source-backed publication.
+    ///
+    /// The supplied package must be the byte-exact artifact emitted by
+    /// `publication`; a reopened foreign or subsequently modified artifact is
+    /// rejected before output begins. Successful publication copies the exact
+    /// retained original artifact, including all untouched physical ZIP bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed conflict, source-change, allocation, or incomplete-
+    /// output error.
+    pub fn publish_document_variables_inverse_to_stream<W: Write>(
+        self,
+        writer: W,
+        publication: &DocumentVariablesPublication,
+    ) -> Result<variables::Snapshot> {
+        let current = self
+            .settings_document_variables_source("publish_document_variables_inverse_to_stream")?;
+        if !current.snapshot.same_content(&publication.snapshot)
+            || self.package.source_artifact().fingerprint()? != publication.published_artifact
+        {
+            return Err(Error::DocumentVariablesConflict);
+        }
+        publication.original_artifact.write_to_stream(writer)?;
+        Ok(publication.original_snapshot.clone())
     }
 
     /// Capture the exact source closure used to detach external hyperlinks in
@@ -271,6 +441,98 @@ impl Package {
             .into());
         }
         Ok((partname, Snapshot::from_shared_xml(raw)?))
+    }
+
+    fn settings_document_variables_source(
+        &self,
+        operation: &'static str,
+    ) -> Result<DocumentVariablesSource> {
+        const STRICT_SETTINGS: &str =
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/settings";
+
+        let main = self.package.main_document_part()?;
+        let package_strict = self.package.rels().iter().find_map(|relationship| {
+            matches!(
+                relationship.reltype(),
+                rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
+            )
+            .then_some(relationship.reltype() == rt::STRICT_OFFICE_DOCUMENT)
+        });
+        let mut matching = main.rels().iter().filter(|relationship| {
+            matches!(relationship.reltype(), rt::SETTINGS | STRICT_SETTINGS)
+        });
+        let relationship = matching.next().ok_or_else(|| {
+            Error::InvalidRelationship(
+                "source-backed document-variable editing requires an existing settings relationship"
+                    .into(),
+            )
+        })?;
+        if matching.next().is_some() {
+            return Err(Error::InvalidRelationship(
+                "document has multiple settings relationships".into(),
+            ));
+        }
+        if relationship.is_external() {
+            return Err(Error::InvalidRelationship(
+                "settings relationship cannot be external".into(),
+            ));
+        }
+        let target = relationship.target_partname()?;
+        let mut inbound_owners = 0usize;
+        for candidate in self.package.rels().iter() {
+            if !candidate.is_external() && candidate.target_partname()? == target {
+                inbound_owners = inbound_owners.saturating_add(1);
+            }
+        }
+        for part in self.package.iter_parts() {
+            for candidate in part.rels().iter() {
+                if !candidate.is_external() && candidate.target_partname()? == target {
+                    inbound_owners = inbound_owners.saturating_add(1);
+                }
+            }
+        }
+        let settings_part = self.package.part(&target)?;
+        if settings_part.content_type() != ct::WML_SETTINGS {
+            return Err(Error::InvalidContentType {
+                expected: ct::WML_SETTINGS.into(),
+                got: settings_part.content_type().into(),
+            });
+        }
+        let raw = settings_part.data()?.into_arc();
+        if raw.len() > variables::MAX_DOCUMENT_VARIABLE_XML_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "settings XML exceeds the {} byte document-variable limit",
+                variables::MAX_DOCUMENT_VARIABLE_XML_BYTES
+            )));
+        }
+        let staged = BlobPart::new_shared(
+            target.clone(),
+            ct::WML_SETTINGS.to_owned(),
+            Arc::clone(&raw),
+        );
+        let visible = litchi_ooxml_common::mce::process_part_arc(&staged)?;
+        if !Arc::ptr_eq(&raw, &visible) {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation,
+                reason: "source-backed document-variable transactions do not support markup-compatibility branch selection",
+            });
+        }
+        let policy = variables::inspect_source_policy(raw.as_slice())?;
+        let settings_strict = relationship.reltype() == STRICT_SETTINGS;
+        let root_strict = policy.dialect == variables::SettingsDialect::Strict;
+        if package_strict != Some(settings_strict) || settings_strict != root_strict {
+            return Err(Error::InvalidRelationship(
+                "main document, settings relationship, and settings XML use mixed OOXML conformance families"
+                    .into(),
+            ));
+        }
+        Ok(DocumentVariablesSource {
+            partname: target,
+            snapshot: variables::Snapshot::from_source_xml(raw, self.package.source_version()?)?,
+            protected: policy.protected,
+            unique_inbound_owner: inbound_owners == 1,
+        })
     }
 
     fn refuse_protected_external_hyperlink_detachment(&self) -> Result<()> {

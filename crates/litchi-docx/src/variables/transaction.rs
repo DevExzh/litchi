@@ -1,12 +1,9 @@
-#![expect(
-    clippy::shadow_reuse,
-    reason = "parser bindings are intentionally refined after validation"
-)]
 //! Source-checked snapshots, edits, commits, and patches for document variables.
 
 use std::sync::Arc;
 
 use crate::{Error, Result};
+use litchi_core::SourceVersion;
 
 use super::codec;
 use super::model::Variables;
@@ -14,8 +11,9 @@ use super::model::Variables;
 /// An immutable settings XML snapshot with its typed document-variable view.
 #[derive(Debug, Clone)]
 pub struct Snapshot {
-    xml: Arc<[u8]>,
+    xml: Arc<Vec<u8>>,
     variables: Variables,
+    source_version: Option<SourceVersion>,
 }
 
 impl Snapshot {
@@ -25,19 +23,32 @@ impl Snapshot {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
-        let xml = xml.into();
-        let variables = Variables::from_xml(&xml)?;
+        Self::from_shared_xml(Arc::new(xml.into()))
+    }
+
+    pub(crate) fn from_shared_xml(xml: Arc<Vec<u8>>) -> Result<Self> {
+        let variables = Variables::from_xml(xml.as_slice())?;
         Ok(Self {
-            xml: Arc::from(xml.into_boxed_slice()),
+            xml,
             variables,
+            source_version: None,
         })
+    }
+
+    pub(crate) fn from_source_xml(
+        xml: Arc<Vec<u8>>,
+        source_version: SourceVersion,
+    ) -> Result<Self> {
+        let mut snapshot = Self::from_shared_xml(xml)?;
+        snapshot.source_version = Some(source_version);
+        Ok(snapshot)
     }
 
     /// Borrow the exact settings XML retained by this snapshot.
     #[inline]
     #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
-        &self.xml
+        self.xml.as_slice()
     }
 
     /// Borrow the typed document-variable collection in source order.
@@ -63,8 +74,31 @@ impl Snapshot {
         }
     }
 
+    /// Start an isolated edit using only fallible semantic allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation error if the bounded variable collection cannot
+    /// be cloned.
+    pub fn try_edit(&self) -> Result<Transaction> {
+        Ok(Transaction {
+            base: self.clone(),
+            next: self.variables.try_clone()?,
+        })
+    }
+
     fn same_source(&self, other: &Self) -> bool {
-        self.xml.as_ref() == other.xml.as_ref() && self.variables == other.variables
+        self.source_version == other.source_version
+            && self.xml.as_slice() == other.xml.as_slice()
+            && self.variables == other.variables
+    }
+
+    pub(crate) fn same_content(&self, other: &Self) -> bool {
+        self.xml.as_slice() == other.xml.as_slice() && self.variables == other.variables
+    }
+
+    pub(crate) fn shared_xml(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.xml)
     }
 }
 
@@ -174,7 +208,7 @@ impl Transaction {
         &mut self,
         edit: impl FnOnce(&mut Variables) -> Result<()>,
     ) -> Result<&mut Self> {
-        let mut candidate = self.next.clone();
+        let mut candidate = self.next.try_clone()?;
         edit(&mut candidate)?;
         candidate.validate()?;
         self.next = candidate;
@@ -210,7 +244,7 @@ impl Transaction {
         }
 
         let xml = codec::rewrite(self.base.xml_bytes(), &self.base.variables, &self.next)?;
-        let snapshot = Snapshot::from_xml(xml)?;
+        let snapshot = Snapshot::from_shared_xml_with_lineage(xml, self.base.source_version)?;
         if snapshot.variables != self.next {
             return Err(invalid(
                 "document-variable publication changed the staged collection",
@@ -225,6 +259,17 @@ impl Transaction {
             patch,
             changed: true,
         })
+    }
+}
+
+impl Snapshot {
+    fn from_shared_xml_with_lineage(
+        xml: Vec<u8>,
+        source_version: Option<SourceVersion>,
+    ) -> Result<Self> {
+        let mut snapshot = Self::from_shared_xml(Arc::new(xml))?;
+        snapshot.source_version = source_version;
+        Ok(snapshot)
     }
 }
 
@@ -336,9 +381,7 @@ impl Patch {
     /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if !source.same_source(&self.before) {
-            return Err(Error::InvalidFormat(
-                "document-variable patch source does not match its precondition".into(),
-            ));
+            return Err(Error::DocumentVariablesConflict);
         }
         Ok(self.after.clone())
     }

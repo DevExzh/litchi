@@ -133,6 +133,14 @@ pub enum Error {
     /// A source-bound external hyperlink patch was applied to a foreign closure.
     #[error("DOCX external hyperlink detachment patch conflicts with the supplied source")]
     ExternalHyperlinkDetachmentConflict,
+
+    /// A source-backed document-variable patch does not match its exact source.
+    #[error("DOCX document-variable patch conflicts with the supplied source")]
+    DocumentVariablesConflict,
+
+    /// A changed document-variable publication cannot preserve selected markup.
+    #[error("unsafe DOCX document-variable edit rejected: {0}")]
+    DocumentVariablesPreservation(&'static str),
 }
 
 impl From<quick_xml::Error> for Error {
