@@ -1,9 +1,9 @@
-//! Exact source-backed copying for deliberately plain main-story paragraphs.
+//! Exact source-backed editing for deliberately plain main-story paragraphs.
 //!
 //! This capability is intentionally narrower than the general document
 //! transaction API. It accepts only a canonical main story whose body contains
-//! direct plain paragraphs made from `w:r` and `w:t`. The copied paragraph is
-//! inserted as its exact source fragment, while every other package member is
+//! direct plain paragraphs made from `w:r` and `w:t`. Paragraphs are copied or
+//! removed as exact source fragments, while every other package member is
 //! raw-copied by the OPC overlay publisher.
 
 use std::io::Write;
@@ -24,6 +24,7 @@ use crate::settings::DocumentSettings;
 use super::Package;
 
 const MAGIC: &[u8; 8] = b"LDXPCPY\0";
+const REMOVAL_MAGIC: &[u8; 8] = b"LDXPREM\0";
 const VERSION: u8 = 1;
 const HEADER_BYTES: usize = 8 + 1 + 1 + (6 * 8) + 8 + 32 + 8;
 const ABSOLUTE_MAX_DURABLE_BYTES: usize = 64 * 1024 * 1024;
@@ -90,10 +91,10 @@ pub enum Error {
         len: usize,
     },
     /// The package cannot be represented by this exact one-part closure.
-    #[error("plain paragraph copy refused: {0}")]
+    #[error("plain paragraph edit refused: {0}")]
     Refused(Refusal),
     /// A configured finite resource ceiling was exceeded.
-    #[error("plain paragraph copy {resource} limit exceeded: {actual} > {max}")]
+    #[error("plain paragraph edit {resource} limit exceeded: {actual} > {max}")]
     Limit {
         /// Bounded resource.
         resource: &'static str,
@@ -103,13 +104,13 @@ pub enum Error {
         actual: usize,
     },
     /// A patch was applied to bytes other than its exact captured source.
-    #[error("plain paragraph copy patch source is stale")]
+    #[error("plain paragraph edit patch source is stale")]
     StaleSource,
     /// A deterministic durable patch envelope was malformed or non-canonical.
-    #[error("invalid durable plain paragraph copy patch")]
+    #[error("invalid durable plain paragraph patch")]
     InvalidDurable,
     /// A bounded allocation failed before publication began.
-    #[error("plain paragraph copy allocation failed for {resource}: {source}")]
+    #[error("plain paragraph edit allocation failed for {resource}: {source}")]
     Allocation {
         /// Allocation being attempted.
         resource: &'static str,
@@ -262,6 +263,16 @@ impl Snapshot {
             base: self.clone(),
             projected: self.clone(),
             operation: None,
+        }
+    }
+
+    /// Start an isolated exact-fragment removal edit.
+    #[must_use]
+    pub fn removal_edit(&self) -> RemovalEdit {
+        RemovalEdit {
+            base: self.clone(),
+            projected: self.clone(),
+            position: None,
         }
     }
 
@@ -616,6 +627,317 @@ impl Publication {
     }
 }
 
+/// One staged exact removal of a direct plain paragraph.
+#[derive(Debug, Clone)]
+pub struct RemovalEdit {
+    base: Snapshot,
+    projected: Snapshot,
+    position: Option<Position>,
+}
+
+impl RemovalEdit {
+    /// Borrow the unchanged source snapshot.
+    #[must_use]
+    pub const fn source(&self) -> &Snapshot {
+        &self.base
+    }
+
+    /// Borrow the projected snapshot.
+    #[must_use]
+    pub const fn projected(&self) -> &Snapshot {
+        &self.projected
+    }
+
+    /// Remove exactly one direct paragraph selected in immutable source order.
+    ///
+    /// The selected `w:p` fragment, including its original lexical spelling,
+    /// is removed without rebuilding any surrounding XML. An empty body is a
+    /// valid result when the selected paragraph is the only paragraph.
+    pub fn remove_plain_paragraph(&mut self, position: Position) -> Result<&mut Self> {
+        if self.position.is_some() {
+            return Err(Error::Limit {
+                resource: "operations",
+                max: 1,
+                actual: 2,
+            });
+        }
+        let projected = remove_fragment(&self.base, position)?;
+        self.position = Some(position);
+        self.projected = projected;
+        Ok(self)
+    }
+
+    /// Finish the removal as an exact reversible patch.
+    #[must_use]
+    pub fn commit(self) -> RemovalCommit {
+        let patch = RemovalPatch {
+            before: Arc::clone(&self.base.xml),
+            after: Arc::clone(&self.projected.xml),
+            expected_fingerprint: self.base.artifact_fingerprint,
+            source_version: Some(self.base.source_version),
+            limits: self.base.limits,
+            position: self.position,
+            direction: Direction::Forward,
+        };
+        RemovalCommit {
+            projected: self.projected,
+            patch,
+        }
+    }
+}
+
+/// Completed exact-removal edit.
+#[derive(Debug, Clone)]
+pub struct RemovalCommit {
+    projected: Snapshot,
+    patch: RemovalPatch,
+}
+
+impl RemovalCommit {
+    /// Borrow the projected main-story snapshot.
+    #[must_use]
+    pub const fn projected(&self) -> &Snapshot {
+        &self.projected
+    }
+
+    /// Borrow the reversible exact removal patch.
+    #[must_use]
+    pub const fn patch(&self) -> &RemovalPatch {
+        &self.patch
+    }
+
+    /// Return the deterministic removal effect.
+    #[must_use]
+    pub fn effect_report(&self) -> RemovalEffectReport {
+        self.patch.effect_report()
+    }
+}
+
+/// Exact, deterministic, reversible main-document removal patch.
+#[derive(Debug, Clone)]
+pub struct RemovalPatch {
+    before: Arc<Vec<u8>>,
+    after: Arc<Vec<u8>>,
+    expected_fingerprint: [u8; 32],
+    source_version: Option<SourceVersion>,
+    limits: Limits,
+    position: Option<Position>,
+    direction: Direction,
+}
+
+impl RemovalPatch {
+    /// Return whether the patch changes no source bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before.as_slice() == self.after.as_slice()
+    }
+
+    /// Apply only to the byte-exact source artifact and main story.
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        if source.artifact_fingerprint != self.expected_fingerprint
+            || source.xml.as_slice() != self.before.as_slice()
+            || self
+                .source_version
+                .is_some_and(|expected| source.source_version != expected)
+        {
+            return Err(Error::StaleSource);
+        }
+        source.with_xml(checked_clone(
+            self.after.as_slice(),
+            "removal patch application",
+        )?)
+    }
+
+    /// Return the exact patch that restores the input bytes.
+    ///
+    /// After ZIP publication, use [`RemovalPublication::inverse_patch`] for an
+    /// inverse authorized against the exact emitted artifact fingerprint.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: Arc::clone(&self.after),
+            after: Arc::clone(&self.before),
+            expected_fingerprint: self.expected_fingerprint,
+            source_version: self.source_version,
+            limits: self.limits,
+            position: self.position,
+            direction: match self.direction {
+                Direction::Forward => Direction::Inverse,
+                Direction::Inverse => Direction::Forward,
+            },
+        }
+    }
+
+    /// Return the deterministic semantic effect.
+    #[must_use]
+    pub fn effect_report(&self) -> RemovalEffectReport {
+        let removed_bytes = self.position.map_or(0, |position| {
+            self.source_layout()
+                .ok()
+                .and_then(|layout| layout.paragraphs.get(position.get()).copied())
+                .map_or(0, |range| range.end.saturating_sub(range.start))
+        });
+        RemovalEffectReport {
+            removed_paragraphs: usize::from(self.position.is_some()),
+            removed_bytes,
+        }
+    }
+
+    /// Encode a canonical bounded durable removal patch.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        let total = HEADER_BYTES
+            .checked_add(self.before.len())
+            .and_then(|value| value.checked_add(self.after.len()))
+            .ok_or(Error::InvalidDurable)?;
+        check_limit("durable patch bytes", self.limits.max_durable_bytes, total)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(total)
+            .map_err(|source| Error::Allocation {
+                resource: "durable removal patch",
+                source,
+            })?;
+        bytes.extend_from_slice(REMOVAL_MAGIC);
+        bytes.push(VERSION);
+        bytes.push(match (self.position, self.direction) {
+            (None, _) => 0,
+            (Some(_), Direction::Forward) => 1,
+            (Some(_), Direction::Inverse) => 2,
+        });
+        for value in [
+            self.limits.max_xml_bytes,
+            self.limits.max_paragraphs,
+            self.limits.max_events,
+            self.limits.max_depth,
+            self.limits.max_output_bytes,
+            self.limits.max_durable_bytes,
+        ] {
+            push_u64(&mut bytes, value)?;
+        }
+        push_u32(&mut bytes, self.position.map_or(0, Position::get))?;
+        push_u32(&mut bytes, 0)?;
+        bytes.extend_from_slice(&self.expected_fingerprint);
+        push_u32(&mut bytes, self.before.len())?;
+        push_u32(&mut bytes, self.after.len())?;
+        bytes.extend_from_slice(self.before.as_slice());
+        bytes.extend_from_slice(self.after.as_slice());
+        if bytes.len() != total {
+            return Err(Error::InvalidDurable);
+        }
+        Ok(bytes)
+    }
+
+    /// Decode and semantically validate a canonical bounded removal patch.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() > Limits::default().max_durable_bytes || bytes.len() < HEADER_BYTES {
+            return Err(Error::InvalidDurable);
+        }
+        let mut cursor = 0usize;
+        if take(bytes, &mut cursor, REMOVAL_MAGIC.len())? != REMOVAL_MAGIC {
+            return Err(Error::InvalidDurable);
+        }
+        if take(bytes, &mut cursor, 1)?[0] != VERSION {
+            return Err(Error::InvalidDurable);
+        }
+        let opcode = take(bytes, &mut cursor, 1)?[0];
+        let limits = Limits::new(
+            take_usize(bytes, &mut cursor)?,
+            take_usize(bytes, &mut cursor)?,
+            take_usize(bytes, &mut cursor)?,
+            take_usize(bytes, &mut cursor)?,
+            take_usize(bytes, &mut cursor)?,
+            take_usize(bytes, &mut cursor)?,
+        )?;
+        if bytes.len() > limits.max_durable_bytes {
+            return Err(Error::InvalidDurable);
+        }
+        let raw_position = take_u32(bytes, &mut cursor)? as usize;
+        let reserved = take_u32(bytes, &mut cursor)?;
+        let mut expected_fingerprint = [0u8; 32];
+        expected_fingerprint.copy_from_slice(take(bytes, &mut cursor, 32)?);
+        let before_len = take_u32(bytes, &mut cursor)? as usize;
+        let after_len = take_u32(bytes, &mut cursor)? as usize;
+        let before = Arc::new(checked_clone(
+            take(bytes, &mut cursor, before_len)?,
+            "durable removal before bytes",
+        )?);
+        let after = Arc::new(checked_clone(
+            take(bytes, &mut cursor, after_len)?,
+            "durable removal after bytes",
+        )?);
+        if cursor != bytes.len() || reserved != 0 {
+            return Err(Error::InvalidDurable);
+        }
+        let position = match opcode {
+            0 if raw_position == 0 && before == after => None,
+            1 | 2 => Some(Position::new(raw_position)),
+            _ => return Err(Error::InvalidDurable),
+        };
+        let direction = if opcode == 2 {
+            Direction::Inverse
+        } else {
+            Direction::Forward
+        };
+        validate_durable_removal_shape(&before, &after, position, direction, limits)?;
+        Ok(Self {
+            before,
+            after,
+            expected_fingerprint,
+            source_version: None,
+            limits,
+            position,
+            direction,
+        })
+    }
+
+    fn source_layout(&self) -> Result<Layout> {
+        match self.direction {
+            Direction::Forward => scan_document(self.before.as_slice(), self.limits),
+            Direction::Inverse => scan_document(self.after.as_slice(), self.limits),
+        }
+    }
+}
+
+/// Deterministic removal effect with no inferred package changes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RemovalEffectReport {
+    /// Number of removed paragraphs (`0` or `1`).
+    pub removed_paragraphs: usize,
+    /// Exact number of removed main-document bytes.
+    pub removed_bytes: usize,
+}
+
+impl RemovalEffectReport {
+    /// Return whether no main-document bytes change.
+    #[must_use]
+    pub const fn is_noop(self) -> bool {
+        self.removed_paragraphs == 0
+    }
+}
+
+/// Exact removal publication evidence retained for one consuming inverse.
+pub struct RemovalPublication {
+    snapshot: Snapshot,
+    original_snapshot: Snapshot,
+    original_artifact: SourceArtifact,
+    published_fingerprint: [u8; 32],
+    inverse_patch: RemovalPatch,
+}
+
+impl RemovalPublication {
+    /// Borrow the published semantic snapshot.
+    #[must_use]
+    pub const fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+
+    /// Borrow the inverse authorized for the exact emitted artifact.
+    #[must_use]
+    pub const fn inverse_patch(&self) -> &RemovalPatch {
+        &self.inverse_patch
+    }
+}
+
 impl Package {
     /// Capture the exact bounded closure for a plain main-story paragraph copy.
     pub fn plain_paragraph_copy_snapshot(&self) -> Result<Snapshot> {
@@ -654,6 +976,21 @@ impl Package {
     /// Start one isolated source-backed exact paragraph-copy edit.
     pub fn edit_plain_paragraph_copy(&self) -> Result<Edit> {
         Ok(self.plain_paragraph_copy_snapshot()?.edit())
+    }
+
+    /// Capture the exact bounded closure for plain-paragraph removal.
+    pub fn plain_paragraph_removal_snapshot(&self) -> Result<Snapshot> {
+        self.plain_paragraph_removal_snapshot_with_limits(Limits::default())
+    }
+
+    /// Capture the exact removal closure under caller-selected finite limits.
+    pub fn plain_paragraph_removal_snapshot_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+        self.plain_paragraph_copy_snapshot_with_limits(limits)
+    }
+
+    /// Start one isolated source-backed exact paragraph-removal edit.
+    pub fn edit_plain_paragraph_removal(&self) -> Result<RemovalEdit> {
+        Ok(self.plain_paragraph_removal_snapshot()?.removal_edit())
     }
 
     /// Publish an exact-source-checked copy while raw-copying every other ZIP member.
@@ -713,6 +1050,73 @@ impl Package {
         self,
         writer: W,
         publication: &Publication,
+    ) -> Result<Snapshot> {
+        let current = fingerprint_artifact(&self.package.source_artifact())?;
+        if current != publication.published_fingerprint {
+            return Err(Error::StaleSource);
+        }
+        publication
+            .original_artifact
+            .write_to_stream(writer)
+            .map_err(crate::Error::from)?;
+        Ok(publication.original_snapshot.clone())
+    }
+
+    /// Publish one exact-source-checked removal while raw-copying every other
+    /// physical ZIP member.
+    pub fn publish_plain_paragraph_removal_to_stream<W: Write>(
+        self,
+        writer: W,
+        commit: &RemovalCommit,
+    ) -> Result<RemovalPublication> {
+        self.publish_plain_paragraph_removal_patch_to_stream(writer, commit.patch())
+    }
+
+    /// Publish a live or rehydrated durable removal patch against its exact
+    /// complete source artifact.
+    pub fn publish_plain_paragraph_removal_patch_to_stream<W: Write>(
+        self,
+        writer: W,
+        patch: &RemovalPatch,
+    ) -> Result<RemovalPublication> {
+        let current = self.plain_paragraph_removal_snapshot_with_limits(patch.limits)?;
+        let target = patch.apply(&current)?;
+        let original_artifact = self.package.source_artifact();
+        let main = self
+            .package
+            .main_document_part()
+            .map_err(crate::Error::from)?
+            .partname()
+            .clone();
+        let mut output = FingerprintingWriter::new(writer);
+        if patch.is_noop() {
+            original_artifact
+                .write_to_stream(&mut output)
+                .map_err(crate::Error::from)?;
+        } else {
+            let replacement = checked_clone(target.xml_bytes(), "removal publication replacement")?;
+            self.package
+                .write_part_overlay_to_stream(&mut output, &main, replacement)
+                .map_err(crate::Error::from)?;
+        }
+        let published_fingerprint = output.finish();
+        let mut inverse_patch = patch.inverse();
+        inverse_patch.expected_fingerprint = published_fingerprint;
+        inverse_patch.source_version = None;
+        Ok(RemovalPublication {
+            snapshot: target,
+            original_snapshot: current,
+            original_artifact,
+            published_fingerprint,
+            inverse_patch,
+        })
+    }
+
+    /// Restore the exact original package from a byte-exact removal output.
+    pub fn publish_plain_paragraph_removal_inverse_to_stream<W: Write>(
+        self,
+        writer: W,
+        publication: &RemovalPublication,
     ) -> Result<Snapshot> {
         let current = fingerprint_artifact(&self.package.source_artifact())?;
         if current != publication.published_fingerprint {
@@ -961,6 +1365,66 @@ fn copy_fragment(source: &Snapshot, from: Position, before: Position) -> Result<
     Ok(candidate)
 }
 
+fn remove_fragment(source: &Snapshot, position: Position) -> Result<Snapshot> {
+    let len = source.paragraph_count();
+    let removed = source
+        .layout
+        .paragraphs
+        .get(position.get())
+        .copied()
+        .ok_or(Error::OutOfBounds {
+            kind: "removal",
+            position: position.get(),
+            len,
+        })?;
+    let removed_len = removed
+        .end
+        .checked_sub(removed.start)
+        .ok_or(Error::InvalidDurable)?;
+    let output_len = source
+        .xml
+        .len()
+        .checked_sub(removed_len)
+        .ok_or(Error::InvalidDurable)?;
+    check_limit("output bytes", source.limits.max_output_bytes, output_len)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "main-document removal output",
+            source,
+        })?;
+    output.extend_from_slice(&source.xml[..removed.start]);
+    output.extend_from_slice(&source.xml[removed.end..]);
+    if output.len() != output_len {
+        return Err(Error::InvalidDurable);
+    }
+    let candidate = source.with_xml(output)?;
+    validate_removal_readback(source, &candidate, position)?;
+    Ok(candidate)
+}
+
+fn validate_removal_readback(
+    source: &Snapshot,
+    target: &Snapshot,
+    position: Position,
+) -> Result<()> {
+    if source.paragraph_count() != target.paragraph_count().saturating_add(1) {
+        return Err(Error::InvalidDurable);
+    }
+    for target_index in 0..target.paragraph_count() {
+        let source_index = if target_index < position.get() {
+            target_index
+        } else {
+            target_index.checked_add(1).ok_or(Error::InvalidDurable)?
+        };
+        if paragraph_bytes(target, target_index)? != paragraph_bytes(source, source_index)? {
+            return Err(Error::InvalidDurable);
+        }
+    }
+    Ok(())
+}
+
 fn validate_copy_readback(
     source: &Snapshot,
     target: &Snapshot,
@@ -1036,6 +1500,47 @@ fn validate_durable_shape(
         Direction::Inverse => (&after_snapshot, &before_snapshot),
     };
     let rebuilt = copy_fragment(source, operation.source, operation.before)?;
+    if rebuilt.xml.as_slice() != expected.xml.as_slice() {
+        return Err(Error::InvalidDurable);
+    }
+    Ok(())
+}
+
+fn validate_durable_removal_shape(
+    before: &[u8],
+    after: &[u8],
+    position: Option<Position>,
+    direction: Direction,
+    limits: Limits,
+) -> Result<()> {
+    let before_layout = scan_document(before, limits)?;
+    let after_layout = scan_document(after, limits)?;
+    let before_snapshot = Snapshot {
+        xml: Arc::new(checked_clone(before, "durable removal validation source")?),
+        layout: before_layout,
+        source_version: SourceVersion::new(0, 0),
+        artifact_fingerprint: [0; 32],
+        limits,
+    };
+    let after_snapshot = Snapshot {
+        xml: Arc::new(checked_clone(after, "durable removal validation target")?),
+        layout: after_layout,
+        source_version: SourceVersion::new(0, 0),
+        artifact_fingerprint: [0; 32],
+        limits,
+    };
+    let Some(position) = position else {
+        return if before == after {
+            Ok(())
+        } else {
+            Err(Error::InvalidDurable)
+        };
+    };
+    let (source, expected) = match direction {
+        Direction::Forward => (&before_snapshot, &after_snapshot),
+        Direction::Inverse => (&after_snapshot, &before_snapshot),
+    };
+    let rebuilt = remove_fragment(source, position)?;
     if rebuilt.xml.as_slice() != expected.xml.as_slice() {
         return Err(Error::InvalidDurable);
     }
