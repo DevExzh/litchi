@@ -121,6 +121,38 @@ fn three_cells() -> Vec<u8> {
     )
 }
 
+fn with_two_cell_styles(bytes: &[u8]) -> (Vec<u8>, PackURI, Vec<u8>) {
+    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let style_uri = PackURI::new("/xl/styles.xml").unwrap();
+    let style_xml = format!(
+        r#"<styleSheet xmlns="{SML}"><cellXfs count="2"><xf/><xf numFmtId="1"/></cellXfs></styleSheet>"#
+    )
+    .into_bytes();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            style_uri.clone(),
+            ct::SML_STYLES.to_owned(),
+            style_xml.clone(),
+        )))
+        .unwrap();
+    package
+        .get_part_mut(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            rt::STYLES.to_owned(),
+            "styles.xml".to_owned(),
+            "rIdStyles".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    (
+        PackageWriter::to_bytes(&package).unwrap(),
+        style_uri,
+        style_xml,
+    )
+}
+
 fn changed_commit(editor: &SourceBackedEditor) -> litchi_xlsx::cell_values::Commit {
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.apply_batch([
@@ -215,9 +247,118 @@ fn scalar_staging_and_batch_staging_are_equivalent_and_clear_retains_record() {
         batch_commit.snapshot().source_xml()
     );
     assert_eq!(batch_commit.snapshot().value(address("C3")), None);
+    assert!(batch_commit.snapshot().contains_cell(address("C3")));
     assert!(
         String::from_utf8_lossy(batch_commit.snapshot().source_xml()).contains(r#"<c r="C3"></c>"#)
     );
+}
+
+#[test]
+fn remove_deletes_exact_cell_owners_but_retains_rows_dimension_and_style_table() {
+    let base = fixture(
+        format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="A1:C3"/><sheetData><row r="1" spans="1:3"><c r="A1" s="1"><v>1</v></c><c r="B1"><v>2</v></c></row><row r="2" spans="2:2"><c r="B2" t="b"><v>1</v></c></row><row r="3" spans="3:3"><c r="C3" t="inlineStr"><is><t>tail</t></is></c></row></sheetData></worksheet>"#
+        ),
+        false,
+    );
+    let (bytes, style_uri, style_xml) = with_two_cell_styles(&base);
+    let original = OpcPackage::from_bytes(&bytes)
+        .unwrap()
+        .get_part(&PackURI::new(SHEET).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+
+    let clear_editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let mut clear = clear_editor.edit("Sheet1").unwrap();
+    clear.clear(address("A1")).unwrap();
+    let clear = clear.commit().unwrap();
+    assert!(clear.snapshot().contains_cell(address("A1")));
+    assert!(
+        String::from_utf8_lossy(clear.snapshot().source_xml()).contains(r#"<c s="1" r="A1"></c>"#)
+    );
+
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.apply_batch([
+        CellValueEdit::remove(address("A1")),
+        CellValueEdit::remove(address("B2")),
+        CellValueEdit::remove(address("C3")),
+    ])
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.diagnostics().changed_cells(), 3);
+    for cell in ["A1", "B2", "C3"] {
+        assert!(!commit.snapshot().contains_cell(address(cell)));
+    }
+    let xml = String::from_utf8_lossy(commit.snapshot().source_xml());
+    assert!(xml.contains(r#"<dimension ref="A1:C3"/>"#));
+    assert!(xml.contains(r#"<row r="1"><c r="B1"><v>2</v></c></row>"#));
+    assert!(xml.contains(r#"<row r="2"></row>"#));
+    assert!(xml.contains(r#"<row r="3"></row>"#));
+    assert!(!xml.contains("spans="));
+    assert!(!xml.contains(r#"r="A1""#));
+    assert!(!xml.contains(r#"r="B2""#));
+    assert!(!xml.contains(r#"r="C3""#));
+
+    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    commit.patch().apply(&mut replay).unwrap();
+    assert_eq!(replay.get_part(&style_uri).unwrap().blob(), style_xml);
+    commit.patch().inverse().apply(&mut replay).unwrap();
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob(),
+        original,
+    );
+
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(
+        OpcPackage::from_bytes(&output)
+            .unwrap()
+            .get_part(&style_uri)
+            .unwrap()
+            .blob(),
+        style_xml,
+    );
+    assert_eq!(
+        OpcPackage::from_bytes(&output)
+            .unwrap()
+            .get_part(&PackURI::new(UNUSED).unwrap())
+            .unwrap()
+            .blob(),
+        OpcPackage::from_bytes(&bytes)
+            .unwrap()
+            .get_part(&PackURI::new(UNUSED).unwrap())
+            .unwrap()
+            .blob(),
+    );
+}
+
+#[test]
+fn remove_missing_and_duplicate_selectors_fail_atomically() {
+    let bytes = three_cells();
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    assert!(edit.remove(address("Z99")).is_err());
+    assert!(edit.is_empty());
+    assert!(
+        edit.apply_batch([
+            CellValueEdit::remove(address("B2")),
+            CellValueEdit::set(address("B2"), false),
+        ])
+        .is_err()
+    );
+    assert!(edit.is_empty());
+    edit.remove(address("B2")).unwrap();
+    assert!(edit.clear(address("B2")).is_err());
+    assert_eq!(edit.len(), 1);
 }
 
 #[test]
@@ -260,7 +401,8 @@ fn exact_batch_limit_accepts_n_and_rejects_n_plus_one_atomically() {
         ),
         false,
     );
-    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.apply_batch(
         (1..=MAX_BATCH_EDITS).map(|row| CellValueEdit::set(address(&format!("A{row}")), 0u32)),
@@ -268,6 +410,16 @@ fn exact_batch_limit_accepts_n_and_rejects_n_plus_one_atomically() {
     .unwrap();
     assert_eq!(edit.len(), MAX_BATCH_EDITS);
     assert!(edit.set(address("A257"), 0u32).is_err());
+    assert_eq!(edit.len(), MAX_BATCH_EDITS);
+
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.apply_batch(
+        (1..=MAX_BATCH_EDITS).map(|row| CellValueEdit::remove(address(&format!("A{row}")))),
+    )
+    .unwrap();
+    assert_eq!(edit.len(), MAX_BATCH_EDITS);
+    assert!(edit.remove(address("A257")).is_err());
     assert_eq!(edit.len(), MAX_BATCH_EDITS);
 }
 
@@ -325,7 +477,7 @@ fn formulas_mce_shared_strings_relationships_and_signed_changes_are_refused() {
     );
     let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(signed))).unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
-    edit.set(address("A1"), 2u32).unwrap();
+    edit.remove(address("A1")).unwrap();
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     assert!(matches!(

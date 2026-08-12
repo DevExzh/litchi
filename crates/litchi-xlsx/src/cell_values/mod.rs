@@ -1,9 +1,12 @@
-//! Source-backed, value-only edits for existing worksheet cells.
+//! Source-backed scalar-cell edits for existing worksheet cells.
 //!
-//! This deliberately narrow capability changes only scalar values already
-//! stored in a single worksheet. It never creates cells, changes styles or
-//! shared-string topology, authors formulas, or claims to recalculate Excel
-//! dependencies. Workbooks outside the statically provable subset are refused.
+//! This deliberately narrow capability changes or removes scalar cells already
+//! stored in a single worksheet. Clearing retains the `<c>` owner and its local
+//! style; removal deletes that complete owner while retaining its row and the
+//! producer's conservative dimension. It never creates cells, mutates shared
+//! style tables or shared-string topology, authors formulas, or claims to
+//! recalculate Excel dependencies. Workbooks outside the statically provable
+//! subset are refused.
 
 mod patch;
 mod snapshot;
