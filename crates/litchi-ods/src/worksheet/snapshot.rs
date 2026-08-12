@@ -7,6 +7,43 @@ use litchi_core::{Error, Position, Result};
 use super::{Cell, Sheet, validation};
 use crate::package::Package;
 
+/// Maximum number of logical cell replacements accepted by one batch.
+pub const MAX_CELL_CHANGES: usize = 4_096;
+
+/// One owned logical-cell replacement in a worksheet batch.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CellChange {
+    row: usize,
+    column: usize,
+    cell: Cell,
+}
+
+impl CellChange {
+    /// Create one logical-cell replacement.
+    #[must_use]
+    pub const fn new(row: usize, column: usize, cell: Cell) -> Self {
+        Self { row, column, cell }
+    }
+
+    /// Zero-based logical row coordinate.
+    #[must_use]
+    pub const fn row(&self) -> usize {
+        self.row
+    }
+
+    /// Zero-based logical column coordinate.
+    #[must_use]
+    pub const fn column(&self) -> usize {
+        self.column
+    }
+
+    /// Replacement cell.
+    #[must_use]
+    pub const fn cell(&self) -> &Cell {
+        &self.cell
+    }
+}
+
 /// Exact sheet name or checked zero-based source position.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Selector<'a> {
@@ -197,6 +234,79 @@ impl Edit {
         cell: Cell,
     ) -> Result<Option<()>> {
         self.update(selector.into(), |sheet| sheet.set_cell(row, column, cell))
+    }
+
+    /// Atomically replace a bounded collection of logical cells.
+    ///
+    /// Semantic no-ops are omitted. The returned count is the number of
+    /// replacements staged in the selected worksheet.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the batch exceeds [`MAX_CELL_CHANGES`], contains
+    /// an invalid or repeated cell, repeats a coordinate, or cannot produce a
+    /// valid worksheet graph. Every failure leaves this edit unchanged.
+    pub fn set_cells<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        mut changes: Vec<CellChange>,
+    ) -> Result<Option<usize>> {
+        if changes.len() > MAX_CELL_CHANGES {
+            return Err(Error::InvalidFormat(format!(
+                "ODS cell batch exceeds the {MAX_CELL_CHANGES} operation safety limit"
+            )));
+        }
+        let Some(index) = select(&self.draft, selector.into())? else {
+            return Ok(None);
+        };
+
+        validate_aggregate_cell_payload(&changes)?;
+        for change in &changes {
+            if change.row >= validation::MAX_LOGICAL_ROWS {
+                return Err(Error::InvalidFormat(format!(
+                    "ODS cell batch row {} is outside the {}-row logical grid",
+                    change.row,
+                    validation::MAX_LOGICAL_ROWS
+                )));
+            }
+            if change.column >= validation::MAX_LOGICAL_COLUMNS {
+                return Err(Error::InvalidFormat(format!(
+                    "ODS cell batch column {} is outside the {}-column logical grid",
+                    change.column,
+                    validation::MAX_LOGICAL_COLUMNS
+                )));
+            }
+            change.cell.validate()?;
+            if change.cell.repeat() != 1 {
+                return Err(Error::InvalidFormat(
+                    "setting one logical cell requires a non-repeated Cell".to_string(),
+                ));
+            }
+        }
+        changes.sort_by_key(|change| (change.row, change.column));
+        for repeated in changes.windows(2) {
+            if repeated[0].row == repeated[1].row && repeated[0].column == repeated[1].column {
+                return Err(Error::InvalidFormat(format!(
+                    "ODS cell batch repeats logical coordinate ({}, {})",
+                    repeated[0].row, repeated[0].column
+                )));
+            }
+        }
+
+        let effective = effective_cell_changes(&self.draft[index], changes);
+        let changed = effective.len();
+        if changed == 0 {
+            return Ok(Some(0));
+        }
+        let mut candidate = self.draft.clone();
+        candidate[index].set_cells_prevalidated(
+            effective
+                .into_iter()
+                .map(|change| (change.row, change.column, change.cell))
+                .collect(),
+        )?;
+        self.publish(candidate)?;
+        Ok(Some(changed))
     }
 
     /// Clear one logical cell while retaining its direct style.
@@ -459,6 +569,94 @@ fn select(sheets: &[Sheet], selector: Selector<'_>) -> Result<Option<usize>> {
     }
 }
 
+fn effective_cell_changes(sheet: &Sheet, changes: Vec<CellChange>) -> Vec<CellChange> {
+    let mut effective = Vec::with_capacity(changes.len());
+    let mut row_index = 0usize;
+    let mut row_start = 0usize;
+    let mut logical_row = None;
+    let mut cell_index = 0usize;
+    let mut cell_start = 0usize;
+
+    for change in changes {
+        while let Some(row) = sheet.rows.get(row_index) {
+            let row_end = row_start.saturating_add(row.repeat());
+            if change.row < row_end {
+                break;
+            }
+            row_start = row_end;
+            row_index += 1;
+        }
+        if logical_row != Some(change.row) {
+            logical_row = Some(change.row);
+            cell_index = 0;
+            cell_start = 0;
+        }
+
+        let existing = sheet.rows.get(row_index).and_then(|row| {
+            while let Some(cell) = row.cells.get(cell_index) {
+                let cell_end = cell_start.saturating_add(cell.repeat());
+                if change.column < cell_end {
+                    return Some(cell);
+                }
+                cell_start = cell_end;
+                cell_index += 1;
+            }
+            None
+        });
+        if existing.is_none_or(|cell| !cell.equivalent_run(&change.cell)) {
+            effective.push(change);
+        }
+    }
+    effective
+}
+
+fn validate_aggregate_cell_payload(changes: &[CellChange]) -> Result<()> {
+    let mut total = 0usize;
+    for change in changes {
+        checked_add_payload_bytes(&mut total, change.cell.text.len())?;
+        checked_add_payload_bytes(
+            &mut total,
+            change.cell.formula.as_ref().map_or(0, String::len),
+        )?;
+        checked_add_payload_bytes(
+            &mut total,
+            change.cell.style_name.as_ref().map_or(0, String::len),
+        )?;
+        match &change.cell.value {
+            super::CellValue::Text(value)
+            | super::CellValue::Date(value)
+            | super::CellValue::Time(value) => {
+                checked_add_payload_bytes(&mut total, value.len())?;
+            },
+            super::CellValue::Currency { currency, .. } => {
+                checked_add_payload_bytes(&mut total, currency.len())?;
+            },
+            super::CellValue::Unknown { kind, value } => {
+                checked_add_payload_bytes(&mut total, kind.len())?;
+                checked_add_payload_bytes(&mut total, value.as_ref().map_or(0, String::len))?;
+            },
+            super::CellValue::Empty
+            | super::CellValue::Number(_)
+            | super::CellValue::Percentage(_)
+            | super::CellValue::Boolean(_) => {},
+        }
+    }
+    Ok(())
+}
+
+fn checked_add_payload_bytes(total: &mut usize, bytes: usize) -> Result<()> {
+    *total = total.checked_add(bytes).ok_or_else(|| {
+        Error::InvalidFormat("ODS cell batch retained string payload overflows".to_string())
+    })?;
+    if *total > validation::MAX_CONTENT_XML_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "ODS cell batch retained string payload exceeds the {}-byte safety limit",
+            validation::MAX_CONTENT_XML_BYTES
+        )));
+    }
+    Ok(())
+}
+
 fn bounds(position: usize, length: usize) -> Error {
     Error::InvalidFormat(format!(
         "ODS worksheet position {position} is outside sheet count {length}"
@@ -500,6 +698,23 @@ mod tests {
         );
         let commit = edit.commit()?;
         assert!(commit.content_provenance_spliced());
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_cell_payload_accepts_exact_limit_and_rejects_next_byte() -> Result<()> {
+        let mut exact = 0;
+        checked_add_payload_bytes(&mut exact, validation::MAX_CONTENT_XML_BYTES)?;
+        assert_eq!(exact, validation::MAX_CONTENT_XML_BYTES);
+
+        let error = checked_add_payload_bytes(&mut exact, 1);
+        assert!(matches!(
+            error,
+            Err(Error::InvalidFormat(message)) if message.contains("payload exceeds")
+        ));
+
+        let mut overflow = usize::MAX;
+        assert!(checked_add_payload_bytes(&mut overflow, 1).is_err());
         Ok(())
     }
 }

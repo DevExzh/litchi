@@ -15,4 +15,4 @@ pub(crate) mod transaction;
 pub(crate) mod validation;
 
 pub use model::{Cell, CellValue, CellView, Merge, Row, Sheet};
-pub use snapshot::{Commit, Edit, Patch, Selector, Snapshot};
+pub use snapshot::{CellChange, Commit, Edit, MAX_CELL_CHANGES, Patch, Selector, Snapshot};
