@@ -26,6 +26,47 @@ pub enum ShapeTransferRefusal {
     UnresolvedConnectorEndpoint,
 }
 
+/// Stable classification for a whole-slide copy plan that cannot prove a
+/// complete, independent dependency closure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SlideCopyRefusal {
+    /// The source package contains OPC digital-signature infrastructure.
+    SignedPackage,
+    /// The presentation carries a modify-password verifier.
+    ProtectedPresentation,
+    /// Markup-compatibility input would require choosing or rewriting a branch.
+    MarkupCompatibility,
+    /// The slide or an owned XML dependency has an unmodeled semantic surface.
+    UnknownSemanticSurface,
+    /// A presentation-global or cross-slide owner is reachable from the slide.
+    SharedOwner,
+    /// A relationship family is outside the explicitly supported closure.
+    UnsupportedRelationship,
+    /// Owned dependency edges contain a cycle whose rewrite policy is not modeled.
+    DependencyCycle,
+    /// The package or selected slide has ambiguous physical ownership.
+    AmbiguousTopology,
+    /// A DrawingML table depends on the presentation-global table-style catalog.
+    GlobalTableStyle,
+}
+
+impl std::fmt::Display for SlideCopyRefusal {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::SignedPackage => "signed package",
+            Self::ProtectedPresentation => "protected presentation",
+            Self::MarkupCompatibility => "markup-compatibility surface",
+            Self::UnknownSemanticSurface => "unknown semantic surface",
+            Self::SharedOwner => "shared or cross-slide owner",
+            Self::UnsupportedRelationship => "unsupported relationship family",
+            Self::DependencyCycle => "dependency cycle",
+            Self::AmbiguousTopology => "ambiguous package topology",
+            Self::GlobalTableStyle => "presentation-global table style",
+        })
+    }
+}
+
 impl std::fmt::Display for ShapeTransferRefusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
@@ -43,6 +84,15 @@ impl std::fmt::Display for ShapeTransferRefusal {
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// A whole-slide copy prerequisite was classified and refused without mutation.
+    #[error("unsupported PresentationML slide copy plan ({kind}): {detail}")]
+    SlideCopyPlan {
+        /// Machine-readable refusal family.
+        kind: SlideCopyRefusal,
+        /// Bounded human-readable source context.
+        detail: String,
+    },
+
     /// A common-shape transfer was classified and refused before publication.
     #[error("unsupported PresentationML shape transfer ({kind}): {detail}")]
     ShapeTransfer {

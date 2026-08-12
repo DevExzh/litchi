@@ -466,11 +466,10 @@ fn validate_master_layouts(package: &OpcPackage, master_part: &dyn Part) -> Resu
                 "slide layout '{layout_name}' has no slide-master relationship"
             ))
         })?;
-        if back_reference.is_external()
-            || back_reference
-                .target_partname()
-                .is_ok_and(|target| target != *master_part.partname())
-        {
+        let references_owner = back_reference
+            .target_partname()
+            .is_ok_and(|target| target == *master_part.partname());
+        if back_reference.is_external() || !references_owner {
             return Err(Error::Relationship(format!(
                 "slide layout '{layout_name}' does not reference its owning master '{}'",
                 master_part.partname()
