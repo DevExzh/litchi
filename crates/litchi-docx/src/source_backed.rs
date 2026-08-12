@@ -9,6 +9,7 @@
 //! while raw-copying every unselected ZIP member.
 
 pub mod paragraph_copy;
+pub mod paragraph_remove;
 
 use crate::document::{Commit, Edit, Snapshot, TransactionResult};
 use crate::error::{Error, Result};
