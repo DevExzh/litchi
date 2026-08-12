@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use litchi_opc::{BlobPart, PackURI, TargetMode};
 
 use super::{History, Limits, Patch, Resolution, ShapeTextReplacement};
-use crate::{Error, Package, Result};
+use crate::{Error, Package, Result, SlideCopyRefusal};
 
 fn opened_two_slide_package() -> Result<Package> {
     let mut package = Package::new()?;
@@ -22,6 +22,127 @@ fn opened_two_slide_package() -> Result<Package> {
     }
     let bytes = package.to_bytes()?;
     Package::from_bytes(&bytes)
+}
+
+fn opened_plain_slide_package() -> Result<Package> {
+    let mut package = Package::new()?;
+    package
+        .presentation_mut()?
+        .add_slide()?
+        .set_title("Copy source");
+    let bytes = package.to_bytes()?;
+    Package::from_bytes(&bytes)
+}
+
+fn make_package_strict(package: &mut Package) -> Result<()> {
+    const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+    const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/";
+    const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+    const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
+    const DML: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+    const STRICT_DML: &str = "http://purl.oclc.org/ooxml/drawingml/main";
+
+    let presentation = PackURI::new("/ppt/presentation.xml").map_err(Error::Invalid)?;
+    let notes_relationship = package
+        .opc
+        .get_part(&presentation)?
+        .rels()
+        .iter()
+        .find(|relationship| {
+            relationship.reltype() == litchi_opc::constants::relationship_type::NOTES_MASTER
+        })
+        .map(|relationship| relationship.r_id().to_owned());
+    if let Some(id) = notes_relationship {
+        package
+            .opc
+            .get_part_mut(&presentation)?
+            .rels_mut()
+            .remove(&id);
+    }
+    let xml = std::str::from_utf8(package.opc.get_part(&presentation)?.blob())
+        .map_err(|error| Error::Xml(error.to_string()))?
+        .replace(
+            "<p:notesMasterIdLst><p:notesMasterId r:id=\"rIdNotesMaster\"/></p:notesMasterIdLst>",
+            "",
+        );
+    package
+        .opc
+        .get_part_mut(&presentation)?
+        .set_blob(xml.into_bytes());
+    for name in [
+        "/ppt/notesMasters/notesMaster1.xml",
+        "/ppt/theme/theme2.xml",
+    ] {
+        package
+            .opc
+            .remove_part(&PackURI::new(name).map_err(Error::Invalid)?);
+    }
+
+    let root: Vec<_> = package
+        .opc
+        .rels()
+        .iter()
+        .map(|relationship| {
+            (
+                relationship.r_id().to_owned(),
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.target_mode(),
+            )
+        })
+        .collect();
+    for (id, kind, target, mode) in root {
+        if let Some(local) = kind.strip_prefix(REL) {
+            package.opc.rels_mut().remove(&id);
+            package.opc.rels_mut().try_add_relationship(
+                format!("{STRICT_REL}{local}"),
+                target,
+                id,
+                mode,
+            )?;
+        }
+    }
+    let names: Vec<_> = package
+        .opc
+        .iter_parts()
+        .map(|part| part.partname().clone())
+        .collect();
+    for name in names {
+        let relationships: Vec<_> = package
+            .opc
+            .get_part(&name)?
+            .rels()
+            .iter()
+            .map(|relationship| {
+                (
+                    relationship.r_id().to_owned(),
+                    relationship.reltype().to_owned(),
+                    relationship.target_ref().to_owned(),
+                    relationship.target_mode(),
+                )
+            })
+            .collect();
+        let part = package.opc.get_part_mut(&name)?;
+        for (id, kind, target, mode) in relationships {
+            if let Some(local) = kind.strip_prefix(REL) {
+                part.rels_mut().remove(&id);
+                part.rels_mut().try_add_relationship(
+                    format!("{STRICT_REL}{local}"),
+                    target,
+                    id,
+                    mode,
+                )?;
+            }
+        }
+        if let Ok(xml) = std::str::from_utf8(part.blob()) {
+            part.set_blob(
+                xml.replace(PML, STRICT_PML)
+                    .replace(DML, STRICT_DML)
+                    .into_bytes(),
+            );
+        }
+    }
+    Ok(())
 }
 
 fn part_states(package: &Package) -> BTreeMap<String, (Vec<u8>, Vec<String>)> {
@@ -49,6 +170,29 @@ fn part_states(package: &Package) -> BTreeMap<String, (Vec<u8>, Vec<String>)> {
             )
         })
         .collect()
+}
+
+fn attach_copy_chart(package: &mut Package, xml: &[u8]) -> Result<PackURI> {
+    let slide = package.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    let chart = PackURI::new("/ppt/charts/copy-proof.xml").map_err(Error::Invalid)?;
+    package.opc.try_add_part(Box::new(BlobPart::new(
+        chart.clone(),
+        litchi_opc::constants::content_type::DML_CHART.into(),
+        xml.to_vec(),
+    )))?;
+    package
+        .opc
+        .get_part_mut(&slide)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::CHART.into(),
+            chart.relative_ref(slide.base_uri()),
+            "rIdCopyProof".into(),
+            TargetMode::Internal,
+        )?;
+    Ok(chart)
 }
 
 fn add_group_connector_transfer_fixture(package: &mut Package) -> Result<()> {
@@ -152,6 +296,580 @@ fn add_group_connector_transfer_fixture(package: &mut Package) -> Result<()> {
     let xml = super::xml::append_shape(&xml, content_part.as_bytes())?;
     let xml = super::xml::append_shape(&xml, unknown.as_bytes())?;
     package.opc.get_part_mut(&slide)?.set_blob(xml);
+    Ok(())
+}
+
+#[test]
+fn slide_copy_plan_is_bounded_deterministic_and_non_publishing() -> Result<()> {
+    let mut package = opened_plain_slide_package()?;
+    let slide = package.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    let image = PackURI::new("/ppt/media/copy-source.png").map_err(Error::Invalid)?;
+    let chart1 = PackURI::new("/ppt/charts/chart1.xml").map_err(Error::Invalid)?;
+    let chart2 = PackURI::new("/ppt/charts/chart2.xml").map_err(Error::Invalid)?;
+    let chart_collision = PackURI::new("/ppt/charts/chart1-copy1.xml").map_err(Error::Invalid)?;
+    let workbook = PackURI::new("/ppt/embeddings/data1.xlsx").map_err(Error::Invalid)?;
+    package.opc.try_add_part(Box::new(BlobPart::new(
+        image.clone(),
+        "image/png".into(),
+        vec![137, 80, 78, 71, 1, 2, 3, 4],
+    )))?;
+    for name in [&chart1, &chart2, &chart_collision] {
+        package.opc.try_add_part(Box::new(BlobPart::new(
+            name.clone(),
+            litchi_opc::constants::content_type::DML_CHART.into(),
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#
+                .to_vec(),
+        )))?;
+    }
+    package.opc.try_add_part(Box::new(BlobPart::new(
+        workbook.clone(),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".into(),
+        vec![80, 75, 3, 4, 9, 8, 7, 6],
+    )))?;
+    for chart in [&chart1, &chart2] {
+        let target = image.relative_ref(chart.base_uri());
+        package
+            .opc
+            .get_part_mut(chart)?
+            .rels_mut()
+            .try_add_relationship(
+                litchi_opc::constants::relationship_type::IMAGE.into(),
+                target,
+                "rIdImage".into(),
+                TargetMode::Internal,
+            )?;
+    }
+    package
+        .opc
+        .get_part_mut(&chart1)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::PACKAGE.into(),
+            workbook.relative_ref(chart1.base_uri()),
+            "rIdWorkbook".into(),
+            TargetMode::Internal,
+        )?;
+    for (id, chart) in [("rIdChart1", &chart1), ("rIdChart2", &chart2)] {
+        package
+            .opc
+            .get_part_mut(&slide)?
+            .rels_mut()
+            .try_add_relationship(
+                litchi_opc::constants::relationship_type::CHART.into(),
+                chart.relative_ref(slide.base_uri()),
+                id.into(),
+                TargetMode::Internal,
+            )?;
+    }
+    package
+        .opc
+        .get_part_mut(&slide)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::HYPERLINK.into(),
+            "https://example.invalid/inert".into(),
+            "rIdExternal".into(),
+            TargetMode::External,
+        )?;
+    let vba = PackURI::new("/ppt/vbaProject.bin").map_err(Error::Invalid)?;
+    package.opc.try_add_part(Box::new(BlobPart::new(
+        vba.clone(),
+        litchi_opc::constants::content_type::OFC_VBA_PROJECT.into(),
+        vec![0xD0, 0xCF, 0x11, 0xE0],
+    )))?;
+    let presentation = PackURI::new("/ppt/presentation.xml").map_err(Error::Invalid)?;
+    package
+        .opc
+        .get_part_mut(&presentation)?
+        .set_content_type(litchi_opc::constants::content_type::PML_PRES_MACRO_MAIN.into())?;
+    package
+        .opc
+        .get_part_mut(&presentation)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::VBA_PROJECT.into(),
+            vba.relative_ref(presentation.base_uri()),
+            "rIdVbaProject".into(),
+            TargetMode::Internal,
+        )?;
+
+    let before = part_states(&package);
+    let snapshot = package.opened_presentation()?;
+    let revision = snapshot.revision();
+    let plan = snapshot.plan_slide_copy(0_usize, 1)?;
+    assert_eq!(plan.position(), 1);
+    assert_eq!(plan.slide_id(), 257);
+    assert_eq!(plan.presentation_relationship_id(), "rId5");
+    assert_eq!(plan.external_relationship_count(), 1);
+    assert_eq!(
+        plan.reused_layout().as_str(),
+        "/ppt/slideLayouts/slideLayout1.xml"
+    );
+    assert_eq!(plan.parts().len(), 5);
+    assert!(plan.planned_bytes() > workbook.as_str().len());
+    assert!(
+        plan.parts().iter().any(|part| part.source() == &slide
+            && part.target().as_str() == "/ppt/slides/slide1-copy1.xml")
+    );
+    assert!(plan.parts().iter().any(|part| {
+        part.source() == &chart1 && part.target().as_str() == "/ppt/charts/chart1-copy2.xml"
+    }));
+    assert_eq!(
+        plan.parts()
+            .iter()
+            .filter(|part| part.source() == &image)
+            .count(),
+        1,
+        "the diamond dependency must be planned once"
+    );
+    assert!(
+        plan.parts()
+            .windows(2)
+            .all(|pair| pair[0].source().as_str() < pair[1].source().as_str())
+    );
+    assert_eq!(snapshot.revision(), revision);
+    assert_eq!(part_states(&package), before);
+    Ok(())
+}
+
+#[test]
+fn slide_copy_plan_refuses_cycles_and_unknown_internal_relationships() -> Result<()> {
+    let mut cyclic = opened_plain_slide_package()?;
+    let slide = cyclic.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    let first = PackURI::new("/ppt/charts/cycle1.xml").map_err(Error::Invalid)?;
+    let second = PackURI::new("/ppt/charts/cycle2.xml").map_err(Error::Invalid)?;
+    for name in [&first, &second] {
+        cyclic.opc.try_add_part(Box::new(BlobPart::new(
+            name.clone(),
+            litchi_opc::constants::content_type::DML_CHART.into(),
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#
+                .to_vec(),
+        )))?;
+    }
+    cyclic
+        .opc
+        .get_part_mut(&slide)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::CHART.into(),
+            first.relative_ref(slide.base_uri()),
+            "rIdCycle".into(),
+            TargetMode::Internal,
+        )?;
+    cyclic
+        .opc
+        .get_part_mut(&first)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::CHART.into(),
+            second.relative_ref(first.base_uri()),
+            "rIdNext".into(),
+            TargetMode::Internal,
+        )?;
+    cyclic
+        .opc
+        .get_part_mut(&second)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::CHART.into(),
+            first.relative_ref(second.base_uri()),
+            "rIdBack".into(),
+            TargetMode::Internal,
+        )?;
+    assert!(matches!(
+        cyclic.opened_presentation()?.plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::DependencyCycle,
+            ..
+        })
+    ));
+
+    let mut unknown = opened_plain_slide_package()?;
+    let slide = unknown.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    let payload = PackURI::new("/ppt/unknown/payload.bin").map_err(Error::Invalid)?;
+    unknown.opc.try_add_part(Box::new(BlobPart::new(
+        payload.clone(),
+        "application/octet-stream".into(),
+        vec![1, 2, 3],
+    )))?;
+    unknown
+        .opc
+        .get_part_mut(&slide)?
+        .rels_mut()
+        .try_add_relationship(
+            "urn:producer:unknown-owner".into(),
+            payload.relative_ref(slide.base_uri()),
+            "rIdUnknown".into(),
+            TargetMode::Internal,
+        )?;
+    assert!(matches!(
+        unknown.opened_presentation()?.plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::UnsupportedRelationship,
+            ..
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn slide_copy_plan_refuses_shared_owners_mce_protection_and_signatures() -> Result<()> {
+    let notes = opened_two_slide_package()?;
+    assert!(matches!(
+        notes.opened_presentation()?.plan_slide_copy(0_usize, 2),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::SharedOwner,
+            ..
+        })
+    ));
+
+    let mut mce = opened_plain_slide_package()?;
+    let slide = mce.opened_presentation()?.slides()[0].part_name().clone();
+    let xml = std::str::from_utf8(mce.opc.get_part(&slide)?.blob())
+        .map_err(|error| Error::Xml(error.to_string()))?
+        .replacen(
+            "<p:sld ",
+            "<p:sld xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:p14=\"urn:test\" mc:Ignorable=\"p14\" ",
+            1,
+        );
+    mce.opc.get_part_mut(&slide)?.set_blob(xml.into_bytes());
+    assert!(matches!(
+        mce.opened_presentation()?.plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::MarkupCompatibility,
+            ..
+        })
+    ));
+
+    let mut protected = opened_plain_slide_package()?;
+    let presentation = protected.opened_presentation()?.presentation_name.clone();
+    let xml = std::str::from_utf8(protected.opc.get_part(&presentation)?.blob())
+        .map_err(|error| Error::Xml(error.to_string()))?
+        .replacen(
+            "</p:presentation>",
+            "<p:modifyVerifier cryptAlgorithmSid=\"14\" spinCount=\"1\" saltData=\"AA==\" hashData=\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\"/></p:presentation>",
+            1,
+        );
+    protected
+        .opc
+        .get_part_mut(&presentation)?
+        .set_blob(xml.into_bytes());
+    assert!(matches!(
+        protected.opened_presentation()?.plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::ProtectedPresentation,
+            ..
+        })
+    ));
+
+    let mut signed = opened_plain_slide_package()?;
+    signed.opc.rels_mut().try_add_relationship(
+        litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN.into(),
+        "_xmlsignatures/origin.sigs".into(),
+        "rIdSignature".into(),
+        TargetMode::Internal,
+    )?;
+    assert!(matches!(
+        signed.opened_presentation()?.plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::SignedPackage,
+            ..
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn slide_copy_plan_refuses_global_tables_and_enforces_closure_limits() -> Result<()> {
+    let mut table = opened_plain_slide_package()?;
+    let slide = table.opened_presentation()?.slides()[0].part_name().clone();
+    let xml = std::str::from_utf8(table.opc.get_part(&slide)?.blob())
+        .map_err(|error| Error::Xml(error.to_string()))?
+        .replacen("</p:spTree>", "<a:tbl/></p:spTree>", 1);
+    table.opc.get_part_mut(&slide)?.set_blob(xml.into_bytes());
+    assert!(matches!(
+        table.opened_presentation()?.plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::GlobalTableStyle,
+            ..
+        })
+    ));
+
+    let mut extension = opened_plain_slide_package()?;
+    let slide = extension.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    let xml = std::str::from_utf8(extension.opc.get_part(&slide)?.blob())
+        .map_err(|error| Error::Xml(error.to_string()))?
+        .replacen(
+            "</p:spTree>",
+            "<p14:sp xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\"/></p:spTree>",
+            1,
+        );
+    extension
+        .opc
+        .get_part_mut(&slide)?
+        .set_blob(xml.into_bytes());
+    assert!(matches!(
+        extension.opened_presentation()?.plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::UnknownSemanticSurface,
+            ..
+        })
+    ));
+
+    let bounds = opened_plain_slide_package()?;
+    assert!(matches!(
+        bounds.opened_presentation()?.plan_slide_copy(0_usize, 2),
+        Err(Error::SlideIndexOutOfBounds { index: 2, len: 2 })
+    ));
+
+    let mut limited = opened_plain_slide_package()?;
+    let slide = limited.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    let image = PackURI::new("/ppt/media/limited.png").map_err(Error::Invalid)?;
+    limited.opc.try_add_part(Box::new(BlobPart::new(
+        image.clone(),
+        "image/png".into(),
+        vec![1, 2, 3, 4],
+    )))?;
+    limited
+        .opc
+        .get_part_mut(&slide)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::IMAGE.into(),
+            image.relative_ref(slide.base_uri()),
+            "rIdImage".into(),
+            TargetMode::Internal,
+        )?;
+    let limits = Limits::new(1, 1024 * 1024, 1024, 4, 1024 * 1024)
+        .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
+    assert!(matches!(
+        limited
+            .opened_presentation_with_limits(limits)?
+            .plan_slide_copy(0_usize, 1),
+        Err(Error::Limit {
+            resource: "slide-copy dependency parts",
+            limit: 1,
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn slide_copy_plan_validates_owned_xml_and_external_topology() -> Result<()> {
+    let mut extension = opened_plain_slide_package()?;
+    attach_copy_chart(
+        &mut extension,
+        br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><future:opaque xmlns:future="urn:future"/></c:chartSpace>"#,
+    )?;
+    assert!(matches!(
+        extension.opened_presentation()?.plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::UnknownSemanticSurface,
+            ..
+        })
+    ));
+
+    let mut encoded_mce = opened_plain_slide_package()?;
+    attach_copy_chart(
+        &mut encoded_mce,
+        br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/200&#x36;"/>"#,
+    )?;
+    assert!(matches!(
+        encoded_mce
+            .opened_presentation()?
+            .plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::MarkupCompatibility,
+            ..
+        })
+    ));
+
+    let mut table = opened_plain_slide_package()?;
+    attach_copy_chart(
+        &mut table,
+        br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:tbl/></c:chartSpace>"#,
+    )?;
+    assert!(matches!(
+        table.opened_presentation()?.plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::GlobalTableStyle,
+            ..
+        })
+    ));
+
+    let mut opaque_xml_media = opened_plain_slide_package()?;
+    let slide = opaque_xml_media.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    let svg = PackURI::new("/ppt/media/unmodeled.svg").map_err(Error::Invalid)?;
+    opaque_xml_media.opc.try_add_part(Box::new(BlobPart::new(
+        svg.clone(),
+        "image/svg+XmL; charset=utf-8".into(),
+        br#"<svg xmlns="http://www.w3.org/2000/svg"/>"#.to_vec(),
+    )))?;
+    opaque_xml_media
+        .opc
+        .get_part_mut(&slide)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::IMAGE.into(),
+            svg.relative_ref(slide.base_uri()),
+            "rIdSvg".into(),
+            TargetMode::Internal,
+        )?;
+    assert!(matches!(
+        opaque_xml_media
+            .opened_presentation()?
+            .plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::UnknownSemanticSurface,
+            ..
+        })
+    ));
+
+    let mut opaque_xml_package = opened_plain_slide_package()?;
+    let slide = opaque_xml_package.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    let payload = PackURI::new("/ppt/embeddings/unmodeled.xml").map_err(Error::Invalid)?;
+    opaque_xml_package.opc.try_add_part(Box::new(BlobPart::new(
+        payload.clone(),
+        "Application/XML; Charset=UTF-8".into(),
+        br#"<opaque/>"#.to_vec(),
+    )))?;
+    opaque_xml_package
+        .opc
+        .get_part_mut(&slide)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::PACKAGE.into(),
+            payload.relative_ref(slide.base_uri()),
+            "rIdXmlPackage".into(),
+            TargetMode::Internal,
+        )?;
+    assert!(matches!(
+        opaque_xml_package
+            .opened_presentation()?
+            .plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::UnknownSemanticSurface,
+            ..
+        })
+    ));
+
+    let mut external_layout = opened_plain_slide_package()?;
+    let slide = external_layout.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    external_layout
+        .opc
+        .get_part_mut(&slide)?
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::SLIDE_LAYOUT.into(),
+            "https://example.invalid/layout".into(),
+            "rIdExternalLayout".into(),
+            TargetMode::External,
+        )?;
+    assert!(matches!(
+        external_layout
+            .opened_presentation()?
+            .plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::SharedOwner,
+            ..
+        })
+    ));
+
+    let mut unknown_external = opened_plain_slide_package()?;
+    let slide = unknown_external.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    unknown_external
+        .opc
+        .get_part_mut(&slide)?
+        .rels_mut()
+        .try_add_relationship(
+            "urn:producer:external-owner".into(),
+            "https://example.invalid/opaque".into(),
+            "rIdExternalOpaque".into(),
+            TargetMode::External,
+        )?;
+    assert!(matches!(
+        unknown_external
+            .opened_presentation()?
+            .plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::UnsupportedRelationship,
+            ..
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn slide_copy_plan_reuses_only_a_registered_layout() -> Result<()> {
+    let mut package = opened_plain_slide_package()?;
+    let slide = package.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    let orphan = PackURI::new("/ppt/slideLayouts/orphan.xml").map_err(Error::Invalid)?;
+    package.opc.try_add_part(Box::new(BlobPart::new(
+        orphan.clone(),
+        litchi_opc::constants::content_type::PML_SLIDE_LAYOUT.into(),
+        br#"<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#
+            .to_vec(),
+    )))?;
+    let layout_id = package
+        .opc
+        .get_part(&slide)?
+        .rels()
+        .iter()
+        .find(|relationship| {
+            crate::parts::is_relationship_type(
+                relationship.reltype(),
+                litchi_opc::constants::relationship_type::SLIDE_LAYOUT,
+                "slideLayout",
+            )
+        })
+        .map(|relationship| relationship.r_id().to_owned())
+        .ok_or_else(|| Error::Invalid("test slide lacks a layout relationship".into()))?;
+    package
+        .opc
+        .get_part_mut(&slide)?
+        .rels_mut()
+        .retarget(&layout_id, orphan.relative_ref(slide.base_uri()))?;
+    assert!(matches!(
+        package.opened_presentation()?.plan_slide_copy(0_usize, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::SharedOwner,
+            ..
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn slide_copy_plan_accepts_the_strict_shared_layout_boundary() -> Result<()> {
+    let mut strict = opened_plain_slide_package()?;
+    make_package_strict(&mut strict)?;
+    let plan = strict.opened_presentation()?.plan_slide_copy(0_usize, 1)?;
+    assert_eq!(plan.source().id(), 256);
+    assert_eq!(plan.slide_id(), 257);
+    assert_eq!(
+        plan.reused_layout().as_str(),
+        "/ppt/slideLayouts/slideLayout1.xml"
+    );
     Ok(())
 }
 

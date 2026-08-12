@@ -7,6 +7,7 @@
 //! Publication uses an exact finite OPC resource patch and classifies shape
 //! transfer refusals before mutation.
 
+mod copy_plan;
 mod model;
 mod patch;
 mod transaction;
@@ -15,6 +16,7 @@ mod xml;
 #[cfg(test)]
 mod tests;
 
+pub use copy_plan::{SlideCopyPart, SlideCopyPlan};
 pub use model::{Limits, MAX_SHAPE_TEXT_REPLACEMENTS, ShapeTextReplacement, Slide, Snapshot};
 pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
 pub use transaction::{Commit, Transaction};
