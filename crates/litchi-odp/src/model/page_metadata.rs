@@ -305,6 +305,46 @@ pub(crate) fn metadata_after_page_remove(
     }
 }
 
+/// Move one page metadata record to a final zero-based position while keeping
+/// every page name and identifier attached to the same semantic page.
+pub(crate) fn metadata_after_page_move(
+    metadata: Option<&Collection>,
+    slide_count: usize,
+    from: usize,
+    to: usize,
+) -> Result<Option<Collection>> {
+    if from >= slide_count || to >= slide_count {
+        return Err(invalid("presentation page move index is out of bounds"));
+    }
+    if from == to || slide_count < 2 {
+        return Ok(metadata.cloned());
+    }
+
+    let names = effective_page_names(metadata, slide_count)?;
+    let mut pages = Vec::new();
+    pages
+        .try_reserve_exact(slide_count)
+        .map_err(|source| Error::Allocation {
+            resource: "ODP reordered page metadata",
+            source,
+        })?;
+    for (old_index, name) in names.into_iter().enumerate() {
+        let mut page = metadata
+            .and_then(|value| value.page(old_index))
+            .cloned()
+            .unwrap_or_else(|| Page::new(old_index));
+        page.name.get_or_insert(name);
+        pages.push(page);
+    }
+
+    let moved = pages.remove(from);
+    pages.insert(to, moved);
+    for (index, page) in pages.iter_mut().enumerate() {
+        page.slide_index = index;
+    }
+    Collection::new(pages).map(Some)
+}
+
 fn fallback_page_name(slide_index: usize) -> Result<String> {
     let ordinal = slide_index
         .checked_add(1)

@@ -4,7 +4,7 @@
 pub mod edit {
     pub use crate::authoring::edit::{
         Commit, CryptoCapability, CryptoOperation, CryptoRefusal, Domain, History, MergePlan,
-        Patch, SecurityPolicy, Selector, Snapshot, Transaction,
+        Patch, SecurityPolicy, Selector, SlidePosition, Snapshot, Transaction,
     };
 }
 

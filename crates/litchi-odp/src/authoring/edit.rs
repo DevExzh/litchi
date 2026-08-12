@@ -303,6 +303,7 @@ impl Snapshot {
             media_bytes: 0,
             resource_bytes: self.resource_bytes,
             source_resource_bytes: self.resource_bytes,
+            slide_order_changed: false,
         })
     }
 
@@ -323,6 +324,18 @@ pub enum Selector<'a> {
     Index(usize),
     /// Exact slide title. Duplicate titles are an ambiguity error.
     Title(&'a str),
+}
+
+/// Final position of a slide after a checked move.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SlidePosition {
+    /// Move the selected slide to the first position.
+    First,
+    /// Move the selected slide to the last position.
+    Last,
+    /// Move the selected slide to this final zero-based position.
+    Index(usize),
 }
 
 impl From<usize> for Selector<'_> {
@@ -350,6 +363,7 @@ pub struct Transaction {
     media_bytes: usize,
     resource_bytes: usize,
     source_resource_bytes: usize,
+    slide_order_changed: bool,
 }
 
 #[derive(Clone)]
@@ -539,6 +553,7 @@ impl Transaction {
     /// Returns an error for invalid text, exhausted limits, or ambiguous retained bindings.
     pub fn add(&mut self, title: &str, text: &str) -> Result<()> {
         Self::check_text(title, text)?;
+        self.check_no_slide_order_change("slide insertion")?;
         self.check_structure_edit()?;
         if self.draft.slides().len() == MAX_SLIDES {
             return invalid("ODP transaction exceeds the slide-count limit");
@@ -562,6 +577,7 @@ impl Transaction {
         S: Into<Selector<'a>>,
     {
         Self::check_text(title, text)?;
+        self.check_no_slide_order_change("slide insertion")?;
         self.check_structure_edit()?;
         if self.draft.slides().len() == MAX_SLIDES {
             return invalid("ODP transaction exceeds the slide-count limit");
@@ -588,6 +604,7 @@ impl Transaction {
     where
         S: Into<Selector<'a>>,
     {
+        self.check_no_slide_order_change("slide replacement")?;
         Self::check_text(title, text)?;
         let Some(index) = select(self.draft.slides(), selector.into())? else {
             return Ok(None);
@@ -614,6 +631,7 @@ impl Transaction {
     where
         S: Into<Selector<'a>>,
     {
+        self.check_no_slide_order_change("slide removal")?;
         self.check_structure_edit()?;
         let Some(index) = select(self.draft.slides(), selector.into())? else {
             return Ok(None);
@@ -624,6 +642,57 @@ impl Transaction {
         self.resource_bytes = candidate;
         self.changed = true;
         Ok(Some(removed))
+    }
+
+    /// Move one selected slide to a checked final position in the staged deck.
+    ///
+    /// Both the selector and [`SlidePosition::Index`] use the transaction's
+    /// current staged sequence. The destination is the slide's final index
+    /// after the move, so moving index `0` to index `2` in a three-slide deck
+    /// produces `[1, 2, 0]`. Page names, raw producer page fragments, notes,
+    /// transitions, animations, shapes, annotations, and resource references
+    /// travel with the selected slide. Sources with retained declarations or
+    /// slide-show settings are conservatively refused until those producer
+    /// fragments can be preserved verbatim.
+    ///
+    /// A move cannot be mixed with already-staged page-indexed chart, design,
+    /// annotation, or rich-content operations: their coordinate replay would
+    /// otherwise be ambiguous. The refusal leaves the transaction unchanged.
+    /// RDF and package-media operations are position-independent and may be
+    /// composed with a move.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an ambiguous selector, an out-of-range destination,
+    /// or a conflicting page-indexed operation. A missing selector returns
+    /// `Ok(None)`. Moving to the current position is an exact no-op.
+    pub fn move_slide<'a, S>(&mut self, selector: S, position: SlidePosition) -> Result<Option<()>>
+    where
+        S: Into<Selector<'a>>,
+    {
+        let Some(from) = select(self.draft.slides(), selector.into())? else {
+            return Ok(None);
+        };
+        let to = match position {
+            SlidePosition::First => 0,
+            SlidePosition::Last => self.draft.slides().len() - 1,
+            SlidePosition::Index(index) if index < self.draft.slides().len() => index,
+            SlidePosition::Index(index) => {
+                return invalid(format!(
+                    "ODP slide move destination {index} exceeds slide count {}",
+                    self.draft.slides().len()
+                ));
+            },
+        };
+        if from == to {
+            return Ok(Some(()));
+        }
+        self.check_page_indexed_move_conflict()?;
+        self.draft.check_slide_move_supported()?;
+        self.draft.move_slide(from, to)?;
+        self.slide_order_changed = true;
+        self.changed = true;
+        Ok(Some(()))
     }
 
     /// Append a typed shape to one supported slide.
@@ -638,6 +707,7 @@ impl Transaction {
     where
         S: Into<Selector<'a>>,
     {
+        self.check_no_slide_order_change("shape insertion")?;
         let Some(index) = select(self.draft.slides(), selector.into())? else {
             return Ok(None);
         };
@@ -662,6 +732,7 @@ impl Transaction {
     where
         S: Into<Selector<'a>>,
     {
+        self.check_no_slide_order_change("shape removal")?;
         let Some(slide_index) = select(self.draft.slides(), selector.into())? else {
             return Ok(None);
         };
@@ -686,6 +757,7 @@ impl Transaction {
     where
         S: Into<Selector<'a>>,
     {
+        self.check_no_slide_order_change("slide clear")?;
         let Some(index) = select(self.draft.slides(), selector.into())? else {
             return Ok(None);
         };
@@ -2017,6 +2089,7 @@ impl Transaction {
         charts: Vec<crate::charts::Chart>,
         operation: ChartOperation,
     ) -> Result<()> {
+        self.check_no_slide_order_change("chart")?;
         if bytes.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP chart transaction exceeds the 128 MiB package limit");
         }
@@ -2061,6 +2134,7 @@ impl Transaction {
     }
 
     fn stage_design_operation(&mut self, operation: DesignOperation) -> Result<()> {
+        self.check_no_slide_order_change("design")?;
         self.ensure_design()?;
         let current = self
             .design
@@ -2164,6 +2238,7 @@ impl Transaction {
     }
 
     fn stage_content(&mut self, operation: crate::content::Operation) -> Result<()> {
+        self.check_no_slide_order_change("rich-content")?;
         let current = self.content_bytes()?;
         let package = OwnedPackage::from_shared_bytes(current)?;
         let bytes = Arc::new(crate::content::apply(&package, &operation)?);
@@ -2184,6 +2259,7 @@ impl Transaction {
         &mut self,
         replacements: Vec<crate::content::OwnedTextBoxModelReplacement>,
     ) -> Result<usize> {
+        self.check_no_slide_order_change("rich-content")?;
         let current = self.content_bytes()?;
         let package = OwnedPackage::from_shared_bytes(current)?;
         let (bytes, changed) =
@@ -2223,6 +2299,7 @@ impl Transaction {
         bytes: Arc<Vec<u8>>,
         operation: AnnotationOperation,
     ) -> Result<()> {
+        self.check_no_slide_order_change("annotation")?;
         if bytes.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP annotation transaction exceeds the 128 MiB package limit");
         }
@@ -2277,6 +2354,40 @@ impl Transaction {
             return unsupported(
                 "ODP structural editing with retained header/footer declarations is not lossless",
             );
+        }
+        Ok(())
+    }
+
+    fn check_page_indexed_move_conflict(&self) -> Result<()> {
+        let conflict = self
+            .charts
+            .as_ref()
+            .is_some_and(|draft| !draft.operations.is_empty())
+            || self
+                .design
+                .as_ref()
+                .is_some_and(|draft| !draft.operations.is_empty())
+            || self
+                .annotations
+                .as_ref()
+                .is_some_and(|draft| !draft.operations.is_empty())
+            || self
+                .content
+                .as_ref()
+                .is_some_and(|draft| !draft.operations.is_empty());
+        if conflict {
+            return unsupported(
+                "ODP slide move conflicts with already-staged page-indexed operations",
+            );
+        }
+        Ok(())
+    }
+
+    fn check_no_slide_order_change(&self, operation: &str) -> Result<()> {
+        if self.slide_order_changed {
+            return unsupported(format!(
+                "ODP {operation} operation cannot be staged after a slide move"
+            ));
         }
         Ok(())
     }
