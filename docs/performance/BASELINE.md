@@ -227,7 +227,7 @@ commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
 PPTX semantic publication case, three opt-in media-rich ODT
-paragraph/line-break/inline-run publication cases, eight opt-in matched XLSX calculation-metadata/page-break/page-margin/print-options
+paragraph/line-break/inline-run publication cases, ten opt-in matched XLSX calculation-metadata/page-break/page-margin/print-options/page-setup
 publication cases, 16 opt-in DOCX/PPTX semantic
 cases, nine opt-in RTF semantic case names across four capability-bounded
 variants (33 tiny / 58 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
@@ -311,6 +311,13 @@ incomplete program and CRUD matrix.
   semantic materializations fall from 12 to 2 and output remains byte-identical
   across eager/source controls. See
   [`0070`](changes/0070-xlsx-source-backed-print-options-publication.md).
+- The guarded XLSX page-setup editor additionally retains the selected
+  worksheet's complete outbound relationship set and accepts only
+  relationship-free settings. It refuses printer references rather than
+  silently widening a one-Part edit to a printer-resource graph. The matched
+  media-rich pair records 12 versus two semantic materializations and exact
+  byte-identical output; see
+  [`0073`](changes/0073-xlsx-source-backed-page-setup-publication.md).
 - Consecutive packaged ODT plain-text replacements now share one mutable
   candidate, content publication, reopen and compact audit while retaining
   ordinary scalar durable operations. The large 100-edit/save p50 falls from
