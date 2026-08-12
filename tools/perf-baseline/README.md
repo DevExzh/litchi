@@ -38,8 +38,8 @@ two matched XLSX data-validation publication cases,
 two matched XLSX auto-filter/sort-state publication cases,
 two matched XLSX conditional-formatting publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
-DOCX/PPTX semantic cases, 11 RTF semantic cases, and 32 ODF semantic cases
-are opt-in, for 156 selectable cases in total:
+DOCX/PPTX semantic cases, 13 RTF semantic cases, and 32 ODF semantic cases
+are opt-in, for 158 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -438,24 +438,24 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/odt-media-structural-paragraph-publication.json
 ```
 
-Run the plain tiny semantic RTF smoke matrix (11
+Run the plain tiny semantic RTF smoke matrix (13
 records):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 --semantic-shape tiny \
-  --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_text_to_sink,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save \
+  --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_text_to_sink,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save,rtf_semantic_remove_paragraph_save,rtf_semantic_move_paragraph_save \
   --json target/perf/semantic-rtf-smoke.json
 ```
 
 Select all transport and producer variants for the complete tiny RTF coverage
-matrix (37 records):
+matrix (39 records):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 --semantic-shape tiny \
   --rtf-variant plain,byte1252,lzfu,watermark \
-  --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_text_to_sink,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save \
+  --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_text_to_sink,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save,rtf_semantic_remove_paragraph_save,rtf_semantic_move_paragraph_save \
   --json target/perf/semantic-rtf-variants-smoke.json
 ```
 
@@ -572,11 +572,14 @@ owned-byte open, lazy paragraph enumeration, one middle paragraph, first
 complete-text materialization, bounded semantic-text output to a forward-only
 sink, exact source streaming, exact empty-edit publication, and
 capability-bounded one-paragraph and `ceil(1%)` paragraph edit/save.
+The two lifecycle cases use a matched default-formatted plain corpus because
+the read/edit corpus's explicit font formatting is outside their changed
+publication closure.
 `--rtf-variant` defaults to `plain`.
 
 | Variant | Source | Shapes | Supported cases |
 |---|---|---|---|
-| `plain` | Deterministic direct ASCII RTF | tiny, medium, large | All 11 |
+| `plain` | Deterministic direct ASCII RTF | tiny, medium, large | All 13 |
 | `byte1252` | Deterministic raw CP-1252 bytes containing literal `0xe9` | tiny, medium, large | Open/read/text-to-sink/stream/no-op; changed splice is excluded because candidate validation refuses this byte layout |
 | `lzfu` | Deterministic LZFu compression of the plain bytes | tiny, medium, large | Open/read/text-to-sink/stream/no-op; changed transport rewrites are explicitly unsupported |
 | `watermark` | Content-addressed real-producer `test-data/rtf/watermark.rtf` | tiny selector only | Open/read/stream/no-op; semantic body-text output is excluded because its meaningful content is header drawing metadata rather than editable body text |
@@ -937,6 +940,25 @@ remain distinguishable.
   `ceil(1%)` paragraph positions, stage one bounded atomic batch, commit once,
   stream once, and verify exact patch replay, inverse restoration, late-failure
   atomicity, and complete reopened text outside the timed interval.
+- `rtf_semantic_remove_paragraph_save`: remove the exact middle paragraph from
+  the matched generated default-formatted plain lifecycle corpus, commit once,
+  and serialize into the same bounded
+  sink. Complete reopen/full projection, volatile and durable forward/inverse,
+  stale-source refusal, and the output hash are checked outside timing.
+- `rtf_semantic_move_paragraph_save`: move the first paragraph to the final
+  list position and perform the same untimed correctness gates. An
+  additional untimed equal-position move proves exact snapshot/byte no-op.
+  Both lifecycle cases deliberately reject changed CP-1252, LZFu, producer
+  watermark, and opaque/formatted sources; their unchanged equal-position move
+  remains exact. Native RTF has no logical-Part materialization counter, so the
+  report records honest output hashes and bounded sink counters rather than a
+  fabricated Part count.
+
+The two lifecycle intervals include edit construction, the one staging call,
+commit, a constant-size diagnostics assertion, one shared snapshot-handle
+clone, and bounded sequential serialization. Complete byte/projection,
+volatile/durable patch, stale-source, no-op, refusal, sink-summary and hash
+oracles remain outside timing.
 
 For both CFB stream-insertion cases, payload generation/cloning and writer
 construction happen before timing, while writer and source destruction happen

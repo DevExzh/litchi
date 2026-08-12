@@ -837,7 +837,7 @@ jobs:
           cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
             --warmup 0 \
             --samples 1 \
-            --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_text_to_sink,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save \
+            --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_text_to_sink,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save,rtf_semantic_remove_paragraph_save,rtf_semantic_move_paragraph_save \
             --semantic-shape tiny \
             --rtf-variant plain,byte1252,lzfu,watermark \
             --json target/perf/rtf-semantic-smoke.json
@@ -850,15 +850,44 @@ jobs:
           assert report["configuration"]["rtf_variants"] == [
               "plain", "byte1252", "lzfu", "watermark"
           ]
-          assert len(report["results"]) == 37
-          assert len({item["case"] for item in report["results"]}) == 11
+          assert len(report["results"]) == 39
+          assert len({item["case"] for item in report["results"]}) == 13
           assert len({
               (item["case"], item["corpus"]["rtf_variant"], item["corpus"]["shape"])
               for item in report["results"]
-          }) == 37
+          }) == 39
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 1
               assert item["corpus"]["archive_sha256"]
+          lifecycle = [
+              item for item in report["results"]
+              if item["case"] in {
+                  "rtf_semantic_remove_paragraph_save",
+                  "rtf_semantic_move_paragraph_save",
+              }
+          ]
+          assert len(lifecycle) == 2
+          assert {item["corpus"]["rtf_variant"] for item in lifecycle} == {"plain"}
+          expected = {
+              "rtf_semantic_remove_paragraph_save": (
+                  "73641cf09b630632deabce8585c67f395a6bd3ac01eedcca6a8b7224ef00d252",
+                  "49ef949a6ee85cc3a1bce19026e10a3b953136c73997eec6f719940e2c0b37a2",
+                  1250,
+              ),
+              "rtf_semantic_move_paragraph_save": (
+                  "73641cf09b630632deabce8585c67f395a6bd3ac01eedcca6a8b7224ef00d252",
+                  "9c7e42060e71be8cedf54fed9907d6a189efa45f1fec0f57d483e02af756f1fd",
+                  1304,
+              ),
+          }
+          for item in lifecycle:
+              source_sha256, output_sha256, output_bytes = expected[item["case"]]
+              assert item["corpus"]["archive_sha256"] == source_sha256
+              assert item["output_sha256"] == output_sha256
+              assert item["sink"]["accepted_bytes"] == output_bytes
+              assert item["sink"]["write_calls"] > 0
+              assert item["sink"]["largest_write"] <= item["sink"]["accepted_bytes"]
+              assert "source" not in item
           PY
 
   full:
@@ -1571,7 +1600,7 @@ jobs:
         run: |
           cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
             --samples 15 \
-            --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_text_to_sink,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save \
+            --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_text_to_sink,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save,rtf_semantic_remove_paragraph_save,rtf_semantic_move_paragraph_save \
             --semantic-shape tiny,large \
             --rtf-variant plain,byte1252,lzfu,watermark \
             --json target/perf/rtf-semantic-baseline.json
@@ -1584,15 +1613,56 @@ jobs:
           assert report["configuration"]["rtf_variants"] == [
               "plain", "byte1252", "lzfu", "watermark"
           ]
-          assert len(report["results"]) == 66
-          assert len({item["case"] for item in report["results"]}) == 11
+          assert len(report["results"]) == 70
+          assert len({item["case"] for item in report["results"]}) == 13
           assert len({
               (item["case"], item["corpus"]["rtf_variant"], item["corpus"]["shape"])
               for item in report["results"]
-          }) == 66
+          }) == 70
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 15
               assert item["corpus"]["archive_sha256"]
+          lifecycle = [
+              item for item in report["results"]
+              if item["case"] in {
+                  "rtf_semantic_remove_paragraph_save",
+                  "rtf_semantic_move_paragraph_save",
+              }
+          ]
+          assert len(lifecycle) == 4
+          assert {item["corpus"]["rtf_variant"] for item in lifecycle} == {"plain"}
+          assert {item["corpus"]["shape"] for item in lifecycle} == {"tiny", "large"}
+          expected = {
+              ("rtf_semantic_remove_paragraph_save", "tiny"): (
+                  "73641cf09b630632deabce8585c67f395a6bd3ac01eedcca6a8b7224ef00d252",
+                  "49ef949a6ee85cc3a1bce19026e10a3b953136c73997eec6f719940e2c0b37a2",
+                  1250,
+              ),
+              ("rtf_semantic_move_paragraph_save", "tiny"): (
+                  "73641cf09b630632deabce8585c67f395a6bd3ac01eedcca6a8b7224ef00d252",
+                  "9c7e42060e71be8cedf54fed9907d6a189efa45f1fec0f57d483e02af756f1fd",
+                  1304,
+              ),
+              ("rtf_semantic_remove_paragraph_save", "large"): (
+                  "5feae6e5bd27751d75c936a5ae9f57e00d391d7759557e07c535227c72f3cf7c",
+                  "946eda640eaa0b1df36e38264aa3ef8dd08d95986de0517baa186fae4da8f95d",
+                  539954,
+              ),
+              ("rtf_semantic_move_paragraph_save", "large"): (
+                  "5feae6e5bd27751d75c936a5ae9f57e00d391d7759557e07c535227c72f3cf7c",
+                  "6f6a12a8f44580bd2a3b243306e49e185931079d3abe369b780fe82d4d111f27",
+                  540008,
+              ),
+          }
+          for item in lifecycle:
+              key = (item["case"], item["corpus"]["shape"])
+              source_sha256, output_sha256, output_bytes = expected[key]
+              assert item["corpus"]["archive_sha256"] == source_sha256
+              assert item["output_sha256"] == output_sha256
+              assert item["sink"]["accepted_bytes"] == output_bytes
+              assert item["sink"]["write_calls"] > 0
+              assert item["sink"]["largest_write"] <= item["sink"]["accepted_bytes"]
+              assert "source" not in item
           PY
 
       - name: Upload performance baseline JSON
