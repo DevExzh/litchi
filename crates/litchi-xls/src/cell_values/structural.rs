@@ -2583,7 +2583,7 @@ fn certify_simple_drawing_obj(payload: &[u8]) -> Result<()> {
     }
 }
 
-fn replace_range_and_adjust_bounds(
+pub(super) fn replace_range_and_adjust_bounds(
     workbook: &mut Vec<u8>,
     start: usize,
     end: usize,
@@ -2632,6 +2632,119 @@ fn replace_range_and_adjust_bounds(
             .and_then(|value| u32::try_from(value).ok())
             .ok_or_else(|| Error::UnsafeEdit("worksheet position adjustment overflows".into()))?;
         adjust_worksheet_index_offsets(workbook, position, delta)?;
+    }
+    Ok(())
+}
+
+/// Applies worksheet-local replacements in descending source order, then
+/// repairs every affected `BoundSheet8` and downstream `INDEX` exactly once.
+///
+/// This narrower batch primitive deliberately rejects workbook-global ranges:
+/// its callers must already have proved that every replacement is inside a
+/// worksheet and after that worksheet's final `DBCELL`.
+pub(super) fn replace_ranges_and_adjust_bounds(
+    workbook: &mut Vec<u8>,
+    replacements: &[(usize, usize, Vec<u8>)],
+) -> Result<()> {
+    if replacements.is_empty() {
+        return Ok(());
+    }
+    let old_bounds = bound_sheets(workbook)?;
+    let first_sheet = old_bounds
+        .iter()
+        .try_fold(None, |first: Option<usize>, bound| {
+            let position = usize::try_from(bound.position)
+                .map_err(|_error| Error::InvalidData("worksheet position exceeds usize".into()))?;
+            Ok::<_, Error>(Some(first.map_or(position, |value| value.min(position))))
+        })?
+        .ok_or_else(|| Error::UnsafeEdit("worksheet replacement requires a BoundSheet".into()))?;
+    let mut prior_start = workbook.len();
+    let mut deltas = Vec::new();
+    deltas
+        .try_reserve_exact(replacements.len())
+        .map_err(|_error| Error::Allocation("retaining worksheet replacement deltas"))?;
+    for (start, end, replacement) in replacements {
+        if *start < first_sheet || *start > *end || *end > workbook.len() {
+            return Err(Error::UnsafeEdit(
+                "batched replacement is outside a worksheet source range".into(),
+            ));
+        }
+        if *end > prior_start {
+            return Err(Error::UnsafeEdit(
+                "batched worksheet replacement ranges overlap or are not descending".into(),
+            ));
+        }
+        let old_len = end
+            .checked_sub(*start)
+            .ok_or_else(|| Error::InvalidData("replacement range is reversed".into()))?;
+        let delta = i64::try_from(replacement.len())
+            .ok()
+            .and_then(|new| {
+                i64::try_from(old_len)
+                    .ok()
+                    .and_then(|old| new.checked_sub(old))
+            })
+            .ok_or_else(|| Error::InvalidData("Workbook replacement delta overflow".into()))?;
+        deltas.push((*end, delta));
+        prior_start = *start;
+    }
+
+    let total_delta = deltas.iter().try_fold(0_i64, |total, (_, delta)| {
+        total
+            .checked_add(*delta)
+            .ok_or_else(|| Error::InvalidData("Workbook replacement total overflow".into()))
+    })?;
+    let target_len = i64::try_from(workbook.len())
+        .ok()
+        .and_then(|length| length.checked_add(total_delta))
+        .and_then(|length| usize::try_from(length).ok())
+        .ok_or_else(|| Error::InvalidData("Workbook replacement length overflows".into()))?;
+    let mut rebuilt = Vec::new();
+    rebuilt
+        .try_reserve_exact(target_len)
+        .map_err(|_error| Error::Allocation("publishing batched worksheet replacements"))?;
+    let mut cursor = 0_usize;
+    for (start, end, replacement) in replacements.iter().rev() {
+        rebuilt.extend_from_slice(workbook.get(cursor..*start).ok_or_else(|| {
+            Error::InvalidData("batched replacement prefix is outside Workbook".into())
+        })?);
+        rebuilt.extend_from_slice(replacement);
+        cursor = *end;
+    }
+    rebuilt.extend_from_slice(workbook.get(cursor..).ok_or_else(|| {
+        Error::InvalidData("batched replacement suffix is outside Workbook".into())
+    })?);
+    if rebuilt.len() != target_len {
+        return Err(Error::InvalidData(
+            "batched Workbook replacement length disagrees with its plan".into(),
+        ));
+    }
+    *workbook = rebuilt;
+
+    for bound in old_bounds {
+        let before = usize::try_from(bound.position)
+            .map_err(|_error| Error::InvalidData("worksheet position exceeds usize".into()))?;
+        let shift = deltas.iter().try_fold(0_i64, |total, (end, delta)| {
+            if *end <= before {
+                total
+                    .checked_add(*delta)
+                    .ok_or_else(|| Error::InvalidData("worksheet shift overflow".into()))
+            } else {
+                Ok(total)
+            }
+        })?;
+        if shift == 0 {
+            continue;
+        }
+        let position = i64::from(bound.position)
+            .checked_add(shift)
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or_else(|| Error::UnsafeEdit("BoundSheet position adjustment overflows".into()))?;
+        workbook
+            .get_mut(bound.record.start + 4..bound.record.start + 8)
+            .ok_or_else(|| Error::InvalidData("BoundSheet position field is truncated".into()))?
+            .copy_from_slice(&position.to_le_bytes());
+        adjust_worksheet_index_offsets(workbook, position, shift)?;
     }
     Ok(())
 }
