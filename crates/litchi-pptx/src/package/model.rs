@@ -195,6 +195,44 @@ impl Package {
         Ok(self.opened_presentation()?.edit())
     }
 
+    /// Atomically publish a source-bound same-package whole-slide copy plan.
+    ///
+    /// Planning validates and materializes the complete candidate without
+    /// mutation. Publication refuses when any part of the package graph has
+    /// changed since planning, including resources outside the copy write set.
+    /// Unrelated OPC members retain their exact in-memory part state and are
+    /// left outside the finite resource patch.
+    ///
+    /// No standalone inverse is exposed: a generic durable patch does not
+    /// encode the plan's complete-package revision binding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale plan, package mutation-policy refusal, or a
+    /// candidate graph that no longer applies exactly.
+    pub fn apply_slide_copy_plan(
+        &mut self,
+        plan: &crate::opened::SlideCopyPlan,
+    ) -> Result<crate::opened::Snapshot> {
+        self.ensure_graph_current("apply_slide_copy_plan")?;
+        if self.mutable_pres.is_some() {
+            return Err(Error::UnsafeEdit {
+                operation: "apply_slide_copy_plan",
+                reason: "slide-copy plans require an already-opened package",
+            });
+        }
+        self.ensure_plain_mutation("apply_slide_copy_plan")?;
+        if crate::opened::package_fingerprint(&self.opc)? != plan.source_revision() {
+            return Err(Error::UnsafeEdit {
+                operation: "apply_slide_copy_plan",
+                reason: "the complete package graph changed after slide-copy planning",
+            });
+        }
+        let snapshot = crate::opened::apply(&mut self.opc, plan.patch())?;
+        self.mutable_pres = None;
+        Ok(snapshot)
+    }
+
     /// Publish one opened-presentation commit atomically.
     ///
     /// # Errors

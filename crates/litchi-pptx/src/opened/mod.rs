@@ -21,6 +21,6 @@ pub use model::{Limits, MAX_SHAPE_TEXT_REPLACEMENTS, ShapeTextReplacement, Slide
 pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
 pub use transaction::{Commit, Transaction};
 
-pub(crate) use model::capture;
+pub(crate) use model::{capture, package_fingerprint};
 pub(crate) use patch::apply;
 pub(crate) use xml::stage_shape_texts;
