@@ -100,6 +100,8 @@ mod cell;
     reason = "the cell transaction accepts forward-compatible public sheet values"
 )]
 pub mod cell_values;
+/// Lossless, source-backed BIFF8 worksheet visibility transactions.
+pub mod sheet_visibility;
 
 /// BIFF8 worksheet data-validation records.
 #[allow(
