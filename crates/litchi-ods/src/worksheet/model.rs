@@ -544,6 +544,51 @@ impl Sheet {
         compact_rows(&mut self.rows)?;
         Ok(())
     }
+
+    pub(crate) fn set_cells_prevalidated(
+        &mut self,
+        changes: Vec<(usize, usize, Cell)>,
+    ) -> Result<()> {
+        let mut touched_rows = Vec::with_capacity(changes.len());
+        let mut changes = changes.into_iter().peekable();
+        let mut row_cursor = 0usize;
+        let mut row_start = 0usize;
+        while let Some((row, column, mut cell)) = changes.next() {
+            let row_index = isolate_row_from(&mut self.rows, row, &mut row_cursor, &mut row_start)?;
+            let mut cell_cursor = 0usize;
+            let mut cell_start = 0usize;
+            let cell_index = isolate_cell_from(
+                &mut self.rows[row_index].cells,
+                column,
+                &mut cell_cursor,
+                &mut cell_start,
+            )?;
+            cell.repeat = NonZeroUsize::MIN;
+            self.rows[row_index].cells[cell_index] = cell;
+
+            while changes
+                .peek()
+                .is_some_and(|(next_row, _, _)| *next_row == row)
+            {
+                let (_, column, mut cell) = changes.next().ok_or_else(|| {
+                    Error::InvalidFormat("ODS cell batch ended early".to_string())
+                })?;
+                let cell_index = isolate_cell_from(
+                    &mut self.rows[row_index].cells,
+                    column,
+                    &mut cell_cursor,
+                    &mut cell_start,
+                )?;
+                cell.repeat = NonZeroUsize::MIN;
+                self.rows[row_index].cells[cell_index] = cell;
+            }
+            touched_rows.push(row_index);
+        }
+        for row_index in touched_rows {
+            compact_cells(&mut self.rows[row_index].cells)?;
+        }
+        compact_rows(&mut self.rows)
+    }
 }
 
 impl Cell {
@@ -553,15 +598,25 @@ impl Cell {
 }
 
 fn isolate_row(rows: &mut Vec<Row>, target: usize) -> Result<usize> {
-    let mut start = 0usize;
-    for index in 0..rows.len() {
-        let count = rows[index].repeat();
+    let mut index = 0;
+    let mut start = 0;
+    isolate_row_from(rows, target, &mut index, &mut start)
+}
+
+fn isolate_row_from(
+    rows: &mut Vec<Row>,
+    target: usize,
+    index: &mut usize,
+    start: &mut usize,
+) -> Result<usize> {
+    while *index < rows.len() {
+        let count = rows[*index].repeat();
         let end = start.checked_add(count).ok_or_else(|| {
             Error::InvalidFormat("ODS row address overflows the logical grid".to_string())
         })?;
         if target < end {
-            let offset = target - start;
-            let original = rows[index].clone();
+            let offset = target - *start;
+            let original = rows[*index].clone();
             let mut replacement = Vec::with_capacity(3);
             if offset > 0 {
                 replacement.push(original.with_repeat(offset)?);
@@ -571,29 +626,44 @@ fn isolate_row(rows: &mut Vec<Row>, target: usize) -> Result<usize> {
             if suffix > 0 {
                 replacement.push(original.with_repeat(suffix)?);
             }
-            rows.splice(index..=index, replacement);
-            return Ok(index + usize::from(offset > 0));
+            rows.splice(*index..=*index, replacement);
+            *index += usize::from(offset > 0);
+            *start = target;
+            return Ok(*index);
         }
-        start = end;
+        *start = end;
+        *index += 1;
     }
 
-    if target > start {
-        rows.push(Row::repeated(target - start)?);
+    if target > *start {
+        rows.push(Row::repeated(target - *start)?);
     }
     rows.push(Row::new());
-    Ok(rows.len() - 1)
+    *index = rows.len() - 1;
+    *start = target;
+    Ok(*index)
 }
 
 fn isolate_cell(cells: &mut Vec<Cell>, target: usize) -> Result<usize> {
-    let mut start = 0usize;
-    for index in 0..cells.len() {
-        let count = cells[index].repeat();
+    let mut index = 0;
+    let mut start = 0;
+    isolate_cell_from(cells, target, &mut index, &mut start)
+}
+
+fn isolate_cell_from(
+    cells: &mut Vec<Cell>,
+    target: usize,
+    index: &mut usize,
+    start: &mut usize,
+) -> Result<usize> {
+    while *index < cells.len() {
+        let count = cells[*index].repeat();
         let end = start.checked_add(count).ok_or_else(|| {
             Error::InvalidFormat("ODS cell address overflows the logical grid".to_string())
         })?;
         if target < end {
-            let offset = target - start;
-            let original = cells[index].clone();
+            let offset = target - *start;
+            let original = cells[*index].clone();
             let mut replacement = Vec::with_capacity(3);
             if offset > 0 {
                 replacement.push(original.with_repeat(offset)?);
@@ -603,16 +673,21 @@ fn isolate_cell(cells: &mut Vec<Cell>, target: usize) -> Result<usize> {
             if suffix > 0 {
                 replacement.push(original.with_repeat(suffix)?);
             }
-            cells.splice(index..=index, replacement);
-            return Ok(index + usize::from(offset > 0));
+            cells.splice(*index..=*index, replacement);
+            *index += usize::from(offset > 0);
+            *start = target;
+            return Ok(*index);
         }
-        start = end;
+        *start = end;
+        *index += 1;
     }
-    if target > start {
-        cells.push(Cell::repeated(CellValue::Empty, "", target - start)?);
+    if target > *start {
+        cells.push(Cell::repeated(CellValue::Empty, "", target - *start)?);
     }
     cells.push(Cell::empty());
-    Ok(cells.len() - 1)
+    *index = cells.len() - 1;
+    *start = target;
+    Ok(*index)
 }
 
 fn compact_cells(cells: &mut Vec<Cell>) -> Result<()> {
