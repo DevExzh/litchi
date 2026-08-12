@@ -1348,6 +1348,18 @@ impl Edit {
                     document.replace_transaction_bytes(bytes)?;
                     OperationResult::Indices(indices)
                 },
+                Operation::GarbageCollectEmbeddedResources { candidates } => {
+                    let current = Snapshot::from_document(&document)?;
+                    let plan = crate::package::resource_gc::plan(current, candidates)?;
+                    if !plan.is_applicable() {
+                        return Err(Error::Unsupported(
+                            "ODT embedded-resource GC replay contains a typed refusal".to_string(),
+                        ));
+                    }
+                    let bytes = plan.apply_to_package(document.transaction_package())?;
+                    document.replace_transaction_bytes(bytes)?;
+                    OperationResult::Unit
+                },
                 Operation::ReplaceEmbeddedObject { index, resource } => {
                     document.replace_embedded_object(*index, resource)?;
                     OperationResult::Unit
@@ -1842,6 +1854,9 @@ enum Operation {
     EmbeddedResourceBatch {
         changes: Vec<crate::package::embedded::EmbeddedResourceChange>,
     },
+    GarbageCollectEmbeddedResources {
+        candidates: Vec<crate::package::resource_gc::EmbeddedResourceGcCandidate>,
+    },
     ReplaceEmbeddedObject {
         index: usize,
         resource: crate::package::embedded::EmbeddedResource,
@@ -1924,6 +1939,19 @@ impl Commit {
     pub fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
+}
+
+pub(crate) fn embedded_resource_gc_commit(
+    before: Snapshot,
+    snapshot: Snapshot,
+    candidates: Vec<crate::package::resource_gc::EmbeddedResourceGcCandidate>,
+) -> Commit {
+    let operations = if candidates.is_empty() {
+        Vec::new()
+    } else {
+        vec![Operation::GarbageCollectEmbeddedResources { candidates }]
+    };
+    Commit::new(before, snapshot, vec![OperationResult::Unit], operations)
 }
 
 /// The typed result produced by one staged operation.
@@ -3196,6 +3224,11 @@ fn semantic_patch_operation(
             "/package/embedded/batch".to_string(),
             embedded_resource_batch_value(changes, blobs)?,
         ),
+        Operation::GarbageCollectEmbeddedResources { candidates } => (
+            "resource.embedded.gc",
+            "/package/embedded/gc".to_string(),
+            embedded_resource_gc_value(candidates),
+        ),
         Operation::ReplaceEmbeddedObject { index, resource } => (
             "resource.embedded.object.replace",
             format!("/package/embedded/objects/{index}"),
@@ -3697,6 +3730,11 @@ fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> 
                 changes: embedded_resource_batch_from_value(&operation.value, blobs)?,
             })
         },
+        "resource.embedded.gc" if operation.target == "/package/embedded/gc" => {
+            Ok(Operation::GarbageCollectEmbeddedResources {
+                candidates: embedded_resource_gc_from_value(&operation.value)?,
+            })
+        },
         "resource.embedded.object.replace" => Ok(Operation::ReplaceEmbeddedObject {
             index: index("/package/embedded/objects/", "")?,
             resource: embedded_resource_from_value(&operation.value, blobs)?,
@@ -4086,6 +4124,56 @@ fn embedded_resource_batch_from_value(
         }
     }
     Ok(changes)
+}
+
+fn embedded_resource_gc_value(
+    candidates: &[crate::package::resource_gc::EmbeddedResourceGcCandidate],
+) -> Value {
+    use crate::package::resource_gc::EmbeddedResourceGcCandidate;
+    Value::Array(
+        candidates
+            .iter()
+            .map(|candidate| match candidate {
+                EmbeddedResourceGcCandidate::PackageFile(path) => {
+                    serde_json::json!({"kind": "file", "path": path})
+                },
+                EmbeddedResourceGcCandidate::PackageSubdocument(path) => {
+                    serde_json::json!({"kind": "subdocument", "path": path})
+                },
+            })
+            .collect(),
+    )
+}
+
+fn embedded_resource_gc_from_value(
+    value: &Value,
+) -> Result<Vec<crate::package::resource_gc::EmbeddedResourceGcCandidate>> {
+    use crate::package::resource_gc::EmbeddedResourceGcCandidate;
+    let values = value.as_array().ok_or_else(invalid_durable_patch)?;
+    if values.len() > 256 {
+        return Err(invalid_durable_patch());
+    }
+    let mut candidates = Vec::new();
+    candidates
+        .try_reserve_exact(values.len())
+        .map_err(|source| Error::Allocation {
+            resource: "embedded-resource GC durable candidates",
+            source,
+        })?;
+    for value in values {
+        let object = exact_object(value, 2)?;
+        let path = object_required_string_map(object, "path")?;
+        crate::package::resource_gc::validate_candidate_path_bound(path)
+            .map_err(|_error| invalid_durable_patch())?;
+        let path = path.to_owned();
+        let candidate = match object_required_string_map(object, "kind")? {
+            "file" => EmbeddedResourceGcCandidate::PackageFile(path),
+            "subdocument" => EmbeddedResourceGcCandidate::PackageSubdocument(path),
+            _ => return Err(invalid_durable_patch()),
+        };
+        candidates.push(candidate);
+    }
+    Ok(candidates)
 }
 
 fn embedded_resource_value(
@@ -4728,6 +4816,11 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
                             }
                         },
                     }
+                }
+            },
+            Operation::GarbageCollectEmbeddedResources { candidates } => {
+                for candidate in candidates {
+                    writes.push(format!("/package/embedded/gc/{}", candidate.path()));
                 }
             },
             Operation::ReplaceEmbeddedObject { index, .. }
