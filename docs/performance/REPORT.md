@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `63c22284b9d643809483d06e7c010c273bc8a957`
+Production base for the latest measured tranche: `2fead7927f6111acccf49aaaf543d285d88d0f90`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -13,14 +13,14 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **141 selectable cases**: 36 default cases and 198 default
+harness contains **143 selectable cases**: 36 default cases and 198 default
 records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
 opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in
 source-backed media-rich PPTX semantic publication case, six opt-in media-rich ODT
-paragraph/line-break/inline-run/hyperlink/insertion/removal publication cases, ten opt-in matched XLSX
-calculation-metadata/page-break/page-margin/print-options/page-setup publication cases, 16 opt-in DOCX/PPTX
+paragraph/line-break/inline-run/hyperlink/insertion/removal publication cases, 12 opt-in matched XLSX
+calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup publication cases, 16 opt-in DOCX/PPTX
 semantic cases, nine opt-in RTF semantic case names across four
 capability-bounded variants (33 tiny / 58 tiny-plus-large rows), 23
 shape-selected ODT/ODS/ODP semantic cases, eight fixed media-rich ODF cases,
@@ -35,6 +35,7 @@ is still not broad program or CRUD coverage.
 | Source-backed OPC and DOCX/XLSX/PPTX facades | EOCD structural-open source bytes **-73.6% to -98.5%**; ordinary payload overlap zero | No latency claim: later EntryId/cache-diagnostic changes confound comparison and some cells exceed 5% variance |
 | Source-backed PPTX selected-slide publication | Media-rich one-edit/save p50 **-97.12%**; atomic eight-shape batch p50/mean **-97.45%**, allocation calls **-39.80%**; materializations **229 -> 2**; byte-identical output | One operation in one existing slide only, bounded to 256 unique nonoverlapping shape-text replacements; MCE rewrites, topology changes and changed signed packages refuse before output |
 | Source-backed XLSX calculation-metadata publication | Media-rich one-edit/save p50 **-99.2519%** (133.67x), mean **-99.2507%**; instructions **-77.78%**; materializations **12 -> 1**; byte-identical output | Existing `xl/workbook.xml` calculation properties/features only; cells, formulas, cached results, chains, relationships and topology remain outside the capability |
+| Source-backed XLSX defined-name publication | Media-rich catalog edit/save p50 **-97.84%** (46.32x), mean **-97.81%**; instructions **-78.45%**; materializations **12 -> 1**; byte-identical output | Complete direct `definedNames` catalog only; protected/MCE/unknown catalogs, sheet topology, cells, formulas, relationships and changed signed sources remain outside the capability |
 | Source-backed XLSX page-break publication | Media-rich one-edit/save p50 **-97.86%** (46.65x), mean **-97.86%**; materializations **12 -> 2**; byte-identical output | One existing normal worksheet's page-break collections only; cells, formulas, styles, relationships, topology, and changed signed sources remain outside the capability |
 | Source-backed XLSX page-margin publication | Media-rich one-edit/save p50 **-97.93%** (48.26x), mean **-97.93%**; materializations **12 -> 2**; byte-identical output | One existing normal worksheet's direct six-value page-margin set only; cells, formulas, styles, relationships, topology, and changed signed sources remain outside the capability |
 | Source-backed XLSX print-options publication | Media-rich one-edit/save p50 **-97.87%** (46.98x), mean **-97.88%**; materializations **12 -> 2**; byte-identical output | One existing normal worksheet's direct five-flag print options only; cells, formulas, printer settings, relationships, topology, and changed signed sources remain outside the capability |
@@ -389,6 +390,15 @@ Counters, allocation/RSS attribution, exact workbook/media preservation,
 refusal coverage and frozen binary/input/output hashes are summarized in
 [`change 0046`](changes/0046-xlsx-source-backed-calculation-metadata-publication.md).
 
+The source-backed XLSX defined-name publication evidence is
+[`before A`](results/abba-xlsx-defined-names-stable-before-a.json),
+[`after A`](results/abba-xlsx-defined-names-stable-after-a.json),
+[`after B`](results/abba-xlsx-defined-names-stable-after-b.json), and
+[`before B`](results/abba-xlsx-defined-names-stable-before-b.json).
+Counters, profiles, allocation/RSS attribution, exact workbook/media
+preservation, refusal coverage and both frozen binary hashes are summarized in
+[`change 0076`](changes/0076-xlsx-source-backed-defined-names-publication.md).
+
 The coalesced ODT paragraph-publication evidence is
 [`before A`](results/abba-odt-paragraph-batch-before-a.json),
 [`after A`](results/abba-odt-paragraph-batch-after-a.json),
@@ -614,6 +624,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | Rejected XLSX 1% commit + save, 4,096 cells | 15.235 ms | 14.990 ms | -1.61% p50 / -1.26% mean | Fully reverted as immaterial; p99 +0.18%, peak heap flat |
 | Rejected XLSX 1% commit + save, 131,072 cells | 514.926 ms | 511.407 ms | -0.68% p50 / -0.66% mean | Fully reverted as immaterial; process allocation calls -0.0623% |
 | Source-backed XLSX calculation-metadata publication, 12 Parts + 16 MiB media | 215.457 ms | 1.612 ms | **-99.2519% p50 (133.67x) / -99.2507% mean** | Materializations 12 -> 1; allocation calls -10.81%; peak heap flat; uninstrumented RSS -1.20% |
+| Source-backed XLSX defined-name publication, 12 Parts + 16 MiB media | 220.101 ms | 4.752 ms | **-97.84% p50 (46.32x) / -97.81% mean** | Materializations 12 -> 1; allocation calls -12.77%; peak heap and uninstrumented RSS flat |
 | Source-backed XLSX page-break publication, 12 Parts + 16 MiB media | 216.789 ms | 4.647 ms | **-97.86% p50 (46.65x) / -97.86% mean** | Materializations 12 -> 2; allocation calls -15.95%; peak heap and uninstrumented RSS flat |
 | Source-backed XLSX page-margin publication, 12 Parts + 16 MiB media | 216.799 ms | 4.492 ms | **-97.93% p50 (48.26x) / -97.93% mean** | Materializations 12 -> 2; allocation calls -12.10%; peak heap and uninstrumented RSS flat |
 | Source-backed XLSX print-options publication, 12 Parts + 16 MiB media | 219.294 ms | 4.668 ms | **-97.87% p50 (46.98x) / -97.88% mean** | Materializations 12 -> 2; allocation calls -12.10%; peak heap and uninstrumented RSS flat |
@@ -693,6 +704,7 @@ The underlying records are:
 - [`0072-odt-content-only-run-publication.md`](changes/0072-odt-content-only-run-publication.md)
 - [`0074-odt-content-only-hyperlink-publication.md`](changes/0074-odt-content-only-hyperlink-publication.md)
 - [`0075-odt-structural-paragraph-publication.md`](changes/0075-odt-structural-paragraph-publication.md)
+- [`0076-xlsx-source-backed-defined-names-publication.md`](changes/0076-xlsx-source-backed-defined-names-publication.md)
 
 The DOC ownership-transfer variant was rejected and removed after a 58.42%
 p50 regression. The earlier full-rewrite mutated-OPC guardrail was neutral on
@@ -839,7 +851,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 141 selectable cases and a 198-record default
+The standalone harness provides 143 selectable cases and a 198-record default
 matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus

@@ -1,0 +1,15 @@
+Control binary SHA-256: 213106275522d57f9ebf7eb38fd589284dd5c3de155bf61ba24de4c959f9fa81
+Candidate binary SHA-256: 1ba55cb94c15bd60db0c899e959256e2f3157cc08743a067c6e2e705f76ae43f
+Protocol: CPU 3, perf stat -r 3, 2 warmups and 10 samples per process
+
+Counter                         Eager control       Source-backed       Delta
+task-clock (ms)                 3,993.91            1,076.10            -73.06%
+context switches               53                  33                  -37.74%
+cycles                          19,481,546,515      5,322,307,184       -72.68%
+instructions                    48,262,368,539      10,399,441,627      -78.45%
+branches                        8,185,835,023       1,343,699,063       -83.59%
+branch misses                   175,857,914         14,274,145          -91.88%
+cache references                1,382,556,621       404,438,720         -70.75%
+cache misses                    30,650,864          21,008,766          -31.46%
+page faults                     271,380             197,376             -27.27%
+CPU migrations                  0                   0                   flat

@@ -220,7 +220,7 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **141
+The stage-1 records above are retained unchanged. The current harness has **143
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
@@ -228,7 +228,7 @@ stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
 PPTX semantic publication case, six opt-in media-rich ODT paragraph,
 line-break, inline-run, hyperlink, insertion, and removal publication cases,
-ten opt-in matched XLSX calculation-metadata/page-break/page-margin/print-options/page-setup
+12 opt-in matched XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup
 publication cases, 16 opt-in DOCX/PPTX semantic
 cases, nine opt-in RTF semantic case names across four capability-bounded
 variants (33 tiny / 58 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
@@ -292,6 +292,13 @@ incomplete program and CRUD matrix.
   before output. Cells, formulas, cached results and calculation-chain
   ownership are deliberately outside this capability. See
   [`0046`](changes/0046-xlsx-source-backed-calculation-metadata-publication.md).
+- The guarded XLSX defined-name editor replaces or clears only the direct
+  workbook catalog. On the same 12-Part media-rich archive, pooled p50 falls
+  from 220.101 to 4.752 ms (-97.84%, 46.32x), instructions fall 78.45%, and
+  semantic materializations fall 12 -> 1 with byte-identical output.
+  Protection, MCE/unknown catalog children, invalid local scope, changed
+  signatures and topology changes refuse. See
+  [`0076`](changes/0076-xlsx-source-backed-defined-names-publication.md).
 - The guarded XLSX page-break editor applies the same publisher to one selected
   normal worksheet after exact workbook-relationship closure checks. On that
   media-rich corpus, pooled p50 falls from 216.789 to 4.647 ms (-97.86%,

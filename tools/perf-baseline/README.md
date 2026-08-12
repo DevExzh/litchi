@@ -4,8 +4,8 @@
 ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
 public-API XLSX snapshot/edit/save flows, and opt-in DOC/XLS/PPT,
 DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows. It creates every corpus in memory; it also exercises
-source-backed XLSX catalog, worksheet reads, and guarded calculation-metadata
-and page-break/page-margin/page-setup/print-options publication over positional I/O. It does not
+source-backed XLSX catalog, worksheet reads, and guarded calculation-metadata,
+defined-name, page-break/page-margin/page-setup/print-options publication over positional I/O. It does not
 depend on untracked office files, network state, or randomness. ODP builder
 timestamps are replaced with fixed metadata before measurement. The JSON
 report contains the generator parameters and SHA-256 hashes for the generated
@@ -27,12 +27,13 @@ range cases, two execution-scaling cases, one low-level source-overlay save
 case, one source-backed DOCX semantic publication case, one source-backed
 media-rich PPTX semantic publication case, one XLSX commit/read attribution case,
 two matched XLSX calculation-metadata publication cases, two matched XLSX
+defined-name publication cases, two matched XLSX
 page-break publication cases, two matched XLSX page-margin publication cases,
 two matched XLSX page-setup publication cases,
 two matched XLSX print-options publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, nine RTF semantic cases, and 31 ODF semantic cases
-are opt-in, for 141 selectable cases in total:
+are opt-in, for 143 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -147,6 +148,22 @@ uses the owning XLSX writer. The source-backed case materializes only the
 workbook Part and consumes the guarded one-Part OPC overlay. Complete package,
 relationship, calculation-metadata, drawing/media, output-hash, and bounded
 sequential-sink verification remains outside timing.
+
+Measure the matched XLSX defined-name catalog publication controls:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 \
+  --case xlsx_eager_defined_names_edit_save,xlsx_source_backed_defined_names_edit_save \
+  --json target/perf/xlsx-defined-names-edit.json
+```
+
+Both paths replace the direct workbook defined-name catalog with one global
+range name and one hidden sheet-local name. The eager control materializes all
+twelve ordinary Parts; the source-backed path materializes only the workbook
+Part and raw-copies the other eleven. Complete name/scope and calculation-policy
+readback, package topology, relationships, media, patch/inverse, output hash,
+and bounded sequential-sink verification remain outside timing.
 
 Measure the matched XLSX page-break publication controls on the same fixed
 media-rich archive:
@@ -942,6 +959,10 @@ The two XLSX calculation-metadata publication cases also emit deterministic
 `output_sha256`, complete source/sink distributions, and semantic
 materialization counts. The eager control reports twelve Parts per sample; the
 source-backed path reports one. Their output hashes are required to match.
+
+The two XLSX defined-name publication cases use the same twelve-Part media-rich
+archive. Their eager/source-backed materialization counts are twelve and one,
+respectively, and their output hashes are required to match.
 
 The two XLSX page-break publication cases emit the same evidence. Their eager
 control reports twelve semantic materializations per sample and the
