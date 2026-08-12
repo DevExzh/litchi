@@ -1,0 +1,20 @@
+Control binary SHA-256: b8fb6ddaab2f6928461b225b5a910d7f502df004e54d1e66fbafc73f8b294827
+Candidate binary SHA-256: dc414be1a3555ec5b69f2e158b64970b9ed687f66799b9c013937e9fd6dd9cdc
+Protocol: perf record -F 999 -g, 0 warmups and 10 samples per process
+
+Control: 3K samples, approximately 14,838,381,802 sampled cycles, zero lost samples.
+  51.22%  zlib_rs::deflate::algorithm::medium::deflate_medium
+  17.88%  zlib_rs::deflate::longest_match::longest_match
+   4.19%  zlib_rs::deflate::Heap::pqdownheap
+
+Candidate: 1K samples, approximately 3,936,251,779 sampled cycles, zero lost samples.
+  18.00%  zlib_rs::deflate::algorithm::medium::deflate_medium
+   6.42%  zlib_rs::deflate::longest_match::longest_match
+   1.63%  zlib_rs::deflate::Heap::pqdownheap
+
+Multiplying exclusive shares by total sampled cycles attributes approximate
+absolute reductions of 90.68% in deflate_medium and 90.48% in longest_match.
+The residual candidate Deflate samples include deterministic corpus creation,
+the one changed content.xml member and complete untimed verification. Kernel
+symbol maps were restricted; user-space symbols resolved and no samples were
+lost.

@@ -1,0 +1,7 @@
+Debuggee: odt_media_line_break_edit_save, control binary b8fb6dda, 0 warmups, 1 sample
+Total runtime: 0.677 s
+Allocation calls: 20,034
+Temporary allocations: 3,479
+Peak heap: 107.17 MiB
+Peak RSS including Heaptrack: 119.19 MiB
+Leaked profiler/runtime memory: 1.78 KiB

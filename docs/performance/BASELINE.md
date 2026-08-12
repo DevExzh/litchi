@@ -220,18 +220,18 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **132
+The stage-1 records above are retained unchanged. The current harness has **133
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
-PPTX semantic publication case, one opt-in media-rich ODT
-paragraph-publication case, eight opt-in matched XLSX calculation-metadata/page-break/page-margin/print-options
+PPTX semantic publication case, two opt-in media-rich ODT
+paragraph/line-break publication cases, eight opt-in matched XLSX calculation-metadata/page-break/page-margin/print-options
 publication cases, 16 opt-in DOCX/PPTX semantic
 cases, nine opt-in RTF semantic case names across four capability-bounded
 variants (33 tiny / 58 tiny-plus-large rows), 23 shape-selected ODT/ODS/ODP
-semantic cases, three fixed media-rich ODF cases, and 21 opt-in native
+semantic cases, four fixed media-rich ODF cases, and 21 opt-in native
 DOC/XLS/PPT semantic cases. It remains an
 incomplete program and CRUD matrix.
 
@@ -645,6 +645,14 @@ incomplete program and CRUD matrix.
   fall 6.71%, peak heap is flat, and RSS improves 0.59%. The ordinary ODT
   open/no-op/one-edit guards all improve. See
   [`0035`](changes/0035-odt-content-only-paragraph-publication.md).
+- A matched case appends one line break to the middle paragraph through that
+  same accepted content-only boundary instead of rebuilding and recompressing
+  the eight unchanged 2 MiB resources. Pooled p50 falls from 217.532 to 3.985
+  ms (-98.17%, 54.59x), mean falls 98.16%, instructions fall 78.34%, and
+  allocation calls fall 6.90% with flat peak heap/RSS. Only `content.xml`
+  changes at the raw ZIP-member level; patch replay, exact inverse, stale
+  refusal, complete media readback and deterministic output remain checked.
+  See [`0071`](changes/0071-odt-content-only-line-break-publication.md).
 - The opaque-heavy common OLE2 case now separates editor open, candidate
   `put_stream` publication, changed `finish` rendering, and the end-to-end
   control. Current p50 values are 1.382, 7.979, 5.473, and 26.086 ms; the

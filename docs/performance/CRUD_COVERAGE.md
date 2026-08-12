@@ -2,7 +2,7 @@
 
 Date: 2026-08-12
 
-This is a coverage map, not a completion claim. It compares the 132 selectable
+This is a coverage map, not a completion claim. It compares the 133 selectable
 benchmark cases with `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB
 substrate measurements do not certify format-semantic CRUD behavior.
 
@@ -18,7 +18,7 @@ substrate measurements do not certify format-semantic CRUD behavior.
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring; large/streaming creation remains missing |
 | Create or append a very large stream | Partial | Large fresh legacy writers accumulate before final output; logical append remains separate and missing |
 | Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication; signed/extension corpora remain missing |
-| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT, ODS and ODP verify eight exact 2 MiB resources and manifest media types, while source-backed DOCX/PPTX and narrow XLSX calculation-metadata publication verify eight exact 2 MiB media Parts after one semantic edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
+| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; ODT separately measures paragraph replacement and inline line-break insertion while ODT, ODS and ODP verify eight exact 2 MiB resources and manifest media types; source-backed DOCX/PPTX and narrow XLSX calculation-metadata publication likewise verify eight exact 2 MiB media Parts after one semantic edit; a separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
 | About 1% semantic update and save | Covered for XLSX/DOCX/PPTX/ODT generated corpora | Deterministic evenly spaced cell, paragraph and shape changes; DOCX uses one canonical atomic paragraph batch, while ODT coalesces ordinary scalar durable replacements internally; both reopen the package |
 | Bulk update matching objects | Partial | PPTX has one bounded atomic same-slide batch for up to 256 unique nonoverlapping shape-text selectors; cross-slide, structural and other formats remain missing |
 | Clear/remove/hide/detach/GC distinctions | Missing | No complete matrix |
@@ -84,8 +84,9 @@ conversion remain.
    unchanged-member publication: source-backed selectors, resource-adding and
    structural publication, 1% and bulk edits, unknown extensions, real
    producers, richer media, security and source-backed I/O. The generated ODT
-   1% paragraph case is covered by change 0045, and changed-result byte
-   finalization by change 0052; broader bulk and structural operations remain.
+   1% paragraph case is covered by change 0045, changed-result byte
+   finalization by change 0052, and content-only line-break publication by
+   change 0071; formatted runs and broader bulk/structural operations remain.
    iWork is deliberately deferred while the `iwa-*` crates change separately.
 
 The former first item is complete for existing-document ODT transaction
@@ -175,6 +176,13 @@ readback and patch/inverse/stale behavior. Regenerated `content.xml` above the
 common 16 MiB optimization limit explicitly returns to the established ODT
 rebuild. Structural/bulk edits, repeated queries, real-producer media and
 source-backed positional I/O remain open.
+
+Change 0071 extends that same proven content-only publication boundary to the
+existing ODT `AppendLineBreak` operation. Its matched media-rich case proves
+that only `content.xml` changes, all untouched core/media members remain raw
+identical, and the line break survives complete reopen, patch replay, inverse,
+stale refusal, and deterministic output. It adds no arbitrary inline-format,
+structural, resource, real-producer, or positional-I/O capability.
 
 Change 0036 separates the common OLE2 one-stream edit into editor-open,
 candidate-publication, final-render and end-to-end attribution cases over four

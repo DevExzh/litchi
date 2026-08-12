@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-12",
+  "production_base": "6f5774d99ae32ae816aa0b6f1335cd23f5f84af7",
+  "control_binary_sha256": "b8fb6ddaab2f6928461b225b5a910d7f502df004e54d1e66fbafc73f8b294827",
+  "candidate_binary_sha256": "dc414be1a3555ec5b69f2e158b64970b9ed687f66799b9c013937e9fd6dd9cdc",
+  "environment": {
+    "cpu": "AMD EPYC 9575F VM",
+    "cpu_affinity": 2,
+    "kernel": "Linux 6.8.0-101-generic x86_64",
+    "rustc": "1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "perf_event_paranoid": 1
+  },
+  "corpus": {
+    "generator": "litchi-odt-media-paragraph-publication-v1",
+    "archive_sha256": "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed",
+    "archive_bytes": 16786287,
+    "logical_payload_bytes": 16787016,
+    "paragraphs": 200,
+    "media_members": 8,
+    "media_member_bytes": 2097152,
+    "zip_members": 13,
+    "target": "paragraph:100",
+    "output_sha256": "c38d45741cdad624da8ac0d22e268f4074e8073c16a7586af13620a1e20e2c20"
+  },
+  "protocol": {
+    "order": ["control_a", "candidate_a", "candidate_b", "control_b"],
+    "warmups_per_leg": 50,
+    "samples_per_leg": 500,
+    "pooled_samples_per_state": 1000
+  },
+  "legs_ns": {
+    "control_a": {"p50": 217331331, "mean": 217843713.934, "p95": 224076297, "p99": 227483474},
+    "candidate_a": {"p50": 3935785, "mean": 3953589.932, "p95": 4259610, "p99": 4654362},
+    "candidate_b": {"p50": 4027681, "mean": 4056441.422, "p95": 4388677, "p99": 4577446},
+    "control_b": {"p50": 217821199, "mean": 218256449.146, "p95": 224985752, "p99": 230520200}
+  },
+  "pooled_ns": {
+    "control": {
+      "samples": 1000,
+      "min": 211219011,
+      "p50": 217532160,
+      "mean": 218050081.54,
+      "mean_ci95": [217818884.10401294, 218281278.97598705],
+      "p95": 224789997,
+      "p99": 229971525,
+      "max": 245152402
+    },
+    "candidate": {
+      "samples": 1000,
+      "min": 3539812,
+      "p50": 3985193,
+      "mean": 4005015.677,
+      "mean_ci95": [3992433.4316500444, 4017597.922349956],
+      "p95": 4315737,
+      "p99": 4654362,
+      "max": 5749315
+    },
+    "delta_percent": {
+      "p50": -98.16799823989244,
+      "mean": -98.16325880333811,
+      "p95": -98.08010273695587,
+      "p99": -97.97611378191277
+    },
+    "speedup": {
+      "p50": 54.58510039538863,
+      "mean": 54.44425168975437,
+      "p95": 52.08612040075658,
+      "p99": 49.40989226880075
+    }
+  },
+  "between_leg_drift_percent": {
+    "control_p50": 0.22489454756881022,
+    "control_mean": 0.18910562029895717,
+    "candidate_p50": 2.2816106836663574,
+    "candidate_mean": 2.5355102983168343
+  },
+  "isolated_regression_guards_percent": {
+    "large_one_paragraph_edit_save": {"p50": 0.39436299973008015, "mean": 0.4995552017477145, "p95": 0.4971949296738387},
+    "large_exact_noop_edit_save": {"p50": 3.6783267219617777, "mean": 2.6076055649024488, "p95": 9.959731543624152},
+    "medium_open": {"p50": -0.9880341880341925, "mean": -0.12703338468245118, "p95": -2.2773148387764564}
+  },
+  "heaptrack_one_sample": {
+    "allocation_calls": {"control": 20034, "candidate": 18652},
+    "temporary_allocations": {"control": 3479, "candidate": 2963},
+    "peak_heap_mib": {"control": 107.17, "candidate": 107.13},
+    "peak_rss_mib": {"control": 119.19, "candidate": 119.38},
+    "leaked_kib": {"control": 1.78, "candidate": 1.78}
+  },
+  "gnu_time_two_process_mean_max_rss_kib": {
+    "control": 110964,
+    "candidate": 111032
+  },
+  "perf_stat_two_warmups_ten_samples_two_process_mean": {
+    "control": {
+      "task_clock_ms": 3514.41,
+      "cpu_migrations": 0,
+      "page_faults": 222547,
+      "cycles": 17227997605,
+      "instructions": 44608672884,
+      "branches": 7600034467,
+      "branch_misses": 163298222,
+      "cache_references": 1178180585,
+      "cache_misses": 21015600
+    },
+    "candidate": {
+      "task_clock_ms": 917.94,
+      "cpu_migrations": 0,
+      "page_faults": 156047,
+      "cycles": 4546319660,
+      "instructions": 9662259246,
+      "branches": 1283096530,
+      "branch_misses": 13994711,
+      "cache_references": 306350782,
+      "cache_misses": 14675584
+    }
+  },
+  "perf_record_ten_samples": {
+    "lost_samples": {"control": 0, "candidate": 0},
+    "sampled_cycles": {"control": 14838381802, "candidate": 3936251779},
+    "deflate_medium_exclusive_percent": {"control": 51.22, "candidate": 18.00},
+    "longest_match_exclusive_percent": {"control": 17.88, "candidate": 6.42},
+    "approximate_absolute_sampled_cycle_delta_percent": {
+      "deflate_medium": -90.67756724643348,
+      "longest_match": -90.47502505532597
+    }
+  }
+}

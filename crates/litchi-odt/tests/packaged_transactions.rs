@@ -31,7 +31,7 @@ fn source() -> Document {
 }
 
 #[test]
-fn paragraph_replacement_raw_preserves_unchanged_media_and_metadata() {
+fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
     const MEDIA_PATH: &str = "Pictures/opaque.bin";
     let mut base = MutableDocument::new();
     base.add_paragraph("Before").unwrap();
@@ -88,6 +88,40 @@ fn paragraph_replacement_raw_preserves_unchanged_media_and_metadata() {
     assert_eq!(
         reopened.get_file(MEDIA_PATH).unwrap(),
         vec![0x5a; 1024 * 1024]
+    );
+    assert_eq!(
+        commit.patch().apply(&snapshot).unwrap().as_bytes(),
+        commit.snapshot().as_bytes()
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        source_bytes
+    );
+
+    let mut edit = snapshot.edit();
+    edit.append_line_break(ParagraphSelector::position(Position::new(0)))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.snapshot().as_bytes()).unwrap();
+    assert!(!identical.contains("content.xml"));
+    for path in [
+        "mimetype",
+        "styles.xml",
+        "meta.xml",
+        "META-INF/manifest.xml",
+        MEDIA_PATH,
+    ] {
+        assert!(identical.contains(path), "{path}");
+    }
+    let reopened = commit.snapshot().document().unwrap();
+    assert_eq!(
+        reopened.paragraphs().unwrap()[0].text().unwrap(),
+        "Before\n"
     );
     assert_eq!(
         commit.patch().apply(&snapshot).unwrap().as_bytes(),
