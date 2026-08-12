@@ -220,20 +220,20 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **158
+The stage-1 records above are retained unchanged. The current harness has **160
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
 PPTX semantic publication case, four opt-in matched same-slide/multi-slide
-PPTX batch cases, six opt-in media-rich ODT paragraph,
+PPTX batch cases, two opt-in matched cross-slide ODP text-box cases, six opt-in media-rich ODT paragraph,
 line-break, inline-run, hyperlink, insertion, and removal publication cases,
 20 opt-in matched XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation/auto-filter/conditional-formatting
 publication cases, 16 opt-in DOCX/PPTX semantic
 cases, 13 opt-in RTF semantic case names across four capability-bounded
 variants (39 tiny / 70 tiny-plus-large rows), 24 shape-selected ODT/ODS/ODP
-semantic cases, eight fixed media-rich ODF cases, and 21 opt-in native
+semantic cases, ten fixed media-rich ODF cases, and 21 opt-in native
 DOC/XLS/PPT semantic cases. It remains an
 incomplete program and CRUD matrix.
 
@@ -377,6 +377,18 @@ incomplete program and CRUD matrix.
   opaque/formatted inputs remain fail-closed. This adds coverage only and
   makes no latency or materialization claim; see
   [`0083`](changes/0083-rtf-paragraph-lifecycle-performance-evidence.md).
+- Existing ODP text-box scalar and bounded-batch APIs now have matched
+  selectable successful-path evidence over eight fixed-name owners distributed
+  across a 12-slide, eight-media corpus. Both paths retain names and produce
+  the same complete slide/full-text and rich-content projection. The batch
+  raw-preserves the manifest; repeated scalar staging regenerates it, so the
+  physically distinct outputs retain case-specific digests. Complete reopen,
+  volatile/durable forward and inverse replay, stale refusal, auxiliary/media
+  raw identity and real one-write sink counters are untimed gates. ODP exposes
+  no source/materialization diagnostics, so none are invented. No latency,
+  allocation, memory, or materialization claim is made before frozen CPU-pinned
+  balanced ABBA evidence; see
+  [`0084`](changes/0084-odp-cross-slide-text-box-batch-evidence.md).
 - Consecutive packaged ODT plain-text replacements now share one mutable
   candidate, content publication, reopen and compact audit while retaining
   ordinary scalar durable operations. The large 100-edit/save p50 falls from

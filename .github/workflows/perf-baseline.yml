@@ -646,7 +646,7 @@ jobs:
           cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
             --warmup 0 \
             --samples 1 \
-            --case odp_media_textbox_edit_save \
+            --case odp_media_textbox_edit_save,odp_media_textbox_scalar_replace_save,odp_media_textbox_batch_replace_save \
             --json target/perf/odp-media-textbox-smoke.json
           python3 - <<'PY'
           import json
@@ -654,13 +654,32 @@ jobs:
 
           report = json.loads(Path("target/perf/odp-media-textbox-smoke.json").read_text())
           assert report["schema_version"] == 1
-          assert len(report["results"]) == 1
-          result = report["results"][0]
+          assert len(report["results"]) == 3
+          results = {result["case"]: result for result in report["results"]}
+          result = results["odp_media_textbox_edit_save"]
           assert result["case"] == "odp_media_textbox_edit_save"
           assert result["corpus"]["entry_count"] == 20
           assert result["corpus"]["uncompressed_payload_bytes"] == 16_778_260
           assert result["corpus"]["archive_sha256"] == "c5e98dac88846d7b8264f0af4e893d80e21672222c35c3b8890f78cff53242d3"
           assert len(result["elapsed_ns"]["samples"]) == 1
+          scalar = results["odp_media_textbox_scalar_replace_save"]
+          batch = results["odp_media_textbox_batch_replace_save"]
+          assert scalar["corpus"] == batch["corpus"]
+          assert scalar["corpus"]["entry_count"] == 28
+          assert scalar["corpus"]["archive_member_count"] == 13
+          assert scalar["corpus"]["uncompressed_payload_bytes"] == 16_778_604
+          assert scalar["corpus"]["archive_bytes"] == 16_786_244
+          assert scalar["corpus"]["archive_sha256"] == "dcbb1f88da9366f2eab8eb6029dcc73930ea2fc03552b78dd4922689f8a9655d"
+          assert scalar["output_sha256"] == "ee31f8c046af7b99819b183ca4fc56e00b97d2f97b36fa776c7d4c96dee3614b"
+          assert batch["output_sha256"] == "fb4243a5433028d050ea97a5cb8db18c1af2ef66bb0d75071c95c2d9e83ec3cf"
+          for measured, expected_bytes in [(scalar, 16_786_370), (batch, 16_786_368)]:
+              assert len(measured["elapsed_ns"]["samples"]) == 1
+              assert measured["sink"] == {
+                  "accepted_bytes": expected_bytes,
+                  "write_calls": 1,
+                  "largest_write": expected_bytes,
+              }
+              assert "source" not in measured
           PY
 
       - name: Run ODT media paragraph publication smoke
@@ -1417,7 +1436,7 @@ jobs:
         run: |
           cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
             --samples 15 \
-            --case odp_media_textbox_edit_save \
+            --case odp_media_textbox_edit_save,odp_media_textbox_scalar_replace_save,odp_media_textbox_batch_replace_save \
             --json target/perf/odp-media-textbox-baseline.json
           python3 - <<'PY'
           import json
@@ -1425,13 +1444,32 @@ jobs:
 
           report = json.loads(Path("target/perf/odp-media-textbox-baseline.json").read_text())
           assert report["schema_version"] == 1
-          assert len(report["results"]) == 1
-          result = report["results"][0]
+          assert len(report["results"]) == 3
+          results = {result["case"]: result for result in report["results"]}
+          result = results["odp_media_textbox_edit_save"]
           assert result["case"] == "odp_media_textbox_edit_save"
           assert result["corpus"]["entry_count"] == 20
           assert result["corpus"]["uncompressed_payload_bytes"] == 16_778_260
           assert result["corpus"]["archive_sha256"] == "c5e98dac88846d7b8264f0af4e893d80e21672222c35c3b8890f78cff53242d3"
           assert len(result["elapsed_ns"]["samples"]) == 15
+          scalar = results["odp_media_textbox_scalar_replace_save"]
+          batch = results["odp_media_textbox_batch_replace_save"]
+          assert scalar["corpus"] == batch["corpus"]
+          assert scalar["corpus"]["entry_count"] == 28
+          assert scalar["corpus"]["archive_member_count"] == 13
+          assert scalar["corpus"]["uncompressed_payload_bytes"] == 16_778_604
+          assert scalar["corpus"]["archive_bytes"] == 16_786_244
+          assert scalar["corpus"]["archive_sha256"] == "dcbb1f88da9366f2eab8eb6029dcc73930ea2fc03552b78dd4922689f8a9655d"
+          assert scalar["output_sha256"] == "ee31f8c046af7b99819b183ca4fc56e00b97d2f97b36fa776c7d4c96dee3614b"
+          assert batch["output_sha256"] == "fb4243a5433028d050ea97a5cb8db18c1af2ef66bb0d75071c95c2d9e83ec3cf"
+          for measured, expected_bytes in [(scalar, 16_786_370), (batch, 16_786_368)]:
+              assert len(measured["elapsed_ns"]["samples"]) == 15
+              assert measured["sink"] == {
+                  "accepted_bytes": expected_bytes,
+                  "write_calls": 1,
+                  "largest_write": expected_bytes,
+              }
+              assert "source" not in measured
           PY
 
       - name: Run release ODT media paragraph publication case
