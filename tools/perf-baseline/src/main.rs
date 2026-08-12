@@ -198,7 +198,11 @@ impl RtfSemanticVariant {
 
     const fn supports_case(self, case: Case) -> bool {
         case.uses_semantic_rtf()
-            && (!matches!(case, Case::RtfSemanticOneEditSave) || matches!(self, Self::Plain))
+            && (!matches!(
+                case,
+                Case::RtfSemanticOneEditSave | Case::RtfSemanticOnePercentEditSave
+            ) || matches!(self, Self::Plain))
+            && (!matches!(case, Case::RtfSemanticTextToSink) || !matches!(self, Self::Watermark))
     }
 }
 
@@ -457,9 +461,11 @@ enum Case {
     RtfSemanticCollectParagraphs,
     RtfSemanticOneParagraph,
     RtfSemanticFullText,
+    RtfSemanticTextToSink,
     RtfSemanticStreamSave,
     RtfSemanticNoopEditSave,
     RtfSemanticOneEditSave,
+    RtfSemanticOnePercentEditSave,
     DocxSemanticOpen,
     DocxSemanticListParagraphs,
     DocxSemanticOneParagraph,
@@ -669,9 +675,11 @@ impl Case {
             Self::RtfSemanticCollectParagraphs => "rtf_semantic_collect_paragraphs",
             Self::RtfSemanticOneParagraph => "rtf_semantic_one_paragraph",
             Self::RtfSemanticFullText => "rtf_semantic_full_text",
+            Self::RtfSemanticTextToSink => "rtf_semantic_text_to_sink",
             Self::RtfSemanticStreamSave => "rtf_semantic_stream_save",
             Self::RtfSemanticNoopEditSave => "rtf_semantic_noop_edit_save",
             Self::RtfSemanticOneEditSave => "rtf_semantic_one_edit_save",
+            Self::RtfSemanticOnePercentEditSave => "rtf_semantic_one_percent_edit_save",
             Self::DocxSemanticOpen => "docx_semantic_open",
             Self::DocxSemanticListParagraphs => "docx_semantic_list_paragraphs",
             Self::DocxSemanticOneParagraph => "docx_semantic_one_paragraph",
@@ -856,9 +864,11 @@ impl Case {
                 | Self::RtfSemanticCollectParagraphs
                 | Self::RtfSemanticOneParagraph
                 | Self::RtfSemanticFullText
+                | Self::RtfSemanticTextToSink
                 | Self::RtfSemanticStreamSave
                 | Self::RtfSemanticNoopEditSave
                 | Self::RtfSemanticOneEditSave
+                | Self::RtfSemanticOnePercentEditSave
         )
     }
 
@@ -2723,9 +2733,11 @@ fn parse_case(value: &str) -> Option<Case> {
         "rtf_semantic_collect_paragraphs" => Some(Case::RtfSemanticCollectParagraphs),
         "rtf_semantic_one_paragraph" => Some(Case::RtfSemanticOneParagraph),
         "rtf_semantic_full_text" => Some(Case::RtfSemanticFullText),
+        "rtf_semantic_text_to_sink" => Some(Case::RtfSemanticTextToSink),
         "rtf_semantic_stream_save" => Some(Case::RtfSemanticStreamSave),
         "rtf_semantic_noop_edit_save" => Some(Case::RtfSemanticNoopEditSave),
         "rtf_semantic_one_edit_save" => Some(Case::RtfSemanticOneEditSave),
+        "rtf_semantic_one_percent_edit_save" => Some(Case::RtfSemanticOnePercentEditSave),
         "docx_semantic_open" => Some(Case::DocxSemanticOpen),
         "docx_semantic_list_paragraphs" => Some(Case::DocxSemanticListParagraphs),
         "docx_semantic_one_paragraph" => Some(Case::DocxSemanticOneParagraph),
@@ -2905,8 +2917,9 @@ fn print_usage() {
                                        rtf_semantic_open,rtf_semantic_paragraph_count,\n\
                                        rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,\n\
                                        rtf_semantic_one_paragraph,rtf_semantic_full_text,\n\
+                                       rtf_semantic_text_to_sink,\n\
                                        rtf_semantic_stream_save,rtf_semantic_noop_edit_save,\n\
-                                       rtf_semantic_one_edit_save,\n\
+                                       rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save,\n\
                                        docx_semantic_open,docx_semantic_list_paragraphs,\n\
                                        docx_semantic_one_paragraph,docx_semantic_full_text,\n\
                                        docx_semantic_create_small,docx_semantic_noop_edit_save,\n\
@@ -3372,13 +3385,15 @@ fn semantic_rtf_paragraph_count(shape: SemanticShape, variant: RtfSemanticVarian
 fn semantic_rtf_expected_text(
     shape: SemanticShape,
     variant: RtfSemanticVariant,
-    updated: Option<usize>,
+    updated: &[usize],
 ) -> String {
     if variant == RtfSemanticVariant::Watermark {
         return "\n".to_owned();
     }
     (0..semantic_rtf_paragraph_count(shape, variant))
-        .map(|index| semantic_rtf_variant_text(variant, index, updated == Some(index)))
+        .map(|index| {
+            semantic_rtf_variant_text(variant, index, updated.binary_search(&index).is_ok())
+        })
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -3458,9 +3473,9 @@ fn build_semantic_rtf_corpus(
 ) -> Result<Corpus, Box<dyn Error>> {
     let archive = semantic_rtf_bytes(shape, variant)?;
     let document = litchi_rtf::Document::from_bytes(&archive)?;
-    verify_semantic_rtf(&document, shape, variant, None)?;
+    verify_semantic_rtf(&document, shape, variant, &[])?;
     let target_payload = semantic_rtf_variant_text(variant, 0, false).into_bytes();
-    let content_bytes = semantic_rtf_expected_text(shape, variant, None).len();
+    let content_bytes = semantic_rtf_expected_text(shape, variant, &[]).len();
     let name = if variant == RtfSemanticVariant::Watermark {
         "rtf-semantic-watermark".to_owned()
     } else {
@@ -4998,9 +5013,11 @@ fn run_case_with_config(
         | Case::RtfSemanticCollectParagraphs
         | Case::RtfSemanticOneParagraph
         | Case::RtfSemanticFullText
+        | Case::RtfSemanticTextToSink
         | Case::RtfSemanticStreamSave
         | Case::RtfSemanticNoopEditSave
-        | Case::RtfSemanticOneEditSave => {
+        | Case::RtfSemanticOneEditSave
+        | Case::RtfSemanticOnePercentEditSave => {
             run_semantic_rtf(case, corpus, warmup_iterations, samples)
         },
         Case::DocxSemanticOpen
@@ -5292,7 +5309,7 @@ fn verify_semantic_rtf(
     document: &litchi_rtf::Document,
     shape: SemanticShape,
     variant: RtfSemanticVariant,
-    updated: Option<usize>,
+    updated: &[usize],
 ) -> Result<(), Box<dyn Error>> {
     let paragraph_count = semantic_rtf_paragraph_count(shape, variant);
     if document.paragraph_count() != paragraph_count {
@@ -5300,7 +5317,8 @@ fn verify_semantic_rtf(
     }
     let mut count = 0usize;
     for (index, paragraph) in document.body().paragraphs().enumerate() {
-        if paragraph.to_text() != semantic_rtf_variant_text(variant, index, updated == Some(index))
+        if paragraph.to_text()
+            != semantic_rtf_variant_text(variant, index, updated.binary_search(&index).is_ok())
         {
             return Err("semantic RTF paragraph text differs from specification".into());
         }
@@ -6631,15 +6649,41 @@ fn run_semantic_rtf(
     }
     let paragraph_count = semantic_rtf_paragraph_count(shape, variant);
     let selected = paragraph_count / 2;
-    let expected_changed = if case == Case::RtfSemanticOneEditSave {
+    let updated = match case {
+        Case::RtfSemanticOneEditSave => vec![selected],
+        Case::RtfSemanticOnePercentEditSave => semantic_update_indices(paragraph_count)?,
+        _ => Vec::new(),
+    };
+    let replacements = updated
+        .iter()
+        .map(|&position| {
+            litchi_rtf::edit::ParagraphTextReplacement::new(
+                position,
+                semantic_rtf_variant_text(variant, position, true),
+            )
+        })
+        .collect::<Vec<_>>();
+    let expected_changed = if !updated.is_empty() {
         let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
         let mut edit = document.edit();
-        edit.replace_paragraph_text(selected, semantic_rtf_variant_text(variant, selected, true))?;
+        if case == Case::RtfSemanticOnePercentEditSave {
+            edit.replace_body_paragraph_texts(&replacements)?;
+        } else {
+            edit.replace_paragraph_text(
+                selected,
+                semantic_rtf_variant_text(variant, selected, true),
+            )?;
+        }
         edit.commit()?.snapshot().to_bytes()?
     } else {
         corpus.archive.clone()
     };
-    let sink_ceiling = u64::try_from(expected_changed.len())?;
+    let expected_text = semantic_rtf_expected_text(shape, variant, &[]);
+    let sink_ceiling = if case == Case::RtfSemanticTextToSink {
+        u64::try_from(expected_text.len())?
+    } else {
+        u64::try_from(expected_changed.len())?
+    };
     let mut elapsed = Vec::with_capacity(samples);
     let mut sinks = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
@@ -6649,7 +6693,7 @@ fn run_semantic_rtf(
                 let started = Instant::now();
                 let document = litchi_rtf::Document::from_bytes(&owned)?;
                 let duration = started.elapsed();
-                verify_semantic_rtf(&document, shape, variant, None)?;
+                verify_semantic_rtf(&document, shape, variant, &[])?;
                 std::hint::black_box(document);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
@@ -6661,7 +6705,7 @@ fn run_semantic_rtf(
                 if count != paragraph_count {
                     return Err("semantic RTF paragraph count differs from specification".into());
                 }
-                verify_semantic_rtf(&document, shape, variant, None)?;
+                verify_semantic_rtf(&document, shape, variant, &[])?;
                 std::hint::black_box(count);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
@@ -6673,7 +6717,7 @@ fn run_semantic_rtf(
                 if count != paragraph_count {
                     return Err("semantic RTF paragraph list differs from specification".into());
                 }
-                verify_semantic_rtf(&document, shape, variant, None)?;
+                verify_semantic_rtf(&document, shape, variant, &[])?;
                 std::hint::black_box(count);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
@@ -6687,7 +6731,7 @@ fn run_semantic_rtf(
                         "semantic RTF paragraph collection differs from specification".into(),
                     );
                 }
-                verify_semantic_rtf(&document, shape, variant, None)?;
+                verify_semantic_rtf(&document, shape, variant, &[])?;
                 std::hint::black_box(paragraphs);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
@@ -6704,7 +6748,7 @@ fn run_semantic_rtf(
                 if paragraph != semantic_rtf_variant_text(variant, selected, false) {
                     return Err("semantic RTF selected paragraph differs from specification".into());
                 }
-                verify_semantic_rtf(&document, shape, variant, None)?;
+                verify_semantic_rtf(&document, shape, variant, &[])?;
                 std::hint::black_box(paragraph);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
@@ -6713,22 +6757,54 @@ fn run_semantic_rtf(
                 let started = Instant::now();
                 let text = document.text();
                 let duration = started.elapsed();
-                if text != semantic_rtf_expected_text(shape, variant, None) {
+                if text != expected_text {
                     return Err("semantic RTF full text differs from specification".into());
                 }
-                verify_semantic_rtf(&document, shape, variant, None)?;
+                verify_semantic_rtf(&document, shape, variant, &[])?;
                 std::hint::black_box(text);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::RtfSemanticTextToSink => {
+                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let mut sink = CountingSink::bounded(sink_ceiling, sink_ceiling);
+                sink.reserve_budget()?;
+                let options = litchi_core::TextOutputOptions::new(
+                    "\n",
+                    "",
+                    sink_ceiling,
+                    u64::try_from(paragraph_count)?,
+                );
+                let started = Instant::now();
+                let report = document.write_text_to(&mut sink, options)?;
+                let duration = started.elapsed();
+                let summary = sink.summary();
+                if sink.bytes != expected_text.as_bytes() {
+                    return Err(
+                        "semantic RTF text sink differs from expected UTF-8 body text".into(),
+                    );
+                }
+                if report.bytes_written() != sink_ceiling
+                    || report.objects_written() != u64::try_from(paragraph_count)?
+                {
+                    return Err("semantic RTF text sink progress differs from specification".into());
+                }
+                verify_semantic_rtf(&document, shape, variant, &[])?;
+                std::hint::black_box(report);
+                if iteration >= warmup_iterations {
+                    sinks.push(summary);
+                }
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticStreamSave
             | Case::RtfSemanticNoopEditSave
-            | Case::RtfSemanticOneEditSave => {
+            | Case::RtfSemanticOneEditSave
+            | Case::RtfSemanticOnePercentEditSave => {
                 let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
                 let mut sink = CountingSink::bounded(sink_ceiling, sink_ceiling);
                 sink.reserve_budget()?;
                 let started = Instant::now();
-                let (published, expected_update) = match case {
-                    Case::RtfSemanticStreamSave => (document.clone(), None),
+                let (published, expected_updates, commit) = match case {
+                    Case::RtfSemanticStreamSave => (document.clone(), &[][..], None),
                     Case::RtfSemanticNoopEditSave => {
                         let commit = document.edit().commit()?;
                         if commit.diagnostics().changed()
@@ -6737,7 +6813,7 @@ fn run_semantic_rtf(
                         {
                             return Err("semantic RTF no-op commit changed its source".into());
                         }
-                        (commit.into_snapshot(), None)
+                        (commit.into_snapshot(), &[][..], None)
                     },
                     Case::RtfSemanticOneEditSave => {
                         let mut edit = document.edit();
@@ -6753,7 +6829,22 @@ fn run_semantic_rtf(
                                 "semantic RTF changed commit has unexpected diagnostics".into()
                             );
                         }
-                        (commit.into_snapshot(), Some(selected))
+                        let published = commit.snapshot().clone();
+                        (published, updated.as_slice(), Some(commit))
+                    },
+                    Case::RtfSemanticOnePercentEditSave => {
+                        let mut edit = document.edit();
+                        edit.replace_body_paragraph_texts(&replacements)?;
+                        let commit = edit.commit()?;
+                        if !commit.diagnostics().changed()
+                            || commit.diagnostics().operation_count() != updated.len()
+                        {
+                            return Err(
+                                "semantic RTF one-percent commit has unexpected diagnostics".into(),
+                            );
+                        }
+                        let published = commit.snapshot().clone();
+                        (published, updated.as_slice(), Some(commit))
                     },
                     _ => return Err("non-save RTF case reached save branch".into()),
                 };
@@ -6764,7 +6855,19 @@ fn run_semantic_rtf(
                     return Err("semantic RTF save differs from deterministic output".into());
                 }
                 let reopened = litchi_rtf::Document::from_bytes(&sink.bytes)?;
-                verify_semantic_rtf(&reopened, shape, variant, expected_update)?;
+                verify_semantic_rtf(&reopened, shape, variant, expected_updates)?;
+                if let Some(commit) = commit {
+                    let applied = commit.patch().apply(&document)?;
+                    if applied.to_bytes()? != sink.bytes {
+                        return Err("semantic RTF patch replay differs from publication".into());
+                    }
+                    let restored = commit.patch().inverse().apply(&applied)?;
+                    if restored.to_bytes()? != corpus.archive {
+                        return Err(
+                            "semantic RTF inverse did not restore exact source bytes".into()
+                        );
+                    }
+                }
                 if iteration >= warmup_iterations {
                     sinks.push(summary);
                 }
@@ -6774,7 +6877,7 @@ fn run_semantic_rtf(
         }
     }
     let sink = (!sinks.is_empty())
-        .then(|| deterministic_sink_summary(&sinks, "semantic RTF stream/save"))
+        .then(|| deterministic_sink_summary(&sinks, "semantic RTF sequential output"))
         .transpose()?;
     Ok(result(case, corpus, elapsed, sink))
 }
@@ -13472,9 +13575,11 @@ mod tests {
             Case::RtfSemanticCollectParagraphs,
             Case::RtfSemanticOneParagraph,
             Case::RtfSemanticFullText,
+            Case::RtfSemanticTextToSink,
             Case::RtfSemanticStreamSave,
             Case::RtfSemanticNoopEditSave,
             Case::RtfSemanticOneEditSave,
+            Case::RtfSemanticOnePercentEditSave,
         ];
 
         for variant in RtfSemanticVariant::ALL {
@@ -13487,7 +13592,10 @@ mod tests {
                 let result = run_case(case, &rtf, 0, 1);
                 if variant.supports_case(case) {
                     let result = result.unwrap();
-                    assert_eq!(result.sink.is_some(), case.name().contains("save"));
+                    assert_eq!(
+                        result.sink.is_some(),
+                        case.name().contains("save") || case == Case::RtfSemanticTextToSink
+                    );
                 } else {
                     assert!(
                         result.is_err(),
@@ -13536,8 +13644,117 @@ mod tests {
                 .flat_map(|variant| cases.iter().map(move |case| (*variant, *case)))
                 .filter(|(variant, case)| variant.supports_case(*case))
                 .count(),
-            33
+            37
         );
+    }
+
+    #[test]
+    fn semantic_rtf_text_sink_is_utf8_bounded_and_transport_independent() {
+        for variant in [
+            RtfSemanticVariant::Plain,
+            RtfSemanticVariant::Byte1252,
+            RtfSemanticVariant::Lzfu,
+        ] {
+            let corpus = build_semantic_rtf_corpus(SemanticShape::Tiny, variant).unwrap();
+            let result = run_case(Case::RtfSemanticTextToSink, &corpus, 0, 1).unwrap();
+            let sink = result.sink.unwrap();
+            assert_eq!(result.case, "rtf_semantic_text_to_sink");
+            assert_eq!(
+                sink.accepted_bytes,
+                u64::try_from(
+                    super::semantic_rtf_expected_text(SemanticShape::Tiny, variant, &[]).len()
+                )
+                .unwrap()
+            );
+            assert!(sink.write_calls > 0);
+            assert!(sink.largest_write <= sink.accepted_bytes);
+        }
+
+        let watermark =
+            build_semantic_rtf_corpus(SemanticShape::Tiny, RtfSemanticVariant::Watermark).unwrap();
+        assert!(run_case(Case::RtfSemanticTextToSink, &watermark, 0, 1).is_err());
+    }
+
+    #[test]
+    fn semantic_rtf_medium_one_percent_batch_is_atomic_reopenable_and_reversible() {
+        let corpus =
+            build_semantic_rtf_corpus(SemanticShape::Medium, RtfSemanticVariant::Plain).unwrap();
+        let result = run_case(Case::RtfSemanticOnePercentEditSave, &corpus, 0, 1).unwrap();
+        assert_eq!(result.case, "rtf_semantic_one_percent_edit_save");
+        assert!(result.sink.is_some());
+
+        let source = litchi_rtf::Document::from_bytes(&corpus.archive).unwrap();
+        let mut invalid = super::semantic_update_indices(source.paragraph_count())
+            .unwrap()
+            .into_iter()
+            .map(|position| {
+                litchi_rtf::edit::ParagraphTextReplacement::new(
+                    position,
+                    super::semantic_rtf_variant_text(RtfSemanticVariant::Plain, position, true),
+                )
+            })
+            .collect::<Vec<_>>();
+        invalid.push(litchi_rtf::edit::ParagraphTextReplacement::new(
+            source.paragraph_count(),
+            "out-of-range",
+        ));
+        let mut edit = source.edit();
+        assert!(edit.replace_body_paragraph_texts(&invalid).is_err());
+        assert_eq!(edit.operation_count(), 0);
+        assert!(edit.commit().unwrap().snapshot().same_snapshot(&source));
+    }
+
+    #[test]
+    fn semantic_rtf_large_evidence_output_hashes_are_stable() {
+        let shape = SemanticShape::Large;
+        let variant = RtfSemanticVariant::Plain;
+        let corpus = build_semantic_rtf_corpus(shape, variant).unwrap();
+        assert_eq!(
+            corpus.manifest.archive_sha256,
+            "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e"
+        );
+
+        let source = litchi_rtf::Document::from_bytes(&corpus.archive).unwrap();
+        let replacements = super::semantic_update_indices(source.paragraph_count())
+            .unwrap()
+            .into_iter()
+            .map(|position| {
+                litchi_rtf::edit::ParagraphTextReplacement::new(
+                    position,
+                    super::semantic_rtf_variant_text(variant, position, true),
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut edit = source.edit();
+        edit.replace_body_paragraph_texts(&replacements).unwrap();
+        let output = edit.commit().unwrap().snapshot().to_bytes().unwrap();
+        assert_eq!(output.len(), 540_151);
+        assert_eq!(
+            sha256_hex(&output),
+            "d040328cb691fc5ec65192477688f4a9a4275a8b62fa354a2fdb68d739786d8f"
+        );
+
+        for (variant, expected_bytes, expected_sha256) in [
+            (
+                RtfSemanticVariant::Plain,
+                499_999,
+                "f122900c5e612d3218061ddd766889f8c2520c4e3b51e6aa3df6158fc736abdc",
+            ),
+            (
+                RtfSemanticVariant::Byte1252,
+                529_999,
+                "b6fb32c1fb727d747630e2667091e1c119c7e4ae4653036f702078580e4a5872",
+            ),
+            (
+                RtfSemanticVariant::Lzfu,
+                499_999,
+                "f122900c5e612d3218061ddd766889f8c2520c4e3b51e6aa3df6158fc736abdc",
+            ),
+        ] {
+            let text = super::semantic_rtf_expected_text(shape, variant, &[]);
+            assert_eq!(text.len(), expected_bytes);
+            assert_eq!(sha256_hex(text.as_bytes()), expected_sha256);
+        }
     }
 
     #[test]

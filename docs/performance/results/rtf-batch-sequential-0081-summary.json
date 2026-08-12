@@ -1,0 +1,271 @@
+{
+  "schema_version": 1,
+  "change": "0081-rtf-batch-and-sequential-text-evidence",
+  "status": "harness evidence only; no production-code change",
+  "environment": {
+    "date": "2026-08-12",
+    "timezone": "Asia/Hong_Kong",
+    "operating_system": "Ubuntu 24.04.4 LTS",
+    "kernel": "Linux 6.8.0-101-generic x86_64",
+    "architecture": "x86_64",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "host_logical_cpus": 12,
+    "cpu_affinity": 2,
+    "logical_cpus_visible_in_raw_reports": 1,
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "rustc_commit": "59807616e1fa2540724bfbac14d7976d7e4a3860",
+    "llvm": "22.1.2",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "profile": "release",
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "ld_preload": null,
+    "perf_event_paranoid": 1
+  },
+  "source": {
+    "branch": "feat/office-format-completeness",
+    "revision_reported_by_raw_runs": "21a214b68928f3a0d819a52c46dcfd1d98a4eaa5",
+    "worktree_dirty": true,
+    "note": "The paired binaries were frozen seconds apart from the same shared dirty worktree. Their only intentional RTF measurement difference is the stored harness comparator patch. No litchi-rtf or other production source changed between builds."
+  },
+  "binaries": {
+    "batch": {
+      "path_at_measurement": "/tmp/litchi-perf-rtf-batch-0082b",
+      "sha256": "4fa0ce9dc067af58d50ee8fdbe167c32f1691027ff847f51065e3e0f6995d59a"
+    },
+    "scalar": {
+      "path_at_measurement": "/tmp/litchi-perf-rtf-scalar-0082b",
+      "sha256": "d772d928f75db5e230967f78b9d5d3250d35b7d68b2e132aea2b069db9844e78"
+    },
+    "production_code_identical": true,
+    "intentional_harness_difference": "The scalar binary repeatedly calls replace_paragraph_text; the batch binary calls replace_body_paragraph_texts once."
+  },
+  "measurement_build": {
+    "batch_commands": [
+      "cargo fmt --manifest-path tools/perf-baseline/Cargo.toml -- --check",
+      "cargo build --locked --release --manifest-path tools/perf-baseline/Cargo.toml",
+      "cp tools/perf-baseline/target/release/litchi-perf-baseline /tmp/litchi-perf-rtf-batch-0082b",
+      "sha256sum /tmp/litchi-perf-rtf-batch-0082b"
+    ],
+    "scalar_commands": [
+      "git apply --check docs/performance/results/rtf-batch-sequential-0081-scalar-comparator.patch",
+      "git apply docs/performance/results/rtf-batch-sequential-0081-scalar-comparator.patch",
+      "cargo fmt --manifest-path tools/perf-baseline/Cargo.toml",
+      "cargo build --locked --release --manifest-path tools/perf-baseline/Cargo.toml",
+      "cp tools/perf-baseline/target/release/litchi-perf-baseline /tmp/litchi-perf-rtf-scalar-0082b",
+      "sha256sum /tmp/litchi-perf-rtf-scalar-0082b",
+      "git apply -R docs/performance/results/rtf-batch-sequential-0081-scalar-comparator.patch",
+      "cargo fmt --manifest-path tools/perf-baseline/Cargo.toml"
+    ],
+    "comparator_patch": "rtf-batch-sequential-0081-scalar-comparator.patch",
+    "comparator_patch_sha256": "c5c9317872d67e5672a0778fc9e027e546774cc3994bb051f4eca0b450fdceb1",
+    "reproducibility_note": "These are the commands used for the measured frozen artifacts. Their SHA-256 values identify those artifacts; they are not expected outputs of later rebuilds because the raw run records a dirty worktree without a complete tree patch or tree hash."
+  },
+  "one_percent_scenario": {
+    "case": "rtf_semantic_one_percent_edit_save",
+    "variant": "plain",
+    "shape": "large",
+    "paragraphs": 10000,
+    "updated_paragraphs": 100,
+    "selection": "ceil(1%) evenly spaced source-relative paragraph positions",
+    "source_bytes": 540051,
+    "source_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+    "changed_output_bytes": 540151,
+    "changed_output_sha256": "d040328cb691fc5ec65192477688f4a9a4275a8b62fa354a2fdb68d739786d8f",
+    "sink": {
+      "accepted_bytes": 540151,
+      "write_calls": 1,
+      "largest_write": 540151
+    }
+  },
+  "protocol": {
+    "order": [
+      "batch_a",
+      "scalar_a",
+      "scalar_b",
+      "batch_b"
+    ],
+    "warmups_per_leg": 30,
+    "samples_per_leg": 200,
+    "pooled_samples_per_state": 400,
+    "command_template": "taskset -c 2 BINARY --case rtf_semantic_one_percent_edit_save --semantic-shape large --rtf-variant plain --samples 200 --warmup 30 --json OUTPUT.json",
+    "timed": [
+      "start detached edit",
+      "stage either one batch or repeated scalar replacements",
+      "commit including candidate serialization, complete candidate reopen, and publication",
+      "clone the published snapshot handle",
+      "serialize the published RTF to a pre-reserved bounded non-seek sink"
+    ],
+    "outside_timing": [
+      "corpus generation and hashing",
+      "source Document parse",
+      "deterministic update selection and replacement construction",
+      "expected changed-output construction",
+      "sink reservation",
+      "exact output-byte comparison",
+      "complete semantic reopen and paragraph readback",
+      "patch apply and exact inverse restoration"
+    ]
+  },
+  "per_leg_ns": {
+    "batch_a": {
+      "samples": 200,
+      "p50": 5469514,
+      "p95": 6096287,
+      "mean": 5520221.820000001,
+      "mean_confidence_interval_95": [
+        5472734.533318911,
+        5567709.106681092
+      ]
+    },
+    "scalar_a": {
+      "samples": 200,
+      "p50": 7089494,
+      "p95": 7631762,
+      "mean": 7159447.405000001,
+      "mean_confidence_interval_95": [
+        7119657.627795197,
+        7199237.182204805
+      ]
+    },
+    "scalar_b": {
+      "samples": 200,
+      "p50": 7147160,
+      "p95": 8064729,
+      "mean": 7294511.32,
+      "mean_confidence_interval_95": [
+        7226605.767440489,
+        7362416.872559512
+      ]
+    },
+    "batch_b": {
+      "samples": 200,
+      "p50": 5370557,
+      "p95": 5780993,
+      "mean": 5416375.725000001,
+      "mean_confidence_interval_95": [
+        5390156.706711839,
+        5442594.743288162
+      ]
+    }
+  },
+  "pooled_ns": {
+    "batch": {
+      "samples": 400,
+      "min": 4914730,
+      "p50": 5413216,
+      "p95": 5918122,
+      "max": 7596944,
+      "mean": 5468298.7725,
+      "standard_deviation": 279610.87688380457,
+      "mean_confidence_interval_95": [
+        5440814.039745766,
+        5495783.505254234
+      ]
+    },
+    "scalar": {
+      "samples": 400,
+      "min": 6779689,
+      "p50": 7118205,
+      "p95": 7884901,
+      "max": 10226627,
+      "mean": 7226979.3625,
+      "standard_deviation": 404312.2562578605,
+      "mean_confidence_interval_95": [
+        7187236.937468635,
+        7266721.787531365
+      ]
+    },
+    "batch_delta_percent_relative_to_scalar": {
+      "p50": -23.95251330918399,
+      "p95": -24.943610579257747,
+      "mean": -24.334933058278814
+    }
+  },
+  "sequential_text_scenario": {
+    "case": "rtf_semantic_text_to_sink",
+    "binary_sha256": "4fa0ce9dc067af58d50ee8fdbe167c32f1691027ff847f51065e3e0f6995d59a",
+    "command": "taskset -c 2 /tmp/litchi-perf-rtf-batch-0082b --case rtf_semantic_text_to_sink --semantic-shape large --rtf-variant plain,byte1252,lzfu --samples 50 --warmup 10 --json /tmp/rtf-text-to-sink-large-0082b.json",
+    "warmups_per_variant": 10,
+    "samples_per_variant": 50,
+    "timed": "Document::write_text_to into a pre-reserved bounded forward-only non-seek sink",
+    "outside_timing": "Document parse, expected UTF-8 construction, sink reservation, byte/report comparison, and complete semantic verification",
+    "package_serialization_included": false,
+    "variants": {
+      "plain": {
+        "source_bytes": 540051,
+        "source_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+        "output_bytes": 499999,
+        "output_sha256": "f122900c5e612d3218061ddd766889f8c2520c4e3b51e6aa3df6158fc736abdc",
+        "p50_ns": 744731,
+        "p95_ns": 842621,
+        "mean_ns": 757401.54,
+        "mean_confidence_interval_95_ns": [
+          748287.5535285677,
+          766515.5264714324
+        ],
+        "write_calls": 19999,
+        "largest_write": 49
+      },
+      "byte1252": {
+        "source_bytes": 560063,
+        "source_sha256": "7157437b91b57aa50fd9725861c350f83eca84d0114341bcbc7bcda554fed50e",
+        "output_bytes": 529999,
+        "output_sha256": "b6fb32c1fb727d747630e2667091e1c119c7e4ae4653036f702078580e4a5872",
+        "p50_ns": 746713,
+        "p95_ns": 810536,
+        "mean_ns": 751813.1799999999,
+        "mean_confidence_interval_95_ns": [
+          745114.9375780949,
+          758511.422421905
+        ],
+        "write_calls": 19999,
+        "largest_write": 52
+      },
+      "lzfu": {
+        "source_bytes": 86235,
+        "source_sha256": "e293574fa01c27edd82f6b3d43d10a257eced749e15fc5a3988eda07b74c5176",
+        "output_bytes": 499999,
+        "output_sha256": "f122900c5e612d3218061ddd766889f8c2520c4e3b51e6aa3df6158fc736abdc",
+        "p50_ns": 750418,
+        "p95_ns": 784371,
+        "mean_ns": 753995.1799999999,
+        "mean_confidence_interval_95_ns": [
+          748347.2956288548,
+          759643.0643711451
+        ],
+        "write_calls": 19999,
+        "largest_write": 49
+      }
+    }
+  },
+  "artifacts": {
+    "rtf-batch-sequential-0081-abba-batch-a.json": "8dc955ec7255639e940a6798668a6403a3f14021f88f41f8019f179513eee095",
+    "rtf-batch-sequential-0081-abba-scalar-a.json": "cbf0b81a6b71302a4ad15ffa4c017bdb03e3e9bf14318ecacbd99ddfa75199f0",
+    "rtf-batch-sequential-0081-abba-scalar-b.json": "1c5b7193ebf7d99b62304c7fb2b1fc32f1e7c0cb7c825d88cfc2b5d8d32dca49",
+    "rtf-batch-sequential-0081-abba-batch-b.json": "1865ed6e20660236cf835ada9d2f3006a23699af7c723be47e503897d9beb609",
+    "rtf-batch-sequential-0081-text-sink-large.json": "e888ee6269e732e9e1fb4af2c33ac72116081363b7edf30fae1077edfc514a75",
+    "rtf-batch-sequential-0081-scalar-comparator.patch": "c5c9317872d67e5672a0778fc9e027e546774cc3994bb051f4eca0b450fdceb1"
+  },
+  "correctness_gates": [
+    "cargo fmt --manifest-path tools/perf-baseline/Cargo.toml -- --check",
+    "cargo check --locked --manifest-path tools/perf-baseline/Cargo.toml",
+    "cargo test --locked --manifest-path tools/perf-baseline/Cargo.toml semantic_rtf -- --nocapture",
+    "cargo clippy --locked --manifest-path tools/perf-baseline/Cargo.toml --all-targets -- -D warnings",
+    "git apply --check docs/performance/results/rtf-batch-sequential-0081-scalar-comparator.patch"
+  ],
+  "claim_policy": {
+    "p99_claimed": false,
+    "production_optimization_claimed": false,
+    "accepted_conclusion": "For this generated large plain-RTF 1% edit/save scenario, selecting the already-existing atomic batch API removes repeated scalar selection work and is materially faster. The separate sequential-text numbers are baseline observations, not before/after optimization evidence."
+  },
+  "limitations": [
+    "Generated corpus only; no real-producer, formatted, media-bearing, malformed, protected, or opaque-rich latency claim.",
+    "The 1% edit capability is intentionally plain RTF only; CP-1252 and LZFu edits retain typed refusal.",
+    "Sequential-text conversion is measured after parse and does not include package serialization or transport decode.",
+    "No allocation, RSS, hardware-counter, cold-cache, concurrent, or remote-source conclusion is made.",
+    "Raw reports include the harness-standard p99 field, but this evidence record makes no p99 claim.",
+    "The raw reports record a dirty worktree; paired production code was identical, and the exact intentional comparator difference is retained as a patch."
+  ]
+}
