@@ -50,6 +50,24 @@ impl<'a> Document<'a> {
         codec::extract_sections(self.part.xml_bytes())
     }
 
+    /// Capture an immutable, source-order section inventory.
+    ///
+    /// Unlike [`Self::sections`], this facade reports property ownership and
+    /// logical paragraph boundaries and does not expose or copy XML spans.
+    /// Header and footer relationship IDs remain inert and no target part is
+    /// resolved or read.
+    pub fn section_inventory(&self) -> Result<crate::section::Inventory> {
+        self.section_inventory_with_limits(&crate::section::Limits::default())
+    }
+
+    /// Capture the section inventory with caller-provided semantic limits.
+    pub fn section_inventory_with_limits(
+        &self,
+        limits: &crate::section::Limits,
+    ) -> Result<crate::section::Inventory> {
+        crate::section::Inventory::parse_with_limits(self.part.xml_bytes(), limits)
+    }
+
     /// Get the document styles.
     ///
     /// Returns a `Styles` object providing access to all paragraph, character,

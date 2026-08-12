@@ -117,7 +117,44 @@ impl Package {
         let main = self.package.main_document_part()?;
         validate_document_main_content_type(main.content_type())?;
         let xml = visible_document_xml(main.data()?.into_arc())?;
-        Ok(Document { xml })
+        let source_version = self.package.source_version()?;
+        Ok(Document {
+            xml,
+            source_version,
+        })
+    }
+
+    /// Load only the mandatory main-document payload and capture its immutable
+    /// section inventory at the exact opened source version.
+    ///
+    /// Header/footer relationship IDs are retained as inert values. Their
+    /// target parts are neither resolved nor read.
+    pub fn section_inventory_snapshot(&self) -> Result<crate::section::Snapshot> {
+        self.section_inventory_snapshot_with_limits(&crate::section::Limits::default())
+    }
+
+    /// Capture a source-bound section inventory with explicit semantic limits.
+    pub fn section_inventory_snapshot_with_limits(
+        &self,
+        limits: &crate::section::Limits,
+    ) -> Result<crate::section::Snapshot> {
+        let main = self.package.main_document_part()?;
+        validate_document_main_content_type(main.content_type())?;
+        let source_version = self.package.source_version()?;
+        let raw = main.data()?;
+        let snapshot =
+            crate::section::Snapshot::from_source_xml(raw.as_bytes(), source_version, limits)?;
+        // Detect hostile adapters that mutate immediately after the payload
+        // read and semantic scan, before publishing the closure to the caller.
+        let observed = self.package.source_version()?;
+        if observed != source_version {
+            return Err(litchi_opc::OpcError::SourceChanged {
+                expected: source_version,
+                actual: observed,
+            }
+            .into());
+        }
+        Ok(snapshot)
     }
 
     /// Return content-free payload-cache activity for this lazy package.
@@ -606,6 +643,7 @@ fn transaction_error_to_document(error: crate::document::TransactionError) -> Er
 #[derive(Clone)]
 pub struct Document {
     xml: Arc<Vec<u8>>,
+    source_version: litchi_core::SourceVersion,
 }
 
 impl Document {
@@ -627,5 +665,31 @@ impl Document {
     /// Return one visible paragraph without allocating all paragraph views.
     pub fn paragraph(&self, index: usize) -> Result<Option<Paragraph>> {
         document_paragraph(Arc::clone(&self.xml), index)
+    }
+
+    /// Capture the immutable section inventory from the pinned main document.
+    pub fn section_inventory(&self) -> Result<crate::section::Inventory> {
+        self.section_inventory_with_limits(&crate::section::Limits::default())
+    }
+
+    /// Capture the section inventory with caller-provided semantic limits.
+    pub fn section_inventory_with_limits(
+        &self,
+        limits: &crate::section::Limits,
+    ) -> Result<crate::section::Inventory> {
+        crate::section::Inventory::parse_with_limits(self.xml.as_slice(), limits)
+    }
+
+    /// Capture a cheaply cloneable inventory bound to the exact opened source.
+    pub fn section_inventory_snapshot(&self) -> Result<crate::section::Snapshot> {
+        self.section_inventory_snapshot_with_limits(&crate::section::Limits::default())
+    }
+
+    /// Capture a source-bound inventory with caller-provided semantic limits.
+    pub fn section_inventory_snapshot_with_limits(
+        &self,
+        limits: &crate::section::Limits,
+    ) -> Result<crate::section::Snapshot> {
+        crate::section::Snapshot::from_source_xml(self.xml.as_slice(), self.source_version, limits)
     }
 }

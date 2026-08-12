@@ -772,7 +772,7 @@ impl Section {
         Ok(())
     }
 
-    fn local_state(&mut self) -> Result<State> {
+    pub(super) fn local_state(&mut self) -> Result<State> {
         Ok(self.snapshot_mut()?.state.clone())
     }
 }

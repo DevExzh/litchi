@@ -8,11 +8,16 @@
 
 mod codec;
 pub mod footnote_columns;
+mod inventory;
 mod model;
 
 #[cfg(test)]
 mod tests;
 
+pub use inventory::{
+    Descriptor, Inventory, Limits, Ownership, ParagraphRange, Property, PropertyValue, Selector,
+    Snapshot,
+};
 pub use model::{
     Column, Columns, Emu, Margins, Orientation, PageSize, Reference, Section, Sections, Start,
 };

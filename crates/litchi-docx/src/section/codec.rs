@@ -34,7 +34,7 @@ use super::model::{
 };
 use crate::error::{Error, Result};
 use crate::header_footer::Kind;
-use crate::namespace::{is_wordprocessing_namespace, word_attribute_value};
+use crate::namespace::is_wordprocessing_namespace;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
@@ -699,6 +699,8 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
 
 fn decode_state(raw: &Raw) -> Result<State> {
     let mut state = State::default();
+    let mut seen = [false; 20];
+    let mut last_rank = 0usize;
     for node in &raw.children {
         let Node::Element {
             local_name,
@@ -708,13 +710,29 @@ fn decode_state(raw: &Raw) -> Result<State> {
         else {
             continue;
         };
+        if let Some(rank) = section_child_rank(local_name) {
+            if rank < last_rank {
+                return Err(Error::InvalidFormat(format!(
+                    "section property '{local_name}' is out of schema order"
+                )));
+            }
+            last_rank = rank;
+            if seen[rank] && !matches!(local_name.as_str(), "headerReference" | "footerReference") {
+                return Err(Error::InvalidFormat(format!(
+                    "section properties contain duplicate '{local_name}'"
+                )));
+            }
+            seen[rank] = true;
+        }
         match local_name.as_str() {
             "type" => {
                 if state.start.is_some() {
                     return Err(Error::InvalidFormat("duplicate section type".into()));
                 }
                 let value = required_attribute(child, b"val")?;
-                state.start = Start::from_xml(&value);
+                state.start = Some(Start::from_xml(&value).ok_or_else(|| {
+                    Error::InvalidFormat(format!("invalid section type '{value}'"))
+                })?);
             },
             "pgSz" => {
                 if state.page_size.is_some() {
@@ -734,8 +752,8 @@ fn decode_state(raw: &Raw) -> Result<State> {
                 }
                 state.columns = Some(parse_columns(raw, child)?);
             },
-            "headerReference" => state.headers.push(parse_reference(child)?),
-            "footerReference" => state.footers.push(parse_reference(child)?),
+            "headerReference" => state.headers.push(parse_reference(raw, child)?),
+            "footerReference" => state.footers.push(parse_reference(raw, child)?),
             _ => {},
         }
     }
@@ -751,8 +769,34 @@ fn decode_state(raw: &Raw) -> Result<State> {
     Ok(state)
 }
 
+fn section_child_rank(name: &str) -> Option<usize> {
+    match name {
+        "headerReference" => Some(0),
+        "footerReference" => Some(1),
+        "footnotePr" => Some(2),
+        "endnotePr" => Some(3),
+        "type" => Some(4),
+        "pgSz" => Some(5),
+        "pgMar" => Some(6),
+        "paperSrc" => Some(7),
+        "pgBorders" => Some(8),
+        "lnNumType" => Some(9),
+        "pgNumType" => Some(10),
+        "cols" => Some(11),
+        "formProt" => Some(12),
+        "vAlign" => Some(13),
+        "titlePg" => Some(14),
+        "textDirection" => Some(15),
+        "bidi" => Some(16),
+        "rtlGutter" => Some(17),
+        "docGrid" => Some(18),
+        "printerSettings" => Some(19),
+        _ => None,
+    }
+}
+
 fn parse_page_size(raw: &Raw, xml: &[u8]) -> Result<PageSize> {
-    let attrs = attributes(xml)?;
+    let attrs = attributes(xml, AttributeFamily::Word)?;
     let width = attr(&attrs, "w")
         .map(|value| parse_measurement(value, "page width", false, true))
         .transpose()?;
@@ -760,7 +804,12 @@ fn parse_page_size(raw: &Raw, xml: &[u8]) -> Result<PageSize> {
         .map(|value| parse_measurement(value, "page height", false, true))
         .transpose()?;
     let orientation = attr(&attrs, "orient")
-        .and_then(Orientation::from_xml)
+        .map(|value| {
+            Orientation::from_xml(value).ok_or_else(|| {
+                Error::InvalidFormat(format!("invalid section orientation '{value}'"))
+            })
+        })
+        .transpose()?
         .unwrap_or_default();
     let _ = raw;
     Ok(PageSize {
@@ -771,7 +820,7 @@ fn parse_page_size(raw: &Raw, xml: &[u8]) -> Result<PageSize> {
 }
 
 fn parse_margins(xml: &[u8]) -> Result<Margins> {
-    let attrs = attributes(xml)?;
+    let attrs = attributes(xml, AttributeFamily::Word)?;
     Ok(Margins {
         top: parse_attr_measurement(&attrs, "top", true, false)?,
         right: parse_attr_measurement(&attrs, "right", false, false)?,
@@ -784,7 +833,7 @@ fn parse_margins(xml: &[u8]) -> Result<Margins> {
 }
 
 fn parse_columns(raw: &Raw, xml: &[u8]) -> Result<Columns> {
-    let attrs = attributes(xml)?;
+    let attrs = attributes(xml, AttributeFamily::Word)?;
     let mut columns = Columns {
         equal_width: attr(&attrs, "equalWidth")
             .is_none_or(|value| value != "0" && value != "false"),
@@ -804,7 +853,7 @@ fn parse_columns(raw: &Raw, xml: &[u8]) -> Result<Columns> {
         if name != "col" {
             continue;
         }
-        let attrs = attributes(&child)?;
+        let attrs = attributes(&child, AttributeFamily::Word)?;
         let width = parse_attr_measurement(&attrs, "w", false, false)?
             .ok_or_else(|| Error::InvalidFormat("section column omits required width".into()))?;
         columns.columns.push(Column {
@@ -817,8 +866,8 @@ fn parse_columns(raw: &Raw, xml: &[u8]) -> Result<Columns> {
     Ok(columns)
 }
 
-fn parse_reference(xml: &[u8]) -> Result<Reference> {
-    let attrs = attributes(xml)?;
+fn parse_reference(raw: &Raw, xml: &[u8]) -> Result<Reference> {
+    let attrs = attributes(xml, AttributeFamily::Reference(raw))?;
     let kind = Kind::from_xml(required_attr(&attrs, "type")?.as_str())
         .ok_or_else(|| Error::InvalidFormat("invalid section header/footer type".into()))?;
     let relationship_id = required_attr(&attrs, "id")?;
@@ -937,14 +986,23 @@ fn direct_children(xml: &[u8]) -> Result<Vec<(String, Vec<u8>)>> {
     Ok(output)
 }
 
-fn attributes(xml: &[u8]) -> Result<Vec<(String, String)>> {
-    let mut reader = Reader::from_reader(xml);
-    let element = loop {
-        match reader
-            .read_event()
-            .map_err(|error| Error::Xml(error.to_string()))?
-        {
-            Event::Start(element) | Event::Empty(element) => break element,
+#[derive(Clone, Copy)]
+enum AttributeFamily<'a> {
+    Word,
+    Reference(&'a Raw),
+}
+
+fn attributes(xml: &[u8], family: AttributeFamily<'_>) -> Result<Vec<(String, String)>> {
+    let mut reader = NsReader::from_reader(xml);
+    let (element, resolver) = loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let _ = namespace;
+                break (element, reader.resolver().clone());
+            },
             Event::Eof => {
                 return Err(Error::InvalidFormat(
                     "section property has no element".into(),
@@ -960,10 +1018,39 @@ fn attributes(xml: &[u8]) -> Result<Vec<(String, String)>> {
             | Event::GeneralRef(_) => {},
         }
     };
+    let fragment_prefix = element
+        .name()
+        .prefix()
+        .map(|prefix| prefix.into_inner().to_vec());
     let mut result = Vec::new();
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = String::from_utf8_lossy(attribute.key.local_name().as_ref()).into_owned();
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        let same_fragment_prefix = matches!(
+            &namespace,
+            ResolveResult::Unknown(prefix)
+                if fragment_prefix.as_deref() == Some(prefix.as_slice())
+        );
+        let relevant = match family {
+            AttributeFamily::Word => {
+                is_wordprocessing_namespace(&namespace)
+                    || matches!(namespace, ResolveResult::Unbound)
+                    || same_fragment_prefix
+            },
+            AttributeFamily::Reference(raw) if name == "id" => {
+                is_relationship_namespace(&namespace)
+                    || matches!(&namespace, ResolveResult::Unknown(prefix) if raw.declares_relationship_prefix(prefix.as_slice())?)
+            },
+            AttributeFamily::Reference(_) => {
+                is_wordprocessing_namespace(&namespace)
+                    || matches!(namespace, ResolveResult::Unbound)
+                    || same_fragment_prefix
+            },
+        };
+        if !relevant {
+            continue;
+        }
         if result.iter().any(|(candidate, _)| candidate == &name) {
             return Err(Error::InvalidFormat(format!(
                 "duplicate section property attribute '{name}'"
@@ -976,6 +1063,50 @@ fn attributes(xml: &[u8]) -> Result<Vec<(String, String)>> {
         result.push((name, value));
     }
     Ok(result)
+}
+
+fn is_relationship_namespace(namespace: &ResolveResult<'_>) -> bool {
+    const TRANSITIONAL: &[u8] =
+        b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+    matches!(namespace, ResolveResult::Bound(quick_xml::name::Namespace(value)) if *value == TRANSITIONAL || *value == STRICT)
+        || matches!(namespace, ResolveResult::Unknown(prefix) if prefix.as_slice() == b"r")
+}
+
+impl Raw {
+    fn declares_relationship_prefix(&self, prefix: &[u8]) -> Result<bool> {
+        let mut reader = Reader::from_reader(self.root_open.as_slice());
+        let element = match reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+        {
+            Event::Start(element) | Event::Empty(element) => element,
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "section properties have an invalid opening element".into(),
+                ));
+            },
+        };
+        for attribute in element.attributes() {
+            let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+            if attribute
+                .key
+                .prefix()
+                .is_some_and(|value| value.as_ref() == b"xmlns")
+                && attribute.key.local_name().as_ref() == prefix
+            {
+                let value = attribute
+                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                return Ok(matches!(
+                    value.as_bytes(),
+                    b"http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                        | b"http://purl.oclc.org/ooxml/officeDocument/relationships"
+                ));
+            }
+        }
+        Ok(false)
+    }
 }
 
 fn attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
@@ -1016,7 +1147,42 @@ fn required_attribute(xml: &[u8], name: &[u8]) -> Result<String> {
             | Event::GeneralRef(_) => {},
         }
     };
-    word_attribute_value(&element, name, decoder, &resolver)?.ok_or_else(|| {
+    let element_prefix = element
+        .name()
+        .prefix()
+        .map(|prefix| prefix.into_inner().to_vec());
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() != name {
+            continue;
+        }
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        let same_fragment_prefix = matches!(
+            &namespace,
+            ResolveResult::Unknown(prefix)
+                if element_prefix.as_deref() == Some(prefix.as_slice())
+        );
+        if !is_wordprocessing_namespace(&namespace)
+            && !matches!(namespace, ResolveResult::Unbound)
+            && !same_fragment_prefix
+        {
+            continue;
+        }
+        if value.is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate section attribute '{}'",
+                String::from_utf8_lossy(name)
+            )));
+        }
+        value = Some(
+            attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| Error::Xml(error.to_string()))?
+                .into_owned(),
+        );
+    }
+    value.ok_or_else(|| {
         Error::InvalidFormat(format!(
             "missing section attribute '{}'",
             String::from_utf8_lossy(name)
