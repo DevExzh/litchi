@@ -32,6 +32,8 @@ pub mod style;
 pub mod text_output;
 /// Common unit conversion utilities (length units used across all formats)
 pub mod unit;
+/// Bounded, format-neutral validation report values.
+pub mod validation;
 /// XML utilities
 pub mod xml;
 /// Shared byte slice for zero-copy element storage across formats
@@ -72,6 +74,12 @@ pub use text_output::{
 };
 // Unit conversions
 pub use unit::LengthUnit;
+pub use validation::{
+    CheckCapabilityId, CheckStatus, CompatibilityImpact, DEFAULT_VALIDATION_LIMITS, EvidenceDigest,
+    EvidenceValue, IssueEvidence, IssueId, IssueLocation, IssueSeverity, RepairAvailability,
+    SpecCitation, ValidateReport, ValidationCheck, ValidationIssue, ValidationLimitKind,
+    ValidationLimits, ValidationReportError,
+};
 // Shared slice types — kept `pub` (not `pub(crate)` per spec) because the
 // umbrella's docx code uses `XmlSlice` in public type signatures across the
 // crate boundary. `#[doc(hidden)]` suppresses public docs surface.
