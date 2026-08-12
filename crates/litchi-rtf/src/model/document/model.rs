@@ -1058,6 +1058,13 @@ impl<'a> RtfDocument<'a> {
         self.plain_body_editability(true)
     }
 
+    pub(crate) fn local_paragraph_property_editability(&self) -> Result<(), &'static str> {
+        if !self.body_story_events.is_empty() || !self.tables.is_empty() {
+            return Err("the body contains tables or positioned structure");
+        }
+        Ok(())
+    }
+
     fn plain_body_editability(&self, allow_mixed_bold: bool) -> Result<(), &'static str> {
         if !self.body_story_events.is_empty() || !self.tables.is_empty() {
             return Err("the body contains tables or positioned structure");

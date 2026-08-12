@@ -553,6 +553,10 @@ pub struct Format<'a> {
 }
 
 impl<'a> Format<'a> {
+    pub(crate) const fn raw(self) -> &'a RawFormat {
+        self.raw
+    }
+
     /// Whether bold formatting is active.
     #[must_use]
     pub const fn bold(self) -> bool {
@@ -668,11 +672,33 @@ pub struct ParagraphFormat<'a> {
     raw: &'a RawParagraph,
 }
 
-impl ParagraphFormat<'_> {
+impl<'a> ParagraphFormat<'a> {
+    pub(crate) const fn raw(self) -> &'a RawParagraph {
+        self.raw
+    }
+
+    /// Dependency-free local layout values used by paragraph transactions.
+    #[must_use]
+    pub fn layout(self) -> crate::edit::ParagraphLayout {
+        crate::edit::ParagraphLayout::from_raw(self.raw)
+    }
+
     /// Local paragraph alignment.
     #[must_use]
     pub const fn alignment(self) -> Alignment {
         self.raw.alignment
+    }
+
+    /// Explicit local paragraph spacing in twips.
+    #[must_use]
+    pub const fn spacing(self) -> crate::Spacing {
+        self.raw.spacing
+    }
+
+    /// Explicit local physical paragraph indentation in twips.
+    #[must_use]
+    pub const fn indentation(self) -> crate::Indentation {
+        self.raw.indentation
     }
 
     /// Explicit local text direction, if authored.

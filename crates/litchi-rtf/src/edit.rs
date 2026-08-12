@@ -1,12 +1,14 @@
 //! Bounded immutable RTF body-text and paragraph-property transactions.
 //!
 //! Operations resolve against one immutable semantic body. Disjoint UTF-8
-//! spans and paragraph-alignment facets compose in one atomic commit. The
-//! exact-body closure deliberately excludes body-anchored opaque syntax,
-//! tables, positioned content, and mixed formatting whose dependent ranges
-//! cannot be updated losslessly yet. Canonical retained-story edits cover
-//! checked table cells, headers/footers, comments, notes, and root shape text
-//! frames while refusing unknown destinations and dependent positioned content.
+//! spans, paragraph alignment, and dependency-free local layout facets compose
+//! in bounded atomic commits. Text edits retain a deliberately narrow uniform
+//! formatting closure. Layout edits instead rewrite checked paragraph/run
+//! snapshots and verify every unrelated property after reopening. Both seams
+//! refuse body-anchored opaque syntax, tables, and positioned content.
+//! Canonical retained-story edits cover checked table cells, headers/footers,
+//! comments, notes, and root shape text frames while refusing unknown
+//! destinations and dependent positioned content.
 
 use crate::{Alignment, Document, HeaderFooterType, RtfError, RtfWriter, TableCellPath};
 use bumpalo::Bump;
@@ -14,6 +16,7 @@ use serde_json::Value;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::io::{self, Write as _};
 use std::ops::Range;
 
 mod composition;
@@ -148,6 +151,396 @@ pub struct ParagraphTextReplacement {
     replacement: String,
 }
 
+/// The dependency-free local layout facets of one ordinary body paragraph.
+///
+/// Values are the effective explicit RTF values after parsing. Zero spacing
+/// or indentation and `false` pagination flags represent the cleared state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParagraphLayout {
+    space_before: i32,
+    space_after: i32,
+    left_indent: i32,
+    right_indent: i32,
+    first_line_indent: i32,
+    keep_together: bool,
+    keep_with_next: bool,
+    page_break_before: bool,
+}
+
+impl ParagraphLayout {
+    pub(crate) fn from_raw(paragraph: &crate::types::Paragraph) -> Self {
+        Self {
+            space_before: paragraph.spacing.before,
+            space_after: paragraph.spacing.after,
+            left_indent: paragraph.indentation.left,
+            right_indent: paragraph.indentation.right,
+            first_line_indent: paragraph.indentation.first_line,
+            keep_together: paragraph.keep_together,
+            keep_with_next: paragraph.keep_next,
+            page_break_before: paragraph.page_break_before,
+        }
+    }
+
+    /// Space before the paragraph in twips.
+    #[must_use]
+    pub const fn space_before(self) -> i32 {
+        self.space_before
+    }
+
+    /// Space after the paragraph in twips.
+    #[must_use]
+    pub const fn space_after(self) -> i32 {
+        self.space_after
+    }
+
+    /// Physical left indentation in twips.
+    #[must_use]
+    pub const fn left_indent(self) -> i32 {
+        self.left_indent
+    }
+
+    /// Physical right indentation in twips.
+    #[must_use]
+    pub const fn right_indent(self) -> i32 {
+        self.right_indent
+    }
+
+    /// First-line indentation in twips. Negative values are hanging indents.
+    #[must_use]
+    pub const fn first_line_indent(self) -> i32 {
+        self.first_line_indent
+    }
+
+    /// Whether the paragraph requests staying on one page.
+    #[must_use]
+    pub const fn keep_together(self) -> bool {
+        self.keep_together
+    }
+
+    /// Whether the paragraph requests staying with its successor.
+    #[must_use]
+    pub const fn keep_with_next(self) -> bool {
+        self.keep_with_next
+    }
+
+    /// Whether the paragraph requests a page break before itself.
+    #[must_use]
+    pub const fn page_break_before(self) -> bool {
+        self.page_break_before
+    }
+}
+
+/// Typed partial update for dependency-free local paragraph layout.
+///
+/// An omitted field is preserved. Supplying zero for spacing or indentation,
+/// or `false` for a pagination flag, clears that explicit semantic value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ParagraphLayoutPatch {
+    space_before: Option<i32>,
+    space_after: Option<i32>,
+    left_indent: Option<i32>,
+    right_indent: Option<i32>,
+    first_line_indent: Option<i32>,
+    keep_together: Option<bool>,
+    keep_with_next: Option<bool>,
+    page_break_before: Option<bool>,
+}
+
+impl ParagraphLayoutPatch {
+    /// Creates an empty delta. At least one field is required when staging.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            space_before: None,
+            space_after: None,
+            left_indent: None,
+            right_indent: None,
+            first_line_indent: None,
+            keep_together: None,
+            keep_with_next: None,
+            page_break_before: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_space_before(mut self, twips: i32) -> Self {
+        self.space_before = Some(twips);
+        self
+    }
+
+    /// Clears explicit space before the paragraph.
+    #[must_use]
+    pub const fn clear_space_before(self) -> Self {
+        self.with_space_before(0)
+    }
+
+    #[must_use]
+    pub const fn with_space_after(mut self, twips: i32) -> Self {
+        self.space_after = Some(twips);
+        self
+    }
+
+    /// Clears explicit space after the paragraph.
+    #[must_use]
+    pub const fn clear_space_after(self) -> Self {
+        self.with_space_after(0)
+    }
+
+    #[must_use]
+    pub const fn with_left_indent(mut self, twips: i32) -> Self {
+        self.left_indent = Some(twips);
+        self
+    }
+
+    /// Clears explicit physical left indentation.
+    #[must_use]
+    pub const fn clear_left_indent(self) -> Self {
+        self.with_left_indent(0)
+    }
+
+    #[must_use]
+    pub const fn with_right_indent(mut self, twips: i32) -> Self {
+        self.right_indent = Some(twips);
+        self
+    }
+
+    /// Clears explicit physical right indentation.
+    #[must_use]
+    pub const fn clear_right_indent(self) -> Self {
+        self.with_right_indent(0)
+    }
+
+    #[must_use]
+    pub const fn with_first_line_indent(mut self, twips: i32) -> Self {
+        self.first_line_indent = Some(twips);
+        self
+    }
+
+    /// Clears explicit first-line or hanging indentation.
+    #[must_use]
+    pub const fn clear_first_line_indent(self) -> Self {
+        self.with_first_line_indent(0)
+    }
+
+    #[must_use]
+    pub const fn with_keep_together(mut self, keep: bool) -> Self {
+        self.keep_together = Some(keep);
+        self
+    }
+
+    /// Clears the local keep-together request.
+    #[must_use]
+    pub const fn clear_keep_together(self) -> Self {
+        self.with_keep_together(false)
+    }
+
+    #[must_use]
+    pub const fn with_keep_with_next(mut self, keep: bool) -> Self {
+        self.keep_with_next = Some(keep);
+        self
+    }
+
+    /// Clears the local keep-with-next request.
+    #[must_use]
+    pub const fn clear_keep_with_next(self) -> Self {
+        self.with_keep_with_next(false)
+    }
+
+    #[must_use]
+    pub const fn with_page_break_before(mut self, page_break: bool) -> Self {
+        self.page_break_before = Some(page_break);
+        self
+    }
+
+    /// Clears the local page-break-before request.
+    #[must_use]
+    pub const fn clear_page_break_before(self) -> Self {
+        self.with_page_break_before(false)
+    }
+
+    const fn fields(self) -> LayoutFields {
+        let mut fields = 0u8;
+        if self.space_before.is_some() {
+            fields |= LayoutFields::SPACE_BEFORE;
+        }
+        if self.space_after.is_some() {
+            fields |= LayoutFields::SPACE_AFTER;
+        }
+        if self.left_indent.is_some() {
+            fields |= LayoutFields::LEFT_INDENT;
+        }
+        if self.right_indent.is_some() {
+            fields |= LayoutFields::RIGHT_INDENT;
+        }
+        if self.first_line_indent.is_some() {
+            fields |= LayoutFields::FIRST_LINE_INDENT;
+        }
+        if self.keep_together.is_some() {
+            fields |= LayoutFields::KEEP_TOGETHER;
+        }
+        if self.keep_with_next.is_some() {
+            fields |= LayoutFields::KEEP_WITH_NEXT;
+        }
+        if self.page_break_before.is_some() {
+            fields |= LayoutFields::PAGE_BREAK_BEFORE;
+        }
+        LayoutFields(fields)
+    }
+
+    fn apply(self, layout: &mut ParagraphLayout) {
+        if let Some(value) = self.space_before {
+            layout.space_before = value;
+        }
+        if let Some(value) = self.space_after {
+            layout.space_after = value;
+        }
+        if let Some(value) = self.left_indent {
+            layout.left_indent = value;
+        }
+        if let Some(value) = self.right_indent {
+            layout.right_indent = value;
+        }
+        if let Some(value) = self.first_line_indent {
+            layout.first_line_indent = value;
+        }
+        if let Some(value) = self.keep_together {
+            layout.keep_together = value;
+        }
+        if let Some(value) = self.keep_with_next {
+            layout.keep_with_next = value;
+        }
+        if let Some(value) = self.page_break_before {
+            layout.page_break_before = value;
+        }
+    }
+}
+
+/// One immutable-source selector and typed local paragraph-layout delta.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParagraphLayoutUpdate {
+    position: usize,
+    patch: ParagraphLayoutPatch,
+}
+
+impl ParagraphLayoutUpdate {
+    #[must_use]
+    pub const fn new(position: usize, patch: ParagraphLayoutPatch) -> Self {
+        Self { position, patch }
+    }
+
+    #[must_use]
+    pub const fn position(self) -> usize {
+        self.position
+    }
+
+    #[must_use]
+    pub const fn patch(self) -> ParagraphLayoutPatch {
+        self.patch
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LayoutFields(u8);
+
+impl LayoutFields {
+    const SPACE_BEFORE: u8 = 1 << 0;
+    const SPACE_AFTER: u8 = 1 << 1;
+    const LEFT_INDENT: u8 = 1 << 2;
+    const RIGHT_INDENT: u8 = 1 << 3;
+    const FIRST_LINE_INDENT: u8 = 1 << 4;
+    const KEEP_TOGETHER: u8 = 1 << 5;
+    const KEEP_WITH_NEXT: u8 = 1 << 6;
+    const PAGE_BREAK_BEFORE: u8 = 1 << 7;
+
+    const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    const fn overlaps(self, other: Self) -> bool {
+        self.0 & other.0 != 0
+    }
+}
+
+fn layout_effect_keys(position: usize, fields: LayoutFields) -> Vec<String> {
+    let mut effects = Vec::new();
+    for (bit, name) in [
+        (LayoutFields::SPACE_BEFORE, "space-before"),
+        (LayoutFields::SPACE_AFTER, "space-after"),
+        (LayoutFields::LEFT_INDENT, "left-indent"),
+        (LayoutFields::RIGHT_INDENT, "right-indent"),
+        (LayoutFields::FIRST_LINE_INDENT, "first-line-indent"),
+        (LayoutFields::KEEP_TOGETHER, "keep-together"),
+        (LayoutFields::KEEP_WITH_NEXT, "keep-with-next"),
+        (LayoutFields::PAGE_BREAK_BEFORE, "page-break-before"),
+    ] {
+        if fields.0 & bit != 0 {
+            effects.push(format!("body:paragraph:{position}:layout:{name}"));
+        }
+    }
+    effects
+}
+
+fn layout_operation_conflicts(
+    operation: &Operation,
+    position: usize,
+    fields: LayoutFields,
+) -> bool {
+    matches!(
+        operation,
+        Operation::ParagraphLayout {
+            position: existing_position,
+            fields: existing_fields,
+            ..
+        } if *existing_position == position && existing_fields.overlaps(fields)
+    )
+}
+
+fn ensure_paragraph_layout_source(source: &Snapshot) -> Result<(), Error> {
+    let source_bytes = source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    if crate::compressed::is_compressed_rtf(source_bytes) {
+        return Err(Error::UnsupportedSource(
+            "compressed RTF needs a transport-aware rewrite",
+        ));
+    }
+    if !source_bytes.is_ascii() {
+        return Err(Error::UnsupportedSource(
+            "paragraph-layout editing refuses non-ASCII transport encodings",
+        ));
+    }
+    if !source.opaque().is_empty() {
+        return Err(Error::UnsupportedSource(
+            "paragraph-layout editing refuses unknown RTF syntax",
+        ));
+    }
+    source
+        .model()
+        .local_paragraph_property_editability()
+        .map_err(Error::UnsupportedSource)?;
+    for paragraph in source.body().paragraphs() {
+        if paragraph
+            .inlines()
+            .any(|inline| matches!(inline, crate::text::Inline::Break(crate::text::Break::Line)))
+        {
+            return Err(Error::UnsupportedSource(
+                "paragraph-layout editing refuses inline line breaks",
+            ));
+        }
+        let raw = paragraph.format().raw();
+        if raw.paragraph_style.is_some()
+            || raw.list_override.is_some()
+            || raw.list_level.is_some()
+            || raw.legacy_numbering.is_some()
+        {
+            return Err(Error::UnsupportedSource(
+                "paragraph-layout editing refuses dependent style or list references",
+            ));
+        }
+    }
+    Ok(())
+}
+
 impl ParagraphTextReplacement {
     /// Creates one source-relative paragraph replacement.
     #[must_use]
@@ -255,10 +648,18 @@ pub enum Error {
     EmptyParagraphBatch,
     /// Paragraph batch selectors must be strictly increasing and unique.
     ParagraphBatchOutOfOrder { previous: usize, incoming: usize },
+    /// A paragraph-layout batch must contain at least one update.
+    EmptyParagraphLayoutBatch,
+    /// A paragraph-layout delta must name at least one field.
+    EmptyParagraphLayoutPatch { position: usize },
+    /// Paragraph-layout batch selectors must be strictly increasing and unique.
+    ParagraphLayoutBatchOutOfOrder { previous: usize, incoming: usize },
     /// Two staged operations have overlapping effects.
     Conflict { existing: usize, incoming: usize },
     /// Paragraph-structure and property changes cannot be proven independent.
     StructuralPropertyConflict,
+    /// Local paragraph-layout updates cannot share a transaction with body text or character work.
+    ParagraphLayoutTextConflict,
     /// Canonical retained-destination work cannot share a transaction with a body splice.
     BodyDestinationConflict,
     /// Replacement text exceeds the source snapshot's retained resource profile.
@@ -313,12 +714,26 @@ impl fmt::Display for Error {
                 formatter,
                 "RTF paragraph replacement positions must be strictly increasing: {incoming} follows {previous}"
             ),
+            Self::EmptyParagraphLayoutBatch => {
+                formatter.write_str("RTF paragraph-layout update batch must not be empty")
+            },
+            Self::EmptyParagraphLayoutPatch { position } => write!(
+                formatter,
+                "RTF paragraph-layout update at position {position} has no fields"
+            ),
+            Self::ParagraphLayoutBatchOutOfOrder { previous, incoming } => write!(
+                formatter,
+                "RTF paragraph-layout positions must be strictly increasing: {incoming} follows {previous}"
+            ),
             Self::Conflict { existing, incoming } => write!(
                 formatter,
                 "RTF edit operation {incoming} conflicts with operation {existing}"
             ),
             Self::StructuralPropertyConflict => formatter
                 .write_str("RTF paragraph-structure and property changes cannot compose safely"),
+            Self::ParagraphLayoutTextConflict => formatter.write_str(
+                "RTF paragraph-layout updates cannot compose with body text or character changes",
+            ),
             Self::BodyDestinationConflict => formatter.write_str(
                 "RTF body splices and canonical retained-destination edits cannot compose safely",
             ),
@@ -398,6 +813,12 @@ enum Operation {
         before: Alignment,
         after: Alignment,
     },
+    ParagraphLayout {
+        position: usize,
+        fields: LayoutFields,
+        before: ParagraphLayout,
+        after: ParagraphLayout,
+    },
     Bold {
         span: TextSpan,
         before: bool,
@@ -467,6 +888,10 @@ impl Operation {
             Self::RestoreParagraph { text, .. } => text.len().saturating_add(1),
             Self::RemoveParagraph { .. } | Self::MoveParagraph { .. } => 0,
             Self::RootTransfer { after, .. } => after.len(),
+            Self::ParagraphLayout { before, after, .. } => {
+                let _ = (before, after);
+                0
+            },
             Self::Alignment { .. } | Self::Bold { .. } => 0,
         }
     }
@@ -480,6 +905,9 @@ impl Operation {
             Self::Alignment { position, .. } => {
                 vec![format!("body:paragraph:{position}:alignment")]
             },
+            Self::ParagraphLayout {
+                position, fields, ..
+            } => layout_effect_keys(*position, *fields),
             Self::Bold { span, .. } => {
                 vec![format!("body:character:{}-{}:bold", span.start, span.end)]
             },
@@ -502,6 +930,7 @@ impl Operation {
             | Self::Bold { span, .. }
             | Self::InsertParagraph { span, .. } => Some(*span),
             Self::Alignment { .. }
+            | Self::ParagraphLayout { .. }
             | Self::RemoveParagraph { .. }
             | Self::RestoreParagraph { .. }
             | Self::MoveParagraph { .. }
@@ -515,7 +944,10 @@ impl Operation {
     }
 
     const fn is_property(&self) -> bool {
-        matches!(self, Self::Alignment { .. } | Self::Bold { .. })
+        matches!(
+            self,
+            Self::Alignment { .. } | Self::ParagraphLayout { .. } | Self::Bold { .. }
+        )
     }
 
     const fn is_destination(&self) -> bool {
@@ -649,6 +1081,13 @@ impl Edit {
         replacements: &[ParagraphTextReplacement],
     ) -> Result<&mut Self, Error> {
         self.ensure_body_compatible()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::ParagraphLayoutTextConflict);
+        }
         if replacements.is_empty() {
             return Err(Error::EmptyParagraphBatch);
         }
@@ -753,6 +1192,13 @@ impl Edit {
     ) -> Result<&mut Self, Error> {
         self.ensure_body_compatible()?;
         self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::ParagraphLayoutTextConflict);
+        }
         let body = self.source.text();
         validate_span(body, span)?;
         let after = replacement.into();
@@ -797,6 +1243,13 @@ impl Edit {
     pub fn set_text_bold(&mut self, span: TextSpan, bold: bool) -> Result<&mut Self, Error> {
         self.ensure_body_compatible()?;
         self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::ParagraphLayoutTextConflict);
+        }
         let body = self.source.text();
         validate_span(body, span)?;
         if span.is_empty()
@@ -1044,6 +1497,105 @@ impl Edit {
             before: paragraph.format().alignment(),
             after: alignment,
         });
+        Ok(self)
+    }
+
+    /// Stages one typed dependency-free local paragraph-layout delta.
+    ///
+    /// Selection and the complete before-state resolve against the immutable
+    /// source snapshot. Zero numeric values and false flags clear the selected
+    /// facet. Alignment may compose independently; body text, character, and
+    /// structural work is deliberately refused by this lossless seam.
+    ///
+    /// # Errors
+    /// Returns an error for an empty delta, invalid selector, overlapping
+    /// facet, unsupported source closure, or retained operation bound.
+    pub fn patch_paragraph_layout(
+        &mut self,
+        position: usize,
+        patch: ParagraphLayoutPatch,
+    ) -> Result<&mut Self, Error> {
+        self.patch_body_paragraph_layouts(&[ParagraphLayoutUpdate::new(position, patch)])
+    }
+
+    /// Atomically stages a bounded source-ordered paragraph-layout batch.
+    ///
+    /// Every selector, dependency, limit, and effect conflict is preflighted
+    /// before any operation is appended. Updates must be strictly ordered by
+    /// source paragraph position. Different facets, including multiple
+    /// independently prepared deltas for different paragraphs, compose.
+    ///
+    /// # Errors
+    /// Returns an error for an empty/unordered batch or delta, unsupported
+    /// source, invalid selector, conflict, mixed text/character work, or bound.
+    pub fn patch_body_paragraph_layouts(
+        &mut self,
+        updates: &[ParagraphLayoutUpdate],
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        if updates.is_empty() {
+            return Err(Error::EmptyParagraphLayoutBatch);
+        }
+        for (previous, incoming) in updates.iter().zip(updates.iter().skip(1)) {
+            if incoming.position <= previous.position {
+                return Err(Error::ParagraphLayoutBatchOutOfOrder {
+                    previous: previous.position,
+                    incoming: incoming.position,
+                });
+            }
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text { .. } | Operation::Bold { .. } | Operation::InsertParagraph { .. }
+            )
+        }) {
+            return Err(Error::ParagraphLayoutTextConflict);
+        }
+        self.ensure_operation_room_for(updates.len())?;
+        ensure_paragraph_layout_source(&self.source)?;
+
+        let mut staged = Vec::new();
+        staged.try_reserve_exact(updates.len()).map_err(|_error| {
+            Error::Write("could not reserve paragraph-layout batch".to_string())
+        })?;
+        let mut updates = updates.iter().peekable();
+        for (position, paragraph) in self.source.body().paragraphs().enumerate() {
+            if updates
+                .peek()
+                .is_some_and(|update| update.position == position)
+            {
+                let update = updates.next().ok_or(Error::UnsupportedSource(
+                    "paragraph-layout selector cursor became inconsistent",
+                ))?;
+                let fields = update.patch.fields();
+                if fields.is_empty() {
+                    return Err(Error::EmptyParagraphLayoutPatch { position });
+                }
+                let before = ParagraphLayout::from_raw(paragraph.format().raw());
+                let mut after = before;
+                update.patch.apply(&mut after);
+                let incoming = self.operations.len().saturating_add(staged.len());
+                for (existing, operation) in self.operations.iter().enumerate() {
+                    if layout_operation_conflicts(operation, position, fields) {
+                        return Err(Error::Conflict { existing, incoming });
+                    }
+                }
+                staged.push(Operation::ParagraphLayout {
+                    position,
+                    fields,
+                    before,
+                    after,
+                });
+            }
+        }
+        if let Some(update) = updates.next() {
+            return Err(Error::ParagraphOutOfRange {
+                position: update.position,
+                count: self.source.paragraph_count(),
+            });
+        }
+        self.operations.append(&mut staged);
         Ok(self)
     }
 
@@ -1366,10 +1918,16 @@ impl Edit {
         }
 
         let (replacement, projected_spans) = project_text(&self.source, &self.operations)?;
+        let layout_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }));
         let property_operation = self.operations.iter().any(|operation| {
             matches!(
                 operation,
-                Operation::Alignment { .. } | Operation::Bold { .. }
+                Operation::Alignment { .. }
+                    | Operation::ParagraphLayout { .. }
+                    | Operation::Bold { .. }
             )
         });
         let mut alignments = if property_operation {
@@ -1377,12 +1935,17 @@ impl Edit {
         } else {
             Vec::new()
         };
-        let base_bold = if property_operation {
+        let base_bold = if property_operation && !layout_operation {
             base_bold_for_edit(&self.source, &self.operations)?
         } else {
             false
         };
         let mut projected_bold_ranges = Vec::new();
+        let mut paragraph_properties = if layout_operation {
+            source_paragraph_properties(&self.source)?
+        } else {
+            Vec::new()
+        };
         for operation in &self.operations {
             match operation {
                 Operation::Alignment {
@@ -1396,6 +1959,31 @@ impl Edit {
                             count,
                         })?;
                     *slot = *after;
+                    if layout_operation {
+                        let count = paragraph_properties.len();
+                        let paragraph = paragraph_properties.get_mut(*position).ok_or(
+                            Error::ParagraphOutOfRange {
+                                position: *position,
+                                count,
+                            },
+                        )?;
+                        paragraph.alignment = *after;
+                    }
+                },
+                Operation::ParagraphLayout {
+                    position,
+                    fields,
+                    after,
+                    ..
+                } => {
+                    let count = paragraph_properties.len();
+                    let paragraph = paragraph_properties.get_mut(*position).ok_or(
+                        Error::ParagraphOutOfRange {
+                            position: *position,
+                            count,
+                        },
+                    )?;
+                    apply_layout_to_raw(paragraph, *after, *fields);
                 },
                 Operation::Bold { span, after, .. } => {
                     projected_bold_ranges
@@ -1424,8 +2012,12 @@ impl Edit {
         let has_bold_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::Bold { before, after, .. } if before != after)
         });
+        let has_layout_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::ParagraphLayout { before, after, .. } if before != after)
+        });
         let did_change = replacement != self.source.text()
             || alignments != original_alignments
+            || has_layout_delta
             || has_bold_delta;
         let semantic_delta = semantic_changes(&self.operations, &projected_spans);
         if !did_change {
@@ -1452,7 +2044,12 @@ impl Edit {
             .operations
             .iter()
             .any(|operation| matches!(operation, Operation::Bold { .. }));
-        if has_bold_operation {
+        if layout_operation {
+            self.source
+                .model()
+                .local_paragraph_property_editability()
+                .map_err(Error::UnsupportedSource)?;
+        } else if has_bold_operation {
             self.source
                 .model()
                 .plain_body_bold_editability()
@@ -1465,7 +2062,17 @@ impl Edit {
         }
         let span = retained_or_located_body_source_span(&self.source, source_bytes)?;
         validate_opaque_preservation(&self.source, source_bytes, &span)?;
-        let replacement_bytes = if property_operation {
+        let replacement_bytes = if layout_operation {
+            if replacement != self.source.text() || has_bold_operation {
+                return Err(Error::ParagraphLayoutTextConflict);
+            }
+            ensure_paragraph_layout_source(&self.source)?;
+            encoded_body_with_paragraph_properties(
+                &self.source,
+                &paragraph_properties,
+                self.source.limits(),
+            )?
+        } else if property_operation {
             encoded_body_with_properties(
                 &replacement,
                 &alignments,
@@ -1487,6 +2094,18 @@ impl Edit {
             return Err(Error::UnsupportedSource(
                 "candidate paragraph alignment did not survive RTF validation",
             ));
+        }
+        if layout_operation {
+            if source_paragraph_properties(&snapshot)? != paragraph_properties {
+                return Err(Error::UnsupportedSource(
+                    "candidate paragraph properties did not survive RTF validation",
+                ));
+            }
+            if !same_source_runs(&snapshot, &self.source) {
+                return Err(Error::UnsupportedSource(
+                    "candidate character runs did not survive paragraph-layout publication",
+                ));
+            }
         }
         for (bold_span, expected) in projected_bold_ranges {
             if bold_for_span(&snapshot, bold_span)? != expected {
@@ -1556,6 +2175,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             },
             Operation::Text { .. }
             | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
@@ -1627,6 +2247,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             },
             Operation::Text { .. }
             | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
@@ -1949,6 +2570,7 @@ fn project_text(
                 Some((operation_index, *span, text.as_str(), true))
             },
             Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -2084,6 +2706,7 @@ fn project_lifecycle_text(source: &Snapshot, operation: &Operation) -> Result<St
         },
         Operation::Text { .. }
         | Operation::Alignment { .. }
+        | Operation::ParagraphLayout { .. }
         | Operation::Bold { .. }
         | Operation::InsertParagraph { .. }
         | Operation::TableCellText { .. }
@@ -2154,6 +2777,64 @@ fn source_alignments(source: &Snapshot) -> Vec<Alignment> {
         .collect()
 }
 
+fn source_paragraph_properties(source: &Snapshot) -> Result<Vec<crate::types::Paragraph>, Error> {
+    let mut properties = Vec::new();
+    properties
+        .try_reserve_exact(source.paragraph_count())
+        .map_err(|_error| Error::Write("could not reserve paragraph properties".to_string()))?;
+    properties.extend(
+        source
+            .body()
+            .paragraphs()
+            .map(|paragraph| *paragraph.format().raw()),
+    );
+    Ok(properties)
+}
+
+fn same_source_runs(left: &Snapshot, right: &Snapshot) -> bool {
+    let mut left = left.body().runs();
+    let mut right = right.body().runs();
+    loop {
+        match (left.next(), right.next()) {
+            (Some(left), Some(right))
+                if left.text() == right.text() && left.format().raw() == right.format().raw() => {},
+            (None, None) => return true,
+            _ => return false,
+        }
+    }
+}
+
+fn apply_layout_to_raw(
+    paragraph: &mut crate::types::Paragraph,
+    layout: ParagraphLayout,
+    fields: LayoutFields,
+) {
+    if fields.0 & LayoutFields::SPACE_BEFORE != 0 {
+        paragraph.spacing.before = layout.space_before;
+    }
+    if fields.0 & LayoutFields::SPACE_AFTER != 0 {
+        paragraph.spacing.after = layout.space_after;
+    }
+    if fields.0 & LayoutFields::LEFT_INDENT != 0 {
+        paragraph.indentation.left = layout.left_indent;
+    }
+    if fields.0 & LayoutFields::RIGHT_INDENT != 0 {
+        paragraph.indentation.right = layout.right_indent;
+    }
+    if fields.0 & LayoutFields::FIRST_LINE_INDENT != 0 {
+        paragraph.indentation.first_line = layout.first_line_indent;
+    }
+    if fields.0 & LayoutFields::KEEP_TOGETHER != 0 {
+        paragraph.keep_together = layout.keep_together;
+    }
+    if fields.0 & LayoutFields::KEEP_WITH_NEXT != 0 {
+        paragraph.keep_next = layout.keep_with_next;
+    }
+    if fields.0 & LayoutFields::PAGE_BREAK_BEFORE != 0 {
+        paragraph.page_break_before = layout.page_break_before;
+    }
+}
+
 fn uniform_body_bold(source: &Snapshot) -> Result<bool, Error> {
     let mut value = None;
     for run in source.body().runs() {
@@ -2175,6 +2856,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             Operation::Bold { span, .. } => Some(*span),
             Operation::Text { .. }
             | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -2224,6 +2906,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 Operation::Bold { after, .. } => Some(*after),
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -2292,6 +2975,7 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
                 Some((*span, text.len().saturating_add(1)))
             },
             Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -2529,6 +3213,110 @@ fn encoded_body_with_properties(
     Ok(output)
 }
 
+fn encoded_body_with_paragraph_properties(
+    source: &Snapshot,
+    properties: &[crate::types::Paragraph],
+    limits: crate::ParseLimits,
+) -> Result<Vec<u8>, Error> {
+    let mut output = BoundedVec::new(limits.max_source_bytes());
+    let mut body_position = 0usize;
+    let mut paragraph_count = 0usize;
+    for (position, paragraph) in source.body().paragraphs().enumerate() {
+        let properties = properties
+            .get(position)
+            .ok_or(Error::StructuralPropertyConflict)?;
+        let paragraph_end =
+            body_position
+                .checked_add(paragraph.len())
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: limits.max_source_bytes(),
+                })?;
+        let terminated = source.text().as_bytes().get(paragraph_end) == Some(&b'\n');
+        let mut runs = paragraph.runs().peekable();
+        if runs.peek().is_none() {
+            write_bounded(&mut output, br"\plain\pard ")?;
+            let mut writer = RtfWriter::new(&mut output);
+            writer
+                .write_paragraph_properties(properties)
+                .map_err(|error| Error::Write(error.to_string()))?;
+            if terminated {
+                write_bounded(&mut output, br"\par ")?;
+            }
+        } else {
+            while let Some(run) = runs.next() {
+                write_bounded(&mut output, br"\plain\pard ")?;
+                let mut writer = RtfWriter::new(&mut output);
+                writer
+                    .write_formatting(run.format().raw())
+                    .and_then(|()| writer.write_paragraph_properties(properties))
+                    .map_err(|error| Error::Write(error.to_string()))?;
+                write_bounded(&mut output, b" ")?;
+                RtfWriter::new(&mut output)
+                    .write_text(run.text())
+                    .map_err(|error| Error::Write(error.to_string()))?;
+                if terminated && runs.peek().is_none() {
+                    write_bounded(&mut output, br"\par ")?;
+                }
+            }
+        }
+        body_position = paragraph_end.saturating_add(usize::from(terminated));
+        paragraph_count = paragraph_count.saturating_add(1);
+    }
+    if paragraph_count != properties.len() {
+        return Err(Error::StructuralPropertyConflict);
+    }
+    Ok(output.into_inner())
+}
+
+fn write_bounded(output: &mut BoundedVec, bytes: &[u8]) -> Result<(), Error> {
+    output
+        .write_all(bytes)
+        .map_err(|error| Error::Write(error.to_string()))
+}
+
+struct BoundedVec {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+
+impl BoundedVec {
+    const fn new(limit: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            limit,
+        }
+    }
+
+    fn into_inner(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+impl io::Write for BoundedVec {
+    fn write(&mut self, input: &[u8]) -> io::Result<usize> {
+        let observed = self
+            .bytes
+            .len()
+            .checked_add(input.len())
+            .ok_or_else(|| io::Error::other("RTF paragraph-layout output size overflow"))?;
+        if observed > self.limit {
+            return Err(io::Error::other(
+                "RTF paragraph-layout output exceeds the source limit",
+            ));
+        }
+        self.bytes
+            .try_reserve(input.len())
+            .map_err(|_error| io::Error::other("could not reserve paragraph-layout output"))?;
+        self.bytes.extend_from_slice(input);
+        Ok(input.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
 fn write_encoded_fragment(
     output: &mut Vec<u8>,
     text: &str,
@@ -2697,6 +3485,12 @@ enum Change {
         before: Alignment,
         after: Alignment,
     },
+    ParagraphLayout {
+        position: usize,
+        fields: LayoutFields,
+        before: ParagraphLayout,
+        after: ParagraphLayout,
+    },
     Bold {
         span: TextSpan,
         after_span: TextSpan,
@@ -2773,6 +3567,17 @@ impl Change {
                 after,
             } => Self::Alignment {
                 position: *position,
+                before: *after,
+                after: *before,
+            },
+            Self::ParagraphLayout {
+                position,
+                fields,
+                before,
+                after,
+            } => Self::ParagraphLayout {
+                position: *position,
+                fields: *fields,
                 before: *after,
                 after: *before,
             },
@@ -2912,6 +3717,17 @@ fn semantic_changes(
                 before: *before,
                 after: *after,
             }),
+            Operation::ParagraphLayout {
+                position,
+                fields,
+                before,
+                after,
+            } if before != after => Some(Change::ParagraphLayout {
+                position: *position,
+                fields: *fields,
+                before: *before,
+                after: *after,
+            }),
             Operation::Bold {
                 span,
                 before,
@@ -3014,6 +3830,7 @@ fn semantic_changes(
             }),
             Operation::Text { .. }
             | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
             | Operation::MoveParagraph { .. }
             | Operation::TableCellText { .. }
@@ -3068,6 +3885,10 @@ impl Patch {
 
     /// Converts this patch to the shared versioned deterministic-JSON patch.
     ///
+    /// Paragraph-layout changes remain source-bound because canonical RTF
+    /// rewrites cannot yet prove an imported exact artifact byte-for-byte;
+    /// callers retain exact undo through [`Self::inverse`] instead.
+    ///
     /// # Errors
     /// Returns an error when caller-selected wire limits cannot represent the
     /// semantic operations or their preconditions.
@@ -3079,6 +3900,16 @@ impl Patch {
         litchi_core::patch::PatchError,
     > {
         use litchi_core::patch::{BlobBundle, ReversibleOperation};
+
+        if self
+            .changes
+            .iter()
+            .any(|change| matches!(change, Change::ParagraphLayout { .. }))
+        {
+            return Err(litchi_core::patch::PatchError::InvalidText {
+                field: "RTF paragraph-layout durable patches are not supported",
+            });
+        }
 
         let before =
             self.before
@@ -3154,6 +3985,14 @@ fn durable_operation(
                 Value::String(alignment_name(*after).to_string()),
             )
         },
+        Change::ParagraphLayout {
+            position: _,
+            fields: _,
+            before: _,
+            after: _,
+        } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF paragraph-layout durable patches are not supported",
+        }),
         Change::Bold {
             span,
             before,
@@ -3335,13 +4174,23 @@ pub(crate) fn apply_durable<Mode>(
     source: &Snapshot,
     patch: &litchi_core::patch::Patch<Mode>,
 ) -> Result<Snapshot, Error> {
-    if patch.format() != "litchi-rtf" || !patch.blobs().is_empty() {
+    if patch.format() != "litchi-rtf" {
         return Err(Error::DurablePatch(
-            "unsupported format or blob bundle".to_string(),
+            "unsupported durable patch format".to_string(),
         ));
     }
     if patch.operations().is_empty() {
+        if !patch.blobs().is_empty() {
+            return Err(Error::DurablePatch(
+                "empty patch has an unreferenced blob bundle".to_string(),
+            ));
+        }
         return Ok(source.clone());
+    }
+    if !patch.blobs().is_empty() {
+        return Err(Error::DurablePatch(
+            "RTF durable operations do not accept artifact blobs".to_string(),
+        ));
     }
     let source_bytes = source
         .source_bytes()
@@ -3351,7 +4200,7 @@ pub(crate) fn apply_durable<Mode>(
     for operation in patch.operations() {
         if operation.preconditions.len() != 2 {
             return Err(Error::DurablePatch(
-                "operation must contain exactly two preconditions".to_string(),
+                "operation has an invalid precondition count".to_string(),
             ));
         }
         let expected_hash = operation
@@ -3409,6 +4258,11 @@ pub(crate) fn apply_durable<Mode>(
                     .and_then(parse_alignment)
                     .ok_or_else(|| Error::DurablePatch("invalid alignment value".to_string()))?;
                 edit.set_paragraph_alignment(position, replacement)?;
+            },
+            "paragraph-layout.patch" => {
+                return Err(Error::DurablePatch(
+                    "paragraph-layout durable patches are not supported".to_string(),
+                ));
             },
             "character-bold.set" => {
                 let span = parse_text_target(&operation.target)?;
@@ -3627,7 +4481,7 @@ pub(crate) fn apply_durable<Mode>(
             },
         }
     }
-    edit.commit().map(Commit::into_snapshot)
+    Ok(edit.commit()?.into_snapshot())
 }
 
 fn is_root_transfer_vocabulary(vocabulary: &str) -> bool {

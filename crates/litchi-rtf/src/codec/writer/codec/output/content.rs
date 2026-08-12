@@ -346,7 +346,7 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write character formatting
-    pub(in super::super) fn write_formatting(&mut self, fmt: &Formatting) -> io::Result<()> {
+    pub(crate) fn write_formatting(&mut self, fmt: &Formatting) -> io::Result<()> {
         if let Some(character_style) = fmt.character_style {
             self.write_control_word("cs", Some(i32::from(character_style)))?;
         }
@@ -879,10 +879,7 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write paragraph properties
-    pub(in super::super) fn write_paragraph_properties(
-        &mut self,
-        para: &Paragraph,
-    ) -> io::Result<()> {
+    pub(crate) fn write_paragraph_properties(&mut self, para: &Paragraph) -> io::Result<()> {
         if let Some(paragraph_style) = para.paragraph_style {
             self.write_control_word("s", Some(i32::from(paragraph_style)))?;
         }
