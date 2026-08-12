@@ -4,4 +4,5 @@ pub mod annotation;
 pub mod charts;
 pub mod embedded;
 pub mod forms;
+pub mod resource_gc;
 pub mod scripts;
