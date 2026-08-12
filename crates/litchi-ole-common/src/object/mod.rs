@@ -20,7 +20,7 @@ pub mod target;
 
 pub use directory::{EntryKind, Links, Metadata, Sid};
 pub use discovery::discover;
-pub use editor::Editor;
+pub use editor::{Editor, MAX_STREAM_REMOVALS};
 pub use link::Link;
 pub use model::{Limits, Object, Objects, Storage, Stream};
 pub use patch::{Commit, Patch};

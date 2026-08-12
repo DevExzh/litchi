@@ -6,6 +6,8 @@
 //! the package editor, while leaving the stored directory spelling untouched.
 
 use litchi_cfb::{OleError, OleFile};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::io::{Read, Seek};
 
 const MAX_DIRECTORY_NAME_CODE_UNITS: usize = 31;
@@ -31,12 +33,45 @@ impl CfbPath {
         Ok(Self { parts })
     }
 
+    pub(crate) fn try_from_slice(
+        parts: &[String],
+        resource: &'static str,
+    ) -> Result<Self, OleError> {
+        if parts.is_empty() {
+            return Err(OleError::InvalidFormat("CFB path is empty".into()));
+        }
+        for part in parts {
+            validate_component(part)?;
+        }
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(parts.len())
+            .map_err(|source| OleError::Allocation { resource, source })?;
+        for part in parts {
+            let mut value = String::new();
+            value
+                .try_reserve_exact(part.len())
+                .map_err(|source| OleError::Allocation { resource, source })?;
+            value.push_str(part);
+            owned.push(value);
+        }
+        Ok(Self { parts: owned })
+    }
+
     pub(crate) fn as_slice(&self) -> &[String] {
         &self.parts
     }
 
     pub(crate) fn overlaps(&self, other: &Self) -> bool {
         starts_with(&self.parts, &other.parts) || starts_with(&other.parts, &self.parts)
+    }
+
+    pub(crate) fn same_as(&self, other: &Self) -> bool {
+        same_path(&self.parts, &other.parts)
+    }
+
+    pub(crate) fn identity_hash(&self) -> u64 {
+        path_identity_hash(&self.parts)
     }
 
     /// Resolves a host-supplied path to the directory spelling stored in the
@@ -69,7 +104,7 @@ impl CfbPath {
 /// Iterates the Unicode simple-uppercase UTF-16 comparison units required by
 /// `[MS-CFB]` 2.6.4 without retaining a second copy of the component.
 struct UppercaseUnits<'a> {
-    input: std::str::EncodeUtf16<'a>,
+    input: std::str::Chars<'a>,
     pending: [u16; 2],
     pending_len: usize,
     pending_index: usize,
@@ -85,21 +120,18 @@ impl Iterator for UppercaseUnits<'_> {
             return Some(value);
         }
 
-        let unit = self.input.next()?;
-        if (0xD800..=0xDFFF).contains(&unit) {
-            return Some(unit);
-        }
-
-        let character = char::from_u32(u32::from(unit))?;
+        let character = self.input.next()?;
         let mut uppercase = character.to_uppercase();
-        let first = uppercase.next()?;
-        if uppercase.next().is_some() {
+        let first = uppercase.next().unwrap_or(character);
+        let simple = if uppercase.next().is_some() {
             // This is a multi-code-point mapping, not a simple mapping.
-            return Some(unit);
-        }
+            character
+        } else {
+            first
+        };
 
         self.pending = [0; 2];
-        let encoded = first.encode_utf16(&mut self.pending);
+        let encoded = simple.encode_utf16(&mut self.pending);
         self.pending_len = encoded.len();
         self.pending_index = 1;
         Some(self.pending[0])
@@ -142,6 +174,26 @@ fn starts_with(path: &[String], prefix: &[String]) -> bool {
             .all(|(part, expected)| same_component(part, expected))
 }
 
+pub(crate) fn same_path(left: &[String], right: &[String]) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .zip(right)
+            .all(|(left, right)| same_component(left, right))
+}
+
+pub(crate) fn path_identity_hash(path: &[String]) -> u64 {
+    let mut hash = DefaultHasher::new();
+    path.len().hash(&mut hash);
+    for component in path {
+        component.encode_utf16().count().hash(&mut hash);
+        for unit in uppercase_units(component) {
+            unit.hash(&mut hash);
+        }
+    }
+    hash.finish()
+}
+
 fn same_component(left: &str, right: &str) -> bool {
     left.encode_utf16().count() == right.encode_utf16().count()
         && uppercase_units(left).eq(uppercase_units(right))
@@ -149,7 +201,7 @@ fn same_component(left: &str, right: &str) -> bool {
 
 fn uppercase_units(value: &str) -> UppercaseUnits<'_> {
     UppercaseUnits {
-        input: value.encode_utf16(),
+        input: value.chars(),
         pending: [0; 2],
         pending_len: 0,
         pending_index: 0,
@@ -163,13 +215,18 @@ fn uppercase_units(value: &str) -> UppercaseUnits<'_> {
     reason = "tests use concise assertions while exercising fallible validation paths"
 )]
 mod tests {
-    use super::{CfbPath, same_component};
+    use super::{CfbPath, path_identity_hash, same_component};
 
     #[test]
     fn cfb_name_comparison_uses_simple_uppercase_without_expansion() {
         assert!(same_component("Pool", "pool"));
         assert!(same_component("Å", "å"));
         assert!(same_component("ſ", "S"));
+        assert!(same_component("𐐨", "𐐀"));
+        assert_eq!(
+            path_identity_hash(&["𐐨".to_string()]),
+            path_identity_hash(&["𐐀".to_string()])
+        );
         assert!(!same_component("ß", "SS"));
         assert!(!same_component("ß", "ẞ"));
     }

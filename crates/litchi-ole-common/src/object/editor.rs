@@ -1,5 +1,6 @@
 //! Transactional CFB stream and selected-storage editing.
 
+use super::cfb_path::CfbPath;
 use super::codec::{self, Package};
 use super::discovery;
 use super::link::{self, Link};
@@ -10,6 +11,9 @@ use super::target::{Target, Targets};
 use litchi_cfb::{OleError, OleFile};
 use std::io::Cursor;
 use std::sync::Arc;
+
+/// Maximum number of stream selectors accepted by one removal publication.
+pub const MAX_STREAM_REMOVALS: usize = 1_024;
 
 /// Transactional editor for target-selected OLE storages.
 #[derive(Debug, Clone)]
@@ -255,6 +259,104 @@ impl Editor {
             .package
             .add_stream(path, data.into(), self.limits)?;
         *self = candidate.commit_candidate()?;
+        Ok(())
+    }
+
+    /// Removes one opaque package stream while retaining its parent storage.
+    ///
+    /// Paths use CFB's Unicode simple-uppercase identity and are resolved to
+    /// the spelling stored in the package. An absent stream is an exact no-op
+    /// represented by `Ok(None)`; an existing storage at the same path is not
+    /// treated as absent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path is empty or invalid, identifies a
+    /// storage, or the rendered package fails validation. Failure leaves this
+    /// editor unchanged.
+    pub fn remove_stream(&mut self, path: &[String]) -> Result<Option<Arc<[u8]>>, OleError> {
+        self.validate_stream_path_depth(path)?;
+        let path = CfbPath::try_from_slice(path, "stream removal path")?;
+        let Some(removed) = self.package.removable_stream(&path)? else {
+            return Ok(None);
+        };
+        let mut candidate = self.clone();
+        candidate.package.remove_stream(&path, self.limits)?;
+        *self = candidate.commit_candidate()?;
+        Ok(Some(removed))
+    }
+
+    /// Removes multiple opaque package streams in one failure-atomic publish.
+    ///
+    /// Results correspond positionally to the supplied selectors. Missing
+    /// streams yield `None`, while present streams yield their shared bytes.
+    /// CFB-equivalent duplicate selectors are refused instead of depending on
+    /// iterator order. Empty batches and all-absent batches are exact no-ops.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the batch exceeds [`MAX_STREAM_REMOVALS`], a path
+    /// is invalid or duplicated, a selector identifies a storage, allocation
+    /// fails, or the rendered package fails validation. Failure leaves this
+    /// editor unchanged.
+    pub fn remove_streams<'a>(
+        &mut self,
+        paths: impl IntoIterator<Item = &'a [String]>,
+    ) -> Result<Vec<Option<Arc<[u8]>>>, OleError> {
+        let mut validated = Vec::<(CfbPath, u64)>::new();
+        for path in paths {
+            if validated.len() == MAX_STREAM_REMOVALS {
+                return Err(OleError::InvalidFormat(format!(
+                    "stream removal batch exceeds operation limit {MAX_STREAM_REMOVALS}"
+                )));
+            }
+            self.validate_stream_path_depth(path)?;
+            let path = CfbPath::try_from_slice(path, "stream removal path")?;
+            let identity = path.identity_hash();
+            if validated.iter().any(|(existing, existing_identity)| {
+                *existing_identity == identity && existing.same_as(&path)
+            }) {
+                return Err(OleError::InvalidFormat(format!(
+                    "stream removal batch contains duplicate path {:?}",
+                    path.as_slice()
+                )));
+            }
+            validated
+                .try_reserve(1)
+                .map_err(|source| OleError::Allocation {
+                    resource: "stream removal selectors",
+                    source,
+                })?;
+            validated.push((path, identity));
+        }
+        if validated.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut candidate = self.clone();
+        let removed = candidate
+            .package
+            .remove_streams(validated.iter().map(|(path, _identity)| path), self.limits)?;
+        let changed = removed.iter().any(Option::is_some);
+        if changed {
+            *self = candidate.commit_candidate()?;
+        }
+        Ok(removed)
+    }
+
+    fn validate_stream_path_depth(&self, path: &[String]) -> Result<(), OleError> {
+        let maximum = self
+            .limits
+            .max_storage_depth
+            .checked_add(1)
+            .ok_or_else(|| {
+                OleError::InvalidFormat("stream selector depth limit overflows usize".into())
+            })?;
+        if path.len() > maximum {
+            return Err(OleError::InvalidFormat(format!(
+                "stream selector depth {} exceeds limit {maximum}",
+                path.len()
+            )));
+        }
         Ok(())
     }
 
