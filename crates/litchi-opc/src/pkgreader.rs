@@ -124,6 +124,24 @@ pub(crate) struct SourceCatalog {
     pub(crate) non_part_members: Vec<NonPartMember>,
 }
 
+/// Exact source-catalog phase used only by the validation entry point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ValidationCatalogPhase {
+    /// ZIP indexing and package-level admission.
+    Ingress,
+    /// `[Content_Types].xml` and physical part-catalog admission.
+    Catalog,
+    /// Relationship manifests loaded for the package and admitted typed parts.
+    LoadedRelationships,
+}
+
+/// A source-catalog failure with validation-only phase provenance.
+#[derive(Debug)]
+pub(crate) struct ValidationCatalogError {
+    pub(crate) phase: ValidationCatalogPhase,
+    pub(crate) error: OpcError,
+}
+
 #[cfg(test)]
 mod physical_part_tests {
     #![allow(
@@ -822,6 +840,116 @@ impl PackageReader {
         Ok(parts)
     }
 
+    fn load_part_catalog_for_validation<A: ArchiveAccess + ?Sized>(
+        archive: &A,
+        content_types_member: &str,
+        pkg_srels: &[SerializedRelationship],
+        content_types: &ContentTypeMap,
+        non_part_members: &mut Vec<NonPartMember>,
+        limits: ReadLimits,
+        ledger: &mut RelationshipLedger,
+    ) -> std::result::Result<Vec<DeferredPart>, ValidationCatalogError> {
+        let phase = |phase, error| ValidationCatalogError { phase, error };
+        let mut relationships =
+            Self::walk_relationship_graph(archive, pkg_srels, limits, ledger)
+                .map_err(|error| phase(ValidationCatalogPhase::LoadedRelationships, error))?;
+        let mut index = PartNameIndex::try_with_capacity(archive.len())
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        let mut typed_parts: Vec<(PackURI, String)> = Vec::new();
+        typed_parts
+            .try_reserve(archive.len())
+            .map_err(|source| allocation("OPC deferred typed parts", source))
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+
+        let mut declared_part_bytes = 0u64;
+        for member_name in archive.file_names() {
+            if member_name.is_empty()
+                || member_name.ends_with('/')
+                || member_name == content_types_member
+            {
+                continue;
+            }
+            if Self::relationship_part_has_relationships(member_name) {
+                return Err(phase(
+                    ValidationCatalogPhase::Catalog,
+                    OpcError::RelationshipPartCannotBeSource(member_name.to_string()),
+                ));
+            }
+            let max_member_name_bytes =
+                usize::try_from(limits.max_archive_member_name_bytes()).unwrap_or(usize::MAX);
+            let Some(partname) = part_name_for_member(member_name, max_member_name_bytes) else {
+                non_part_members.push(
+                    NonPartMember::new(member_name, NonPartReason::UnmappablePartName)
+                        .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?,
+                );
+                continue;
+            };
+            let is_relationship_part = Self::is_relationship_member(partname.membername());
+            let content_type = if is_relationship_part {
+                Self::relationship_part_content_type(content_types, &partname)
+                    .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?
+            } else {
+                match content_types.get(&partname) {
+                    Ok(content_type) => content_type,
+                    Err(OpcError::ContentTypeNotFound(_))
+                        if !relationships.contains_key(partname.as_str()) =>
+                    {
+                        non_part_members.push(
+                            NonPartMember::new(member_name, NonPartReason::UntypedAndUnreferenced)
+                                .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?,
+                        );
+                        continue;
+                    },
+                    Err(error) => return Err(phase(ValidationCatalogPhase::Catalog, error)),
+                }
+            };
+            index
+                .insert(&partname)
+                .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+            if !is_relationship_part {
+                let part_count =
+                    checked_increment(typed_parts.len(), limits.max_parts(), ReadResource::Parts)
+                        .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+                debug_assert_eq!(part_count, typed_parts.len() + 1);
+                let declared = archive
+                    .metadata(partname.membername())
+                    .map_err(OpcError::from)
+                    .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?
+                    .uncompressed_size();
+                limits
+                    .check(ReadResource::PartBytes, declared, limits.max_part_bytes())
+                    .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+                declared_part_bytes = checked_add(
+                    declared_part_bytes,
+                    declared,
+                    ReadResource::TotalPartBytes,
+                    limits.max_total_part_bytes(),
+                )
+                .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+                typed_parts.push((partname, content_type));
+            }
+        }
+
+        let mut parts = Vec::new();
+        parts
+            .try_reserve_exact(typed_parts.len())
+            .map_err(|source| allocation("OPC deferred parts", source))
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        for (partname, content_type) in typed_parts {
+            let srels = match relationships.remove(partname.as_str()) {
+                Some(srels) => srels,
+                None => Self::load_rels_lazy(archive, &partname, limits, ledger)
+                    .map_err(|error| phase(ValidationCatalogPhase::LoadedRelationships, error))?,
+            };
+            parts.push(DeferredPart {
+                partname,
+                content_type,
+                srels,
+            });
+        }
+        Ok(parts)
+    }
+
     pub(crate) fn source_catalog<A: ArchiveAccess + ?Sized>(
         archive: &A,
         limits: ReadLimits,
@@ -857,6 +985,77 @@ impl PackageReader {
             .try_reserve(archive.len())
             .map_err(|source| allocation("OPC non-part members", source))?;
         let parts = Self::load_part_catalog(
+            archive,
+            content_types_member,
+            &pkg_srels,
+            &content_types,
+            &mut non_part_members,
+            limits,
+            &mut ledger,
+        )?;
+        Ok(SourceCatalog {
+            pkg_srels,
+            parts,
+            non_part_members,
+        })
+    }
+
+    /// Source-backed catalog admission with exact validation-only phase
+    /// provenance. Ordinary package opens continue to use [`Self::source_catalog`].
+    pub(crate) fn source_catalog_for_validation<A: ArchiveAccess + ?Sized>(
+        archive: &A,
+        limits: ReadLimits,
+    ) -> std::result::Result<SourceCatalog, ValidationCatalogError> {
+        let phase = |phase, error| ValidationCatalogError { phase, error };
+        limits
+            .check(
+                ReadResource::ArchiveMembers,
+                archive.len() as u64,
+                limits.max_archive_members() as u64,
+            )
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        let relationship_part_count = archive
+            .file_names()
+            .filter(|member_name| Self::is_relationship_member(member_name))
+            .count();
+        limits
+            .check(
+                ReadResource::RelationshipParts,
+                relationship_part_count as u64,
+                limits.max_relationship_parts() as u64,
+            )
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        let mut ledger = RelationshipLedger::default();
+        let content_types_member = Self::locate_content_types_member(archive)
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        let content_types_metadata = archive
+            .metadata(content_types_member)
+            .map_err(OpcError::from)
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        limits
+            .check(
+                ReadResource::ContentTypesBytes,
+                content_types_metadata.uncompressed_size(),
+                limits.max_content_types_bytes() as u64,
+            )
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        let content_types_xml = archive
+            .read(content_types_member)
+            .map_err(OpcError::from)
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        let content_types = ContentTypeMap::from_xml(&content_types_xml, limits)
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        let package_uri = PackURI::new(PACKAGE_URI)
+            .map_err(OpcError::InvalidPackUri)
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        let pkg_srels = Self::load_rels_lazy(archive, &package_uri, limits, &mut ledger)
+            .map_err(|error| phase(ValidationCatalogPhase::LoadedRelationships, error))?;
+        let mut non_part_members = Vec::new();
+        non_part_members
+            .try_reserve(archive.len())
+            .map_err(|source| allocation("OPC non-part members", source))
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        let parts = Self::load_part_catalog_for_validation(
             archive,
             content_types_member,
             &pkg_srels,

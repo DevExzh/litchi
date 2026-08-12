@@ -11,7 +11,10 @@ use crate::members::NonPartMember;
 use crate::package::OpcPackage;
 use crate::packuri::{PACKAGE_URI, PackURI};
 use crate::part::PartFactory;
-use crate::pkgreader::{PackageReader, SerializedRelationship, SourceCatalog};
+use crate::pkgreader::{
+    PackageReader, SerializedRelationship, SourceCatalog, ValidationCatalogError,
+    ValidationCatalogPhase,
+};
 use crate::rel::{Relationships, TargetMode};
 use litchi_core::{ReadAt, SourceVersion};
 use sha2::{Digest as _, Sha256};
@@ -687,7 +690,112 @@ pub struct SourceBackedPackage {
     cache: PartCache,
 }
 
+/// Validation-only open failure with exact ingress phase provenance.
+pub(crate) struct ValidationOpenError {
+    pub(crate) phase: ValidationCatalogPhase,
+    pub(crate) error: OpcError,
+}
+
 impl SourceBackedPackage {
+    /// Validation-only source open. Ordinary callers retain the existing open
+    /// path; this variant adds phase provenance without changing its hot path.
+    pub(crate) fn from_read_at_for_validation(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+    ) -> std::result::Result<Self, ValidationOpenError> {
+        let phase = |phase, error| ValidationOpenError { phase, error };
+        let version = source
+            .version()
+            .map_err(OpcError::from)
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        let length = source
+            .len()
+            .map_err(OpcError::from)
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        limits
+            .check(ReadResource::InputBytes, length, limits.max_input_bytes())
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        let snapshot = SourceSnapshot {
+            source: Arc::clone(&source),
+            version,
+            length,
+            monitor_reads: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        };
+        snapshot
+            .ensure_current()
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        let archive = IndexedArchive::from_reader_with_limits(
+            SourceReader {
+                snapshot: snapshot.clone(),
+            },
+            length,
+            limits.zip_limits(),
+        )
+        .map_err(OpcError::from)
+        .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        snapshot
+            .ensure_current()
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        let SourceCatalog {
+            pkg_srels,
+            parts,
+            non_part_members,
+        } = PackageReader::source_catalog_for_validation(&archive, limits).map_err(
+            |ValidationCatalogError {
+                 phase: stage,
+                 error,
+             }| phase(stage, error),
+        )?;
+        snapshot
+            .ensure_current()
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+
+        let package_relationships = relationships_for_package(pkg_srels)
+            .map_err(|error| phase(ValidationCatalogPhase::LoadedRelationships, error))?;
+        let mut catalog_parts = Vec::new();
+        catalog_parts
+            .try_reserve_exact(parts.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC catalog parts",
+                source,
+            })
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        let mut parts_by_name = HashMap::new();
+        parts_by_name
+            .try_reserve(parts.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC part lookup",
+                source,
+            })
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        for (index, part) in parts.into_iter().enumerate() {
+            let relationships = relationships_for_part(&part.partname, part.srels)
+                .map_err(|error| phase(ValidationCatalogPhase::LoadedRelationships, error))?;
+            let entry_id = archive
+                .entry_id(part.partname.membername())
+                .ok_or_else(|| OpcError::PartNotFound(part.partname.to_string()))
+                .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+            parts_by_name.insert(part.partname.clone(), index);
+            catalog_parts.push(CatalogPart {
+                partname: part.partname,
+                content_type: part.content_type,
+                relationships,
+                entry_id,
+            });
+        }
+
+        Ok(Self {
+            source: snapshot,
+            archive,
+            limits,
+            package_relationships,
+            parts: catalog_parts,
+            parts_by_name,
+            non_part_members,
+            cache: PartCache::new(SourceCacheLimits::default()),
+        })
+    }
+
     /// Open a source-backed package with the standard bounded read policy.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
         Self::from_read_at_with_limits_and_cache_limits(
