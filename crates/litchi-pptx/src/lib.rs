@@ -160,7 +160,8 @@ pub use presentation::{
     MAX_SOURCE_BACKED_SLIDE_BATCH, Presentation, SourceBackedPresentation,
     SourceBackedPresentationEditor, SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit,
     SourceBackedSlideBatchPatch, SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit,
-    SourceBackedSlideEdit, SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceSlide,
+    SourceBackedSlideEdit, SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImage,
+    SourceImageDescriptor, SourceImageTarget, SourceSlide,
 };
 pub use presentation_properties::{
     BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,

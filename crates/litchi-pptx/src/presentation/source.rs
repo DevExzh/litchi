@@ -10,10 +10,15 @@ use std::sync::{Arc, OnceLock};
 use litchi_core::ReadAt;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    BlobPart, PackURI, Part, PartData, PartView, ReadLimits, SourceBackedPackage, TargetMode,
+    BlobPart, PackURI, Part, PartData, PartView, ReadLimits, Relationships, SourceBackedPackage,
+    TargetMode,
 };
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
 
 use crate::parts::{PresentationPart, SlidePart, SlideReference};
+use crate::shape::{Bounds, Shape};
 use crate::{Error, Result};
 
 /// Maximum number of existing slides in one source-backed batch edit.
@@ -23,22 +28,78 @@ struct SourceSlideData {
     position: usize,
     part_uri: PackURI,
     binding: SlideBinding,
-    part: OnceLock<BlobPart>,
+    part: OnceLock<SourcePart>,
 }
 
 struct SourceInner {
     package: SourceBackedPackage,
     // Retain the pinned mandatory root without relying on the OPC payload cache.
-    _presentation: BlobPart,
+    _presentation: SourcePart,
     slides: Box<[Arc<SourceSlideData>]>,
 }
 
 struct SourceCatalog {
-    presentation: BlobPart,
+    presentation: SourcePart,
     package_relationships: Box<[RelationshipBinding]>,
     presentation_binding: PartBinding,
-    presentation_xml: Arc<Vec<u8>>,
     slides: Box<[Arc<SourceSlideData>]>,
+}
+
+/// Read-only PresentationML part adapter that retains the source-backed
+/// payload handle instead of escaping it as an unmanaged `Arc`.
+#[derive(Debug, Clone)]
+struct SourcePart {
+    partname: PackURI,
+    content_type: String,
+    data: PartData,
+    replacement: Option<Vec<u8>>,
+    rels: Relationships,
+}
+
+impl SourcePart {
+    fn from_view(view: &PartView<'_>, data: PartData) -> Self {
+        Self {
+            partname: view.partname().clone(),
+            content_type: view.content_type().to_string(),
+            data,
+            replacement: None,
+            rels: view.rels().clone(),
+        }
+    }
+}
+
+impl Part for SourcePart {
+    fn blob(&self) -> &[u8] {
+        self.replacement
+            .as_deref()
+            .unwrap_or_else(|| self.data.as_bytes())
+    }
+
+    fn blob_arc(&self) -> Arc<Vec<u8>> {
+        // Source catalog and image-query paths use `blob()` so this defensive
+        // trait fallback never detaches a managed PartData reservation.
+        Arc::new(self.blob().to_vec())
+    }
+
+    fn content_type(&self) -> &str {
+        &self.content_type
+    }
+
+    fn partname(&self) -> &PackURI {
+        &self.partname
+    }
+
+    fn rels(&self) -> &Relationships {
+        &self.rels
+    }
+
+    fn rels_mut(&mut self) -> &mut Relationships {
+        &mut self.rels
+    }
+
+    fn set_blob(&mut self, blob: Vec<u8>) {
+        self.replacement = Some(blob);
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -90,6 +151,162 @@ pub struct SourceSlide {
     data: Arc<SourceSlideData>,
 }
 
+/// The validated target of one direct `p:pic` image relationship.
+///
+/// Internal images are limited to `/ppt/media/` parts and retain only the
+/// target metadata until [`SourceSlide::read_image`] is called. External
+/// targets are reported as inert metadata; this crate never dereferences
+/// them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SourceImageTarget {
+    /// An embedded image part in the package media directory.
+    Internal {
+        /// Absolute OPC part URI.
+        part_uri: PackURI,
+        /// Content type declared by `[Content_Types].xml`.
+        content_type: String,
+    },
+    /// An external image relationship retained without network access.
+    External {
+        /// Producer-supplied external target URI.
+        target: String,
+    },
+}
+
+impl SourceImageTarget {
+    /// Whether this target is external and therefore cannot be read by this
+    /// crate.
+    #[must_use]
+    pub const fn is_external(&self) -> bool {
+        matches!(self, Self::External { .. })
+    }
+
+    /// Borrow the embedded part URI, if this is an internal target.
+    #[must_use]
+    pub fn part_uri(&self) -> Option<&PackURI> {
+        match self {
+            Self::Internal { part_uri, .. } => Some(part_uri),
+            Self::External { .. } => None,
+        }
+    }
+
+    /// Borrow the embedded image content type, if this is an internal target.
+    #[must_use]
+    pub fn content_type(&self) -> Option<&str> {
+        match self {
+            Self::Internal { content_type, .. } => Some(content_type),
+            Self::External { .. } => None,
+        }
+    }
+
+    /// Borrow the external URI, if this is an external target.
+    #[must_use]
+    pub fn external_target(&self) -> Option<&str> {
+        match self {
+            Self::Internal { .. } => None,
+            Self::External { target } => Some(target),
+        }
+    }
+}
+
+/// Metadata-only descriptor for one direct image in scene order.
+///
+/// Listing descriptors reads the selected slide XML and its relationship
+/// metadata but never reads an embedded media payload. The `position` value
+/// is the exact zero-based image position used by [`SourceSlide::read_image`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceImageDescriptor {
+    position: usize,
+    shape_position: usize,
+    id: Option<u32>,
+    name: Option<String>,
+    bounds: Option<Bounds>,
+    relationship_id: String,
+    target: SourceImageTarget,
+}
+
+impl SourceImageDescriptor {
+    /// Exact zero-based image position in scene order.
+    #[must_use]
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Exact zero-based pre-order position of the owning shape.
+    #[must_use]
+    pub const fn shape_position(&self) -> usize {
+        self.shape_position
+    }
+
+    /// Numeric non-visual shape ID, when safely available.
+    #[must_use]
+    pub const fn id(&self) -> Option<u32> {
+        self.id
+    }
+
+    /// Producer-visible non-visual shape name, when safely available.
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// Explicit local transform bounds, when safely available.
+    #[must_use]
+    pub const fn bounds(&self) -> Option<Bounds> {
+        self.bounds
+    }
+
+    /// Relationship ID carried by the picture's `a:blip`.
+    #[must_use]
+    pub fn relationship_id(&self) -> &str {
+        &self.relationship_id
+    }
+
+    /// Validated embedded or inert external target metadata.
+    #[must_use]
+    pub const fn target(&self) -> &SourceImageTarget {
+        &self.target
+    }
+
+    /// Whether this descriptor points at an external, unreadable target.
+    #[must_use]
+    pub const fn is_external(&self) -> bool {
+        self.target.is_external()
+    }
+}
+
+/// One selected embedded image and its bounded source-backed payload handle.
+///
+/// The payload is held as [`litchi_opc::PartData`], so managed package memory
+/// reservations and finite cache behavior remain active for the lifetime of
+/// this value. External image descriptors cannot produce this type.
+#[derive(Debug, Clone)]
+pub struct SourceImage {
+    descriptor: SourceImageDescriptor,
+    data: PartData,
+}
+
+impl SourceImage {
+    /// Metadata descriptor used to select this image.
+    #[must_use]
+    pub const fn descriptor(&self) -> &SourceImageDescriptor {
+        &self.descriptor
+    }
+
+    /// Borrow the exact embedded image payload bytes.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        self.data.as_bytes()
+    }
+
+    /// Borrow the underlying bounded OPC payload handle.
+    #[must_use]
+    pub const fn data(&self) -> &PartData {
+        &self.data
+    }
+}
+
 /// An owning, source-backed editor for one existing slide.
 ///
 /// Unlike [`SourceBackedPresentation`], this type is intentionally not
@@ -98,7 +315,7 @@ pub struct SourceSlide {
 /// It supports no package topology or relationship changes.
 pub struct SourceBackedPresentationEditor {
     package: SourceBackedPackage,
-    _presentation: BlobPart,
+    _presentation: SourcePart,
     slides: Box<[Arc<SourceSlideData>]>,
     limits: ReadLimits,
 }
@@ -410,7 +627,7 @@ impl SourceBackedPresentationEditor {
             closure: SlideClosure {
                 package_relationships: catalog.package_relationships.clone(),
                 presentation: catalog.presentation_binding.clone(),
-                presentation_xml: Arc::clone(&catalog.presentation_xml),
+                presentation_xml: catalog.presentation.data.into_arc()?,
                 slide: data.binding.clone(),
             },
             max_output_bytes: source_slide_output_limit(self.limits),
@@ -859,20 +1076,615 @@ impl SourceSlide {
         SlidePart::from_part(self.part()?)?.text()
     }
 
-    fn part(&self) -> Result<&BlobPart> {
+    /// List direct `p:pic` image descriptors in scene order.
+    ///
+    /// This reads only the selected slide XML and its relationship metadata.
+    /// It never reads an embedded `/ppt/media/` payload. Backgrounds,
+    /// inherited layout/master images, notes, charts, OLE previews, and
+    /// non-picture graphic frames are outside this direct-picture closure.
+    /// Markup-compatibility branches and ambiguous or malformed picture
+    /// grammar are refused rather than projected into a lossy descriptor.
+    pub fn images(&self) -> Result<Vec<SourceImageDescriptor>> {
+        let view = self.owner.package.part(&self.data.part_uri)?;
+        let part = self.load_part(&view)?;
+        validate_source_slide_root(part)?;
+        reject_picture_markup_compatibility(part.blob())?;
+        // Keep the normal borrowed part validation on the safe path as well;
+        // the raw-root check above prevents MCE preprocessing from masking a
+        // malformed selected slide before our refusal scan runs.
+        SlidePart::from_part(part)?;
+        let scene = crate::shape::Scene::read(part.blob())?;
+        if scene.is_rewritten() {
+            return Err(Error::UnsafeEdit {
+                operation: "source-backed picture inventory",
+                reason: "markup-compatibility picture branches are not selected",
+            });
+        }
+
+        let mut descriptors = Vec::new();
+        descriptors
+            .try_reserve_exact(scene.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed picture descriptors",
+                source,
+            })?;
+        for (shape_position, shape) in scene.iter().enumerate() {
+            let Shape::Picture(picture) = shape else {
+                continue;
+            };
+            let common = picture.common();
+            let relationship = parse_picture_relationship(common.xml()?)?;
+            let target = resolve_picture_target(&self.owner.package, &view, &relationship)?;
+            descriptors.push(SourceImageDescriptor {
+                position: descriptors.len(),
+                shape_position,
+                id: common.id(),
+                name: common.name().map(str::to_owned),
+                bounds: common.bounds(),
+                relationship_id: relationship.id,
+                target,
+            });
+        }
+        Ok(descriptors)
+    }
+
+    /// Select one direct image descriptor by exact zero-based image position.
+    ///
+    /// The selected embedded payload is still deferred; use
+    /// [`Self::read_image`] when payload bytes are required.
+    pub fn image(&self, position: usize) -> Result<SourceImageDescriptor> {
+        let images = self.images()?;
+        let len = images.len();
+        images
+            .into_iter()
+            .nth(position)
+            .ok_or(Error::IndexOutOfBounds {
+                index: position,
+                len,
+            })
+    }
+
+    /// Read one embedded image payload by exact zero-based image position.
+    ///
+    /// Internal image bytes are loaded through the source-backed OPC PartView,
+    /// retaining source-version checks, finite cache limits, cancellation,
+    /// and managed budget reservations. External targets are described by
+    /// [`Self::images`] but are refused here without any network or filesystem
+    /// access.
+    pub fn read_image(&self, position: usize) -> Result<SourceImage> {
+        let descriptor = self.image(position)?;
+        let SourceImageTarget::Internal { part_uri, .. } = &descriptor.target else {
+            return Err(Error::Relationship(format!(
+                "source-backed image {position} has an external target and is inert"
+            )));
+        };
+        let view = self.owner.package.part(part_uri)?;
+        if !view.rels().is_empty() {
+            return Err(Error::Relationship(format!(
+                "source-backed image part '{}' has outbound relationships",
+                part_uri.as_str()
+            )));
+        }
+        let data = view.data()?;
+        Ok(SourceImage { descriptor, data })
+    }
+
+    fn part(&self) -> Result<&SourcePart> {
         // The metadata lookup keeps source-version checks active even after a
         // selected slide payload has entered the local cache.
         let view = self.owner.package.part(&self.data.part_uri)?;
+        self.load_part(&view)
+    }
+
+    fn load_part<'a>(&'a self, view: &PartView<'_>) -> Result<&'a SourcePart> {
         if let Some(part) = self.data.part.get() {
             return Ok(part);
         }
 
-        let part = owned_part(&view, view.data()?)?;
+        let part = SourcePart::from_view(view, view.data()?);
         let _publish_result = self.data.part.set(part);
         self.data.part.get().ok_or_else(|| {
             Error::Invalid("source-backed slide cache did not publish a value".to_string())
         })
     }
+}
+
+struct PictureRelationship {
+    id: String,
+    external: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PictureNode {
+    Picture,
+    NonVisualProperties,
+    BlipFill,
+    ShapeProperties,
+    Blip,
+    SourceRectangle,
+    Stretch,
+    Tile,
+    FillRectangle,
+    Other,
+}
+
+const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
+const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
+
+fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut stack: Vec<(PictureNode, Vec<u8>)> = Vec::new();
+    let mut root_seen = false;
+    let mut picture_stage = 0_u8;
+    let mut blip_fill_stage = 0_u8;
+    let mut saw_blip = false;
+    let mut saw_stretch = false;
+    let mut saw_tile = false;
+    let mut saw_fill_rectangle = false;
+    let mut relationship = None;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let is_start = matches!(&event, Event::Start(_));
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let parent = stack.last().map(|(node, _)| *node);
+                let node = picture_node(&namespace, element.name());
+                if stack.is_empty() && node != PictureNode::Picture {
+                    return Err(Error::Invalid(
+                        "picture descriptor XML does not have a p:pic root".into(),
+                    ));
+                }
+                if stack.is_empty() {
+                    if root_seen {
+                        return Err(Error::Invalid(
+                            "picture descriptor contains more than one root element".into(),
+                        ));
+                    }
+                    root_seen = true;
+                }
+                if node == PictureNode::Picture && !stack.is_empty() {
+                    return Err(Error::Invalid(
+                        "picture descriptor contains a nested p:pic".into(),
+                    ));
+                }
+
+                match parent {
+                    None => {},
+                    Some(PictureNode::Picture) => {
+                        let expected = match picture_stage {
+                            0 => PictureNode::NonVisualProperties,
+                            1 => PictureNode::BlipFill,
+                            2 => PictureNode::ShapeProperties,
+                            _ => PictureNode::Other,
+                        };
+                        if node != expected {
+                            return Err(Error::Invalid(
+                                "picture descriptor direct children must be nvPicPr, blipFill, and spPr in schema order".into(),
+                            ));
+                        }
+                        picture_stage = picture_stage.saturating_add(1);
+                    },
+                    Some(PictureNode::BlipFill) => match node {
+                        PictureNode::Blip if !saw_blip && blip_fill_stage == 0 => {
+                            saw_blip = true;
+                            blip_fill_stage = 1;
+                            validate_blip_attributes(
+                                &element,
+                                reader.decoder(),
+                                reader.resolver(),
+                            )?;
+                            let embed = crate::namespace::relationship_attribute_value(
+                                &element,
+                                b"embed",
+                                reader.decoder(),
+                                reader.resolver(),
+                            )?;
+                            let link = crate::namespace::relationship_attribute_value(
+                                &element,
+                                b"link",
+                                reader.decoder(),
+                                reader.resolver(),
+                            )?;
+                            let (id, external) = match (embed, link) {
+                                (Some(id), None) => (id, false),
+                                (None, Some(id)) => (id, true),
+                                (Some(_), Some(_)) => {
+                                    return Err(Error::Relationship(
+                                        "picture a:blip cannot carry both r:embed and r:link"
+                                            .into(),
+                                    ));
+                                },
+                                (None, None) => {
+                                    return Err(Error::Relationship(
+                                        "picture a:blip is missing r:embed or r:link".into(),
+                                    ));
+                                },
+                            };
+                            if id.is_empty() {
+                                return Err(Error::Relationship(
+                                    "picture a:blip relationship ID is empty".into(),
+                                ));
+                            }
+                            relationship = Some(PictureRelationship { id, external });
+                        },
+                        PictureNode::SourceRectangle if blip_fill_stage <= 1 => {
+                            blip_fill_stage = 2;
+                        },
+                        PictureNode::Stretch
+                            if blip_fill_stage <= 2 && !saw_stretch && !saw_tile =>
+                        {
+                            blip_fill_stage = 3;
+                            saw_stretch = true;
+                            if !is_start {
+                                return Err(Error::Invalid(
+                                    "picture blipFill stretch must contain one fillRect".into(),
+                                ));
+                            }
+                        },
+                        PictureNode::Tile if blip_fill_stage <= 2 && !saw_stretch && !saw_tile => {
+                            blip_fill_stage = 3;
+                            saw_tile = true;
+                        },
+                        _ => {
+                            return Err(Error::Invalid(
+                                "picture blipFill direct children are an ordered blip, srcRect, and stretch/tile set".into(),
+                            ));
+                        },
+                    },
+                    Some(PictureNode::Stretch) => {
+                        if node != PictureNode::FillRectangle || saw_fill_rectangle {
+                            return Err(Error::Invalid(
+                                "picture stretch requires exactly one direct fillRect".into(),
+                            ));
+                        }
+                        saw_fill_rectangle = true;
+                    },
+                    Some(
+                        PictureNode::Blip
+                        | PictureNode::SourceRectangle
+                        | PictureNode::Tile
+                        | PictureNode::FillRectangle,
+                    ) => {
+                        return Err(Error::Invalid(
+                            "picture blipFill child contains an unsupported nested element".into(),
+                        ));
+                    },
+                    Some(PictureNode::NonVisualProperties)
+                    | Some(PictureNode::ShapeProperties)
+                    | Some(PictureNode::Other) => {},
+                }
+
+                if parent == Some(PictureNode::BlipFill)
+                    && node == PictureNode::Stretch
+                    && !is_start
+                {
+                    return Err(Error::Invalid(
+                        "picture blipFill stretch must contain one fillRect".into(),
+                    ));
+                }
+                if node == PictureNode::Picture && !is_start {
+                    return Err(Error::Invalid(
+                        "picture descriptor requires nvPicPr, blipFill, and spPr children".into(),
+                    ));
+                }
+
+                if is_start {
+                    stack.push((node, element.name().as_ref().to_vec()));
+                }
+            },
+            Event::End(element) => {
+                let (_, start_name) = stack.pop().ok_or_else(|| {
+                    Error::Invalid("picture descriptor has an unmatched end element".into())
+                })?;
+                if start_name.as_slice() != element.name().as_ref() {
+                    return Err(Error::Invalid(
+                        "picture descriptor has a mismatched end element".into(),
+                    ));
+                }
+            },
+            Event::Text(text) => {
+                let parent = stack.last().map(|(node, _)| *node);
+                if parent.is_none() && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(Error::Invalid(
+                        "picture descriptor contains text outside its p:pic root".into(),
+                    ));
+                }
+                let finite_parent = matches!(
+                    parent,
+                    Some(
+                        PictureNode::Picture
+                            | PictureNode::BlipFill
+                            | PictureNode::Blip
+                            | PictureNode::SourceRectangle
+                            | PictureNode::Stretch
+                            | PictureNode::Tile
+                            | PictureNode::FillRectangle
+                    )
+                );
+                if finite_parent
+                    && (parent == Some(PictureNode::Blip)
+                        || !text.as_ref().iter().all(u8::is_ascii_whitespace))
+                {
+                    return Err(Error::Invalid(
+                        "picture descriptor contains text in a finite picture grammar element"
+                            .into(),
+                    ));
+                }
+            },
+            Event::CData(_) | Event::GeneralRef(_) | Event::Comment(_)
+                if stack.last().is_some_and(|(node, _)| {
+                    matches!(
+                        node,
+                        PictureNode::Picture
+                            | PictureNode::BlipFill
+                            | PictureNode::Blip
+                            | PictureNode::SourceRectangle
+                            | PictureNode::Stretch
+                            | PictureNode::Tile
+                            | PictureNode::FillRectangle
+                    )
+                }) =>
+            {
+                return Err(Error::Invalid(
+                    "picture descriptor contains unsupported content in a finite grammar element"
+                        .into(),
+                ));
+            },
+            Event::Eof => break,
+            Event::Decl(_) | Event::DocType(_) | Event::PI(_) => {
+                return Err(Error::Invalid(
+                    "picture descriptor contains forbidden XML declarations".into(),
+                ));
+            },
+            _ => {},
+        }
+    }
+    if !stack.is_empty() {
+        return Err(Error::Invalid(
+            "picture descriptor XML ended with unclosed elements".into(),
+        ));
+    }
+    if !root_seen {
+        return Err(Error::Invalid(
+            "picture descriptor XML lacks a p:pic root".into(),
+        ));
+    }
+    if picture_stage != 3 {
+        return Err(Error::Invalid(
+            "picture descriptor requires exactly nvPicPr, blipFill, and spPr children".into(),
+        ));
+    }
+    if !saw_blip {
+        return Err(Error::Relationship(
+            "picture descriptor is missing its a:blip relationship".into(),
+        ));
+    }
+    if saw_stretch && !saw_fill_rectangle {
+        return Err(Error::Invalid(
+            "picture stretch requires exactly one direct fillRect".into(),
+        ));
+    }
+    relationship.ok_or_else(|| {
+        Error::Relationship("picture descriptor is missing its a:blip relationship".into())
+    })
+}
+
+fn picture_node(namespace: &ResolveResult<'_>, name: quick_xml::name::QName<'_>) -> PictureNode {
+    if is_presentation_name(namespace, name, b"pic") {
+        PictureNode::Picture
+    } else if is_presentation_name(namespace, name, b"nvPicPr") {
+        PictureNode::NonVisualProperties
+    } else if is_presentation_name(namespace, name, b"blipFill") {
+        PictureNode::BlipFill
+    } else if is_presentation_name(namespace, name, b"spPr") {
+        PictureNode::ShapeProperties
+    } else if is_drawing_name(namespace, name, b"blip") {
+        PictureNode::Blip
+    } else if is_drawing_name(namespace, name, b"srcRect") {
+        PictureNode::SourceRectangle
+    } else if is_drawing_name(namespace, name, b"stretch") {
+        PictureNode::Stretch
+    } else if is_drawing_name(namespace, name, b"tile") {
+        PictureNode::Tile
+    } else if is_drawing_name(namespace, name, b"fillRect") {
+        PictureNode::FillRectangle
+    } else {
+        PictureNode::Other
+    }
+}
+
+fn validate_blip_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    resolver: &quick_xml::name::NamespaceResolver,
+) -> Result<()> {
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.as_namespace_binding().is_some() {
+            continue;
+        }
+        let (namespace, local) = resolver.resolve_attribute(attribute.key);
+        let is_relationship = matches!(
+            namespace,
+            ResolveResult::Bound(Namespace(value))
+                if value == litchi_ooxml_common::relationships::TRANSITIONAL_NAMESPACE
+                    || value == litchi_ooxml_common::relationships::STRICT_NAMESPACE
+        ) || matches!(namespace, ResolveResult::Unknown(prefix) if prefix.as_slice() == b"r");
+        if !is_relationship || !matches!(local.as_ref(), b"embed" | b"link") {
+            return Err(Error::Invalid(
+                "picture a:blip contains an unsupported attribute".into(),
+            ));
+        }
+        let _ = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+    }
+    Ok(())
+}
+
+fn reject_picture_markup_compatibility(xml: &[u8]) -> Result<()> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let namespace_is_mce = is_mce_namespace(&namespace);
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let mut has_mce_attribute = false;
+                for attribute in element.attributes().with_checks(true) {
+                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    has_mce_attribute |=
+                        is_mce_namespace(&reader.resolver().resolve_attribute(attribute.key).0);
+                }
+                if namespace_is_mce || has_mce_attribute {
+                    return Err(Error::UnsafeEdit {
+                        operation: "source-backed picture inventory",
+                        reason: "markup-compatibility elements and attributes are refused",
+                    });
+                }
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(Error::Invalid(
+                    "slide XML contains forbidden XML declarations".into(),
+                ));
+            },
+            Event::Eof => return Ok(()),
+            _ => {},
+        }
+    }
+}
+
+fn validate_source_slide_root(part: &dyn Part) -> Result<()> {
+    if part.content_type() != ct::PML_SLIDE {
+        return Err(Error::ContentType {
+            expected: ct::PML_SLIDE.to_string(),
+            actual: part.content_type().to_string(),
+        });
+    }
+    let mut reader = NsReader::from_reader(part.blob());
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if !is_presentation_name(&namespace, element.name(), b"sld") {
+                    return Err(Error::Invalid(
+                        "slide part does not have a p:sld root".into(),
+                    ));
+                }
+                return Ok(());
+            },
+            Event::Decl(_) | Event::Comment(_) => {},
+            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(Error::Invalid(
+                    "slide part contains a forbidden XML declaration".into(),
+                ));
+            },
+            Event::Eof => {
+                return Err(Error::Invalid("slide part lacks a p:sld root".into()));
+            },
+            _ => {
+                return Err(Error::Invalid(
+                    "slide part lacks a p:sld element root".into(),
+                ));
+            },
+        }
+    }
+}
+
+fn resolve_picture_target(
+    package: &SourceBackedPackage,
+    view: &PartView<'_>,
+    picture: &PictureRelationship,
+) -> Result<SourceImageTarget> {
+    let relationship = view.rels().get(&picture.id).ok_or_else(|| {
+        Error::Relationship(format!(
+            "picture image relationship '{}' is missing",
+            picture.id
+        ))
+    })?;
+    if relationship.is_external() != picture.external {
+        return Err(Error::Relationship(format!(
+            "picture image relationship '{}' has the wrong target mode",
+            picture.id
+        )));
+    }
+    if relationship.reltype() != rt::IMAGE && relationship.reltype() != rt::STRICT_IMAGE {
+        return Err(Error::Relationship(format!(
+            "picture image relationship '{}' has an unexpected type",
+            picture.id
+        )));
+    }
+    if relationship.is_external() {
+        if relationship.target_ref().is_empty() {
+            return Err(Error::Relationship(
+                "external picture image relationship has an empty target".into(),
+            ));
+        }
+        return Ok(SourceImageTarget::External {
+            target: relationship.target_ref().to_owned(),
+        });
+    }
+
+    let part_uri = relationship.target_partname()?;
+    if !part_uri.as_str().starts_with("/ppt/media/") {
+        return Err(Error::Relationship(format!(
+            "picture image target '{}' is outside /ppt/media",
+            part_uri.as_str()
+        )));
+    }
+    let media = package.part(&part_uri)?;
+    if !is_image_content_type(media.content_type()) {
+        return Err(Error::ContentType {
+            expected: "image/*".into(),
+            actual: media.content_type().to_owned(),
+        });
+    }
+    if !media.rels().is_empty() {
+        return Err(Error::Relationship(format!(
+            "picture image part '{}' has outbound relationships",
+            part_uri.as_str()
+        )));
+    }
+    Ok(SourceImageTarget::Internal {
+        part_uri,
+        content_type: media.content_type().to_owned(),
+    })
+}
+
+fn is_image_content_type(content_type: &str) -> bool {
+    content_type.starts_with("image/")
+}
+
+fn is_mce_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == MCE_NAMESPACE)
+}
+
+fn is_presentation_name(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    local: &[u8],
+) -> bool {
+    crate::namespace::is_presentationml_name(namespace, name, local)
+}
+
+fn is_drawing_name(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    local: &[u8],
+) -> bool {
+    name.local_name().as_ref() == local
+        && (matches!(
+            namespace,
+            ResolveResult::Bound(Namespace(value))
+                if *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE
+        ) || matches!(namespace, ResolveResult::Unknown(prefix) if prefix.as_slice() == b"a"))
 }
 
 fn validate_slide_graph(
@@ -944,8 +1756,7 @@ fn source_slide_output_limit(limits: ReadLimits) -> usize {
 
 fn source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalog> {
     let view = package.main_document_part()?;
-    let presentation = owned_part(&view, view.data()?)?;
-    let presentation_xml = presentation.blob_arc();
+    let presentation = SourcePart::from_view(&view, view.data()?);
     let presentation_binding = part_binding(&view);
     let references = PresentationPart::from_part(&presentation)?.slide_references()?;
     let slides = validate_slide_graph(package, &view, &references)?;
@@ -953,13 +1764,8 @@ fn source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalog> {
         presentation,
         package_relationships: relationship_bindings(package.rels()),
         presentation_binding,
-        presentation_xml,
         slides,
     })
-}
-
-fn owned_part(view: &PartView<'_>, data: PartData) -> Result<BlobPart> {
-    owned_part_shared(view, data.into_arc()?)
 }
 
 fn owned_part_shared(view: &PartView<'_>, bytes: Arc<Vec<u8>>) -> Result<BlobPart> {
@@ -987,7 +1793,7 @@ fn part_binding(view: &PartView<'_>) -> PartBinding {
     }
 }
 
-fn relationship_bindings(relationships: &litchi_opc::Relationships) -> Box<[RelationshipBinding]> {
+fn relationship_bindings(relationships: &Relationships) -> Box<[RelationshipBinding]> {
     let mut bindings = relationships
         .iter()
         .map(relationship_binding)
@@ -1008,17 +1814,22 @@ fn relationship_binding(relationship: &litchi_opc::Relationship) -> Relationship
 #[cfg(test)]
 mod tests {
     use std::io;
+    use std::num::{NonZeroU64, NonZeroUsize};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
-    use litchi_core::{ReadAt, SourceVersion};
-    use litchi_opc::{ReadLimits, ReadResource};
+    use litchi_core::{
+        Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
+        SourceVersion,
+    };
+    use litchi_opc::{ReadLimits, ReadResource, SourceBackedPackage};
     use soapberry_zip::office::StreamingArchiveWriter;
 
-    use super::SourceBackedPresentation;
+    use super::{SourceBackedPresentation, SourceImageTarget};
     use crate::Error;
 
     const SECOND_MARKER: &[u8] = b"source-backed-unrequested-second-slide";
+    const MEDIA_MARKER: &[u8] = b"source-backed-picture-media-payload";
 
     struct CountingSource {
         bytes: Vec<u8>,
@@ -1071,6 +1882,57 @@ mod tests {
         }
     }
 
+    struct PictureCountingSource {
+        bytes: Vec<u8>,
+        marker_offset: usize,
+        media_payload_reads: AtomicUsize,
+        revision: AtomicU64,
+    }
+
+    impl PictureCountingSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            let marker_offset = bytes
+                .windows(MEDIA_MARKER.len())
+                .position(|window| window == MEDIA_MARKER)
+                .expect("picture media marker is stored in archive");
+            Self {
+                bytes,
+                marker_offset,
+                media_payload_reads: AtomicUsize::new(0),
+                revision: AtomicU64::new(0),
+            }
+        }
+
+        fn changed(&self) {
+            self.revision.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    impl ReadAt for PictureCountingSource {
+        fn len(&self) -> io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let offset = usize::try_from(offset)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset too large"))?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            let end = offset + count;
+            if offset < self.marker_offset + MEDIA_MARKER.len() && self.marker_offset < end {
+                self.media_payload_reads.fetch_add(1, Ordering::SeqCst);
+            }
+            output[..count].copy_from_slice(&self.bytes[offset..end]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(93, self.revision.load(Ordering::SeqCst)))
+        }
+    }
+
     fn source_backed_pptx() -> Vec<u8> {
         let mut writer = StreamingArchiveWriter::new();
         writer
@@ -1114,6 +1976,86 @@ mod tests {
         writer.finish_to_bytes().unwrap()
     }
 
+    fn picture_slide(blip: &str) -> Vec<u8> {
+        let children = format!(
+            r#"<p:nvPicPr><p:cNvPr id="42" name="Photo"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill>{blip}<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="1" y="2"/><a:ext cx="3" cy="4"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>"#
+        );
+        picture_slide_with_pic_children(&children)
+    }
+
+    fn picture_slide_with_pic_children(children: &str) -> Vec<u8> {
+        format!(
+            r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:pic>{children}</p:pic></p:spTree></p:cSld></p:sld>"#
+        )
+        .into_bytes()
+    }
+
+    fn picture_pptx(
+        slide: &[u8],
+        slide_relationships: &[u8],
+        media_content_type: Option<&str>,
+        media_relationships: Option<&[u8]>,
+    ) -> Vec<u8> {
+        let mut writer = StreamingArchiveWriter::new();
+        let media_default = media_content_type.map_or_else(String::new, |content_type| {
+            format!(r#"<Default Extension="png" ContentType="{content_type}"/>"#)
+        });
+        let content_types = format!(
+            r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>{media_default}<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/></Types>"#
+        );
+        writer
+            .write_stored("[Content_Types].xml", content_types.as_bytes())
+            .unwrap();
+        writer
+            .write_stored(
+                "_rels/.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored(
+                "ppt/presentation.xml",
+                br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored(
+                "ppt/_rels/presentation.xml.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.write_stored("ppt/slides/slide1.xml", slide).unwrap();
+        writer
+            .write_stored("ppt/slides/_rels/slide1.xml.rels", slide_relationships)
+            .unwrap();
+        if media_content_type.is_some() {
+            writer
+                .write_stored("ppt/media/image1.png", &media_payload())
+                .unwrap();
+            if let Some(relationships) = media_relationships {
+                writer
+                    .write_stored("ppt/media/_rels/image1.png.rels", relationships)
+                    .unwrap();
+            }
+        }
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn media_payload() -> Vec<u8> {
+        let mut payload = MEDIA_MARKER.to_vec();
+        payload.extend(std::iter::repeat_n(b'!', 2048));
+        payload
+    }
+
+    fn embedded_picture_pptx() -> Vec<u8> {
+        picture_pptx(
+            &picture_slide(r#"<a:blip r:embed="rIdImage"/>"#),
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#,
+            Some("image/png"),
+            None,
+        )
+    }
+
     #[test]
     fn catalog_and_selected_text_leave_unselected_slides_unread() {
         let source = Arc::new(CountingSource::new(source_backed_pptx()));
@@ -1136,6 +2078,398 @@ mod tests {
         let second = presentation.slide(1).unwrap();
         assert_eq!(second.text().unwrap(), "Second slide");
         assert!(source.second_payload_reads.load(Ordering::SeqCst) > 0);
+    }
+
+    #[test]
+    fn picture_inventory_is_metadata_only_and_read_is_exact_and_cached() {
+        let source = Arc::new(PictureCountingSource::new(embedded_picture_pptx()));
+        let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+        let slide = presentation.slide(0).unwrap();
+
+        let images = slide.images().unwrap();
+        assert_eq!(images.len(), 1);
+        assert_eq!(images[0].position(), 0);
+        assert_eq!(images[0].shape_position(), 0);
+        assert_eq!(images[0].id(), Some(42));
+        assert_eq!(images[0].name(), Some("Photo"));
+        assert_eq!(
+            images[0]
+                .bounds()
+                .map(|value| (value.x(), value.y(), value.width(), value.height())),
+            Some((1, 2, 3, 4))
+        );
+        assert_eq!(images[0].relationship_id(), "rIdImage");
+        assert_eq!(
+            images[0].target().part_uri().unwrap().as_str(),
+            "/ppt/media/image1.png"
+        );
+        assert_eq!(images[0].target().content_type(), Some("image/png"));
+        assert!(!images[0].is_external());
+        assert_eq!(source.media_payload_reads.load(Ordering::SeqCst), 0);
+
+        let image = slide.read_image(0).unwrap();
+        assert!(image.bytes().starts_with(MEDIA_MARKER));
+        let reads_after_first = source.media_payload_reads.load(Ordering::SeqCst);
+        assert!(reads_after_first > 0);
+        let second = slide.read_image(0).unwrap();
+        assert!(second.bytes().starts_with(MEDIA_MARKER));
+        assert_eq!(
+            source.media_payload_reads.load(Ordering::SeqCst),
+            reads_after_first
+        );
+    }
+
+    #[test]
+    fn picture_selection_reports_checked_out_of_range() {
+        let source = Arc::new(PictureCountingSource::new(embedded_picture_pptx()));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        let slide = presentation.slide(0).unwrap();
+
+        assert!(matches!(
+            slide.image(1),
+            Err(Error::IndexOutOfBounds { index: 1, len: 1 })
+        ));
+    }
+
+    #[test]
+    fn strict_picture_graph_is_supported_without_payload_reads() {
+        let slide = String::from_utf8(picture_slide(r#"<a:blip r:embed="rIdImage"/>"#))
+            .unwrap()
+            .replace(
+                "http://schemas.openxmlformats.org/presentationml/2006/main",
+                "http://purl.oclc.org/ooxml/presentationml/main",
+            )
+            .replace(
+                "http://schemas.openxmlformats.org/drawingml/2006/main",
+                "http://purl.oclc.org/ooxml/drawingml/main",
+            )
+            .replace(
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+                "http://purl.oclc.org/ooxml/officeDocument/relationships",
+            );
+        let relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://purl.oclc.org/ooxml/officeDocument/relationships/image" Target="../media/image1.png"/></Relationships>"#;
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            slide.as_bytes(),
+            relationships,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+        let images = presentation.slide(0).unwrap().images().unwrap();
+        assert_eq!(images.len(), 1);
+        assert_eq!(images[0].target().content_type(), Some("image/png"));
+        assert_eq!(source.media_payload_reads.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn external_picture_is_listed_but_never_fetched() {
+        let slide = picture_slide(r#"<a:blip r:link="rIdExternal"/>"#);
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            &slide,
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdExternal" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="https://example.invalid/photo.png" TargetMode="External"/></Relationships>"#,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+        let image = presentation.slide(0).unwrap().image(0).unwrap();
+        assert!(
+            matches!(image.target(), SourceImageTarget::External { target } if target == "https://example.invalid/photo.png")
+        );
+        assert!(image.is_external());
+        assert!(matches!(
+            presentation.slide(0).unwrap().read_image(0),
+            Err(Error::Relationship(message)) if message.contains("external target")
+        ));
+        assert_eq!(source.media_payload_reads.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn malformed_picture_grammar_and_graphs_are_refused() {
+        let cases = [
+            (
+                picture_slide("<a:stretch><a:fillRect/></a:stretch>"),
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#.as_slice(),
+                Some("image/png"),
+            ),
+            (
+                picture_slide(r#"<a:blip r:embed="rIdImage"/><a:blip r:embed="rIdImage"/>"#),
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#.as_slice(),
+                Some("image/png"),
+            ),
+            (
+                picture_slide(r#"<a:blip r:embed="rIdImage"/>"#),
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="../media/image1.png"/></Relationships>"#.as_slice(),
+                Some("image/png"),
+            ),
+            (
+                picture_slide(r#"<a:blip r:embed="rIdImage"/>"#),
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../custom/image1.png"/></Relationships>"#.as_slice(),
+                Some("image/png"),
+            ),
+            (
+                picture_slide(r#"<a:blip r:embed="rIdImage"/>"#),
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#.as_slice(),
+                Some("application/octet-stream"),
+            ),
+            (
+                picture_slide(r#"<a:blip r:embed="rIdMissing"/>"#),
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#.as_slice(),
+                Some("image/png"),
+            ),
+            (
+                picture_slide(r#"<a:blip r:embed="rIdImage"/>"#),
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/missing.png"/></Relationships>"#.as_slice(),
+                Some("image/png"),
+            ),
+        ];
+        for (slide, relationships, content_type) in cases {
+            let source = Arc::new(PictureCountingSource::new(picture_pptx(
+                &slide,
+                relationships,
+                content_type,
+                None,
+            )));
+            let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+            assert!(presentation.slide(0).unwrap().images().is_err());
+        }
+    }
+
+    #[test]
+    fn direct_picture_children_are_finite_ordered_and_complete() {
+        let blip_fill = r#"<p:blipFill><a:blip r:embed="rIdImage"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>"#;
+        let cases = [
+            // Missing nvPicPr.
+            format!(r#"{blip_fill}<p:spPr/>"#),
+            // Duplicate nvPicPr.
+            format!(r#"<p:nvPicPr/><p:nvPicPr/>{blip_fill}<p:spPr/>"#),
+            // Misordered required children.
+            format!(r#"{blip_fill}<p:nvPicPr/><p:spPr/>"#),
+            // Arbitrary direct child after the required sequence.
+            format!(r#"<p:nvPicPr/>{blip_fill}<p:spPr/><p:style/>"#),
+            // Arbitrary direct child inside blipFill.
+            r#"<p:nvPicPr/><p:blipFill><a:blip r:embed="rIdImage"/><a:bad/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr/>"#.to_owned(),
+        ];
+        for children in cases {
+            let source = Arc::new(PictureCountingSource::new(picture_pptx(
+                &picture_slide_with_pic_children(&children),
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#,
+                Some("image/png"),
+                None,
+            )));
+            let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+            assert!(presentation.slide(0).unwrap().images().is_err());
+        }
+    }
+
+    #[test]
+    fn selected_slide_root_is_validated_before_picture_scanning() {
+        let wrong_root = String::from_utf8(picture_slide(r#"<a:blip r:embed="rIdImage"/>"#))
+            .unwrap()
+            .replace("<p:sld ", "<p:notSlide ")
+            .replace("</p:sld>", "</p:notSlide>");
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            wrong_root.as_bytes(),
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        assert!(matches!(
+            presentation.slide(0).unwrap().images(),
+            Err(Error::Invalid(message)) if message.contains("p:sld root")
+        ));
+    }
+
+    #[test]
+    fn paired_empty_blip_and_fill_rect_are_semantically_empty_but_content_is_refused() {
+        let paired_empty =
+            String::from_utf8(picture_slide(r#"<a:blip r:embed="rIdImage"></a:blip>"#))
+                .unwrap()
+                .replace("<a:fillRect/>", "<a:fillRect></a:fillRect>");
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            paired_empty.as_bytes(),
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+        assert_eq!(presentation.slide(0).unwrap().images().unwrap().len(), 1);
+        assert_eq!(source.media_payload_reads.load(Ordering::SeqCst), 0);
+
+        let nonempty_fill = paired_empty.replace(
+            "<a:fillRect></a:fillRect>",
+            "<a:fillRect>payload</a:fillRect>",
+        );
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            nonempty_fill.as_bytes(),
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        assert!(presentation.slide(0).unwrap().images().is_err());
+
+        let nonempty = picture_slide(r#"<a:blip r:embed="rIdImage">payload</a:blip>"#);
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            &nonempty,
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        assert!(presentation.slide(0).unwrap().images().is_err());
+    }
+
+    #[test]
+    fn malformed_markup_compatibility_attribute_is_not_suppressed() {
+        let malformed = String::from_utf8(picture_slide(r#"<a:blip r:embed="rIdImage"/>"#))
+            .unwrap()
+            .replace(
+                "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"",
+                "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"",
+            )
+            .replace(
+                "<p:cSld>",
+                "<p:cSld mc:Ignorable=\"a\" mc:Ignorable=\"p\">",
+            );
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            malformed.as_bytes(),
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        let result = presentation.slide(0).unwrap().images();
+        assert!(matches!(result, Err(Error::Xml(_))));
+    }
+
+    #[test]
+    fn markup_compatibility_and_media_outbound_edges_are_refused() {
+        let mce_slide = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><mc:AlternateContent><mc:Fallback><p:pic><p:nvPicPr><p:cNvPr id="42" name="Photo"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rIdImage"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="1" y="2"/><a:ext cx="3" cy="4"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic></mc:Fallback></mc:AlternateContent></p:spTree></p:cSld></p:sld>"#;
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            mce_slide,
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        let result = presentation.slide(0).unwrap().images();
+        assert!(matches!(result, Err(Error::UnsafeEdit { .. })));
+
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            &picture_slide(r#"<a:blip r:embed="rIdImage"/>"#),
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#,
+            Some("image/png"),
+            Some(br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test" Target="../custom.xml"/></Relationships>"#),
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        assert!(presentation.slide(0).unwrap().images().is_err());
+    }
+
+    #[test]
+    fn picture_reads_preserve_source_version_and_limits() {
+        let source = Arc::new(PictureCountingSource::new(embedded_picture_pptx()));
+        let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+        let slide = presentation.slide(0).unwrap();
+        assert!(slide.images().is_ok());
+        source.changed();
+        assert!(matches!(
+            slide.read_image(0),
+            Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+        ));
+
+        let source = Arc::new(PictureCountingSource::new(embedded_picture_pptx()));
+        let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+        let slide = presentation.slide(0).unwrap();
+        assert!(slide.read_image(0).is_ok());
+        source.changed();
+        assert!(matches!(
+            slide.read_image(0),
+            Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+        ));
+
+        let source = Arc::new(PictureCountingSource::new(embedded_picture_pptx()));
+        let limits = ReadLimits::builder()
+            .max_part_bytes(1024)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            SourceBackedPresentation::from_read_at_with_limits(source.clone(), limits),
+            Err(Error::Opc(litchi_opc::OpcError::ReadLimit { .. }))
+        ));
+        assert_eq!(source.media_payload_reads.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn picture_source_open_honors_managed_cancellation_before_media_payload() {
+        let source = Arc::new(PictureCountingSource::new(embedded_picture_pptx()));
+        let budget = Budget::root(
+            "pptx-picture-test",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(u64::MAX).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+        cancellation_source.cancel();
+
+        assert!(matches!(
+            SourceBackedPackage::from_read_at_with_execution_context(
+                source.clone(),
+                ReadLimits::default(),
+                context,
+            ),
+            Err(litchi_opc::OpcError::Cancelled)
+        ));
+        assert_eq!(source.media_payload_reads.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn managed_picture_package_retains_budgeted_payload_handles() {
+        let archive = embedded_picture_pptx();
+        let source = Arc::new(PictureCountingSource::new(archive.clone()));
+        let memory_limit = archive.len() as u64;
+        let budget = Budget::root(
+            "pptx-picture-managed-test",
+            Limits::new(
+                memory_limit,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            ),
+        );
+        let (_cancellation_source, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(memory_limit.max(1)).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let presentation = SourceBackedPresentation::from_source_backed_package(package).unwrap();
+        let slide = presentation.slide(0).unwrap();
+        assert_eq!(slide.images().unwrap().len(), 1);
+        assert!(budget.used(Resource::Memory) > 0);
+        assert_eq!(source.media_payload_reads.load(Ordering::SeqCst), 0);
+
+        let image = slide.read_image(0).unwrap();
+        assert!(image.bytes().starts_with(MEDIA_MARKER));
+        assert!(source.media_payload_reads.load(Ordering::SeqCst) > 0);
     }
 
     #[test]
