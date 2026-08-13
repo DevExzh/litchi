@@ -163,8 +163,13 @@ fn source_snapshot_applies_limits_and_rejects_a_changed_read_at() {
     let hostile = Arc::new(ObservedSource::new(bytes, false));
     let read_at: Arc<dyn ReadAt> = hostile.clone();
     let package = source_backed::Package::from_read_at(read_at).unwrap();
+    // The armed adapter advances its revision while the pinned main payload
+    // is read, between the inventory's pre-capture and post-capture checks.
     hostile.arm_change();
-    assert!(package.section_inventory_snapshot().is_err());
+    assert!(matches!(
+        package.section_inventory_snapshot(),
+        Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+    ));
 }
 
 fn overlaps(left: &std::ops::Range<usize>, right: &std::ops::Range<usize>) -> bool {

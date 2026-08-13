@@ -152,6 +152,32 @@ fn malformed_and_unbounded_fragments_are_rejected() {
 }
 
 #[test]
+fn standalone_sections_validate_qnames_without_rejecting_inherited_prefixes() {
+    for xml in [
+        br#"<w:sectPr xmlns:1bad="urn:invalid"/>"#.to_vec(),
+        br#"<w:sectPr><1bad:x/></w:sectPr>"#.to_vec(),
+        br#"<w:sectPr foo:bad:name="x"/>"#.to_vec(),
+        br#"<w:sectPr><xmlns:p/></w:sectPr>"#.to_vec(),
+        br#"<w:sectPr xmlns:foo="http://www.w3.org/XML/1998/namespace"/>"#.to_vec(),
+        br#"<w:sectPr xmlns:xml="urn:wrong"/>"#.to_vec(),
+        br#"<w:sectPr xmlns:foo="http://www.w3.org/2000/xmlns/"/>"#.to_vec(),
+        br#"<w:sectPr xmlns="http://www.w3.org/XML/1998/namespace"/>"#.to_vec(),
+    ] {
+        assert!(
+            Section::from_xml_bytes(xml).is_err(),
+            "accepted invalid standalone section QName or binding"
+        );
+    }
+
+    assert!(
+        Section::from_xml_bytes(
+            br#"<w:sectPr><x:opaque x:value="inherited"/></w:sectPr>"#.to_vec()
+        )
+        .is_ok()
+    );
+}
+
+#[test]
 fn inventory_reports_zero_one_and_multiple_logical_sections() {
     let empty = Inventory::parse(
         br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#,
@@ -215,6 +241,83 @@ fn inventory_selects_mce_and_keeps_header_footer_references_inert() {
     );
     let clone = inventory.clone();
     assert!(inventory.shares_allocation_with(&clone));
+}
+
+#[test]
+fn inventory_ignores_table_cell_section_properties_for_main_story_boundaries() {
+    let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:tbl><w:tr><w:tc><w:p><w:pPr><w:sectPr><w:type w:val="continuous"/></w:sectPr></w:pPr><w:r/></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr/></w:body></w:document>"#;
+    let inventory = Inventory::parse(xml).unwrap();
+
+    assert_eq!(inventory.paragraph_count(), 3);
+    assert_eq!(inventory.sections().len(), 2);
+    assert_eq!(
+        inventory.sections()[0].ownership(),
+        Ownership::Paragraph(litchi_core::Position::new(0))
+    );
+    assert_eq!(inventory.sections()[0].paragraphs().len(), 1);
+    assert_eq!(inventory.sections()[1].ownership(), Ownership::BodyFinal);
+    assert_eq!(inventory.sections()[1].paragraphs().len(), 2);
+}
+
+#[test]
+fn inventory_materializes_inherited_namespaces_after_quoted_gt_and_refuses_malformed_opening() {
+    let quoted = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:opaque"><w:body><w:sectPr x:opaque="a>b" x:single='c>d'><w:headerReference w:type="default" r:id="rId1"/></w:sectPr></w:body></w:document>"#;
+    let inventory = Inventory::parse(quoted).unwrap();
+    assert_eq!(inventory.sections()[0].headers()[0].relationship_id, "rId1");
+
+    for malformed in [
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:opaque"><w:body><w:sectPr x:opaque="a>b></w:sectPr></w:body></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:opaque"><w:body><w:sectPr x:opaque='a>b></w:sectPr></w:body></w:document>"#.as_slice(),
+    ] {
+        assert!(Inventory::parse(malformed).is_err());
+    }
+}
+
+#[test]
+fn inventory_rejects_unbound_prefixes_and_non_xml_relationship_ids() {
+    let unbound_relationship = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sectPr><w:headerReference w:type="default" r:id="rId1"/></w:sectPr></w:body></w:document>"#;
+    assert!(Inventory::parse(unbound_relationship).is_err());
+
+    let unbound_element = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><x:opaque/></w:body></w:document>"#;
+    assert!(Inventory::parse(unbound_element).is_err());
+
+    for relationship_id in ["1rId", "r Id", "r:id", "r/id"] {
+        let xml = format!(
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:sectPr><w:headerReference w:type="default" r:id="{relationship_id}"/></w:sectPr></w:body></w:document>"#
+        );
+        assert!(
+            Inventory::parse(xml.as_bytes()).is_err(),
+            "accepted invalid relationship ID {relationship_id:?}"
+        );
+    }
+
+    let valid = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:sectPr><w:headerReference w:type="default" r:id="_header-1.2"/></w:sectPr></w:body></w:document>"#;
+    assert!(Inventory::parse(valid).is_ok());
+}
+
+#[test]
+fn inventory_rejects_invalid_qnames_and_reserved_namespace_bindings() {
+    for xml in [
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:1bad="urn:invalid"><w:body/></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:foo="urn:invalid"><w:body foo:bad:name="x"/></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:1bad="urn:invalid"><w:body><1bad:p/></w:body></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:xmlns="urn:invalid"><w:body><xmlns:p/></w:body></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:foo="http://www.w3.org/XML/1998/namespace"><w:body/></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:xml="urn:wrong"><w:body/></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:foo="http://www.w3.org/2000/xmlns/"><w:body/></w:document>"#.as_slice(),
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns="http://www.w3.org/XML/1998/namespace"><w:body/></w:document>"#.as_slice(),
+    ] {
+        assert!(Inventory::parse(xml).is_err());
+    }
+}
+
+#[test]
+fn inventory_refuses_unsupported_mce_branch_and_body_final_trailing_content() {
+    let malformed_mce = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><w:body><mc:AlternateContent><mc:Fallback/><mc:Choice Requires="x"/></mc:AlternateContent></w:body></w:document>"#;
+    assert!(Inventory::parse(malformed_mce).is_err());
+
+    let trailing = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:opaque"><w:body><w:p/><w:sectPr/><x:tail/></w:body></w:document>"#;
+    assert!(Inventory::parse(trailing).is_err());
 }
 
 #[test]
