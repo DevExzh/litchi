@@ -6,8 +6,9 @@
 use std::io::{self, Cursor, Write};
 
 use litchi_odf_common::{
-    MIMETYPE_LOCAL_EXTRA_REPAIR, OdfRepairLimits, RepairError, RepairOutputProgress,
-    plan_mimetype_local_extra, validate_package,
+    MIMETYPE_LOCAL_EXTRA_REPAIR, MIMETYPE_REPAIR_PLAN_SCHEMA, OdfRepairLimits, RepairChangedRegion,
+    RepairError, RepairIntentKind, RepairOutputProgress, plan_mimetype_local_extra,
+    plan_odf_repair, validate_package,
 };
 use zip::{CompressionMethod, ZipWriter, write::FullFileOptions};
 
@@ -135,6 +136,16 @@ fn package_with_mimetype_last() -> Vec<u8> {
     zip.start_file("mimetype", mimetype).unwrap();
     zip.write_all(MIME.as_bytes()).unwrap();
     zip.finish().unwrap().into_inner()
+}
+
+fn package_metadata_base(member_count: u64, names: &[&str]) -> u64 {
+    let raw_name_bytes = names.iter().map(|name| name.len() as u64).sum::<u64>();
+    let central_record_bytes = member_count * 46 + raw_name_bytes;
+    member_count * (128 + 64 + 128 + 16) + raw_name_bytes + central_record_bytes
+}
+
+fn package_manifest_metadata_bytes() -> u64 {
+    1 + MIME.len() as u64 + "content.xml".len() as u64 + "text/xml".len() as u64
 }
 
 fn remove_central_extra(mut source: Vec<u8>) -> Vec<u8> {
@@ -282,7 +293,7 @@ fn add_descriptor_to_second_member(mut source: Vec<u8>) -> Vec<u8> {
 }
 
 #[test]
-fn valid_plan_is_bounded_deterministic_and_forward_only() {
+fn valid_plan_is_bounded_deterministic_and_non_destructive() {
     let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
     let source_before = source.clone();
     let report = validate_package(&source).unwrap();
@@ -303,6 +314,68 @@ fn valid_plan_is_bounded_deterministic_and_forward_only() {
     assert_eq!(publication.bytes(), output.len() as u64);
     assert_eq!(output.len(), plan.output_len() as usize);
     assert_eq!(validate_package(&output).unwrap().issues().len(), 0);
+    assert_eq!(source, source_before);
+}
+
+#[test]
+fn typed_preview_reports_effects_and_apply_inverse_restores_exact_source() {
+    let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
+    let source_before = source.clone();
+    let report = validate_package(&source).unwrap();
+    let plan = plan_odf_repair(&source, &report, OdfRepairLimits::default()).unwrap();
+    let preview = plan.preview();
+    assert_eq!(preview.schema(), MIMETYPE_REPAIR_PLAN_SCHEMA);
+    assert_eq!(preview.validation_issue_id(), report.issues()[0].id());
+    assert_eq!(preview.intent(), RepairIntentKind::NonDestructive);
+    assert_eq!(preview.repair_id(), MIMETYPE_LOCAL_EXTRA_REPAIR);
+    assert!(!preview.is_noop());
+    assert_eq!(preview.effects().changed_members(), ["mimetype"]);
+    assert_eq!(
+        preview.effects().changed_regions(),
+        [
+            RepairChangedRegion::MimetypeLocalHeader,
+            RepairChangedRegion::CentralDirectoryOffsets,
+            RepairChangedRegion::EndOfCentralDirectory,
+        ]
+    );
+    assert!(preview.effects().member_payloads_preserved());
+    assert!(preview.effects().reversible());
+
+    let metadata = plan.to_json().unwrap();
+    assert!(metadata.contains("\"intent\":\"non_destructive\""));
+    assert!(metadata.contains("\"changed_members\":[\"mimetype\"]"));
+    assert!(metadata.contains("\"member_payloads_preserved\":true"));
+    assert!(metadata.contains("\"reversible\":true"));
+
+    let patch = plan.apply().unwrap();
+    assert_eq!(patch.source_fingerprint(), plan.source_fingerprint());
+    assert_eq!(patch.target_fingerprint(), plan.output_fingerprint());
+    assert_eq!(patch.target_bytes().len(), plan.output_len() as usize);
+
+    let mut target = Vec::new();
+    patch.write_to(&mut target).unwrap();
+    assert_eq!(target, patch.target_bytes());
+    let canonical_report = validate_package(&target).unwrap();
+    assert!(canonical_report.issues().is_empty());
+    let canonical_before = target.clone();
+    assert!(matches!(
+        plan_odf_repair(&target, &canonical_report, OdfRepairLimits::default()),
+        Err(RepairError::ReportMismatch)
+    ));
+    assert_eq!(target, canonical_before);
+
+    let mut restored = Vec::new();
+    patch.inverse().write_to(&mut restored).unwrap();
+    assert_eq!(restored, source_before);
+
+    let mut stale_sink = Vec::new();
+    let mut stale = target.clone();
+    stale[0] ^= 1;
+    assert!(matches!(
+        patch.inverse().apply_to(&stale, &mut stale_sink),
+        Err(RepairError::SourceChanged { .. })
+    ));
+    assert!(stale_sink.is_empty());
     assert_eq!(source, source_before);
 }
 
@@ -718,7 +791,10 @@ fn aggregate_metadata_budget_accepts_exact_and_rejects_one_over() {
     // One fixed estimate for each retained catalog/layout entry, plus the
     // copied-name accounting and complete raw central records.
     let central_record_bytes = 3_u64 * 46 + raw_name_bytes as u64;
-    let exact = 3_u64 * (128 + 64 + 128 + 16) + raw_name_bytes as u64 + central_record_bytes;
+    let exact = 3_u64 * (128 + 64 + 128 + 16)
+        + raw_name_bytes as u64
+        + central_record_bytes
+        + package_manifest_metadata_bytes();
     let exact_limits = OdfRepairLimits::default().with_max_metadata_bytes(exact);
     assert!(plan_mimetype_local_extra(&source, &report, exact_limits).is_ok());
 
@@ -730,6 +806,34 @@ fn aggregate_metadata_budget_accepts_exact_and_rejects_one_over() {
             observed,
             limit,
         }) if observed == exact && limit + 1 == exact
+    ));
+}
+
+#[test]
+fn decoded_manifest_metadata_is_charged_at_exact_and_one_over_boundaries() {
+    let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
+    let report = validate_package(&source).unwrap();
+    let base = package_metadata_base(3, &["mimetype", "META-INF/manifest.xml", "content.xml"]);
+    let exact = base + package_manifest_metadata_bytes();
+    assert!(
+        plan_mimetype_local_extra(
+            &source,
+            &report,
+            OdfRepairLimits::default().with_max_metadata_bytes(exact),
+        )
+        .is_ok()
+    );
+    assert!(matches!(
+        plan_mimetype_local_extra(
+            &source,
+            &report,
+            OdfRepairLimits::default().with_max_metadata_bytes(exact - 1),
+        ),
+        Err(RepairError::Limit {
+            resource: "repair metadata bytes",
+            observed,
+            limit,
+        }) if observed == exact && limit == exact - 1
     ));
 }
 
