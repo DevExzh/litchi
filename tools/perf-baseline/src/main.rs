@@ -106,6 +106,7 @@ const SEMANTIC_RTF_CORPUS_GENERATOR: &str = "litchi-rtf-semantic-v2";
 const RTF_LIFECYCLE_CORPUS_GENERATOR: &str = "litchi-rtf-paragraph-lifecycle-v1";
 const XLSX_STREAMING_CORPUS_GENERATOR: &str = "litchi-xlsx-streaming-create-v1";
 const RTF_STREAMING_CORPUS_GENERATOR: &str = "litchi-rtf-streaming-create-v1";
+const RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES: usize = 16 * 1024;
 const XLSX_STREAMING_ROW_BYTES: u64 = 4 * 1024;
 const RTF_STREAMING_SCRATCH_BYTES: u64 = 37;
 const XLS_COMMENTS_EDIT_CORPUS_GENERATOR: &str = "litchi-xls-comments-opaque-heavy-v1";
@@ -235,6 +236,8 @@ impl RtfSemanticVariant {
                     | Case::RtfSemanticOnePercentEditSave
                     | Case::RtfSemanticRemoveParagraphSave
                     | Case::RtfSemanticMoveParagraphSave
+                    | Case::RtfLogicalTailAppend
+                    | Case::RtfLogicalTailNoopSave
             ) || matches!(self, Self::Plain))
             && (!matches!(case, Case::RtfSemanticTextToSink) || !matches!(self, Self::Watermark))
     }
@@ -527,6 +530,8 @@ enum Case {
     RtfSemanticOnePercentEditSave,
     RtfSemanticRemoveParagraphSave,
     RtfSemanticMoveParagraphSave,
+    RtfLogicalTailAppend,
+    RtfLogicalTailNoopSave,
     RtfStreamingCreate,
     DocxSemanticOpen,
     DocxSemanticListParagraphs,
@@ -771,6 +776,8 @@ impl Case {
             Self::RtfSemanticOnePercentEditSave => "rtf_semantic_one_percent_edit_save",
             Self::RtfSemanticRemoveParagraphSave => "rtf_semantic_remove_paragraph_save",
             Self::RtfSemanticMoveParagraphSave => "rtf_semantic_move_paragraph_save",
+            Self::RtfLogicalTailAppend => "rtf_logical_tail_append",
+            Self::RtfLogicalTailNoopSave => "rtf_logical_tail_noop_save",
             Self::RtfStreamingCreate => "rtf_streaming_create",
             Self::DocxSemanticOpen => "docx_semantic_open",
             Self::DocxSemanticListParagraphs => "docx_semantic_list_paragraphs",
@@ -983,6 +990,8 @@ impl Case {
                 | Self::RtfSemanticOnePercentEditSave
                 | Self::RtfSemanticRemoveParagraphSave
                 | Self::RtfSemanticMoveParagraphSave
+                | Self::RtfLogicalTailAppend
+                | Self::RtfLogicalTailNoopSave
         )
     }
 
@@ -990,6 +999,13 @@ impl Case {
         matches!(
             self,
             Self::RtfSemanticRemoveParagraphSave | Self::RtfSemanticMoveParagraphSave
+        )
+    }
+
+    const fn is_rtf_logical_tail(self) -> bool {
+        matches!(
+            self,
+            Self::RtfLogicalTailAppend | Self::RtfLogicalTailNoopSave
         )
     }
 
@@ -1693,6 +1709,25 @@ struct SinkSummary {
     input_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     authored_part_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rtf_tail_append: Option<RtfTailAppendSummary>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+struct RtfTailAppendSummary {
+    operation: &'static str,
+    source_bytes: u64,
+    input_bytes: u64,
+    inserted_bytes: u64,
+    output_bytes: u64,
+    paragraphs: u64,
+    runs: u64,
+    sink_window_bytes: u64,
+    exact_noop_verified: bool,
+    in_memory_patch_verified: bool,
+    durable_patch_verified: bool,
+    reopen_verified: bool,
+    source_conflict_verified: bool,
 }
 
 /// A non-seekable, bounded memory sink that consumes every output byte.
@@ -1723,6 +1758,7 @@ impl CountingSink {
                 runs: None,
                 input_bytes: None,
                 authored_part_bytes: None,
+                rtf_tail_append: None,
             },
             max_bytes,
             max_write,
@@ -1833,6 +1869,90 @@ impl Write for HashingDiscardSink {
             .ok_or_else(|| io::Error::other("streaming write count overflows u64"))?;
         self.summary.largest_write = self.summary.largest_write.max(length);
         Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+/// A bounded forward-only sink used by logical-tail publication measurements.
+///
+/// The tail-append API owns a validated candidate snapshot, so this sink keeps
+/// publication accounting separate from candidate retention. It accepts at
+/// most one fixed window per call, retains no output, and hashes the complete
+/// stream for an untimed digest comparison.
+#[derive(Debug)]
+struct WindowedHashingSink {
+    summary: SinkSummary,
+    maximum: u64,
+    window: usize,
+    digest: Sha256,
+}
+
+impl WindowedHashingSink {
+    fn new(maximum: u64, window: usize) -> io::Result<Self> {
+        if window == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "logical-tail sink window must be non-zero",
+            ));
+        }
+        Ok(Self {
+            summary: SinkSummary {
+                retained_output_bytes: Some(0),
+                retained_authoring_window_bytes: Some(u64::try_from(window).map_err(|_error| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "logical-tail sink window does not fit u64",
+                    )
+                })?),
+                ..SinkSummary::default()
+            },
+            maximum,
+            window,
+            digest: Sha256::new(),
+        })
+    }
+
+    fn finish(self) -> (SinkSummary, String) {
+        let digest = self.digest.finalize();
+        let mut output = String::with_capacity(digest.len() * 2);
+        for byte in digest {
+            use std::fmt::Write as _;
+            let _ = write!(output, "{byte:02x}");
+        }
+        (self.summary, output)
+    }
+}
+
+impl Write for WindowedHashingSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let count = bytes.len().min(self.window);
+        let length = u64::try_from(count)
+            .map_err(|_error| io::Error::other("logical-tail write length does not fit u64"))?;
+        let accepted = self
+            .summary
+            .accepted_bytes
+            .checked_add(length)
+            .ok_or_else(|| io::Error::other("logical-tail output byte count overflows u64"))?;
+        if accepted > self.maximum {
+            return Err(io::Error::other("logical-tail output ceiling exceeded"));
+        }
+        self.digest.update(bytes.get(..count).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "logical-tail sink window is outside the write buffer",
+            )
+        })?);
+        self.summary.accepted_bytes = accepted;
+        self.summary.write_calls = self
+            .summary
+            .write_calls
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("logical-tail write count overflows u64"))?;
+        self.summary.largest_write = self.summary.largest_write.max(length);
+        Ok(count)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -2867,7 +2987,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             {
                 let semantic_corpus = build_semantic_rtf_corpus(*shape, *variant)?;
                 let lifecycle_corpus = (*variant == RtfSemanticVariant::Plain
-                    && options.cases.iter().any(|case| case.is_rtf_lifecycle()))
+                    && options
+                        .cases
+                        .iter()
+                        .any(|case| case.is_rtf_lifecycle() || case.is_rtf_logical_tail()))
                 .then(|| build_rtf_lifecycle_corpus(*shape))
                 .transpose()?;
                 for case in options
@@ -2875,7 +2998,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     .iter()
                     .filter(|case| variant.supports_case(**case))
                 {
-                    let corpus = if case.is_rtf_lifecycle() {
+                    let corpus = if case.is_rtf_lifecycle() || case.is_rtf_logical_tail() {
                         lifecycle_corpus
                             .as_ref()
                             .ok_or("RTF lifecycle case has no plain lifecycle corpus")?
@@ -3448,6 +3571,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "rtf_semantic_one_percent_edit_save" => Some(Case::RtfSemanticOnePercentEditSave),
         "rtf_semantic_remove_paragraph_save" => Some(Case::RtfSemanticRemoveParagraphSave),
         "rtf_semantic_move_paragraph_save" => Some(Case::RtfSemanticMoveParagraphSave),
+        "rtf_logical_tail_append" => Some(Case::RtfLogicalTailAppend),
+        "rtf_logical_tail_noop_save" => Some(Case::RtfLogicalTailNoopSave),
         "rtf_streaming_create" => Some(Case::RtfStreamingCreate),
         "docx_semantic_open" => Some(Case::DocxSemanticOpen),
         "docx_semantic_list_paragraphs" => Some(Case::DocxSemanticListParagraphs),
@@ -3658,6 +3783,7 @@ fn print_usage() {
                                        rtf_semantic_stream_save,rtf_semantic_noop_edit_save,\n\
                                        rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save,\n\
                                        rtf_semantic_remove_paragraph_save,rtf_semantic_move_paragraph_save,\n\
+                                       rtf_logical_tail_append,rtf_logical_tail_noop_save,\n\
                                        rtf_streaming_create,\n\
                                        docx_semantic_open,docx_semantic_list_paragraphs,\n\
                                        docx_semantic_one_paragraph,docx_semantic_full_text,\n\
@@ -4306,6 +4432,175 @@ fn build_rtf_lifecycle_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
         target_payload,
         xlsx: None,
     })
+}
+
+fn rtf_logical_tail_paragraph_count(shape: SemanticShape) -> usize {
+    match shape {
+        SemanticShape::Tiny => 4,
+        SemanticShape::Medium => 64,
+        SemanticShape::Large => 256,
+    }
+}
+
+fn rtf_logical_tail_text(shape: SemanticShape, index: usize) -> String {
+    format!(
+        "litchi-perf-baseline-rtf-tail-v1-{}-{index:04}",
+        shape.name()
+    )
+}
+
+fn rtf_logical_tail_limits(
+    source_bytes: usize,
+    input_bytes: usize,
+    paragraph_count: usize,
+) -> Result<litchi_rtf::TailAppendLimits, Box<dyn Error>> {
+    let paragraph_overhead = paragraph_count
+        .checked_mul(32)
+        .ok_or("RTF logical-tail paragraph bound overflows usize")?;
+    let inserted_bound = input_bytes
+        .checked_add(paragraph_overhead)
+        .and_then(|value| value.checked_add(1024))
+        .ok_or("RTF logical-tail inserted-byte bound overflows usize")?;
+    let output_bound = source_bytes
+        .checked_add(inserted_bound)
+        .ok_or("RTF logical-tail output bound overflows usize")?;
+    let patch_bound = inserted_bound
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(4096))
+        .ok_or("RTF logical-tail patch bound overflows usize")?;
+    Ok(litchi_rtf::TailAppendLimits::new(
+        paragraph_count,
+        paragraph_count,
+        input_bytes,
+        inserted_bound,
+        output_bound,
+        patch_bound,
+    ))
+}
+
+fn stage_rtf_logical_tail(
+    source: &litchi_rtf::Document,
+    paragraphs: &[&str],
+    limits: litchi_rtf::TailAppendLimits,
+) -> Result<litchi_rtf::TailAppendCommit, Box<dyn Error>> {
+    let mut edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+    edit.append_text_paragraphs(paragraphs)?;
+    Ok(edit.commit()?)
+}
+
+fn verify_rtf_logical_tail_projection(
+    document: &litchi_rtf::Document,
+    source: &litchi_rtf::Document,
+    appended: &[String],
+) -> Result<(), Box<dyn Error>> {
+    let mut expected = source
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.to_text())
+        .collect::<Vec<_>>();
+    expected.extend(appended.iter().cloned());
+    let actual = document
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.to_text())
+        .collect::<Vec<_>>();
+    if actual != expected || document.paragraph_count() != expected.len() {
+        return Err(
+            "RTF logical-tail reopen paragraph projection differs from specification".into(),
+        );
+    }
+    let mut expected_text = expected.join("\n");
+    if !expected.is_empty() {
+        expected_text.push('\n');
+    }
+    if document.text() != expected_text {
+        return Err("RTF logical-tail reopen text differs from specification".into());
+    }
+    Ok(())
+}
+
+fn verify_rtf_logical_tail_gates(
+    source: &litchi_rtf::Document,
+    changed: &litchi_rtf::TailAppendCommit,
+    noop: &litchi_rtf::TailAppendCommit,
+    appended: &[String],
+    limits: litchi_rtf::TailAppendLimits,
+    expected: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    if !changed.diagnostics().changed()
+        || changed.diagnostics().operation_count() != 1
+        || changed.diagnostics().paragraphs() != appended.len()
+        || changed.diagnostics().runs() != appended.len()
+    {
+        return Err("RTF logical-tail append diagnostics differ from specification".into());
+    }
+    if noop.diagnostics().changed()
+        || noop.diagnostics().operation_count() != 0
+        || !noop.snapshot().same_snapshot(source)
+    {
+        return Err("RTF logical-tail empty append was not an exact no-op".into());
+    }
+
+    let mut published = Vec::new();
+    changed.write_to(&mut published, limits)?;
+    if published != expected {
+        return Err("RTF logical-tail sequential publication differs from candidate".into());
+    }
+    verify_rtf_logical_tail_projection(
+        &litchi_rtf::Document::from_bytes(expected)?,
+        source,
+        appended,
+    )?;
+
+    let applied = changed.patch().apply(source)?;
+    if applied.to_bytes()? != expected {
+        return Err("RTF logical-tail in-memory patch replay differs from publication".into());
+    }
+    let restored = changed.patch().inverse().apply(&applied)?;
+    if restored.to_bytes()? != source.to_bytes()? {
+        return Err("RTF logical-tail in-memory inverse did not restore exact source".into());
+    }
+
+    let durable = changed.patch().to_durable(limits)?;
+    let encoded = durable.to_deterministic_json()?;
+    let decoded = litchi_rtf::DurableTailAppendPatch::from_deterministic_json(&encoded, limits)?;
+    let durable_applied = decoded.apply(source)?;
+    if durable_applied.to_bytes()? != expected {
+        return Err("RTF logical-tail durable replay differs from publication".into());
+    }
+    let inverse_encoded = decoded.inverse().to_deterministic_json()?;
+    let inverse =
+        litchi_rtf::DurableTailAppendPatch::from_deterministic_json(&inverse_encoded, limits)?;
+    let durable_restored = inverse.apply(&durable_applied)?;
+    if durable_restored.to_bytes()? != source.to_bytes()? {
+        return Err("RTF logical-tail durable inverse did not restore exact source".into());
+    }
+
+    let mut noop_output = Vec::new();
+    noop.write_to(&mut noop_output, limits)?;
+    if noop_output != source.to_bytes()? {
+        return Err("RTF logical-tail no-op publication changed source bytes".into());
+    }
+    let noop_durable = noop.patch().to_durable(limits)?;
+    let noop_json = noop_durable.to_deterministic_json()?;
+    let noop_decoded =
+        litchi_rtf::DurableTailAppendPatch::from_deterministic_json(&noop_json, limits)?;
+    let noop_applied = noop_decoded.apply(source)?;
+    if !noop_applied.same_snapshot(source) || noop_applied.to_bytes()? != source.to_bytes()? {
+        return Err("RTF logical-tail durable no-op lost exact source identity".into());
+    }
+
+    let foreign = litchi_rtf::Document::parse(r"{\rtf1\ansi foreign source}")?;
+    if !matches!(
+        changed.patch().apply(&foreign),
+        Err(litchi_rtf::TailAppendError::PatchConflict)
+    ) || !matches!(
+        decoded.apply(&foreign),
+        Err(litchi_rtf::TailAppendError::PatchConflict)
+    ) {
+        return Err("RTF logical-tail source-conflict gate accepted a foreign source".into());
+    }
+    Ok(())
 }
 
 fn semantic_docx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
@@ -6187,6 +6482,9 @@ fn run_case_with_config(
         | Case::RtfSemanticRemoveParagraphSave
         | Case::RtfSemanticMoveParagraphSave => {
             run_semantic_rtf(case, corpus, warmup_iterations, samples)
+        },
+        Case::RtfLogicalTailAppend | Case::RtfLogicalTailNoopSave => {
+            run_rtf_logical_tail_append(case, corpus, warmup_iterations, samples)
         },
         Case::DocxSemanticOpen
         | Case::DocxSemanticListParagraphs
@@ -9029,6 +9327,134 @@ fn run_semantic_rtf(
     if lifecycle_projection.is_some() {
         result.output_sha256 = Some(sha256_hex(&expected_changed));
     }
+    Ok(result)
+}
+
+fn run_rtf_logical_tail_append(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !matches!(semantic_rtf_variant(corpus)?, RtfSemanticVariant::Plain) {
+        return Err("RTF logical-tail cases require the plain uncompressed corpus".into());
+    }
+    let shape = semantic_shape(corpus)?;
+    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let appended = (0..rtf_logical_tail_paragraph_count(shape))
+        .map(|index| rtf_logical_tail_text(shape, index))
+        .collect::<Vec<_>>();
+    let paragraph_inputs = appended.iter().map(String::as_str).collect::<Vec<_>>();
+    let input_bytes = appended.iter().try_fold(0usize, |total, text| {
+        total
+            .checked_add(text.len())
+            .ok_or("RTF logical-tail input byte count overflows usize")
+    })?;
+    let limits = rtf_logical_tail_limits(corpus.archive.len(), input_bytes, appended.len())?;
+    let changed = stage_rtf_logical_tail(&source, &paragraph_inputs, limits)?;
+    let noop = {
+        let edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+        edit.commit()?
+    };
+    let expected = changed.snapshot().to_bytes()?;
+    verify_rtf_logical_tail_gates(&source, &changed, &noop, &appended, limits, &expected)?;
+    let expected_digest = sha256_hex(&expected);
+    let source_bytes = u64::try_from(corpus.archive.len())?;
+    let output_bytes = u64::try_from(expected.len())?;
+    let inserted_bytes = output_bytes
+        .checked_sub(source_bytes)
+        .ok_or("RTF logical-tail output is smaller than its source")?;
+    let maximum = output_bytes;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summaries = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut sink = WindowedHashingSink::new(maximum, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?;
+        let started = Instant::now();
+        let written = match case {
+            Case::RtfLogicalTailAppend => {
+                let commit = stage_rtf_logical_tail(&source, &paragraph_inputs, limits)?;
+                commit.write_to(&mut sink, limits)?
+            },
+            Case::RtfLogicalTailNoopSave => {
+                let edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+                let commit = edit.commit()?;
+                commit.write_to(&mut sink, limits)?
+            },
+            _ => return Err("non-tail case passed to the logical-tail runner".into()),
+        };
+        let duration = started.elapsed();
+        let (mut summary, digest) = sink.finish();
+        let expected_written = if case == Case::RtfLogicalTailAppend {
+            output_bytes
+        } else {
+            source_bytes
+        };
+        let expected_digest_for_case = if case == Case::RtfLogicalTailAppend {
+            &expected_digest
+        } else {
+            &corpus.manifest.archive_sha256
+        };
+        if u64::try_from(written)? != expected_written || summary.accepted_bytes != expected_written
+        {
+            return Err("RTF logical-tail sink byte count differs from expected output".into());
+        }
+        if &digest != expected_digest_for_case {
+            return Err("RTF logical-tail sink digest differs from expected output".into());
+        }
+        summary.rtf_tail_append = Some(RtfTailAppendSummary {
+            operation: if case == Case::RtfLogicalTailAppend {
+                "append"
+            } else {
+                "exact_noop"
+            },
+            source_bytes,
+            input_bytes: if case == Case::RtfLogicalTailAppend {
+                u64::try_from(input_bytes)?
+            } else {
+                0
+            },
+            inserted_bytes: if case == Case::RtfLogicalTailAppend {
+                inserted_bytes
+            } else {
+                0
+            },
+            output_bytes: expected_written,
+            paragraphs: if case == Case::RtfLogicalTailAppend {
+                u64::try_from(appended.len())?
+            } else {
+                0
+            },
+            runs: if case == Case::RtfLogicalTailAppend {
+                u64::try_from(appended.len())?
+            } else {
+                0
+            },
+            sink_window_bytes: u64::try_from(RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?,
+            exact_noop_verified: true,
+            in_memory_patch_verified: true,
+            durable_patch_verified: true,
+            reopen_verified: true,
+            source_conflict_verified: true,
+        });
+        if iteration >= warmup_iterations {
+            summaries.push(summary);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let sink = deterministic_sink_summary(&summaries, case.name())?;
+    if sink.retained_output_bytes != Some(0)
+        || sink.retained_authoring_window_bytes
+            != Some(u64::try_from(RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?)
+        || sink.largest_write > u64::try_from(RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?
+    {
+        return Err("RTF logical-tail sink exceeded its fixed publication window".into());
+    }
+    let mut result = result(case, corpus, elapsed, Some(sink));
+    result.output_sha256 = Some(if case == Case::RtfLogicalTailAppend {
+        expected_digest
+    } else {
+        corpus.manifest.archive_sha256.clone()
+    });
     Ok(result)
 }
 
@@ -17702,15 +18128,15 @@ mod tests {
     use super::{
         Case, CorpusShape, CountingSink, InstrumentedSource, ODP_TEXT_BOX_BATCH_COUNT,
         ODT_RESOURCE_BATCH_COUNT, OpcCacheMode, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind,
-        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
-        SimulatedRangeSource, SourceBackedPackage, WriterShape, XlsxShape, build_cfb_corpus,
-        build_docx_source_edit_corpus, build_odp_media_corpus, build_odp_text_box_batch_corpus,
-        build_ods_media_corpus, build_odt_media_corpus, build_odt_resource_batch_corpus,
-        build_ole_common_corpus, build_opc_corpus, build_pptx_source_edit_corpus,
-        build_rtf_lifecycle_corpus, build_semantic_docx_corpus, build_semantic_odp_corpus,
-        build_semantic_ods_corpus, build_semantic_odt_corpus, build_semantic_pptx_corpus,
-        build_semantic_rtf_corpus, build_streaming_corpus, build_writer_corpus,
-        build_xls_comments_edit_corpus, build_xlsx_auto_filter_edit_corpus,
+        RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
+        RtfSemanticVariant, SemanticShape, SimulatedRangeSource, SourceBackedPackage, WriterShape,
+        XlsxShape, build_cfb_corpus, build_docx_source_edit_corpus, build_odp_media_corpus,
+        build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
+        build_odt_resource_batch_corpus, build_ole_common_corpus, build_opc_corpus,
+        build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_semantic_docx_corpus,
+        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
+        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
+        build_writer_corpus, build_xls_comments_edit_corpus, build_xlsx_auto_filter_edit_corpus,
         build_xlsx_calculation_metadata_edit_corpus, build_xlsx_conditional_formatting_edit_corpus,
         build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
         build_xlsx_defined_names_edit_corpus, build_xlsx_merge_edit_corpus,
@@ -18574,6 +19000,8 @@ mod tests {
             Case::RtfSemanticOnePercentEditSave,
             Case::RtfSemanticRemoveParagraphSave,
             Case::RtfSemanticMoveParagraphSave,
+            Case::RtfLogicalTailAppend,
+            Case::RtfLogicalTailNoopSave,
         ];
 
         for variant in RtfSemanticVariant::ALL {
@@ -18585,7 +19013,7 @@ mod tests {
             assert_eq!(rtf.manifest.rtf_variant, Some(variant.name()));
 
             for case in cases {
-                let selected_corpus = if case.is_rtf_lifecycle() {
+                let selected_corpus = if case.is_rtf_lifecycle() || case.is_rtf_logical_tail() {
                     lifecycle.as_ref().unwrap_or(&rtf)
                 } else {
                     &rtf
@@ -18595,7 +19023,9 @@ mod tests {
                     let result = result.unwrap();
                     assert_eq!(
                         result.sink.is_some(),
-                        case.name().contains("save") || case == Case::RtfSemanticTextToSink
+                        case.name().contains("save")
+                            || case == Case::RtfSemanticTextToSink
+                            || case.is_rtf_logical_tail()
                     );
                 } else {
                     assert!(
@@ -18651,8 +19081,34 @@ mod tests {
                 .flat_map(|variant| cases.iter().map(move |case| (*variant, *case)))
                 .filter(|(variant, case)| variant.supports_case(*case))
                 .count(),
-            39
+            41
         );
+    }
+
+    #[test]
+    fn semantic_rtf_logical_tail_is_bounded_reopenable_and_reversible() {
+        for shape in [SemanticShape::Tiny, SemanticShape::Large] {
+            let corpus = build_rtf_lifecycle_corpus(shape).unwrap();
+            let append = run_case(Case::RtfLogicalTailAppend, &corpus, 0, 1).unwrap();
+            let noop = run_case(Case::RtfLogicalTailNoopSave, &corpus, 0, 1).unwrap();
+            for result in [append, noop] {
+                assert_eq!(result.elapsed_ns.samples.len(), 1);
+                assert!(result.output_sha256.is_some());
+                let sink = result.sink.unwrap();
+                let tail = sink.rtf_tail_append.unwrap();
+                assert!(tail.exact_noop_verified);
+                assert!(tail.in_memory_patch_verified);
+                assert!(tail.durable_patch_verified);
+                assert!(tail.reopen_verified);
+                assert!(tail.source_conflict_verified);
+                assert_eq!(sink.retained_output_bytes, Some(0));
+                assert_eq!(
+                    sink.retained_authoring_window_bytes,
+                    Some(RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES as u64)
+                );
+                assert!(sink.largest_write <= RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES as u64);
+            }
+        }
     }
 
     #[test]
