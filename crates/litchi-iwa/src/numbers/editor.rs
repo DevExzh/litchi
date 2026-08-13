@@ -155,6 +155,47 @@ struct NumbersTextBoxGraph {
     uuid_object_ids: Vec<u64>,
 }
 
+#[cfg(test)]
+pub(crate) fn compatibility_document_from_bytes(
+    bytes: &[u8],
+) -> crate::Result<litchi_numbers::Document> {
+    let editor = NumbersEditor::from_bytes(bytes)?;
+    let descriptors = table_models(editor.package())?;
+    let tables = litchi_numbers::compatibility_tables_from_bytes(bytes)
+        .map_err(|error| crate::Error::InvalidFormat(error.to_string()))?;
+    if descriptors.len() != tables.len() {
+        return Err(crate::Error::InvalidFormat(
+            "Numbers compatibility table projection changed its source cardinality".to_owned(),
+        ));
+    }
+
+    let mut tables_by_drawable = descriptors
+        .into_iter()
+        .zip(tables)
+        .map(|(descriptor, table)| (descriptor.table_info_id, table))
+        .collect::<HashMap<_, _>>();
+    let mut sheets = Vec::new();
+    for sheet_info in editor.sheets()? {
+        let (_, _, archive) = numbers_sheet(editor.package(), sheet_info.object_id)?;
+        let sheet_tables = archive
+            .drawable_infos
+            .into_iter()
+            .filter_map(|reference| tables_by_drawable.remove(&reference.identifier))
+            .collect::<Vec<_>>();
+        let sheet =
+            litchi_numbers::Sheet::try_from_tables(sheet_info.name, sheet_info.index, sheet_tables)
+                .map_err(|error| crate::Error::InvalidFormat(error.to_string()))?;
+        sheets.push(sheet);
+    }
+    if !tables_by_drawable.is_empty() {
+        return Err(crate::Error::InvalidFormat(
+            "Numbers compatibility table projection contains an unrooted table".to_owned(),
+        ));
+    }
+    litchi_numbers::Document::from_sheets(sheets)
+        .map_err(|error| crate::Error::InvalidFormat(error.to_string()))
+}
+
 #[path = "editor/package.rs"]
 mod package;
 #[path = "editor/semantic.rs"]

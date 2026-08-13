@@ -18,9 +18,12 @@ use litchi_iwa_archive::{
     package::{Entry, EntryEdit},
 };
 use litchi_iwa_common::{
-    decode_varint_from_bytes,
+    WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireView, patch_length_delimited_field, transform_length_delimited_field},
+    wire::{
+        WireDescent, WireView, patch_length_delimited_field, preflight_wire_tree_with_limits,
+        transform_length_delimited_field,
+    },
 };
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{numbers_names_codec, table_info_codec, tn, tsce, tst};
@@ -1643,48 +1646,158 @@ fn sheet_drawable_payloads(message_type: u32, source: &[u8]) -> Result<Vec<&[u8]
     }
 }
 
+pub(super) fn preflight_sheet_payload(
+    message_type: u32,
+    source: &[u8],
+    maximum_drawables: usize,
+) -> Result<(&str, Vec<u64>), Error> {
+    let name = decode_sheet_name(message_type, source)?;
+    let mut identifiers = Vec::new();
+    let wire_limits = WireLimits::default()
+        .with_input_bytes(
+            source
+                .len()
+                .saturating_mul(2)
+                .clamp(1, WireLimits::MAX_INPUT_BYTES),
+        )
+        .and_then(|limits| limits.with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS)))
+        .and_then(|limits| limits.with_nesting(2))
+        .map_err(map_wire_error)?;
+    preflight_wire_tree_with_limits(source, wire_limits, |visit| {
+        let is_drawable = match message_type {
+            SHEET_MESSAGE_TYPE => visit.path().is_empty() && visit.field().number() == 2,
+            FORM_BASED_SHEET_MESSAGE_TYPE => {
+                visit.path() == [FORM_SHEET_SUPER_FIELD] && visit.field().number() == 2
+            },
+            _ => {
+                return Err(litchi_iwa_common::Error::InvalidFormat(
+                    "invalid sheet type".into(),
+                ));
+            },
+        };
+        if is_drawable {
+            if visit.field().wire_type() != 2 {
+                return Err(litchi_iwa_common::Error::InvalidFormat(
+                    "invalid drawable reference".into(),
+                ));
+            }
+            let observed = identifiers.len().saturating_add(1);
+            if observed > maximum_drawables {
+                return Err(litchi_iwa_common::Error::LimitExceeded {
+                    kind: litchi_iwa_common::LimitKind::MaterializedCells,
+                    observed,
+                    limit: maximum_drawables,
+                });
+            }
+            identifiers.try_reserve(1).map_err(|_allocation| {
+                litchi_iwa_common::Error::Allocation {
+                    resource: "Numbers drawable reference projection",
+                    amount: observed,
+                }
+            })?;
+            let identifier = local_reference_identifier_common(visit.field().payload())?;
+            identifiers.push(identifier);
+        }
+        let descend = message_type == FORM_BASED_SHEET_MESSAGE_TYPE
+            && visit.path().is_empty()
+            && visit.field().number() == FORM_SHEET_SUPER_FIELD;
+        Ok(if descend {
+            WireDescent::Descend
+        } else {
+            WireDescent::Skip
+        })
+    })
+    .map_err(|error| match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::MaterializedCells,
+            observed,
+            limit,
+        } => Error::LimitExceeded {
+            kind: LimitKind::PayloadReferences,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(limit),
+        },
+        other => map_wire_error(other),
+    })?;
+    Ok((name, identifiers))
+}
+
 fn require_local_reference(source: &[u8], expected_identifier: u64) -> Result<(), Error> {
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    if local_reference_identifier_common(source).map_err(map_wire_error)? != expected_identifier {
+        return Err(Error::InvalidSource);
+    }
+    Ok(())
+}
+
+fn local_reference_identifier_common(source: &[u8]) -> litchi_iwa_common::Result<u64> {
     let mut identifier = None;
     let mut deprecated_type = None;
     let mut external = None;
-    for field in view.fields() {
-        field.validate_canonical_framing().map_err(map_wire_error)?;
+    let limits = WireLimits::default()
+        .with_input_bytes(source.len().clamp(1, WireLimits::MAX_INPUT_BYTES))?
+        .with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS))?
+        .with_nesting(1)?;
+    preflight_wire_tree_with_limits(source, limits, |visit| {
+        let field = visit.field();
         match field.number() {
             1 => {
                 if identifier.is_some() || field.wire_type() != 0 {
-                    return Err(Error::InvalidSource);
+                    return Err(litchi_iwa_common::Error::InvalidFormat(
+                        "invalid local reference".into(),
+                    ));
                 }
-                identifier = Some(canonical_varint(field.payload())?);
+                identifier = Some(canonical_varint(field.payload()).map_err(|_| {
+                    litchi_iwa_common::Error::InvalidFormat("invalid local reference".into())
+                })?);
             },
             2 => {
                 if deprecated_type.is_some() || field.wire_type() != 0 {
-                    return Err(Error::InvalidSource);
+                    return Err(litchi_iwa_common::Error::InvalidFormat(
+                        "invalid local reference".into(),
+                    ));
                 }
-                let value = canonical_varint(field.payload())?;
+                let value = canonical_varint(field.payload()).map_err(|_| {
+                    litchi_iwa_common::Error::InvalidFormat("invalid local reference".into())
+                })?;
                 if value > u64::from(i32::MAX.unsigned_abs()) && value < MIN_SIGN_EXTENDED_I32 {
-                    return Err(Error::InvalidSource);
+                    return Err(litchi_iwa_common::Error::InvalidFormat(
+                        "invalid local reference".into(),
+                    ));
                 }
                 deprecated_type = Some(value);
             },
             3 => {
                 if external.is_some() || field.wire_type() != 0 {
-                    return Err(Error::InvalidSource);
+                    return Err(litchi_iwa_common::Error::InvalidFormat(
+                        "invalid local reference".into(),
+                    ));
                 }
-                let value = canonical_varint(field.payload())?;
+                let value = canonical_varint(field.payload()).map_err(|_| {
+                    litchi_iwa_common::Error::InvalidFormat("invalid local reference".into())
+                })?;
                 if value > 1 {
-                    return Err(Error::InvalidSource);
+                    return Err(litchi_iwa_common::Error::InvalidFormat(
+                        "invalid local reference".into(),
+                    ));
                 }
                 external = Some(value != 0);
             },
             _ => {},
         }
+        Ok(WireDescent::Skip)
+    })?;
+    let identifier = identifier
+        .ok_or_else(|| litchi_iwa_common::Error::InvalidFormat("invalid local reference".into()))?;
+    if identifier == 0 || external == Some(true) {
+        return Err(litchi_iwa_common::Error::InvalidFormat(
+            "invalid local reference".into(),
+        ));
     }
-    if identifier != Some(expected_identifier) || expected_identifier == 0 || external == Some(true)
-    {
-        return Err(Error::InvalidSource);
-    }
-    Ok(())
+    Ok(identifier)
+}
+
+pub(super) fn preflight_local_reference(source: &[u8]) -> litchi_iwa_common::Result<u64> {
+    local_reference_identifier_common(source)
 }
 
 fn canonical_varint(source: &[u8]) -> Result<u64, Error> {
@@ -2228,6 +2341,10 @@ fn decode_table_name(source: &[u8]) -> Result<&str, Error> {
         .map_err(map_names_codec_error)
 }
 
+pub(super) fn preflight_table_name(source: &[u8]) -> Result<&str, Error> {
+    decode_table_name(source)
+}
+
 fn decode_table_info(source: &[u8]) -> Result<table_info_codec::TableInfoSnapshot, Error> {
     table_info_codec::decode_table_info(source, table_info_decode_options(source))
         .map_err(map_table_info_error)
@@ -2419,6 +2536,7 @@ fn map_read_error(error: ReadError) -> Error {
             maximum,
         },
         ReadError::Io(_)
+        | ReadError::Detection(_)
         | ReadError::MalformedPayload { .. }
         | ReadError::NotNumbers
         | ReadError::InvalidFormat(_)

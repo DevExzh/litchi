@@ -138,6 +138,7 @@
       "litchi-core"
     ],
     "litchi-numbers": [
+      "litchi-core",
       "litchi-iwa-archive",
       "litchi-iwa-common",
       "litchi-iwa-core",

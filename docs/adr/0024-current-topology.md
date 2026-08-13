@@ -2156,3 +2156,74 @@ chart, table, media, and formatting workflows. Its direct focused dependency
 is still used by production code, so ordered debt 017 and the manifest edge do
 not close. The native read oracle and its silent-normalization caveat are
 frozen in ADR 0008.
+
+## 2026-08-13 current-status amendment: Numbers reader cutover
+
+`litchi_numbers::Document` is now the canonical archive-free rooted Numbers
+reader. It accepts checked packaged-file and app-authored-directory paths,
+borrowed bytes, and caller-owned shared bytes, eagerly completes bounded
+semantic projection, and retains one cheaply shared workbook state. Its public
+surface is semantic and selector-first; native bundles, object indexes,
+component/member names, protobuf/Buffa values, raw identifiers, and exact
+package bytes do not cross the boundary.
+
+Source-backed documents may retain content-free statistics and narrow metadata
+from exactly `Metadata/Properties.plist`,
+`Metadata/BuildVersionHistory.plist`, and
+`Metadata/DocumentIdentifier`. Metadata capture is conditional on the frozen
+source being classified as Numbers. Semantic constructors and package-derived
+documents have no source metadata or statistics. The focused `DocumentStats`
+fields are `source_record_count`, `sheet_count`, and `table_count`; the former raw
+`total_objects` vocabulary and constant application tag are absent.
+Unix file and directory path ingress uses pinned, no-follow capture. Other
+non-Windows targets use version-checked path capture. Windows path ingress
+fails closed until pinned, reparse-safe handle traversal exists;
+borrowed/shared byte ingress remains portable.
+Each selected metadata authority is capped at 64 KiB before packaged payload
+materialization or directory-sidecar allocation. A narrow `plist::stream`
+event projection then enforces fixed event, nesting, history-entry, scalar, and
+retained-property budgets instead of constructing a general scalar DTO or
+plist value tree.
+
+Rooted `Document::plain_text` is available independently of source
+diagnostics. It emits deterministic rooted workbook semantics and fixes the
+legacy reader's inability to construct the checked-in native workbook before
+its public `text()` could run. Empty rendered Text/Formula values are excluded.
+Recovered private storage output matches `Package::text` on two frozen
+fixtures only; `Package::text` remains a separate physical/storage diagnostic
+with no unqualified legacy-parity claim.
+
+The 460-line host `numbers/document.rs`, its module/export and
+reader/state/statistics types, and the 142-line reader-only `NumbersSheet`
+adapter are gone: 602 host reader lines in total. This removes the duplicate
+bundle, object index, root/sheet/table traversal, semantic cache, and public
+raw getters. `NumbersTable`, `TableDataExtractor`, `NumbersEditor`, and
+`NumbersDocumentBuilder` remain host owners. Their continued production use
+keeps debt 015 and the `litchi-iwa -> litchi-numbers` manifest edge open.
+
+Focused Numbers still eagerly decodes substantial generated Prost graph state.
+Private strict raw/Buffa projections selectively qualify root sheet order,
+sheet references/names, TableInfo, table model/list/segment/tile/rich-text, and
+formula-category boundaries; focused `Document` does not retain comments. The
+remaining table/formula graph is not fully Buffa-lazy. This cut deletes the
+duplicate public reader; it does not claim every `Package` path is hardened, a
+codec completion, latency/RSS result, or monolith deletion.
+
+Frozen gates pass 16/16 focused reader cases, with a seventeenth
+Windows-configured case; 240 Numbers library cases pass and four are ignored;
+compatibility and name gates pass 5/5 and 10/10. Archive coverage passes 127
+cases (125 unit plus two integration), detector coverage passes 40/40, and the
+host library passes 1,397/1,397, while generated-roundtrip and doctest gates
+pass 1/1 and nine passed with three ignored. Host all-target check and no-run,
+strict scoped host Clippy, focused
+all-target Clippy, strict focused rustdoc, formatting, and diff checks pass. The
+boundary units pass 237/237 and both live retirement/API audits report zero
+findings. The 15-file host-scoped cut contains 329 insertions and 888 deletions,
+net -559. Broad host all-target Clippy remains blocked by unrelated existing
+lints; the global boundary policy still reports 14 unrelated
+`soapberry-zip`/`xml-minifier` debt findings.
+
+The native evidence and its silent-normalization caveat are frozen in ADR
+0008. The tracked 136,357-byte source remains exact at SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`;
+only an isolated copy was opened in Numbers 14.4 build 7043.0.93.

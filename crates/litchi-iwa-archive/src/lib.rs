@@ -20,6 +20,7 @@ mod limits;
 mod logical;
 pub mod package;
 mod package_state;
+mod semantic;
 mod zip;
 
 pub use catalog::{Component, ComponentCatalog, SourceCatalog};
@@ -33,6 +34,8 @@ pub use logical::LogicalSourceCatalog;
 #[doc(hidden)]
 pub use package::LogicalEntryLimits;
 pub use package::SourceProvenance;
+#[doc(hidden)]
+pub use semantic::{SemanticMetadataSidecars, SemanticProfile, SemanticProjection};
 
 use litchi_iwa_core::{Archive, SnappyStream};
 use soapberry_zip::office::ArchiveReader;
@@ -87,6 +90,147 @@ pub fn inspect_detection_root(bytes: &[u8], limits: Limits) -> Result<DetectionR
     validated_limits.check_input_size(input_size, "ZIP input")?;
     let archive = ArchiveReader::new_with_limits(bytes, validated_limits.zip_limits())?;
     inspect_zip(&archive, validated_limits, true)
+}
+
+/// Inspect only exact canonical IWA authorities for semantic format selection.
+///
+/// Unlike generic detection, this fixed hidden profile does not admit ZIP
+/// path normalization aliases and never reads unrelated package payloads.
+#[doc(hidden)]
+pub fn inspect_semantic_detection_root(bytes: &[u8], limits: Limits) -> Result<DetectionRoot> {
+    let validated_limits = limits.validate()?;
+    let input_size = u64::try_from(bytes.len())
+        .map_err(|_error| Error::InvalidBundle("ZIP input length does not fit u64".to_owned()))?;
+    validated_limits.check_input_size(input_size, "ZIP input")?;
+    let archive = zip::ZipArchive::new_with_limits(bytes, validated_limits)?;
+    if zip::is_encrypted(&archive) {
+        return Err(Error::Encrypted);
+    }
+    let document = package::semantic_detection_root_entry(&archive, false)?;
+    let nested_index = package::semantic_nested_index_entry(&archive)?;
+    let (has_direct_iwa, has_keynote_components) = semantic_component_markers(&archive, false)?;
+    if has_direct_iwa && nested_index.is_some() {
+        return Err(Error::InvalidBundle(
+            "iWork package mixes direct IWA members with a legacy Index.zip".to_owned(),
+        ));
+    }
+    if has_direct_iwa {
+        return detection_root_from_exact_document(
+            &archive,
+            document,
+            validated_limits,
+            has_keynote_components,
+        );
+    }
+
+    let Some(index_entry) = nested_index else {
+        return Ok(empty_detection_root());
+    };
+    let index_name = index_entry.name();
+    package::preflight_semantic_container(index_entry, index_name)?;
+    validated_limits.check_input_size(index_entry.uncompressed_size(), "legacy iWork Index.zip")?;
+    let index_data = archive.read_entry(index_entry)?;
+    let index_size = u64::try_from(index_data.len()).map_err(|_error| {
+        Error::InvalidBundle("legacy iWork Index.zip length does not fit u64".to_owned())
+    })?;
+    validated_limits.check_input_size(index_size, "legacy iWork Index.zip")?;
+    let index = zip::ZipArchive::new_with_limits(&index_data, validated_limits)?;
+    if zip::is_encrypted(&index) {
+        return Err(Error::Encrypted);
+    }
+    let document = package::semantic_detection_root_entry(&index, true)?;
+    let recursive_index = package::semantic_nested_index_entry(&index)?;
+    let (has_iwa_components, has_keynote_components) = semantic_component_markers(&index, true)?;
+    if has_iwa_components && recursive_index.is_some() {
+        return Err(Error::InvalidBundle(
+            "iWork package mixes direct IWA members with a legacy Index.zip".to_owned(),
+        ));
+    }
+    if recursive_index.is_some() {
+        return Err(Error::InvalidBundle(format!(
+            "legacy package index {index_name} contains a nested Index.zip"
+        )));
+    }
+    if !has_iwa_components {
+        return Err(Error::InvalidBundle(format!(
+            "legacy package index {index_name} contains no IWA components"
+        )));
+    }
+    detection_root_from_exact_document(&index, document, validated_limits, has_keynote_components)
+}
+
+fn detection_root_from_exact_document(
+    archive: &zip::ZipArchive<'_>,
+    document_entry: Option<&zip::PhysicalEntry>,
+    limits: Limits,
+    has_keynote_components: bool,
+) -> Result<DetectionRoot> {
+    let document = if let Some(entry) = document_entry {
+        package::preflight_semantic_iwa(entry, entry.name())?;
+        let compressed = archive.read_entry(entry)?;
+        let stream = SnappyStream::decompress_with_limits(&compressed, limits.snappy_limits()?)?;
+        Some(Archive::parse_with_limits(
+            stream.as_bytes(),
+            limits.effective_archive_limits()?,
+        )?)
+    } else {
+        None
+    };
+    Ok(DetectionRoot {
+        has_iwa_components: true,
+        has_keynote_components,
+        document,
+    })
+}
+
+fn semantic_component_markers(archive: &zip::ZipArchive<'_>, nested: bool) -> Result<(bool, bool)> {
+    let mut has_iwa_components = false;
+    let mut has_keynote_components = false;
+    for entry in archive
+        .physical_entries()
+        .filter(|entry| !entry.is_directory())
+    {
+        let name = if nested {
+            package::semantic_nested_iwa_name(entry)
+        } else {
+            package::semantic_iwa_name(entry)
+        };
+        let Some(name) = name else {
+            continue;
+        };
+        has_iwa_components = true;
+        has_keynote_components |= ["MasterSlide", "Slide", "TemplateSlide"]
+            .iter()
+            .any(|stem| semantic_keynote_component_name(name, stem, nested));
+    }
+    Ok((has_iwa_components, has_keynote_components))
+}
+
+fn semantic_keynote_component_name(name: &str, stem: &str, nested: bool) -> bool {
+    let basename = if nested {
+        if name.contains('/') {
+            return false;
+        }
+        name
+    } else {
+        let Some(basename) = name.strip_prefix("Index/") else {
+            return false;
+        };
+        if basename.contains('/') {
+            return false;
+        }
+        basename
+    };
+    let Some(component) = basename.strip_suffix(".iwa") else {
+        return false;
+    };
+    let Some(suffix) = component.strip_prefix(stem) else {
+        return false;
+    };
+    suffix.is_empty()
+        || suffix.strip_prefix('-').is_some_and(|version| {
+            !version.is_empty() && version.bytes().all(|byte| byte.is_ascii_digit())
+        })
 }
 
 fn inspect_zip(

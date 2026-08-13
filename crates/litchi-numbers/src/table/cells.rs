@@ -15,7 +15,7 @@
 //! infer presence from an empty-looking value. Stored values may also be the
 //! semantic formula or error values already represented by
 //! [`Value`](crate::cell::Value). Changed batches accept only finite scalar
-//! [`Input`] values or explicit clears; formula and error construction stay
+//! [`Input`](crate::table::cells::Input) values or explicit clears; formula and error construction stay
 //! outside this boundary.
 //!
 //! A range is half-open and returned in row-major order. It is deliberately

@@ -97,11 +97,11 @@
 //! ### Extract tables
 //!
 //! ```rust,no_run
-//! use litchi_iwa::numbers::NumbersDocument;
+//! use litchi_numbers::Document;
 //!
-//! let doc = NumbersDocument::open("spreadsheet.numbers")?;
+//! let doc = Document::open("spreadsheet.numbers")?;
 //!
-//! for sheet in doc.semantic_sheets().iter() {
+//! for sheet in doc.sheets() {
 //!     for table in sheet.tables() {
 //!         println!("Table: {}", table.name());
 //!     }

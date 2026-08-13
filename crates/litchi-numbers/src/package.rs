@@ -51,11 +51,10 @@ use litchi_iwa_archive::{ComponentCatalog, SourceCatalog};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
 use litchi_iwa_core::{Archive, RawMessage};
-#[cfg(feature = "internal-iwork-source")]
-use litchi_iwa_detect::PreparedSource;
-use litchi_iwa_detect::{Format, detect_application_from_document};
-use litchi_iwa_protos::table_info_codec;
+use litchi_iwa_detect::{Format, PreparedSource};
+use litchi_iwa_protos::{numbers_sheet_order_codec, table_info_codec};
 use litchi_iwa_protos::{tn, tswp};
+use plist::stream::{Event as PlistEvent, Reader as PlistReader};
 use prost::Message;
 use thiserror::Error;
 
@@ -82,6 +81,40 @@ const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
 const LEGACY_TABLE_INFO_MESSAGE_TYPE: u32 = 6_003;
 const TABLE_INFO_PROJECTION_RECURSION_LIMIT: u32 = 2;
+const MAX_METADATA_EVENTS: usize = 1_024;
+const MAX_METADATA_NESTING: usize = 16;
+const MAX_METADATA_SCALAR_BYTES: usize = 16 * 1024;
+const MAX_METADATA_RETAINED_BYTES: usize = 64 * 1024;
+const MAX_BUILD_HISTORY_ENTRIES: usize = 128;
+
+#[derive(Debug, Clone, Copy)]
+struct MetadataBudget {
+    retained: usize,
+}
+
+impl MetadataBudget {
+    const fn new() -> Self {
+        Self { retained: 0 }
+    }
+
+    fn retain(&mut self, amount: usize) -> Result<()> {
+        self.retained = self.retained.checked_add(amount).ok_or_else(|| {
+            metadata_limit(
+                SemanticLimitKind::TextBytes,
+                usize::MAX,
+                MAX_METADATA_RETAINED_BYTES,
+            )
+        })?;
+        if self.retained > MAX_METADATA_RETAINED_BYTES {
+            return Err(metadata_limit(
+                SemanticLimitKind::TextBytes,
+                self.retained,
+                MAX_METADATA_RETAINED_BYTES,
+            ));
+        }
+        Ok(())
+    }
+}
 
 /// Content-free semantic location associated with a Numbers read failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -171,6 +204,9 @@ pub enum Error {
     /// ZIP or IWA package ingress failed.
     #[error(transparent)]
     Archive(#[from] litchi_iwa_archive::Error),
+    /// Semantic-only source preparation failed.
+    #[error(transparent)]
+    Detection(#[from] litchi_iwa_detect::Error),
     /// A native payload could not be decoded at a stable semantic location.
     #[error("malformed Numbers payload at {path}")]
     MalformedPayload {
@@ -303,6 +339,7 @@ impl Error {
             },
             Self::Io(_)
             | Self::Archive(_)
+            | Self::Detection(_)
             | Self::MalformedPayload { .. }
             | Self::NotNumbers
             | Self::InvalidFormat(_)
@@ -330,7 +367,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug)]
 enum Components {
     Physical(Box<SourceCatalog>),
-    #[cfg(feature = "internal-iwork-source")]
     Semantic(Arc<ComponentCatalog>),
 }
 
@@ -347,7 +383,6 @@ impl Components {
         )))
     }
 
-    #[cfg(feature = "internal-iwork-source")]
     fn from_catalog(catalog: Arc<ComponentCatalog>) -> Self {
         Self::Semantic(catalog)
     }
@@ -355,7 +390,6 @@ impl Components {
     fn catalog(&self) -> &ComponentCatalog {
         match self {
             Self::Physical(source) => source.components(),
-            #[cfg(feature = "internal-iwork-source")]
             Self::Semantic(catalog) => catalog,
         }
     }
@@ -363,7 +397,6 @@ impl Components {
     fn physical(&self) -> Option<&SourceCatalog> {
         match self {
             Self::Physical(source) => Some(source),
-            #[cfg(feature = "internal-iwork-source")]
             Self::Semantic(_) => None,
         }
     }
@@ -436,6 +469,10 @@ impl SemanticBudget {
             path,
         )?;
         Ok(())
+    }
+
+    const fn remaining_references(&self) -> usize {
+        self.limits.max_references().saturating_sub(self.references)
     }
 
     fn charge_table(&mut self, path: SemanticPath) -> Result<()> {
@@ -535,16 +572,15 @@ impl Package {
         let semantic = options.semantic();
         let index = Index::from_components(&components, semantic.max_objects())?;
         let root = Self::root_document(&components)?;
-        let sheets = Self::decode_sheets(&components, &index, &root, semantic)?;
-        let document = Document::from_sheets_with_limits(
-            sheets,
-            DocumentLimits::new(
-                semantic.max_sheets(),
-                semantic.max_tables(),
-                semantic.max_materialized_cells(),
-                semantic.max_output_text_bytes(),
-            ),
-        )?;
+        let sheets = Self::decode_sheets(&components, &index, &root, semantic, true)?;
+        let document_limits = DocumentLimits::new(
+            semantic.max_sheets(),
+            semantic.max_tables(),
+            semantic.max_materialized_cells(),
+            semantic.max_output_text_bytes(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let document = Document::from_sheets_with_limits(sheets, document_limits)?;
         Ok(Self {
             state: Arc::new(State {
                 source,
@@ -697,7 +733,9 @@ impl Package {
     ///
     /// Storage objects are preserved separately from semantic tables because
     /// Numbers may retain text for shapes and auxiliary objects. Each decoded
-    /// storage is separated with one newline, matching the former IWA reader.
+    /// non-empty storage message is separated with one newline. This
+    /// compatibility diagnostic is not the rooted workbook rendering exposed
+    /// by [`Document::plain_text`].
     ///
     /// # Errors
     ///
@@ -728,6 +766,11 @@ impl Package {
     }
 
     fn root_document(components: &Components) -> Result<tn::DocumentArchive> {
+        tn::DocumentArchive::decode(Self::root_document_payload(components)?)
+            .map_err(|error| Error::malformed_payload(error, SemanticPath::Document))
+    }
+
+    fn root_document_payload(components: &Components) -> Result<&[u8]> {
         let object = components
             .get_archive("Index/Document.iwa")
             .and_then(|archive| archive.object(1))
@@ -745,8 +788,7 @@ impl Package {
                 "Numbers document root has no canonical document payload".to_owned(),
             )
         })?;
-        tn::DocumentArchive::decode(message.data.as_slice())
-            .map_err(|error| Error::malformed_payload(error, SemanticPath::Document))
+        Ok(message.data.as_slice())
     }
 
     fn decode_sheets(
@@ -754,6 +796,7 @@ impl Package {
         index: &Index,
         document: &tn::DocumentArchive,
         limits: SemanticLimits,
+        retain_comments: bool,
     ) -> Result<Vec<Sheet>> {
         if document.sheets.len() > limits.max_sheets() {
             return Err(Error::SemanticLimit {
@@ -767,6 +810,12 @@ impl Package {
         let mut budget = SemanticBudget::new(limits);
         budget.charge_references(document.sheets.len(), SemanticPath::Document)?;
         let extractor = TableDataExtractor::new(components, index, limits);
+        let extractor = if retain_comments {
+            extractor
+        } else {
+            extractor.without_comments()
+        };
+        extractor.charge_references(document.sheets.len())?;
         let mut sheets = Vec::new();
         sheets
             .try_reserve_exact(document.sheets.len())
@@ -795,8 +844,30 @@ impl Package {
             let object = index
                 .resolve_ref_id(components, reference.identifier)?
                 .ok_or_else(|| Error::InvalidFormat(format!("Numbers {path} is missing")))?;
+            let (message_type, payload) = sheet_payload(object.messages, path)?;
+            let consumed_references = limits
+                .max_references()
+                .saturating_sub(budget.remaining_references());
+            let (projected_name, projected_drawables) = names::preflight_sheet_payload(
+                message_type,
+                payload,
+                budget.remaining_references(),
+            )
+            .map_err(|error| map_sheet_preflight_error(error, path, consumed_references))?;
+            budget.charge_references(projected_drawables.len(), path)?;
+            extractor.charge_references(projected_drawables.len())?;
+            extractor.charge_output_text(projected_name.len())?;
             let archive = decode_sheet_payload(object.messages, path)?;
-            budget.charge_references(archive.drawable_infos.len(), path)?;
+            if archive.name != projected_name
+                || archive.drawable_infos.len() != projected_drawables.len()
+                || archive
+                    .drawable_infos
+                    .iter()
+                    .zip(&projected_drawables)
+                    .any(|(decoded, projected)| decoded.identifier != *projected)
+            {
+                return Err(Error::MalformedPayload { path });
+            }
             seen_drawables
                 .try_reserve(archive.drawable_infos.len())
                 .map_err(|_error| {
@@ -805,7 +876,6 @@ impl Package {
                         archive.drawable_infos.len(),
                     )
                 })?;
-            extractor.charge_output_text(archive.name.len())?;
             let mut sheet = DecodedSheet::new(archive.name, position);
             for (drawable_position, drawable) in archive.drawable_infos.into_iter().enumerate() {
                 let drawable_path = SemanticPath::Drawable {
@@ -875,6 +945,7 @@ impl Package {
         )
         .map_err(|_error| Error::MalformedPayload { path })?;
         budget.charge_references(1, path)?;
+        extractor.charge_references(1)?;
         let model_id = model_reference.identifier().get();
         let model = index.resolve_ref_id(components, model_id)?.ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers {path} table model is missing"))
@@ -983,6 +1054,677 @@ pub fn __compatibility_tables_from_prepared_source(
     compatibility_tables_from_components(&components, archive_limits, semantic)
 }
 
+/// Consume a prepared Numbers source into an archive-free rooted document.
+///
+/// Exact source-package provenance is discarded before semantic publication.
+/// This unstable handoff exists for format coordinators and the focused
+/// [`Document`] source constructors.
+///
+/// # Errors
+///
+/// Returns [`Error`] when the source belongs to another application, metadata
+/// diagnostics are malformed, or the rooted workbook exceeds a selected
+/// semantic ceiling.
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub fn __semantic_document_from_prepared_source(
+    source: PreparedSource,
+    semantic: DocumentLimits,
+) -> Result<Document> {
+    semantic_document_from_prepared_source(source, semantic)
+}
+
+pub(crate) fn semantic_document_from_prepared_source(
+    source: PreparedSource,
+    semantic: DocumentLimits,
+) -> Result<Document> {
+    if source.format() != Format::Numbers {
+        return Err(Error::NotNumbers);
+    }
+    let document_limits = semantic;
+    let semantic = package_semantic_limits(document_limits)?;
+    let prepared = source.__into_numbers_semantic_source()?;
+    let (catalog, source_limits, sidecars) = prepared.__into_parts();
+    let metadata = metadata_from_sidecars(&sidecars)?;
+    let components = Components::from_catalog(catalog);
+    validate_numbers_application(&components, source_limits)?;
+    let index = Index::from_components(&components, semantic.max_objects())?;
+    let source_record_count = index.object_count();
+    let root_payload = Package::root_document_payload(&components)?;
+    let root_projection = preflight_root_sheet_references(root_payload, document_limits)?;
+    let root = Package::root_document(&components)?;
+    if root.sheets.len() != root_projection.sheet_references().len()
+        || root
+            .sheets
+            .iter()
+            .zip(root_projection.sheet_references())
+            .any(|(decoded, projected)| decoded.identifier != projected.identifier())
+    {
+        return Err(Error::MalformedPayload {
+            path: SemanticPath::Document,
+        });
+    }
+    let sheets = Package::decode_sheets(&components, &index, &root, semantic, false)
+        .map_err(|error| remap_document_limit_error(error, document_limits))?;
+    let table_count = sheets
+        .iter()
+        .try_fold(0usize, |count, sheet| {
+            count.checked_add(sheet.tables().len())
+        })
+        .ok_or(Error::SemanticLimit {
+            kind: SemanticLimitKind::Tables,
+            observed: usize::MAX,
+            maximum: semantic.max_tables(),
+            path: SemanticPath::Document,
+        })?;
+    let document = Document::from_sheets_with_limits(sheets, document_limits)?;
+    let stats = crate::document::Stats {
+        source_record_count,
+        sheet_count: document.sheet_count(),
+        table_count,
+    };
+    Ok(Document::from_source(document, metadata, stats))
+}
+
+fn preflight_root_sheet_references(
+    payload: &[u8],
+    limits: DocumentLimits,
+) -> Result<numbers_sheet_order_codec::DocumentSheetOrderSnapshot> {
+    let max_sheets = limits
+        .max_sheets()
+        .min(DocumentLimits::default().max_sheets());
+    let options = numbers_sheet_order_codec::DecodeOptions::new(
+        payload.len().max(1),
+        payload.len().saturating_mul(2).max(1),
+        payload.len().saturating_mul(4).max(1),
+        2,
+        max_sheets.saturating_add(1),
+    );
+    numbers_sheet_order_codec::decode_document_sheet_order(payload, options).map_err(|error| {
+        if let Some(limit) = error.resource_limit() {
+            let (kind, observed, maximum) = match limit {
+                numbers_sheet_order_codec::DecodeLimit::Bytes { observed, maximum } => {
+                    (SemanticLimitKind::FormulaWireBytes, observed, maximum)
+                },
+                numbers_sheet_order_codec::DecodeLimit::References { observed, maximum } => (
+                    SemanticLimitKind::Sheets,
+                    observed.saturating_sub(1),
+                    maximum.saturating_sub(1),
+                ),
+                numbers_sheet_order_codec::DecodeLimit::Fields { observed, maximum } => {
+                    (SemanticLimitKind::Objects, observed, maximum)
+                },
+                numbers_sheet_order_codec::DecodeLimit::Work { observed, maximum } => {
+                    (SemanticLimitKind::FormulaWork, observed, maximum)
+                },
+                numbers_sheet_order_codec::DecodeLimit::Nesting { observed, maximum } => (
+                    SemanticLimitKind::FormulaDepth,
+                    observed as usize,
+                    maximum as usize,
+                ),
+                _ => {
+                    return Error::MalformedPayload {
+                        path: SemanticPath::Document,
+                    };
+                },
+            };
+            return Error::SemanticLimit {
+                kind,
+                observed,
+                maximum,
+                path: SemanticPath::Document,
+            };
+        }
+        if let Some(amount) = error.allocation_amount() {
+            return allocation_error("Numbers document sheet references", amount);
+        }
+        Error::MalformedPayload {
+            path: SemanticPath::Document,
+        }
+    })
+}
+
+fn package_semantic_limits(limits: DocumentLimits) -> Result<SemanticLimits> {
+    Ok(SemanticLimits::for_document(limits))
+}
+
+fn remap_document_limit_error(error: Error, limits: DocumentLimits) -> Error {
+    let Error::SemanticLimit {
+        kind,
+        observed,
+        maximum,
+        path,
+    } = error
+    else {
+        return error;
+    };
+    let selected = match kind {
+        SemanticLimitKind::Sheets => limits.max_sheets(),
+        SemanticLimitKind::Tables => limits.max_tables(),
+        SemanticLimitKind::MaterializedCells => limits.max_materialized_cells(),
+        SemanticLimitKind::OutputTextBytes | SemanticLimitKind::TextBytes => {
+            limits.max_text_bytes()
+        },
+        _ => maximum,
+    };
+    Error::SemanticLimit {
+        kind,
+        observed,
+        maximum: maximum.min(selected),
+        path,
+    }
+}
+
+fn metadata_from_sidecars(
+    sidecars: &litchi_iwa_detect::PreparedMetadataSidecars,
+) -> Result<litchi_core::Metadata> {
+    let mut budget = MetadataBudget::new();
+    let mut metadata = litchi_core::Metadata {
+        application: Some("Numbers".to_owned()),
+        ..Default::default()
+    };
+    let mut build_version = None;
+    if let Some(data) = sidecars.properties_plist() {
+        let diagnostic = parse_properties_diagnostic(data, &mut budget)?;
+        metadata.title = diagnostic.title.or(diagnostic.document_title);
+        metadata.author = diagnostic
+            .author
+            .or(diagnostic.document_author)
+            .or(diagnostic.sfwp_author);
+        metadata.keywords = diagnostic.keywords;
+        metadata.description = diagnostic.comments;
+        metadata.revision = diagnostic.revision;
+        build_version = diagnostic.build_version;
+        if let Some(version) = diagnostic.file_format_version {
+            const PREFIX: &str = "Numbers Format Version ";
+            budget.retain(PREFIX.len())?;
+            let required = PREFIX
+                .len()
+                .checked_add(version.len())
+                .ok_or_else(invalid_metadata)?;
+            let mut content_status = String::new();
+            content_status
+                .try_reserve_exact(required)
+                .map_err(|_allocation| {
+                    Error::Common(litchi_iwa_common::Error::Allocation {
+                        resource: "Numbers metadata content status",
+                        amount: required,
+                    })
+                })?;
+            content_status.push_str(PREFIX);
+            content_status.push_str(&version);
+            metadata.content_status = Some(content_status);
+        }
+    }
+    if let Some(data) = sidecars.build_version_history_plist() {
+        if let Some(history_version) = parse_build_history(data, &mut budget)? {
+            build_version = Some(history_version);
+        }
+    }
+    if let Some(data) = sidecars.document_identifier() {
+        let identifier = std::str::from_utf8(data)
+            .map_err(|_error| Error::InvalidFormat("invalid Numbers identifier".to_owned()))?
+            .trim();
+        if identifier.is_empty() {
+            return Err(Error::InvalidFormat(
+                "Numbers identifier must not be empty".to_owned(),
+            ));
+        }
+        if identifier.len() > MAX_METADATA_SCALAR_BYTES {
+            return Err(metadata_limit(
+                SemanticLimitKind::TextBytes,
+                identifier.len(),
+                MAX_METADATA_SCALAR_BYTES,
+            ));
+        }
+        budget.retain(identifier.len())?;
+        let mut retained = String::new();
+        retained
+            .try_reserve_exact(identifier.len())
+            .map_err(|_allocation| {
+                Error::Common(litchi_iwa_common::Error::Allocation {
+                    resource: "Numbers metadata identifier",
+                    amount: identifier.len(),
+                })
+            })?;
+        retained.push_str(identifier);
+        metadata.identifier = Some(retained);
+    }
+    metadata.version = build_version;
+    Ok(metadata)
+}
+
+#[derive(Debug, Default)]
+struct PropertiesDiagnostic {
+    title: Option<String>,
+    author: Option<String>,
+    keywords: Option<String>,
+    comments: Option<String>,
+    document_title: Option<String>,
+    document_author: Option<String>,
+    sfwp_author: Option<String>,
+    revision: Option<String>,
+    build_version: Option<String>,
+    file_format_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum PropertyKey {
+    Title,
+    Author,
+    Keywords,
+    Comments,
+    DocumentTitle,
+    DocumentAuthor,
+    SfwpAuthor,
+    Revision,
+    BuildVersion,
+    FileFormatVersion,
+    Ignored,
+}
+
+fn parse_properties_diagnostic(
+    data: &[u8],
+    budget: &mut MetadataBudget,
+) -> Result<PropertiesDiagnostic> {
+    preflight_binary_metadata(data)?;
+    let mut reader = PlistReader::new(io::Cursor::new(data));
+    let Some(Ok(PlistEvent::StartDictionary(_))) = reader.next() else {
+        return Err(invalid_metadata());
+    };
+    let mut result = PropertiesDiagnostic::default();
+    let mut depth = 1usize;
+    let mut events = 1usize;
+    let mut pending = None;
+    let mut skipping_value_depth = None;
+    for event in reader {
+        let event = event.map_err(|_error| invalid_metadata())?;
+        check_metadata_event_scalar(&event)?;
+        events = events.checked_add(1).ok_or_else(invalid_metadata)?;
+        if events > MAX_METADATA_EVENTS {
+            return Err(metadata_limit(
+                SemanticLimitKind::Objects,
+                events,
+                MAX_METADATA_EVENTS,
+            ));
+        }
+        match event {
+            PlistEvent::StartArray(_) | PlistEvent::StartDictionary(_) => {
+                depth = depth.checked_add(1).ok_or_else(invalid_metadata)?;
+                if depth > MAX_METADATA_NESTING {
+                    return Err(metadata_limit(
+                        SemanticLimitKind::FormulaDepth,
+                        depth,
+                        MAX_METADATA_NESTING,
+                    ));
+                }
+                if depth == 2 {
+                    if !matches!(pending, Some(PropertyKey::Ignored)) {
+                        return Err(invalid_metadata());
+                    }
+                    skipping_value_depth = Some(depth);
+                }
+            },
+            PlistEvent::EndCollection => {
+                if depth == 1 {
+                    if pending.is_some() || skipping_value_depth.is_some() {
+                        return Err(invalid_metadata());
+                    }
+                    return Ok(result);
+                }
+                if skipping_value_depth == Some(depth) {
+                    skipping_value_depth = None;
+                    pending = None;
+                }
+                depth = depth.checked_sub(1).ok_or_else(invalid_metadata)?;
+            },
+            PlistEvent::String(value) if depth == 1 && pending.is_none() => {
+                pending = Some(property_key(&value));
+            },
+            scalar if depth == 1 => {
+                let key = pending.take().ok_or_else(invalid_metadata)?;
+                if !matches!(key, PropertyKey::Ignored) {
+                    let value = metadata_scalar(scalar)?;
+                    budget.retain(value.len())?;
+                    assign_property(&mut result, key, value)?;
+                }
+            },
+            _ => {},
+        }
+    }
+    Err(invalid_metadata())
+}
+
+fn parse_build_history(data: &[u8], budget: &mut MetadataBudget) -> Result<Option<String>> {
+    preflight_binary_metadata(data)?;
+    let mut reader = PlistReader::new(io::Cursor::new(data));
+    let Some(Ok(PlistEvent::StartArray(_))) = reader.next() else {
+        return Err(invalid_metadata());
+    };
+    let mut depth = 1usize;
+    let mut events = 1usize;
+    let mut entries = 0usize;
+    let mut latest = None;
+    let mut pending_key: Option<BuildHistoryKey> = None;
+    let mut version: Option<String> = None;
+    let mut build: Option<String> = None;
+    for event in reader {
+        let event = event.map_err(|_error| invalid_metadata())?;
+        check_metadata_event_scalar(&event)?;
+        events = events.checked_add(1).ok_or_else(invalid_metadata)?;
+        if events > MAX_METADATA_EVENTS {
+            return Err(metadata_limit(
+                SemanticLimitKind::Objects,
+                events,
+                MAX_METADATA_EVENTS,
+            ));
+        }
+        match event {
+            PlistEvent::StartDictionary(_) if depth == 1 => {
+                depth = 2;
+                entries = entries.checked_add(1).ok_or_else(invalid_metadata)?;
+                if entries > MAX_BUILD_HISTORY_ENTRIES {
+                    return Err(metadata_limit(
+                        SemanticLimitKind::Objects,
+                        entries,
+                        MAX_BUILD_HISTORY_ENTRIES,
+                    ));
+                }
+                version = None;
+                build = None;
+            },
+            PlistEvent::EndCollection if depth == 2 => {
+                let selected = version
+                    .take()
+                    .or_else(|| build.take())
+                    .ok_or_else(invalid_metadata)?;
+                budget.retain(selected.len())?;
+                latest = Some(selected);
+                pending_key = None;
+                depth = 1;
+            },
+            PlistEvent::EndCollection if depth == 1 => return Ok(latest),
+            PlistEvent::String(value) if depth == 1 => {
+                entries = entries.checked_add(1).ok_or_else(invalid_metadata)?;
+                if entries > MAX_BUILD_HISTORY_ENTRIES {
+                    return Err(metadata_limit(
+                        SemanticLimitKind::Objects,
+                        entries,
+                        MAX_BUILD_HISTORY_ENTRIES,
+                    ));
+                }
+                let selected = checked_metadata_string(value.into_owned())?;
+                budget.retain(selected.len())?;
+                latest = Some(selected);
+            },
+            PlistEvent::String(value) if depth == 2 && pending_key.is_none() => {
+                pending_key = Some(match value.as_ref() {
+                    "Version" => BuildHistoryKey::Version,
+                    "Build" => BuildHistoryKey::Build,
+                    _ => BuildHistoryKey::Ignored,
+                });
+            },
+            scalar if depth == 2 => match pending_key.take().ok_or_else(invalid_metadata)? {
+                BuildHistoryKey::Version => {
+                    let selected = metadata_scalar(scalar)?;
+                    if version.replace(selected).is_some() {
+                        return Err(invalid_metadata());
+                    }
+                },
+                BuildHistoryKey::Build => {
+                    let selected = metadata_scalar(scalar)?;
+                    if build.replace(selected).is_some() {
+                        return Err(invalid_metadata());
+                    }
+                },
+                BuildHistoryKey::Ignored => {},
+            },
+            PlistEvent::StartArray(_) | PlistEvent::StartDictionary(_) => {
+                return Err(invalid_metadata());
+            },
+            _ => return Err(invalid_metadata()),
+        }
+    }
+    Err(invalid_metadata())
+}
+
+fn preflight_binary_metadata(data: &[u8]) -> Result<()> {
+    if !data.starts_with(b"bplist00") {
+        return Ok(());
+    }
+    let trailer_offset = data.len().checked_sub(32).ok_or_else(invalid_metadata)?;
+    let trailer = data.get(trailer_offset..).ok_or_else(invalid_metadata)?;
+    let offset_width = usize::from(trailer[6]);
+    let reference_width = usize::from(trailer[7]);
+    if !(1..=8).contains(&offset_width) || !(1..=8).contains(&reference_width) {
+        return Err(invalid_metadata());
+    }
+    let objects = usize::try_from(binary_u64(&trailer[8..16])).map_err(|_| invalid_metadata())?;
+    if objects == 0 || objects > MAX_METADATA_EVENTS {
+        return Err(metadata_limit(
+            SemanticLimitKind::Objects,
+            objects,
+            MAX_METADATA_EVENTS,
+        ));
+    }
+    let root = usize::try_from(binary_u64(&trailer[16..24])).map_err(|_| invalid_metadata())?;
+    if root >= objects {
+        return Err(invalid_metadata());
+    }
+    let offset_table =
+        usize::try_from(binary_u64(&trailer[24..32])).map_err(|_| invalid_metadata())?;
+    let table_bytes = objects
+        .checked_mul(offset_width)
+        .ok_or_else(invalid_metadata)?;
+    if offset_table < 8
+        || offset_table
+            .checked_add(table_bytes)
+            .filter(|end| *end <= trailer_offset)
+            .is_none()
+    {
+        return Err(invalid_metadata());
+    }
+    for index in 0..objects {
+        let begin = offset_table
+            .checked_add(
+                index
+                    .checked_mul(offset_width)
+                    .ok_or_else(invalid_metadata)?,
+            )
+            .ok_or_else(invalid_metadata)?;
+        let end = begin
+            .checked_add(offset_width)
+            .ok_or_else(invalid_metadata)?;
+        let offset = usize::try_from(binary_uint(
+            data.get(begin..end).ok_or_else(invalid_metadata)?,
+        ))
+        .map_err(|_| invalid_metadata())?;
+        if offset < 8 || offset >= offset_table {
+            return Err(invalid_metadata());
+        }
+        let marker = *data.get(offset).ok_or_else(invalid_metadata)?;
+        let marker_kind = marker >> 4;
+        if matches!(marker_kind, 0x4 | 0x5 | 0x6 | 0xa | 0xc | 0xd) {
+            let (count, payload_offset) = binary_object_count(data, offset, marker)?;
+            if matches!(marker_kind, 0x4..=0x6) {
+                let scalar_bytes = if marker_kind == 0x6 {
+                    count.checked_mul(2).ok_or_else(invalid_metadata)?
+                } else {
+                    count
+                };
+                if scalar_bytes > MAX_METADATA_SCALAR_BYTES {
+                    return Err(metadata_limit(
+                        SemanticLimitKind::TextBytes,
+                        scalar_bytes,
+                        MAX_METADATA_SCALAR_BYTES,
+                    ));
+                }
+                if payload_offset
+                    .checked_add(scalar_bytes)
+                    .filter(|end| *end <= offset_table)
+                    .is_none()
+                {
+                    return Err(invalid_metadata());
+                }
+                continue;
+            }
+            if count > MAX_METADATA_EVENTS {
+                return Err(metadata_limit(
+                    SemanticLimitKind::Objects,
+                    count,
+                    MAX_METADATA_EVENTS,
+                ));
+            }
+            let multiplier = if marker_kind == 0xd { 2 } else { 1 };
+            let reference_bytes = count
+                .checked_mul(multiplier)
+                .and_then(|value| value.checked_mul(reference_width))
+                .ok_or_else(invalid_metadata)?;
+            if payload_offset
+                .checked_add(reference_bytes)
+                .filter(|end| *end <= offset_table)
+                .is_none()
+            {
+                return Err(invalid_metadata());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn binary_object_count(data: &[u8], offset: usize, marker: u8) -> Result<(usize, usize)> {
+    let inline = usize::from(marker & 0x0f);
+    if inline < 15 {
+        return Ok((inline, offset.saturating_add(1)));
+    }
+    let size_marker_offset = offset.checked_add(1).ok_or_else(invalid_metadata)?;
+    let size_marker = *data.get(size_marker_offset).ok_or_else(invalid_metadata)?;
+    if size_marker >> 4 != 1 || size_marker & 0x0f > 3 {
+        return Err(invalid_metadata());
+    }
+    let width = 1usize << (size_marker & 0x0f);
+    let begin = size_marker_offset
+        .checked_add(1)
+        .ok_or_else(invalid_metadata)?;
+    let end = begin.checked_add(width).ok_or_else(invalid_metadata)?;
+    let count = usize::try_from(binary_uint(
+        data.get(begin..end).ok_or_else(invalid_metadata)?,
+    ))
+    .map_err(|_| invalid_metadata())?;
+    Ok((count, end))
+}
+
+fn binary_uint(bytes: &[u8]) -> u64 {
+    bytes
+        .iter()
+        .fold(0u64, |value, byte| (value << 8) | u64::from(*byte))
+}
+
+fn binary_u64(bytes: &[u8]) -> u64 {
+    let mut fixed = [0u8; 8];
+    fixed.copy_from_slice(bytes);
+    u64::from_be_bytes(fixed)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BuildHistoryKey {
+    Version,
+    Build,
+    Ignored,
+}
+
+fn property_key(value: &str) -> PropertyKey {
+    match value {
+        "Title" => PropertyKey::Title,
+        "Author" => PropertyKey::Author,
+        "Keywords" => PropertyKey::Keywords,
+        "Comments" => PropertyKey::Comments,
+        "kDocumentTitleKey" => PropertyKey::DocumentTitle,
+        "kDocumentAuthorKey" => PropertyKey::DocumentAuthor,
+        "kSFWPAuthorPropertyKey" => PropertyKey::SfwpAuthor,
+        "revision" => PropertyKey::Revision,
+        "buildVersion" => PropertyKey::BuildVersion,
+        "fileFormatVersion" => PropertyKey::FileFormatVersion,
+        _ => PropertyKey::Ignored,
+    }
+}
+
+fn assign_property(
+    result: &mut PropertiesDiagnostic,
+    key: PropertyKey,
+    value: String,
+) -> Result<()> {
+    let slot = match key {
+        PropertyKey::Title => &mut result.title,
+        PropertyKey::Author => &mut result.author,
+        PropertyKey::Keywords => &mut result.keywords,
+        PropertyKey::Comments => &mut result.comments,
+        PropertyKey::DocumentTitle => &mut result.document_title,
+        PropertyKey::DocumentAuthor => &mut result.document_author,
+        PropertyKey::SfwpAuthor => &mut result.sfwp_author,
+        PropertyKey::Revision => &mut result.revision,
+        PropertyKey::BuildVersion => &mut result.build_version,
+        PropertyKey::FileFormatVersion => &mut result.file_format_version,
+        PropertyKey::Ignored => return Ok(()),
+    };
+    if slot.replace(value).is_some() {
+        return Err(invalid_metadata());
+    }
+    Ok(())
+}
+
+fn metadata_scalar(event: PlistEvent<'static>) -> Result<String> {
+    let value = match event {
+        PlistEvent::String(value) => value.into_owned(),
+        PlistEvent::Integer(value) => value.to_string(),
+        PlistEvent::Real(value) if value.is_finite() => ryu::Buffer::new().format(value).to_owned(),
+        PlistEvent::Boolean(value) => value.to_string(),
+        PlistEvent::Date(value) => value.to_xml_format(),
+        _ => return Err(invalid_metadata()),
+    };
+    checked_metadata_string(value)
+}
+
+fn checked_metadata_string(value: String) -> Result<String> {
+    if value.len() > MAX_METADATA_SCALAR_BYTES {
+        return Err(metadata_limit(
+            SemanticLimitKind::TextBytes,
+            value.len(),
+            MAX_METADATA_SCALAR_BYTES,
+        ));
+    }
+    Ok(value)
+}
+
+fn check_metadata_event_scalar(event: &PlistEvent<'_>) -> Result<()> {
+    let observed = match event {
+        PlistEvent::String(value) => value.len(),
+        PlistEvent::Data(value) => value.len(),
+        _ => return Ok(()),
+    };
+    if observed > MAX_METADATA_SCALAR_BYTES {
+        return Err(metadata_limit(
+            SemanticLimitKind::TextBytes,
+            observed,
+            MAX_METADATA_SCALAR_BYTES,
+        ));
+    }
+    Ok(())
+}
+
+fn invalid_metadata() -> Error {
+    Error::InvalidFormat("invalid Numbers metadata diagnostic".to_owned())
+}
+
+fn metadata_limit(kind: SemanticLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::SemanticLimit {
+        kind,
+        observed,
+        maximum,
+        path: SemanticPath::Package,
+    }
+}
+
 fn compatibility_tables_from_components(
     components: &Components,
     archive_limits: Limits,
@@ -1007,12 +1749,16 @@ fn validate_numbers_application(components: &Components, archive_limits: Limits)
         "document",
     )?;
     let Some(canonical) = canonical_message else {
-        let mut foreign = root
-            .messages
-            .iter()
-            .filter_map(|message| detect_application_from_document(&message.data))
-            .filter(|format| matches!(format, Format::Pages | Format::Keynote));
-        if foreign.next().is_some() && foreign.next().is_none() {
+        let mut foreign = 0usize;
+        for message in &root.messages {
+            if matches!(
+                litchi_iwa_detect::__classify_application_payload(&message.data)?,
+                Some(Format::Pages | Format::Keynote)
+            ) {
+                foreign = foreign.saturating_add(1);
+            }
+        }
+        if foreign == 1 {
             return Err(Error::NotNumbers);
         }
         return Err(Error::InvalidFormat(
@@ -1020,11 +1766,12 @@ fn validate_numbers_application(components: &Components, archive_limits: Limits)
         ));
     };
     preflight_application_payload(&canonical.data, archive_limits)?;
-    let application = detect_application_from_document(&canonical.data).ok_or_else(|| {
-        Error::InvalidFormat(
-            "canonical iWork document payload has no unambiguous application shape".to_owned(),
-        )
-    })?;
+    let application = litchi_iwa_detect::__classify_application_payload(&canonical.data)?
+        .ok_or_else(|| {
+            Error::InvalidFormat(
+                "canonical iWork document payload has no unambiguous application shape".to_owned(),
+            )
+        })?;
     match application {
         Format::Numbers => Ok(()),
         Format::Pages | Format::Keynote => Err(Error::NotNumbers),
@@ -1115,6 +1862,19 @@ fn unique_message<'a>(
 }
 
 fn decode_sheet_payload(messages: &[RawMessage], path: SemanticPath) -> Result<tn::SheetArchive> {
+    let (message_type, payload) = sheet_payload(messages, path)?;
+    match message_type {
+        SHEET_MESSAGE_TYPE => {
+            tn::SheetArchive::decode(payload).map_err(|error| Error::malformed_payload(error, path))
+        },
+        FORM_BASED_SHEET_MESSAGE_TYPE => tn::FormBasedSheetArchive::decode(payload)
+            .map(|form_archive| form_archive.super_)
+            .map_err(|error| Error::malformed_payload(error, path)),
+        _ => Err(Error::MalformedPayload { path }),
+    }
+}
+
+fn sheet_payload(messages: &[RawMessage], path: SemanticPath) -> Result<(u32, &[u8])> {
     let sheet = unique_message(messages, SHEET_MESSAGE_TYPE, path, "sheet")?;
     let form = unique_message(
         messages,
@@ -1126,14 +1886,53 @@ fn decode_sheet_payload(messages: &[RawMessage], path: SemanticPath) -> Result<t
         (Some(_), Some(_)) => Err(Error::InvalidFormat(format!(
             "Numbers {path} has ambiguous sheet payload ownership"
         ))),
-        (Some(message), None) => tn::SheetArchive::decode(message.data.as_slice())
-            .map_err(|error| Error::malformed_payload(error, path)),
-        (None, Some(message)) => tn::FormBasedSheetArchive::decode(message.data.as_slice())
-            .map(|form_archive| form_archive.super_)
-            .map_err(|error| Error::malformed_payload(error, path)),
+        (Some(message), None) => Ok((message.type_, message.data.as_slice())),
+        (None, Some(message)) => Ok((message.type_, message.data.as_slice())),
         (None, None) => Err(Error::InvalidFormat(format!(
             "Numbers {path} has no canonical sheet payload"
         ))),
+    }
+}
+
+fn map_sheet_preflight_error(
+    error: names::Error,
+    path: SemanticPath,
+    consumed_references: usize,
+) -> Error {
+    match error {
+        names::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::SemanticLimit {
+            kind: match kind {
+                names::LimitKind::PayloadReferences => SemanticLimitKind::References,
+                names::LimitKind::WireBytes => SemanticLimitKind::FormulaWireBytes,
+                names::LimitKind::WireFields => SemanticLimitKind::Objects,
+                names::LimitKind::WireNesting => SemanticLimitKind::FormulaDepth,
+                names::LimitKind::WireWork => SemanticLimitKind::FormulaWork,
+                _ => return Error::MalformedPayload { path },
+            },
+            observed: usize::try_from(observed)
+                .unwrap_or(usize::MAX)
+                .saturating_add(if matches!(kind, names::LimitKind::PayloadReferences) {
+                    consumed_references
+                } else {
+                    0
+                }),
+            maximum: usize::try_from(maximum)
+                .unwrap_or(usize::MAX)
+                .saturating_add(if matches!(kind, names::LimitKind::PayloadReferences) {
+                    consumed_references
+                } else {
+                    0
+                }),
+            path,
+        },
+        names::Error::Allocation { amount } => {
+            allocation_error("Numbers rooted drawable reference projection", amount)
+        },
+        _ => Error::MalformedPayload { path },
     }
 }
 

@@ -2758,3 +2758,86 @@ The monolith exit remains incomplete. `PagesEditor`,
 examples and tests still live in `litchi-iwa`; production host code still uses
 focused Pages types. Ordered debt 017 and the `litchi-iwa -> litchi-pages`
 manifest edge remain unchanged.
+
+## 2026-08-13 amendment: Numbers reader host exit
+
+The Numbers read-facade cell exits the monolith. The 460-line host
+`numbers/document.rs`, its module and re-export, `NumbersDocument`, private
+reader state and statistics type, and the 142-line reader-only `NumbersSheet`
+adapter are deleted without aliases: 602 host reader lines in total. The cut
+removes the duplicate bundle capture, object index, root/sheet/table walker,
+repeated semantic conversion, validation path, and public
+`bundle()`/`object_index()` escape hatches.
+
+Supported read responsibilities move to focused owners by provenance.
+`litchi_numbers::Document` owns archive-free semantic file/directory paths,
+borrowed/shared bytes, and checked source and semantic options. Semantic zero
+ceilings are exact and over-hard requests fail through `DocumentLimitsError`.
+It owns rooted sheets and selectors, cheap snapshots, rooted plain text,
+validation, and optional source metadata/statistics. `litchi_numbers::Package`
+owns exact complete regular-file/byte artifacts, physical/storage diagnostics,
+write/edit provenance, and focused transactions. A package-derived or
+semantically constructed document has no source metadata or stats, and
+`Package::open` continues to refuse directories.
+
+Source-backed metadata captures only the three canonical Numbers authorities,
+from the same frozen source as the semantic components and only after Numbers
+classification. It excludes every other sidecar, `Data/`, previews, media,
+unknown package members, and exact bytes. This advances frozen-directory and
+semantic-reader coverage without turning an app-authored directory into a
+preserve-mode package.
+Unix path ingress uses pinned, no-follow capture; other non-Windows targets use
+version-checked path capture. Windows path ingress remains an explicit
+capability gap: both file and directory paths fail closed until stable,
+reparse-safe handle traversal is available, while borrowed/shared byte ingress
+remains portable.
+Each selected authority is physically capped at 64 KiB before materialization;
+a narrow `plist::stream` event projector applies fixed structure and
+retained-scalar ceilings before source diagnostics are published, without
+deserializing a general scalar DTO or plist value tree.
+
+Deletion gate 3 advances with deliberate semantic correction. Rooted
+`Document::plain_text` follows semantic workbook reachability and ordering and
+works on the native fixture that the legacy reader rejected during document
+construction, before public `text()` was reachable. Recovered private legacy
+storage output matched `Package::text` on two frozen fixtures, but
+`Package::text` remains a separate physical/storage diagnostic with no general
+parity claim. Raw archive/object-index getters and
+archive-aware sheet adapters are intentionally not replaced because they
+violate the format-owned semantic boundary. The redundant archive-byte aliases
+and constant `Application::Numbers` statistic are also removed rather than
+carried forward.
+
+The focused reader remains eager and substantially Prost-backed. Existing
+private raw/Buffa projections cover selected ownership/scalar seams, while the
+larger root, sheet, table, tile, list, comment, rich-text-sidecar, and formula
+graph remains generated-Prost debt. Consequently this reader exit is neither
+a whole-graph Buffa-lazy claim nor completion of the Numbers portion of
+deletion gate 3.
+
+Deletion gate 3 is frozen by 16/16 focused reader cases, with a seventeenth
+Windows-configured case; 240 Numbers library cases pass and four are ignored;
+compatibility and name gates pass 5/5 and 10/10. Archive coverage passes 127
+cases (125 unit plus two integration), detector coverage passes 40/40, and the
+host library passes 1,397/1,397, while generated-roundtrip and doctest gates
+pass 1/1 and nine passed with three ignored. Host all-target check and no-run,
+strict scoped host Clippy, focused
+all-target Clippy, strict focused rustdoc, formatting, and diff checks pass. The
+boundary units pass 237/237 and both live retirement/API audits report zero
+findings. The host-scoped cut touches 15 files with 329 insertions and 888
+deletions, net -559, including the 602 reader-owned source lines. Broad host
+all-target Clippy remains blocked by unrelated existing lints; the global
+boundary policy still reports 14 unrelated `soapberry-zip`/`xml-minifier` debt
+findings.
+
+ADR 0008 freezes native evidence from an isolated copy: Numbers 14.4 build
+7043.0.93 accepted the one-sheet, one-table 22-by-7 workbook without repair or
+conversion and agreed with focused semantics, but silently normalized the copy
+on close. The tracked source remained unopened and exact. No byte-inert-open,
+package-locality, or performance claim follows.
+
+The monolith exit remains incomplete. `NumbersEditor`,
+`NumbersDocumentBuilder`, `NumbersTable`, `TableDataExtractor`, creation,
+editing, examples, and broad compatibility tests still live in `litchi-iwa`.
+They continue to use `litchi-numbers`, so ordered debt 015 and the manifest
+edge remain unchanged.

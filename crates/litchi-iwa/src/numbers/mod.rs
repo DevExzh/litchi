@@ -1,7 +1,7 @@
 //! Numbers Spreadsheet Support
 //!
-//! This module provides comprehensive support for parsing Apple Numbers spreadsheets,
-//! including table extraction, cell data parsing, and formula support.
+//! This module provides Numbers creation and editing support. Use
+//! [`litchi_numbers::Document`] for archive-free spreadsheet reading.
 //!
 //! ## Features
 //!
@@ -14,10 +14,10 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use litchi_iwa::numbers::NumbersDocument;
+//! use litchi_numbers::Document;
 //!
-//! let doc = NumbersDocument::open("spreadsheet.numbers")?;
-//! let sheets = doc.sheets()?;
+//! let doc = Document::open("spreadsheet.numbers")?;
+//! let sheets = doc.sheets();
 //!
 //! for sheet in sheets.iter() {
 //!     println!("Sheet: {}", sheet.name());
@@ -30,10 +30,8 @@
 
 pub(crate) mod cell;
 pub mod creation;
-pub mod document;
 pub mod editor;
 pub(crate) mod formula;
-pub(crate) mod sheet;
 pub mod table;
 pub mod table_extractor;
 
@@ -71,7 +69,6 @@ impl From<litchi_numbers::table::merge::Error> for crate::Error {
 }
 
 pub use creation::NumbersDocumentBuilder;
-pub use document::NumbersDocument;
 pub use editor::{
     Dimension, Direction, NumbersEditor, NumbersPivotCategoryInfo, NumbersSheetAudioInfo,
     NumbersSheetAudioOptions, NumbersSheetChartInfo, NumbersSheetImageInfo,
@@ -99,6 +96,19 @@ pub use formula::{
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
 };
 pub use litchi_numbers::cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, Type, Update, Value};
-pub use sheet::NumbersSheet;
 pub use table::NumbersTable;
 pub use table_extractor::TableDataExtractor;
+
+#[cfg(test)]
+pub(crate) trait SemanticTableCellAssertions {
+    fn get_cell(&self, row: usize, column: usize) -> Option<&litchi_numbers::cell::Value>;
+}
+
+#[cfg(test)]
+impl SemanticTableCellAssertions for litchi_numbers::Table {
+    fn get_cell(&self, row: usize, column: usize) -> Option<&litchi_numbers::cell::Value> {
+        litchi_numbers::Position::try_from_usize(row, column)
+            .ok()
+            .and_then(|position| self.get(position))
+    }
+}

@@ -249,27 +249,27 @@ impl FrozenDirectoryBundle {
         Self::open_with_profile(path.as_ref(), limits, CaptureProfile::Properties)
     }
 
-    /// Snapshot a directory index plus Pages' three canonical metadata
-    /// diagnostics.
+    /// Snapshot a directory index plus the three canonical semantic metadata
+    /// diagnostics used by format-owned readers.
     ///
     /// The profile captures only `Metadata/Properties.plist`,
     /// `Metadata/BuildVersionHistory.plist`, and `Metadata/DocumentIdentifier`
     /// from one pinned `Metadata` directory. All selected files are charged
     /// before their payload bytes are allocated.
     #[doc(hidden)]
-    pub fn open_with_pages_metadata(path: impl AsRef<Path>, limits: Limits) -> Result<Self> {
-        Self::open_with_profile(path.as_ref(), limits, CaptureProfile::PagesMetadata)
+    pub fn open_with_semantic_metadata(path: impl AsRef<Path>, limits: Limits) -> Result<Self> {
+        Self::open_with_profile(path.as_ref(), limits, CaptureProfile::SemanticMetadata)
     }
 
-    /// Snapshot Pages metadata only when the already-frozen index and markers
-    /// satisfy a format-owned predicate.
+    /// Snapshot semantic metadata only when the already-frozen index and
+    /// markers satisfy a format-owned predicate.
     ///
     /// The predicate runs after index acquisition from the pinned root but
     /// before any selected metadata authority is inspected or read. This
-    /// keeps Pages-only sidecar policy from affecting Keynote, Numbers, or
-    /// unrecognized directory bundles without reopening an ambient path.
+    /// keeps a format owner's sidecar policy from affecting another format or
+    /// an unrecognized directory bundle without reopening an ambient path.
     #[doc(hidden)]
-    pub fn open_with_pages_metadata_when<F>(
+    pub fn open_with_semantic_metadata_when<F>(
         path: impl AsRef<Path>,
         limits: Limits,
         mut predicate: F,
@@ -277,12 +277,44 @@ impl FrozenDirectoryBundle {
     where
         F: FnMut(&ComponentCatalog, DirectoryMarkers) -> bool,
     {
+        let checked_limits = limits.validate()?;
+        #[cfg(unix)]
+        {
+            return Self::open_unix_semantic_when(path.as_ref(), checked_limits, &mut predicate);
+        }
+        #[cfg(windows)]
+        {
+            let _ = (path, checked_limits, predicate);
+            return Err(Error::InvalidBundle(
+                "directory-backed bundle ingress is unsupported on Windows".to_owned(),
+            ));
+        }
+        #[cfg(all(not(unix), not(windows)))]
         Self::open_with_profile_when(
             path.as_ref(),
-            limits,
-            CaptureProfile::PagesMetadata,
+            checked_limits,
+            CaptureProfile::SemanticMetadata,
             Some(&mut predicate),
         )
+    }
+
+    /// Compatibility spelling for Pages' semantic metadata profile.
+    #[doc(hidden)]
+    pub fn open_with_pages_metadata(path: impl AsRef<Path>, limits: Limits) -> Result<Self> {
+        Self::open_with_semantic_metadata(path, limits)
+    }
+
+    /// Compatibility spelling for conditional Pages metadata capture.
+    #[doc(hidden)]
+    pub fn open_with_pages_metadata_when<F>(
+        path: impl AsRef<Path>,
+        limits: Limits,
+        predicate: F,
+    ) -> Result<Self>
+    where
+        F: FnMut(&ComponentCatalog, DirectoryMarkers) -> bool,
+    {
+        Self::open_with_semantic_metadata_when(path, limits, predicate)
     }
 
     fn open_with_profile(root: &Path, limits: Limits, profile: CaptureProfile) -> Result<Self> {
@@ -339,6 +371,7 @@ impl FrozenDirectoryBundle {
                     markers_before.markers,
                     index_limits,
                     checked_limits,
+                    profile.is_semantic(),
                 )
                 .map_err(|error| remap_reserved_limit(error, checked_limits, &sidecars))?,
                 (Node::Missing, Node::Directory(version)) => Self::from_loose_index(
@@ -347,6 +380,7 @@ impl FrozenDirectoryBundle {
                     markers_before.markers,
                     index_limits,
                     checked_limits,
+                    profile.is_semantic(),
                 )
                 .map_err(|error| remap_reserved_limit(error, checked_limits, &sidecars))?,
                 (Node::File(_), Node::Directory(_)) => {
@@ -436,6 +470,217 @@ impl FrozenDirectoryBundle {
     }
 
     #[cfg(unix)]
+    fn open_unix_semantic_when(
+        root: &Path,
+        limits: Limits,
+        predicate: &mut dyn FnMut(&ComponentCatalog, DirectoryMarkers) -> bool,
+    ) -> Result<Self> {
+        let root_fd = unix_fs::open(
+            root,
+            OFlags::RDONLY
+                | OFlags::DIRECTORY
+                | OFlags::NOFOLLOW
+                | OFlags::NONBLOCK
+                | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .map_err(|error| {
+            let root_is_symlink =
+                matches!(error, rustix::io::Errno::LOOP | rustix::io::Errno::NOTDIR)
+                    && fs::symlink_metadata(root)
+                        .is_ok_and(|metadata| metadata.file_type().is_symlink());
+            if root_is_symlink {
+                Error::InvalidBundle("directory bundle root must not be a symbolic link".to_owned())
+            } else {
+                unix_error(error)
+            }
+        })?;
+        Self::open_unix_root_semantic_when(&root_fd, limits, predicate)
+    }
+
+    #[cfg(unix)]
+    fn open_unix_root_semantic_when(
+        root_fd: &OwnedFd,
+        limits: Limits,
+        predicate: &mut dyn FnMut(&ComponentCatalog, DirectoryMarkers) -> bool,
+    ) -> Result<Self> {
+        let root_before = unix_file_version(&unix_fs::fstat(root_fd).map_err(unix_error)?)?;
+        unix_require_kind(root_fd, FileType::Directory, "directory bundle root")?;
+        unix_reject_encryption_markers(root_fd)?;
+        let markers_before = unix_snapshot_markers(root_fd)?;
+        let index_zip = unix_inspect_node(root_fd, c"Index.zip", "directory bundle Index.zip")?;
+        let index = unix_inspect_node(root_fd, c"Index", "directory bundle Index")?;
+
+        let (snapshot, capture_sidecars, mut sidecars) = match (index_zip, index) {
+            (Node::File(version), Node::Missing) => {
+                let bytes = unix_read_stable_file_at(
+                    root_fd,
+                    c"Index.zip",
+                    &version,
+                    limits,
+                    FileRole::IndexZip,
+                )?;
+                let (root_components, root_report) =
+                    ComponentCatalog::from_directory_index_zip_root_with_report(
+                        &bytes, limits, limits,
+                    )?;
+                let capture = predicate(&root_components, markers_before.markers);
+                let mut sidecars = MetadataCapture::default();
+                let snapshot = if capture {
+                    sidecars = unix_inspect_sidecars(root_fd, CaptureProfile::SemanticMetadata)?;
+                    let index_limits = limits_without_sidecars(limits, &sidecars)?;
+                    Self::from_captured_index_zip(
+                        bytes,
+                        markers_before.markers,
+                        index_limits,
+                        limits,
+                        true,
+                    )
+                    .map_err(|error| remap_reserved_limit(error, limits, &sidecars))?
+                } else {
+                    Self::from_captured_index_zip_root_components(
+                        bytes,
+                        markers_before.markers,
+                        root_components,
+                        root_report,
+                        limits,
+                    )
+                };
+                unix_ensure_node_version(
+                    root_fd,
+                    c"Index.zip",
+                    &version,
+                    "verifying directory bundle Index.zip after component parsing",
+                )?;
+                if !matches!(
+                    unix_inspect_node(root_fd, c"Index", "directory bundle Index")?,
+                    Node::Missing
+                ) {
+                    return Err(changed(
+                        "verifying directory bundle Index.zip representation",
+                    ));
+                }
+                (snapshot, capture, sidecars)
+            },
+            (Node::Missing, Node::Directory(version)) => {
+                let index_fd = unix_open_directory_at(root_fd, c"Index", &version)?;
+                let (root_entry, root_version) = unix_read_loose_root(&index_fd, limits)?;
+                let root_components = ComponentCatalog::from_semantic_logical_entries(
+                    root_entry.iter().map(|entry| (entry.name(), entry.data())),
+                    limits,
+                )?;
+                let capture = predicate(&root_components, markers_before.markers);
+                let mut sidecars = MetadataCapture::default();
+                let snapshot = if capture {
+                    sidecars = unix_inspect_sidecars(root_fd, CaptureProfile::SemanticMetadata)?;
+                    let index_limits = limits_without_sidecars(limits, &sidecars)?;
+                    let manifest = unix_scan_manifest(&index_fd, index_limits)
+                        .map_err(|error| remap_reserved_limit(error, limits, &sidecars))?;
+                    if manifest.is_empty() {
+                        return Err(Error::InvalidBundle(
+                            "directory bundle Index/ contains no entries".to_owned(),
+                        ));
+                    }
+                    let entries = unix_read_manifest_reusing_root(
+                        &index_fd,
+                        &manifest,
+                        index_limits,
+                        root_entry,
+                        root_version,
+                    )
+                    .map_err(|error| remap_reserved_limit(error, limits, &sidecars))?;
+                    let snapshot =
+                        Self::from_captured_loose(entries, markers_before.markers, limits, true)
+                            .map_err(|error| remap_reserved_limit(error, limits, &sidecars))?;
+                    let observed = unix_scan_manifest(&index_fd, index_limits)
+                        .map_err(|error| remap_reserved_limit(error, limits, &sidecars))?;
+                    if observed != manifest {
+                        return Err(changed(
+                            "verifying directory bundle Index/ manifest after component parsing",
+                        ));
+                    }
+                    snapshot
+                } else {
+                    Self::from_captured_loose_root(root_entry, markers_before.markers, limits)?
+                };
+                match root_version {
+                    Some(root_version) => unix_ensure_node_version(
+                        &index_fd,
+                        c"Document.iwa",
+                        &root_version,
+                        "verifying pinned directory bundle Index/Document.iwa",
+                    )?,
+                    None => {
+                        if !matches!(
+                            unix_inspect_node(
+                                &index_fd,
+                                c"Document.iwa",
+                                "directory bundle Index/Document.iwa",
+                            )?,
+                            Node::Missing
+                        ) {
+                            return Err(changed(
+                                "verifying pinned directory bundle Index/Document.iwa",
+                            ));
+                        }
+                    },
+                }
+                let index_after =
+                    unix_file_version(&unix_fs::fstat(&index_fd).map_err(unix_error)?)?;
+                if index_after != version {
+                    return Err(changed(
+                        "verifying directory bundle Index/ after component parsing",
+                    ));
+                }
+                unix_ensure_node_version(
+                    root_fd,
+                    c"Index",
+                    &version,
+                    "verifying pinned directory bundle Index/ representation",
+                )?;
+                if !matches!(
+                    unix_inspect_node(root_fd, c"Index.zip", "directory bundle Index.zip")?,
+                    Node::Missing
+                ) {
+                    return Err(changed("verifying directory bundle Index/ representation"));
+                }
+                (snapshot, capture, sidecars)
+            },
+            (Node::File(_), Node::Directory(_)) => {
+                return Err(Error::InvalidBundle(
+                    "directory bundle contains both Index.zip and Index/ representations"
+                        .to_owned(),
+                ));
+            },
+            (Node::Missing, Node::Missing) => {
+                return Err(Error::InvalidBundle(
+                    "directory bundle contains neither Index.zip nor Index/".to_owned(),
+                ));
+            },
+            _ => {
+                return Err(Error::InvalidBundle(
+                    "directory bundle index representation has an invalid node type".to_owned(),
+                ));
+            },
+        };
+
+        unix_reject_encryption_markers(root_fd)?;
+        if unix_snapshot_markers(root_fd)? != markers_before {
+            return Err(changed("verifying directory bundle application markers"));
+        }
+        if capture_sidecars {
+            validate_sidecars_budget(snapshot.state.index_report, limits, &sidecars)?;
+            unix_read_sidecars(root_fd, &mut sidecars, limits)?;
+            unix_verify_sidecars(root_fd, &sidecars)?;
+        }
+        let root_after = unix_file_version(&unix_fs::fstat(root_fd).map_err(unix_error)?)?;
+        if root_after != root_before {
+            return Err(changed("verifying pinned directory bundle root"));
+        }
+        snapshot.with_sidecars(sidecars.into_sidecars())
+    }
+
+    #[cfg(unix)]
     fn open_unix_root(
         root_fd: &OwnedFd,
         limits: Limits,
@@ -471,6 +716,7 @@ impl FrozenDirectoryBundle {
                     markers_before.markers,
                     index_limits,
                     limits,
+                    profile.is_semantic(),
                 )
                 .map_err(|error| remap_reserved_limit(error, limits, &sidecars))?;
                 unix_ensure_node_version(
@@ -500,8 +746,13 @@ impl FrozenDirectoryBundle {
                 }
                 let entries = unix_read_manifest(&index_fd, &manifest, index_limits)
                     .map_err(|error| remap_reserved_limit(error, limits, &sidecars))?;
-                let snapshot = Self::from_captured_loose(entries, markers_before.markers, limits)
-                    .map_err(|error| remap_reserved_limit(error, limits, &sidecars))?;
+                let snapshot = Self::from_captured_loose(
+                    entries,
+                    markers_before.markers,
+                    limits,
+                    profile.is_semantic(),
+                )
+                .map_err(|error| remap_reserved_limit(error, limits, &sidecars))?;
 
                 let observed = unix_scan_manifest(&index_fd, index_limits)
                     .map_err(|error| remap_reserved_limit(error, limits, &sidecars))?;
@@ -579,10 +830,11 @@ impl FrozenDirectoryBundle {
         markers: DirectoryMarkers,
         index_limits: Limits,
         retained_limits: Limits,
+        semantic: bool,
     ) -> Result<Self> {
         let bytes = read_stable_file(path, &expected, index_limits, FileRole::IndexZip)?;
         let snapshot =
-            Self::from_captured_index_zip(bytes, markers, index_limits, retained_limits)?;
+            Self::from_captured_index_zip(bytes, markers, index_limits, retained_limits, semantic)?;
         ensure_path_version(
             path,
             &expected,
@@ -596,12 +848,21 @@ impl FrozenDirectoryBundle {
         markers: DirectoryMarkers,
         index_limits: Limits,
         retained_limits: Limits,
+        semantic: bool,
     ) -> Result<Self> {
-        let (components, index_report) = ComponentCatalog::from_directory_index_zip_with_report(
-            &bytes,
-            index_limits,
-            retained_limits,
-        )?;
+        let (components, index_report) = if semantic {
+            ComponentCatalog::from_directory_index_zip_with_report_semantic(
+                &bytes,
+                index_limits,
+                retained_limits,
+            )?
+        } else {
+            ComponentCatalog::from_directory_index_zip_with_report(
+                &bytes,
+                index_limits,
+                retained_limits,
+            )?
+        };
         if components.is_empty() {
             return Err(Error::InvalidBundle(
                 "directory bundle Index.zip contains no decodable IWA components".to_owned(),
@@ -620,6 +881,26 @@ impl FrozenDirectoryBundle {
         })
     }
 
+    fn from_captured_index_zip_root_components(
+        bytes: Box<[u8]>,
+        markers: DirectoryMarkers,
+        components: ComponentCatalog,
+        index_report: DirectoryIndexReport,
+        retained_limits: Limits,
+    ) -> Self {
+        Self {
+            state: Arc::new(State {
+                provenance: DirectoryProvenance::IndexZip,
+                markers,
+                limits: retained_limits,
+                components: Arc::new(components),
+                sidecars: DirectoryMetadataSidecars::default(),
+                index_report,
+                storage: Storage::IndexZip(bytes),
+            }),
+        }
+    }
+
     #[cfg(all(not(unix), not(windows)))]
     fn from_loose_index(
         path: &Path,
@@ -627,6 +908,7 @@ impl FrozenDirectoryBundle {
         markers: DirectoryMarkers,
         index_limits: Limits,
         retained_limits: Limits,
+        semantic: bool,
     ) -> Result<Self> {
         let manifest = scan_manifest(path, index_limits)?;
         if manifest.is_empty() {
@@ -654,7 +936,7 @@ impl FrozenDirectoryBundle {
             });
         }
 
-        let snapshot = Self::from_captured_loose(entries, markers, retained_limits)?;
+        let snapshot = Self::from_captured_loose(entries, markers, retained_limits, semantic)?;
         let observed = scan_manifest(path, index_limits)?;
         if manifest != observed {
             return Err(changed(
@@ -673,11 +955,19 @@ impl FrozenDirectoryBundle {
         entries: Vec<FrozenDirectoryEntry>,
         markers: DirectoryMarkers,
         retained_limits: Limits,
+        semantic: bool,
     ) -> Result<Self> {
-        let components = ComponentCatalog::from_logical_entries(
-            entries.iter().map(|entry| (entry.name(), entry.data())),
-            retained_limits,
-        )?;
+        let components = if semantic {
+            ComponentCatalog::from_semantic_logical_entries(
+                entries.iter().map(|entry| (entry.name(), entry.data())),
+                retained_limits,
+            )?
+        } else {
+            ComponentCatalog::from_logical_entries(
+                entries.iter().map(|entry| (entry.name(), entry.data())),
+                retained_limits,
+            )?
+        };
         if components.is_empty() {
             return Err(Error::InvalidBundle(
                 "directory bundle Index/ contains no decodable IWA components".to_owned(),
@@ -714,6 +1004,52 @@ impl FrozenDirectoryBundle {
                     })?;
                 report.input_bytes = report.expanded_bytes;
                 Ok::<DirectoryIndexReport, Error>(report)
+            },
+        )?;
+        Ok(Self {
+            state: Arc::new(State {
+                provenance: DirectoryProvenance::LooseIndex,
+                markers,
+                limits: retained_limits,
+                components: Arc::new(components),
+                sidecars: DirectoryMetadataSidecars::default(),
+                index_report,
+                storage: Storage::LooseIndex(entries.into_boxed_slice()),
+            }),
+        })
+    }
+
+    fn from_captured_loose_root(
+        entry: Option<FrozenDirectoryEntry>,
+        markers: DirectoryMarkers,
+        retained_limits: Limits,
+    ) -> Result<Self> {
+        let entries = entry.into_iter().collect::<Vec<_>>();
+        let components = ComponentCatalog::from_semantic_logical_entries(
+            entries.iter().map(|entry| (entry.name(), entry.data())),
+            retained_limits,
+        )?;
+        let index_report = entries.iter().try_fold(
+            DirectoryIndexReport {
+                input_bytes: 0,
+                entries: 0,
+                metadata_bytes: 0,
+                expanded_bytes: 0,
+            },
+            |mut report, entry| {
+                report.entries += 1;
+                let name_bytes = u64::try_from(entry.name.len()).map_err(|_error| {
+                    Error::InvalidBundle(
+                        "directory root entry name length does not fit u64".to_owned(),
+                    )
+                })?;
+                let data_bytes = u64::try_from(entry.data.len()).map_err(|_error| {
+                    Error::InvalidBundle("directory root entry length does not fit u64".to_owned())
+                })?;
+                report.metadata_bytes = name_bytes;
+                report.input_bytes = data_bytes;
+                report.expanded_bytes = data_bytes;
+                Ok::<_, Error>(report)
             },
         )?;
         Ok(Self {
@@ -777,16 +1113,25 @@ impl FrozenDirectoryBundle {
         }
     }
 
-    /// Consume this snapshot into semantic components and Pages' canonical
+    /// Consume this snapshot into semantic components and the canonical
     /// metadata sidecars. This semantic-only handoff never yields exact
     /// package provenance.
     #[doc(hidden)]
     #[must_use]
-    pub fn into_pages_semantic_parts(self) -> (Arc<ComponentCatalog>, DirectoryMetadataSidecars) {
+    pub fn into_semantic_metadata_parts(
+        self,
+    ) -> (Arc<ComponentCatalog>, DirectoryMetadataSidecars) {
         match Arc::try_unwrap(self.state) {
             Ok(state) => (state.components, state.sidecars),
             Err(state) => (Arc::clone(&state.components), state.sidecars.clone()),
         }
+    }
+
+    /// Compatibility spelling for the Pages semantic handoff.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn into_pages_semantic_parts(self) -> (Arc<ComponentCatalog>, DirectoryMetadataSidecars) {
+        self.into_semantic_metadata_parts()
     }
 
     /// Consume this snapshot into a shared immutable component catalog.
@@ -836,7 +1181,7 @@ impl FrozenDirectoryBundle {
 enum CaptureProfile {
     None,
     Properties,
-    PagesMetadata,
+    SemanticMetadata,
 }
 
 impl CaptureProfile {
@@ -844,11 +1189,15 @@ impl CaptureProfile {
         !matches!(self, Self::None)
     }
 
+    const fn is_semantic(self) -> bool {
+        matches!(self, Self::SemanticMetadata)
+    }
+
     const fn captures(self, sidecar: Sidecar) -> bool {
         match self {
             Self::None => false,
             Self::Properties => matches!(sidecar, Sidecar::Properties),
-            Self::PagesMetadata => true,
+            Self::SemanticMetadata => true,
         }
     }
 }
@@ -1529,6 +1878,85 @@ fn unix_read_manifest(
             amount: manifest.len(),
         })?;
     for item in manifest {
+        let data = unix_read_stable_file_at(
+            index_fd,
+            &item.physical_name,
+            &item.version,
+            limits,
+            FileRole::LooseEntry,
+        )?;
+        entries.push(FrozenDirectoryEntry {
+            name: item.logical_name.clone(),
+            data,
+        });
+    }
+    Ok(entries)
+}
+
+#[cfg(unix)]
+fn unix_read_loose_root(
+    index_fd: &OwnedFd,
+    limits: Limits,
+) -> Result<(Option<FrozenDirectoryEntry>, Option<FileVersion>)> {
+    let node = unix_inspect_node(
+        index_fd,
+        c"Document.iwa",
+        "directory bundle Index/Document.iwa",
+    )?;
+    let Node::File(version) = node else {
+        return match node {
+            Node::Missing => Ok((None, None)),
+            Node::Directory(_) => Err(Error::InvalidBundle(
+                "directory bundle Index/Document.iwa is not a regular file".to_owned(),
+            )),
+            Node::File(_) => unreachable!(),
+        };
+    };
+    let data = unix_read_stable_file_at(
+        index_fd,
+        c"Document.iwa",
+        &version,
+        limits,
+        FileRole::LooseEntry,
+    )?;
+    Ok((
+        Some(FrozenDirectoryEntry {
+            name: "Index/Document.iwa".into(),
+            data,
+        }),
+        Some(version),
+    ))
+}
+
+#[cfg(unix)]
+fn unix_read_manifest_reusing_root(
+    index_fd: &OwnedFd,
+    manifest: &[UnixManifestEntry],
+    limits: Limits,
+    root: Option<FrozenDirectoryEntry>,
+    root_version: Option<FileVersion>,
+) -> Result<Vec<FrozenDirectoryEntry>> {
+    let mut root = root;
+    let mut entries = Vec::new();
+    entries
+        .try_reserve_exact(manifest.len())
+        .map_err(|_error| Error::Allocation {
+            resource: "directory bundle entries",
+            amount: manifest.len(),
+        })?;
+    for item in manifest {
+        if item.logical_name.as_ref() == "Index/Document.iwa" {
+            if root_version.as_ref() != Some(&item.version) {
+                return Err(changed(
+                    "verifying pinned directory bundle Index/Document.iwa",
+                ));
+            }
+            let entry = root
+                .take()
+                .ok_or_else(|| changed("verifying pinned directory bundle Index/Document.iwa"))?;
+            entries.push(entry);
+            continue;
+        }
         let data = unix_read_stable_file_at(
             index_fd,
             &item.physical_name,
@@ -2402,6 +2830,73 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn conditional_semantic_index_zip_classifies_root_before_hostile_foreign_members() -> Result<()>
+    {
+        let temp = Temp::new()?;
+        let index = index_zip(&[
+            ("Index/Document.iwa", iwa(1, 10_000)?),
+            ("Index/Hostile.iwa", b"not-a-snappy-stream".to_vec()),
+        ])?;
+        fs::write(temp.path().join("Index.zip"), &index)?;
+        fs::create_dir(temp.path().join("Metadata"))?;
+        fs::write(
+            temp.path().join("Metadata/Properties.plist"),
+            vec![b'x'; usize::try_from(MAX_DIRECTORY_PROPERTIES_BYTES + 1).unwrap()],
+        )?;
+
+        crate::zip::reset_test_entry_read_count();
+        let frozen = FrozenDirectoryBundle::open_with_semantic_metadata_when(
+            temp.path(),
+            Limits::default(),
+            |components, _markers| {
+                assert!(components.get("Index/Document.iwa").is_some());
+                false
+            },
+        )?;
+
+        assert_eq!(frozen.components().len(), 1);
+        assert_eq!(crate::zip::test_entry_read_count(), 1);
+        assert!(frozen.components().get("Index/Hostile.iwa").is_none());
+        assert!(frozen.properties_plist().is_none());
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn conditional_semantic_loose_index_classifies_root_before_hostile_foreign_members()
+    -> Result<()> {
+        let temp = Temp::new()?;
+        fs::create_dir(temp.path().join("Index"))?;
+        fs::write(temp.path().join("Index/Document.iwa"), iwa(1, 10_000)?)?;
+        fs::write(
+            temp.path().join("Index/Hostile.iwa"),
+            b"not-a-snappy-stream",
+        )?;
+        fs::create_dir(temp.path().join("Metadata"))?;
+        fs::write(
+            temp.path().join("Metadata/DocumentIdentifier"),
+            vec![b'x'; usize::try_from(MAX_DIRECTORY_PROPERTIES_BYTES + 1).unwrap()],
+        )?;
+
+        let frozen = FrozenDirectoryBundle::open_with_semantic_metadata_when(
+            temp.path(),
+            Limits::default(),
+            |components, _markers| {
+                assert!(components.get("Index/Document.iwa").is_some());
+                false
+            },
+        )?;
+
+        assert_eq!(frozen.provenance(), DirectoryProvenance::LooseIndex);
+        assert_eq!(frozen.components().len(), 1);
+        assert_eq!(frozen.loose_entries().len(), 1);
+        assert_eq!(frozen.loose_entries()[0].name(), "Index/Document.iwa");
+        assert!(frozen.properties_plist().is_none());
+        Ok(())
+    }
+
     #[test]
     fn pages_metadata_profile_charges_all_three_sidecars_before_index_capture() -> Result<()> {
         let temp = Temp::new()?;
@@ -2827,7 +3322,7 @@ mod tests {
             b"first",
         )?;
         let replacement_fd = root_fd(replacement.path())?;
-        let mut capture = unix_inspect_sidecars(&replacement_fd, CaptureProfile::PagesMetadata)?;
+        let mut capture = unix_inspect_sidecars(&replacement_fd, CaptureProfile::SemanticMetadata)?;
         fs::write(replacement.path().join("replacement.plist"), b"other")?;
         fs::rename(
             replacement.path().join("replacement.plist"),
@@ -2845,7 +3340,7 @@ mod tests {
             b"identifier",
         )?;
         let deletion_fd = root_fd(deletion.path())?;
-        let mut capture = unix_inspect_sidecars(&deletion_fd, CaptureProfile::PagesMetadata)?;
+        let mut capture = unix_inspect_sidecars(&deletion_fd, CaptureProfile::SemanticMetadata)?;
         fs::remove_file(deletion.path().join("Metadata/DocumentIdentifier"))?;
         assert!(unix_read_sidecars(&deletion_fd, &mut capture, Limits::default()).is_err());
 
@@ -2858,7 +3353,8 @@ mod tests {
             b"history",
         )?;
         let changed_type_fd = root_fd(changed_type.path())?;
-        let mut capture = unix_inspect_sidecars(&changed_type_fd, CaptureProfile::PagesMetadata)?;
+        let mut capture =
+            unix_inspect_sidecars(&changed_type_fd, CaptureProfile::SemanticMetadata)?;
         fs::remove_file(
             changed_type
                 .path()
@@ -3157,6 +3653,7 @@ mod tests {
             DirectoryMarkers::default(),
             Limits::default(),
             Limits::default(),
+            false,
         )?;
         assert_eq!(snapshot.components().len(), 1);
 
@@ -3237,6 +3734,7 @@ mod tests {
             entries,
             DirectoryMarkers::default(),
             Limits::default(),
+            false,
         )?;
         assert!(frozen.components().get("Index/Document.iwa").is_some());
 

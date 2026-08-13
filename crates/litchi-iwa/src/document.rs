@@ -9,7 +9,7 @@
 //! modules:
 //!
 //! - `litchi_pages::Document` for Pages-specific read features
-//! - `crate::numbers::NumbersDocument` for Numbers-specific features
+//! - `litchi_numbers::Document` for Numbers-specific read features
 //! - `litchi_keynote::Package` for Keynote-specific features
 
 use std::collections::HashMap;
@@ -330,7 +330,7 @@ impl DocumentStats {
 
 // Note: Application-specific document types have been moved to dedicated modules:
 // - litchi_pages::Document
-// - crate::numbers::NumbersDocument
+// - litchi_numbers::Document
 // - litchi_keynote::Package
 //
 // The unified Document type above works with all formats and provides

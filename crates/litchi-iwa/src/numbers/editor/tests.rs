@@ -1,6 +1,7 @@
+use super::compatibility_document_from_bytes;
 use super::*;
 use crate::archive::{Archive, ArchiveObject, FieldInfo, FieldPath};
-use crate::numbers::{NumbersDocument, NumbersDocumentBuilder};
+use crate::numbers::{NumbersDocumentBuilder, SemanticTableCellAssertions};
 use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
 use crate::protobuf::tn;
 use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Reference, Uuid};
@@ -347,14 +348,22 @@ fn populated_sheet_duplicate_is_ordered_and_independent() {
             .text(),
         "Source"
     );
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let sheets = document.sheets().unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let sheets = document.sheets();
     assert_eq!(
-        sheets[0].tables[0].get_cell(SOURCE_CELL_ROW, SOURCE_CELL_COLUMN),
+        sheets[0]
+            .tables()
+            .next()
+            .unwrap()
+            .get_cell(SOURCE_CELL_ROW, SOURCE_CELL_COLUMN),
         Some(&CellValue::Text("Original".to_owned()))
     );
     assert_eq!(
-        sheets[1].tables[0].get_cell(SOURCE_CELL_ROW, SOURCE_CELL_COLUMN),
+        sheets[1]
+            .tables()
+            .next()
+            .unwrap()
+            .get_cell(SOURCE_CELL_ROW, SOURCE_CELL_COLUMN),
         Some(&CellValue::Text("Copied cell".to_owned()))
     );
 }
@@ -1142,9 +1151,12 @@ fn edit_promotes_a_complete_legacy_tile_mirror_to_bnc() {
             && row.cell_storage_buffer_pre_bnc.is_empty()
             && row.cell_offsets_pre_bnc.is_empty()
     }));
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0]
+        document.sheets()[0]
+            .tables()
+            .next()
+            .unwrap()
             .get_cell(0, 1)
             .unwrap()
             .as_number(),
@@ -1166,9 +1178,9 @@ fn segmented_formula_entries_are_reused_and_released() {
     let mut package = editor.into_package();
     move_table_data_list_entries_to_segment(&mut package, 21, 61);
 
-    let document = NumbersDocument::from_bytes(&package.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&package.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(0, 0),
+        document.sheets()[0].tables().next().unwrap().get_cell(0, 0),
         Some(&CellValue::Formula("=SUM(1,2)".to_owned()))
     );
     let mut editor = NumbersEditor::from_package(package).unwrap();
@@ -1181,8 +1193,8 @@ fn segmented_formula_entries_are_reused_and_released() {
             .unwrap();
     assert_eq!(segment.entries.len(), 1);
     assert_eq!(segment.entries[0].refcount, 1);
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(table.get_cell(0, 0).unwrap().as_number(), Some(7.0));
     assert_eq!(
         table.get_cell(1, 0),
@@ -1197,9 +1209,9 @@ fn formula_error_cells_release_root_and_segmented_list_entries() {
         if segmented {
             move_table_data_list_entries_to_segment(&mut package, 22, 60);
         }
-        let before = NumbersDocument::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let before = compatibility_document_from_bytes(&package.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            before.sheets().unwrap()[0].tables[0].get_cell(0, 1),
+            before.sheets()[0].tables().next().unwrap().get_cell(0, 1),
             Some(&CellValue::Error("Syntax Error".to_owned()))
         );
 
@@ -1218,9 +1230,12 @@ fn formula_error_cells_release_root_and_segmented_list_entries() {
         let cell = BncCell::parse(cells[1].as_deref().unwrap()).unwrap();
         assert_eq!(cell.formula_error_identifier(), None);
         assert_eq!(cell.stored_value(), StoredValue::Number);
-        let after = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let after = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            after.sheets().unwrap()[0].tables[0]
+            after.sheets()[0]
+                .tables()
+                .next()
+                .unwrap()
                 .get_cell(0, 1)
                 .unwrap()
                 .as_number(),
@@ -1240,12 +1255,9 @@ fn cell_comment_crud_preserves_value_and_comment_metadata() {
         [StorageId::new(70).unwrap()]
     );
     assert_eq!(original.comment.storage_uuid.unwrap().lower(), 61);
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let reader_comment = document.sheets().unwrap()[0].tables[0]
-        .get_comment(0, 1)
-        .unwrap()
-        .clone();
-    assert_eq!(reader_comment, original.comment);
+    let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reader_comment = reopened.cell_comment(10, 0, 1).unwrap().unwrap();
+    assert_eq!(reader_comment.comment, original.comment);
 
     editor
         .set_cell_comment(10, 0, 1, "Updated comment")
@@ -1273,10 +1285,11 @@ fn cell_comment_crud_preserves_value_and_comment_metadata() {
         TableDataList::decode(archive.object(60).unwrap().messages[0].data.as_slice()).unwrap();
     assert!(list.entries.is_empty());
 
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(table.get_cell(0, 1), Some(&CellValue::Empty));
-    assert!(table.get_comment(0, 1).is_none());
+    let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert!(reopened.cell_comment(10, 0, 1).unwrap().is_none());
 }
 
 #[test]
@@ -1454,17 +1467,29 @@ fn creates_comment_table_and_comment_only_cell_when_missing() {
     assert!(info.comment.creation_date_seconds.is_some());
     assert!(info.comment.storage_uuid.is_some());
 
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(table.get_cell(1, 2), Some(&CellValue::Empty));
-    assert_eq!(table.get_comment(1, 2).unwrap().text, "Created comment");
+    let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .cell_comment(10, 1, 2)
+            .unwrap()
+            .unwrap()
+            .comment
+            .text,
+        "Created comment"
+    );
 
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 2, cell_number(42.0)).unwrap();
     editor.clear_cell_comment(10, 1, 2).unwrap();
     assert!(editor.cell_comment(10, 1, 2).unwrap().is_none());
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0]
+        document.sheets()[0]
+            .tables()
+            .next()
+            .unwrap()
             .get_cell(1, 2)
             .unwrap()
             .as_number(),
@@ -1538,7 +1563,7 @@ fn malformed_comment_storage_fails_transactionally() {
     assert_eq!(editor.to_bytes().unwrap(), before);
     // Semantic Numbers data is validated at ingress, so malformed native
     // comment storage is rejected before an archive-backed document exists.
-    assert!(NumbersDocument::from_bytes(&before).is_err());
+    assert!(compatibility_document_from_bytes(&before).is_err());
 }
 
 #[test]
@@ -1600,8 +1625,8 @@ fn public_reader_applies_tile_row_origins() {
         })
         .unwrap();
 
-    let document = NumbersDocument::from_bytes(&package.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&package.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(table.get_cell(0, 1).unwrap().as_text(), "Original");
     assert_eq!(table.get_cell(256, 0).unwrap().as_number(), Some(99.0));
 }
@@ -1632,8 +1657,8 @@ fn formula_writes_intern_validate_and_release_references() {
     assert_eq!(formulas.entries[0].refcount, 2);
 
     let bytes = editor.to_bytes().unwrap();
-    let document = NumbersDocument::from_bytes(&bytes).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&bytes).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(
         table.get_cell(0, 0),
         Some(&CellValue::Formula("=SUM(1,2)".to_owned()))
@@ -1660,9 +1685,9 @@ fn formula_writes_intern_validate_and_release_references() {
             ),
         )
         .unwrap();
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(2, 0),
+        document.sheets()[0].tables().next().unwrap().get_cell(2, 0),
         Some(&CellValue::Formula("=((50)%>=0.5)".to_owned()))
     );
 
@@ -1733,9 +1758,9 @@ fn overwrites_formula_with_tiled_only_app_dependency_storage() {
     )
     .unwrap();
     assert_eq!(tile.cell_records.len(), 1);
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(0, 0),
+        document.sheets()[0].tables().next().unwrap().get_cell(0, 0),
         Some(&CellValue::Formula("=SUM(2)".to_owned()))
     );
 }
@@ -1753,9 +1778,9 @@ fn local_reference_formulas_write_exact_calculation_engine_edges() {
     );
 
     editor.set_formula(table_id, 3, 2, expression).unwrap();
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(3, 2),
+        document.sheets()[0].tables().next().unwrap().get_cell(3, 2),
         Some(&CellValue::Formula("=SUM(A1:B$2)".to_owned()))
     );
 
@@ -2064,11 +2089,10 @@ fn cross_table_formula_cells_write_owner_uid_ast_and_external_edges() {
     assert_eq!(edges.edge_with_owner_rows, [0]);
     assert_eq!(edges.internal_owner_id_for_edge, [7]);
 
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let sheets = document.sheets().unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let sheets = document.sheets();
     let host = sheets[0]
-        .tables
-        .iter()
+        .tables()
         .find(|table| table.name() == "Table 1")
         .unwrap();
     assert_eq!(
@@ -2197,10 +2221,9 @@ fn whole_row_formula_ranges_round_trip_with_complete_external_edges() {
     assert_eq!(edges.edge_with_owner_rows, [0, 0, 0, 0, 1, 1, 1, 1]);
     assert_eq!(edges.internal_owner_id_for_edge, [7; 8]);
 
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let host = document.sheets().unwrap()[0]
-        .tables
-        .iter()
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let host = document.sheets()[0]
+        .tables()
         .find(|table| table.name() == "Table 1")
         .unwrap()
         .clone();
@@ -2370,11 +2393,17 @@ fn duplicates_populated_table_with_independent_storage() {
     assert_eq!(created.name, "Table 1 copy");
     assert_eq!((created.rows, created.columns), (4, 4));
 
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let tables = &document.sheets().unwrap()[0].tables;
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut tables = document.sheets()[0].tables();
     assert_eq!(tables.len(), 2);
-    assert_eq!(tables[0].get_cell(0, 1).unwrap().as_text(), "Original");
-    assert_eq!(tables[1].get_cell(0, 1).unwrap().as_text(), "Original");
+    assert_eq!(
+        tables.next().unwrap().get_cell(0, 1).unwrap().as_text(),
+        "Original"
+    );
+    assert_eq!(
+        tables.next().unwrap().get_cell(0, 1).unwrap().as_text(),
+        "Original"
+    );
 
     crate::numbers::editor::set_cell_fixture(
         &mut editor,
@@ -2384,10 +2413,16 @@ fn duplicates_populated_table_with_independent_storage() {
         CellValue::Text("Independent".to_owned()),
     )
     .unwrap();
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let tables = &document.sheets().unwrap()[0].tables;
-    assert_eq!(tables[0].get_cell(0, 1).unwrap().as_text(), "Original");
-    assert_eq!(tables[1].get_cell(0, 1).unwrap().as_text(), "Independent");
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut tables = document.sheets()[0].tables();
+    assert_eq!(
+        tables.next().unwrap().get_cell(0, 1).unwrap().as_text(),
+        "Original"
+    );
+    assert_eq!(
+        tables.next().unwrap().get_cell(0, 1).unwrap().as_text(),
+        "Independent"
+    );
 
     assert_eq!(
         editor
@@ -2421,14 +2456,14 @@ fn duplicates_formula_table_with_independent_dependency_owner() {
         .unwrap();
     let owner = find_table_owner(editor.package(), created.object_id).unwrap();
     let cloned_table_info_id = owner.table_info_id;
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(document.sheets().unwrap()[0].tables.len(), 2);
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(document.sheets()[0].table_count(), 2);
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+        document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
         Some(&CellValue::Formula("=SUM(1,2)".to_owned()))
     );
     assert_eq!(
-        document.sheets().unwrap()[0].tables[1].get_cell(1, 1),
+        document.sheets()[0].tables().nth(1).unwrap().get_cell(1, 1),
         Some(&CellValue::Formula("=SUM(1,2)".to_owned()))
     );
 
@@ -2497,13 +2532,13 @@ fn duplicates_formula_table_with_independent_dependency_owner() {
             FormulaExpression::function("SUM", [FormulaExpression::Number(9.0)]),
         )
         .unwrap();
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+        document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
         Some(&CellValue::Formula("=SUM(1,2)".to_owned()))
     );
     assert_eq!(
-        document.sheets().unwrap()[0].tables[1].get_cell(1, 1),
+        document.sheets()[0].tables().nth(1).unwrap().get_cell(1, 1),
         Some(&CellValue::Formula("=SUM(9)".to_owned()))
     );
 
@@ -2699,10 +2734,10 @@ fn duplicates_app_normalized_range_graph_and_removes_it_without_orphans() {
     let cloned_table_info_id = find_table_owner(editor.package(), created.object_id)
         .unwrap()
         .table_info_id;
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(document.sheets().unwrap()[0].tables.len(), 2);
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(document.sheets()[0].table_count(), 2);
     assert!(
-        document.sheets().unwrap()[0].tables.iter().all(
+        document.sheets()[0].tables().all(
             |table| table.get_cell(3, 1) == Some(&CellValue::Formula("=SUM(B2:B3)".to_owned()))
         )
     );
@@ -3426,8 +3461,8 @@ fn inserts_blank_table_row_and_shifts_cells_uids_headers_and_formulas() {
         .unwrap();
 
     let bytes = editor.to_bytes().unwrap();
-    let document = NumbersDocument::from_bytes(&bytes).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&bytes).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!((table.row_count(), table.column_count()), (5, 4));
     assert_eq!(table.get_cell(1, 1), None);
     assert_eq!(
@@ -3532,8 +3567,8 @@ fn appends_blank_table_row_without_allocating_storage() {
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(4))
         .unwrap();
     assert_eq!(editor.tables().unwrap()[0].rows, 5);
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(document.sheets().unwrap()[0].tables[0].row_count(), 5);
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(document.sheets()[0].tables().next().unwrap().row_count(), 5);
     let archive = editor
         .package()
         .archive("Index/CalculationEngine.iwa")
@@ -3612,9 +3647,9 @@ fn row_insert_rewrites_relative_formula_ast_losslessly() {
     editor
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(2))
         .unwrap();
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(3, 2),
+        document.sheets()[0].tables().next().unwrap().get_cell(3, 2),
         Some(&CellValue::Formula("=B2".to_owned()))
     );
     editor
@@ -3640,9 +3675,9 @@ fn column_insert_rewrites_absolute_formula_ast_losslessly() {
     editor
         .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::body(1))
         .unwrap();
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(2, 3),
+        document.sheets()[0].tables().next().unwrap().get_cell(2, 3),
         Some(&CellValue::Formula("=$C$2".to_owned()))
     );
     editor
@@ -3703,9 +3738,9 @@ fn row_insert_rewrites_range_ast_and_preserves_unknown_formula_wire() {
     editor
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(2))
         .unwrap();
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(4, 2),
+        document.sheets()[0].tables().next().unwrap().get_cell(4, 2),
         Some(&CellValue::Formula("=SUM(B1:B2)".to_owned()))
     );
     editor
@@ -3733,9 +3768,9 @@ fn row_insert_rewrites_segmented_formula_ast_losslessly() {
     editor
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(2))
         .unwrap();
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(3, 2),
+        document.sheets()[0].tables().next().unwrap().get_cell(3, 2),
         Some(&CellValue::Formula("=B2".to_owned()))
     );
     editor
@@ -3768,8 +3803,8 @@ fn row_insert_copy_on_writes_shared_formula_ast_and_remerges_on_delete() {
     editor
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(2))
         .unwrap();
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(
         table.get_cell(3, 2),
         Some(&CellValue::Formula("=B2".to_owned()))
@@ -3854,9 +3889,9 @@ fn row_insert_expands_footer_aggregate_and_delete_restores_exact_bytes() {
     editor
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(3))
         .unwrap();
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(4, 1),
+        document.sheets()[0].tables().next().unwrap().get_cell(4, 1),
         Some(&CellValue::Formula("=SUM(B2:B4)".to_owned()))
     );
     let archive = editor
@@ -4118,9 +4153,9 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
     editor
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(3))
         .unwrap();
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(4, 1),
+        document.sheets()[0].tables().next().unwrap().get_cell(4, 1),
         Some(&CellValue::Formula("=SUM(B2:B4)".to_owned()))
     );
     let archive = editor.package().archive(VERSIONED_ENGINE_ENTRY).unwrap();
@@ -4343,8 +4378,8 @@ fn inserts_blank_table_column_and_shifts_cells_uids_headers_and_formulas() {
         .unwrap();
 
     let bytes = editor.to_bytes().unwrap();
-    let document = NumbersDocument::from_bytes(&bytes).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&bytes).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!((table.row_count(), table.column_count()), (4, 5));
     assert_eq!(table.get_cell(1, 1), None);
     assert_eq!(
@@ -4757,9 +4792,9 @@ fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
     assert_eq!(settings.header_row_count(), 2);
     assert_eq!(settings.header_column_count(), 2);
     assert_eq!(settings.footer_row_count(), 1);
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(4, 2),
+        document.sheets()[0].tables().next().unwrap().get_cell(4, 2),
         Some(&CellValue::Formula("=SUM(C3:C4)".to_owned()))
     );
 
@@ -4812,9 +4847,9 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
             .footer_row_count(),
         2
     );
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(4, 1),
+        document.sheets()[0].tables().next().unwrap().get_cell(4, 1),
         Some(&CellValue::Formula("=SUM(B2:B3)".to_owned()))
     );
     editor
@@ -4940,15 +4975,15 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
     assert_eq!(settings.header_row_count(), 0);
     assert_eq!(settings.footer_row_count(), 0);
     assert_eq!(settings.header_column_count(), 0);
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!((table.row_count(), table.column_count()), (2, 3));
     assert_eq!(
         table.get_cell(0, 0),
         Some(&CellValue::Text("Body".to_owned()))
     );
-    assert!(!table.iter_cells().any(|(_, value)| matches!(
-        value,
+    assert!(!table.iter_cells().any(|cell| matches!(
+        cell.value(),
         CellValue::Text(text) if text == "Header" || text == "Footer"
     )));
 
@@ -5000,8 +5035,8 @@ fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
         .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(1))
         .unwrap();
 
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!((table.row_count(), table.column_count()), (3, 4));
     assert_eq!(table.get_cell(1, 1), None);
     assert_eq!(
@@ -5020,8 +5055,8 @@ fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
     editor
         .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::body(1))
         .unwrap();
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!((table.row_count(), table.column_count()), (3, 3));
     assert_eq!(
         table.get_cell(1, 1),
@@ -5049,8 +5084,8 @@ fn table_axis_delete_releases_comment_graphs() {
         let list =
             TableDataList::decode(archive.object(60).unwrap().messages[0].data.as_slice()).unwrap();
         assert!(list.entries.is_empty());
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        assert_eq!(document.sheets().unwrap()[0].tables[0].comment_count(), 0);
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert!(reopened.cell_comment(10, 0, 1).unwrap().is_none());
     }
 }
 
@@ -5607,8 +5642,8 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
         editor.table_sort_order(TableSelector::index(0)).unwrap(),
         Some(order)
     );
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(
         table.get_cell(1, 0),
         Some(&CellValue::Text("Outside".to_owned()))
@@ -5691,8 +5726,8 @@ fn table_sort_order_executes_stable_body_sort_and_remaps_row_uids() {
         editor.table_sort_order(TableSelector::index(0)).unwrap(),
         Some(order)
     );
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(table.get_cell(0, 0), Some(&CellValue::Text("A".to_owned())));
     assert_eq!(table.get_cell(0, 1), Some(&cell_number(1.0)));
     assert_eq!(table.get_cell(1, 0), Some(&CellValue::Text("B".to_owned())));
@@ -5767,8 +5802,8 @@ fn source_created_table_executes_stable_plain_text_sort() {
         editor.table_sort_order(TableSelector::index(0)).unwrap(),
         Some(order)
     );
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(
         table.get_cell(0, 0),
         Some(&CellValue::Text("Name".to_owned()))
@@ -5856,8 +5891,8 @@ fn table_sort_resolves_plain_text_keys_from_segmented_string_storage() {
             .apply_table_sort_order(TableSelector::index(0))
             .unwrap()
     );
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(
         table.get_cell(0, 0),
         Some(&CellValue::Text("apple".to_owned()))
@@ -5993,8 +6028,8 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
             .apply_table_sort_order(TableSelector::index(0))
             .unwrap()
     );
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(
         table.get_cell(0, 0),
         Some(&CellValue::Text("Region".to_owned()))
@@ -6123,11 +6158,8 @@ fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
             .unwrap(),
         hidden
     );
-    let table = &NumbersDocument::from_bytes(&editor.to_bytes().unwrap())
-        .unwrap()
-        .sheets()
-        .unwrap()[0]
-        .tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = document.sheets()[0].tables().next().unwrap();
     assert_eq!(
         table.get_cell(1, 0),
         Some(&CellValue::Text("North".to_owned()))
@@ -6223,8 +6255,8 @@ fn table_sort_moves_rows_across_tile_boundaries() {
             .apply_table_sort_order(TableSelector::index(0))
             .unwrap()
     );
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = &document.sheets().unwrap()[0].tables[0];
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(table.get_cell(0, 0), Some(&cell_number(0.0)));
     assert_eq!(table.get_cell(1, 0), Some(&cell_number(1.0)));
     assert_eq!(table.get_cell(2, 0), Some(&cell_number(2.0)));
@@ -6431,11 +6463,12 @@ fn cell_conditional_highlighting_is_detected_and_deleted_without_changing_value(
     .unwrap();
 
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    let original_value = NumbersDocument::from_bytes(&editor.to_bytes().unwrap())
+    let original_value = compatibility_document_from_bytes(&editor.to_bytes().unwrap())
         .unwrap()
-        .sheets()
-        .unwrap()[0]
-        .tables[0]
+        .sheets()[0]
+        .tables()
+        .next()
+        .unwrap()
         .get_cell(0, 1)
         .cloned();
     let info = editor
@@ -6455,9 +6488,9 @@ fn cell_conditional_highlighting_is_detected_and_deleted_without_changing_value(
             .unwrap()
             .is_none()
     );
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        document.sheets().unwrap()[0].tables[0].get_cell(0, 1),
+        document.sheets()[0].tables().next().unwrap().get_cell(0, 1),
         original_value.as_ref()
     );
     assert!(
@@ -6755,10 +6788,10 @@ fn removes_table_from_owning_sheet_transactionally() {
         .unwrap();
     assert_eq!(removed.name, "Table 1");
     assert!(editor.tables().unwrap().is_empty());
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let sheets = document.sheets().unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let sheets = document.sheets();
     assert_eq!(sheets.len(), 1);
-    assert!(sheets[0].tables.is_empty());
+    assert!(sheets[0].is_empty());
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
@@ -6893,11 +6926,12 @@ fn moves_populated_table_between_sheets_losslessly() {
     )
     .unwrap();
     assert_eq!(
-        NumbersDocument::from_bytes(&editor.to_bytes().unwrap())
+        compatibility_document_from_bytes(&editor.to_bytes().unwrap())
             .unwrap()
-            .sheets()
-            .unwrap()[1]
-            .tables[0]
+            .sheets()[1]
+            .tables()
+            .next()
+            .unwrap()
             .get_cell(0, 0),
         Some(&CellValue::Text("Moved cell".to_owned()))
     );
@@ -6990,8 +7024,8 @@ fn creates_empty_sheet_with_unique_object_id() {
     let sheets = editor.sheets().unwrap();
     assert_eq!(sheets.len(), 2);
     assert_eq!(sheets[1].object_id, created.object_id);
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(document.sheets().unwrap()[1].name, "Created 東京");
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(document.sheets()[1].name(), "Created 東京");
 }
 
 #[test]
@@ -7067,14 +7101,26 @@ fn creates_independent_empty_table_on_an_existing_sheet() {
         CellValue::Text("Independent".to_owned()),
     )
     .unwrap();
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let sheets = document.sheets().unwrap();
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let sheets = document.sheets();
     assert_eq!(
-        sheets[0].tables[0].get_cell(0, 1).unwrap().as_text(),
+        sheets[0]
+            .tables()
+            .next()
+            .unwrap()
+            .get_cell(0, 1)
+            .unwrap()
+            .as_text(),
         "Original"
     );
     assert_eq!(
-        sheets[1].tables[0].get_cell(0, 0).unwrap().as_text(),
+        sheets[1]
+            .tables()
+            .next()
+            .unwrap()
+            .get_cell(0, 0)
+            .unwrap()
+            .as_text(),
         "Independent"
     );
 
@@ -7132,13 +7178,8 @@ fn recreates_first_table_after_removing_the_last_scratch_table() {
     .unwrap();
 
     let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let table = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap())
-        .unwrap()
-        .sheets()
-        .unwrap()
-        .remove(0)
-        .tables
-        .remove(0);
+    let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+    let table = document.sheets()[0].tables().next().unwrap();
     assert_eq!(
         table.get_cell(2, 1),
         Some(&CellValue::Text("bootstrapped".to_owned()))
@@ -7172,10 +7213,10 @@ fn first_table_bootstrap_uses_the_target_sheet() {
             .sheet_id,
         target.object_id
     );
-    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let sheets = document.sheets().unwrap();
-    assert!(sheets[0].tables.is_empty());
-    assert_eq!(sheets[1].tables[0].name(), "Target table");
+    let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let sheets = document.sheets();
+    assert!(sheets[0].is_empty());
+    assert_eq!(sheets[1].tables().next().unwrap().name(), "Target table");
 }
 
 #[test]

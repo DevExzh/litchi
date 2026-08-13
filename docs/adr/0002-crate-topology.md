@@ -3268,3 +3268,78 @@ The focused Pages suite passes 153/153, with supporting archive and detector
 suites at 93/93 and 32/32 and the host generated-roundtrip at 1/1. The boundary
 suite passes 227/227; its live retirement and focused-public-API audits both
 report zero findings.
+
+## 2026-08-13 amendment: Numbers reader ownership and provenance
+
+The duplicate `litchi-iwa::numbers::NumbersDocument` read facade is retired.
+Its 460-line host source, module, state and statistics types, re-export, and
+the 142-line reader-only `NumbersSheet` adapter are deleted rather than
+preserved behind an alias: 602 host reader lines in total. This removes the
+second bundle capture, object index, root/sheet/table traversal, repeated
+semantic conversion, and public raw `bundle()` and `object_index()` escape
+hatches. The host's `NumbersTable`,
+`TableDataExtractor`, `NumbersEditor`, and `NumbersDocumentBuilder` remain
+because editor, creation, and compatibility workflows still consume them.
+
+`litchi_numbers::Document` is now the canonical archive-free rooted workbook
+reader. It owns semantic ZIP and checked app-authored directory path ingress,
+borrowed ZIP bytes, caller-owned shared ZIP bytes, and checked source and
+semantic profiles. `DocumentLimits::new` accepts zero as an exact ceiling and
+rejects values above the hard semantic maxima through `DocumentLimitsError`.
+The document retains cheap immutable snapshots, semantic sheets and selectors,
+rooted plain text, validation, and optional source diagnostics. A source-backed
+document retains only semantic state plus the
+narrowly projected canonical Numbers metadata authorities and content-free
+statistics. It does not retain the package, media, previews, native object
+identifiers, or exact source bytes.
+
+`litchi_numbers::Package` keeps the separate exact-artifact contract: complete
+regular-file and byte ingress, exact source/write and edit provenance,
+physical/storage diagnostics, and focused transactions. A document derived
+from `Package`, or constructed directly from semantic sheets, has no source
+metadata or statistics. Direct `Package::open` continues to refuse directory
+backing; a frozen `Index.zip` or loose `Index/` supplies semantics but is not a
+complete writable artifact.
+
+The three source metadata authorities are exactly
+`Metadata/Properties.plist`, `Metadata/BuildVersionHistory.plist`, and
+`Metadata/DocumentIdentifier`. Capture is conditional on the frozen source
+being classified as Numbers, so foreign and generic detector paths do not
+inspect or retain Numbers metadata. Unselected metadata, `Data/`, previews,
+media, and unknown sidecars stay outside an archive-free document. This is a
+provenance boundary, not a promise that directory input preserves a package.
+On Unix, Numbers file and directory path ingress uses pinned, no-follow source
+capture. Other non-Windows path targets use version-checked path capture rather
+than claiming descriptor pinning. Windows file and directory path ingress fails
+closed until stable, reparse-safe handle traversal exists. Borrowed and shared
+byte ingress is portable across those platforms.
+
+The source-backed `DocumentStats` vocabulary replaces the raw-sounding
+`total_objects` and redundant constant `Application::Numbers` with
+`source_record_count`, `sheet_count`, and `table_count`. Rooted
+`Document::plain_text` intentionally supplies the rooted semantic workbook
+projection that the legacy public reader could not produce for the checked-in
+native fixture. The recovered private legacy storage projection matched
+`Package::text` on the basic and formula-rich fixtures, but the public legacy
+method was unreachable because document construction failed first. The
+existing `Package::text` therefore remains a distinct physical/storage
+diagnostic with no unqualified legacy-parity claim.
+
+This deletion removes one reader cell, not the Numbers host dependency. The
+direct `litchi-iwa -> litchi-numbers` manifest edge and ordered debt 015 remain
+while the editor, builder, table adapters, examples, and tests still use the
+focused crate.
+
+The frozen gates pass 16/16 focused reader cases, with a seventeenth
+Windows-configured case; 240 Numbers library cases pass and four are ignored;
+the compatibility and name gates pass 5/5 and 10/10. Archive coverage passes
+127 cases (125 unit plus two integration), detector coverage passes 40/40, and
+the host library passes 1,397/1,397, while generated-roundtrip and doctest
+gates pass 1/1 and nine passed with three ignored. Host all-target check and
+no-run, strict scoped host Clippy,
+focused all-target Clippy, strict focused rustdoc, formatting, and diff checks
+pass. The boundary units pass 237/237 and both live retirement/API audits report
+zero findings. The host-scoped retirement changes 15 files with 329 insertions
+and 888 deletions, net -559. Broad host all-target Clippy remains blocked by
+unrelated existing lints; the global boundary policy still reports 14 unrelated
+`soapberry-zip`/`xml-minifier` debt findings.

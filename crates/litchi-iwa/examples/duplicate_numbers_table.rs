@@ -1,7 +1,7 @@
 use std::env;
 
-use litchi_iwa::numbers::{NumbersDocument, NumbersEditor};
-use litchi_numbers::TableSelector;
+use litchi_iwa::numbers::NumbersEditor;
+use litchi_numbers::{Document, TableSelector};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments = env::args().skip(1).collect::<Vec<_>>();
@@ -20,8 +20,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let created = editor.duplicate_table(TableSelector::index(table_index))?;
     editor.save(&arguments[1])?;
 
-    let document = NumbersDocument::open(&arguments[1])?;
-    let sheets = document.sheets()?;
+    let document = Document::open(&arguments[1])?;
+    let sheets = document.sheets();
     let copied = sheets
         .iter()
         .flat_map(|sheet| sheet.tables())

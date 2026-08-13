@@ -11,7 +11,8 @@
 
 use litchi_iwa_archive::{
     self, ComponentCatalog, DetectionRoot, DirectoryMarkers, DirectoryMetadataSidecars,
-    FrozenDirectoryBundle, LogicalEntryLimits, LogicalSourceCatalog, SourceCatalog,
+    FrozenDirectoryBundle, LogicalEntryLimits, LogicalSourceCatalog, SemanticMetadataSidecars,
+    SemanticProfile, SemanticProjection, SourceCatalog,
 };
 use litchi_iwa_common::wire::{WireField, parse_wire_fields};
 use litchi_iwa_core::{Archive, SnappyLimits, SnappyStream};
@@ -92,6 +93,14 @@ pub enum LimitKind {
     IwaStreamBytes,
     /// Aggregate decoded bytes across IWA components.
     IwaTotalBytes,
+    /// Aggregate IWA objects across semantic components.
+    IwaObjects,
+    /// Protobuf-style fields parsed while classifying an IWA root.
+    IwaFields,
+    /// Nested protobuf traversal while classifying an IWA root.
+    IwaNesting,
+    /// Aggregate bounded wire work while classifying an IWA root.
+    IwaWork,
 }
 
 impl fmt::Display for LimitKind {
@@ -107,6 +116,10 @@ impl fmt::Display for LimitKind {
             Self::TotalBytes => "expanded package bytes",
             Self::IwaStreamBytes => "decoded IWA component bytes",
             Self::IwaTotalBytes => "aggregate decoded IWA bytes",
+            Self::IwaObjects => "aggregate IWA objects",
+            Self::IwaFields => "IWA root fields",
+            Self::IwaNesting => "IWA root nesting",
+            Self::IwaWork => "IWA root work",
         })
     }
 }
@@ -175,9 +188,15 @@ impl From<litchi_iwa_core::Error> for Error {
         match error {
             litchi_iwa_core::Error::InvalidLimits { .. } => Self::InvalidLimits,
             litchi_iwa_core::Error::Limit {
-                observed, maximum, ..
+                kind,
+                observed,
+                maximum,
             } => Self::LimitExceeded {
-                kind: LimitKind::IwaStreamBytes,
+                kind: if kind == litchi_iwa_core::LimitKind::Objects {
+                    LimitKind::IwaObjects
+                } else {
+                    LimitKind::IwaStreamBytes
+                },
                 observed: usize_u64(observed),
                 maximum: usize_u64(maximum),
             },
@@ -194,7 +213,30 @@ impl From<litchi_iwa_core::Error> for Error {
 
 impl From<litchi_iwa_common::Error> for Error {
     fn from(error: litchi_iwa_common::Error) -> Self {
-        Self::IwaCommon(error)
+        match error {
+            litchi_iwa_common::Error::LimitExceeded {
+                kind,
+                observed,
+                limit,
+            } => Self::LimitExceeded {
+                kind: match kind {
+                    litchi_iwa_common::LimitKind::InputBytes => LimitKind::IwaStreamBytes,
+                    litchi_iwa_common::LimitKind::Fields => LimitKind::IwaFields,
+                    litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                    litchi_iwa_common::LimitKind::Nesting => LimitKind::IwaNesting,
+                    litchi_iwa_common::LimitKind::RewriteWork => LimitKind::IwaWork,
+                    litchi_iwa_common::LimitKind::TableRows
+                    | litchi_iwa_common::LimitKind::TableColumns
+                    | litchi_iwa_common::LimitKind::TableCells
+                    | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::IwaFields,
+                },
+                observed: usize_u64(observed),
+                maximum: usize_u64(limit),
+            },
+            litchi_iwa_common::Error::Allocation { amount, .. } => Self::Allocation { amount },
+            litchi_iwa_common::Error::InvalidLimit { .. } => Self::InvalidLimits,
+            invalid @ litchi_iwa_common::Error::InvalidFormat(_) => Self::IwaCommon(invalid),
+        }
     }
 }
 /// The application family of a detected iWork document.
@@ -224,8 +266,8 @@ pub struct PreparedSource {
 /// Canonical metadata diagnostics retained for a format-owned semantic reader.
 ///
 /// This explicitly unstable DTO exposes only the three fixed authorities used
-/// by the Pages reader. It deliberately carries neither physical package
-/// entries nor caller-selected paths.
+/// by format-owned Pages and Numbers readers. It deliberately carries neither
+/// physical package entries nor caller-selected paths.
 #[doc(hidden)]
 #[derive(Clone, Default)]
 pub struct PreparedMetadataSidecars {
@@ -286,6 +328,18 @@ impl From<DirectoryMetadataSidecars> for PreparedMetadataSidecars {
     }
 }
 
+impl From<SemanticMetadataSidecars> for PreparedMetadataSidecars {
+    fn from(sidecars: SemanticMetadataSidecars) -> Self {
+        let (properties_plist, build_version_history_plist, document_identifier) =
+            sidecars.into_parts();
+        Self {
+            properties_plist: properties_plist.map(Arc::from),
+            build_version_history_plist: build_version_history_plist.map(Arc::from),
+            document_identifier: document_identifier.map(Arc::from),
+        }
+    }
+}
+
 /// Archive-free semantic state consumed by one format owner.
 ///
 /// This DTO preserves the checked archive profile and immutable component
@@ -342,6 +396,9 @@ impl PreparedSemanticSource {
 
 enum PreparedBacking {
     Package(SourceCatalog),
+    FormatOnly {
+        limits: litchi_iwa_archive::Limits,
+    },
     Semantic {
         components: Arc<ComponentCatalog>,
         limits: litchi_iwa_archive::Limits,
@@ -353,7 +410,7 @@ enum PreparedBacking {
 enum PathProfile {
     IndexOnly,
     Properties,
-    PagesMetadata,
+    SemanticMetadata(Format),
 }
 
 impl fmt::Debug for PreparedSource {
@@ -409,21 +466,84 @@ impl PreparedSource {
     /// profile.
     #[doc(hidden)]
     pub fn __from_bytes_with_pages_metadata(value: &[u8], limits: Limits) -> Result<Option<Self>> {
+        Self::from_bytes_with_catalog_metadata(value, limits, Format::Pages)
+    }
+
+    /// Prepare borrowed package bytes for Numbers' archive-free semantic
+    /// reader under the fixed canonical metadata profile.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_bytes_with_limits`], plus a
+    /// refusal when a selected canonical metadata authority violates its
+    /// physical profile.
+    #[doc(hidden)]
+    pub fn __from_bytes_with_numbers_semantics(
+        value: &[u8],
+        limits: Limits,
+    ) -> Result<Option<Self>> {
+        Self::from_bytes_with_semantic_projection(value, limits, Format::Numbers)
+    }
+
+    fn from_bytes_with_catalog_metadata(
+        value: &[u8],
+        limits: Limits,
+        expected: Format,
+    ) -> Result<Option<Self>> {
         if !check_prepared_candidate(value, limits)? {
             return Ok(None);
         }
         let archive_limits = archive_limits(limits)?;
-        let catalog = if bytes_with_limits(value, limits)? == Some(Format::Pages) {
-            SourceCatalog::__from_bytes_with_logical_entry_limits(
-                value,
-                archive_limits,
-                LogicalEntryLimits::PAGES_METADATA,
-            )
-        } else {
-            SourceCatalog::from_bytes_with_limits(value, archive_limits)
+        let root = litchi_iwa_archive::inspect_semantic_detection_root(value, archive_limits)
+            .map_err(map_archive_error)?;
+        let Some(format) = classify_root(&root)? else {
+            return Ok(None);
+        };
+        if format != expected {
+            return Ok(Some(Self::format_only(format, limits, archive_limits)));
         }
+        let catalog = SourceCatalog::__from_bytes_with_logical_entry_limits(
+            value,
+            archive_limits,
+            LogicalEntryLimits::SEMANTIC_METADATA,
+        )
         .map_err(map_archive_error)?;
         Self::from_catalog(catalog, limits)
+    }
+
+    fn from_bytes_with_semantic_projection(
+        value: &[u8],
+        limits: Limits,
+        expected: Format,
+    ) -> Result<Option<Self>> {
+        if !check_prepared_candidate(value, limits)? {
+            return Ok(None);
+        }
+        let archive_limits = archive_limits(limits)?;
+        let root = litchi_iwa_archive::inspect_semantic_detection_root(value, archive_limits)
+            .map_err(map_archive_error)?;
+        let Some(format) = classify_root(&root)? else {
+            return Ok(None);
+        };
+        if format != expected {
+            return Ok(Some(Self::format_only(format, limits, archive_limits)));
+        }
+        let projection = SemanticProjection::from_bytes_with_limits(
+            value,
+            archive_limits,
+            SemanticProfile::Metadata,
+        )
+        .map_err(map_archive_error)?;
+        let (components, sidecars, projected_limits) = projection.into_parts();
+        Ok(Some(Self {
+            backing: PreparedBacking::Semantic {
+                components: Arc::new(components),
+                limits: projected_limits,
+                sidecars: sidecars.into(),
+            },
+            format,
+            limits,
+        }))
     }
 
     /// Prepare already-owned immutable package bytes without copying them.
@@ -470,19 +590,47 @@ impl PreparedSource {
         value: Arc<[u8]>,
         limits: Limits,
     ) -> Result<Option<Self>> {
+        Self::from_shared_bytes_with_catalog_metadata(value, limits, Format::Pages)
+    }
+
+    /// Prepare shared package bytes for Numbers' archive-free semantic reader
+    /// under the fixed canonical metadata profile.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_shared_bytes_with_limits`],
+    /// plus a refusal when a selected canonical metadata authority violates
+    /// its physical profile.
+    #[doc(hidden)]
+    pub fn __from_shared_bytes_with_numbers_semantics(
+        value: Arc<[u8]>,
+        limits: Limits,
+    ) -> Result<Option<Self>> {
+        Self::from_bytes_with_semantic_projection(&value, limits, Format::Numbers)
+    }
+
+    fn from_shared_bytes_with_catalog_metadata(
+        value: Arc<[u8]>,
+        limits: Limits,
+        expected: Format,
+    ) -> Result<Option<Self>> {
         if !check_prepared_candidate(&value, limits)? {
             return Ok(None);
         }
         let archive_limits = archive_limits(limits)?;
-        let catalog = if bytes_with_limits(&value, limits)? == Some(Format::Pages) {
-            SourceCatalog::__from_shared_bytes_with_logical_entry_limits(
-                value,
-                archive_limits,
-                LogicalEntryLimits::PAGES_METADATA,
-            )
-        } else {
-            SourceCatalog::from_shared_bytes_with_limits(value, archive_limits)
+        let root = litchi_iwa_archive::inspect_semantic_detection_root(&value, archive_limits)
+            .map_err(map_archive_error)?;
+        let Some(format) = classify_root(&root)? else {
+            return Ok(None);
+        };
+        if format != expected {
+            return Ok(Some(Self::format_only(format, limits, archive_limits)));
         }
+        let catalog = SourceCatalog::__from_shared_bytes_with_logical_entry_limits(
+            value,
+            archive_limits,
+            LogicalEntryLimits::SEMANTIC_METADATA,
+        )
         .map_err(map_archive_error)?;
         Self::from_catalog(catalog, limits)
     }
@@ -525,6 +673,10 @@ impl PreparedSource {
         let Some(format) = component_catalog(logical.components())? else {
             return Ok(None);
         };
+        logical
+            .components()
+            .__validate_semantic_object_limit()
+            .map_err(map_archive_error)?;
         let archive_limits = logical.limits();
         let components = Arc::new(logical.into_components());
         Ok(Some(Self {
@@ -596,7 +748,35 @@ impl PreparedSource {
         value: impl AsRef<Path>,
         limits: Limits,
     ) -> Result<Option<Self>> {
-        Self::from_path_with_profile(value.as_ref(), limits, PathProfile::PagesMetadata)
+        Self::from_path_with_profile(
+            value.as_ref(),
+            limits,
+            PathProfile::SemanticMetadata(Format::Pages),
+        )
+    }
+
+    /// Prepare a path for Numbers' archive-free semantic reader while
+    /// retaining exactly the three fixed canonical metadata diagnostics.
+    ///
+    /// Directory sidecars are inspected only after the frozen application
+    /// root and markers agree that the source is Numbers. Packaged files use
+    /// the semantic ZIP profile; Windows path ingress fails closed while the
+    /// byte and shared-byte entry points remain available.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_path_with_limits`], plus a
+    /// refusal when a selected canonical metadata authority is unsafe.
+    #[doc(hidden)]
+    pub fn __from_path_with_numbers_semantics(
+        value: impl AsRef<Path>,
+        limits: Limits,
+    ) -> Result<Option<Self>> {
+        Self::from_path_with_profile(
+            value.as_ref(),
+            limits,
+            PathProfile::SemanticMetadata(Format::Numbers),
+        )
     }
 
     fn from_path_with_profile(
@@ -606,22 +786,32 @@ impl PreparedSource {
     ) -> Result<Option<Self>> {
         match kind(path)? {
             Kind::File => {
-                // Focused Pages path ingress promises a stable, no-follow
+                // Focused semantic path ingress promises a stable, no-follow
                 // physical snapshot. The current Windows adapter cannot pin
                 // that identity across reparse-point resolution, so keep the
                 // byte/shared-byte APIs available there and fail closed for
                 // this path-owned profile.
                 #[cfg(windows)]
-                if profile == PathProfile::PagesMetadata {
-                    return Err(Error::InvalidFormat(
-                        "Pages package path ingress is unsupported on Windows".to_owned(),
-                    ));
+                if let PathProfile::SemanticMetadata(format) = profile {
+                    return Err(Error::InvalidFormat(format!(
+                        "{format:?} package path ingress is unsupported on Windows"
+                    )));
                 }
                 let source = read_stable_package_file(path, limits)?;
-                if profile == PathProfile::PagesMetadata {
-                    Self::__from_shared_bytes_with_pages_metadata(source, limits)
-                } else {
-                    Self::from_shared_bytes_with_limits(source, limits)
+                match profile {
+                    PathProfile::SemanticMetadata(Format::Numbers) => {
+                        Self::from_bytes_with_semantic_projection(&source, limits, Format::Numbers)
+                    },
+                    PathProfile::SemanticMetadata(expected) => {
+                        Self::from_shared_bytes_with_catalog_metadata(
+                            source.into(),
+                            limits,
+                            expected,
+                        )
+                    },
+                    PathProfile::IndexOnly | PathProfile::Properties => {
+                        Self::from_shared_bytes_with_limits(source.into(), limits)
+                    },
                 }
             },
             Kind::Dir => {
@@ -633,22 +823,27 @@ impl PreparedSource {
                     PathProfile::Properties => {
                         FrozenDirectoryBundle::open_with_properties(path, archive)
                     },
-                    PathProfile::PagesMetadata => {
-                        FrozenDirectoryBundle::open_with_pages_metadata_when(
+                    PathProfile::SemanticMetadata(expected) => {
+                        FrozenDirectoryBundle::open_with_semantic_metadata_when(
                             path,
                             archive,
                             |components, markers| {
-                                matches!(component_catalog(components), Ok(Some(Format::Pages)))
-                                    && matches!(
-                                        marker_outcome(markers),
-                                        Outcome::None | Outcome::Found(Format::Pages)
-                                    )
+                                matches!(component_catalog(components), Ok(Some(format)) if format == expected)
+                                    && (marker_outcome(markers) == Outcome::None
+                                        || matches!(
+                                            marker_outcome(markers),
+                                            Outcome::Found(format) if format == expected
+                                        ))
                             },
                         )
                     },
                 }
                 .map_err(map_archive_error)?;
-                Self::from_directory(directory, limits)
+                Self::from_directory(
+                    directory,
+                    limits,
+                    matches!(profile, PathProfile::SemanticMetadata(_)),
+                )
             },
             Kind::Missing => Err(Error::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -668,7 +863,25 @@ impl PreparedSource {
         }))
     }
 
-    fn from_directory(directory: FrozenDirectoryBundle, limits: Limits) -> Result<Option<Self>> {
+    fn format_only(
+        format: Format,
+        limits: Limits,
+        archive_limits: litchi_iwa_archive::Limits,
+    ) -> Self {
+        Self {
+            backing: PreparedBacking::FormatOnly {
+                limits: archive_limits,
+            },
+            format,
+            limits,
+        }
+    }
+
+    fn from_directory(
+        directory: FrozenDirectoryBundle,
+        limits: Limits,
+        semantic_profile: bool,
+    ) -> Result<Option<Self>> {
         let Some(format) = component_catalog(directory.components())? else {
             if marker_outcome(directory.markers()) != Outcome::None {
                 return Err(Error::InvalidFormat(
@@ -677,6 +890,12 @@ impl PreparedSource {
             }
             return Ok(None);
         };
+        if semantic_profile {
+            directory
+                .components()
+                .__validate_semantic_object_limit()
+                .map_err(map_archive_error)?;
+        }
         match marker_outcome(directory.markers()) {
             Outcome::None => {},
             Outcome::Found(marker) if marker == format => {},
@@ -693,7 +912,7 @@ impl PreparedSource {
             },
         }
         let archive_limits = directory.limits();
-        let (components, sidecars) = directory.into_pages_semantic_parts();
+        let (components, sidecars) = directory.into_semantic_metadata_parts();
         Ok(Some(Self {
             backing: PreparedBacking::Semantic {
                 limits: archive_limits,
@@ -728,7 +947,7 @@ impl PreparedSource {
     pub fn __into_source_catalog(self) -> Option<SourceCatalog> {
         match self.backing {
             PreparedBacking::Package(catalog) => Some(catalog),
-            PreparedBacking::Semantic { .. } => None,
+            PreparedBacking::FormatOnly { .. } | PreparedBacking::Semantic { .. } => None,
         }
     }
 
@@ -744,6 +963,9 @@ impl PreparedSource {
             PreparedBacking::Package(catalog) => {
                 let limits = catalog.limits();
                 (Arc::new(catalog.into_components()), limits)
+            },
+            PreparedBacking::FormatOnly { limits } => {
+                (Arc::new(ComponentCatalog::__empty()), limits)
             },
             PreparedBacking::Semantic {
                 components, limits, ..
@@ -797,6 +1019,9 @@ impl PreparedSource {
                     .transpose()?;
                 Ok((Arc::new(catalog.into_components()), limits, properties))
             },
+            PreparedBacking::FormatOnly { limits } => {
+                Ok((Arc::new(ComponentCatalog::__empty()), limits, None))
+            },
             PreparedBacking::Semantic {
                 components,
                 limits,
@@ -820,21 +1045,40 @@ impl PreparedSource {
     /// selected authority.
     #[doc(hidden)]
     pub fn __into_pages_semantic_source(self) -> Result<PreparedSemanticSource> {
-        if self.format != Format::Pages {
-            return Err(Error::InvalidFormat(
-                "prepared iWork source is not a Pages document".to_owned(),
-            ));
+        self.into_semantic_source(Format::Pages)
+    }
+
+    /// Consume a Numbers-prepared source into one typed archive-free semantic
+    /// handoff.
+    ///
+    /// # Errors
+    ///
+    /// Returns a format error unless this source was classified as Numbers,
+    /// or an allocation/physical error while finalizing the fixed sidecars.
+    #[doc(hidden)]
+    pub fn __into_numbers_semantic_source(self) -> Result<PreparedSemanticSource> {
+        self.into_semantic_source(Format::Numbers)
+    }
+
+    fn into_semantic_source(self, expected: Format) -> Result<PreparedSemanticSource> {
+        if self.format != expected {
+            return Err(Error::InvalidFormat(format!(
+                "prepared iWork source is not a {expected:?} document"
+            )));
         }
         match self.backing {
             PreparedBacking::Package(catalog) => {
                 let limits = catalog.limits();
-                let sidecars = copy_pages_metadata_sidecars(catalog.package())?;
+                let sidecars = copy_semantic_metadata_sidecars(catalog.package(), expected)?;
                 Ok(PreparedSemanticSource {
                     components: Arc::new(catalog.into_components()),
                     limits,
                     sidecars,
                 })
             },
+            PreparedBacking::FormatOnly { .. } => Err(Error::InvalidFormat(format!(
+                "prepared iWork source is not a {expected:?} document"
+            ))),
             PreparedBacking::Semantic {
                 components,
                 limits,
@@ -848,46 +1092,47 @@ impl PreparedSource {
     }
 }
 
-const PAGES_METADATA_AUTHORITIES: [(&str, PagesSidecar); 3] = [
-    ("Metadata/Properties.plist", PagesSidecar::Properties),
+const SEMANTIC_METADATA_AUTHORITIES: [(&str, SemanticSidecar); 3] = [
+    ("Metadata/Properties.plist", SemanticSidecar::Properties),
     (
         "Metadata/BuildVersionHistory.plist",
-        PagesSidecar::BuildVersionHistory,
+        SemanticSidecar::BuildVersionHistory,
     ),
     (
         "Metadata/DocumentIdentifier",
-        PagesSidecar::DocumentIdentifier,
+        SemanticSidecar::DocumentIdentifier,
     ),
 ];
 
 #[derive(Clone, Copy)]
-enum PagesSidecar {
+enum SemanticSidecar {
     Properties,
     BuildVersionHistory,
     DocumentIdentifier,
 }
 
-fn copy_pages_metadata_sidecars(
+fn copy_semantic_metadata_sidecars(
     package: &litchi_iwa_archive::package::Catalog,
+    format: Format,
 ) -> Result<PreparedMetadataSidecars> {
     let mut sidecars = PreparedMetadataSidecars::default();
     let selected = package
-        .__pages_metadata_sidecars()
+        .__semantic_metadata_sidecars()
         .map_err(map_archive_error)?;
     for (authority, sidecar, entry) in [
         (
-            PAGES_METADATA_AUTHORITIES[0].0,
-            PagesSidecar::Properties,
+            SEMANTIC_METADATA_AUTHORITIES[0].0,
+            SemanticSidecar::Properties,
             selected.properties_plist(),
         ),
         (
-            PAGES_METADATA_AUTHORITIES[1].0,
-            PagesSidecar::BuildVersionHistory,
+            SEMANTIC_METADATA_AUTHORITIES[1].0,
+            SemanticSidecar::BuildVersionHistory,
             selected.build_version_history_plist(),
         ),
         (
-            PAGES_METADATA_AUTHORITIES[2].0,
-            PagesSidecar::DocumentIdentifier,
+            SEMANTIC_METADATA_AUTHORITIES[2].0,
+            SemanticSidecar::DocumentIdentifier,
             selected.document_identifier(),
         ),
     ] {
@@ -896,7 +1141,7 @@ fn copy_pages_metadata_sidecars(
         };
         if entry.is_opaque() {
             return Err(Error::InvalidFormat(format!(
-                "canonical Pages metadata authority {authority} uses unsupported compression"
+                "canonical {format:?} metadata authority {authority} uses unsupported compression"
             )));
         }
         if entry.data().len() > MAX_PROPERTIES_BYTES {
@@ -908,9 +1153,9 @@ fn copy_pages_metadata_sidecars(
         }
         let data = Some(copy_semantic_sidecar(entry.data())?);
         match sidecar {
-            PagesSidecar::Properties => sidecars.properties_plist = data,
-            PagesSidecar::BuildVersionHistory => sidecars.build_version_history_plist = data,
-            PagesSidecar::DocumentIdentifier => sidecars.document_identifier = data,
+            SemanticSidecar::Properties => sidecars.properties_plist = data,
+            SemanticSidecar::BuildVersionHistory => sidecars.build_version_history_plist = data,
+            SemanticSidecar::DocumentIdentifier => sidecars.document_identifier = data,
         }
     }
     Ok(sidecars)
@@ -930,7 +1175,7 @@ fn marker_outcome(markers: DirectoryMarkers) -> Outcome {
     classify(markers.pages(), markers.keynote(), markers.numbers())
 }
 
-fn read_stable_package_file(path: &Path, limits: Limits) -> Result<Arc<[u8]>> {
+fn read_stable_package_file(path: &Path, limits: Limits) -> Result<Vec<u8>> {
     let _checked = archive_limits(limits)?;
     let mut options = OpenOptions::new();
     options.read(true);
@@ -983,7 +1228,7 @@ fn read_stable_package_file(path: &Path, limits: Limits) -> Result<Arc<[u8]>> {
     if before != after || after != path_after || observed != before.len {
         return Err(Error::SourceChanged);
     }
-    Ok(bytes.into())
+    Ok(bytes)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1367,25 +1612,53 @@ fn is_zip_signature(value: &[u8]) -> bool {
 /// document at field 3. Malformed or multiply matching payloads fail closed.
 #[must_use]
 pub fn detect_application_from_document(payload: &[u8]) -> Option<Format> {
-    let fields = wire_fields(payload)?;
-    let pages = unique_field(payload, &fields, 15, 2).is_some_and(valid_shared_document);
-    let numbers = [4, 5, 6]
-        .into_iter()
-        .all(|field| unique_field(payload, &fields, field, 2).is_some_and(valid_reference))
-        && unique_field(payload, &fields, 8, 2).is_some_and(valid_shared_document);
-    let keynote = unique_field(payload, &fields, 2, 2).is_some_and(valid_reference)
-        && unique_field(payload, &fields, 3, 2).is_some_and(valid_shared_document);
+    classify_application_payload(payload).ok().flatten()
+}
 
-    match (pages, numbers, keynote) {
+/// Strictly classify a root `DocumentArchive` payload for detector consumers.
+///
+/// Unlike [`detect_application_from_document`], this preserves malformed-wire
+/// and resource-limit failures as typed detector errors.
+#[doc(hidden)]
+pub fn __classify_application_payload(payload: &[u8]) -> Result<Option<Format>> {
+    classify_application_payload(payload)
+}
+
+fn classify_application_payload(payload: &[u8]) -> Result<Option<Format>> {
+    let fields = parse_canonical_wire_fields(payload)?;
+    let pages = match unique_field(payload, &fields, 15, 2)? {
+        Some(shared) => valid_shared_document(shared)?,
+        None => false,
+    };
+    let mut numbers = true;
+    for field in [4, 5, 6] {
+        numbers &= match unique_field(payload, &fields, field, 2)? {
+            Some(reference) => valid_reference(reference)?,
+            None => false,
+        };
+    }
+    numbers &= match unique_field(payload, &fields, 8, 2)? {
+        Some(shared) => valid_shared_document(shared)?,
+        None => false,
+    };
+    let keynote = match unique_field(payload, &fields, 2, 2)? {
+        Some(reference) => valid_reference(reference)?,
+        None => false,
+    } && match unique_field(payload, &fields, 3, 2)? {
+        Some(shared) => valid_shared_document(shared)?,
+        None => false,
+    };
+
+    let resolved = match (pages, numbers, keynote) {
         (true, false, false) => Some(Format::Pages),
         (false, true, false) => Some(Format::Numbers),
         (false, false, true) => Some(Format::Keynote),
         _ => None,
+    };
+    if resolved.is_none() && !pages && !numbers && !keynote {
+        validate_malformed_application_authority(payload, &fields)?;
     }
-}
-
-fn wire_fields(payload: &[u8]) -> Option<Vec<WireField>> {
-    parse_wire_fields(payload).ok()
+    Ok(resolved)
 }
 
 fn unique_field<'a>(
@@ -1393,26 +1666,121 @@ fn unique_field<'a>(
     fields: &[WireField],
     number: u32,
     wire_type: u8,
-) -> Option<&'a [u8]> {
+) -> Result<Option<&'a [u8]>> {
     let mut matches = fields.iter().filter(|field| field.number() == number);
-    let field = matches.next()?;
+    let Some(field) = matches.next() else {
+        return Ok(None);
+    };
     if matches.next().is_some() || field.wire_type() != wire_type {
-        return None;
+        return Ok(None);
     }
-    field.checked_payload(payload).ok()
+    Ok(Some(field.checked_payload(payload)?))
 }
 
-fn valid_reference(payload: &[u8]) -> bool {
-    wire_fields(payload)
-        .and_then(|fields| unique_field(payload, &fields, 1, 0))
-        .is_some()
+fn valid_reference(payload: &[u8]) -> Result<bool> {
+    let fields = parse_canonical_wire_fields(payload)?;
+    let Some(identifier) = unique_field(payload, &fields, 1, 0)? else {
+        return Ok(false);
+    };
+    Ok(is_canonical_reference_identifier(identifier))
 }
 
-fn valid_shared_document(payload: &[u8]) -> bool {
-    wire_fields(payload)
-        .and_then(|fields| unique_field(payload, &fields, 1, 2))
-        .and_then(wire_fields)
-        .is_some()
+fn is_canonical_reference_identifier(payload: &[u8]) -> bool {
+    let Ok((identifier, width)) = litchi_iwa_common::decode_varint_from_bytes(payload) else {
+        return false;
+    };
+    width == payload.len() && width == litchi_iwa_common::varint::encoded_len(identifier)
+}
+
+fn valid_shared_document(payload: &[u8]) -> Result<bool> {
+    let fields = parse_canonical_wire_fields(payload)?;
+    let Some(document) = unique_field(payload, &fields, 1, 2)? else {
+        return Ok(false);
+    };
+    let _fields = parse_canonical_wire_fields(document)?;
+    Ok(true)
+}
+
+fn parse_canonical_wire_fields(payload: &[u8]) -> Result<Vec<WireField>> {
+    let fields = parse_wire_fields(payload)?;
+    for field in &fields {
+        field.validate_canonical_framing(payload)?;
+    }
+    Ok(fields)
+}
+
+fn validate_malformed_application_authority(payload: &[u8], fields: &[WireField]) -> Result<()> {
+    if fields.iter().any(|field| field.number() == 15) {
+        let shared = strict_unique_field(payload, fields, 15, 2)?;
+        validate_strict_shared_document(shared)?;
+        return Ok(());
+    }
+    if [4, 5, 6, 8]
+        .iter()
+        .all(|number| fields.iter().any(|field| field.number() == *number))
+    {
+        for number in [4, 5, 6] {
+            validate_strict_reference(strict_unique_field(payload, fields, number, 2)?)?;
+        }
+        validate_strict_shared_document(strict_unique_field(payload, fields, 8, 2)?)?;
+        return Ok(());
+    }
+    if [2, 3]
+        .iter()
+        .all(|number| fields.iter().any(|field| field.number() == *number))
+    {
+        validate_strict_reference(strict_unique_field(payload, fields, 2, 2)?)?;
+        validate_strict_shared_document(strict_unique_field(payload, fields, 3, 2)?)?;
+    }
+    Ok(())
+}
+
+fn strict_unique_field<'a>(
+    payload: &'a [u8],
+    fields: &[WireField],
+    number: u32,
+    wire_type: u8,
+) -> Result<&'a [u8]> {
+    let mut matches = fields.iter().filter(|field| field.number() == number);
+    let Some(field) = matches.next() else {
+        return Err(invalid_application_authority(number, "is missing"));
+    };
+    if matches.next().is_some() {
+        return Err(invalid_application_authority(number, "is duplicated"));
+    }
+    if field.wire_type() != wire_type {
+        return Err(invalid_application_authority(
+            number,
+            "has the wrong wire type",
+        ));
+    }
+    Ok(field.checked_payload(payload)?)
+}
+
+fn validate_strict_reference(payload: &[u8]) -> Result<()> {
+    let fields = parse_canonical_wire_fields(payload)?;
+    let identifier = strict_unique_field(payload, &fields, 1, 0)?;
+    if !is_canonical_reference_identifier(identifier) {
+        return Err(invalid_application_authority(
+            1,
+            "has a noncanonical reference identifier",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_strict_shared_document(payload: &[u8]) -> Result<()> {
+    let fields = parse_canonical_wire_fields(payload)?;
+    let document = strict_unique_field(payload, &fields, 1, 2)?;
+    let _document_fields = parse_canonical_wire_fields(document)?;
+    Ok(())
+}
+
+fn invalid_application_authority(number: u32, reason: &str) -> Error {
+    litchi_iwa_common::Error::InvalidFormat(format!(
+        "protobuf field {number} {reason} in an application authority"
+    ))
+    .into()
 }
 
 fn root_format(data: &[u8], limits: Limits) -> Result<Option<Format>> {
@@ -1424,14 +1792,15 @@ fn root_format(data: &[u8], limits: Limits) -> Result<Option<Format>> {
 fn root_format_archive(archive: &Archive) -> Result<Option<Format>> {
     let mut detected = None;
 
-    for application in archive
+    for message in archive
         .objects
         .iter()
         .filter(|object| object.archive_info.identifier == Some(1))
         .flat_map(|object| &object.messages)
-        .filter_map(|message| detect_application_from_document(&message.data))
     {
-        let format = application;
+        let Some(format) = classify_application_payload(&message.data)? else {
+            continue;
+        };
         if detected.is_some() {
             return Err(Error::InvalidFormat(
                 "Document.iwa contains multiple application roots".to_owned(),
@@ -1820,6 +2189,28 @@ mod tests {
         }
     }
 
+    fn append_length_delimited_field(output: &mut Vec<u8>, number: u32, value: &[u8]) {
+        litchi_iwa_common::encode_varint_into(output, (u64::from(number) << 3) | 2);
+        litchi_iwa_common::encode_varint_into(output, u64::try_from(value.len()).unwrap());
+        output.extend_from_slice(value);
+    }
+
+    fn numbers_payload_with_first_reference(first_reference: &[u8]) -> Vec<u8> {
+        let second = reference(2).encode_to_vec();
+        let third = reference(3).encode_to_vec();
+        let shared = shared_document().encode_to_vec();
+        let mut payload = Vec::new();
+        for (number, value) in [
+            (4, first_reference),
+            (5, second.as_slice()),
+            (6, third.as_slice()),
+            (8, shared.as_slice()),
+        ] {
+            append_length_delimited_field(&mut payload, number, value);
+        }
+        payload
+    }
+
     fn package(names: &[(&str, &[u8])]) -> Vec<u8> {
         litchi_iwa_archive::package::to_bytes(
             names.iter().copied(),
@@ -2046,6 +2437,70 @@ mod tests {
         assert_eq!(detect_application_from_document(&[0x78, 0x00]), None);
         assert_eq!(detect_application_from_document(&[0x7a, 0x00]), None);
         assert_eq!(detect_application_from_document(&[0x80]), None);
+    }
+
+    #[test]
+    fn strict_document_payload_classifier_preserves_typed_outcomes() {
+        let pages = document_payload(Format::Pages);
+        assert_eq!(
+            __classify_application_payload(&pages).unwrap(),
+            Some(Format::Pages)
+        );
+
+        let mut duplicate = pages.clone();
+        duplicate.extend_from_slice(&pages);
+        assert!(matches!(
+            __classify_application_payload(&duplicate),
+            Err(Error::IwaCommon(litchi_iwa_common::Error::InvalidFormat(_)))
+        ));
+
+        assert!(matches!(
+            __classify_application_payload(&[0x78, 0x00]),
+            Err(Error::IwaCommon(litchi_iwa_common::Error::InvalidFormat(_)))
+        ));
+        assert!(matches!(
+            __classify_application_payload(&[0x80]),
+            Err(Error::IwaCommon(litchi_iwa_common::Error::InvalidFormat(_)))
+        ));
+        assert!(matches!(
+            __classify_application_payload(&[0xfa, 0x00, 0x00]),
+            Err(Error::IwaCommon(litchi_iwa_common::Error::InvalidFormat(_)))
+        ));
+    }
+
+    #[test]
+    fn strict_document_payload_classifier_reports_wire_field_limit() {
+        let payload =
+            [0x08, 0x00].repeat(litchi_iwa_common::WireLimits::default().max_fields() + 1);
+        assert!(matches!(
+            __classify_application_payload(&payload),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::IwaFields,
+                observed,
+                maximum,
+            }) if observed == maximum + 1
+        ));
+    }
+
+    #[test]
+    fn strict_document_payload_classifier_validates_nested_reference_identifiers() {
+        for invalid in [
+            &[0x08, 0x81, 0x00][..],
+            &[0x08, 0x01, 0x08, 0x02][..],
+            &[0x0a, 0x01, 0x01][..],
+        ] {
+            assert!(matches!(
+                __classify_application_payload(&numbers_payload_with_first_reference(invalid)),
+                Err(Error::IwaCommon(litchi_iwa_common::Error::InvalidFormat(_)))
+            ));
+        }
+
+        assert_eq!(
+            __classify_application_payload(&numbers_payload_with_first_reference(&[0x08, 0x00]))
+                .unwrap(),
+            Some(Format::Numbers),
+            "zero is a canonical TSP.Reference encoding used by generated roots"
+        );
     }
 
     #[test]
@@ -2342,7 +2797,7 @@ mod tests {
 
     #[test]
     fn pages_zip_profile_enforces_modern_canonical_boundaries_before_handoff() {
-        for authority in PAGES_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
+        for authority in SEMANTIC_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
             let exact = vec![b'x'; MAX_PROPERTIES_BYTES];
             let accepted = document_package_with_members(Format::Pages, &[(authority, &exact)]);
             let prepared =
@@ -2381,7 +2836,7 @@ mod tests {
 
     #[test]
     fn pages_zip_profile_normalizes_legacy_outer_canonical_boundaries() {
-        for authority in PAGES_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
+        for authority in SEMANTIC_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
             let exact = vec![b'x'; MAX_PROPERTIES_BYTES];
             let accepted = legacy_pages_package_with_outer_members(&[(authority, &exact)]);
             PreparedSource::__from_bytes_with_pages_metadata(&accepted, Limits::default())
@@ -2408,7 +2863,7 @@ mod tests {
     }
 
     #[test]
-    fn pages_zip_profile_ignores_near_names_and_rejects_duplicate_authorities() {
+    fn pages_zip_profile_ignores_near_names_and_unprefixed_legacy_decoys() {
         let oversized = vec![b'x'; MAX_PROPERTIES_BYTES + 1];
         let near_names = document_package_with_members(
             Format::Pages,
@@ -2433,7 +2888,7 @@ mod tests {
 
         let root = document(Format::Pages);
         let index = package(&[("Document.iwa", root.as_slice())]);
-        let duplicate = package(&[
+        let legacy = package(&[
             ("legacy.pages/Index.zip", index.as_slice()),
             (
                 "legacy.pages/Metadata/DocumentIdentifier",
@@ -2441,21 +2896,14 @@ mod tests {
             ),
             ("Metadata/DocumentIdentifier", &oversized),
         ]);
-        let duplicate_error =
-            PreparedSource::__from_bytes_with_pages_metadata(&duplicate, Limits::default())
-                .expect_err("a duplicate normalized authority must fail before payload decode");
-        assert!(
-            matches!(
-                &duplicate_error,
-                Error::LimitExceeded {
-                    kind: LimitKind::EntryBytes,
-                    observed,
-                    maximum,
-                } if *observed == oversized.len() as u64
-                    && *maximum == MAX_PROPERTIES_BYTES as u64
-            ),
-            "unexpected duplicate preflight result: {duplicate_error:?}"
-        );
+        let sidecars = PreparedSource::__from_bytes_with_pages_metadata(&legacy, Limits::default())
+            .expect("unprefixed outer metadata is outside the legacy authority")
+            .expect("legacy fixture has a Pages root")
+            .__into_pages_semantic_source()
+            .expect("only the explicitly prefixed authority is selected")
+            .__into_parts()
+            .2;
+        assert_eq!(sidecars.document_identifier(), Some(b"first".as_slice()));
     }
 
     #[test]
@@ -2508,7 +2956,7 @@ mod tests {
 
     #[test]
     fn pages_zip_profile_refuses_opaque_canonical_authorities_during_preparation() {
-        for authority in PAGES_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
+        for authority in SEMANTIC_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
             let mut bytes = document_package_with_members(
                 Format::Pages,
                 &[(authority, b"canonical-pages-sidecar")],
@@ -2599,7 +3047,7 @@ mod tests {
 
     #[test]
     fn pages_semantic_handoff_rejects_opaque_canonical_sidecars() {
-        for authority in PAGES_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
+        for authority in SEMANTIC_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
             let mut bytes = document_package_with_members(
                 Format::Pages,
                 &[(authority, b"canonical-pages-sidecar")],
@@ -2622,7 +3070,7 @@ mod tests {
 
     #[test]
     fn pages_semantic_handoff_enforces_the_exact_per_sidecar_ceiling() {
-        for authority in PAGES_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
+        for authority in SEMANTIC_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
             let exact = vec![b'x'; MAX_PROPERTIES_BYTES];
             let accepted = document_package_with_members(Format::Pages, &[(authority, &exact)]);
             let prepared = PreparedSource::from_bytes(&accepted)
@@ -3057,6 +3505,208 @@ mod tests {
         )?;
         fs::write(representation_conflict.join("Index/Slide-1.iwa"), [])?;
         assert!(path(&representation_conflict).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn numbers_semantic_ingress_hands_off_only_exact_sidecars_and_releases_shared_input() {
+        let properties = b"numbers-properties";
+        let history = b"numbers-history";
+        let identifier = b"numbers-identifier";
+        let bytes: Arc<[u8]> = document_package_with_members(
+            Format::Numbers,
+            &[
+                ("Metadata/Properties.plist", properties),
+                ("Metadata/BuildVersionHistory.plist", history),
+                ("Metadata/DocumentIdentifier", identifier),
+                ("Metadata/Properties.plist.bak", b"properties-decoy"),
+                ("Metadata/DocumentIdentifier.txt", b"identifier-decoy"),
+            ],
+        )
+        .into();
+
+        let prepared = PreparedSource::__from_shared_bytes_with_numbers_semantics(
+            Arc::clone(&bytes),
+            Limits::default(),
+        )
+        .unwrap()
+        .expect("fixture has a Numbers root");
+        assert_eq!(
+            Arc::strong_count(&bytes),
+            1,
+            "Numbers preparation must not retain the shared package snapshot"
+        );
+        let shared = prepared
+            .__into_numbers_semantic_source()
+            .expect("Numbers sidecars hand off");
+        assert_eq!(
+            Arc::strong_count(&bytes),
+            1,
+            "the semantic Numbers handoff must release its package snapshot"
+        );
+        assert_eq!(
+            shared.sidecars().properties_plist(),
+            Some(properties.as_slice())
+        );
+        assert_eq!(
+            shared.sidecars().build_version_history_plist(),
+            Some(history.as_slice())
+        );
+        assert_eq!(
+            shared.sidecars().document_identifier(),
+            Some(identifier.as_slice())
+        );
+
+        let borrowed =
+            PreparedSource::__from_bytes_with_numbers_semantics(&bytes, Limits::default())
+                .unwrap()
+                .expect("borrowed Numbers input is accepted")
+                .__into_numbers_semantic_source()
+                .expect("borrowed Numbers source hands off");
+        assert_eq!(
+            borrowed.sidecars().properties_plist(),
+            Some(properties.as_slice())
+        );
+    }
+
+    #[test]
+    fn numbers_zip_profile_enforces_exact_raw_sidecar_boundaries() {
+        for authority in SEMANTIC_METADATA_AUTHORITIES.map(|(authority, _)| authority) {
+            let exact = vec![b'x'; MAX_PROPERTIES_BYTES];
+            let accepted = document_package_with_members(Format::Numbers, &[(authority, &exact)]);
+            PreparedSource::__from_bytes_with_numbers_semantics(&accepted, Limits::default())
+                .unwrap()
+                .expect("fixture has a Numbers root")
+                .__into_numbers_semantic_source()
+                .expect("64 KiB canonical Numbers sidecar is accepted");
+
+            let oversized = vec![b'x'; MAX_PROPERTIES_BYTES + 1];
+            let rejected =
+                document_package_with_members(Format::Numbers, &[(authority, &oversized)]);
+            assert!(matches!(
+                PreparedSource::__from_bytes_with_numbers_semantics(&rejected, Limits::default()),
+                Err(Error::LimitExceeded {
+                    kind: LimitKind::EntryBytes,
+                    observed,
+                    maximum,
+                }) if observed == oversized.len() as u64 && maximum == MAX_PROPERTIES_BYTES as u64
+            ));
+        }
+
+        let authority = "Metadata/Properties.plist";
+        let mut near_name =
+            document_package_with_members(Format::Numbers, &[(authority, b"numbers-properties")]);
+        patch_zip_member_raw_names(&mut near_name, authority, r"Metadata\Properties.plist");
+        assert!(matches!(
+            PreparedSource::__from_bytes_with_numbers_semantics(&near_name, Limits::default()),
+            Err(Error::Archive(message))
+                if message.contains("non-canonical or one-sided ZIP names")
+        ));
+    }
+
+    #[test]
+    fn numbers_zip_profile_refuses_selected_opaque_authorities() {
+        let authority = "Metadata/BuildVersionHistory.plist";
+        let mut bytes = document_package_with_members(
+            Format::Numbers,
+            &[(authority, b"canonical-numbers-sidecar")],
+        );
+        patch_zip_member_compression_to_opaque(&mut bytes, authority);
+        assert!(matches!(
+            PreparedSource::__from_bytes_with_numbers_semantics(&bytes, Limits::default()),
+            Err(Error::Archive(message))
+                if message.contains(authority) && message.contains("unsupported ZIP compression")
+        ));
+    }
+
+    #[test]
+    fn numbers_zip_profile_leaves_foreign_metadata_uninspected() {
+        let oversized = vec![b'x'; MAX_PROPERTIES_BYTES + 1];
+        for format in [Format::Pages, Format::Keynote] {
+            let mut bytes = document_package_with_members(
+                format,
+                &[("Metadata/BuildVersionHistory.plist", &oversized)],
+            );
+            patch_zip_member_compression_to_opaque(
+                &mut bytes,
+                "Metadata/BuildVersionHistory.plist",
+            );
+            let prepared =
+                PreparedSource::__from_bytes_with_numbers_semantics(&bytes, Limits::default())
+                    .expect("foreign metadata must remain outside Numbers profile")
+                    .expect("fixture has a foreign iWork root");
+            assert_eq!(prepared.format(), format);
+        }
+    }
+
+    #[test]
+    fn directory_numbers_semantic_profile_is_conditional_and_exact() -> Result<()> {
+        let temp = Temp::new()?;
+        let numbers = temp.0.join("profile.numbers");
+        fs::create_dir(&numbers)?;
+        fs::write(
+            numbers.join("Index.zip"),
+            document_package(Format::Numbers, &[]),
+        )?;
+        fs::create_dir(numbers.join("Metadata"))?;
+        fs::write(numbers.join("Metadata/Properties.plist"), b"properties")?;
+        fs::write(
+            numbers.join("Metadata/BuildVersionHistory.plist"),
+            b"history",
+        )?;
+        fs::write(numbers.join("Metadata/DocumentIdentifier"), b"identifier")?;
+        fs::write(numbers.join("Metadata/Properties.plist.bak"), b"decoy")?;
+        let semantic =
+            PreparedSource::__from_path_with_numbers_semantics(&numbers, Limits::default())
+                .unwrap()
+                .expect("Numbers bundle is classified")
+                .__into_numbers_semantic_source()
+                .unwrap();
+        assert_eq!(
+            semantic.sidecars().properties_plist(),
+            Some(&b"properties"[..])
+        );
+        assert_eq!(
+            semantic.sidecars().build_version_history_plist(),
+            Some(&b"history"[..])
+        );
+        assert_eq!(
+            semantic.sidecars().document_identifier(),
+            Some(&b"identifier"[..])
+        );
+
+        for (format, extension) in [(Format::Pages, "pages"), (Format::Keynote, "key")] {
+            let foreign = temp.0.join(format!("foreign.{extension}"));
+            fs::create_dir(&foreign)?;
+            fs::write(foreign.join("Index.zip"), document_package(format, &[]))?;
+            fs::create_dir_all(foreign.join("Metadata/DocumentIdentifier"))?;
+            let prepared =
+                PreparedSource::__from_path_with_numbers_semantics(&foreign, Limits::default())
+                    .expect("foreign directory sidecars must not be captured")
+                    .expect("foreign document remains detectable");
+            assert_eq!(prepared.format(), format);
+        }
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn numbers_semantic_path_profile_fails_closed_without_pinned_windows_identity()
+    -> std::io::Result<()> {
+        let temp = Temp::new()?;
+        let package = temp.0.join("document.numbers");
+        fs::write(&package, document_package(Format::Numbers, &[]))?;
+        assert!(matches!(
+            PreparedSource::__from_path_with_numbers_semantics(&package, Limits::default()),
+            Err(Error::InvalidFormat(message))
+                if message == "Numbers package path ingress is unsupported on Windows"
+        ));
+        let bytes = document_package(Format::Numbers, &[]);
+        assert!(
+            PreparedSource::__from_bytes_with_numbers_semantics(&bytes, Limits::default())
+                .unwrap()
+                .is_some()
+        );
         Ok(())
     }
 

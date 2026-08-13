@@ -678,6 +678,13 @@ class BoundaryPolicyTests(unittest.TestCase):
         self.assertIn(edge, self.policy.canonical_edges)
         self.assertNotIn(edge, self.policy.migration_edges)
 
+    def test_numbers_metadata_core_edge_is_canonical(self) -> None:
+        edge = boundaries.Edge("litchi-numbers", "litchi-core")
+
+        self.assertIn(edge, self.policy.canonical_edges)
+        self.assertNotIn(edge, self.policy.migration_edges)
+        self.assertNotIn(edge, self.policy.dev_only_edges)
+
     def test_spreadsheet_drawing_owner_and_host_edges_are_canonical(self) -> None:
         owner = "litchi-spreadsheet-drawing"
         dependencies = {
@@ -7981,6 +7988,224 @@ class BoundaryPolicyTests(unittest.TestCase):
                             "crates/litchi-numbers/src/package.rs:1"
                         ],
                     )
+
+    def test_retired_iwa_numbers_document_reader_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_DOCUMENT_SOURCE,
+            Path("crates/litchi-iwa/src/numbers/document.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_DOCUMENT_TYPES,
+            ("NumbersDocument", "NumbersDocumentState", "NumbersDocumentStats"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_SHEET_SOURCE,
+            Path("crates/litchi-iwa/src/numbers/sheet.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_SHEET_TYPES, ("NumbersSheet",)
+        )
+        self.assertEqual(
+            boundaries.IWA_NUMBERS_MODULE_SOURCE,
+            Path("crates/litchi-iwa/src/numbers/mod.rs"),
+        )
+        self.assertEqual(
+            boundaries.IWA_NUMBERS_FOCUSED_READER_TYPES,
+            frozenset({"Document", "Package"}),
+        )
+
+    def test_retired_iwa_numbers_document_reader_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            retired = root / boundaries.RETIRED_IWA_NUMBERS_DOCUMENT_SOURCE
+            retired.parent.mkdir(parents=True)
+            retired.write_text("// retired reader returned\n", encoding="utf-8")
+            retired_sheet = root / boundaries.RETIRED_IWA_NUMBERS_SHEET_SOURCE
+            retired_sheet.write_text("// retired sheet returned\n", encoding="utf-8")
+            module = root / boundaries.IWA_NUMBERS_MODULE_SOURCE
+            module.write_text(
+                "pub mod r#document;\n"
+                "pub(crate) mod sheet;\n"
+                "pub use self::r#document::*;\n"
+                "pub use sheet::NumbersSheet;\n",
+                encoding="utf-8",
+            )
+            caller = root / "crates/litchi-iwa/src/legacy_numbers.rs"
+            caller.parent.mkdir(parents=True, exist_ok=True)
+            caller.write_text(
+                "pub fn open() -> NumbersDocument { todo!() }\n"
+                "pub type State = NumbersDocumentState;\n"
+                "pub fn sheets() -> Vec<NumbersSheet> { todo!() }\n"
+                "/// Do not restore `NumbersDocumentStats`.\n",
+                encoding="utf-8",
+            )
+            example = root / "crates/litchi-iwa/examples/read_numbers.rs"
+            example.parent.mkdir(parents=True)
+            example.write_text(
+                "use litchi_iwa::numbers::NumbersDocument;\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_NUMBERS_README
+            readme.write_text(
+                "Never restore `NumbersDocumentStats`.\n", encoding="utf-8"
+            )
+
+            violations = boundaries.audit_iwa_numbers_document_source_topology(root)
+            joined = "\n".join(violations)
+            self.assertIn("document reader source returned", joined)
+            self.assertIn("sheet reader source returned", joined)
+            self.assertIn("reader module document", joined)
+            self.assertIn("reader module sheet", joined)
+            self.assertIn("reader local re-export document", joined)
+            self.assertIn("reader local re-export sheet", joined)
+            self.assertIn("workspace public name NumbersDocument", joined)
+            self.assertIn("workspace public name NumbersDocumentState", joined)
+            self.assertIn("workspace public name NumbersSheet", joined)
+            self.assertIn("workspace public rustdoc NumbersDocumentStats", joined)
+            self.assertIn("workspace type usage NumbersDocument", joined)
+            self.assertIn("document reader README reference NumbersDocumentStats", joined)
+
+    def test_retired_iwa_numbers_document_module_and_reexport_variants(self) -> None:
+        declarations = (
+            "mod document;\n",
+            "pub(crate) mod r#document {}\n",
+            "pub\nmod\ndocument\n{}\n",
+            "pub use document::NumbersDocument;\n",
+            "pub(crate) use self::r#document::*;\n",
+            "pub use crate::numbers::{document::NumbersDocument};\n",
+            "pub use {document::*};\n",
+            "pub use {self::sheet::*};\n",
+            "pub(crate) mod sheet;\n",
+            "pub use self::sheet::NumbersSheet;\n",
+        )
+        for declaration in declarations:
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    module = root / boundaries.IWA_NUMBERS_MODULE_SOURCE
+                    module.parent.mkdir(parents=True)
+                    module.write_text(declaration, encoding="utf-8")
+                    self.assertTrue(
+                        boundaries.audit_iwa_numbers_document_source_topology(root)
+                    )
+
+    def test_retired_iwa_numbers_document_multiline_aliases_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "crates/adapter/src/lib.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "pub\ntype\nLegacy\n=\nNumbersDocumentStats\n;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_document_source_topology(root)
+            joined = "\n".join(violations)
+            self.assertIn("workspace public name NumbersDocumentStats", joined)
+            self.assertIn("workspace type usage NumbersDocumentStats", joined)
+
+    def test_iwa_numbers_document_reader_policy_allows_builder_editor_and_direct_focused_use(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "crates/litchi-iwa/src/numbers/creation.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "pub struct NumbersDocumentBuilder;\n"
+                "pub struct NumbersEditor;\n"
+                "pub struct NumbersTable;\n"
+                "pub struct TableDataExtractor;\n"
+                "fn direct() -> (litchi_numbers::Document, litchi_numbers::Package, "
+                "litchi_numbers::Sheet) "
+                "{ todo!() }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_document_source_topology(root), []
+            )
+
+    def test_iwa_numbers_document_reader_policy_rejects_host_focused_facades(self) -> None:
+        declarations = (
+            "pub use litchi_numbers::Document;\n",
+            "pub use litchi_numbers::{Package as Spreadsheet};\n",
+            "pub use litchi_numbers::*;\n",
+            "pub use litchi_numbers as numbers_api;\n",
+            "pub use litchi_numbers::document as reader;\n",
+            "pub use litchi_numbers::{package as artifact};\n",
+            "use litchi_numbers::Document as Focused;\npub type Reader = Focused;\n",
+            "use litchi_numbers::document as semantic;\npub type Reader = semantic::Document;\n",
+            "pub type Reader = litchi_numbers::Document;\n",
+        )
+        for declaration in declarations:
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / "crates/litchi-iwa/src/numbers/facade.rs"
+                    source.parent.mkdir(parents=True)
+                    source.write_text(declaration, encoding="utf-8")
+                    violations = boundaries.audit_iwa_numbers_document_source_topology(root)
+                    self.assertTrue(violations)
+                    self.assertTrue(
+                        all("focused host facade" in item for item in violations),
+                        violations,
+                    )
+
+    def test_retired_numbers_document_public_names_are_workspace_wide(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "crates/unrelated/src/lib.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "pub struct NumbersDocument;\n"
+                "fn private_reader(_: NumbersSheet) {}\n"
+                "/// [`NumbersDocumentStats`] must stay retired.\n"
+                "pub struct Report;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_document_source_topology(root)
+            joined = "\n".join(violations)
+            self.assertIn("workspace public name NumbersDocument", joined)
+            self.assertIn("workspace type usage NumbersSheet", joined)
+            self.assertIn("workspace public rustdoc NumbersDocumentStats", joined)
+
+    def test_focused_numbers_document_reader_public_api_rejects_native_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / boundaries.NUMBERS_DOCUMENT_PUBLIC_API_SOURCES[0]
+            document.parent.mkdir(parents=True)
+            document.write_text(
+                "/// Returns a `NativeObjectIdentifier`.\n"
+                "pub struct Document { pub object_id: u64 }\n"
+                "pub fn raw_source_bytes() -> &[u8] { todo!() }\n"
+                "pub type Native = litchi_iwa_common::ObjectArchive;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_document_public_api(root)
+            joined = "\n".join(violations)
+            self.assertIn("raw identifier object_id", joined)
+            self.assertIn("raw source bytes raw_source_bytes", joined)
+            self.assertIn("archive/IWA type litchi_iwa_common", joined)
+            self.assertIn("native object ObjectArchive", joined)
+            self.assertIn("rustdoc exposes raw identifier NativeObjectIdentifier", joined)
+
+    def test_focused_numbers_document_reader_public_api_allows_checked_limits(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / boundaries.NUMBERS_DOCUMENT_PUBLIC_API_SOURCES[0]
+            document.parent.mkdir(parents=True)
+            document.write_text(
+                "/// Immutable semantic spreadsheet.\n"
+                "pub struct Document;\n"
+                "pub struct DocumentReadOptions;\n"
+                "pub struct DocumentSourceLimits;\n"
+                "pub enum DocumentSourceLimitKind { InputBytes }\n"
+                "pub enum ReadLimitKind { Sheets, Tables, Cells, TextBytes }\n"
+                "pub struct Stats { pub sheet_count: usize }\n"
+                "pub fn from_shared_bytes(_: std::sync::Arc<[u8]>) -> Document "
+                "{ Document }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(boundaries.audit_numbers_document_public_api(root), [])
 
     def test_retired_iwa_pages_document_reader_inventory_is_exact(self) -> None:
         self.assertEqual(

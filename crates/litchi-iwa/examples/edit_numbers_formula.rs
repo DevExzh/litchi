@@ -2,9 +2,9 @@ use std::env;
 
 use litchi_iwa::numbers::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCellReference, FormulaExpression,
-    FormulaPivotCategoryReference, FormulaUuid, NumbersDocument, NumbersEditor,
+    FormulaPivotCategoryReference, FormulaUuid, NumbersEditor,
 };
-use litchi_numbers::cell::FiniteF64;
+use litchi_numbers::{Document, Position, cell::FiniteF64};
 
 fn parse_address(address: &str) -> Result<FormulaCellReference, String> {
     let mut input = address;
@@ -254,13 +254,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_formula(table_id, row, column, expression)?;
     editor.save(output)?;
 
-    let document = NumbersDocument::open(output)?;
-    let sheets = document.sheets()?;
+    let document = Document::open(output)?;
+    let sheets = document.sheets();
     let cell = sheets
         .iter()
         .flat_map(|sheet| sheet.tables())
         .find(|table| table.name() == table_name)
-        .and_then(|table| table.get_cell(row, column));
+        .and_then(|table| {
+            Position::try_from_usize(row, column)
+                .ok()
+                .and_then(|position| table.get(position))
+        });
     if let Some(cell) = cell {
         println!("saved {output}; cell ({row}, {column}) = {cell}");
     } else {

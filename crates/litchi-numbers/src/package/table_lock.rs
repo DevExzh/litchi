@@ -935,6 +935,7 @@ fn map_candidate_read_error(error: ReadError) -> TableLockError {
             maximum,
         },
         other @ (ReadError::Io(_)
+        | ReadError::Detection(_)
         | ReadError::Archive(_)
         | ReadError::MalformedPayload { .. }
         | ReadError::NotNumbers
@@ -979,6 +980,7 @@ fn map_read_error(error: ReadError) -> TableLockError {
             maximum,
         },
         ReadError::Io(_)
+        | ReadError::Detection(_)
         | ReadError::MalformedPayload { .. }
         | ReadError::NotNumbers
         | ReadError::InvalidFormat(_)

@@ -333,9 +333,10 @@ mod tests {
     use super::*;
     use crate::archive::{ArchiveObject, RawMessage};
     use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
+    use crate::numbers::editor::compatibility_document_from_bytes;
     use crate::numbers::{
         FormulaAxisReference, FormulaCachedValue, FormulaCellReference, FormulaExpression,
-        NumbersDocument, NumbersDocumentBuilder,
+        NumbersDocumentBuilder, SemanticTableCellAssertions,
     };
     use crate::pages::{PagesDocumentBuilder, PagesEditor};
     use crate::shapes::{DrawablePoint, DrawableSize};
@@ -574,9 +575,9 @@ mod tests {
         assert_eq!(editor.tables().unwrap()[0].rows, 3);
         assert_eq!(editor.tables().unwrap()[0].columns, 4);
 
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
             Some(&CellValue::Text("Merged".to_owned()))
         );
         assert_eq!(
@@ -626,9 +627,9 @@ mod tests {
             editor.table_cell_merges(table_id).unwrap(),
             vec![Region::new(1, 1, 1, 2).unwrap()]
         );
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
             Some(&CellValue::Formula("=E3".to_owned()))
         );
 
@@ -639,9 +640,9 @@ mod tests {
             )
             .unwrap();
         assert!(editor.table_cell_merges(table_id).unwrap().is_empty());
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
             Some(&CellValue::Formula("=D3".to_owned()))
         );
         crate::numbers::editor::set_cell_fixture(
@@ -714,9 +715,9 @@ mod tests {
             editor.table_cell_merges(source_table_id).unwrap(),
             vec![Region::new(1, 1, 1, 2).unwrap()]
         );
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
             Some(&CellValue::Formula("=Sheet 1::Referenced::A3".to_owned()))
         );
         assert_eq!(cached_formula_number(&editor, source_table_id, 1, 1), 0.0);
@@ -734,9 +735,9 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
             Some(&CellValue::Formula("=Sheet 1::Referenced::B3".to_owned()))
         );
         assert_eq!(cached_formula_number(&editor, source_table_id, 1, 1), 0.0);
@@ -809,9 +810,9 @@ mod tests {
                 RowDeletion::body(0),
             )
             .unwrap();
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
             Some(&CellValue::Formula(
                 "=SUM(Sheet 1::Referenced::A3:A4)".to_owned()
             ))
@@ -825,9 +826,9 @@ mod tests {
                 ColumnDeletion::body(0),
             )
             .unwrap();
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
             Some(&CellValue::Formula(
                 "=SUM(Sheet 1::Referenced::B3:B4)".to_owned()
             ))
@@ -905,9 +906,9 @@ mod tests {
                 RowDeletion::body(0),
             )
             .unwrap();
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
             Some(&CellValue::Formula(
                 "=SUM(Sheet 1::Referenced::A3:A4)".to_owned()
             ))
@@ -931,9 +932,9 @@ mod tests {
                 ColumnDeletion::body(0),
             )
             .unwrap();
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
             Some(&CellValue::Formula(
                 "=SUM(Sheet 1::Referenced::B3:B4)".to_owned()
             ))
@@ -1037,9 +1038,9 @@ mod tests {
                 RowDeletion::body(0),
             )
             .unwrap();
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
             Some(&CellValue::Formula(
                 "=SUM(Sheet 1::Referenced::3:4)".to_owned()
             ))
@@ -1129,9 +1130,9 @@ mod tests {
                 ColumnDeletion::body(0),
             )
             .unwrap();
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
             Some(&CellValue::Formula(
                 "=SUM(Sheet 1::Referenced::C:D)".to_owned()
             ))

@@ -1338,8 +1338,9 @@ fn solid_fill() -> tsd::FillArchive {
 mod tests {
     use super::*;
     use crate::numbers::cell::CellValue;
+    use crate::numbers::editor::compatibility_document_from_bytes;
     use crate::numbers::{
-        FormulaBinaryOperator, FormulaCellReference, FormulaExpression, NumbersDocument,
+        FormulaBinaryOperator, FormulaCellReference, FormulaExpression, SemanticTableCellAssertions,
     };
 
     #[test]
@@ -1593,9 +1594,9 @@ mod tests {
             .unwrap();
 
         let bytes = editor.to_bytes().unwrap();
-        let document = NumbersDocument::from_bytes(&bytes).unwrap();
-        let sheets = document.sheets().unwrap();
-        let table = &sheets[0].tables[0];
+        let document = compatibility_document_from_bytes(&bytes).unwrap();
+        let sheets = document.sheets();
+        let table = &sheets[0].tables().next().unwrap();
         assert_eq!(
             table.get_cell(1, 1),
             Some(&CellValue::Text("Litchi".to_owned()))
@@ -1641,9 +1642,9 @@ mod tests {
                 ),
             )
             .unwrap();
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(0, 2),
+            document.sheets()[0].tables().next().unwrap().get_cell(0, 2),
             Some(&CellValue::Formula("=(A1/B1)".to_owned()))
         );
 
@@ -1694,11 +1695,10 @@ mod tests {
                 ),
             )
             .unwrap();
-        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        let sheets = document.sheets().unwrap();
+        let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let sheets = document.sheets();
         let added = sheets[0]
-            .tables
-            .iter()
+            .tables()
             .find(|candidate| candidate.name() == table.name)
             .unwrap();
         assert_eq!(
