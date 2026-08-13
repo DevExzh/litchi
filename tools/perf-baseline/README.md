@@ -2,13 +2,22 @@
 
 `litchi-perf-baseline` is an isolated, reproducible measurement tool for the
 ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
-public-API XLSX snapshot/edit/save flows, and opt-in DOC/XLS/PPT,
+public-API XLSX snapshot/edit/save flows, matched opt-in XLSX scalar-cell
+eager/source-backed publication controls, and opt-in DOC/XLS/PPT,
 DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows, including the opt-in RTF logical-tail
 append transaction, bounded RTF/XLS/DOCX/PPTX/ODF validation reports, and a
 source-backed DOCX section inventory. It creates every corpus in memory; it also exercises
 source-backed XLSX catalog, worksheet reads, and guarded calculation-metadata,
 defined-name, page-break/page-margin/page-setup/print-options/sheet-protection/data-validation/auto-filter
-publication over positional I/O. It does not
+publication over positional I/O. The scalar-cell controls use deterministic
+medium and dense/sparse four-sheet corpora with untouched media Parts. Their
+timed interval covers open, staging, commit, and sequential publication;
+reopen, semantic equality, exact hashes, raw media identity, lifecycle gates,
+and source/materialization counter sampling remain outside the reported timing.
+The reported duration is the sum of open/stage/commit and sequential
+publication segments; source cache diagnostics are sampled between those
+segments and are excluded. They are evidence for later release ABBA work, not
+a speedup claim. It does not
 depend on untracked office files, network state, or randomness. ODP builder
 timestamps are replaced with fixed metadata before measurement. The JSON
 report contains the generator parameters and SHA-256 hashes for the generated
@@ -40,15 +49,17 @@ two matched XLSX sheet-protection publication cases,
 two matched XLSX data-validation publication cases,
 two matched XLSX auto-filter/sort-state publication cases,
 two matched XLSX conditional-formatting publication cases,
-two XLSX merge/unmerge commit-plus-save cases,
+two XLSX merge/unmerge commit-plus-save cases, six matched XLSX scalar-cell
+publication cases (one cell, `ceil(1%)`, and the exact 256-cell bound, each
+eager/source-backed),
 two bounded XLSX/RTF streaming-creation cases,
 four matched native XLS existing-comment publication cases,
 four matched native XLS worksheet-visibility publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, 15 RTF semantic cases (13 transport/read/edit
 cases plus two logical-tail publication cases), and 36 ODF semantic cases are
-opt-in. The current `Case` matrix exposes 190 selectable case names in total;
-the six validation/section selectors are opt-in and do not alter the default
+opt-in. The current `Case` matrix exposes 196 selectable case names in total;
+the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 
 ```sh
@@ -101,6 +112,36 @@ which validates the selected payload, preserves the existing URI, content type,
 relationships and topology, raw-copies every other member, and writes to a
 sequential sink. Payload preparation and complete output verification stay
 outside timing.
+
+Measure the matched XLSX scalar-cell controls on their deterministic
+media-rich four-sheet corpora:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 15 \
+  --case xlsx_eager_cell_values_one_edit_save,\
+xlsx_source_backed_cell_values_one_edit_save,\
+xlsx_eager_cell_values_one_percent_edit_save,\
+xlsx_source_backed_cell_values_one_percent_edit_save,\
+xlsx_eager_cell_values_batch_edit_save,\
+xlsx_source_backed_cell_values_batch_edit_save \
+  --xlsx-cell-crud-shape medium,dense-sparse \
+  --json target/perf/xlsx-cell-values-crud.json
+```
+
+The one-cell, deterministic `ceil(1%)`, and exact-256 selectors are matched
+eager/source-backed pairs. The source-backed path uses one selector-first
+multi-sheet transaction and a sequential overlay publisher; the harness also
+checks exact no-op, clear, and remove lifecycle behavior as untimed gates.
+Every output is reopened and checked for semantic cell state, package topology,
+relationships, deterministic hashes, and the bounded sink; eager outputs also
+check untouched media payloads. Source-backed outputs additionally compare raw
+local and central ZIP records for every unselected member, including media,
+relationships, content types, workbook, and unselected worksheets. Source read
+and successful materialization counters are sampled after the
+timed segments (with diagnostics excluded from the reported sum). These
+controls are evidence for later release ABBA work,
+not a speedup claim by themselves.
 
 Measure the opt-in OPC source-cache Budget boundary and controlled contention
 matrix on one fixed many-small incompressible corpus:

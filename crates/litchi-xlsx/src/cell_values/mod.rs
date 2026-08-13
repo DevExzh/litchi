@@ -13,6 +13,10 @@ mod snapshot;
 mod source;
 mod validation;
 
-pub use patch::{Commit, Diagnostics, Patch};
-pub use snapshot::Snapshot;
-pub use source::{CellValueEdit, MAX_BATCH_EDITS, SourceBackedEditor, SourceEdit};
+pub use patch::Patch;
+pub use patch::{Commit, Diagnostics, MultiCommit, MultiDiagnostics, MultiPatch};
+pub use snapshot::{MAX_MULTI_WORKSHEET_BYTES, MAX_SHEET_OWNERS, MultiSnapshot, Snapshot};
+pub use source::{
+    CellValueEdit, MAX_BATCH_EDITS, MultiSourceEdit, SheetCellValueEdit, SourceBackedEditor,
+    SourceEdit,
+};

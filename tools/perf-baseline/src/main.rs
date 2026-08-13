@@ -88,6 +88,8 @@ const XLSX_AUTO_FILTER_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-auto-filter-source-edit-media-v1";
 const XLSX_CONDITIONAL_FORMATTING_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-conditional-formatting-source-edit-media-v1";
+const XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR: &str =
+    "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1";
 const XLSX_MERGE_EDIT_CORPUS_GENERATOR: &str = "litchi-xlsx-merge-edit-sparse-a1-b2-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
 const ODT_MEDIA_CORPUS_GENERATOR: &str = "litchi-odt-media-paragraph-publication-v1";
@@ -133,6 +135,8 @@ const ODT_RESOURCE_BATCH_COUNT: usize = 64;
 const ODT_RESOURCE_PAYLOAD_BYTES: usize = 4 * 1024;
 const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
+const XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT: usize = 8;
+const XLSX_CELL_VALUES_MEDIA_ENTRY_BYTES: usize = 512 * 1024;
 const ODP_MEDIA_TEXT_BOX_NAME: &str = "litchi-perf-media-text-box";
 const OLE_COMMON_CORPUS_GENERATOR: &str = "litchi-ole-common-copy-elision-v1";
 const OLE_COMMON_TARGET: &str = "ole_common_edit_target.bin";
@@ -196,6 +200,27 @@ enum XlsxShape {
     Tiny,
     Medium,
     DenseWide,
+}
+
+/// Deterministic media-rich multi-sheet corpora for scalar-cell CRUD.
+///
+/// This matrix is opt-in because it intentionally exercises the new bounded
+/// multi-worksheet source closure rather than the historical 36-case matrix.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum XlsxCellCrudShape {
+    Medium,
+    DenseSparse,
+}
+
+impl XlsxCellCrudShape {
+    const ALL: [Self; 2] = [Self::Medium, Self::DenseSparse];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Medium => "medium",
+            Self::DenseSparse => "dense-sparse",
+        }
+    }
 }
 
 /// Small, complete public-API DOCX/PPTX corpora.  These cases are opt-in so
@@ -461,6 +486,12 @@ enum Case {
     XlsxSourceBackedConditionalFormattingEditSave,
     XlsxEagerMergeCommitSave,
     XlsxEagerUnmergeCommitSave,
+    XlsxEagerCellValuesOneEditSave,
+    XlsxSourceBackedCellValuesOneEditSave,
+    XlsxEagerCellValuesOnePercentEditSave,
+    XlsxSourceBackedCellValuesOnePercentEditSave,
+    XlsxEagerCellValuesBatchEditSave,
+    XlsxSourceBackedCellValuesBatchEditSave,
     CfbOpen,
     CfbListStreams,
     CfbReadOne,
@@ -713,6 +744,20 @@ impl Case {
             },
             Self::XlsxEagerMergeCommitSave => "xlsx_eager_merge_commit_save",
             Self::XlsxEagerUnmergeCommitSave => "xlsx_eager_unmerge_commit_save",
+            Self::XlsxEagerCellValuesOneEditSave => "xlsx_eager_cell_values_one_edit_save",
+            Self::XlsxSourceBackedCellValuesOneEditSave => {
+                "xlsx_source_backed_cell_values_one_edit_save"
+            },
+            Self::XlsxEagerCellValuesOnePercentEditSave => {
+                "xlsx_eager_cell_values_one_percent_edit_save"
+            },
+            Self::XlsxSourceBackedCellValuesOnePercentEditSave => {
+                "xlsx_source_backed_cell_values_one_percent_edit_save"
+            },
+            Self::XlsxEagerCellValuesBatchEditSave => "xlsx_eager_cell_values_batch_edit_save",
+            Self::XlsxSourceBackedCellValuesBatchEditSave => {
+                "xlsx_source_backed_cell_values_batch_edit_save"
+            },
             Self::CfbOpen => "cfb_open",
             Self::CfbListStreams => "cfb_list_streams",
             Self::CfbReadOne => "cfb_read_one",
@@ -995,6 +1040,10 @@ impl Case {
                 | Self::XlsxRangeSourceFirstCell
                 | Self::XlsxRangeSourceNarrowColumnRangeScan
         )
+    }
+
+    const fn uses_xlsx_cell_values(self) -> bool {
+        self.is_xlsx_cell_values_edit_save()
     }
 
     const fn uses_streaming_creation(self) -> bool {
@@ -1295,6 +1344,18 @@ impl Case {
             Self::XlsxEagerMergeCommitSave | Self::XlsxEagerUnmergeCommitSave
         )
     }
+
+    const fn is_xlsx_cell_values_edit_save(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxEagerCellValuesOneEditSave
+                | Self::XlsxSourceBackedCellValuesOneEditSave
+                | Self::XlsxEagerCellValuesOnePercentEditSave
+                | Self::XlsxSourceBackedCellValuesOnePercentEditSave
+                | Self::XlsxEagerCellValuesBatchEditSave
+                | Self::XlsxSourceBackedCellValuesBatchEditSave
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -1327,6 +1388,7 @@ struct Options {
     payloads: Vec<PayloadKind>,
     writer_shapes: Vec<WriterShape>,
     xlsx_shapes: Vec<XlsxShape>,
+    xlsx_cell_crud_shapes: Vec<XlsxCellCrudShape>,
     semantic_shapes: Vec<SemanticShape>,
     rtf_variants: Vec<RtfSemanticVariant>,
     range_simulation: RangeSimulationConfig,
@@ -1367,6 +1429,9 @@ struct XlsxCorpus {
     row_count: usize,
     column_count: usize,
     one_percent_updates: Vec<XlsxCoordinate>,
+    /// Optional sparse coordinate inventory used by the media-rich CRUD
+    /// matrix. `None` preserves the historical rectangular corpus behavior.
+    cell_inventory: Option<Vec<Vec<XlsxCoordinate>>>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1430,6 +1495,7 @@ struct Configuration {
     payload_kinds: Vec<&'static str>,
     writer_shapes: Vec<&'static str>,
     xlsx_shapes: Vec<&'static str>,
+    xlsx_cell_crud_shapes: Vec<&'static str>,
     semantic_shapes: Vec<&'static str>,
     rtf_variants: Vec<&'static str>,
     range_simulation: RangeSimulationConfig,
@@ -2956,6 +3022,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_xls()
                     && !case.uses_semantic_ppt()
                     && !case.uses_xlsx()
+                    && !case.uses_xlsx_cell_values()
                     && !case.uses_streaming_creation()
                     && !case.uses_semantic_rtf()
                     && !case.uses_semantic_docx()
@@ -3423,6 +3490,28 @@ fn main() -> Result<(), Box<dyn Error>> {
     if options
         .cases
         .iter()
+        .any(|case| case.uses_xlsx_cell_values())
+    {
+        for shape in &options.xlsx_cell_crud_shapes {
+            let corpus = build_xlsx_cell_crud_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .filter(|case| case.uses_xlsx_cell_values())
+            {
+                results.push(run_xlsx_cell_values_edit_save(
+                    *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
         .any(|case| case.uses_streaming_creation())
     {
         for shape in &options.semantic_shapes {
@@ -3816,6 +3905,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .iter()
                 .map(|shape| shape.name())
                 .collect(),
+            xlsx_cell_crud_shapes: options
+                .xlsx_cell_crud_shapes
+                .iter()
+                .map(|shape| shape.name())
+                .collect(),
             semantic_shapes: options
                 .semantic_shapes
                 .iter()
@@ -3846,6 +3940,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut payloads = PayloadKind::ALL.to_vec();
     let mut writer_shapes = WriterShape::ALL.to_vec();
     let mut xlsx_shapes = XlsxShape::ALL.to_vec();
+    let mut xlsx_cell_crud_shapes = XlsxCellCrudShape::ALL.to_vec();
     let mut semantic_shapes = SemanticShape::ALL.to_vec();
     let mut rtf_variants = vec![RtfSemanticVariant::Plain];
     let mut range_simulation = RangeSimulationConfig::default();
@@ -3893,6 +3988,13 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
             },
             "--xlsx-shape" => {
                 xlsx_shapes = parse_selection(arguments.next(), "--xlsx-shape", parse_xlsx_shape)?;
+            },
+            "--xlsx-cell-crud-shape" => {
+                xlsx_cell_crud_shapes = parse_selection(
+                    arguments.next(),
+                    "--xlsx-cell-crud-shape",
+                    parse_xlsx_cell_crud_shape,
+                )?;
             },
             "--semantic-shape" => {
                 semantic_shapes =
@@ -3948,6 +4050,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         payloads,
         writer_shapes,
         xlsx_shapes,
+        xlsx_cell_crud_shapes,
         semantic_shapes,
         rtf_variants,
         range_simulation,
@@ -4092,6 +4195,20 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "xlsx_eager_merge_commit_save" => Some(Case::XlsxEagerMergeCommitSave),
         "xlsx_eager_unmerge_commit_save" => Some(Case::XlsxEagerUnmergeCommitSave),
+        "xlsx_eager_cell_values_one_edit_save" => Some(Case::XlsxEagerCellValuesOneEditSave),
+        "xlsx_source_backed_cell_values_one_edit_save" => {
+            Some(Case::XlsxSourceBackedCellValuesOneEditSave)
+        },
+        "xlsx_eager_cell_values_one_percent_edit_save" => {
+            Some(Case::XlsxEagerCellValuesOnePercentEditSave)
+        },
+        "xlsx_source_backed_cell_values_one_percent_edit_save" => {
+            Some(Case::XlsxSourceBackedCellValuesOnePercentEditSave)
+        },
+        "xlsx_eager_cell_values_batch_edit_save" => Some(Case::XlsxEagerCellValuesBatchEditSave),
+        "xlsx_source_backed_cell_values_batch_edit_save" => {
+            Some(Case::XlsxSourceBackedCellValuesBatchEditSave)
+        },
         "cfb_open" => Some(Case::CfbOpen),
         "cfb_list_streams" => Some(Case::CfbListStreams),
         "cfb_read_one" => Some(Case::CfbReadOne),
@@ -4285,6 +4402,14 @@ fn parse_xlsx_shape(value: &str) -> Option<XlsxShape> {
     }
 }
 
+fn parse_xlsx_cell_crud_shape(value: &str) -> Option<XlsxCellCrudShape> {
+    match value {
+        "medium" => Some(XlsxCellCrudShape::Medium),
+        "dense-sparse" => Some(XlsxCellCrudShape::DenseSparse),
+        _ => None,
+    }
+}
+
 fn parse_semantic_shape(value: &str) -> Option<SemanticShape> {
     match value {
         "tiny" => Some(SemanticShape::Tiny),
@@ -4386,6 +4511,12 @@ fn print_usage() {
                                        xlsx_one_cell_commit,xlsx_one_cell_commit_first_read,\n\
                                        xlsx_one_cell_commit_save,\n\
                                        xlsx_one_percent_commit,xlsx_one_percent_commit_save,\n\
+                                       xlsx_eager_cell_values_one_edit_save,\n\
+                                       xlsx_source_backed_cell_values_one_edit_save,\n\
+                                       xlsx_eager_cell_values_one_percent_edit_save,\n\
+                                       xlsx_source_backed_cell_values_one_percent_edit_save,\n\
+                                       xlsx_eager_cell_values_batch_edit_save,\n\
+                                       xlsx_source_backed_cell_values_batch_edit_save,\n\
                                        xlsx_source_open,xlsx_source_list_sheets,\n\
                                        xlsx_source_first_cell,\n\
                                        xlsx_source_narrow_column_range_scan,\n\
@@ -4440,6 +4571,7 @@ fn print_usage() {
            --payload LIST              compressible,incompressible\n\
            --writer-shape LIST         tiny,large,payload-heavy\n\
            --xlsx-shape LIST           tiny,medium,dense-wide\n\
+           --xlsx-cell-crud-shape LIST medium,dense-sparse (only used by matched scalar-cell cases)\n\
            --semantic-shape LIST       tiny,medium,large (only used by opt-in Office semantic cases)\n\
            --rtf-variant LIST          plain,byte1252,lzfu,watermark (default: plain)\n\
            --range-fixed-latency-us N  Fixed latency per request (default: {DEFAULT_RANGE_FIXED_LATENCY_US})\n\
@@ -6580,6 +6712,7 @@ fn build_xlsx_corpus(shape: XlsxShape) -> Result<Corpus, Box<dyn Error>> {
         row_count: shape.row_count(),
         column_count: shape.column_count(),
         one_percent_updates: xlsx_one_percent_updates(shape)?,
+        cell_inventory: None,
     };
     let workbook = build_xlsx_workbook(&spec)?;
     let archive = workbook.to_bytes()?;
@@ -6632,35 +6765,242 @@ fn build_xlsx_corpus(shape: XlsxShape) -> Result<Corpus, Box<dyn Error>> {
     })
 }
 
+fn xlsx_cell_crud_inventory(shape: XlsxCellCrudShape) -> Vec<Vec<XlsxCoordinate>> {
+    let sheet_count = 4;
+    let mut inventory = Vec::with_capacity(sheet_count);
+    for sheet in 0..sheet_count {
+        let mut cells = Vec::new();
+        match shape {
+            XlsxCellCrudShape::Medium => {
+                for row in 0..48 {
+                    for column in 0..48 {
+                        cells.push(XlsxCoordinate { sheet, row, column });
+                    }
+                }
+            },
+            XlsxCellCrudShape::DenseSparse => match sheet {
+                0 => {
+                    for row in 0..128 {
+                        for column in 0..128 {
+                            cells.push(XlsxCoordinate { sheet, row, column });
+                        }
+                    }
+                },
+                1 => {
+                    for row in (0..128).step_by(4) {
+                        for column in (0..128).step_by(4) {
+                            cells.push(XlsxCoordinate { sheet, row, column });
+                        }
+                    }
+                },
+                2 => {
+                    for row in (0..128).step_by(8) {
+                        for column in (0..128).step_by(8) {
+                            cells.push(XlsxCoordinate { sheet, row, column });
+                        }
+                    }
+                },
+                _ => {
+                    for index in 0..128 {
+                        cells.push(XlsxCoordinate {
+                            sheet,
+                            row: index,
+                            column: index,
+                        });
+                    }
+                },
+            },
+        }
+        inventory.push(cells);
+    }
+    inventory
+}
+
+fn xlsx_cell_crud_updates(
+    inventory: &[Vec<XlsxCoordinate>],
+) -> Result<Vec<XlsxCoordinate>, Box<dyn Error>> {
+    let all = inventory.iter().flatten().copied().collect::<Vec<_>>();
+    let update_count = all
+        .len()
+        .checked_add(99)
+        .ok_or("XLSX cell CRUD update count overflows usize")?
+        / 100;
+    let mut updates = Vec::with_capacity(update_count);
+    for index in 0..update_count {
+        let position = index
+            .checked_mul(all.len())
+            .ok_or("XLSX cell CRUD update position overflows usize")?
+            / update_count;
+        updates.push(
+            *all.get(position)
+                .ok_or("XLSX cell CRUD update position is outside inventory")?,
+        );
+    }
+    Ok(updates)
+}
+
+fn xlsx_cell_crud_media_payload(index: usize) -> Vec<u8> {
+    let mut payload = payload_bytes(
+        PayloadKind::Incompressible,
+        70_000 + index,
+        XLSX_CELL_VALUES_MEDIA_ENTRY_BYTES,
+    );
+    payload[..8].copy_from_slice(b"\x89PNG\r\n\x1a\n");
+    payload
+}
+
+fn strip_xlsx_cell_crud_calc_properties(package: &mut OpcPackage) -> Result<(), Box<dyn Error>> {
+    let workbook_uri = PackURI::new("/xl/workbook.xml")?;
+    let workbook_xml = package.get_part(&workbook_uri)?.blob();
+    let mut workbook_xml = String::from_utf8(workbook_xml.to_vec())?;
+    if let Some(start) = workbook_xml.find("<calcPr") {
+        let end = workbook_xml[start..]
+            .find("/>")
+            .map(|offset| start + offset + 2)
+            .ok_or("XLSX CRUD workbook calcPr is not self-closing")?;
+        workbook_xml.replace_range(start..end, "");
+    }
+    package
+        .get_part_mut(&workbook_uri)?
+        .set_blob(workbook_xml.into_bytes());
+    Ok(())
+}
+
+fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<dyn Error>> {
+    let inventory = xlsx_cell_crud_inventory(shape);
+    let updates = xlsx_cell_crud_updates(&inventory)?;
+    let (row_count, column_count) = match shape {
+        XlsxCellCrudShape::Medium => (48, 48),
+        XlsxCellCrudShape::DenseSparse => (128, 128),
+    };
+    let spec = XlsxCorpus {
+        sheet_count: inventory.len(),
+        row_count,
+        column_count,
+        one_percent_updates: updates,
+        cell_inventory: Some(inventory),
+    };
+    let workbook = build_xlsx_workbook(&spec)?;
+    let mut archive = workbook.to_bytes()?;
+    let mut package = OpcPackage::from_bytes(&archive)?;
+    strip_xlsx_cell_crud_calc_properties(&mut package)?;
+    for index in 0..XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT {
+        package.try_add_part(Box::new(BlobPart::new(
+            PackURI::new(format!("/xl/media/litchi-cell-crud-{index:02}.png"))?,
+            opc_content_type::PNG.to_owned(),
+            xlsx_cell_crud_media_payload(index),
+        )))?;
+    }
+    archive = PackageWriter::to_bytes(&package)?;
+    let reopened = Workbook::from_bytes(archive.clone())?;
+    verify_xlsx_cells(&reopened, &spec, &[])?;
+    let cell_count = xlsx_cell_count(&spec)?;
+    let target = *spec
+        .one_percent_updates
+        .first()
+        .ok_or("XLSX cell CRUD corpus has no target cell")?;
+    let target_name = xlsx_cell_name(target);
+    let target_payload = xlsx_value(target).to_string().into_bytes();
+    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("xlsx-cell-values-{}", shape.name()),
+            generator: XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
+            package_format: "XLSX/OPC/ZIP",
+            shape: shape.name(),
+            payload_kind: "deterministic-multi-sheet-scalar-grid-with-media",
+            compression: "deflate",
+            entry_count: cell_count,
+            archive_member_count,
+            entry_bytes: std::mem::size_of::<i32>(),
+            uncompressed_payload_bytes: cell_count
+                .checked_mul(std::mem::size_of::<i32>())
+                .and_then(|bytes| {
+                    bytes.checked_add(
+                        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT
+                            .checked_mul(XLSX_CELL_VALUES_MEDIA_ENTRY_BYTES)?,
+                    )
+                })
+                .ok_or("XLSX cell CRUD logical byte count overflows usize")?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: target_name.clone(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: Some(XlsxManifest {
+                sheet_count: spec.sheet_count,
+                rows_per_sheet: spec.row_count,
+                columns_per_sheet: spec.column_count,
+                one_percent_update_count: spec.one_percent_updates.len(),
+                source_members,
+            }),
+        },
+        archive,
+        target_name,
+        target_payload,
+        xlsx: Some(spec),
+    })
+}
+
 fn build_xlsx_workbook(spec: &XlsxCorpus) -> Result<Workbook, Box<dyn Error>> {
     let workbook = Workbook::new()?;
     let mut edit = workbook.edit()?;
-    {
-        let mut sheet = edit
-            .sheet("Sheet1")?
-            .ok_or("XLSX baseline sheet is missing")?;
-        for row in 0..spec.row_count {
-            for column in 0..spec.column_count {
-                let coordinate = XlsxCoordinate {
-                    sheet: 0,
-                    row,
-                    column,
-                };
-                sheet.set(xlsx_address(row, column)?, xlsx_value(coordinate))?;
+    if let Some(inventory) = spec.cell_inventory.as_ref() {
+        for sheet_index in 0..spec.sheet_count {
+            let name = xlsx_sheet_name(sheet_index);
+            let coordinates = inventory
+                .get(sheet_index)
+                .ok_or("XLSX CRUD sheet inventory is missing")?;
+            if sheet_index == 0 {
+                let mut sheet = edit
+                    .sheet(name.as_str())?
+                    .ok_or("XLSX CRUD sheet is missing")?;
+                for coordinate in coordinates {
+                    sheet.set(
+                        xlsx_address(coordinate.row, coordinate.column)?,
+                        xlsx_value(*coordinate),
+                    )?;
+                }
+            } else {
+                let mut sheet = edit.add(name)?;
+                for coordinate in coordinates {
+                    sheet.set(
+                        xlsx_address(coordinate.row, coordinate.column)?,
+                        xlsx_value(*coordinate),
+                    )?;
+                }
             }
         }
-    }
-    for sheet_index in 1..spec.sheet_count {
-        let name = xlsx_sheet_name(sheet_index);
-        let mut sheet = edit.add(name)?;
-        for row in 0..spec.row_count {
-            for column in 0..spec.column_count {
-                let coordinate = XlsxCoordinate {
-                    sheet: sheet_index,
-                    row,
-                    column,
-                };
-                sheet.set(xlsx_address(row, column)?, xlsx_value(coordinate))?;
+    } else {
+        {
+            let mut sheet = edit
+                .sheet("Sheet1")?
+                .ok_or("XLSX baseline sheet is missing")?;
+            for row in 0..spec.row_count {
+                for column in 0..spec.column_count {
+                    let coordinate = XlsxCoordinate {
+                        sheet: 0,
+                        row,
+                        column,
+                    };
+                    sheet.set(xlsx_address(row, column)?, xlsx_value(coordinate))?;
+                }
+            }
+        }
+        for sheet_index in 1..spec.sheet_count {
+            let name = xlsx_sheet_name(sheet_index);
+            let mut sheet = edit.add(name)?;
+            for row in 0..spec.row_count {
+                for column in 0..spec.column_count {
+                    let coordinate = XlsxCoordinate {
+                        sheet: sheet_index,
+                        row,
+                        column,
+                    };
+                    sheet.set(xlsx_address(row, column)?, xlsx_value(coordinate))?;
+                }
             }
         }
     }
@@ -6697,6 +7037,13 @@ fn xlsx_one_percent_updates(shape: XlsxShape) -> Result<Vec<XlsxCoordinate>, Box
 }
 
 fn xlsx_cell_count(spec: &XlsxCorpus) -> Result<usize, Box<dyn Error>> {
+    if let Some(inventory) = spec.cell_inventory.as_ref() {
+        return inventory.iter().try_fold(0usize, |total, sheet| {
+            total
+                .checked_add(sheet.len())
+                .ok_or_else(|| "XLSX cell inventory count overflows usize".into())
+        });
+    }
     spec.sheet_count
         .checked_mul(spec.row_count)
         .and_then(|value| value.checked_mul(spec.column_count))
@@ -6734,6 +7081,231 @@ fn xlsx_cell_name(coordinate: XlsxCoordinate) -> String {
         xlsx_address(coordinate.row, coordinate.column)
             .expect("bounded XLSX benchmark coordinate must be valid")
     )
+}
+
+fn xlsx_cell_crud_updates_for_case(
+    case: Case,
+    spec: &XlsxCorpus,
+) -> Result<Vec<XlsxCoordinate>, Box<dyn Error>> {
+    let inventory = spec
+        .cell_inventory
+        .as_ref()
+        .ok_or("XLSX cell CRUD case has no cell inventory")?;
+    let total = inventory.iter().map(Vec::len).sum::<usize>();
+    let count = match case {
+        Case::XlsxEagerCellValuesOneEditSave | Case::XlsxSourceBackedCellValuesOneEditSave => 1,
+        Case::XlsxEagerCellValuesOnePercentEditSave
+        | Case::XlsxSourceBackedCellValuesOnePercentEditSave => total.div_ceil(100),
+        Case::XlsxEagerCellValuesBatchEditSave | Case::XlsxSourceBackedCellValuesBatchEditSave => {
+            litchi_xlsx::cell_values::MAX_BATCH_EDITS
+        },
+        _ => return Err("invalid XLSX cell CRUD case".into()),
+    };
+    if count == 0 || count > total {
+        return Err("XLSX cell CRUD update count is outside corpus inventory".into());
+    }
+    if matches!(
+        case,
+        Case::XlsxEagerCellValuesOnePercentEditSave
+            | Case::XlsxSourceBackedCellValuesOnePercentEditSave
+    ) {
+        if spec.one_percent_updates.len() != count {
+            return Err("XLSX CRUD 1% manifest count differs from selected updates".into());
+        }
+        return Ok(spec.one_percent_updates.clone());
+    }
+    if count == 1 {
+        return Ok(vec![
+            *inventory
+                .first()
+                .and_then(|cells| cells.first())
+                .ok_or("XLSX cell CRUD corpus has no first cell")?,
+        ]);
+    }
+    let mut updates = Vec::with_capacity(count);
+    for index in 0..count {
+        let sheet = index % inventory.len();
+        let local = index / inventory.len();
+        updates.push(
+            *inventory
+                .get(sheet)
+                .and_then(|cells| cells.get(local))
+                .ok_or("XLSX cross-sheet update position is outside inventory")?,
+        );
+    }
+    Ok(updates)
+}
+
+fn xlsx_update_sheet_selectors(updates: &[XlsxCoordinate]) -> Vec<litchi_xlsx::Selector<'static>> {
+    let mut positions = updates
+        .iter()
+        .map(|coordinate| coordinate.sheet)
+        .collect::<Vec<_>>();
+    positions.sort_unstable();
+    positions.dedup();
+    positions
+        .into_iter()
+        .map(litchi_xlsx::Selector::from)
+        .collect()
+}
+
+fn verify_xlsx_cell_crud_output(
+    corpus: &Corpus,
+    output: &[u8],
+    updated: &[XlsxCoordinate],
+) -> Result<(), Box<dyn Error>> {
+    let spec = xlsx_spec(corpus)?;
+    let workbook = Workbook::from_bytes(output.to_vec())?;
+    verify_xlsx_cells(&workbook, spec, updated)?;
+    verify_xlsx_cell_crud_package_identity(corpus, output)
+}
+
+fn verify_xlsx_cell_crud_package_identity(
+    corpus: &Corpus,
+    output: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let source = OpcPackage::from_bytes(&corpus.archive)?;
+    let candidate = OpcPackage::from_bytes(output)?;
+    if source.part_count() != candidate.part_count()
+        || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
+    {
+        return Err("XLSX cell CRUD output changed package topology".into());
+    }
+    for source_part in source.iter_parts() {
+        let candidate_part = candidate.get_part(source_part.partname())?;
+        if candidate_part.content_type() != source_part.content_type()
+            || relationship_signatures(candidate_part.rels())
+                != relationship_signatures(source_part.rels())
+        {
+            return Err("XLSX cell CRUD output changed Part metadata".into());
+        }
+        if source_part.partname().membername().starts_with("xl/media/")
+            && candidate_part.blob() != source_part.blob()
+        {
+            return Err("XLSX cell CRUD output changed untouched media".into());
+        }
+    }
+    Ok(())
+}
+
+fn verify_xlsx_cell_crud_raw_source_output(
+    corpus: &Corpus,
+    output: &[u8],
+    updated: &[XlsxCoordinate],
+) -> Result<(), Box<dyn Error>> {
+    let source = raw_zip_members(&corpus.archive)?;
+    let candidate = raw_zip_members(output)?;
+    if source.keys().ne(candidate.keys()) {
+        return Err("XLSX source CRUD raw ZIP member set differs from source".into());
+    }
+    let touched = updated
+        .iter()
+        .map(|coordinate| format!("xl/worksheets/sheet{}.xml", coordinate.sheet + 1))
+        .collect::<BTreeSet<_>>();
+    for (name, source_member) in source {
+        if !touched.contains(&name) && candidate.get(&name) != Some(&source_member) {
+            return Err(
+                format!("XLSX source CRUD changed raw unselected ZIP member {name}").into(),
+            );
+        }
+    }
+    Ok(())
+}
+
+fn run_xlsx_cell_value_lifecycle_gates(
+    corpus: &Corpus,
+    spec: &XlsxCorpus,
+) -> Result<(), Box<dyn Error>> {
+    let selectors = (0..spec.sheet_count)
+        .map(litchi_xlsx::Selector::from)
+        .collect::<Vec<_>>();
+    let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
+    let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source)?;
+    let noop = editor.edit_sheets(selectors.clone())?;
+    let noop_commit = noop.commit()?;
+    if noop_commit.changed() || !noop_commit.patch().is_empty() {
+        return Err("XLSX cell CRUD exact no-op produced a change".into());
+    }
+    let mut noop_output = Vec::new();
+    editor.publish_multi_commit_to_stream(&mut noop_output, &noop_commit)?;
+    if noop_output != corpus.archive {
+        return Err("XLSX cell CRUD exact no-op changed source bytes".into());
+    }
+
+    let target = *spec
+        .cell_inventory
+        .as_ref()
+        .and_then(|inventory| inventory.first())
+        .and_then(|cells| cells.first())
+        .ok_or("XLSX cell CRUD corpus has no lifecycle target")?;
+    for remove in [false, true] {
+        let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
+        let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source)?;
+        let mut edit = editor.edit_sheets([litchi_xlsx::Selector::from(target.sheet)])?;
+        let address =
+            litchi_xlsx::Address::at(u32::try_from(target.row)?, u32::try_from(target.column)?)?;
+        if remove {
+            edit.remove(target.sheet, address)?;
+        } else {
+            edit.clear(target.sheet, address)?;
+        }
+        let commit = edit.commit()?;
+        if !commit.changed() || commit.diagnostics().changed_cells() != 1 {
+            return Err(
+                "XLSX cell CRUD clear/remove lifecycle gate did not change one cell".into(),
+            );
+        }
+        let mut published = Vec::new();
+        editor.publish_multi_commit_to_stream(&mut published, &commit)?;
+        verify_xlsx_cell_crud_package_identity(corpus, &published)?;
+        let workbook = Workbook::from_bytes(published.clone())?;
+        verify_xlsx_cell_crud_lifecycle_state(&workbook, spec, target, remove)?;
+        let mut applied = OpcPackage::from_bytes(&corpus.archive)?;
+        commit.patch().apply(&mut applied)?;
+        let applied_bytes = PackageWriter::to_bytes(&applied)?;
+        verify_xlsx_cell_crud_package_identity(corpus, &applied_bytes)?;
+        let applied_workbook = Workbook::from_bytes(applied_bytes)?;
+        verify_xlsx_cell_crud_lifecycle_state(&applied_workbook, spec, target, remove)?;
+        if commit.patch().apply(&mut applied).is_ok() {
+            return Err("XLSX lifecycle stale source was accepted".into());
+        }
+        commit.patch().inverse().apply(&mut applied)?;
+        let restored_bytes = PackageWriter::to_bytes(&applied)?;
+        verify_xlsx_cell_crud_package_identity(corpus, &restored_bytes)?;
+        let restored_workbook = Workbook::from_bytes(restored_bytes)?;
+        verify_xlsx_cells(&restored_workbook, spec, &[])?;
+    }
+    Ok(())
+}
+
+fn verify_xlsx_cell_crud_lifecycle_state(
+    workbook: &Workbook,
+    spec: &XlsxCorpus,
+    target: XlsxCoordinate,
+    removed: bool,
+) -> Result<(), Box<dyn Error>> {
+    let sheet = workbook
+        .sheet(xlsx_sheet_name(target.sheet).as_str())?
+        .ok_or("XLSX lifecycle state is missing its target sheet")?;
+    let address = xlsx_address(target.row, target.column)?;
+    let stored = sheet.cell(address.as_str())?.stored();
+    if removed {
+        if stored.is_some() {
+            return Err("XLSX remove lifecycle retained the cell owner".into());
+        }
+    } else if !matches!(stored, Some(XlsxCell::Empty)) {
+        return Err("XLSX clear lifecycle did not retain an empty cell owner".into());
+    }
+    let expected = spec
+        .cell_inventory
+        .as_ref()
+        .and_then(|inventory| inventory.get(target.sheet))
+        .map(|cells| cells.len() - usize::from(removed))
+        .ok_or("XLSX lifecycle target sheet inventory is missing")?;
+    if sheet.cells("A1:XFD1048576")?.count() != expected {
+        return Err("XLSX lifecycle state changed the wrong cell owners".into());
+    }
+    Ok(())
 }
 
 fn xlsx_value(coordinate: XlsxCoordinate) -> i32 {
@@ -6774,33 +7346,49 @@ fn verify_xlsx_cells(
         let sheet = workbook
             .sheet(name.as_str())?
             .ok_or("XLSX workbook sheet is missing")?;
+        let expected = spec.cell_inventory.as_ref().map_or_else(
+            || {
+                spec.row_count
+                    .checked_mul(spec.column_count)
+                    .ok_or("XLSX per-sheet cell count overflows usize")
+            },
+            |inventory| {
+                inventory
+                    .get(sheet_index)
+                    .map(|cells| cells.len())
+                    .ok_or("XLSX cell inventory is missing a sheet")
+            },
+        )?;
         let observed = sheet.cells("A1:XFD1048576")?.count();
-        let expected = spec
-            .row_count
-            .checked_mul(spec.column_count)
-            .ok_or("XLSX per-sheet cell count overflows usize")?;
         if observed != expected {
             return Err("XLSX stored cell count differs from corpus specification".into());
         }
-        for row in 0..spec.row_count {
-            for column in 0..spec.column_count {
-                let coordinate = XlsxCoordinate {
-                    sheet: sheet_index,
-                    row,
-                    column,
-                };
-                let expected = xlsx_value(coordinate) + i32::from(updated.contains(&coordinate));
-                let address = xlsx_address(row, column)?;
-                let actual = sheet
-                    .cell(address.as_str())?
-                    .stored()
-                    .ok_or("XLSX expected stored cell is missing")?;
-                let XlsxCell::Value(XlsxValue::Number(actual)) = actual else {
-                    return Err("XLSX expected numeric cell has another value type".into());
-                };
-                if actual.as_str() != expected.to_string() {
-                    return Err("XLSX numeric cell differs from deterministic expectation".into());
-                }
+        let coordinates = spec.cell_inventory.as_ref().map_or_else(
+            || {
+                (0..spec.row_count)
+                    .flat_map(|row| {
+                        (0..spec.column_count).map(move |column| XlsxCoordinate {
+                            sheet: sheet_index,
+                            row,
+                            column,
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            },
+            |inventory| inventory[sheet_index].clone(),
+        );
+        for coordinate in coordinates {
+            let expected = xlsx_value(coordinate) + i32::from(updated.contains(&coordinate));
+            let address = xlsx_address(coordinate.row, coordinate.column)?;
+            let actual = sheet
+                .cell(address.as_str())?
+                .stored()
+                .ok_or("XLSX expected stored cell is missing")?;
+            let XlsxCell::Value(XlsxValue::Number(actual)) = actual else {
+                return Err("XLSX expected numeric cell has another value type".into());
+            };
+            if actual.as_str() != expected.to_string() {
+                return Err("XLSX numeric cell differs from deterministic expectation".into());
             }
         }
     }
@@ -7059,6 +7647,14 @@ fn run_case_with_config(
         Case::XlsxOnePercentCommit => run_xlsx_update_commit(corpus, warmup_iterations, samples, 0),
         Case::XlsxOnePercentCommitSave => {
             run_xlsx_update_commit_save(corpus, warmup_iterations, samples, 0)
+        },
+        Case::XlsxEagerCellValuesOneEditSave
+        | Case::XlsxSourceBackedCellValuesOneEditSave
+        | Case::XlsxEagerCellValuesOnePercentEditSave
+        | Case::XlsxSourceBackedCellValuesOnePercentEditSave
+        | Case::XlsxEagerCellValuesBatchEditSave
+        | Case::XlsxSourceBackedCellValuesBatchEditSave => {
+            run_xlsx_cell_values_edit_save(case, corpus, warmup_iterations, samples)
         },
         Case::XlsxSourceOpen => run_xlsx_source_open(corpus, warmup_iterations, samples),
         Case::XlsxSourceListSheets => {
@@ -13158,6 +13754,162 @@ fn run_xlsx_update_commit_save(
     Ok(result(case, corpus, elapsed, Some(sink)))
 }
 
+fn xlsx_cell_crud_eager_output(
+    corpus: &Corpus,
+    updates: &[XlsxCoordinate],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+    let mut edit = workbook.edit()?;
+    for coordinate in updates {
+        let mut sheet = edit
+            .sheet(xlsx_sheet_name(coordinate.sheet))?
+            .ok_or("XLSX cell CRUD eager target sheet is missing")?;
+        sheet.set(
+            xlsx_address(coordinate.row, coordinate.column)?,
+            xlsx_value(*coordinate) + 1,
+        )?;
+    }
+    let commit = edit.commit()?;
+    let output = commit.workbook().to_bytes()?;
+    verify_xlsx_cell_crud_output(corpus, &output, updates)?;
+    Ok(output)
+}
+
+fn run_xlsx_cell_values_edit_save(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
+        || !case.is_xlsx_cell_values_edit_save()
+    {
+        return Err("XLSX cell CRUD case requires its fixed multi-sheet media corpus".into());
+    }
+    let spec = xlsx_spec(corpus)?;
+    let updates = xlsx_cell_crud_updates_for_case(case, spec)?;
+    run_xlsx_cell_value_lifecycle_gates(corpus, spec)?;
+    let expected = xlsx_cell_crud_eager_output(corpus, &updates)?;
+    let expected_digest = sha256_hex(&expected);
+    let source_backed = matches!(
+        case,
+        Case::XlsxSourceBackedCellValuesOneEditSave
+            | Case::XlsxSourceBackedCellValuesOnePercentEditSave
+            | Case::XlsxSourceBackedCellValuesBatchEditSave
+    );
+    let expected_touched = xlsx_update_sheet_selectors(&updates).len();
+    let maximum = xlsx_output_ceiling(expected.len())?;
+    let payload_ranges = source_backed
+        .then(|| xlsx_cell_crud_payload_ranges(corpus))
+        .transpose()?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut output_digests = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut sink = CountingSink::bounded(maximum, 64 * 1024);
+        sink.reserve_budget()?;
+        let backing = source_backed.then(|| {
+            Arc::new(InstrumentedSource::new(
+                corpus.archive.clone(),
+                payload_ranges
+                    .clone()
+                    .expect("source CRUD ranges are present"),
+            ))
+        });
+        let eager_source = (!source_backed).then(|| corpus.archive.clone());
+        let mut duration = Duration::ZERO;
+        let mut source_metrics = None;
+        let mut materializations = 0u64;
+        if source_backed {
+            let read_at: Arc<dyn ReadAt> = backing.clone().expect("source CRUD backing exists");
+            let started = Instant::now();
+            let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(read_at)?;
+            let selectors = xlsx_update_sheet_selectors(&updates);
+            let mut edit = editor.edit_sheets(selectors)?;
+            for coordinate in &updates {
+                edit.set(
+                    coordinate.sheet,
+                    litchi_xlsx::Address::at(
+                        u32::try_from(coordinate.row)?,
+                        u32::try_from(coordinate.column)?,
+                    )?,
+                    xlsx_value(*coordinate) + 1,
+                )?;
+            }
+            let commit = edit.commit()?;
+            duration += started.elapsed();
+            if commit.diagnostics().touched_worksheets() != expected_touched {
+                return Err("XLSX source CRUD touched an unexpected worksheet count".into());
+            }
+            materializations = editor.cache_diagnostics().successful_loads;
+            let publish_started = Instant::now();
+            editor.publish_multi_commit_to_stream(&mut sink, &commit)?;
+            duration += publish_started.elapsed();
+            source_metrics = Some(
+                backing
+                    .clone()
+                    .expect("source CRUD backing exists")
+                    .snapshot(),
+            );
+        } else {
+            let started = Instant::now();
+            let workbook = Workbook::from_bytes(eager_source.expect("eager source exists"))?;
+            let mut edit = workbook.edit()?;
+            for coordinate in &updates {
+                edit.sheet(xlsx_sheet_name(coordinate.sheet))?
+                    .ok_or("XLSX cell CRUD eager target sheet is missing")?
+                    .set(
+                        xlsx_address(coordinate.row, coordinate.column)?,
+                        xlsx_value(*coordinate) + 1,
+                    )?;
+            }
+            let commit = edit.commit()?;
+            duration += started.elapsed();
+            let started = Instant::now();
+            commit.workbook().write_to(&mut sink)?;
+            duration += started.elapsed();
+        }
+        if source_backed && materializations < expected_touched as u64 {
+            return Err("XLSX source CRUD materialized fewer worksheets than touched".into());
+        }
+        if sink.bytes.is_empty() {
+            return Err("XLSX cell CRUD publication emitted no bytes".into());
+        }
+        verify_xlsx_cell_crud_output(corpus, &sink.bytes, &updates)?;
+        if source_backed {
+            verify_xlsx_cell_crud_raw_source_output(corpus, &sink.bytes, &updates)?;
+        }
+        if sink.summary().largest_write > 64 * 1024 {
+            return Err("XLSX cell CRUD publication exceeded sequential sink bound".into());
+        }
+        let digest = sha256_hex(&sink.bytes);
+        if iteration >= warmup_iterations {
+            if let Some(metrics) = source_metrics {
+                source_summary.record_opc(metrics, materializations);
+            }
+            sink_summaries.push(sink.summary());
+            output_digests.push(digest);
+        }
+        std::hint::black_box(&sink.bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let sink = deterministic_sink_summary(&sink_summaries, case.name())?;
+    if output_digests.windows(2).any(|pair| pair[0] != pair[1]) {
+        return Err("XLSX cell CRUD output hashes are not deterministic".into());
+    }
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: source_backed.then_some(source_summary),
+        execution: None,
+        output_sha256: output_digests.first().cloned().or(Some(expected_digest)),
+    })
+}
+
 fn prepare_xlsx_merge_edit(
     workbook: &Workbook,
     merge: bool,
@@ -13476,6 +14228,15 @@ fn xlsx_calculation_payload_ranges(corpus: &Corpus) -> Result<Vec<Range<u64>>, B
         return Err("XLSX calculation-edit payload count differs from corpus manifest".into());
     }
     Ok(ordinary)
+}
+
+fn xlsx_cell_crud_payload_ranges(corpus: &Corpus) -> Result<Vec<Range<u64>>, Box<dyn Error>> {
+    Ok(zip_member_ranges(&corpus.archive)?
+        .into_iter()
+        .filter_map(|(name, range)| {
+            (name != "[Content_Types].xml" && !name.ends_with(".rels")).then_some(range)
+        })
+        .collect())
 }
 
 fn xlsx_source_layout(
@@ -19608,14 +20369,16 @@ mod tests {
         ODT_RESOURCE_BATCH_COUNT, OpcCacheMode, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind,
         RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
         RtfSemanticVariant, SemanticShape, SimulatedRangeSource, SourceBackedPackage, WriterShape,
-        XlsxShape, build_cfb_corpus, build_docx_source_edit_corpus, build_odp_media_corpus,
-        build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
-        build_odt_resource_batch_corpus, build_ole_common_corpus, build_opc_corpus,
-        build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_semantic_docx_corpus,
-        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
-        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
-        build_writer_corpus, build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
-        build_xlsx_auto_filter_edit_corpus, build_xlsx_calculation_metadata_edit_corpus,
+        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
+        XlsxCellCrudShape, XlsxShape, build_cfb_corpus, build_docx_source_edit_corpus,
+        build_odp_media_corpus, build_odp_text_box_batch_corpus, build_ods_media_corpus,
+        build_odt_media_corpus, build_odt_resource_batch_corpus, build_ole_common_corpus,
+        build_opc_corpus, build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus,
+        build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
+        build_semantic_odt_corpus, build_semantic_pptx_corpus, build_semantic_rtf_corpus,
+        build_streaming_corpus, build_writer_corpus, build_xls_comments_edit_corpus,
+        build_xls_visibility_edit_corpus, build_xlsx_auto_filter_edit_corpus,
+        build_xlsx_calculation_metadata_edit_corpus, build_xlsx_cell_crud_corpus,
         build_xlsx_conditional_formatting_edit_corpus, build_xlsx_corpus,
         build_xlsx_data_validation_edit_corpus, build_xlsx_defined_names_edit_corpus,
         build_xlsx_merge_edit_corpus, build_xlsx_page_break_edit_corpus,
@@ -19633,6 +20396,7 @@ mod tests {
         run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
         run_xlsx_page_setup_edit_save, run_xlsx_print_options_edit_save,
         run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
+        xlsx_cell_count,
     };
 
     #[test]
@@ -21580,6 +22344,55 @@ mod tests {
         let measured = run_case(Case::XlsxOneCellCommitFirstRead, &first, 0, 1).unwrap();
         assert_eq!(measured.case, "xlsx_one_cell_commit_first_read");
         assert_eq!(measured.elapsed_ns.samples.len(), 1);
+    }
+
+    #[test]
+    fn xlsx_cell_values_matched_controls_are_deterministic_and_bounded() {
+        let first = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
+        let second = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
+        assert_eq!(first.archive, second.archive);
+        assert_eq!(
+            first.manifest.generator,
+            XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
+        );
+        assert!(first.manifest.archive_member_count >= XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT);
+        let spec = first.xlsx.as_ref().unwrap();
+        assert_eq!(spec.sheet_count, 4);
+        assert_eq!(xlsx_cell_count(spec).unwrap(), 9_216);
+        assert_eq!(spec.one_percent_updates.len(), 93);
+        assert_eq!(XlsxCellCrudShape::ALL.len(), 2);
+
+        for case in [
+            Case::XlsxEagerCellValuesOneEditSave,
+            Case::XlsxSourceBackedCellValuesOneEditSave,
+            Case::XlsxEagerCellValuesOnePercentEditSave,
+            Case::XlsxSourceBackedCellValuesOnePercentEditSave,
+            Case::XlsxEagerCellValuesBatchEditSave,
+            Case::XlsxSourceBackedCellValuesBatchEditSave,
+        ] {
+            let measured = run_case(case, &first, 0, 1).unwrap();
+            assert_eq!(measured.case, case.name());
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            assert!(measured.output_sha256.is_some());
+            let sink = measured.sink.unwrap();
+            assert!(sink.largest_write <= 64 * 1024, "{}", case.name());
+            if case.is_xlsx_cell_values_edit_save() {
+                assert_eq!(
+                    measured.corpus.generator,
+                    XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
+                );
+            }
+        }
+
+        let dense_first = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::DenseSparse).unwrap();
+        let dense_second = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::DenseSparse).unwrap();
+        assert_eq!(dense_first.archive, dense_second.archive);
+        let dense_spec = dense_first.xlsx.as_ref().unwrap();
+        assert_eq!(dense_spec.row_count, 128);
+        assert_eq!(dense_spec.column_count, 128);
+        assert_eq!(xlsx_cell_count(dense_spec).unwrap(), 17_792);
+        assert_eq!(dense_spec.one_percent_updates.len(), 178);
+        assert!(dense_first.manifest.archive_member_count >= XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT);
     }
 
     #[test]

@@ -2,7 +2,7 @@
 
 use litchi_opc::OpcPackage;
 
-use super::Snapshot;
+use super::{MultiSnapshot, Snapshot};
 use crate::error::{Error, Result, invalid};
 
 /// Exact source-bound replacement of one safe worksheet value closure.
@@ -10,6 +10,109 @@ use crate::error::{Error, Result, invalid};
 pub struct Patch {
     before: Snapshot,
     after: Snapshot,
+}
+
+/// Exact source-bound replacement of a bounded worksheet set.
+///
+/// The patch owns exact bytes for selected worksheet Parts and the complete
+/// workbook ownership graph. Unselected worksheet payload bytes are not part
+/// of the closure: applying a patch preserves valid independent edits to
+/// those payloads while still rejecting graph, relationship, content-type,
+/// signature, and source-lineage conflicts.
+#[derive(Clone, Debug)]
+pub struct MultiPatch {
+    before: MultiSnapshot,
+    after: MultiSnapshot,
+}
+
+impl MultiPatch {
+    pub(crate) const fn new(before: MultiSnapshot, after: MultiSnapshot) -> Self {
+        Self { before, after }
+    }
+
+    /// Required exact source state for every selected worksheet.
+    #[must_use]
+    pub const fn before(&self) -> &MultiSnapshot {
+        &self.before
+    }
+
+    /// Exact target state for every selected worksheet.
+    #[must_use]
+    pub const fn after(&self) -> &MultiSnapshot {
+        &self.after
+    }
+
+    /// Whether every selected worksheet remains byte-identical to its source.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.before.same_source(&self.after)
+    }
+
+    /// Exact source-bound inverse.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: self.after.clone(),
+            after: self.before.clone(),
+        }
+    }
+
+    /// Apply all worksheet replacements atomically after exact source checks.
+    pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+        let current = MultiSnapshot::load_owned(
+            package,
+            self.before.sheets().iter().map(Snapshot::sheet_position),
+        )
+        .map_err(|_| Error::PatchConflict {
+            part: self
+                .before
+                .sheets()
+                .first()
+                .map_or_else(String::new, |snapshot| {
+                    snapshot.worksheet_part_name().to_string()
+                }),
+        })?;
+        if !current.same_source(&self.before) {
+            return Err(Error::PatchConflict {
+                part: self
+                    .before
+                    .sheets()
+                    .first()
+                    .map_or_else(String::new, |snapshot| {
+                        snapshot.worksheet_part_name().to_string()
+                    }),
+            });
+        }
+        if self.is_empty() {
+            return Ok(());
+        }
+        if package.is_signed() {
+            return Err(Error::Signed);
+        }
+        let mut candidate = package.clone();
+        for (_before, snapshot) in self
+            .before
+            .sheets()
+            .iter()
+            .zip(self.after.sheets())
+            .filter(|(before, after)| before.source_xml() != after.source_xml())
+        {
+            candidate
+                .get_part_mut(snapshot.worksheet_part_name())?
+                .set_blob_shared(snapshot.source_arc());
+        }
+        let readback = MultiSnapshot::load_owned(
+            &candidate,
+            self.after.sheets().iter().map(Snapshot::sheet_position),
+        )?;
+        if !readback.same_source(&self.after) {
+            return Err(invalid(
+                "multi-sheet value-only patch readback differs from its target",
+            ));
+        }
+        *package = candidate;
+        Ok(())
+    }
 }
 
 impl Patch {
@@ -78,6 +181,62 @@ pub struct Commit {
     diagnostics: Diagnostics,
 }
 
+/// Successful bounded multi-worksheet value-only publication.
+#[derive(Debug)]
+pub struct MultiCommit {
+    snapshot: MultiSnapshot,
+    patch: MultiPatch,
+    diagnostics: MultiDiagnostics,
+}
+
+impl MultiCommit {
+    pub(super) fn new(
+        snapshot: MultiSnapshot,
+        patch: MultiPatch,
+        changed_cells: usize,
+        touched_worksheets: usize,
+    ) -> Self {
+        Self {
+            snapshot,
+            patch,
+            diagnostics: MultiDiagnostics {
+                changed_cells,
+                touched_worksheets,
+            },
+        }
+    }
+
+    /// Whether at least one scalar payload changed.
+    #[must_use]
+    pub fn changed(&self) -> bool {
+        self.diagnostics.changed_cells != 0
+    }
+
+    /// Resulting immutable worksheet snapshots.
+    #[must_use]
+    pub const fn snapshot(&self) -> &MultiSnapshot {
+        &self.snapshot
+    }
+
+    /// Exact reversible multi-worksheet patch.
+    #[must_use]
+    pub const fn patch(&self) -> &MultiPatch {
+        &self.patch
+    }
+
+    /// Content-free publication diagnostics.
+    #[must_use]
+    pub const fn diagnostics(&self) -> MultiDiagnostics {
+        self.diagnostics
+    }
+
+    /// Consume into snapshot and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (MultiSnapshot, MultiPatch) {
+        (self.snapshot, self.patch)
+    }
+}
+
 impl Commit {
     pub(super) fn new(snapshot: Snapshot, patch: Patch, changed_cells: usize) -> Self {
         Self {
@@ -122,6 +281,27 @@ impl Commit {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Diagnostics {
     changed_cells: usize,
+}
+
+/// Content-free bounded multi-worksheet publication diagnostics.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MultiDiagnostics {
+    changed_cells: usize,
+    touched_worksheets: usize,
+}
+
+impl MultiDiagnostics {
+    /// Number of scalar payloads changed by the commit.
+    #[must_use]
+    pub const fn changed_cells(self) -> usize {
+        self.changed_cells
+    }
+
+    /// Number of worksheet Parts replaced by the commit.
+    #[must_use]
+    pub const fn touched_worksheets(self) -> usize {
+        self.touched_worksheets
+    }
 }
 
 impl Diagnostics {

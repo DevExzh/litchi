@@ -1,11 +1,13 @@
 //! Immutable source closure for one value-only worksheet capability.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use litchi_core::{Selector as CoreSelector, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    OpcPackage, PackURI, Part, Relationship, Relationships, SourceBackedPackage, TargetMode,
+    OpcPackage, PackURI, Part, Relationship, Relationships, SourceBackedPackage, SourceLineage,
+    TargetMode,
 };
 
 use crate::cell::{Cell, Store, Value};
@@ -14,6 +16,18 @@ use crate::workbook::source::validate_sheet_graph;
 use crate::{Selector, WorksheetKind, raw};
 
 use super::validation;
+
+const CHARTSHEET_REL: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
+const STRICT_CHARTSHEET_REL: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet";
+const DIALOGSHEET_REL: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet";
+const MACROSHEET_REL: &str = "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet";
+const INTL_MACROSHEET_REL: &str =
+    "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet";
+const CHARTSHEET_CONTENT_TYPE: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
 
 /// Exact worksheet values plus the complete package owner state required to
 /// publish a one-Part overlay safely.
@@ -25,10 +39,367 @@ pub struct Snapshot {
     source: SourceState,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SheetGraphState {
+    name: Box<str>,
+    relationship_id: Box<str>,
+    sheet_id: u32,
+    visibility: raw::Visibility,
+    kind: WorksheetKind,
+    uri: PackURI,
+    content_type: Box<str>,
+    relationships: Box<[SourceRelationship]>,
+    relationship: SourceRelationship,
+}
+
+struct SourceCatalogCapture {
+    sheets: Vec<raw::Sheet>,
+    parts: Vec<crate::workbook::source::SheetPart>,
+    workbook_uri: PackURI,
+    workbook_content_type: Box<str>,
+    workbook_xml: Arc<Vec<u8>>,
+    owner_relationship: SourceRelationship,
+    package_relationships: Arc<[SourceRelationship]>,
+    workbook_relationships: Arc<[SourceRelationship]>,
+    style_count: u32,
+    auxiliary: Arc<[PartState]>,
+    graph: Arc<[SheetGraphState]>,
+    source_lineage: SourceLineage,
+    source_version: SourceVersion,
+}
+
+struct OwnedCatalogCapture {
+    sheets: Vec<raw::Sheet>,
+    parts: Vec<crate::workbook::source::SheetPart>,
+    workbook_uri: PackURI,
+    workbook_content_type: Box<str>,
+    workbook_xml: Arc<Vec<u8>>,
+    owner_relationship: SourceRelationship,
+    package_relationships: Arc<[SourceRelationship]>,
+    workbook_relationships: Arc<[SourceRelationship]>,
+    style_count: u32,
+    auxiliary: Arc<[PartState]>,
+    graph: Arc<[SheetGraphState]>,
+}
+
+pub(super) fn checked_multi_bytes(total: usize, next: usize, maximum: usize) -> Result<usize> {
+    let updated = total
+        .checked_add(next)
+        .ok_or_else(|| invalid("multi-sheet worksheet XML size overflows usize"))?;
+    if updated > maximum {
+        return Err(invalid(format!(
+            "multi-sheet worksheet XML exceeds {maximum} bytes"
+        )));
+    }
+    Ok(updated)
+}
+
+/// Maximum worksheet owners in one source-backed scalar transaction.
+pub const MAX_SHEET_OWNERS: usize = 64;
+/// Maximum aggregate worksheet XML retained by one multi-sheet transaction.
+pub const MAX_MULTI_WORKSHEET_BYTES: usize = 64 * 1024 * 1024;
+
+/// Immutable source closure for a bounded set of worksheets.
+///
+/// Selected worksheet payload bytes are retained for editing and reversible
+/// publication. The complete workbook sheet graph (descriptors, relationships,
+/// targets, kinds, and content types) is retained as shared ownership
+/// metadata; unrelated worksheet payloads remain deferred so independent edits
+/// can compose without materializing or overwriting them.
+#[derive(Clone, Debug)]
+pub struct MultiSnapshot {
+    sheets: Box<[Snapshot]>,
+}
+
+impl MultiSnapshot {
+    pub(crate) fn from_sheets(mut sheets: Vec<Snapshot>) -> Result<Self> {
+        if sheets.is_empty() {
+            return Err(invalid("multi-sheet value edits require one worksheet"));
+        }
+        if sheets.len() > MAX_SHEET_OWNERS {
+            return Err(invalid(format!(
+                "multi-sheet value edits exceed {MAX_SHEET_OWNERS} worksheet owners"
+            )));
+        }
+        let mut total_bytes = 0usize;
+        for snapshot in &sheets {
+            total_bytes = checked_multi_bytes(
+                total_bytes,
+                snapshot.source_xml().len(),
+                MAX_MULTI_WORKSHEET_BYTES,
+            )?;
+        }
+        sheets.sort_unstable_by_key(Snapshot::sheet_position);
+        if sheets
+            .windows(2)
+            .any(|pair| pair[0].sheet_position() == pair[1].sheet_position())
+        {
+            return Err(invalid(
+                "multi-sheet value edits contain a duplicate worksheet",
+            ));
+        }
+        Ok(Self {
+            sheets: sheets.into_boxed_slice(),
+        })
+    }
+
+    pub(crate) fn load_source_backed<'a, I>(
+        package: &SourceBackedPackage,
+        selectors: I,
+    ) -> Result<Self>
+    where
+        I: IntoIterator<Item = Selector<'a>>,
+    {
+        let mut selected = Vec::new();
+        selected
+            .try_reserve_exact(MAX_SHEET_OWNERS)
+            .map_err(|source| allocation("multi-sheet selector snapshot", source))?;
+        for selector in selectors {
+            if selected.len() >= MAX_SHEET_OWNERS {
+                return Err(invalid(format!(
+                    "multi-sheet value edits exceed {MAX_SHEET_OWNERS} worksheet owners"
+                )));
+            }
+            selected.push(selector);
+        }
+        let selectors = selected;
+        let mut sheets = Vec::new();
+        sheets
+            .try_reserve_exact(MAX_SHEET_OWNERS)
+            .map_err(|source| allocation("multi-sheet value snapshot", source))?;
+        if selectors.len() > MAX_SHEET_OWNERS {
+            return Err(invalid(format!(
+                "multi-sheet value edits exceed {MAX_SHEET_OWNERS} worksheet owners"
+            )));
+        }
+        let capture = load_source_catalog(package)?;
+        let positions = resolve_selectors(&capture.sheets, selectors)?;
+        let mut aggregate_bytes = 0usize;
+        for position in positions {
+            let remaining = MAX_MULTI_WORKSHEET_BYTES.saturating_sub(aggregate_bytes);
+            let snapshot = Snapshot::from_source_selected(package, position, &capture, remaining)?;
+            aggregate_bytes = checked_multi_bytes(
+                aggregate_bytes,
+                snapshot.source_xml().len(),
+                MAX_MULTI_WORKSHEET_BYTES,
+            )?;
+            sheets.push(snapshot);
+        }
+        Self::from_sheets(sheets)
+    }
+
+    pub(crate) fn load_owned<I>(package: &OpcPackage, positions: I) -> Result<Self>
+    where
+        I: IntoIterator<Item = usize>,
+    {
+        let mut selected = Vec::new();
+        selected
+            .try_reserve_exact(MAX_SHEET_OWNERS)
+            .map_err(|source| allocation("multi-sheet owned selector snapshot", source))?;
+        for position in positions {
+            if selected.len() >= MAX_SHEET_OWNERS {
+                return Err(invalid(format!(
+                    "multi-sheet value edits exceed {MAX_SHEET_OWNERS} worksheet owners"
+                )));
+            }
+            if selected.contains(&position) {
+                return Err(invalid(
+                    "multi-sheet value edits contain a duplicate worksheet",
+                ));
+            }
+            selected.push(position);
+        }
+        selected.sort_unstable();
+        let capture = load_owned_catalog(package)?;
+        let mut sheets = Vec::new();
+        sheets
+            .try_reserve_exact(selected.len())
+            .map_err(|source| allocation("multi-sheet owned snapshots", source))?;
+        let mut aggregate_bytes = 0usize;
+        for position in selected {
+            if position >= capture.sheets.len() {
+                return Err(invalid("multi-sheet worksheet position did not resolve"));
+            }
+            let remaining = MAX_MULTI_WORKSHEET_BYTES.saturating_sub(aggregate_bytes);
+            let snapshot = Snapshot::from_owned_selected(package, position, &capture, remaining)?;
+            aggregate_bytes = checked_multi_bytes(
+                aggregate_bytes,
+                snapshot.source_xml().len(),
+                MAX_MULTI_WORKSHEET_BYTES,
+            )?;
+            sheets.push(snapshot);
+        }
+        Self::from_sheets(sheets)
+    }
+
+    pub(crate) fn sheets(&self) -> &[Snapshot] {
+        &self.sheets
+    }
+
+    /// Number of selected worksheet owners.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.sheets.len()
+    }
+
+    /// Whether no worksheet owners were selected.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.sheets.is_empty()
+    }
+
+    /// Name of a selected worksheet in deterministic workbook order.
+    #[must_use]
+    pub fn sheet_name(&self, index: usize) -> Option<&str> {
+        self.sheets.get(index).map(Snapshot::sheet_name)
+    }
+
+    /// Zero-based workbook position of a selected worksheet.
+    #[must_use]
+    pub fn sheet_position(&self, index: usize) -> Option<usize> {
+        self.sheets.get(index).map(Snapshot::sheet_position)
+    }
+
+    /// Exact scalar value in one selected worksheet.
+    #[must_use]
+    pub fn value(&self, index: usize, address: litchi_sheet::Cell) -> Option<&Value> {
+        self.sheets
+            .get(index)
+            .and_then(|sheet| sheet.value(address))
+    }
+
+    /// Whether an explicit cell owner exists in one selected worksheet.
+    #[must_use]
+    pub fn contains_cell(&self, index: usize, address: litchi_sheet::Cell) -> bool {
+        self.sheets
+            .get(index)
+            .is_some_and(|sheet| sheet.contains_cell(address))
+    }
+
+    pub(crate) fn same_source(&self, other: &Self) -> bool {
+        self.sheets.len() == other.sheets.len()
+            && self
+                .sheets
+                .iter()
+                .zip(&other.sheets)
+                .all(|(left, right)| left.same_source(right))
+    }
+}
+
 impl Snapshot {
+    fn from_owned_selected(
+        package: &OpcPackage,
+        position: usize,
+        capture: &OwnedCatalogCapture,
+        remaining_bytes: usize,
+    ) -> Result<Self> {
+        let sheet = &capture.sheets[position];
+        let sheet_part = &capture.parts[position];
+        if sheet_part.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: sheet.name.clone(),
+            });
+        }
+        let worksheet = package.get_part(&sheet_part.uri)?;
+        if !worksheet.rels().is_empty() {
+            return Err(invalid("value-only edits refuse worksheet relationships"));
+        }
+        let worksheet_xml = worksheet.blob_arc();
+        checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
+        validation::worksheet_xml(worksheet_xml.as_slice())?;
+        let cells = raw::worksheet::parse(worksheet_xml.as_slice(), || Ok(None))?;
+        validate_style_references(&cells, capture.style_count)?;
+        validate_scalar_cells(&cells)?;
+        let graph = &capture.graph[position];
+        Ok(Self {
+            sheet_name: copy_boxed(&sheet.name, "value-only sheet name")?,
+            sheet_position: position,
+            cells: Arc::new(cells),
+            source: SourceState {
+                workbook: PartState::new(
+                    capture.workbook_uri.clone(),
+                    capture.workbook_content_type.as_ref(),
+                    Arc::clone(&capture.workbook_xml),
+                )?,
+                worksheet: PartState::new(
+                    worksheet.partname().clone(),
+                    worksheet.content_type(),
+                    worksheet_xml,
+                )?,
+                owner_relationship: capture.owner_relationship.clone(),
+                sheet_relationship: graph.relationship.clone(),
+                package_relationships: Arc::clone(&capture.package_relationships),
+                workbook_relationships: Arc::clone(&capture.workbook_relationships),
+                auxiliary: Arc::clone(&capture.auxiliary),
+                graph: Arc::clone(&capture.graph),
+                source_lineage: None,
+                source_version: None,
+            },
+        })
+    }
+
+    fn from_source_selected(
+        package: &SourceBackedPackage,
+        position: usize,
+        capture: &SourceCatalogCapture,
+        remaining_bytes: usize,
+    ) -> Result<Self> {
+        let sheet = &capture.sheets[position];
+        let sheet_part = &capture.parts[position];
+        if sheet_part.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: sheet.name.clone(),
+            });
+        }
+        let worksheet = package.part(&sheet_part.uri)?;
+        if !worksheet.rels().is_empty() {
+            return Err(invalid("value-only edits refuse worksheet relationships"));
+        }
+        let worksheet_xml = worksheet.data()?.into_arc()?;
+        checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
+        validation::worksheet_xml(worksheet_xml.as_slice())?;
+        let cells = raw::worksheet::parse(worksheet_xml.as_slice(), || Ok(None))?;
+        validate_style_references(&cells, capture.style_count)?;
+        validate_scalar_cells(&cells)?;
+        let graph = &capture.graph[position];
+        Ok(Self {
+            sheet_name: copy_boxed(&sheet.name, "value-only sheet name")?,
+            sheet_position: position,
+            cells: Arc::new(cells),
+            source: SourceState {
+                workbook: PartState::new(
+                    capture.workbook_uri.clone(),
+                    capture.workbook_content_type.as_ref(),
+                    Arc::clone(&capture.workbook_xml),
+                )?,
+                worksheet: PartState::new(
+                    worksheet.partname().clone(),
+                    worksheet.content_type(),
+                    worksheet_xml,
+                )?,
+                owner_relationship: capture.owner_relationship.clone(),
+                sheet_relationship: graph.relationship.clone(),
+                package_relationships: Arc::clone(&capture.package_relationships),
+                workbook_relationships: Arc::clone(&capture.workbook_relationships),
+                auxiliary: Arc::clone(&capture.auxiliary),
+                graph: Arc::clone(&capture.graph),
+                source_lineage: Some(capture.source_lineage.clone()),
+                source_version: Some(capture.source_version),
+            },
+        })
+    }
+
     pub(crate) fn load_source_backed<'a>(
         package: &SourceBackedPackage,
         selector: impl Into<Selector<'a>>,
+    ) -> Result<Self> {
+        Self::load_source_backed_with_sheet_policy(package, selector, true)
+    }
+
+    fn load_source_backed_with_sheet_policy<'a>(
+        package: &SourceBackedPackage,
+        selector: impl Into<Selector<'a>>,
+        require_single_sheet: bool,
     ) -> Result<Self> {
         let workbook = package.main_document_part()?;
         validate_package_relationships(package.rels())?;
@@ -41,12 +412,12 @@ impl Snapshot {
         validation::workbook_xml(workbook_xml.as_slice())?;
         let catalog = raw::parse_catalog(workbook_xml.as_slice())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
-        if catalog.sheets.len() != 1 {
+        if require_single_sheet && catalog.sheets.len() != 1 {
             return Err(invalid(
                 "value-only edits currently require exactly one worksheet",
             ));
         }
-        validate_workbook_relationships(workbook.rels())?;
+        validate_workbook_relationships(workbook.rels(), require_single_sheet)?;
         let position = resolve_selector(&catalog.sheets, selector.into())?
             .ok_or_else(|| invalid("value-only worksheet selector did not resolve"))?;
         let sheet = &catalog.sheets[position];
@@ -83,12 +454,27 @@ impl Snapshot {
             sheet_relationship,
             style_count,
             auxiliary,
+            capture_sheet_graph_source(package, &workbook, &catalog.sheets, &sheet_parts)?,
+            Some(package.source_lineage()),
             Some(package.source_version()?),
         )
     }
 
     /// Load and validate one value-only closure from an owning OPC package.
     pub fn load<'a>(package: &OpcPackage, selector: impl Into<Selector<'a>>) -> Result<Self> {
+        Self::load_with_sheet_policy(package, selector, true)
+    }
+
+    /// Load one selected worksheet from a multi-worksheet value-only closure.
+    pub fn load_multi<'a>(package: &OpcPackage, selector: impl Into<Selector<'a>>) -> Result<Self> {
+        Self::load_with_sheet_policy(package, selector, false)
+    }
+
+    fn load_with_sheet_policy<'a>(
+        package: &OpcPackage,
+        selector: impl Into<Selector<'a>>,
+        require_single_sheet: bool,
+    ) -> Result<Self> {
         let workbook = package.main_document_part()?;
         validate_package_relationships(package.rels())?;
         if workbook.content_type() != ct::SML_SHEET_MAIN {
@@ -99,12 +485,13 @@ impl Snapshot {
         let workbook_xml = workbook.blob_arc();
         validation::workbook_xml(workbook_xml.as_slice())?;
         let catalog = raw::parse_catalog(workbook_xml.as_slice())?;
-        if catalog.sheets.len() != 1 {
+        let sheet_parts = validate_sheet_graph_owned(package, workbook, &catalog.sheets)?;
+        if require_single_sheet && catalog.sheets.len() != 1 {
             return Err(invalid(
                 "value-only edits currently require exactly one worksheet",
             ));
         }
-        validate_workbook_relationships(workbook.rels())?;
+        validate_workbook_relationships(workbook.rels(), require_single_sheet)?;
         let position = resolve_selector(&catalog.sheets, selector.into())?
             .ok_or_else(|| invalid("value-only worksheet selector did not resolve"))?;
         let sheet = &catalog.sheets[position];
@@ -140,6 +527,8 @@ impl Snapshot {
             relationship,
             style_count,
             auxiliary,
+            capture_sheet_graph_owned(package, workbook, &catalog.sheets, &sheet_parts)?,
+            None,
             None,
         )
     }
@@ -160,6 +549,8 @@ impl Snapshot {
         sheet_relationship: &Relationship,
         style_count: u32,
         auxiliary: Box<[PartState]>,
+        graph: Box<[SheetGraphState]>,
+        source_lineage: Option<SourceLineage>,
         source_version: Option<SourceVersion>,
     ) -> Result<Self> {
         require_worksheet_relationship(sheet_relationship)?;
@@ -170,15 +561,7 @@ impl Snapshot {
         }
         let cells = raw::worksheet::parse(worksheet_xml.as_slice(), || Ok(None))?;
         validate_style_references(&cells, style_count)?;
-        if cells.entries().iter().any(|entry| {
-            matches!(entry.cell, Cell::Formula(_) | Cell::Unknown(_))
-                || entry.cell_metadata.is_some()
-                || entry.value_metadata.is_some()
-        }) {
-            return Err(invalid(
-                "value-only edits refuse formulas, unknown cells, and cell metadata",
-            ));
-        }
+        validate_scalar_cells(&cells)?;
         Ok(Self {
             sheet_name: copy_boxed(sheet_name, "value-only sheet name")?,
             sheet_position,
@@ -188,9 +571,11 @@ impl Snapshot {
                 worksheet: PartState::new(worksheet_uri, worksheet_content_type, worksheet_xml)?,
                 owner_relationship: SourceRelationship::capture(owner_relationship)?,
                 sheet_relationship: SourceRelationship::capture(sheet_relationship)?,
-                package_relationships: capture_relationships(package_relationships)?,
-                workbook_relationships: capture_relationships(workbook_relationships)?,
-                auxiliary,
+                package_relationships: Arc::from(capture_relationships(package_relationships)?),
+                workbook_relationships: Arc::from(capture_relationships(workbook_relationships)?),
+                auxiliary: Arc::from(auxiliary),
+                graph: Arc::from(graph),
+                source_lineage,
                 source_version,
             },
         })
@@ -273,6 +658,21 @@ impl Snapshot {
         {
             return false;
         }
+        let Ok(workbook_xml) = raw::parse_catalog(workbook.blob()) else {
+            return false;
+        };
+        let Ok(sheet_parts) = validate_sheet_graph_owned(package, workbook, &workbook_xml.sheets)
+        else {
+            return false;
+        };
+        let Ok(graph) =
+            capture_sheet_graph_owned(package, workbook, &workbook_xml.sheets, &sheet_parts)
+        else {
+            return false;
+        };
+        if graph.as_ref() != self.source.graph.as_ref() {
+            return false;
+        }
         let Some(relationship) = workbook
             .rels()
             .get(self.source.sheet_relationship.id.as_ref())
@@ -290,15 +690,69 @@ impl Snapshot {
     }
 }
 
+fn validate_sheet_graph_owned(
+    package: &OpcPackage,
+    workbook: &dyn Part,
+    sheets: &[raw::Sheet],
+) -> Result<Vec<crate::workbook::source::SheetPart>> {
+    let mut parts = Vec::new();
+    let mut targets = HashSet::new();
+    parts
+        .try_reserve_exact(sheets.len())
+        .map_err(|source| allocation("owned workbook sheet graph", source))?;
+    for sheet in sheets {
+        let relationship = workbook.rels().get(&sheet.relationship_id).ok_or_else(|| {
+            invalid(format!(
+                "sheet '{}' references missing relationship '{}'",
+                sheet.name, sheet.relationship_id
+            ))
+        })?;
+        if relationship.is_external() {
+            return Err(invalid("worksheet relationship cannot be external"));
+        }
+        let target = relationship.target_partname()?;
+        let part = package.get_part(&target)?;
+        let kind = match relationship.reltype() {
+            rt::WORKSHEET | rt::STRICT_WORKSHEET => {
+                if part.content_type() != ct::SML_WORKSHEET {
+                    return Err(invalid("worksheet content type is invalid"));
+                }
+                WorksheetKind::Worksheet
+            },
+            CHARTSHEET_REL | STRICT_CHARTSHEET_REL => {
+                if part.content_type() != CHARTSHEET_CONTENT_TYPE {
+                    return Err(invalid("chartsheet content type is invalid"));
+                }
+                WorksheetKind::Chart
+            },
+            DIALOGSHEET_REL => WorksheetKind::Dialog,
+            MACROSHEET_REL | INTL_MACROSHEET_REL => WorksheetKind::Macro,
+            _ => WorksheetKind::Unknown,
+        };
+        if !targets.insert(part.partname().clone()) {
+            return Err(invalid(
+                "workbook sheet graph contains a duplicate Part target",
+            ));
+        }
+        parts.push(crate::workbook::source::SheetPart {
+            kind,
+            uri: part.partname().clone(),
+        });
+    }
+    Ok(parts)
+}
+
 #[derive(Clone, Debug)]
 struct SourceState {
     workbook: PartState,
     worksheet: PartState,
     owner_relationship: SourceRelationship,
     sheet_relationship: SourceRelationship,
-    package_relationships: Box<[SourceRelationship]>,
-    workbook_relationships: Box<[SourceRelationship]>,
-    auxiliary: Box<[PartState]>,
+    package_relationships: Arc<[SourceRelationship]>,
+    workbook_relationships: Arc<[SourceRelationship]>,
+    auxiliary: Arc<[PartState]>,
+    graph: Arc<[SheetGraphState]>,
+    source_lineage: Option<SourceLineage>,
     source_version: Option<SourceVersion>,
 }
 
@@ -311,6 +765,11 @@ impl SourceState {
             && self.package_relationships == other.package_relationships
             && self.workbook_relationships == other.workbook_relationships
             && self.auxiliary == other.auxiliary
+            && self.graph == other.graph
+            && match (&self.source_lineage, &other.source_lineage) {
+                (Some(left), Some(right)) => left == right,
+                (None, _) | (_, None) => true,
+            }
             && match (self.source_version, other.source_version) {
                 (Some(left), Some(right)) => left == right,
                 (None, _) | (_, None) => true,
@@ -365,7 +824,10 @@ impl SourceRelationship {
     }
 }
 
-fn validate_workbook_relationships(relationships: &Relationships) -> Result<()> {
+fn validate_workbook_relationships(
+    relationships: &Relationships,
+    require_single_sheet: bool,
+) -> Result<()> {
     let mut worksheets = 0usize;
     let mut styles = 0usize;
     let mut themes = 0usize;
@@ -391,12 +853,184 @@ fn validate_workbook_relationships(relationships: &Relationships) -> Result<()> 
             _ => {},
         }
     }
-    if worksheets != 1 || styles > 1 || themes > 1 {
+    let worksheets_valid = if require_single_sheet {
+        worksheets == 1
+    } else {
+        worksheets > 0
+    };
+    if !worksheets_valid || styles > 1 || themes > 1 {
         return Err(invalid(
-            "value-only edits require one worksheet and at most one styles and theme relationship",
+            "value-only edits require worksheet relationships and at most one styles and theme relationship",
         ));
     }
     Ok(())
+}
+
+fn validate_scalar_cells(cells: &Store) -> Result<()> {
+    if cells.entries().iter().any(|entry| {
+        matches!(entry.cell, Cell::Formula(_) | Cell::Unknown(_))
+            || entry.cell_metadata.is_some()
+            || entry.value_metadata.is_some()
+    }) {
+        return Err(invalid(
+            "value-only edits refuse formulas, unknown cells, and cell metadata",
+        ));
+    }
+    Ok(())
+}
+
+fn resolve_selectors<'a>(
+    sheets: &[raw::Sheet],
+    selectors: Vec<Selector<'a>>,
+) -> Result<Vec<usize>> {
+    let mut positions = Vec::new();
+    positions
+        .try_reserve_exact(selectors.len())
+        .map_err(|source| allocation("multi-sheet selector positions", source))?;
+    for selector in selectors {
+        let position = resolve_selector(sheets, selector)?
+            .ok_or_else(|| invalid("value-only worksheet selector did not resolve"))?;
+        if positions.contains(&position) {
+            return Err(invalid(
+                "multi-sheet value edits contain a duplicate worksheet",
+            ));
+        }
+        positions.push(position);
+    }
+    positions.sort_unstable();
+    Ok(positions)
+}
+
+fn capture_sheet_graph_source(
+    package: &SourceBackedPackage,
+    workbook: &litchi_opc::PartView<'_>,
+    sheets: &[raw::Sheet],
+    parts: &[crate::workbook::source::SheetPart],
+) -> Result<Box<[SheetGraphState]>> {
+    let mut graph = Vec::new();
+    graph
+        .try_reserve_exact(sheets.len())
+        .map_err(|source| allocation("source-backed worksheet graph", source))?;
+    for (sheet, part_info) in sheets.iter().zip(parts) {
+        let relationship = workbook
+            .rels()
+            .get(&sheet.relationship_id)
+            .ok_or_else(|| invalid("worksheet relationship is missing"))?;
+        let part = package.part(&part_info.uri)?;
+        graph.push(SheetGraphState {
+            name: copy_boxed(&sheet.name, "worksheet graph sheet name")?,
+            relationship_id: copy_boxed(&sheet.relationship_id, "worksheet graph relationship ID")?,
+            sheet_id: sheet.sheet_id,
+            visibility: sheet.visibility.clone(),
+            kind: part_info.kind,
+            uri: part.partname().clone(),
+            content_type: copy_boxed(part.content_type(), "worksheet graph content type")?,
+            relationships: capture_relationships(part.rels())?,
+            relationship: SourceRelationship::capture(relationship)?,
+        });
+    }
+    Ok(graph.into_boxed_slice())
+}
+
+fn capture_sheet_graph_owned(
+    package: &OpcPackage,
+    workbook: &dyn Part,
+    sheets: &[raw::Sheet],
+    parts: &[crate::workbook::source::SheetPart],
+) -> Result<Box<[SheetGraphState]>> {
+    let mut graph = Vec::new();
+    graph
+        .try_reserve_exact(sheets.len())
+        .map_err(|source| allocation("owned worksheet graph", source))?;
+    for (sheet, part_info) in sheets.iter().zip(parts) {
+        let relationship = workbook
+            .rels()
+            .get(&sheet.relationship_id)
+            .ok_or_else(|| invalid("worksheet relationship is missing"))?;
+        let part = package.get_part(&part_info.uri)?;
+        graph.push(SheetGraphState {
+            name: copy_boxed(&sheet.name, "worksheet graph sheet name")?,
+            relationship_id: copy_boxed(&sheet.relationship_id, "worksheet graph relationship ID")?,
+            sheet_id: sheet.sheet_id,
+            visibility: sheet.visibility.clone(),
+            kind: part_info.kind,
+            uri: part.partname().clone(),
+            content_type: copy_boxed(part.content_type(), "worksheet graph content type")?,
+            relationships: capture_relationships(part.rels())?,
+            relationship: SourceRelationship::capture(relationship)?,
+        });
+    }
+    Ok(graph.into_boxed_slice())
+}
+
+fn load_source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalogCapture> {
+    let workbook = package.main_document_part()?;
+    validate_package_relationships(package.rels())?;
+    if workbook.content_type() != ct::SML_SHEET_MAIN {
+        return Err(invalid(
+            "value-only edits require an ordinary XLSX workbook",
+        ));
+    }
+    let workbook_xml = workbook.data()?.into_arc()?;
+    validation::workbook_xml(workbook_xml.as_slice())?;
+    let catalog = raw::parse_catalog(workbook_xml.as_slice())?;
+    let parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
+    validate_workbook_relationships(workbook.rels(), false)?;
+    let owner = unique_owner(package.rels())?;
+    let (style_count, auxiliary) = capture_auxiliary_source(package, &workbook)?;
+    let graph = capture_sheet_graph_source(package, &workbook, &catalog.sheets, &parts)?;
+    Ok(SourceCatalogCapture {
+        sheets: catalog.sheets.clone(),
+        parts,
+        workbook_uri: workbook.partname().clone(),
+        workbook_content_type: copy_boxed(
+            workbook.content_type(),
+            "value-only workbook content type",
+        )?,
+        workbook_xml,
+        owner_relationship: SourceRelationship::capture(owner)?,
+        package_relationships: Arc::from(capture_relationships(package.rels())?),
+        workbook_relationships: Arc::from(capture_relationships(workbook.rels())?),
+        style_count,
+        auxiliary: Arc::from(auxiliary),
+        graph: Arc::from(graph),
+        source_lineage: package.source_lineage(),
+        source_version: package.source_version()?,
+    })
+}
+
+fn load_owned_catalog(package: &OpcPackage) -> Result<OwnedCatalogCapture> {
+    let workbook = package.main_document_part()?;
+    validate_package_relationships(package.rels())?;
+    if workbook.content_type() != ct::SML_SHEET_MAIN {
+        return Err(invalid(
+            "value-only edits require an ordinary XLSX workbook",
+        ));
+    }
+    let workbook_xml = Arc::new(workbook.blob().to_vec());
+    validation::workbook_xml(workbook_xml.as_slice())?;
+    let catalog = raw::parse_catalog(workbook_xml.as_slice())?;
+    let parts = validate_sheet_graph_owned(package, workbook, &catalog.sheets)?;
+    validate_workbook_relationships(workbook.rels(), false)?;
+    let owner = unique_owner(package.rels())?;
+    let (style_count, auxiliary) = capture_auxiliary(package, workbook)?;
+    let graph = capture_sheet_graph_owned(package, workbook, &catalog.sheets, &parts)?;
+    Ok(OwnedCatalogCapture {
+        sheets: catalog.sheets.clone(),
+        parts,
+        workbook_uri: workbook.partname().clone(),
+        workbook_content_type: copy_boxed(
+            workbook.content_type(),
+            "value-only workbook content type",
+        )?,
+        workbook_xml,
+        owner_relationship: SourceRelationship::capture(owner)?,
+        package_relationships: Arc::from(capture_relationships(package.rels())?),
+        workbook_relationships: Arc::from(capture_relationships(workbook.rels())?),
+        style_count,
+        auxiliary: Arc::from(auxiliary),
+        graph: Arc::from(graph),
+    })
 }
 
 fn validate_package_relationships(relationships: &Relationships) -> Result<()> {
@@ -604,4 +1238,15 @@ fn relationships_match(values: &Relationships, expected: &[SourceRelationship]) 
                 .binary_search_by(|item| item.id.as_ref().cmp(value.r_id()))
                 .is_ok_and(|index| expected[index].matches(value))
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::checked_multi_bytes;
+
+    #[test]
+    fn aggregate_cap_accepts_exact_total_and_rejects_one_over() {
+        assert_eq!(checked_multi_bytes(0, 4, 4).unwrap(), 4);
+        assert!(checked_multi_bytes(4, 1, 4).is_err());
+    }
 }
