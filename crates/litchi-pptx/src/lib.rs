@@ -101,6 +101,8 @@ pub mod table;
 pub mod tag;
 pub mod time;
 pub mod transition;
+/// Bounded, content-free semantic validation of PresentationML packages.
+pub mod validation;
 pub mod view_properties;
 /// Inert Office Add-in and persisted task-pane metadata.
 ///
@@ -169,6 +171,10 @@ pub use presentation_properties::{
     WebColor, WebScreenSize, load_from_package as load_presentation_properties,
 };
 pub use slide::{Key, Slide, SlideLayout, SlideMaster};
+pub use validation::{
+    PptxValidationError, PptxValidationLimits, validate_source, validate_source_backed,
+    validate_source_backed_with_limits, validate_source_with_limits,
+};
 pub use view_properties::{
     CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,
     OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,
