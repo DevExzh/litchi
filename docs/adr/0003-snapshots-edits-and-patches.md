@@ -1373,3 +1373,31 @@ they do not create an `Edit`, `Patch`, or `Commit` formula-authoring operation.
 
 Public formula insertion, host retirement, formula-native validation, and
 formula-authoring performance evidence remain unclaimed.
+
+## 2026-08-13 amendment: Pages section-background patches
+
+A Pages section-background `Edit` binds one resolved semantic position to an
+immutable package snapshot. It can stage only `set_solid` or `clear`; it cannot
+manufacture an unsupported native fill. Exact no-ops share the source snapshot.
+A changed edit requires an exact source, proves the selected section/payload and
+field-30 reference ownership, rewrites only field 30, reopens the complete
+candidate, verifies semantic readback and locality, then publishes one
+immutable package.
+
+`Patch` is directional and process-local. Its private exact source and target
+artifacts authorize apply and inverse; public diagnostics expose only semantic
+path, change state, touched-component count, and reparse state. Replayed,
+stale, tampered, or wrong-source application fails with `PatchConflict`, and
+inverse restores the accepted source exactly. Unsupported fills and ambiguous
+or reference-owned field-30 state refuse changed edits before publication.
+
+This is not a durable operation log, merge format, history system, or
+library-level atomic filesystem-save guarantee. The focused CLI publishes to a
+distinct no-clobber destination through a synchronized sibling temporary; it
+demonstrates command-line handling, not a broader package-save contract.
+
+Apple Pages 14.4.1 accepted both focused candidate artifacts without repair or
+conversion, saved and reopened their exact paths, and retained the requested
+`Color Fill` dark-red and `No Fill` UI states. This native check confirms the
+supported semantic transition; Pages' own resave is not used as an exact
+locality oracle.

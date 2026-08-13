@@ -10136,3 +10136,50 @@ These are foundation gates only. No focused public formula authoring is
 implemented or verified; the production host setters remain. No native
 Numbers formula-authoring run, candidate artifact, performance measurement,
 host retirement, dependency-edge removal, or debt closure is claimed.
+
+## 2026-08-13 amendment: Pages section-background verification
+
+The focused Pages background codec takes the strict raw-preserving route
+TP.SectionArchive field 30 -> Fill fields 1/2/3 -> Color model field 1, RGB
+fields 3--6, and color-space field 12. A private read-only Buffa lazy view is
+an independent parity oracle after strict preflight; handwritten routing owns
+preservation and rewrite. It retains no unknown/repeated generated state, uses
+no generated production encoder, and refuses duplicate or wrong-wire field 30,
+malformed nesting, noncanonical/invalid semantic color state, and strict/Buffa
+disagreement.
+
+The projection source SHA-256 is
+`0a6f03a7046c285e431953b8752096a1f0117206724b561da294c64092aa9cfc`.
+Deterministic generation produces five files totaling 99,593 bytes, with zero
+`RepeatedView` or `LazyRepeatedView` mentions, aggregate SHA-256
+`9abd261dfe79866b0718411e0da75e1001a1eeeda50770037400c9e309cbb9ca`.
+Codec tests pass 8/8 and focused integration passes 8/8. The integration gate
+covers absent/solid/unsupported read classification, selector failures,
+malformed field refusal, exact no-op identity, set/clear, apply/inverse and
+conflict, nested unknown preservation, selected-component locality, changed
+legacy refusal, output-limit atomicity, and unsupported/ambiguous ownership
+refusal.
+
+The native gate starts from the Apple-authored 91,681-byte
+`/private/tmp/litchi-pages-section-settings-native.aEp44s/section-background-solid.pages`,
+SHA-256
+`5d5795c9de521e54eb5e5986241ca752ec4e87d076bc9171c67ef4a281bedc8c`.
+Focused CLI replacement produced a 91,695-byte dark-red sRGB candidate,
+`d5b7605b2f24de197b9e29fc79f25e44f1a5d34a15c82528d72baea74d5d6118`,
+and clear produced a 91,671-byte `None` candidate,
+`c278fcb2a7504824385fb29fd33f74d5fe26a3030b47eab62ed742f13a6037f4`.
+Each inverse was byte-exact to its source. Pages 14.4.1
+(`M14.4-7043.0.93-4`) opened both without repair or conversion; Accessibility
+identified page 1 replacement as Section Background `Color Fill`, color
+`dark red 34`, and clear as `No Fill`. After Save, close, and exact-path
+reopen, the same states persisted. The native-resaved ZIPs are valid:
+replacement is 92,160 bytes / SHA-256
+`8db386ebcba32086afa3b37ce1d2617c6360677814462ad49085558c949492eb`,
+and clear is 89,121 bytes / SHA-256
+`b097877d83ca6832285956be4cee15f9680fc90d046eb48acf4aebafbeba8d1b`.
+
+Focused reread of each Pages-resaved artifact reports the corresponding
+solid-to-solid or none-to-none exact no-op, zero touched components, and zero
+deleted previews; its no-op and inverse remain byte-exact. Pages can otherwise
+rewrite its own package on resave, so this gate makes no claim about native
+resave member locality or byte preservation.

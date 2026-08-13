@@ -2015,3 +2015,22 @@ There is still no focused public formula-authoring surface. Production host
 formula setters and raw formula vocabulary remain, so the crate graph,
 manifest edges, and ordered debts are unchanged. No formula-native or
 formula-authoring performance gate is claimed.
+
+## 2026-08-13 current-status amendment: Pages section-background bounds
+
+The focused Pages field-30 transaction reuses the bounded section transaction
+profile for source discovery, strict wire work, ownership validation, rewrite,
+reassembly, and candidate reopen. Its dedicated 4,096-to-8,192 object gate
+keeps each observed size-sensitive counter at or below 2.20x, while each
+successful changed operation performs one output allocation and one candidate
+reopen. An instrumented required-minus-one `TransactionWork` ceiling refuses
+before publication.
+
+These are deterministic bounded-work gates, not claims about latency,
+throughput, RSS, allocator events, peak scratch, or complete end-to-end
+locality accounting. Exact package/member locality and inverse behavior are
+separately checked by the focused transaction tests. Apple Pages 14.4.1
+accepted, saved, closed, and exact-path reopened both candidates without repair
+or conversion, retaining dark-red `Color Fill` and `No Fill` respectively.
+The Pages-resaved ZIPs pass integrity, but their independent rewriting is not
+used as a locality, allocation, scratch, or byte-preservation measurement.

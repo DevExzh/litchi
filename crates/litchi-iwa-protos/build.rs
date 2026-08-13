@@ -32,6 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/package_metadata_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_formula_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
+    println!("cargo:rerun-if-changed=src/pages_section_background_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_document_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_page_layout_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_section_codec.rs");
@@ -85,6 +86,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     enforce_package_metadata_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_formula_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_body_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_pages_section_background_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
     enforce_pages_section_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_table_info_projection_provenance(proto_directory, buffa_projection_directory)?;
 
@@ -487,6 +492,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_pages_section_projection_budget(&buffa_pages_section_out_directory)?;
+
+    // Pages section backgrounds need only field 30 and the nested solid-color
+    // discriminants/components. Strict handwritten routing remains the raw
+    // preservation and publication authority.
+    let buffa_pages_section_background_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-pages-section-background");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TPSectionBackgroundArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_pages_section_background_out_directory)
+        .include_file("iwa_pages_section_background_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_pages_section_background_projection_budget(
+        &buffa_pages_section_background_out_directory,
+    )?;
 
     // Pages root/body traversal needs only three root references, scalar page
     // layout/document settings, and one streamed section-boundary entry. The
@@ -1697,6 +1724,68 @@ fn enforce_pages_section_projection_provenance(
             "derived Pages section projections drifted from TP.SectionArchive fields 17--22/26/28, exceeded their 2 KiB source budget, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
+    }
+    Ok(())
+}
+
+fn enforce_pages_section_background_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_PROJECTION_DIGEST: &str =
+        "0a6f03a7046c285e431953b8752096a1f0117206724b561da294c64092aa9cfc";
+    const SECTION_FIELD: &str = "optional .TSD.FillArchive background_fill = 30;";
+    const FILL_FIELDS: [&str; 3] = [
+        "optional .TSP.Color color = 1;",
+        "optional .TSD.GradientArchive gradient = 2;",
+        "optional .TSD.ImageFillArchive image = 3;",
+    ];
+    const COLOR_FIELDS: [&str; 6] = [
+        "required .TSP.Color.ColorModel model = 1;",
+        "optional float r = 3;",
+        "optional float g = 4;",
+        "optional float b = 5;",
+        "optional float a = 6 [default = 1];",
+        "optional .TSP.Color.RGBColorSpace rgbspace = 12;",
+    ];
+    const CODEC_MARKERS: [&str; 4] = [
+        "const SECTION_BACKGROUND_FIELD: u32 = 30;",
+        "const FILL_COLOR_FIELD: u32 = 1;",
+        "const COLOR_MODEL_FIELD: u32 = 1;",
+        "const COLOR_SPACE_FIELD: u32 = 12;",
+    ];
+
+    let pages = fs::read_to_string(proto_directory.join("TPArchives.proto"))?;
+    let drawing = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let common = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TPSectionBackgroundArchive.proto"))?;
+    let projection_digest = Sha256::digest(projection.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let codec = fs::read_to_string("src/pages_section_background_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    if pages.matches(SECTION_FIELD).count() != 1
+        || !FILL_FIELDS.iter().all(|field| drawing.contains(field))
+        || !COLOR_FIELDS
+            .iter()
+            .all(|field| common.matches(field).count() == 1)
+        || !CODEC_MARKERS
+            .iter()
+            .all(|marker| codec.matches(marker).count() == 1)
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || projection_digest != EXPECTED_PROJECTION_DIGEST
+        || production_codec.contains("prost::")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err("Pages section-background projection/codec drifted from TP field 30, TSD Fill fields 1--3, or TSP Color fields 1/3--6/12; exceeded its source budget, introduced repeated storage, Prost, or generated production encoding".into());
     }
     Ok(())
 }
@@ -3017,6 +3106,68 @@ fn enforce_pages_section_projection_budget(directory: &Path) -> Result<(), Box<d
     {
         return Err(format!(
             "Pages section projections generated {names:?}/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions/digest {aggregate_digest}; expected {EXPECTED_FILES:?}, at most {MAX_GENERATED_BYTES} bytes, zero repeated views, and digest {EXPECTED_DIGEST}"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_pages_section_background_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: [&str; 5] = [
+        "LitchiIwaPagesBackgroundProjection.mod.rs",
+        "TPSectionBackgroundArchive.__lazy_view.rs",
+        "TPSectionBackgroundArchive.__view.rs",
+        "TPSectionBackgroundArchive.rs",
+        "iwa_pages_section_background_buffa_protos.rs",
+    ];
+    const EXPECTED_GENERATED_BYTES: u64 = 99_593;
+    const EXPECTED_DIGEST: &str =
+        "9abd261dfe79866b0718411e0da75e1001a1eeeda50770037400c9e309cbb9ca";
+    let mut entries = fs::read_dir(directory)?
+        .map(|result| result.map(|entry| (entry.file_name(), entry.path(), entry.file_type())))
+        .collect::<Result<Vec<_>, _>>()?;
+    entries.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut names = Vec::new();
+    let mut bytes = 0u64;
+    let mut repeated = 0usize;
+    let mut lazy_repeated = 0usize;
+    let mut digest = Sha256::new();
+    for (file_name, path, file_type_result) in entries {
+        if !file_type_result?.is_file() {
+            continue;
+        }
+        let name = file_name
+            .into_string()
+            .map_err(|_name| "Pages background projection generated a non-UTF-8 filename")?;
+        let generated = fs::read(&path)?;
+        let text = std::str::from_utf8(&generated)?;
+        bytes = bytes
+            .checked_add(u64::try_from(generated.len())?)
+            .ok_or("Pages background generated-byte overflow")?;
+        repeated = repeated
+            .checked_add(text.matches("RepeatedView").count())
+            .ok_or("Pages background repeated-view count overflow")?;
+        lazy_repeated = lazy_repeated
+            .checked_add(text.matches("LazyRepeatedView").count())
+            .ok_or("Pages background lazy-repeated-view count overflow")?;
+        digest.update(generated);
+        names.push(name);
+    }
+    let aggregate_digest = digest
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    if names.as_slice() != EXPECTED_FILES
+        || bytes != EXPECTED_GENERATED_BYTES
+        || repeated != 0
+        || lazy_repeated != 0
+        || aggregate_digest != EXPECTED_DIGEST
+    {
+        return Err(format!(
+            "Pages section-background projection generated {names:?}/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions/digest {aggregate_digest}; expected {EXPECTED_FILES:?}, exactly {EXPECTED_GENERATED_BYTES} bytes, zero repeated views, and digest {EXPECTED_DIGEST}"
         )
         .into());
     }

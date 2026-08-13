@@ -557,6 +557,45 @@ mod buffa_pages_section_generated {
     ));
 }
 
+/// Private Buffa parity projection for a Pages section background solid fill.
+///
+/// Generated views are read-only. Handwritten strict routing retains and
+/// rewrites caller-owned source bytes.
+#[doc(hidden)]
+mod buffa_pages_section_background_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "buffa-build output is generated from the derived wire projection."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-pages-section-background/iwa_pages_section_background_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for Pages root/body graph leaves.
 ///
 /// It contains two root references and one singular section-boundary entry.
@@ -741,6 +780,10 @@ pub mod keynote_show_codec;
 /// Buffa lazy-view sidecar. Generated types remain inaccessible downstream.
 #[doc(hidden)]
 pub mod pages_section_codec;
+
+/// Internal strict raw-preserving Pages section-background codec.
+#[doc(hidden)]
+pub mod pages_section_background_codec;
 
 /// Internal Pages root/body projection implemented by a private strict Buffa
 /// lazy-view adapter. Generated types remain inaccessible downstream.

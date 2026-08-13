@@ -2586,3 +2586,39 @@ The formula exit gate is not satisfied: public focused authoring has not
 landed, production host formula setters and raw formula vocabulary remain, and
 no dependency edge or ordered debt closes. This amendment accepts no native
 formula-authoring or formula-authoring performance evidence.
+
+## 2026-08-13 amendment: Pages section-background host exit
+
+Deletion gate 3 advances for direct field-30 backgrounds on existing Pages
+sections. `litchi-pages` now owns selector-first read, set-solid, clear,
+exact-source patch application, and inverse through its focused
+`section::background` transaction. The host's `PagesEditor::section_background`
+and `set_section_background`, their two private implementation modules, direct
+raw-ID example, duplicate host regression, and stale README usage are removed;
+no compatibility alias bridges back to the migration host.
+
+The transaction classifies absent direct fill, supported sRGB/Display-P3 solid
+fill, and a byte-free `Unsupported` preservation state. It does not author,
+clear, or normalize unsupported gradient/image/future fills. Duplicate,
+wrong-wire, malformed, ambiguous, or reference-owned field-30 state fails
+closed for changed operations. Changed publication preserves the selected
+section's non-background fields, sibling sections, unrelated objects and ZIP
+members, and the rooted cache/layout/preview state; it reopens before
+publication and exact inverse restores the accepted source.
+
+The private Buffa lazy projection is bounded and read-only: five generated
+files, 99,593 bytes, zero repeated views, with the frozen aggregate SHA-256 in
+ADR 0008. Codec and focused integration gates pass 8/8 each; the deterministic
+4,096-to-8,192 work gate stays within 2.20x, fixes output allocation/reopen at
+one each, and proves an instrumented transaction-work max-minus-one refusal.
+
+This transfer does not close the Pages manifest edge or its ordered host debt.
+Section text/templates/header-footer content, section lifecycle, tables,
+drawables/media, broader editor paths, durable patches, and atomic library save
+remain open. Native Pages 14.4.1 acceptance is now established for the two
+supported field-30 transitions only: it opened both Rust candidates without a
+repair/conversion prompt, showed page 1 dark-red `Color Fill` after replacement
+and `No Fill` after clear, and retained those states through Save, close, and
+exact-path reopen. The original candidates and exact inverses, as well as the
+Pages-resaved ZIP hashes and post-resave no-op proof, are frozen in ADR 0008.
+Pages' own resave is not asserted to retain byte or member locality.

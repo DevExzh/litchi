@@ -1,0 +1,25 @@
+// Read-only Buffa parity projection for TP.SectionArchive.background_fill.
+// Caller-owned source bytes remain authoritative for raw preservation and
+// publication; generated messages are never used to encode production data.
+syntax = "proto2";
+
+package LitchiIwaPagesBackgroundProjection;
+
+message PagesSectionBackgroundArchive {
+  optional PagesBackgroundFillArchive background_fill = 30;
+}
+
+message PagesBackgroundFillArchive {
+  optional PagesBackgroundColorArchive color = 1;
+  optional bytes gradient = 2;
+  optional bytes image = 3;
+}
+
+message PagesBackgroundColorArchive {
+  required int32 model = 1;
+  optional float red = 3;
+  optional float green = 4;
+  optional float blue = 5;
+  optional float alpha = 6 [default = 1];
+  optional int32 rgb_space = 12 [default = 1];
+}

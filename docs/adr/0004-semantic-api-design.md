@@ -1908,3 +1908,33 @@ This foundation exposes no supported semantic formula constructor, formula
 edit input, or focused formula mutation method. The production host formula
 API remains in place. No native application or formula-authoring performance
 evidence is accepted by this amendment.
+
+## 2026-08-13 amendment: Pages section-background semantics
+
+`litchi_pages::section::Background` models the direct fill on one existing
+section as `None`, `Solid(Rgba)`, or `Unsupported`. `Solid` accepts only finite,
+in-range sRGB or Display-P3 components. `Unsupported` is an observable
+preservation state for gradients, images, future fills, and unsupported color
+models; it intentionally carries no raw payload and a changed edit from that
+state is refused. Consequently callers cannot inject native protobuf bytes or
+choose a destructive conversion policy.
+
+`Package::section_background`, `edit_section_background`, and
+`apply_section_background` use `SectionSelector`, resolve it immediately, and
+retain only `Path::Section { position }`. `Edit::background`, `set_solid`,
+`clear`, and `commit` form the complete mutation vocabulary. Typed,
+content-free errors distinguish selector ambiguity/missing position, invalid
+or unsupported source, bounded resource refusal, verification, allocation,
+and patch conflict. `Debug` omits content, artifacts, names, locators, and
+bytes.
+
+This surface owns only TP.SectionArchive field 30. It neither creates or
+deletes sections, changes fields 17--29 or 31, touches templates/text/cache or
+preview state, nor implements gradient/image/media editing. Those capabilities
+remain separate ownership and migration work.
+
+Native acceptance covers only the two supported semantic states: Pages 14.4.1
+opened replacement as a dark-red `Color Fill` and clear as `No Fill`, without a
+repair or conversion prompt, and preserved each state through Save, close, and
+exact-path reopen. It does not expand `Unsupported` into a mutable variant or
+establish semantic ownership of any other fill family.

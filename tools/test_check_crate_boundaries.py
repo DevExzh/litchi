@@ -378,6 +378,45 @@ def add_pages_section_settings_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_pages_section_background_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.PAGES_SECTION_BACKGROUND_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.PAGES_SECTION_BACKGROUND_CANONICAL_TYPES
+        )
+        + "impl Edit {\n"
+        + "".join(
+            f"pub fn {method}() {{}}\n"
+            for method in boundaries.PAGES_SECTION_BACKGROUND_EDIT_METHODS
+        )
+        + "}\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.PAGES_SECTION_BACKGROUND_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "impl Package {\n"
+        + "".join(
+            f"pub fn {method}() {{}}\n"
+            for method in boundaries.PAGES_SECTION_BACKGROUND_PACKAGE_METHODS
+        )
+        + "}\n",
+        encoding="utf-8",
+    )
+    lib_export, package_export, section_export = (
+        root / path for path in boundaries.PAGES_SECTION_BACKGROUND_EXPORT_SOURCES
+    )
+    lib_export.write_text("pub mod section;\n", encoding="utf-8")
+    package_export.write_text(
+        "pub(crate) mod section_background;\n", encoding="utf-8"
+    )
+    section_export.write_text(
+        "pub mod background;\npub struct Background;\n", encoding="utf-8"
+    )
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -9343,6 +9382,318 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(
                 boundaries.audit_pages_section_settings_facade_source_topology(root), []
+            )
+
+
+    def test_pages_section_background_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_SECTION_BACKGROUND_METHODS,
+            ("section_background", "set_section_background"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_SECTION_BACKGROUND_SOURCES,
+            (
+                Path("crates/litchi-iwa/src/pages/editor/section_background.rs"),
+                Path("crates/litchi-iwa/src/pages/editor/section_settings.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_SECTION_BACKGROUND_CANONICAL_TYPES,
+            ("Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind", "Path"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_SECTION_BACKGROUND_PACKAGE_METHODS,
+            (
+                "section_background",
+                "edit_section_background",
+                "apply_section_background",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_SECTION_BACKGROUND_EDIT_METHODS,
+            ("background", "set_solid", "clear", "commit"),
+        )
+        self.assertTrue(
+            {
+                "SectionBackground",
+                "SectionBackgroundEdit",
+                "PagesSectionBackground",
+                "PagesSectionBackgroundPatch",
+            }
+            <= boundaries.PAGES_SECTION_BACKGROUND_FLAT_ALIASES
+        )
+
+    def test_retired_iwa_pages_section_background_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/section_background.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "pub fn section_background() {}\n"
+                "pub fn set_section_background() {}\n"
+                "pub(super) fn section_background_payload() {}\n",
+                encoding="utf-8",
+            )
+            retired_settings = root / boundaries.RETIRED_IWA_PAGES_SECTION_BACKGROUND_SOURCES[1]
+            retired_settings.write_text("mod preserved {}\n", encoding="utf-8")
+            tests = root / boundaries.IWA_PAGES_EDITOR_TEST_SOURCE
+            tests.write_text(
+                "\n".join(
+                    f"fn {name}() {{}}"
+                    for name in boundaries.RETIRED_IWA_PAGES_SECTION_BACKGROUND_TESTS
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_PAGES_EDITOR_SOURCE
+            editor.write_text(
+                "mod section_background;\npub(crate) mod section_settings;\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.RETIRED_IWA_PAGES_SECTION_BACKGROUND_EXAMPLE
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+
+            violations = boundaries.audit_iwa_pages_section_background_source_topology(
+                root
+            )
+
+            self.assertEqual(len(violations), 8)
+            self.assertEqual(sum("source returned" in item for item in violations), 2)
+            self.assertTrue(any("example returned" in item for item in violations))
+            for method in boundaries.RETIRED_IWA_PAGES_SECTION_BACKGROUND_METHODS:
+                self.assertTrue(
+                    any(f"background method {method}:" in item for item in violations)
+                )
+            for module in boundaries.RETIRED_IWA_PAGES_SECTION_BACKGROUND_MODULES:
+                self.assertTrue(
+                    any(f"background module {module}:" in item for item in violations)
+                )
+            for name in boundaries.RETIRED_IWA_PAGES_SECTION_BACKGROUND_TESTS:
+                self.assertTrue(any(f"test {name}:" in item for item in violations))
+            self.assertFalse(any("section_background_payload" in item for item in violations))
+
+    def test_retired_iwa_pages_section_background_readme_tokens(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            readme = root / boundaries.IWA_PAGES_README
+            readme.parent.mkdir(parents=True)
+            readme.write_text(
+                "pages.section_background(selector);\n"
+                "editor\n  .\n  set_section_background(selector, value);\n"
+                "other.set_section_background(selector, value);\n"
+                "crate::PagesEditor::section_background(selector);\n"
+                "set_pages_section_background\n"
+                "set_pages_section_background.rs\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_pages_section_background_source_topology(
+                root
+            )
+
+            self.assertEqual(sum("README call" in item for item in violations), 4)
+            self.assertEqual(
+                sum("README example reference" in item for item in violations), 2
+            )
+
+    def test_iwa_pages_section_background_policy_retains_adjacent_seams(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/section_wire.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "pub(super) fn section_background_payload() {}\n"
+                "pub(super) fn set_section_background_payload() {}\n"
+                "pub fn section_pagination() {}\n"
+                "pub fn edit_section_name() {}\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_PAGES_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "Use litchi_pages::section::background and edit_section_background.\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_section_background_source_topology(root), []
+            )
+
+    def test_focused_pages_section_background_requires_each_canonical_type(self) -> None:
+        for missing in boundaries.PAGES_SECTION_BACKGROUND_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_section_background_canonical_scaffold(root)
+                    semantic = root / boundaries.PAGES_SECTION_BACKGROUND_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_SECTION_BACKGROUND_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Edit {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_SECTION_BACKGROUND_EDIT_METHODS
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_pages_section_background_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-pages section-background public API is "
+                            f"missing canonical section::background type {missing}: "
+                            "crates/litchi-pages/src/section/background.rs"
+                        ],
+                    )
+
+    def test_focused_pages_section_background_requires_nested_private_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_background_canonical_scaffold(root)
+            package = root / boundaries.PAGES_SECTION_BACKGROUND_EXPORT_SOURCES[1]
+            package.write_text("pub mod section_background;\n", encoding="utf-8")
+            section = root / boundaries.PAGES_SECTION_BACKGROUND_EXPORT_SOURCES[2]
+            section.write_text("mod background;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_section_background_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "missing canonical section::background module" in item
+                    for item in violations
+                )
+            )
+            self.assertTrue(
+                any(
+                    "exposes duplicate package::section_background module" in item
+                    for item in violations
+                )
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_background_canonical_scaffold(root)
+            (root / boundaries.PAGES_SECTION_BACKGROUND_OWNER_SOURCE).unlink()
+            self.assertEqual(
+                boundaries.audit_pages_section_background_facade_source_topology(root),
+                [
+                    "focused litchi-pages section-background public API is missing "
+                    "Package method apply_section_background: "
+                    "crates/litchi-pages/src/package/section_background.rs",
+                    "focused litchi-pages section-background public API is missing "
+                    "Package method edit_section_background: "
+                    "crates/litchi-pages/src/package/section_background.rs",
+                    "focused litchi-pages section-background public API is missing "
+                    "Package method section_background: "
+                    "crates/litchi-pages/src/package/section_background.rs",
+                    "focused litchi-pages section-background public API is missing "
+                    "private package owner source: "
+                    "crates/litchi-pages/src/package/section_background.rs",
+                ],
+            )
+
+    def test_focused_pages_section_background_rejects_aliases_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_background_canonical_scaffold(root)
+            helper = (
+                root / boundaries.PAGES_SECTION_BACKGROUND_OWNER_HELPER_ROOT / "api.rs"
+            )
+            helper.parent.mkdir(parents=True)
+            helper.write_text(
+                "pub type SectionBackgroundEdit = Edit;\n"
+                "pub fn section_background(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo, opaque: Opaque) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_SECTION_BACKGROUND_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod section;\n"
+                "pub use crate::section::background::{Edit, Patch};\n",
+                encoding="utf-8",
+            )
+            section = root / boundaries.PAGES_SECTION_BACKGROUND_EXPORT_SOURCES[2]
+            section.write_text(
+                "pub mod background;\npub struct Background;\n"
+                "pub use background::{Edit, Patch, Commit};\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_section_background_facade_source_topology(
+                root
+            )
+
+            for fragment in (
+                "retains flat alias SectionBackgroundEdit",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type Opaque",
+                "exposes public section-background owner alias",
+                "retains root alias Edit",
+                "retains root alias Patch",
+                "retains root alias Commit",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_section_background_allows_canonical_and_adjacent_api(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_background_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_SECTION_BACKGROUND_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use crate::package::section_background::{Commit, Diagnostics, "
+                "Edit, Error, LimitKind, Patch, Path};\n"
+                "impl Edit {\n"
+                "pub fn background() {}\n"
+                "pub fn set_solid() {}\n"
+                "pub fn clear() {}\n"
+                "pub fn commit() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.PAGES_SECTION_BACKGROUND_OWNER_SOURCE
+            owner.write_text(
+                "impl Package {\n"
+                "pub fn section_background() {}\n"
+                "pub fn edit_section_background() {}\n"
+                "pub fn apply_section_background() {}\n"
+                "}\n"
+                "pub(crate) fn resolve_object_id(source_bytes: &[u8], wire: WireView) {}\n",
+                encoding="utf-8",
+            )
+            section = root / boundaries.PAGES_SECTION_BACKGROUND_EXPORT_SOURCES[2]
+            section.write_text(
+                "pub mod background;\npub struct Background;\n"
+                "pub mod settings;\npub struct Settings;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_section_background_facade_source_topology(root),
+                [],
             )
 
 

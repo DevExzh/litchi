@@ -1,3 +1,5 @@
+/// Exact-source transactions for the fill stored directly on one section.
+pub mod background;
 pub mod pagination;
 /// Exact-source transactions for the settings stored on one section.
 pub mod settings;
@@ -15,9 +17,6 @@ const FIRST_PAGE_DIFFERENT: u8 = 2;
 const EVEN_ODD_PAGES_DIFFERENT: u8 = 4;
 const FIRST_PAGE_HIDES_HEADER_FOOTER: u8 = 8;
 
-/// Maximum bytes retained by one opaque section-background payload.
-pub const MAX_BACKGROUND_PAYLOAD_BYTES: usize = 4 * 1024 * 1024;
-
 /// Validation failures for section semantic values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 #[non_exhaustive]
@@ -31,12 +30,6 @@ pub enum Error {
     /// A known native page-numbering value was represented by an unknown value.
     #[error("Pages page numbering must use its canonical variant for a known value")]
     NonCanonicalNumbering,
-    /// An opaque fill payload was empty.
-    #[error("Pages section background payload cannot be empty")]
-    EmptyBackgroundPayload,
-    /// An opaque fill payload exceeded the semantic storage budget.
-    #[error("Pages section background payload exceeds the semantic byte budget")]
-    BackgroundPayloadTooLarge,
 }
 
 /// Result type for section semantic value construction and validation.
@@ -326,51 +319,12 @@ pub enum Background {
     None,
     /// A single validated color fills the section.
     Solid(litchi_iwa_common::color::Rgba),
-    /// A native fill payload not modeled by this version of the crate.
-    Opaque(Opaque),
-}
-
-/// A lossless, non-empty native section-background payload.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Opaque(Box<[u8]>);
-
-impl Opaque {
-    /// Retain a non-empty native payload in exact-size bounded storage.
+    /// A native gradient, image, future fill, or unsupported color model.
     ///
-    /// # Errors
-    ///
-    /// Returns [`Error::EmptyBackgroundPayload`] for an empty payload or
-    /// [`Error::BackgroundPayloadTooLarge`] when it exceeds the semantic byte
-    /// budget.
-    pub fn new(input: impl Into<Box<[u8]>>) -> Result<Self> {
-        let payload = input.into();
-        validate_background_payload(&payload)?;
-        Ok(Self(payload))
-    }
-
-    /// Copy a borrowed native payload into an opaque value.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::EmptyBackgroundPayload`] for an empty payload or
-    /// [`Error::BackgroundPayloadTooLarge`] when it exceeds the semantic byte
-    /// budget. The length is checked before copying the borrowed bytes.
-    pub fn from_slice(payload: &[u8]) -> Result<Self> {
-        validate_background_payload(payload)?;
-        Self::new(payload.to_vec().into_boxed_slice())
-    }
-
-    /// Borrow the exact retained native bytes.
-    #[must_use]
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.0
-    }
-
-    /// Consume the value and return its exact native bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Box<[u8]> {
-        self.0
-    }
+    /// The native bytes stay private in the immutable package snapshot. This
+    /// marker is observable but cannot be authored, and a changed edit from
+    /// this state is refused because the fill may own media or references.
+    Unsupported,
 }
 
 /// A logical Pages document section.
@@ -695,16 +649,6 @@ impl SectionType {
     }
 }
 
-fn validate_background_payload(payload: &[u8]) -> Result<()> {
-    if payload.is_empty() {
-        return Err(Error::EmptyBackgroundPayload);
-    }
-    if payload.len() > MAX_BACKGROUND_PAYLOAD_BYTES {
-        return Err(Error::BackgroundPayloadTooLarge);
-    }
-    Ok(())
-}
-
 fn append_value(output: &mut String, first: &mut bool, value: &str) {
     if !*first {
         output.push('\n');
@@ -769,33 +713,6 @@ mod tests {
         assert_eq!(
             settings.set_page_numbering(Some(PageNumbering::Unknown(1))),
             Err(Error::NonCanonicalNumbering)
-        );
-    }
-
-    #[test]
-    fn background_opaque_owns_exact_storage() {
-        let opaque = Opaque::from_slice(&[0x0a, 0xff])
-            .unwrap_or_else(|error| panic!("valid opaque background: {error}"));
-        assert_eq!(opaque.as_bytes(), [0x0a, 0xff]);
-        assert_eq!(opaque.into_bytes().as_ref(), [0x0a, 0xff]);
-        assert_eq!(
-            Opaque::from_slice(&[]).err(),
-            Some(Error::EmptyBackgroundPayload)
-        );
-        let oversized = vec![0_u8; MAX_BACKGROUND_PAYLOAD_BYTES + 1];
-        assert_eq!(
-            Opaque::from_slice(&oversized).err(),
-            Some(Error::BackgroundPayloadTooLarge)
-        );
-        assert_eq!(
-            Background::Opaque(
-                Opaque::from_slice(&[0x01])
-                    .unwrap_or_else(|error| panic!("valid opaque background: {error}")),
-            ),
-            Background::Opaque(
-                Opaque::from_slice(&[0x01])
-                    .unwrap_or_else(|error| panic!("valid opaque background: {error}")),
-            )
         );
     }
 
