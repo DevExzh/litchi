@@ -81,6 +81,10 @@ mod encryption;
 /// BIFF record parsing utilities
 pub mod records;
 
+/// Bounded, non-mutating validation of CFB-backed XLS ingress and BIFF
+/// ownership metadata.
+pub mod validation;
+
 /// Workbook parsing implementation
 pub mod workbook;
 

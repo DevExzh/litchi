@@ -88,6 +88,12 @@ pub(crate) fn generate_workbook_stream(
     // BOF record (workbook)
     biff::write_bof(&mut stream, 0x0005)?;
 
+    if let Some(sharing) = file_sharing {
+        if sharing.password_hash.is_some() {
+            biff::write_write_protect(&mut stream)?;
+        }
+    }
+
     if environment.template {
         biff::write_template(&mut stream)?;
     }
@@ -97,9 +103,6 @@ pub(crate) fn generate_workbook_stream(
     biff::write_interface_end(&mut stream)?;
     biff::write_write_access(&mut stream, DEFAULT_WRITE_ACCESS_USER)?;
     if let Some(sharing) = file_sharing {
-        if sharing.password_hash.is_some() {
-            biff::write_write_protect(&mut stream)?;
-        }
         biff::write_file_sharing(
             &mut stream,
             sharing.read_only_recommended,
