@@ -1466,6 +1466,42 @@ jobs:
           assert source["source"]["ordinary_payload_materializations"] == [3] * 15
           PY
 
+      - name: Run release XLSX conditional-formatting publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case xlsx_eager_conditional_formatting_edit_save,xlsx_source_backed_conditional_formatting_edit_save \
+            --json target/perf/xlsx-conditional-formatting-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-conditional-formatting-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_conditional_formatting_edit_save"]
+          source = results["xlsx_source_backed_conditional_formatting_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "843ec3a9fdf759f3ed79064050125975150b16b8230aab52e6074dc000efedfa"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_783_105
+              assert result["output_sha256"] == "5a44bffa0f3b4ea554e3eaa6588eec770d72528a9c854019c7abc6ee419b9b70"
+              assert result["sink"]["accepted_bytes"] == 16_786_983
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+              assert all(
+                  value <= result["corpus"]["archive_bytes"] + 65_536
+                  for value in result["source"]["read_bytes"]
+              )
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_calls"])
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_bytes"])
+          assert eager["output_sha256"] == source["output_sha256"]
+          assert eager["source"]["ordinary_payload_materializations"] == [12] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [3] * 15
+          PY
+
       - name: Run release ODP media publication case
         run: |
           cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
@@ -1791,6 +1827,13 @@ jobs:
             target/perf/xlsx-sheet-protection-edit-baseline.json
             target/perf/xlsx-data-validation-edit-baseline.json
             target/perf/xlsx-auto-filter-edit-baseline.json
+            target/perf/xlsx-conditional-formatting-edit-baseline.json
+            target/perf/ole-common-baseline.json
+            target/perf/odp-media-textbox-baseline.json
+            target/perf/odt-media-paragraph-baseline.json
+            target/perf/odt-embedded-resource-baseline.json
+            target/perf/odt-media-line-break-baseline.json
+            target/perf/odt-media-append-run-baseline.json
             target/perf/odt-media-append-hyperlink-baseline.json
             target/perf/odt-media-structural-paragraph-baseline.json
             target/perf/ole2-semantic-baseline.json
