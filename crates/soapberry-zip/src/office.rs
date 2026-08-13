@@ -1492,6 +1492,49 @@ impl std::fmt::Display for StreamingLimitMarker {
 
 impl std::error::Error for StreamingLimitMarker {}
 
+#[derive(Debug)]
+struct StreamingPayloadLimitMarker {
+    resource: LimitResource,
+    actual: u64,
+    maximum: u64,
+}
+
+impl std::fmt::Display for StreamingPayloadLimitMarker {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "streaming ZIP {} limit exceeded: attempted {}, maximum {}",
+            self.resource, self.actual, self.maximum
+        )
+    }
+}
+
+impl std::error::Error for StreamingPayloadLimitMarker {}
+
+fn streaming_payload_limit_io_error(
+    resource: LimitResource,
+    actual: u64,
+    maximum: u64,
+) -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::Other,
+        StreamingPayloadLimitMarker {
+            resource,
+            actual,
+            maximum,
+        },
+    )
+}
+
+fn streaming_payload_limit_from_io_error(
+    io_error: &std::io::Error,
+) -> Option<(LimitResource, u64, u64)> {
+    io_error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<StreamingPayloadLimitMarker>())
+        .map(|marker| (marker.resource, marker.actual, marker.maximum))
+}
+
 fn streaming_limit_io_error(
     resource: StreamingLimitResource,
     actual: u64,
@@ -1514,6 +1557,17 @@ fn streaming_limit_from_error(error: &Error) -> Option<StreamingLimitExceeded> {
         ErrorKind::IO(error) | ErrorKind::Io(error) => error,
         _ => return None,
     };
+    streaming_limit_from_io_error(io_error)
+}
+
+fn streaming_limit_from_io_error(io_error: &std::io::Error) -> Option<StreamingLimitExceeded> {
+    if let Some((actual, maximum)) = crate::writer::owned_entry_limit_from_io_error(io_error) {
+        return Some(StreamingLimitExceeded {
+            resource: StreamingLimitResource::CompressedBytes,
+            actual,
+            maximum,
+        });
+    }
     io_error
         .get_ref()
         .and_then(|source| source.downcast_ref::<StreamingLimitMarker>())
@@ -1684,6 +1738,256 @@ pub struct StreamingArchiveWriter<W: Write> {
     names: HashSet<String>,
     last_limit: Option<StreamingLimitExceeded>,
     output_counter: Arc<AtomicU64>,
+}
+
+/// A consuming, bounded ZIP entry writer.
+///
+/// The entry owns the archive writer while it is active, so callers can pass
+/// this value through a streaming pipeline without holding a mutable borrow
+/// into a parent archive. [`Write`] accepts uncompressed bytes for either
+/// Store or Deflate output. [`Self::finish`] consumes the entry and recovers a
+/// [`StreamingArchiveWriter`] for the next member.
+pub struct StreamingArchiveEntry<W: Write> {
+    entry: Option<crate::ZipOwnedEntryWriter<BoundedOutput<W>>>,
+    limits: StreamingArchiveLimits,
+    entries: usize,
+    metadata_bytes: u64,
+    total_uncompressed_bytes: u64,
+    names: HashSet<String>,
+    normalized_name: String,
+    name_bytes: u64,
+    uncompressed_bytes: u64,
+    output_bytes: u64,
+    poisoned: bool,
+    last_limit: Option<StreamingLimitExceeded>,
+    failure: Option<Error>,
+    output_counter: Arc<AtomicU64>,
+}
+
+impl<W: Write> StreamingArchiveEntry<W> {
+    /// Number of uncompressed payload bytes accepted by this entry.
+    #[must_use]
+    pub const fn uncompressed_bytes(&self) -> u64 {
+        self.uncompressed_bytes
+    }
+
+    /// Number of compressed payload bytes accepted by this entry.
+    #[must_use]
+    pub fn compressed_bytes(&self) -> u64 {
+        self.entry
+            .as_ref()
+            .map(crate::ZipOwnedEntryWriter::compressed_bytes)
+            .unwrap_or(0)
+    }
+
+    /// Content-free progress for the active entry.
+    #[must_use]
+    pub fn progress(&self) -> StreamingArchiveProgress {
+        StreamingArchiveProgress {
+            output_bytes: self.output_counter.load(Ordering::Acquire),
+            poisoned: self.poisoned,
+        }
+    }
+
+    /// Whether a payload or sink failure permanently invalidated this entry.
+    #[must_use]
+    pub const fn is_poisoned(&self) -> bool {
+        self.poisoned
+    }
+
+    fn refresh_output_bytes(&mut self) {
+        self.output_bytes = self.output_counter.load(Ordering::Acquire);
+    }
+
+    fn capture_io_failure(&mut self, error: &std::io::Error) {
+        let limit = streaming_limit_from_io_error(error);
+        self.last_limit = limit;
+        self.refresh_output_bytes();
+
+        if let Some((resource, actual, maximum)) = streaming_payload_limit_from_io_error(error) {
+            self.failure = Some(limit_error(resource, actual, maximum));
+        } else if let Some(StreamingLimitExceeded {
+            resource: StreamingLimitResource::CompressedBytes,
+            actual,
+            maximum,
+        }) = limit
+        {
+            self.failure = Some(limit_error(LimitResource::CompressedSize, actual, maximum));
+        } else {
+            self.failure = Some(Error::from(std::io::Error::new(
+                error.kind(),
+                error.to_string(),
+            )));
+        }
+        self.poisoned = true;
+    }
+
+    fn failure(self) -> StreamingArchiveFailure {
+        StreamingArchiveFailure {
+            error: self.failure.unwrap_or_else(|| {
+                ErrorKind::InvalidInput {
+                    msg: "streaming ZIP entry was poisoned".to_string(),
+                }
+                .into()
+            }),
+            progress: StreamingArchiveProgress {
+                output_bytes: self.output_counter.load(Ordering::Acquire),
+                poisoned: self.poisoned,
+            },
+            limit: self.last_limit,
+        }
+    }
+
+    /// Finishes the entry and recovers the bounded archive writer.
+    pub fn finish(self) -> Result<StreamingArchiveWriter<W>, StreamingArchiveFailure> {
+        self.finish_with_progress()
+            .map(|(writer, _progress)| writer)
+    }
+
+    /// Finishes the entry while preserving output progress on failure.
+    pub fn finish_with_progress(
+        mut self,
+    ) -> Result<(StreamingArchiveWriter<W>, StreamingArchiveProgress), StreamingArchiveFailure>
+    {
+        if self.poisoned {
+            return Err(self.failure());
+        }
+
+        let entry = match self.entry.take() {
+            Some(entry) => entry,
+            None => {
+                self.poisoned = true;
+                self.failure = Some(
+                    ErrorKind::InvalidInput {
+                        msg: "streaming ZIP entry writer was already finished".to_string(),
+                    }
+                    .into(),
+                );
+                return Err(self.failure());
+            },
+        };
+        let archive = match entry.finish() {
+            Ok(archive) => archive,
+            Err(error) => {
+                self.poisoned = true;
+                let limit = streaming_limit_from_error(&error).or(self.last_limit);
+                let error = match limit {
+                    Some(StreamingLimitExceeded {
+                        resource: StreamingLimitResource::CompressedBytes,
+                        actual,
+                        maximum,
+                    }) => limit_error(LimitResource::CompressedSize, actual, maximum),
+                    _ => error,
+                };
+                self.failure = Some(error);
+                self.last_limit = limit;
+                return Err(self.failure());
+            },
+        };
+
+        let mut writer = StreamingArchiveWriter {
+            archive,
+            limits: self.limits,
+            entries: self.entries.saturating_add(1),
+            metadata_bytes: self.metadata_bytes.saturating_add(self.name_bytes),
+            total_uncompressed_bytes: self
+                .total_uncompressed_bytes
+                .saturating_add(self.uncompressed_bytes),
+            output_bytes: self.output_bytes,
+            poisoned: false,
+            names: self.names,
+            last_limit: None,
+            output_counter: self.output_counter,
+        };
+        let inserted = writer.names.insert(self.normalized_name);
+        debug_assert!(inserted);
+        writer.refresh_output_bytes();
+        let progress = writer.progress();
+        Ok((writer, progress))
+    }
+}
+
+impl<W: Write> Write for StreamingArchiveEntry<W> {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        if self.poisoned {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "streaming ZIP entry writer is poisoned",
+            ));
+        }
+        if buffer.is_empty() {
+            return Ok(0);
+        }
+
+        let requested = u64::try_from(buffer.len()).unwrap_or(u64::MAX);
+        let next_entry = self.uncompressed_bytes.saturating_add(requested);
+        if next_entry > self.limits.max_entry_size {
+            let error = streaming_payload_limit_io_error(
+                LimitResource::EntrySize,
+                next_entry,
+                self.limits.max_entry_size,
+            );
+            self.capture_io_failure(&error);
+            return Err(error);
+        }
+        let next_total = self.total_uncompressed_bytes.saturating_add(next_entry);
+        if next_total > self.limits.max_total_size {
+            let error = streaming_payload_limit_io_error(
+                LimitResource::TotalSize,
+                next_total,
+                self.limits.max_total_size,
+            );
+            self.capture_io_failure(&error);
+            return Err(error);
+        }
+
+        let result = self
+            .entry
+            .as_mut()
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::Other, "streaming ZIP entry finished")
+            })
+            .and_then(|entry| entry.write(buffer));
+        match result {
+            Ok(0) => {
+                let error = std::io::Error::new(
+                    std::io::ErrorKind::WriteZero,
+                    "streaming ZIP entry sink accepted no bytes",
+                );
+                self.capture_io_failure(&error);
+                Err(error)
+            },
+            Ok(written) => {
+                self.uncompressed_bytes = self.uncompressed_bytes.saturating_add(written as u64);
+                self.refresh_output_bytes();
+                Ok(written)
+            },
+            Err(error) => {
+                self.capture_io_failure(&error);
+                Err(error)
+            },
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        if self.poisoned {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "streaming ZIP entry writer is poisoned",
+            ));
+        }
+        let result = self
+            .entry
+            .as_mut()
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::Other, "streaming ZIP entry finished")
+            })
+            .and_then(Write::flush);
+        if let Err(error) = &result {
+            self.capture_io_failure(error);
+        }
+        result
+    }
 }
 
 impl StreamingArchiveWriter<std::io::Cursor<Vec<u8>>> {
@@ -1949,9 +2253,19 @@ impl<W: Write> StreamingArchiveWriter<W> {
     }
 
     fn record_streaming_entry(&mut self, normalized_name: String, name_bytes: u64) {
-        debug_assert!(self.names.insert(normalized_name));
+        let inserted = self.names.insert(normalized_name);
+        debug_assert!(inserted);
         self.entries += 1;
         self.metadata_bytes += name_bytes;
+    }
+
+    fn reserve_streaming_entry(&mut self) -> Result<(), Error> {
+        self.names.try_reserve(1).map_err(|error| {
+            ErrorKind::InvalidInput {
+                msg: format!("could not reserve streaming ZIP member-name index: {error}"),
+            }
+            .into()
+        })
     }
 
     fn copy_stream<R: Read, O: Write>(
@@ -2009,6 +2323,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
         compression_method: CompressionMethod,
     ) -> Result<(), Error> {
         let (normalized_name, name_bytes) = self.validate_streaming_entry(name)?;
+        self.reserve_streaming_entry()?;
         let started = self
             .archive
             .new_file(&normalized_name)
@@ -2082,10 +2397,108 @@ impl<W: Write> StreamingArchiveWriter<W> {
         Ok(())
     }
 
+    /// Starts a consuming, bounded entry writer.
+    ///
+    /// The archive writer is moved into the returned entry. After all
+    /// uncompressed payload bytes have been written, call
+    /// [`StreamingArchiveEntry::finish`] to recover the archive writer and
+    /// continue with another member. Store and Deflate are the only supported
+    /// Office transport methods.
+    pub fn start_entry(
+        mut self,
+        name: &str,
+        compression_method: CompressionMethod,
+    ) -> Result<StreamingArchiveEntry<W>, StreamingArchiveFailure> {
+        let (normalized_name, name_bytes) = match self.validate_streaming_entry(name) {
+            Ok(value) => value,
+            Err(error) => {
+                return Err(StreamingArchiveFailure {
+                    limit: streaming_limit_from_error(&error),
+                    error,
+                    progress: self.progress(),
+                });
+            },
+        };
+        if !matches!(
+            compression_method,
+            CompressionMethod::Store | CompressionMethod::Deflate
+        ) {
+            return Err(StreamingArchiveFailure {
+                error: ErrorKind::UnsupportedCompressionMethod(compression_method.as_id().as_u16())
+                    .into(),
+                progress: self.progress(),
+                limit: None,
+            });
+        }
+        if let Err(error) = self.reserve_streaming_entry() {
+            return Err(StreamingArchiveFailure {
+                error,
+                progress: self.progress(),
+                limit: None,
+            });
+        }
+
+        let StreamingArchiveWriter {
+            archive,
+            limits,
+            entries,
+            metadata_bytes,
+            total_uncompressed_bytes,
+            output_bytes,
+            poisoned: _,
+            names,
+            last_limit,
+            output_counter,
+        } = self;
+        let entry = match archive
+            .start_file_owned(&normalized_name, compression_method)
+            .map(|entry| entry.with_compressed_limit(limits.max_compressed_size))
+        {
+            Ok(entry) => entry,
+            Err(error) => {
+                let limit = streaming_limit_from_error(&error).or(last_limit);
+                let error = match limit {
+                    Some(StreamingLimitExceeded {
+                        resource: StreamingLimitResource::CompressedBytes,
+                        actual,
+                        maximum,
+                    }) => limit_error(LimitResource::CompressedSize, actual, maximum),
+                    _ => error,
+                };
+                return Err(StreamingArchiveFailure {
+                    error,
+                    progress: StreamingArchiveProgress {
+                        output_bytes: output_counter.load(Ordering::Acquire),
+                        poisoned: true,
+                    },
+                    limit,
+                });
+            },
+        };
+
+        Ok(StreamingArchiveEntry {
+            entry: Some(entry),
+            limits,
+            entries,
+            metadata_bytes,
+            total_uncompressed_bytes,
+            names,
+            normalized_name,
+            name_bytes,
+            uncompressed_bytes: 0,
+            output_bytes,
+            poisoned: false,
+            last_limit: None,
+            failure: None,
+            output_counter,
+        })
+    }
+
     /// Write a file without compression (stored).
     pub fn write_stored(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
         let data_bytes = u64::try_from(data.len()).unwrap_or(u64::MAX);
         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+        self.reserve_streaming_entry()?;
         if data_bytes > self.limits.max_compressed_size {
             return Err(limit_error(
                 LimitResource::CompressedSize,
@@ -2109,6 +2522,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
     pub fn write_deflated(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
         let data_bytes = u64::try_from(data.len()).unwrap_or(u64::MAX);
         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+        self.reserve_streaming_entry()?;
         let started = self
             .archive
             .new_file(&normalized_name)
@@ -2660,6 +3074,256 @@ mod tests {
         let reader = ArchiveReader::new(&bytes).unwrap();
         assert!(reader.contains("content.xml"));
         assert_eq!(reader.read("content.xml").unwrap(), b"<root>Hello</root>");
+    }
+
+    #[test]
+    fn consuming_entry_writer_recovers_bounded_archive_for_both_methods() {
+        let mut writer = StreamingArchiveWriter::new();
+        let mut entry = writer
+            .start_entry("first.bin", CompressionMethod::Store)
+            .unwrap();
+        entry.write_all(b"first payload").unwrap();
+        writer = entry.finish().unwrap();
+
+        let mut entry = writer
+            .start_entry("second.bin", CompressionMethod::Deflate)
+            .unwrap();
+        entry.write_all(b"second payload").unwrap();
+        writer = entry.finish().unwrap();
+
+        let bytes = writer.finish_to_bytes().unwrap();
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(reader.read("first.bin").unwrap(), b"first payload");
+        assert_eq!(reader.read("second.bin").unwrap(), b"second payload");
+    }
+
+    #[test]
+    fn consuming_entry_writer_preserves_limits_and_poison_progress() {
+        let limits = StreamingArchiveLimits::new(4, 16, 4096).with_byte_limits(3, 8, 4096);
+        let writer = StreamingArchiveWriter::with_limits(limits);
+        let mut entry = writer
+            .start_entry("bounded.bin", CompressionMethod::Store)
+            .unwrap();
+        let error = entry.write_all(b"over").unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::Other);
+        assert!(entry.is_poisoned());
+        assert!(entry.progress().is_poisoned());
+        let failure = match entry.finish() {
+            Ok(_) => panic!("poisoned entry unexpectedly finished"),
+            Err(failure) => failure,
+        };
+        assert!(matches!(
+            failure.error().kind(),
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::EntrySize,
+                actual: 4,
+                maximum: 3,
+            }
+        ));
+        assert!(failure.progress().is_poisoned());
+    }
+
+    #[test]
+    fn consuming_entry_writer_rejects_duplicate_before_header_and_handles_short_sink() {
+        let mut writer = StreamingArchiveWriter::new();
+        let mut entry = writer
+            .start_entry("dir/../same.bin", CompressionMethod::Deflate)
+            .unwrap();
+        entry.write_all(b"first").unwrap();
+        writer = entry.finish().unwrap();
+
+        let duplicate = match writer.start_entry("same.bin", CompressionMethod::Store) {
+            Ok(_) => panic!("duplicate normalized member unexpectedly started"),
+            Err(failure) => failure,
+        };
+        assert!(matches!(
+            duplicate.error().kind(),
+            ErrorKind::InvalidInput { .. }
+        ));
+        assert!(!duplicate.progress().is_poisoned());
+
+        let mut sink = ShortWriter::new(2);
+        let mut writer = StreamingArchiveWriter::with_writer(&mut sink);
+        let mut entry = writer
+            .start_entry("short.bin", CompressionMethod::Deflate)
+            .unwrap();
+        entry.write_all(b"short sink payload").unwrap();
+        writer = entry.finish().unwrap();
+        writer.finish().unwrap();
+        let reader = ArchiveReader::new(&sink.bytes).unwrap();
+        assert_eq!(reader.read("short.bin").unwrap(), b"short sink payload");
+    }
+
+    #[test]
+    fn consuming_entry_writer_preflights_raw_names_and_drops_incomplete_publication() {
+        let limits = StreamingArchiveLimits::new(4, 8, 64);
+        let mut sink = ShortWriter::new(3);
+        let failure = match StreamingArchiveWriter::with_writer_and_limits(&mut sink, limits)
+            .start_entry(&"x".repeat(9), CompressionMethod::Store)
+        {
+            Ok(_) => panic!("oversized raw name unexpectedly started"),
+            Err(failure) => failure,
+        };
+        assert!(matches!(
+            failure.error().kind(),
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::MemberNameBytes,
+                actual: 9,
+                maximum: 8,
+            }
+        ));
+        assert_eq!(failure.progress().output_bytes(), 0);
+        assert!(sink.bytes.is_empty());
+
+        let mut sink = ShortWriter::new(3);
+        {
+            let writer = StreamingArchiveWriter::with_writer(&mut sink);
+            let mut entry = writer
+                .start_entry("unfinished.bin", CompressionMethod::Deflate)
+                .unwrap();
+            entry.write_all(b"partial payload").unwrap();
+        }
+        assert!(ArchiveReader::new(&sink.bytes).is_err());
+    }
+
+    #[test]
+    fn consuming_entry_writer_enforces_store_compressed_and_aggregate_boundaries() {
+        let base = StreamingArchiveLimits::new(4, 32, 128).with_byte_limits(16, 16, 4096);
+        let mut writer = StreamingArchiveWriter::with_limits(base.with_compressed_size_limit(3));
+        let mut entry = writer
+            .start_entry("exact.bin", CompressionMethod::Store)
+            .unwrap();
+        entry.write_all(b"abc").unwrap();
+        writer = entry.finish().unwrap();
+        assert_eq!(writer.total_uncompressed_bytes(), 3);
+
+        let mut entry = writer
+            .start_entry("over.bin", CompressionMethod::Store)
+            .unwrap();
+        let error = entry.write_all(b"abcd").unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::Other);
+        let failure = match entry.finish() {
+            Ok(_) => panic!("compressed limit unexpectedly accepted payload"),
+            Err(failure) => failure,
+        };
+        assert!(matches!(
+            failure.error().kind(),
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::CompressedSize,
+                actual: 4,
+                maximum: 3,
+            }
+        ));
+
+        let limits = StreamingArchiveLimits::new(4, 32, 128).with_byte_limits(16, 3, 4096);
+        let mut writer = StreamingArchiveWriter::with_limits(limits);
+        let mut entry = writer
+            .start_entry("first.bin", CompressionMethod::Store)
+            .unwrap();
+        entry.write_all(b"ab").unwrap();
+        writer = entry.finish().unwrap();
+        let mut entry = writer
+            .start_entry("second.bin", CompressionMethod::Store)
+            .unwrap();
+        let error = entry.write_all(b"cd").unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::Other);
+        let failure = match entry.finish() {
+            Ok(_) => panic!("aggregate limit unexpectedly accepted payload"),
+            Err(failure) => failure,
+        };
+        assert!(matches!(
+            failure.error().kind(),
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::TotalSize,
+                actual: 4,
+                maximum: 3,
+            }
+        ));
+    }
+
+    #[test]
+    fn consuming_entry_writer_reports_sink_failure_during_descriptor_finish() {
+        let mut sink = FailingWriter::new(52);
+        let mut entry = StreamingArchiveWriter::with_writer(&mut sink)
+            .start_entry("descriptor.bin", CompressionMethod::Store)
+            .unwrap();
+        entry.write_all(b"payload").unwrap();
+        let failure = match entry.finish() {
+            Ok(_) => panic!("descriptor sink failure unexpectedly succeeded"),
+            Err(failure) => failure,
+        };
+        assert!(matches!(
+            failure.error().kind(),
+            ErrorKind::IO(_) | ErrorKind::Io(_)
+        ));
+        assert!(failure.progress().is_poisoned());
+        assert!(failure.progress().output_bytes() <= 52);
+    }
+
+    #[test]
+    fn consuming_entry_writer_enforces_deflate_and_output_exact_boundaries() {
+        let mut probe = StreamingArchiveWriter::new();
+        let mut entry = probe.start_entry("x", CompressionMethod::Deflate).unwrap();
+        entry.write_all(b"payload").unwrap();
+        probe = entry.finish().unwrap();
+        let expected_output = probe.finish_to_bytes().unwrap();
+
+        let limits = StreamingArchiveLimits::new(4, 32, 1).with_byte_limits(
+            64,
+            64,
+            expected_output.len() as u64,
+        );
+        let mut exact = StreamingArchiveWriter::with_limits(limits);
+        let mut entry = exact.start_entry("x", CompressionMethod::Deflate).unwrap();
+        entry.write_all(b"payload").unwrap();
+        exact = entry.finish().unwrap();
+        assert_eq!(exact.finish_to_bytes().unwrap(), expected_output);
+
+        let limits = limits.with_byte_limits(64, 64, expected_output.len() as u64 - 1);
+        let over = StreamingArchiveWriter::with_limits(limits);
+        let mut entry = over.start_entry("x", CompressionMethod::Deflate).unwrap();
+        entry.write_all(b"payload").unwrap();
+        let over = match entry.finish() {
+            Ok(writer) => writer,
+            Err(_) => panic!("entry output limit failed before archive finalization"),
+        };
+        let failure = match over.finish_with_progress() {
+            Ok(_) => panic!("output limit unexpectedly accepted one over"),
+            Err(failure) => failure,
+        };
+        assert_eq!(
+            failure.limit().map(StreamingLimitExceeded::resource),
+            Some(StreamingLimitResource::OutputBytes)
+        );
+
+        let limited = StreamingArchiveWriter::with_limits(
+            StreamingArchiveLimits::new(4, 32, 128)
+                .with_byte_limits(64, 64, 4096)
+                .with_compressed_size_limit(0),
+        );
+        let entry = limited
+            .start_entry("empty", CompressionMethod::Deflate)
+            .unwrap();
+        let failure = match entry.finish() {
+            Ok(_) => panic!("compressed limit unexpectedly accepted an empty deflate stream"),
+            Err(failure) => failure,
+        };
+        let compressed_actual = failure
+            .limit()
+            .expect("compressed limit attribution")
+            .actual();
+        assert!(compressed_actual > 0);
+
+        let mut exact = StreamingArchiveWriter::with_limits(
+            StreamingArchiveLimits::new(4, 32, 128)
+                .with_byte_limits(64, 64, 4096)
+                .with_compressed_size_limit(compressed_actual.saturating_add(2)),
+        );
+        let entry = exact
+            .start_entry("empty", CompressionMethod::Deflate)
+            .unwrap();
+        exact = entry.finish().unwrap();
+        exact.finish_to_bytes().unwrap();
     }
 
     #[test]
