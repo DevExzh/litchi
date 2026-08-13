@@ -9,6 +9,7 @@ use rc4::{KeyInit, Rc4, StreamCipher};
 use zeroize::Zeroizing;
 
 const FILEPASS_SID: u16 = 0x002f;
+const WRITEPROTECT_SID: u16 = 0x0086;
 const BOUNDSHEET8_SID: u16 = 0x0085;
 const BINARY_RC4_FILEPASS_LEN: usize = 54;
 const BINARY_RC4_BLOCK_SIZE: usize = 1024;
@@ -139,6 +140,29 @@ enum FilePassRecord {
     BinaryRc4(BinaryRc4FilePass),
     CryptoApi(Header),
     Unsupported(EncryptionKind),
+}
+
+/// The password-to-open family found in one structurally valid `FILEPASS`
+/// record.  Validation only uses this to report presence and support status;
+/// it never derives a key or decrypts the source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FilePassKind {
+    Xor,
+    BinaryRc4,
+    CryptoApi,
+    Unsupported(EncryptionKind),
+}
+
+/// Inspect one `FILEPASS` payload without retaining or decrypting it.
+pub(crate) fn inspect_filepass(data: &[u8]) -> Result<FilePassKind> {
+    match FilePassRecord::parse(data) {
+        Ok(FilePassRecord::Xor(_)) => Ok(FilePassKind::Xor),
+        Ok(FilePassRecord::BinaryRc4(_)) => Ok(FilePassKind::BinaryRc4),
+        Ok(FilePassRecord::CryptoApi(_)) => Ok(FilePassKind::CryptoApi),
+        Ok(FilePassRecord::Unsupported(kind)) => Ok(FilePassKind::Unsupported(kind)),
+        Err(Error::UnsupportedEncryption(kind)) => Ok(FilePassKind::Unsupported(kind)),
+        Err(error) => Err(error),
+    }
 }
 
 impl FilePassRecord {
@@ -350,7 +374,10 @@ fn inspect_clear_workbook(workbook: &[u8]) -> Result<ClearWorkbookPlan> {
     let mut position = 0usize;
     let mut record_positions = std::collections::HashSet::new();
     let mut boundsheet_payloads = Vec::new();
-    let mut codepage_offset = None;
+    let mut filepass_offset = None;
+    let mut filepass_slot_open = false;
+    let mut writeprotect_seen = false;
+    let mut codepage_seen = false;
     let mut globals_eof = None;
     let mut saw_filepass = false;
 
@@ -388,13 +415,32 @@ fn inspect_clear_workbook(workbook: &[u8]) -> Result<ClearWorkbookPlan> {
                         .to_string(),
                 ));
             }
+            filepass_offset = Some(record_end);
+            filepass_slot_open = true;
         } else if sid == FILEPASS_SID {
             saw_filepass = true;
         }
-        if in_globals && sid == CODEPAGE_SID && codepage_offset.replace(position).is_some() {
-            return Err(Error::InvalidData(
-                "generated workbook globals contain duplicate CODEPAGE records".to_string(),
-            ));
+        if in_globals && filepass_slot_open && position != 0 {
+            if sid == WRITEPROTECT_SID {
+                if writeprotect_seen {
+                    return Err(Error::InvalidData(
+                        "generated workbook globals contain duplicate WRITEPROTECT records"
+                            .to_string(),
+                    ));
+                }
+                writeprotect_seen = true;
+                filepass_offset = Some(record_end);
+            } else {
+                filepass_slot_open = false;
+            }
+        }
+        if in_globals && sid == CODEPAGE_SID {
+            if codepage_seen {
+                return Err(Error::InvalidData(
+                    "generated workbook globals contain duplicate CODEPAGE records".to_string(),
+                ));
+            }
+            codepage_seen = true;
         }
         if in_globals && sid == BOUNDSHEET8_SID {
             if data_len < 4 {
@@ -414,15 +460,20 @@ fn inspect_clear_workbook(workbook: &[u8]) -> Result<ClearWorkbookPlan> {
             "generated Workbook stream already contains FILEPASS".to_string(),
         ));
     }
-    let filepass_offset = codepage_offset.ok_or_else(|| {
-        Error::InvalidData("generated workbook globals are missing CODEPAGE".to_string())
+    let filepass_offset = filepass_offset.ok_or_else(|| {
+        Error::InvalidData("generated Workbook stream is missing its BOF".to_string())
     })?;
     let globals_eof = globals_eof.ok_or_else(|| {
         Error::InvalidData("generated workbook globals are missing EOF".to_string())
     })?;
+    if !codepage_seen {
+        return Err(Error::InvalidData(
+            "generated workbook globals are missing CODEPAGE".to_string(),
+        ));
+    }
     if filepass_offset >= globals_eof {
         return Err(Error::InvalidData(
-            "generated CODEPAGE record is outside workbook globals".to_string(),
+            "generated FILEPASS slot is outside workbook globals".to_string(),
         ));
     }
     for &payload in &boundsheet_payloads {
