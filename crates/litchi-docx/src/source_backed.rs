@@ -13,6 +13,7 @@ pub mod paragraph_remove;
 
 use crate::document::{Commit, Edit, Snapshot, TransactionResult};
 use crate::error::{Error, Result};
+use crate::namespace::scan_word_element_ranges;
 use crate::package::validate_document_main_content_type;
 use crate::paragraph::Paragraph;
 use crate::parts::document_part::{
@@ -22,9 +23,12 @@ use crate::redact;
 use crate::sanitize::{self, RelationshipState};
 use crate::settings::DocumentSettings;
 use crate::variables;
-use litchi_core::ReadAt;
+use litchi_core::{ExecutionContext, ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, Part, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage};
+use litchi_opc::{
+    BlobPart, Part, PartData, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
+    SourceCacheDiagnostics, SourceCacheLimits,
+};
 use sha2::{Digest as _, Sha256};
 use smallvec::SmallVec;
 use std::io::Write;
@@ -33,6 +37,7 @@ use std::sync::Arc;
 /// A DOCX package that leaves ordinary part bodies cold at open.
 pub struct Package {
     package: SourceBackedPackage,
+    execution: Option<ExecutionContext>,
 }
 
 struct DocumentVariablesSource {
@@ -106,25 +111,144 @@ impl Package {
         )?)
     }
 
+    /// Open a DOCX source with an explicit finite deferred-part cache policy.
+    ///
+    /// This compatibility constructor remains unmanaged: cache retention is
+    /// bounded, but it is not charged to a hierarchical execution budget.
+    /// Use one of the `*_with_execution_context` constructors when the caller
+    /// owns the budget for lazy payloads.
+    pub fn from_read_at_with_cache_limits(
+        source: Arc<dyn ReadAt>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed(SourceBackedPackage::from_read_at_with_cache_limits(
+            source,
+            cache_limits,
+        )?)
+    }
+
+    /// Open a DOCX source with explicit read and finite cache policies.
+    pub fn from_read_at_with_limits_and_cache_limits(
+        source: Arc<dyn ReadAt>,
+        limits: litchi_opc::ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+                source,
+                limits,
+                cache_limits,
+            )?,
+        )
+    }
+
+    /// Open a DOCX source with an explicit cache policy and caller execution
+    /// context while retaining the standard OPC read limits.
+    pub fn from_read_at_with_cache_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            source,
+            litchi_opc::ReadLimits::default(),
+            cache_limits,
+            context,
+        )
+    }
+
+    /// Open a DOCX source with an explicit caller-owned execution context.
+    ///
+    /// The context is checked before mandatory open work and before each
+    /// deferred semantic read. Lazy part payloads retain their managed
+    /// [`PartData`] handles for the lifetime of the returned read facade; no
+    /// executor or global scheduler is installed.
+    pub fn from_read_at_with_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: litchi_opc::ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            source,
+            limits,
+            SourceCacheLimits::default(),
+            context,
+        )
+    }
+
+    /// Open a DOCX source with explicit read and execution policies while
+    /// retaining the default finite deferred-part cache.
+    pub fn from_read_at_with_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: litchi_opc::ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_execution_context(source, limits, context)
+    }
+
+    /// Open a DOCX source with explicit read, cache, and execution policies.
+    ///
+    /// This is the fully explicit managed constructor. The selective
+    /// read-only document facade retains the bounded OPC [`PartData`] handle
+    /// instead of detaching it into an unbudgeted `Arc` allocation. Existing
+    /// edit operations whose snapshots require an owned `Arc` remain typed
+    /// refusals on this path.
+    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: litchi_opc::ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        let package_context = context.clone();
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                limits,
+                cache_limits,
+                context,
+            )?;
+        Self::with_execution(package, Some(package_context))
+    }
+
     fn from_source_backed(package: SourceBackedPackage) -> Result<Self> {
+        Self::with_execution(package, None)
+    }
+
+    fn with_execution(
+        package: SourceBackedPackage,
+        execution: Option<ExecutionContext>,
+    ) -> Result<Self> {
+        package.check_execution()?;
         let main = package.main_document_part()?;
         validate_document_main_content_type(main.content_type())?;
-        Ok(Self { package })
+        package.check_execution()?;
+        Ok(Self { package, execution })
     }
 
     /// Load and pin the main document for read-only semantic queries.
     ///
     /// The first call reads only the main-document part. The returned document
-    /// owns its normalized XML bytes, so repeated text and paragraph queries do
-    /// not revisit the positional source.
+    /// owns its validated visible XML bytes, so repeated text and selective
+    /// queries do not revisit the positional source. Managed opens retain the
+    /// budgeted [`PartData`] handle instead of detaching an `Arc`.
     pub fn document(&self) -> Result<Document> {
+        self.package.check_execution()?;
         let main = self.package.main_document_part()?;
         validate_document_main_content_type(main.content_type())?;
-        let xml = visible_document_xml(main.data()?.into_arc()?)?;
+        let data = main.data()?;
+        let managed = self.package.cache_diagnostics().budget_managed;
+        let xml = if managed {
+            ensure_source_document_xml(data.as_bytes())?;
+            DocumentPayload::Managed(data)
+        } else {
+            DocumentPayload::Owned(visible_document_xml(data.into_arc()?)?)
+        };
         let source_version = self.package.source_version()?;
+        self.package.check_execution()?;
         Ok(Document {
             xml,
             source_version,
+            execution: self.execution.clone(),
         })
     }
 
@@ -142,6 +266,7 @@ impl Package {
         &self,
         limits: &crate::section::Limits,
     ) -> Result<crate::section::Snapshot> {
+        self.package.check_execution()?;
         let main = self.package.main_document_part()?;
         validate_document_main_content_type(main.content_type())?;
         let source_version = self.package.source_version()?;
@@ -158,15 +283,19 @@ impl Package {
             }
             .into());
         }
+        self.package.check_execution()?;
         Ok(snapshot)
     }
 
-    /// Return content-free payload-cache activity for this lazy package.
-    ///
-    /// This does not read any part payload or expose member identities.
+    /// Return content-free cache activity for this source-backed DOCX.
     #[must_use]
-    pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
+    pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
         self.package.cache_diagnostics()
+    }
+
+    /// Return the exact source identity and revision captured at open.
+    pub fn source_version(&self) -> Result<SourceVersion> {
+        Ok(self.package.source_version()?)
     }
 
     /// Load the exact raw main-document bytes as a semantic transaction
@@ -554,14 +683,20 @@ impl Package {
         &self,
         operation: &'static str,
     ) -> TransactionResult<(litchi_opc::PackURI, Snapshot)> {
+        self.package.check_execution().map_err(Error::from)?;
         let main = self.package.main_document_part().map_err(Error::from)?;
         validate_document_main_content_type(main.content_type())?;
         let partname = main.partname().clone();
-        let raw = main
-            .data()
-            .map_err(Error::from)?
-            .into_arc()
-            .map_err(Error::from)?;
+        if self.package.cache_diagnostics().budget_managed {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation,
+                reason: "managed source-backed document transactions require an owned edit snapshot; use the selective read facade or an unmanaged compatibility constructor",
+            }
+            .into());
+        }
+        let data = main.data().map_err(Error::from)?;
+        let raw = data.into_arc().map_err(Error::from)?;
         let visible = visible_document_xml(Arc::clone(&raw))?;
         if !Arc::ptr_eq(&raw, &visible) {
             return Err(Error::UnsafeEdit {
@@ -578,6 +713,7 @@ impl Package {
         &self,
         operation: &'static str,
     ) -> Result<DocumentVariablesSource> {
+        self.package.check_execution()?;
         const STRICT_SETTINGS: &str =
             "http://purl.oclc.org/ooxml/officeDocument/relationships/settings";
 
@@ -629,7 +765,15 @@ impl Package {
                 got: settings_part.content_type().into(),
             });
         }
-        let raw = settings_part.data()?.into_arc()?;
+        if self.package.cache_diagnostics().budget_managed {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation,
+                reason: "managed source-backed settings snapshots require an owned edit snapshot; use an unmanaged compatibility constructor",
+            });
+        }
+        let data = settings_part.data()?;
+        let raw = data.into_arc()?;
         if raw.len() > variables::MAX_DOCUMENT_VARIABLE_XML_BYTES {
             return Err(Error::InvalidFormat(format!(
                 "settings XML exceeds the {} byte document-variable limit",
@@ -669,6 +813,14 @@ impl Package {
     fn refuse_protected_external_hyperlink_detachment(&self) -> Result<()> {
         const STRICT_SETTINGS: &str =
             "http://purl.oclc.org/ooxml/officeDocument/relationships/settings";
+
+        if self.package.cache_diagnostics().budget_managed {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "external_hyperlink_wrapper_detachment",
+                reason: "managed source-backed hyperlink sanitization requires an owned settings snapshot; use an unmanaged compatibility constructor",
+            });
+        }
 
         let main = self.package.main_document_part()?;
         let mut settings_relationships = main.rels().iter().filter(|relationship| {
@@ -787,6 +939,47 @@ fn transaction_error_to_document(error: crate::document::TransactionError) -> Er
     }
 }
 
+/// Managed source-backed document reads must not run the MCE processor: its
+/// owned `Cow` output would be an unbudgeted duplicate of the retained
+/// `PartData` payload. The existing source-backed edit boundary already
+/// refuses any MCE projection, so conservatively reject every package that
+/// declares the MCE namespace before a materialization can occur.
+fn ensure_source_document_xml(xml: &[u8]) -> Result<()> {
+    if xml
+        .windows(litchi_ooxml_common::mce::NAMESPACE.len())
+        .any(|window| window == litchi_ooxml_common::mce::NAMESPACE.as_bytes())
+    {
+        return Err(Error::UnsafeEdit {
+            format: "DOCX",
+            operation: "source-backed document read",
+            reason: "markup-compatibility preprocessing would require an unbudgeted owned payload",
+        });
+    }
+    Ok(())
+}
+
+#[derive(Clone)]
+enum DocumentPayload {
+    /// Compatibility payload whose Arc ownership is not attached to a
+    /// hierarchical execution budget.
+    Owned(Arc<Vec<u8>>),
+    /// Managed payload retaining its OPC reservation for the document view.
+    Managed(PartData),
+}
+
+impl DocumentPayload {
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Owned(xml) => xml.as_slice(),
+            Self::Managed(data) => data.as_bytes(),
+        }
+    }
+
+    const fn is_managed(&self) -> bool {
+        matches!(self, Self::Managed(_))
+    }
+}
+
 /// A pinned read-only view of a DOCX main document.
 ///
 /// This view owns the main-document bytes loaded by [`Package::document`].
@@ -794,29 +987,105 @@ fn transaction_error_to_document(error: crate::document::TransactionError) -> Er
 /// the established [`crate::Package`] APIs for mutable package access.
 #[derive(Clone)]
 pub struct Document {
-    xml: Arc<Vec<u8>>,
-    source_version: litchi_core::SourceVersion,
+    xml: DocumentPayload,
+    source_version: SourceVersion,
+    execution: Option<ExecutionContext>,
 }
 
 impl Document {
+    fn check_execution(&self) -> Result<()> {
+        let Some(context) = self.execution.as_ref() else {
+            return Ok(());
+        };
+        context.check().map_err(|error| {
+            Error::Opc(match error {
+                litchi_core::ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                other => litchi_opc::OpcError::Execution(other),
+            })
+        })
+    }
+
+    fn check_selective_operation(&self, operation: &'static str) -> Result<()> {
+        self.check_execution()?;
+        if self.xml.is_managed() {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation,
+                reason: "this query would return Arc-backed paragraph views that cannot retain the managed PartData reservation",
+            });
+        }
+        Ok(())
+    }
+
+    /// Return the exact source identity and revision captured for this view.
+    #[must_use]
+    pub const fn source_version(&self) -> SourceVersion {
+        self.source_version
+    }
+
     /// Extract all visible paragraph text from the pinned document.
     pub fn extract_text(&self) -> Result<String> {
-        crate::paragraph::extract_word_text(self.xml.as_slice())
+        self.check_execution()?;
+        crate::paragraph::extract_word_text(self.xml.as_bytes())
     }
 
     /// Count visible paragraphs in the pinned document.
     pub fn paragraph_count(&self) -> Result<usize> {
-        document_paragraph_count(self.xml.as_slice())
+        self.check_execution()?;
+        document_paragraph_count(self.xml.as_bytes())
+    }
+
+    /// Extract one direct body paragraph's visible text without constructing
+    /// an Arc-backed [`Paragraph`] view. This is available for managed
+    /// source-backed documents because the returned `String` is caller-owned
+    /// semantic output, not a hidden payload alias.
+    pub fn paragraph_text(&self, index: usize) -> Result<Option<String>> {
+        self.check_execution()?;
+        let mut position = 0usize;
+        let mut selected = None;
+        scan_word_element_ranges(self.xml.as_bytes(), &[b"p"], |_, start, length| {
+            if position == index {
+                selected = Some((start, length));
+            }
+            position = position.checked_add(1).ok_or_else(|| {
+                Error::InvalidFormat("document paragraph counter overflow".into())
+            })?;
+            Ok(())
+        })?;
+        let Some((start, length)) = selected else {
+            return Ok(None);
+        };
+        let start = usize::try_from(start)
+            .map_err(|_| Error::InvalidFormat("document paragraph offset overflow".into()))?;
+        let length = usize::try_from(length)
+            .map_err(|_| Error::InvalidFormat("document paragraph length overflow".into()))?;
+        let end = start
+            .checked_add(length)
+            .ok_or_else(|| Error::InvalidFormat("document paragraph range overflow".into()))?;
+        let xml = self.xml.as_bytes().get(start..end).ok_or_else(|| {
+            Error::InvalidFormat("document paragraph range is outside XML".into())
+        })?;
+        let text = crate::paragraph::extract_word_text(xml)?;
+        self.check_execution()?;
+        Ok(Some(text))
     }
 
     /// Return visible paragraphs sharing the pinned main-document allocation.
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 32]>> {
-        document_paragraphs(Arc::clone(&self.xml))
+        self.check_selective_operation("document paragraphs")?;
+        let DocumentPayload::Owned(xml) = &self.xml else {
+            unreachable!("managed document payload rejected above")
+        };
+        document_paragraphs(Arc::clone(xml))
     }
 
     /// Return one visible paragraph without allocating all paragraph views.
     pub fn paragraph(&self, index: usize) -> Result<Option<Paragraph>> {
-        document_paragraph(Arc::clone(&self.xml), index)
+        self.check_selective_operation("document paragraph")?;
+        let DocumentPayload::Owned(xml) = &self.xml else {
+            unreachable!("managed document payload rejected above")
+        };
+        document_paragraph(Arc::clone(xml), index)
     }
 
     /// Capture the immutable section inventory from the pinned main document.
@@ -829,7 +1098,8 @@ impl Document {
         &self,
         limits: &crate::section::Limits,
     ) -> Result<crate::section::Inventory> {
-        crate::section::Inventory::parse_with_limits(self.xml.as_slice(), limits)
+        self.check_execution()?;
+        crate::section::Inventory::parse_with_limits(self.xml.as_bytes(), limits)
     }
 
     /// Capture a cheaply cloneable inventory bound to the exact opened source.
@@ -842,6 +1112,7 @@ impl Document {
         &self,
         limits: &crate::section::Limits,
     ) -> Result<crate::section::Snapshot> {
-        crate::section::Snapshot::from_source_xml(self.xml.as_slice(), self.source_version, limits)
+        self.check_execution()?;
+        crate::section::Snapshot::from_source_xml(self.xml.as_bytes(), self.source_version, limits)
     }
 }
