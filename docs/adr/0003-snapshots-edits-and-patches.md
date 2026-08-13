@@ -1401,3 +1401,55 @@ conversion, saved and reopened their exact paths, and retained the requested
 `Color Fill` dark-red and `No Fill` UI states. This native check confirms the
 supported semantic transition; Pages' own resave is not used as an exact
 locality oracle.
+
+## 2026-08-13 amendment: canonical Keynote read snapshots
+
+Keynote read snapshots now have one focused owner with two provenance levels.
+`litchi_keynote::Document::{open, open_with_options}` accepts either a complete
+ZIP or a frozen app-authored package directory, completes bounded semantic
+projection eagerly, and publishes a cheaply clonable archive-free full `Show`,
+rooted text, source-derived metadata, and source statistics.
+`litchi_keynote::Package::snapshot` instead cheaply shares the immutable
+complete regular-file artifact and its semantic state; `semantic_snapshot`
+returns a cheap shared archive-free `Document` whose source diagnostics are
+intentionally absent, so its `metadata()` and `stats()` are `None`. The retired
+`KeynoteDocument` had duplicated these responsibilities with its own `Bundle`,
+`ObjectIndex`, and `OnceLock<Document>`.
+
+Together, `Document` and `Package` retain the supported read capabilities.
+Semantic path reads, snapshots, text, slides, metadata, show, validation, and
+source statistics are available through source-backed `Document`; exact ZIP
+byte ingress and artifact-backed statistics remain on `Package`.
+`from_archive_bytes` was merely an alias for `from_bytes` and is intentionally
+not preserved under a second name; exact byte callers use
+`Package::from_bytes`. `KeynoteDocumentStats::application` was the constant
+`Keynote`, so the focused stats type need not repeat it.
+
+Directory semantics follow a different invariant from exact artifact
+ownership. Focused `Document` freezes app-authored directories through
+`PreparedSource`; the cross-format coordinator can delegate through that same
+boundary. `Package::open` refuses directories because exact `write_to` and edit
+provenance require the complete ZIP artifact. Directory capture never promotes
+an `Index.zip` fragment into a supposedly complete writable source, and the
+semantic snapshot makes no preservation claim for other sidecars, `Data/`, or
+previews.
+
+Semantic corrections are part of the cutover. `Package::text` visits only
+storages reachable in rooted presentation order. Slide reads preserve rich
+`Storage` fragments rather than flattening body/date content into legacy text
+vectors. Metadata and validation use the focused package's stricter bounded
+rules and may recover plist revision/content-status data differently. These
+differences forbid an object-for-object equality claim while preserving every
+supported read capability.
+
+Metadata lookup binds to the exact canonical logical
+`Metadata/Properties.plist` path. A hostile near-name with the same basename is
+inert. Catalog-normalized legacy nested-ZIP wrapper prefixes are supported;
+arbitrary flat wrapper prefixes are not treated as canonical metadata paths.
+Source-backed metadata is always present because it begins with semantic Show
+fields; canonical properties, when present, contribute only narrowly decoded
+scalar diagnostics. Their independent hard admission ceiling is 64 KiB.
+
+No edit, patch, publication, or native mutation is introduced by deleting the
+duplicate reader. Existing `Package` transactions continue to bind their
+patches to exact immutable source snapshots.

@@ -836,13 +836,10 @@ fn checked_charge(
     reason = "the internal-source feature adds a semantic-source error path"
 )]
 fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
-    #[cfg(feature = "internal-iwork-source")]
     let source = match &package.state.source {
         super::PhysicalSource::Package(source) => source,
         super::PhysicalSource::Semantic(_) => return Err(Error::UnsupportedSource),
     };
-    #[cfg(not(feature = "internal-iwork-source"))]
-    let super::PhysicalSource::Package(source) = &package.state.source;
     Ok(source.shared_source())
 }
 
@@ -851,15 +848,9 @@ fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
     reason = "the internal-source feature adds a semantic-source error path"
 )]
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
-    #[cfg(feature = "internal-iwork-source")]
     match &package.state.source {
         super::PhysicalSource::Package(source) => Ok(source),
         super::PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
-    }
-    #[cfg(not(feature = "internal-iwork-source"))]
-    {
-        let super::PhysicalSource::Package(source) = &package.state.source;
-        Ok(source)
     }
 }
 

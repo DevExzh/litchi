@@ -1938,3 +1938,58 @@ opened replacement as a dark-red `Color Fill` and clear as `No Fill`, without a
 repair or conversion prompt, and preserved each state through Save, close, and
 exact-path reopen. It does not expand `Unsupported` into a mutable variant or
 establish semantic ownership of any other fill family.
+
+## 2026-08-13 amendment: canonical Keynote reader API
+
+Callers read Keynote semantics through `litchi_keynote::Document::{open,
+open_with_options}`. Both complete ZIP artifacts and app-authored package
+directories are frozen through `PreparedSource`, fully decoded under checked
+limits, and returned as archive-free snapshots with full `Show`, rooted text,
+source-derived metadata, and source statistics. Metadata begins with semantic
+Show fields and incorporates narrowly decoded canonical-properties scalar
+diagnostics when that sidecar exists; `Some` does not establish its presence.
+The cross-format `litchi::iwork::Document` coordinator can delegate to this focused
+semantic owner. Exact complete regular-file artifacts remain on
+`litchi_keynote::Package`, including byte ingress, semantic projection,
+cheap shared `semantic_snapshot`, exact `write_to`, and edit provenance. A
+package-derived semantic snapshot is intentionally diagnostic-free, with
+`metadata()` and `stats()` both `None`. The retired
+`litchi_iwa::keynote::KeynoteDocument` surface is not aliased or bridged.
+
+Every supported legacy capability has a focused equivalent distributed by
+provenance: `Document` owns semantic path opening, cheap snapshots, text,
+slides, metadata, show, validation, and source stats; `Package` owns exact byte
+opening and physical-artifact operations. The sole legacy-only
+constructor name, `from_archive_bytes`, performed exactly the same work as
+`from_bytes`, so `Package::from_bytes` is canonical. The retired stats type's
+`application` member was always `Keynote`; format identity follows from the
+concrete reader rather than a repeated runtime field.
+
+The ingress split prevents a false provenance claim. A directory's
+`Index.zip` or loose `Index/` can supply semantic components to `Document`, but
+is not the complete regular-file artifact needed for `Package::write_to` or
+exact-source edits. `Package::open` therefore refuses directory backing.
+`Document` deliberately does not retain an archive and promises no preservation
+of other sidecars, `Data/`, previews, or exact package bytes.
+
+The semantic contract is focused rather than historically bug-compatible.
+`text` is rooted and excludes unreachable or template-only storages. Slides
+retain rich storage fragments instead of flattening body/date text into a
+legacy vector. Focused metadata can expose plist revision and content-status
+facts, and validation rejects malformed graph or resource state under retained
+bounds. No raw `Bundle`, `ObjectIndex`, native identifier, or Prost message
+enters the public API. The focused semantic traversal still performs bounded
+generated Prost decoding after wire preflight; `Document` eagerly completes
+that projection before publication, while `Package` performs it lazily.
+
+Focused metadata accepts only the canonical logical
+`Metadata/Properties.plist`. It ignores unrelated entries that merely share the
+basename. Legacy nested-ZIP wrapper prefixes are normalized by the package
+catalog; arbitrary flat wrapper prefixes receive no such authorization. The
+canonical diagnostic has a centralized, non-configurable 64 KiB admission
+ceiling independent of broader entry limits, and decoding is limited to the
+scalar fields projected into public metadata.
+
+This amendment retires only the read facade. `KeynoteEditor`,
+`KeynoteDocumentBuilder`, creation, and mutation surfaces remain in
+`litchi-iwa`.

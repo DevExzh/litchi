@@ -14,9 +14,9 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use litchi_iwa::keynote::KeynoteDocument;
+//! use litchi_keynote::Package;
 //!
-//! let doc = KeynoteDocument::open("presentation.key")?;
+//! let doc = Package::open("presentation.key")?;
 //! let slides = doc.slides()?;
 //!
 //! for slide in slides {
@@ -31,11 +31,9 @@
 //! ```
 
 pub mod creation;
-pub mod document;
 pub mod editor;
 
 pub use creation::KeynoteDocumentBuilder;
-pub use document::KeynoteDocument;
 pub use editor::Effect;
 pub use editor::{
     Angle, Background, BuildAcceleration, BuildStart, Gradient, KeynoteBuildChunkInfo,

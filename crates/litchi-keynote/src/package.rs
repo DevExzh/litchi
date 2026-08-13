@@ -20,7 +20,7 @@ pub(crate) mod soundtrack_settings;
 
 use std::fmt;
 use std::fs::File;
-use std::io::{Cursor, Read, Write};
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::Arc;
 #[cfg(test)]
@@ -32,9 +32,7 @@ use litchi_iwa_common::{
     wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree_with_limits},
 };
 use litchi_iwa_core::{ArchiveObject, RawMessage};
-use litchi_iwa_detect::Format;
-#[cfg(feature = "internal-iwork-source")]
-use litchi_iwa_detect::PreparedSource;
+use litchi_iwa_detect::{Format, PreparedSource};
 use litchi_iwa_protos::{keynote_document_codec, keynote_show_codec, kn, tswp};
 use litchi_iwa_text::storage::Storage;
 use litchi_iwa_text_wire::{
@@ -44,6 +42,7 @@ use litchi_iwa_text_wire::{
 };
 use once_cell::sync::OnceCell;
 use prost::Message;
+use serde::Deserialize;
 use thiserror::Error;
 
 use crate::show::{Mode, Settings, Show, Size};
@@ -331,14 +330,13 @@ struct State {
     semantic: OnceCell<Document>,
     #[cfg(test)]
     semantic_decode_attempts: AtomicUsize,
-    #[cfg(all(test, feature = "internal-iwork-source"))]
+    #[cfg(test)]
     source_classification_attempts: usize,
 }
 
 #[derive(Debug)]
 enum PhysicalSource {
     Package(SourceCatalog),
-    #[cfg(feature = "internal-iwork-source")]
     Semantic(Arc<ComponentCatalog>),
 }
 
@@ -346,7 +344,6 @@ impl PhysicalSource {
     fn components(&self) -> &ComponentCatalog {
         match self {
             Self::Package(source) => source.components(),
-            #[cfg(feature = "internal-iwork-source")]
             Self::Semantic(components) => components,
         }
     }
@@ -354,7 +351,6 @@ impl PhysicalSource {
     fn package_source(&self) -> &SourceCatalog {
         match self {
             Self::Package(source) => source,
-            #[cfg(feature = "internal-iwork-source")]
             Self::Semantic(_) => {
                 panic!("semantic-only Keynote decoder has no physical package source")
             },
@@ -485,7 +481,6 @@ impl Package {
     ///
     /// Returns [`ReadError`] when the source belongs to another application or
     /// the Keynote root/index cannot be validated.
-    #[cfg(feature = "internal-iwork-source")]
     #[doc(hidden)]
     pub fn __from_prepared_source(
         source: PreparedSource,
@@ -538,7 +533,7 @@ impl Package {
                 semantic: OnceCell::new(),
                 #[cfg(test)]
                 semantic_decode_attempts: AtomicUsize::new(0),
-                #[cfg(all(test, feature = "internal-iwork-source"))]
+                #[cfg(test)]
                 source_classification_attempts,
             }),
         };
@@ -546,7 +541,6 @@ impl Package {
         Ok(package)
     }
 
-    #[cfg(feature = "internal-iwork-source")]
     fn from_classified_components(
         components: Arc<ComponentCatalog>,
         archive: ArchiveLimits,
@@ -563,7 +557,7 @@ impl Package {
                 semantic: OnceCell::new(),
                 #[cfg(test)]
                 semantic_decode_attempts: AtomicUsize::new(0),
-                #[cfg(all(test, feature = "internal-iwork-source"))]
+                #[cfg(test)]
                 source_classification_attempts: 0,
             }),
         };
@@ -710,43 +704,41 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns an error when the show or a present `Properties.plist` cannot
-    /// be decoded under the package's original physical limits.
+    /// Returns an error when the show or the canonical
+    /// `Metadata/Properties.plist` member cannot be decoded under the
+    /// package's original physical limits. Unrelated members with the same
+    /// basename are not metadata authorities.
     pub fn metadata(&self) -> ReadResult<Option<litchi_core::Metadata>> {
-        let mut metadata = litchi_core::Metadata {
-            application: Some("Keynote".to_owned()),
-            ..litchi_core::Metadata::default()
-        };
-        let mut has_data = true;
-
-        if let Some(title) = self.show()?.title() {
-            metadata.title = Some(title.to_owned());
+        let properties = self
+            .state
+            .source
+            .package()
+            .iter()
+            .find(|entry| entry.name() == "Metadata/Properties.plist")
+            .map(|entry| {
+                if entry.is_opaque() {
+                    return Err(ReadError::InvalidFormat(
+                        "canonical Keynote properties use unsupported compression".to_owned(),
+                    ));
+                }
+                Ok(entry.data())
+            })
+            .transpose()?;
+        if properties.is_some_and(|data| data.len() > litchi_iwa_detect::MAX_PROPERTIES_BYTES) {
+            return Err(ReadError::Detection(
+                litchi_iwa_detect::Error::LimitExceeded {
+                    kind: litchi_iwa_detect::LimitKind::EntryBytes,
+                    observed: properties
+                        .map(|data| u64::try_from(data.len()).unwrap_or(u64::MAX))
+                        .unwrap_or(0),
+                    maximum: litchi_iwa_detect::MAX_PROPERTIES_BYTES as u64,
+                },
+            ));
         }
-
-        if let Some(properties) = self.state.source.package().iter().find(|entry| {
-            entry.name().rsplit('/').next() == Some("Properties.plist") && !entry.is_opaque()
-        }) {
-            let value = plist::Value::from_reader(Cursor::new(properties.data()))?;
-            let dictionary = value.as_dictionary().ok_or_else(|| {
-                ReadError::InvalidFormat("Keynote Properties.plist is not a dictionary".to_owned())
-            })?;
-            if metadata.title.is_none() {
-                metadata.title = property(dictionary, "Title")
-                    .or_else(|| property(dictionary, "kDocumentTitleKey"));
-            }
-            metadata.author = property(dictionary, "Author")
-                .or_else(|| property(dictionary, "kDocumentAuthorKey"))
-                .or_else(|| property(dictionary, "kSFWPAuthorPropertyKey"));
-            metadata.keywords = property(dictionary, "Keywords");
-            metadata.description = property(dictionary, "Comments");
-            metadata.revision =
-                property(dictionary, "revision").or_else(|| property(dictionary, "buildVersion"));
-            metadata.content_status = property(dictionary, "fileFormatVersion")
-                .map(|version| format!("Keynote Format Version {version}"));
-            has_data = true;
-        }
-
-        Ok(has_data.then_some(metadata))
+        Ok(Some(metadata_from_show_and_properties(
+            self.show()?,
+            properties,
+        )?))
     }
 
     /// Validate the retained package root and all lazily decoded semantics.
@@ -1298,17 +1290,30 @@ impl Package {
 ///
 /// Returns [`ReadError`] when the source belongs to another application or
 /// its Keynote graph is malformed or exceeds the supplied semantic limits.
-#[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub fn __semantic_document_from_prepared_source(
+    source: PreparedSource,
+    semantic: SemanticLimits,
+) -> ReadResult<Document> {
+    semantic_document_from_prepared_source(source, semantic)
+}
+
+pub(crate) fn semantic_document_from_prepared_source(
     source: PreparedSource,
     semantic: SemanticLimits,
 ) -> ReadResult<Document> {
     if source.format() != Format::Keynote {
         return Err(ReadError::NotKeynote);
     }
-    let (components, archive) = source.__into_components();
-    Package::from_classified_components(components, archive, semantic)?.semantic_snapshot()
+    let (components, archive, properties) = source.__into_semantic_parts()?;
+    let package = Package::from_classified_components(components, archive, semantic)?;
+    let show = package.decode_show()?;
+    let stats = Stats {
+        total_objects: package.state.total_objects,
+        slide_count: show.slides().len(),
+    };
+    let metadata = metadata_from_show_and_properties(&show, properties.as_deref())?;
+    Ok(Document::from_source(show, metadata, stats))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2565,7 +2570,7 @@ where
         .map_err(|_error| ReadError::InvalidFormat(format!("{context} payload is malformed")))
 }
 
-fn semantic_text(show: &Show) -> ReadResult<String> {
+pub(crate) fn semantic_text(show: &Show) -> ReadResult<String> {
     let mut parts = 0usize;
     let mut content_bytes = 0usize;
     visit_show_text(show, |text| {
@@ -2835,11 +2840,93 @@ fn settings_from_show_projection(
     Ok(settings)
 }
 
-fn property(dictionary: &plist::Dictionary, key: &str) -> Option<String> {
-    dictionary
-        .get(key)
-        .and_then(plist::Value::as_string)
-        .map(str::to_owned)
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+struct PropertiesDiagnostic {
+    title: Option<PropertyScalar>,
+    author: Option<PropertyScalar>,
+    keywords: Option<PropertyScalar>,
+    comments: Option<PropertyScalar>,
+    #[serde(rename = "kDocumentTitleKey")]
+    document_title: Option<PropertyScalar>,
+    #[serde(rename = "kDocumentAuthorKey")]
+    document_author: Option<PropertyScalar>,
+    #[serde(rename = "kSFWPAuthorPropertyKey")]
+    sfwp_author: Option<PropertyScalar>,
+    #[serde(rename = "revision")]
+    revision: Option<PropertyScalar>,
+    #[serde(rename = "buildVersion")]
+    build_version: Option<PropertyScalar>,
+    #[serde(rename = "fileFormatVersion")]
+    file_format_version: Option<PropertyScalar>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum PropertyScalar {
+    String(String),
+    Integer(plist::Integer),
+    Real(f64),
+    Boolean(bool),
+    Date(plist::Date),
+}
+
+impl PropertyScalar {
+    fn into_string(self) -> String {
+        match self {
+            Self::String(value) => value,
+            Self::Integer(value) => value.to_string(),
+            Self::Real(value) => value.to_string(),
+            Self::Boolean(value) => value.to_string(),
+            Self::Date(value) => value.to_xml_format(),
+        }
+    }
+}
+
+fn metadata_from_show_and_properties(
+    show: &Show,
+    properties: Option<&[u8]>,
+) -> ReadResult<litchi_core::Metadata> {
+    let mut metadata = litchi_core::Metadata {
+        application: Some("Keynote".to_owned()),
+        title: show.title().map(str::to_owned),
+        ..litchi_core::Metadata::default()
+    };
+    let Some(properties) = properties else {
+        return Ok(metadata);
+    };
+    if properties.len() > litchi_iwa_detect::MAX_PROPERTIES_BYTES {
+        return Err(ReadError::Detection(
+            litchi_iwa_detect::Error::LimitExceeded {
+                kind: litchi_iwa_detect::LimitKind::EntryBytes,
+                observed: u64::try_from(properties.len()).unwrap_or(u64::MAX),
+                maximum: litchi_iwa_detect::MAX_PROPERTIES_BYTES as u64,
+            },
+        ));
+    }
+    let diagnostic: PropertiesDiagnostic = plist::from_bytes(properties)?;
+    if metadata.title.is_none() {
+        metadata.title = diagnostic
+            .title
+            .or(diagnostic.document_title)
+            .map(PropertyScalar::into_string);
+    }
+    metadata.author = diagnostic
+        .author
+        .or(diagnostic.document_author)
+        .or(diagnostic.sfwp_author)
+        .map(PropertyScalar::into_string);
+    metadata.keywords = diagnostic.keywords.map(PropertyScalar::into_string);
+    metadata.description = diagnostic.comments.map(PropertyScalar::into_string);
+    metadata.revision = diagnostic
+        .revision
+        .or(diagnostic.build_version)
+        .map(PropertyScalar::into_string);
+    metadata.content_status = diagnostic
+        .file_format_version
+        .map(PropertyScalar::into_string)
+        .map(|version| format!("Keynote Format Version {version}"));
+    Ok(metadata)
 }
 
 #[cfg(test)]
@@ -2941,6 +3028,109 @@ mod tests {
     }
 
     #[test]
+    fn metadata_uses_only_the_canonical_properties_member() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let package = Package::open(native_fixture_path())?;
+        let expected = package
+            .metadata()?
+            .ok_or_else(|| io::Error::other("native fixture has no metadata"))?;
+        let catalog = package.state.source.package();
+        let unrelated = b"not a plist";
+        let mut entries = Vec::new();
+        entries.try_reserve_exact(catalog.len().saturating_add(1))?;
+        entries.push(("A/Properties.plist", unrelated.as_slice()));
+        entries.extend(catalog.iter().map(|entry| (entry.name(), entry.data())));
+        let candidate =
+            litchi_iwa_archive::package::to_bytes(entries.iter().copied(), Limits::default())?;
+
+        let observed = Package::from_bytes(&candidate)?
+            .metadata()?
+            .ok_or_else(|| io::Error::other("candidate has no metadata"))?;
+        assert_eq!(observed.title, expected.title);
+        assert_eq!(observed.author, expected.author);
+        assert_eq!(observed.revision, expected.revision);
+        assert_eq!(observed.content_status, expected.content_status);
+        assert_eq!(observed.application, expected.application);
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_opaque_properties_refuse_metadata() -> Result<(), Box<dyn std::error::Error>> {
+        const NAME: &[u8] = b"Metadata/Properties.plist";
+        const UNSUPPORTED_METHOD: [u8; 2] = 99u16.to_le_bytes();
+
+        let mut bytes = std::fs::read(native_fixture_path())?;
+        let mut cursor = 0usize;
+        let mut changed = 0usize;
+        while let Some(relative) = bytes[cursor..]
+            .windows(NAME.len())
+            .position(|candidate| candidate == NAME)
+        {
+            let position = cursor + relative;
+            if position >= 30 && bytes[position - 30..position - 26] == [0x50, 0x4b, 0x03, 0x04] {
+                bytes[position - 22..position - 20].copy_from_slice(&UNSUPPORTED_METHOD);
+                changed += 1;
+            } else if position >= 46
+                && bytes[position - 46..position - 42] == [0x50, 0x4b, 0x01, 0x02]
+            {
+                bytes[position - 36..position - 34].copy_from_slice(&UNSUPPORTED_METHOD);
+                changed += 1;
+            }
+            cursor = position.saturating_add(NAME.len());
+        }
+        assert_eq!(
+            changed, 2,
+            "canonical properties must have local and central records"
+        );
+
+        let package = Package::from_bytes(&bytes)?;
+        assert!(matches!(
+            package.metadata(),
+            Err(ReadError::InvalidFormat(message))
+                if message.contains("unsupported compression")
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn properties_scalars_and_hard_ceiling_are_exact() -> Result<(), Box<dyn std::error::Error>> {
+        const PREFIX: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\"><plist version=\"1.0\"><dict><key>revision</key><integer>18446744073709551615</integer><key>fileFormatVersion</key><date>2026-08-13T00:00:00Z</date><key>Padding</key><string>";
+        const SUFFIX: &str = "</string></dict></plist>";
+
+        let padding = litchi_iwa_detect::MAX_PROPERTIES_BYTES
+            .checked_sub(PREFIX.len().saturating_add(SUFFIX.len()))
+            .ok_or_else(|| io::Error::other("properties test envelope exceeds hard ceiling"))?;
+        let mut exact = String::new();
+        exact.try_reserve_exact(litchi_iwa_detect::MAX_PROPERTIES_BYTES)?;
+        exact.push_str(PREFIX);
+        exact.extend(std::iter::repeat_n('x', padding));
+        exact.push_str(SUFFIX);
+        assert_eq!(exact.len(), litchi_iwa_detect::MAX_PROPERTIES_BYTES);
+
+        let metadata =
+            metadata_from_show_and_properties(&Show::builder().build(), Some(exact.as_bytes()))?;
+        assert_eq!(metadata.revision.as_deref(), Some("18446744073709551615"));
+        assert_eq!(
+            metadata.content_status.as_deref(),
+            Some("Keynote Format Version 2026-08-13T00:00:00Z")
+        );
+
+        let oversized = vec![0; litchi_iwa_detect::MAX_PROPERTIES_BYTES + 1];
+        assert!(matches!(
+            metadata_from_show_and_properties(&Show::builder().build(), Some(&oversized)),
+            Err(ReadError::Detection(
+                litchi_iwa_detect::Error::LimitExceeded {
+                    kind: litchi_iwa_detect::LimitKind::EntryBytes,
+                    observed,
+                    maximum,
+                }
+            )) if observed == oversized.len() as u64
+                && maximum == litchi_iwa_detect::MAX_PROPERTIES_BYTES as u64
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn write_to_streams_exact_bytes_and_reports_sink_progress()
     -> Result<(), Box<dyn std::error::Error>> {
         let package = Package::open(native_fixture_path())?;
@@ -3020,7 +3210,6 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn prepared_source_skips_redundant_keynote_classification()
     -> Result<(), Box<dyn std::error::Error>> {

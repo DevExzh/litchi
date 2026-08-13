@@ -10183,3 +10183,102 @@ solid-to-solid or none-to-none exact no-op, zero touched components, and zero
 deleted previews; its no-op and inverse remain byte-exact. Pages can otherwise
 rewrite its own package on resave, so this gate makes no claim about native
 resave member locality or byte preservation.
+
+## 2026-08-13 amendment: legacy Keynote reader retirement gate
+
+The retirement deletes the 933-line
+`crates/litchi-iwa/src/keynote/document.rs`, its module declaration, and the
+`KeynoteDocument` re-export. Source audit finds no retained public
+`KeynoteDocument` or `KeynoteDocumentStats`. The duplicate reader's private
+`Bundle`, `ObjectIndex`, semantic `OnceLock`, eager-Prost show/slide graph, and
+wide text extractor disappear with the file; editor and builder code remain.
+
+API audit maps every supported semantic capability to
+`litchi_keynote::Document`: `open` and `open_with_options` accept complete ZIPs
+or frozen app-authored package directories and eagerly return an archive-free
+full show, rooted text, source-derived metadata, and source statistics. The
+metadata begins with semantic Show values and incorporates narrowly decoded
+canonical-properties scalars when that diagnostic exists; `Some` is not a
+sidecar-presence signal. Cheap snapshots, slides, validation, and those
+accessors remain on the detached value. Exact regular-file artifacts map
+separately to `litchi_keynote::Package`, including `from_bytes`, semantic
+projection, cheap shared `semantic_snapshot`, exact `write_to`, and edit
+provenance. A package-derived semantic snapshot is intentionally
+diagnostic-free: `metadata()` and `stats()` return `None`. The redundant
+`from_archive_bytes` alias maps to `Package::from_bytes`. The constant
+`KeynoteDocumentStats.application` field is intentionally omitted. Checked
+physical and semantic limits and prepared-source ingress are additional
+focused capabilities, not compatibility obligations.
+
+Path parity is intentionally split by provenance. `Document` captures either
+path shape through `PreparedSource` and completes semantic decoding before it
+publishes the snapshot. The cross-format coordinator can delegate through that
+same frozen-source boundary. `Package::open` requires the complete regular-file
+ZIP because exact `write_to` and mutation patches bind to the full physical
+artifact; it refuses directories rather than treating directory `Index.zip` or
+loose `Index/` components as a complete writable `.key`. An archive-free
+directory snapshot makes no promise to preserve other sidecars, `Data/`,
+previews, or complete package bytes.
+
+Parity is verified at the public behavior boundary, not by comparing legacy
+and focused object layouts. The focused reader deliberately corrects three
+legacy behaviors: text is limited to storages reachable from the rooted show
+graph; rich storage fragments are preserved instead of flattening body/date
+content; and plist metadata plus package validation are richer and stricter.
+Accordingly no claim is made that legacy and focused Show values, text vectors,
+or error classifications are structurally identical.
+
+Metadata lookup authorizes the exact canonical logical
+`Metadata/Properties.plist` path. The hostile near-name regression proves that
+an unrelated entry sharing `Properties.plist` as its basename is ignored.
+Catalog-normalized legacy nested-ZIP wrapper prefixes retain their logical
+path, while arbitrary flat wrapper prefixes are not accepted as canonical. A
+centralized 64 KiB hard ceiling admits the canonical diagnostic independently
+of the broader source-entry limit, and only the scalar fields projected into
+public metadata are decoded.
+
+This cut removes the duplicate host eager-Prost path, not every Prost use in
+the focused crate. Six generated-message decodes remain in semantic traversal
+after bounded wire preflight; they do not form a second public reader.
+
+The permanent `generated_roundtrip` gate opens a builder-generated flat `.key`
+with `litchi_keynote::Package` and proves `Send + Sync`, snapshot/stats
+agreement, validation, show and semantic-snapshot slide counts, and nonempty
+rooted text.
+
+The permanent path regressions prove packaged/directory Keynote semantic parity
+both through focused `Document` and through the cross-format coordinator. They
+match directory snapshots against the focused ZIP package for slide count,
+rooted text, position, skip state, name, title, builds, and transition presence.
+Boundary ratchets audit removal of the public reader and its duplicate
+implementation, while the full checker continues to distinguish the existing
+dependency-policy baseline.
+
+The frozen ingress and semantic gates pass: archive-directory 16/16,
+detection 18/18, focused Keynote native 7/7, coordinator `iwork_path` 7/7, and
+metadata scalar/64 KiB-cap unit coverage 1/1.
+
+This is a read-only retirement, so it requires no new native mutation or Save
+oracle. The fixed Apple-authored read fixture is
+`test-data/iwork/keynote/basic.key`, 500,058 bytes, SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+Its existing focused native reader coverage remains the read-only oracle; this
+cut does not rewrite that fixture or claim a new mutation artifact. Keynote
+14.4 build 7043.0.93 opened an isolated copy without repair, recovery, or
+conversion warning. The navigator showed its single
+`Litchi native Keynote fixture` slide; the canvas showed the expected title,
+body marker, and `2026-08-07`. Separately, the automated focused native-fixture
+gate covers deterministic package behavior, typed `Package` directory refusal,
+focused `Document` ZIP/directory semantic reads, canonical metadata lookup with
+a hostile near-name, and focused reread of one slide and 959 objects. Metadata
+isolation also preserves the source exactly; these tests do not automate the
+Keynote UI. Command-W produced no save prompt, but Keynote silently
+autosave-normalized only the disposable copy to 500,011 bytes,
+SHA-256
+`5a6c5b260a3e3b6d77e848d3198a5d41b74fe9f1e9f9fd7d1a8050f9b4092427`;
+focused semantics remain identical and ZIP integrity passes. The checked-in
+source retained its size, hash, mtime, and inode, so this is read compatibility
+evidence rather than byte-preservation evidence for native open.
+
+`KeynoteEditor` and `KeynoteDocumentBuilder` remain. Debt 014 and the
+`litchi-iwa -> litchi-keynote` manifest edge therefore remain open.

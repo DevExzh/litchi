@@ -5,6 +5,7 @@ use std::io;
 use std::path::PathBuf;
 
 use litchi::iwork::{Document, ErrorKind, Format, Options, Resource, SourceLimits, Stage};
+use litchi_keynote::Package as KeynotePackage;
 
 fn fixture(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -43,6 +44,51 @@ fn packaged_files_and_native_directories_have_semantic_parity() {
         "keynote/basic.key",
         "directory/keynote/basic.key",
         Format::Keynote,
+    );
+}
+
+#[test]
+fn keynote_directory_coordinator_matches_the_focused_zip_snapshot() {
+    let directory = Document::open(fixture("directory/keynote/basic.key"))
+        .unwrap_or_else(|error| panic!("directory Keynote fixture must open: {error}"));
+    let focused = KeynotePackage::open(fixture("keynote/basic.key"))
+        .unwrap_or_else(|error| panic!("focused Keynote fixture must open: {error}"));
+    let snapshot = directory.snapshot();
+
+    assert_eq!(directory.format(), Format::Keynote);
+    assert_eq!(snapshot.format(), Format::Keynote);
+    assert_eq!(snapshot.slide_count(), 1);
+    assert_eq!(snapshot.summary().slides(), focused.slides().unwrap().len());
+    assert_eq!(
+        snapshot.all_text(),
+        focused
+            .show()
+            .unwrap()
+            .all_text()
+            .into_iter()
+            .collect::<Vec<_>>()
+    );
+
+    let slide = snapshot
+        .slide(0)
+        .unwrap_or_else(|| panic!("directory Keynote snapshot must have one slide"));
+    let focused_slide = &focused.slides().unwrap()[0];
+    assert_eq!(slide.position(), focused_slide.index());
+    assert_eq!(slide.is_skipped(), focused_slide.is_skipped());
+    assert_eq!(slide.name(), focused_slide.name());
+    assert_eq!(slide.title(), focused_slide.title());
+    assert_eq!(slide.build_count(), focused_slide.builds().len());
+    assert_eq!(slide.has_transition(), focused_slide.transition().is_some());
+    assert_eq!(
+        slide
+            .iter_text()
+            .map(|text| text.value())
+            .collect::<Vec<_>>(),
+        [
+            "Litchi native Keynote fixture",
+            "Buffa lazy-view migration verification",
+            "2026-08-07",
+        ]
     );
 }
 

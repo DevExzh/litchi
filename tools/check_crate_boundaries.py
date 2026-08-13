@@ -127,6 +127,32 @@ RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_EXAMPLE = Path(
     "crates/litchi-iwa/examples/edit_keynote_show.rs"
 )
 IWA_KEYNOTE_README = Path("crates/litchi-iwa/README.md")
+RETIRED_IWA_KEYNOTE_DOCUMENT_SOURCE = IWA_KEYNOTE_SOURCE_ROOT / "document.rs"
+RETIRED_IWA_KEYNOTE_DOCUMENT_TYPES = (
+    "KeynoteDocument",
+    "KeynoteDocumentState",
+    "KeynoteDocumentStats",
+)
+RETIRED_IWA_KEYNOTE_DOCUMENT_TYPE_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_DOCUMENT_TYPES
+)
+IWA_KEYNOTE_MODULE_SOURCE = IWA_KEYNOTE_SOURCE_ROOT / "mod.rs"
+IWA_KEYNOTE_DOCUMENT_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?(document)\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+IWA_KEYNOTE_DOCUMENT_LOCAL_REEXPORT = re.compile(
+    r"^[ \t]*pub(?:\([^()]*\))?[ \t\r\n]+use[ \t\r\n]+"
+    r"(?:(?:r#)?self[ \t\r\n]*::[ \t\r\n]*)?"
+    r"(?:r#)?(?P<module>document)\b",
+    re.MULTILINE,
+)
+IWA_KEYNOTE_DOCUMENT_CALLER_ROOTS = (
+    Path("crates/litchi-iwa/src"),
+    Path("crates/litchi-iwa/tests"),
+    Path("crates/litchi-iwa/examples"),
+)
 KEYNOTE_SOURCE_ROOT = Path("crates/litchi-keynote/src")
 KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "show.rs",
@@ -2974,6 +3000,27 @@ def _mask_rust_non_code(source: str) -> str:
     return "".join(masked)
 
 
+def _rust_doc_identifier_occurrences(
+    source: str, names: frozenset[str]
+) -> list[tuple[str, int]]:
+    """Return exact identifiers in Rust doc comments and `#[doc = ...]` attributes."""
+
+    regions = [
+        *re.finditer(r"^[ \t]*//[/!][^\r\n]*", source, re.MULTILINE),
+        *re.finditer(r"/\*(?:\*|!)[\s\S]*?\*/", source),
+        *re.finditer(r"#\s*\[\s*doc\s*=\s*[^\]]*\]", source),
+    ]
+    occurrences: set[tuple[str, int]] = set()
+    for region in regions:
+        for identifier in RUST_IDENTIFIER.finditer(region.group(0)):
+            name = identifier.group(1)
+            if name not in names:
+                continue
+            offset = region.start() + identifier.start(1)
+            occurrences.add((name, source.count("\n", 0, offset) + 1))
+    return sorted(occurrences, key=lambda item: (item[1], item[0]))
+
+
 def _rust_function_declarations(source: str) -> list[tuple[str, int]]:
     """Return exact Rust function declaration names and source line numbers."""
 
@@ -3904,6 +3951,78 @@ def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
             violations.append(
                 "retired litchi-iwa Keynote method "
                 f"{name}: {path.relative_to(root)}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_document_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the retired Keynote reader and its compatibility surface deleted."""
+
+    violations: list[str] = []
+    retired_source = root / RETIRED_IWA_KEYNOTE_DOCUMENT_SOURCE
+    if retired_source.exists():
+        violations.append(
+            "retired litchi-iwa Keynote document reader source returned: "
+            + str(RETIRED_IWA_KEYNOTE_DOCUMENT_SOURCE)
+        )
+
+    module_path = root / IWA_KEYNOTE_MODULE_SOURCE
+    if module_path.is_file():
+        module_source = _mask_rust_non_code(
+            module_path.read_text(encoding="utf-8")
+        )
+        for match in IWA_KEYNOTE_DOCUMENT_MODULE.finditer(module_source):
+            line_number = module_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote document reader module "
+                f"{match.group(1)}: {IWA_KEYNOTE_MODULE_SOURCE}:{line_number}"
+            )
+        for match in IWA_KEYNOTE_DOCUMENT_LOCAL_REEXPORT.finditer(module_source):
+            line_number = module_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote document reader local re-export "
+                f"{match.group('module')}: {IWA_KEYNOTE_MODULE_SOURCE}:{line_number}"
+            )
+
+    caller_paths: set[Path] = set()
+    for caller_root in IWA_KEYNOTE_DOCUMENT_CALLER_ROOTS:
+        caller_path = root / caller_root
+        if caller_path.is_dir():
+            caller_paths.update(caller_path.rglob("*.rs"))
+    for path in sorted(caller_paths):
+        raw_source = path.read_text(encoding="utf-8")
+        source = _mask_rust_non_code(raw_source)
+        for match in RUST_IDENTIFIER.finditer(source):
+            name = match.group(1)
+            if name not in RETIRED_IWA_KEYNOTE_DOCUMENT_TYPE_SET:
+                continue
+            line_number = source.count("\n", 0, match.start(1)) + 1
+            violations.append(
+                "retired litchi-iwa Keynote document reader type usage "
+                f"{name}: {path.relative_to(root)}:{line_number}"
+            )
+        for name, line_number in _rust_doc_identifier_occurrences(
+            raw_source, RETIRED_IWA_KEYNOTE_DOCUMENT_TYPE_SET
+        ):
+            violations.append(
+                "retired litchi-iwa Keynote document reader rustdoc reference "
+                f"{name}: {path.relative_to(root)}:{line_number}"
+            )
+
+    readme_path = root / IWA_KEYNOTE_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for match in RUST_IDENTIFIER.finditer(source):
+            name = match.group(1)
+            if name not in RETIRED_IWA_KEYNOTE_DOCUMENT_TYPE_SET:
+                continue
+            line_number = source.count("\n", 0, match.start(1)) + 1
+            violations.append(
+                "retired litchi-iwa Keynote document reader README reference "
+                f"{name}: {IWA_KEYNOTE_README}:{line_number}"
             )
 
     return sorted(set(violations))
@@ -7829,6 +7948,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_snapshot(snapshot, policy)
         + audit_litchi_facade_source_topology()
         + audit_iwa_keynote_source_topology()
+        + audit_iwa_keynote_document_source_topology()
         + audit_iwa_keynote_show_settings_source_topology()
         + audit_keynote_show_settings_facade_source_topology()
         + audit_iwa_keynote_soundtrack_settings_source_topology()

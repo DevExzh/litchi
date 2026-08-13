@@ -313,11 +313,15 @@ pub mod transition;
 pub use background::{Angle, Background, Gradient, Kind, Opaque, Stop};
 pub use build::{AnimationType, Build};
 pub use chart::ChartSelector;
-pub use document::Document;
+pub use document::{Document, DocumentReadOptions};
 pub use error::{Error, Result};
 pub use litchi_core::Position;
+/// Checked physical limits for archive-free Keynote document capture.
+pub use litchi_iwa_detect::Limits as DocumentSourceLimits;
+/// Maximum canonical `Metadata/Properties.plist` bytes retained by
+/// archive-free document ingress.
+pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
 pub use litchi_iwa_text::{TextPosition, TextSpan};
-#[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::__semantic_document_from_prepared_source;
 pub use package::{

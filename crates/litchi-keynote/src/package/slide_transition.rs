@@ -2074,15 +2074,9 @@ fn check_output(output: &[u8], limits: WireLimits) -> Result<(), Error> {
     reason = "the semantic-only source feature adds a typed unsupported-source branch"
 )]
 fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
-    #[cfg(feature = "internal-iwork-source")]
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
         PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
-    }
-    #[cfg(not(feature = "internal-iwork-source"))]
-    {
-        let PhysicalSource::Package(source) = &package.state.source;
-        Ok(source)
     }
 }
 fn map_read_error(error: ReadError) -> Error {

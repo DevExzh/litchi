@@ -24,6 +24,7 @@ litchi-iwa-text-wire = { workspace = true }
 once_cell         = { workspace = true }
 plist             = { workspace = true }
 prost             = { workspace = true }
+serde             = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

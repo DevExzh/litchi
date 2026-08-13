@@ -1147,6 +1147,188 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(boundaries.audit_iwa_keynote_source_topology(root), [])
 
+    def test_retired_iwa_keynote_document_reader_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_DOCUMENT_SOURCE,
+            Path("crates/litchi-iwa/src/keynote/document.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_DOCUMENT_TYPES,
+            ("KeynoteDocument", "KeynoteDocumentState", "KeynoteDocumentStats"),
+        )
+        self.assertEqual(
+            boundaries.IWA_KEYNOTE_MODULE_SOURCE,
+            Path("crates/litchi-iwa/src/keynote/mod.rs"),
+        )
+        self.assertEqual(
+            boundaries.IWA_KEYNOTE_DOCUMENT_CALLER_ROOTS,
+            (
+                Path("crates/litchi-iwa/src"),
+                Path("crates/litchi-iwa/tests"),
+                Path("crates/litchi-iwa/examples"),
+            ),
+        )
+
+    def test_retired_iwa_keynote_document_reader_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            retired = root / boundaries.RETIRED_IWA_KEYNOTE_DOCUMENT_SOURCE
+            retired.parent.mkdir(parents=True)
+            retired.write_text("// retired reader returned\n", encoding="utf-8")
+            module = root / boundaries.IWA_KEYNOTE_MODULE_SOURCE
+            module.write_text(
+                "pub mod r#document;\n"
+                "pub use self::r#document::*;\n",
+                encoding="utf-8",
+            )
+            source_caller = root / "crates/litchi-iwa/src/legacy_keynote.rs"
+            source_caller.parent.mkdir(parents=True, exist_ok=True)
+            source_caller.write_text(
+                "pub fn open() -> KeynoteDocument { todo!() }\n"
+                "pub type State = KeynoteDocumentState;\n"
+                "/// Do not restore `KeynoteDocumentStats`.\n",
+                encoding="utf-8",
+            )
+            test_caller = root / "crates/litchi-iwa/tests/keynote_reader.rs"
+            test_caller.parent.mkdir(parents=True)
+            test_caller.write_text(
+                "fn assert_stats(_: KeynoteDocumentStats) {}\n",
+                encoding="utf-8",
+            )
+            example_caller = root / "crates/litchi-iwa/examples/read_keynote.rs"
+            example_caller.parent.mkdir(parents=True)
+            example_caller.write_text(
+                "use litchi_iwa::keynote::KeynoteDocument;\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.write_text(
+                "Open with `KeynoteDocumentState` and inspect "
+                "`KeynoteDocumentStats`.\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_document_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Keynote document reader local re-export "
+                        "document: crates/litchi-iwa/src/keynote/mod.rs:2",
+                        "retired litchi-iwa Keynote document reader module document: "
+                        "crates/litchi-iwa/src/keynote/mod.rs:1",
+                        "retired litchi-iwa Keynote document reader README reference "
+                        "KeynoteDocumentState: crates/litchi-iwa/README.md:1",
+                        "retired litchi-iwa Keynote document reader README reference "
+                        "KeynoteDocumentStats: crates/litchi-iwa/README.md:1",
+                        "retired litchi-iwa Keynote document reader source returned: "
+                        "crates/litchi-iwa/src/keynote/document.rs",
+                        "retired litchi-iwa Keynote document reader rustdoc reference "
+                        "KeynoteDocumentStats: crates/litchi-iwa/src/legacy_keynote.rs:3",
+                        "retired litchi-iwa Keynote document reader type usage "
+                        "KeynoteDocument: crates/litchi-iwa/examples/read_keynote.rs:1",
+                        "retired litchi-iwa Keynote document reader type usage "
+                        "KeynoteDocument: crates/litchi-iwa/src/legacy_keynote.rs:1",
+                        "retired litchi-iwa Keynote document reader type usage "
+                        "KeynoteDocumentState: crates/litchi-iwa/src/legacy_keynote.rs:2",
+                        "retired litchi-iwa Keynote document reader type usage "
+                        "KeynoteDocumentStats: crates/litchi-iwa/tests/keynote_reader.rs:1",
+                    ]
+                ),
+            )
+
+    def test_retired_iwa_keynote_document_rustdoc_references_cannot_return(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / boundaries.IWA_KEYNOTE_MODULE_SOURCE
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "//! Use `KeynoteDocument`.\n"
+                "/// State was `KeynoteDocumentState`.\n"
+                "/** Stats were `KeynoteDocumentStats`. */\n"
+                '#[doc = "Do not restore KeynoteDocument"]\n'
+                "pub struct Reader;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_document_source_topology(root),
+                [
+                    "retired litchi-iwa Keynote document reader rustdoc reference "
+                    "KeynoteDocument: crates/litchi-iwa/src/keynote/mod.rs:1",
+                    "retired litchi-iwa Keynote document reader rustdoc reference "
+                    "KeynoteDocument: crates/litchi-iwa/src/keynote/mod.rs:4",
+                    "retired litchi-iwa Keynote document reader rustdoc reference "
+                    "KeynoteDocumentState: crates/litchi-iwa/src/keynote/mod.rs:2",
+                    "retired litchi-iwa Keynote document reader rustdoc reference "
+                    "KeynoteDocumentStats: crates/litchi-iwa/src/keynote/mod.rs:3",
+                ],
+            )
+
+    def test_retired_iwa_keynote_document_module_and_reexport_variants(
+        self,
+    ) -> None:
+        declarations = (
+            ("mod document;", "module document"),
+            ("pub(crate) mod r#document;", "module document"),
+            ("pub\nmod\ndocument\n{}", "module document"),
+            ("pub use document::*;", "local re-export document"),
+            ("pub(crate) use self::r#document as legacy;", "local re-export document"),
+        )
+        for declaration, fragment in declarations:
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    module = root / boundaries.IWA_KEYNOTE_MODULE_SOURCE
+                    module.parent.mkdir(parents=True)
+                    module.write_text(declaration + "\n", encoding="utf-8")
+
+                    violations = (
+                        boundaries.audit_iwa_keynote_document_source_topology(root)
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(fragment, violations[0])
+
+    def test_iwa_keynote_document_reader_policy_allows_builder_and_focused_reader(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            module = root / boundaries.IWA_KEYNOTE_MODULE_SOURCE
+            module.parent.mkdir(parents=True)
+            module.write_text(
+                "pub use creation::KeynoteDocumentBuilder;\n"
+                "pub use litchi_keynote::document::Document;\n"
+                "pub use litchi_keynote::Package;\n",
+                encoding="utf-8",
+            )
+            for relative in (
+                Path("crates/litchi-iwa/src/keynote/creation.rs"),
+                Path("crates/litchi-iwa/tests/generated_roundtrip.rs"),
+                Path("crates/litchi-iwa/examples/create_keynote.rs"),
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "use litchi_iwa::keynote::KeynoteDocumentBuilder;\n"
+                    "use litchi_keynote::{Package, document::Document};\n"
+                    "pub struct KeynoteDocuments;\n"
+                    "pub struct LegacyKeynoteDocumentStats;\n"
+                    "// KeynoteDocument and KeynoteDocumentState are retired.\n",
+                    encoding="utf-8",
+                )
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.write_text(
+                "Use `KeynoteDocumentBuilder`, `litchi_keynote::Package`, or "
+                "`litchi_keynote::document::Document`.\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_document_source_topology(root), []
+            )
+
     def test_retired_iwa_keynote_show_settings_inventory_is_exact(self) -> None:
         self.assertEqual(
             boundaries.RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_METHODS,

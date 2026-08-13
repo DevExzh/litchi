@@ -3162,3 +3162,60 @@ and reopened their exact paths. The UI showed page 1's Section Background as
 `Color Fill` / `dark red 34` for replacement and `No Fill` for clear. This is
 focused field-30 acceptance only, not a claim about broader Pages ownership or
 about the locality of Pages' own resave.
+
+## 2026-08-13 amendment: Keynote reader ownership
+
+Keynote now has an explicit two-layer reader boundary. `litchi_keynote::Document`
+is the canonical semantic reader for both complete ZIP artifacts and frozen
+app-authored package directories. Its `open` and `open_with_options` paths
+capture a checked `PreparedSource`, eagerly finish the bounded semantic
+projection, and publish an archive-free full `Show`, rooted text,
+source-derived metadata, and source `Stats`. For every source-backed
+`Document`, metadata combines semantic Show fields with narrowly decoded scalar
+values from canonical `Metadata/Properties.plist` when that diagnostic exists;
+`Some` does not prove the sidecar was present. The cross-format
+`litchi::iwork::Document` coordinator may delegate Keynote
+semantic reads through the same frozen-source boundary. By contrast,
+`litchi_keynote::Package` remains the exact complete regular-file artifact
+owner for byte ingress, writing, and editing; direct `Package::open` refuses
+directories rather than assigning exact-artifact provenance to them. The
+host's 933-line
+`keynote/document.rs`, `keynote::document` module, `KeynoteDocument` re-export,
+and `KeynoteDocument`/`KeynoteDocumentStats` types are removed. This also
+deletes the duplicate host `Bundle`, `ObjectIndex`, `OnceLock<Document>`,
+root/show/slide graph traversal, text extraction, and eager-Prost decoding of
+Show, SlideNode, Slide, drawable, note, build, transition, and storage payloads.
+
+The focused crate therefore owns every supported read capability across its
+two surfaces: semantic path ingress, snapshots, text, slides, metadata, show,
+validation, and source statistics on `Document`; exact ZIP path/byte ingress,
+semantic projection, cheap shared `semantic_snapshot`, and exact write/edit
+provenance on `Package`. The package-derived semantic snapshot is intentionally
+diagnostic-free: its `metadata()` and `stats()` are `None`. The old
+`from_archive_bytes` was only a second name for `from_bytes`; exact byte callers
+use `Package::from_bytes`. The
+old stats `application` field was a constant `Keynote`, so focused `Stats`
+retains the meaningful measurements without that field. A directory semantic
+snapshot intentionally does not represent or promise preservation of other
+sidecars, `Data/`, previews, or complete package bytes.
+
+This is not a claim that the two implementations produced identical internal
+objects. Focused text follows the rooted presentation graph and excludes
+unreachable theme/template storage that the host-wide extractor could include.
+Focused slides preserve rich storage fragments instead of flattening body/date
+content into the old `text_content`, and focused plist metadata and validation
+are intentionally richer and stricter. Metadata authorizes only the canonical
+logical `Metadata/Properties.plist`; unrelated basename matches are ignored.
+Catalog normalization accounts for legacy nested-ZIP wrapper prefixes but does
+not bless arbitrary flat wrapper prefixes. A centralized 64 KiB hard ceiling
+applies to that canonical diagnostic independently of broader source-entry
+limits, and its decoder admits only the narrow scalar fields used by public
+metadata.
+
+The ingress foundations pass 16/16 archive-directory tests and 18/18 detection
+tests. Focused Keynote native coverage passes 7/7, coordinator path parity
+passes 7/7, and the metadata scalar/64 KiB-cap unit gate passes 1/1.
+
+`KeynoteEditor` and `KeynoteDocumentBuilder` remain host owners. Consequently
+the `litchi-iwa -> litchi-keynote` manifest edge and ordered debt 014 remain;
+this retirement removes no dependency declaration.

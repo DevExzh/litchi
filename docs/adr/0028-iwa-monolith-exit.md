@@ -2622,3 +2622,65 @@ and `No Fill` after clear, and retained those states through Save, close, and
 exact-path reopen. The original candidates and exact inverses, as well as the
 Pages-resaved ZIP hashes and post-resave no-op proof, are frozen in ADR 0008.
 Pages' own resave is not asserted to retain byte or member locality.
+
+## 2026-08-13 amendment: Keynote reader host exit
+
+The Keynote read-facade cell exits the monolith. The complete 933-line
+`keynote/document.rs` implementation, its module declaration, and its
+`KeynoteDocument`/`KeynoteDocumentStats` exports are removed. That retires the
+second package capture, object index, semantic cache, eager-Prost show/slide
+decoder, graph resolver, and wide text extractor. The focused package still
+uses six bounded, preflighted Prost decodes during semantic traversal; the
+exit claim is removal of the duplicate eager host reader, not a Prost-free
+focused implementation.
+
+`litchi_keynote::Document::{open, open_with_options}` owns the surviving
+semantic path API for complete ZIPs and frozen app-authored package directories.
+It captures checked `PreparedSource` components and eagerly publishes an
+archive-free full show, rooted text, source-derived metadata, and source
+statistics. For a source-backed `Document`, metadata and statistics are
+present; metadata combines semantic Show values with narrowly decoded
+canonical-properties scalars when that diagnostic exists, so `Some` does not
+prove sidecar presence. `litchi_keynote::Package` remains the exact regular-file
+artifact owner for path/byte ingress, semantic projection, cheap shared
+`semantic_snapshot`, exact `write_to`, and edit provenance. The package-derived
+semantic snapshot is intentionally diagnostic-free, with `metadata()` and
+`stats()` both `None`. Direct
+`Package::open` refuses directory backing because an `Index.zip` or loose
+`Index/` is not the complete artifact required for those operations. The
+cross-format coordinator can delegate semantic reads through the same focused
+boundary. The removed `from_archive_bytes` name was a direct alias for
+`from_bytes`; the removed application statistic was always the constant
+`Keynote`. No compatibility alias preserves either redundancy, and semantic
+directory snapshots do not promise preservation of other sidecars, `Data/`,
+previews, or exact package bytes.
+
+This is capability parity with deliberate semantic correction, not structural
+equality. Focused text follows rooted presentation reachability, slides retain
+rich storage fragments instead of flattened legacy body/date text, and focused
+metadata/validation are richer and stricter. Canonical logical
+`Metadata/Properties.plist` lookup ignores hostile basename-only near-names.
+That diagnostic has a centralized 64 KiB hard admission ceiling independent of
+broader entry limits, and only public-metadata scalar fields are decoded.
+The generated roundtrip, host compile/lint/doctest, focused path, native
+fixture, and boundary gates cover the retired surface and replacement paths.
+The fixed Apple-authored read-only fixture is
+500,058 bytes with SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+The live retired-reader audit reports zero findings, and the full checker
+continues to distinguish its dependency-policy baseline findings. Permanent
+path tests prove packaged/directory semantic parity through both focused
+`Document` and the coordinator, and match the directory snapshot to the focused
+ZIP reader.
+Frozen ingress and semantic gates pass archive-directory 16/16, detection
+18/18, focused Keynote native 7/7, coordinator `iwork_path` 7/7, and metadata
+scalar/64 KiB-cap unit coverage 1/1.
+Keynote 14.4 read-only acceptance on an isolated copy showed the one expected
+slide and its title/body/date sentinels without repair, recovery, or conversion
+warning. Separately, the non-UI focused native-fixture gate reports one slide
+and 959 objects. Native autosave normalized only the
+disposable copy, so no claim is made that native open is byte-inert.
+
+The monolith exit remains incomplete. `KeynoteEditor` and
+`KeynoteDocumentBuilder` still live in `litchi-iwa`, so the manifest edge and
+ordered debt 014 remain unchanged.

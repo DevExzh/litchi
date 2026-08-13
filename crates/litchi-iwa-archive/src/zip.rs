@@ -3,6 +3,7 @@ use std::ops::Range;
 use soapberry_zip::office::{ArchiveLimits as ZipLimits, ArchiveReader};
 use soapberry_zip::{ZipArchive as RawZipArchive, ZipFileHeaderRecord};
 
+use crate::catalog::DirectoryIndexReport;
 use crate::catalog::{Component, parse_component};
 use crate::{Error, Limits, Result};
 
@@ -205,6 +206,56 @@ impl<'data> ZipArchive<'data> {
 
     pub(crate) const fn base_offset(&self) -> u64 {
         self.base_offset
+    }
+
+    pub(crate) fn directory_index_report(&self) -> Result<DirectoryIndexReport> {
+        let mut entries = 0usize;
+        let mut metadata_bytes = 0u64;
+        let mut expanded_bytes = 0u64;
+        for entry in &self.physical_entries {
+            let local = &entry.local_header;
+            let central = &entry.central_header;
+            let metadata = local
+                .name
+                .len()
+                .checked_add(local.extra.len())
+                .and_then(|value| value.checked_add(central.name.len()))
+                .and_then(|value| value.checked_add(central.extra.len()))
+                .and_then(|value| value.checked_add(central.comment.len()))
+                .ok_or_else(|| {
+                    Error::InvalidBundle(
+                        "directory index metadata length overflowed usize".to_owned(),
+                    )
+                })?;
+            metadata_bytes = metadata_bytes
+                .checked_add(u64::try_from(metadata).map_err(|_error| {
+                    Error::InvalidBundle(
+                        "directory index metadata length does not fit u64".to_owned(),
+                    )
+                })?)
+                .ok_or_else(|| {
+                    Error::InvalidBundle(
+                        "directory index metadata length overflowed u64".to_owned(),
+                    )
+                })?;
+            if !entry.is_directory() {
+                entries = entries.checked_add(1).ok_or_else(|| {
+                    Error::InvalidBundle("directory index entry count overflowed usize".to_owned())
+                })?;
+                expanded_bytes = expanded_bytes
+                    .checked_add(entry.uncompressed_size())
+                    .ok_or_else(|| {
+                        Error::InvalidBundle(
+                            "directory index expanded length overflowed u64".to_owned(),
+                        )
+                    })?;
+            }
+        }
+        Ok(DirectoryIndexReport {
+            entries,
+            metadata_bytes,
+            expanded_bytes,
+        })
     }
 }
 
