@@ -56,6 +56,31 @@ fn build_package(
     zip.finish().unwrap().into_inner()
 }
 
+fn remove_first_central_extra(mut source: Vec<u8>) -> Vec<u8> {
+    let archive = soapberry_zip::ZipArchive::from_slice(&source).unwrap();
+    let eocd = archive.eocd_offset() as usize;
+    let first = archive.entries().next().unwrap().unwrap();
+    let record_start = first.central_directory_offset() as usize;
+    let name_len =
+        u16::from_le_bytes([source[record_start + 28], source[record_start + 29]]) as usize;
+    let extra_len =
+        u16::from_le_bytes([source[record_start + 30], source[record_start + 31]]) as usize;
+    assert!(extra_len > 0);
+    let extra_start = record_start + 46 + name_len;
+    let extra_end = extra_start + extra_len;
+    let mut output = Vec::with_capacity(source.len() - extra_len);
+    output.extend_from_slice(&source[..extra_start]);
+    output.extend_from_slice(&source[extra_end..eocd]);
+    output.extend_from_slice(&source[eocd..]);
+    output[record_start + 30..record_start + 32].copy_from_slice(&[0, 0]);
+    let new_eocd = eocd - extra_len;
+    let central_size = u32::from_le_bytes(output[new_eocd + 12..new_eocd + 16].try_into().unwrap());
+    output[new_eocd + 12..new_eocd + 16]
+        .copy_from_slice(&(central_size - extra_len as u32).to_le_bytes());
+    source.clear();
+    output
+}
+
 fn valid_package(mimetype: &str, family: &str) -> Vec<u8> {
     build_package(
         mimetype,
@@ -63,6 +88,31 @@ fn valid_package(mimetype: &str, family: &str) -> Vec<u8> {
         content(family, "", "").as_bytes(),
         &[],
     )
+}
+
+fn repairable_mimetype_package() -> Vec<u8> {
+    let mimetype = "application/vnd.oasis.opendocument.text";
+    let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
+    let mut mimetype_options =
+        FullFileOptions::default().compression_method(CompressionMethod::Stored);
+    mimetype_options
+        .add_extra_data(0x5455, [1, 0, 0, 0, 0], false)
+        .unwrap();
+    zip.start_file("mimetype", mimetype_options).unwrap();
+    zip.write_all(mimetype.as_bytes()).unwrap();
+    zip.start_file(
+        "META-INF/manifest.xml",
+        SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
+    )
+    .unwrap();
+    zip.write_all(manifest(mimetype, "").as_bytes()).unwrap();
+    zip.start_file(
+        "content.xml",
+        SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
+    )
+    .unwrap();
+    zip.write_all(content("text", "", "").as_bytes()).unwrap();
+    remove_first_central_extra(zip.finish().unwrap().into_inner())
 }
 
 fn status<'a>(report: &'a litchi_core::ValidateReport, id: &str) -> &'a CheckStatus {
@@ -287,9 +337,83 @@ fn mimetype_local_header_extra_fields_are_a_layout_error() {
     )
     .unwrap();
     zip.write_all(content("text", "", "").as_bytes()).unwrap();
-    let bytes = zip.finish().unwrap().into_inner();
+    let bytes = remove_first_central_extra(zip.finish().unwrap().into_inner());
     let report = validate_package(&bytes).unwrap();
     assert!(has_code(&report, "odf.mimetype.layout"));
+}
+
+#[test]
+fn one_valid_extended_timestamp_gets_the_narrow_repair_diagnostic() {
+    let mimetype = "application/vnd.oasis.opendocument.text";
+    let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
+    let mut mimetype_options =
+        FullFileOptions::default().compression_method(CompressionMethod::Stored);
+    mimetype_options
+        .add_extra_data(0x5455, [1, 0, 0, 0, 0], false)
+        .unwrap();
+    zip.start_file("mimetype", mimetype_options).unwrap();
+    zip.write_all(mimetype.as_bytes()).unwrap();
+    zip.start_file(
+        "META-INF/manifest.xml",
+        SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
+    )
+    .unwrap();
+    zip.write_all(manifest(mimetype, "").as_bytes()).unwrap();
+    zip.start_file(
+        "content.xml",
+        SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
+    )
+    .unwrap();
+    zip.write_all(content("text", "", "").as_bytes()).unwrap();
+    let bytes = remove_first_central_extra(zip.finish().unwrap().into_inner());
+    let report = validate_package(&bytes).unwrap();
+    assert!(has_code(&report, "odf.mimetype.local_header_extra"));
+    let issue = report
+        .issues()
+        .iter()
+        .find(|issue| issue.code() == "odf.mimetype.local_header_extra")
+        .unwrap();
+    assert_eq!(
+        issue.repair().repair_id(),
+        Some("odf.repair.mimetype_local_extra")
+    );
+    assert_eq!(issue.evidence().len(), 2);
+}
+
+#[test]
+fn mimetype_header_mismatches_never_advertise_the_repair() {
+    let base = repairable_mimetype_package();
+    let archive = soapberry_zip::ZipArchive::from_slice(&base).unwrap();
+    let first = archive.entries().next().unwrap().unwrap();
+    let local = first.local_header_offset() as usize;
+    let central = first.central_directory_offset() as usize;
+
+    let mut crc_mismatch = base.clone();
+    crc_mismatch[local + 14] ^= 1;
+    let report = validate_package(&crc_mismatch).unwrap();
+    assert!(!has_code(&report, "odf.mimetype.local_header_extra"));
+
+    let mut size_mismatch = base.clone();
+    size_mismatch[local + 22] ^= 1;
+    let report = validate_package(&size_mismatch).unwrap();
+    assert!(!has_code(&report, "odf.mimetype.local_header_extra"));
+
+    let mut name_mismatch = base.clone();
+    name_mismatch[local + 30] = b'M';
+    let report = validate_package(&name_mismatch).unwrap();
+    assert!(!has_code(&report, "odf.mimetype.local_header_extra"));
+    assert!(has_code(&report, "odf.mimetype.layout") || has_code(&report, "odf.zip.invalid"));
+
+    let mut descriptor_flags = base;
+    let local_flags =
+        u16::from_le_bytes([descriptor_flags[local + 6], descriptor_flags[local + 7]]);
+    let central_flags =
+        u16::from_le_bytes([descriptor_flags[central + 8], descriptor_flags[central + 9]]);
+    descriptor_flags[local + 6..local + 8].copy_from_slice(&(local_flags | 0x08).to_le_bytes());
+    descriptor_flags[central + 8..central + 10]
+        .copy_from_slice(&(central_flags | 0x08).to_le_bytes());
+    let report = validate_package(&descriptor_flags).unwrap();
+    assert!(!has_code(&report, "odf.mimetype.local_header_extra"));
 }
 
 #[test]

@@ -21,10 +21,16 @@ pub mod media;
 pub mod namespace;
 pub mod package;
 pub mod rdf;
+pub mod repair;
 pub mod signature;
 pub mod style;
 pub mod validation;
 
+pub use repair::{
+    MIMETYPE_LOCAL_EXTRA_ISSUE, MIMETYPE_LOCAL_EXTRA_REPAIR, MimetypeRepairPlan, OdfRepairLimits,
+    OutputProgress as RepairOutputProgress, RemoveMimetypeLocalExtra, RepairError,
+    RepairFingerprint, RepairPublication, plan_mimetype_local_extra, plan_mimetype_repair,
+};
 pub use validation::{
     DEFAULT_ODF_VALIDATION_LIMITS, OdfValidationError, OdfValidationLimits, validate_package,
     validate_package_with_limits,

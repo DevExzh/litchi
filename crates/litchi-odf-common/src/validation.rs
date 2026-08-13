@@ -2,8 +2,10 @@
 //!
 //! The validator indexes ZIP metadata and materializes only `mimetype`, the
 //! package manifest, and `content.xml`. It does not decrypt content, verify
-//! signatures, execute macros, fetch links, validate a document family's
-//! semantics, or offer repairs.
+//! signatures, execute macros, fetch links, or validate a document family's
+//! semantics. One otherwise-valid `mimetype` local-extra issue is identified
+//! with a separate repair ID; execution belongs to the bounded `repair`
+//! module.
 
 use std::{collections::HashSet, error::Error, fmt, str};
 
@@ -37,8 +39,9 @@ const CONTENT_PATH: &str = "content.xml";
 const MIMETYPE_PATH: &str = "mimetype";
 const DOCUMENT_SIGNATURE_PATH: &str = "META-INF/documentsignatures.xml";
 const MACRO_SIGNATURE_PATH: &str = "META-INF/macrosignatures.xml";
-const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
+pub(crate) const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
 const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
+const MIMETYPE_REPAIR_ID: &str = "odf.repair.mimetype_local_extra";
 
 /// Default finite bounds for generic ODF validation.
 pub const DEFAULT_ODF_VALIDATION_LIMITS: OdfValidationLimits = OdfValidationLimits {
@@ -91,6 +94,27 @@ impl OdfValidationLimits {
     #[must_use]
     pub const fn with_max_archive_entry_bytes(mut self, maximum: u64) -> Self {
         self.archive.max_entry_size = maximum;
+        self
+    }
+
+    /// Returns a copy with a new per-member compressed-size ceiling.
+    #[must_use]
+    pub const fn with_max_archive_compressed_bytes(mut self, maximum: u64) -> Self {
+        self.archive.max_compressed_size = maximum;
+        self
+    }
+
+    /// Returns a copy with a new aggregate uncompressed ZIP-size ceiling.
+    #[must_use]
+    pub const fn with_max_archive_total_bytes(mut self, maximum: u64) -> Self {
+        self.archive.max_total_size = maximum;
+        self
+    }
+
+    /// Returns a copy with a new raw member-name ceiling.
+    #[must_use]
+    pub const fn with_max_archive_member_name_bytes(mut self, maximum: u64) -> Self {
+        self.archive.max_member_name_bytes = maximum;
         self
     }
 
@@ -256,8 +280,10 @@ pub fn validate_package(data: &[u8]) -> Result<ValidateReport, OdfValidationErro
 /// A configured input, ZIP, manifest, or XML ceiling is represented by the
 /// affected capability's `Blocked` status. Structural rejection is instead a
 /// completed check with a deterministic issue. Signature cryptography, macro
-/// behavior, semantic document validity, repair, and external fetching are not
-/// capabilities of this function.
+/// behavior, semantic document validity, and external fetching are not
+/// capabilities of this function. The one supported `mimetype` local-extra
+/// diagnostic is only an authorization hint for the separate repair module;
+/// it does not execute a repair.
 ///
 /// # Errors
 ///
@@ -359,6 +385,8 @@ pub fn validate_package_with_limits(
         &archive,
         input_limits,
         report_limits,
+        source_size,
+        data,
         &mut state,
     )?;
     if let Some(declarations) = declarations.as_ref() {
@@ -483,6 +511,8 @@ fn inspect_declarations(
     archive: &ArchiveReader<'_>,
     input_limits: OdfValidationLimits,
     report_limits: ValidationLimits,
+    source_size: u64,
+    source: &[u8],
     state: &mut ValidationState,
 ) -> Result<Option<Declarations>, OdfValidationError> {
     if !archive.contains(MIMETYPE_PATH) || !archive.contains(MANIFEST_PATH) {
@@ -698,15 +728,31 @@ fn inspect_declarations(
             report_limits,
         )?)?;
     }
-    if archive.file_names().next() != Some(MIMETYPE_PATH)
-        || archive.is_stored(MIMETYPE_PATH).ok() != Some(true)
-        || raw_catalog.mimetype_local_extra
-    {
+    let first_and_stored = raw_catalog.mimetype_central_first
+        && archive.is_stored(MIMETYPE_PATH).ok() == Some(true)
+        && raw_catalog.mimetype_local_first;
+    if !first_and_stored {
         state.push_issue(simple_issue(
             DECLARATIONS,
             "odf.mimetype.layout",
             IssueSeverity::Error,
             "The ODF mimetype member must be first, stored, and have no local-header extra field.",
+            MIMETYPE_PATH,
+            CompatibilityImpact::Interoperability,
+            report_limits,
+        )?)?;
+    } else if raw_catalog.mimetype_repairable {
+        state.push_issue(mimetype_extra_issue(
+            source_size,
+            EvidenceDigest::of(source),
+            report_limits,
+        )?)?;
+    } else if raw_catalog.mimetype_local_extra {
+        state.push_issue(simple_issue(
+            DECLARATIONS,
+            "odf.mimetype.layout",
+            IssueSeverity::Error,
+            "The ODF mimetype local-header extra field is not a supported bounded repair target.",
             MIMETYPE_PATH,
             CompatibilityImpact::Interoperability,
             report_limits,
@@ -1397,7 +1443,7 @@ fn inspect_xml(
     }
 }
 
-fn valid_xml_reference(reference: &BytesRef<'_>) -> bool {
+pub(crate) fn valid_xml_reference(reference: &BytesRef<'_>) -> bool {
     let bytes: &[u8] = reference;
     matches!(bytes, b"amp" | b"lt" | b"gt" | b"apos" | b"quot")
         || (reference.is_char_ref()
@@ -1461,7 +1507,7 @@ fn trim_xml_schema_whitespace(mut value: &[u8]) -> &[u8] {
     value
 }
 
-fn safe_package_href(value: &[u8]) -> bool {
+pub(crate) fn safe_package_href(value: &[u8]) -> bool {
     if !decoded_href_is_utf8(value) {
         return false;
     }
@@ -1649,6 +1695,9 @@ fn decoded_href_is_utf8(value: &[u8]) -> bool {
 struct RawCatalogObservations {
     hostile_paths: u64,
     mimetype_local_extra: bool,
+    mimetype_repairable: bool,
+    mimetype_local_first: bool,
+    mimetype_central_first: bool,
 }
 
 fn inspect_raw_catalog(
@@ -1658,12 +1707,33 @@ fn inspect_raw_catalog(
     let archive = ZipArchive::from_slice(data)?;
     let mut hostile_paths = 0_u64;
     let mut mimetype_local_extra = false;
+    let mut mimetype_local_extra_repairable = false;
+    let mut mimetype_central_extra = false;
+    let mut first_local_offset = None;
+    let mut mimetype_local_offset = None;
+    let mut next_local_offset = None;
+    let mut mimetype_count = 0_usize;
+    let mut mimetype_local_header_valid = false;
+    let mut mimetype_local_payload_end = None;
+    let mut first_central_name_is_mimetype = false;
+    let mut first_central_seen = false;
     let mut files = 0_usize;
     let mut metadata_bytes = 0_u64;
     let mut total_size = 0_u64;
     for entry in archive.entries() {
         let entry = entry?;
         let raw_path = entry.file_path();
+        if !first_central_seen {
+            first_central_seen = true;
+            first_central_name_is_mimetype = raw_path.as_ref() == MIMETYPE_PATH.as_bytes();
+        }
+        let local_offset = entry.local_header_offset();
+        first_local_offset =
+            Some(first_local_offset.map_or(local_offset, |first: u64| first.min(local_offset)));
+        if local_offset > 0 {
+            next_local_offset =
+                Some(next_local_offset.map_or(local_offset, |next: u64| next.min(local_offset)));
+        }
         let name_bytes = raw_path.as_ref().len() as u64;
         enforce_zip_limit(
             LimitResource::MemberNameBytes,
@@ -1686,8 +1756,87 @@ fn inspect_raw_catalog(
             hostile_paths = hostile_paths.saturating_add(1);
         }
         if raw_path.as_ref() == MIMETYPE_PATH.as_bytes() {
+            mimetype_count = mimetype_count.saturating_add(1);
+            mimetype_local_offset = Some(local_offset);
+            let mut central_fields = entry.extra_fields();
+            mimetype_central_extra =
+                central_fields.next().is_some() || !central_fields.remaining_bytes().is_empty();
             let local = archive.get_entry(entry.wayfinder())?;
-            mimetype_local_extra = !local.extra_fields().remaining_bytes().is_empty();
+            let mut fields = local.extra_fields();
+            if fields.next().is_some() || !fields.remaining_bytes().is_empty() {
+                mimetype_local_extra = true;
+                mimetype_local_extra_repairable =
+                    is_repairable_mimetype_extra(local.extra_fields());
+            }
+
+            // Keep the repair authorization predicate in lockstep with the
+            // raw repair layout. In particular, this rejects descriptors,
+            // flag/compression/CRC/size mismatches, and any opaque bytes after
+            // the first stored payload before advertising the sole repair
+            // diagnostic.
+            let local_start = usize::try_from(local_offset).ok();
+            let local_fixed = local_start
+                .and_then(|start| start.checked_add(30).and_then(|end| data.get(start..end)));
+            let central_start = usize::try_from(entry.central_directory_offset()).ok();
+            let central_fixed = central_start
+                .and_then(|start| start.checked_add(46).and_then(|end| data.get(start..end)));
+            if let (Some(local_fixed), Some(central_fixed)) = (local_fixed, central_fixed) {
+                let local_flags = validation_le_u16(local_fixed, 6);
+                let central_flags = validation_le_u16(central_fixed, 8);
+                let local_compression = validation_le_u16(local_fixed, 8);
+                let central_compression = validation_le_u16(central_fixed, 10);
+                let local_name_len = validation_le_u16(local_fixed, 26).map(usize::from);
+                let local_extra_len = validation_le_u16(local_fixed, 28).map(usize::from);
+                let central_name_len = validation_le_u16(central_fixed, 28).map(usize::from);
+                let local_payload_end =
+                    local_name_len
+                        .zip(local_extra_len)
+                        .and_then(|(name_len, extra_len)| {
+                            30usize
+                                .checked_add(name_len)
+                                .and_then(|header_end| header_end.checked_add(extra_len))
+                                .and_then(|payload_start| {
+                                    usize::try_from(entry.compressed_size_hint())
+                                        .ok()
+                                        .and_then(|size| payload_start.checked_add(size))
+                                })
+                        });
+                let local_name = local_name_len.and_then(|name_len| {
+                    local_start.and_then(|start| {
+                        let name_start = start.checked_add(30)?;
+                        data.get(name_start..name_start.checked_add(name_len)?)
+                    })
+                });
+                let central_name = central_name_len.and_then(|name_len| {
+                    data.get(
+                        central_start?.checked_add(46)?
+                            ..central_start?.checked_add(46usize.checked_add(name_len)?)?,
+                    )
+                });
+                let local_crc = validation_le_u32(local_fixed, 14);
+                let central_crc = validation_le_u32(central_fixed, 16);
+                let local_compressed = validation_le_u32(local_fixed, 18);
+                let local_uncompressed = validation_le_u32(local_fixed, 22);
+                let central_compressed = validation_le_u32(central_fixed, 20);
+                let central_uncompressed = validation_le_u32(central_fixed, 24);
+                let entry_compressed = u32::try_from(entry.compressed_size_hint()).ok();
+                let entry_uncompressed = u32::try_from(entry.uncompressed_size_hint()).ok();
+                mimetype_local_payload_end = local_payload_end.map(|end| end as u64);
+                mimetype_local_header_valid = le_u32_validation(local_fixed, 0)
+                    == Some(0x0403_4b50)
+                    && local_flags == central_flags
+                    && local_flags.is_some_and(|flags| flags & !0x0800 == 0)
+                    && local_compression == Some(0)
+                    && central_compression == Some(0)
+                    && local_name == Some(MIMETYPE_PATH.as_bytes())
+                    && central_name == Some(MIMETYPE_PATH.as_bytes())
+                    && local_name_len == central_name_len
+                    && local_crc == central_crc
+                    && local_compressed == central_compressed
+                    && local_uncompressed == central_uncompressed
+                    && local_compressed == entry_compressed
+                    && local_uncompressed == entry_uncompressed;
+            }
         }
         if entry.is_dir() {
             continue;
@@ -1711,10 +1860,73 @@ fn inspect_raw_catalog(
         total_size = total_size.saturating_add(entry.uncompressed_size_hint());
         enforce_zip_limit(LimitResource::TotalSize, total_size, limits.max_total_size)?;
     }
+    let local_span_end = next_local_offset.unwrap_or_else(|| {
+        // `directory_offset` is a parsed ZIP offset and is therefore already
+        // bounded by the caller's successful archive parse.
+        archive.directory_offset()
+    });
+    let mimetype_repairable = mimetype_count == 1
+        && first_central_name_is_mimetype
+        && mimetype_local_offset == Some(0)
+        && mimetype_local_offset == first_local_offset
+        && mimetype_local_header_valid
+        && mimetype_local_extra_repairable
+        && !mimetype_central_extra
+        && mimetype_local_payload_end == Some(local_span_end);
     Ok(RawCatalogObservations {
         hostile_paths,
         mimetype_local_extra,
+        mimetype_repairable,
+        mimetype_local_first: mimetype_local_offset == Some(0)
+            && mimetype_local_offset == first_local_offset,
+        mimetype_central_first: first_central_name_is_mimetype,
     })
+}
+
+fn validation_le_u16(bytes: &[u8], offset: usize) -> Option<u16> {
+    bytes
+        .get(offset..offset.checked_add(2)?)
+        .and_then(|slice| slice.try_into().ok())
+        .map(u16::from_le_bytes)
+}
+
+fn validation_le_u32(bytes: &[u8], offset: usize) -> Option<u32> {
+    bytes
+        .get(offset..offset.checked_add(4)?)
+        .and_then(|slice| slice.try_into().ok())
+        .map(u32::from_le_bytes)
+}
+
+fn le_u32_validation(bytes: &[u8], offset: usize) -> Option<u32> {
+    validation_le_u32(bytes, offset)
+}
+
+fn is_repairable_mimetype_extra(mut fields: soapberry_zip::extra_fields::ExtraFields<'_>) -> bool {
+    // The only local metadata this narrow repair is willing to remove is one
+    // well-formed Extended Timestamp field.  No unknown, repeated, or
+    // malformed field is silently discarded.
+    let mut seen = false;
+    for (id, body) in fields.by_ref() {
+        if seen || id != soapberry_zip::extra_fields::ExtraFieldId::EXTENDED_TIMESTAMP {
+            return false;
+        }
+        seen = true;
+        if !valid_extended_timestamp(body) {
+            return false;
+        }
+    }
+    seen && fields.remaining_bytes().is_empty()
+}
+
+fn valid_extended_timestamp(body: &[u8]) -> bool {
+    let Some(&flags) = body.first() else {
+        return false;
+    };
+    if flags & !0b111 != 0 {
+        return false;
+    }
+    let timestamps = flags.count_ones() as usize;
+    body.len() == 1 + timestamps * 4
 }
 
 fn central_file_comment_len(data: &[u8], central_offset: u64) -> u64 {
@@ -1943,6 +2155,33 @@ fn simple_issue(
         None,
         compatibility,
         RepairAvailability::Unavailable,
+        limits,
+    )
+    .map_err(Into::into)
+}
+
+fn mimetype_extra_issue(
+    source_size: u64,
+    source_digest: EvidenceDigest,
+    limits: ValidationLimits,
+) -> Result<ValidationIssue, OdfValidationError> {
+    ValidationIssue::try_new(
+        id(DECLARATIONS, limits)?,
+        "odf.mimetype.local_header_extra",
+        IssueSeverity::Error,
+        "The ODF mimetype has one recognized removable local-header extra field.",
+        [location(MIMETYPE_PATH, limits)?],
+        [
+            IssueEvidence::try_new("source_size", EvidenceValue::Size(source_size), limits)?,
+            IssueEvidence::try_new(
+                "source_sha256",
+                EvidenceValue::Sha256(source_digest),
+                limits,
+            )?,
+        ],
+        None,
+        CompatibilityImpact::Interoperability,
+        RepairAvailability::available(MIMETYPE_REPAIR_ID, limits)?,
         limits,
     )
     .map_err(Into::into)
