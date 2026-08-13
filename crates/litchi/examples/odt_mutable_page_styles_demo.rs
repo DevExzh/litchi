@@ -1,11 +1,13 @@
-#[cfg(feature = "odf")]
+#[cfg(feature = "odt")]
 use litchi::Result;
-#[cfg(feature = "odf")]
+#[cfg(feature = "odt")]
+use litchi::common::Position;
+#[cfg(feature = "odt")]
 use litchi::odt::mutable::MutableDocument;
-#[cfg(feature = "odf")]
+#[cfg(feature = "odt")]
 use litchi::odt::{Builder, Document};
 
-#[cfg(feature = "odf")]
+#[cfg(feature = "odt")]
 fn main() -> Result<()> {
     let base_file = "odt_mutable_page_styles_base.odt";
     let output_file = "odt_mutable_page_styles_demo.odt";
@@ -19,10 +21,7 @@ fn main() -> Result<()> {
     let document = Document::open(base_file)?;
     let mut mutable = MutableDocument::from_document(document)?;
 
-    mutable.replace_paragraph_at(
-        litchi::common::Position::new(0),
-        "Mutable ODT Demo (reopened and updated)",
-    )?;
+    mutable.replace_paragraph_at(Position::new(0), "Mutable ODT Demo (reopened and updated)")?;
 
     mutable.add_paragraph(
         "The reopened document now includes extra paragraphs added through MutableDocument.",
@@ -40,5 +39,5 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(feature = "odf"))]
+#[cfg(not(feature = "odt"))]
 fn main() {}
