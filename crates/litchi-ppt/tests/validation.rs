@@ -570,6 +570,30 @@ fn oversized_current_user_never_reads_powerpoint_document_payload() {
 }
 
 #[test]
+fn out_of_bounds_current_edit_never_reads_powerpoint_document_payload() {
+    let document = valid_stream(false, &[record(0, 0, 0x2222, &[0xA5; 8 * 1024])]);
+    let current = current_user(u32::try_from(document.len()).unwrap(), false);
+    let bytes = package_with_streams(false, &document, &current, &[]);
+    let (document_range, _) = fat_stream_range_and_size(&bytes, "PowerPoint Document");
+    let source = Arc::new(RejectRangesSource::new(bytes, [document_range]));
+
+    let report = validate_source(source).unwrap();
+    assert!(
+        !check(&report, "ppt.current_user.stream")
+            .status()
+            .is_complete()
+    );
+    assert!(!check(&report, "ppt.record.parse").status().is_complete());
+    assert!(
+        report
+            .issues()
+            .iter()
+            .any(|issue| issue.code() == "ppt.current_user.edit_offset_out_of_bounds"),
+        "{report:?}"
+    );
+}
+
+#[test]
 fn current_user_parser_resource_limit_blocks_without_document_read() {
     let document = valid_stream(false, &[record(0, 0, 0x2222, &[0xA5; 8 * 1024])]);
     let edit_offset = u32::try_from(document.len() - USER_EDIT_RECORD_SIZE).unwrap();
