@@ -13804,8 +13804,13 @@ fn run_opc_source_cache_contention_cell(
         let (package, budget) =
             opc_cache_package(mode, read_at, cache_limits, memory_limit, worker_count)?;
 
-        for index in prefill_start..timed_start {
-            let data = package.part(&parts[index])?.data()?;
+        for (index, part) in parts
+            .iter()
+            .enumerate()
+            .take(timed_start)
+            .skip(prefill_start)
+        {
+            let data = package.part(part)?.data()?;
             if data.as_bytes()
                 != payload_bytes(
                     PayloadKind::Incompressible,
