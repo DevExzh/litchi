@@ -207,7 +207,24 @@ struct SourceSnapshot {
     version: SourceVersion,
     length: u64,
     monitor_reads: Arc<std::sync::atomic::AtomicBool>,
+    lineage: SourceLineage,
 }
+
+/// Process-local identity for one opened source-backed package lineage.
+///
+/// A lineage is intentionally distinct from [`SourceVersion`]. Two source
+/// adapters may report the same caller-chosen version token while still being
+/// different package instances; patches must never cross that boundary.
+#[derive(Clone, Debug)]
+pub struct SourceLineage(Arc<()>);
+
+impl PartialEq for SourceLineage {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for SourceLineage {}
 
 /// Exact immutable source artifact retained for a later reversible restore.
 #[derive(Clone)]
@@ -268,7 +285,7 @@ impl SourceArtifact {
 
     /// Copy the retained source artifact exactly to a sequential sink.
     pub fn write_to_stream<W: Write>(&self, writer: W) -> Result<()> {
-        write_exact_snapshot(&self.snapshot, writer)
+        write_exact_snapshot(&self.snapshot, writer, None)
     }
 }
 
@@ -333,6 +350,69 @@ impl<W: Write> Write for Counted<'_, W> {
 struct SourceCheckedSink<W> {
     inner: W,
     snapshot: SourceSnapshot,
+}
+
+struct ContextCheckedSink<W> {
+    inner: W,
+    context: Option<ExecutionContext>,
+    failure: Arc<Mutex<Option<ExecutionError>>>,
+}
+
+impl<W: Write> ContextCheckedSink<W> {
+    fn record_failure(&self, error: ExecutionError) {
+        let mut failure = self
+            .failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if failure.is_none() {
+            *failure = Some(error);
+        }
+    }
+
+    fn check_before_write(&self) -> std::io::Result<()> {
+        let Some(context) = self.context.as_ref() else {
+            return Ok(());
+        };
+        context.check().map_err(|error| {
+            let message = error.to_string();
+            self.record_failure(error);
+            // `Write::write_all` retries `Interrupted` indefinitely. Use a
+            // terminal I/O classification; the shared failure slot below
+            // restores the typed execution error after ZIP writing returns.
+            std::io::Error::other(message)
+        })
+    }
+}
+
+impl<W: Write> Write for ContextCheckedSink<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.check_before_write()?;
+        let result = self.inner.write(bytes);
+        if result.is_ok() {
+            // Check after each bounded Chunked write as well. If a sink
+            // cancels from inside its first write, the accepted byte count is
+            // preserved and the next write/flush returns the typed failure.
+            if let Some(context) = self.context.as_ref() {
+                if let Err(error) = context.check() {
+                    self.record_failure(error);
+                }
+            }
+        }
+        result
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.check_before_write()?;
+        let result = self.inner.flush();
+        if result.is_ok() {
+            if let Some(context) = self.context.as_ref() {
+                if let Err(error) = context.check() {
+                    self.record_failure(error);
+                }
+            }
+        }
+        result
+    }
 }
 
 impl<W: Write> Write for SourceCheckedSink<W> {
@@ -966,6 +1046,7 @@ impl SourceBackedPackage {
             version,
             length,
             monitor_reads: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            lineage: SourceLineage(Arc::new(())),
         };
         snapshot
             .ensure_current()
@@ -1130,13 +1211,20 @@ impl SourceBackedPackage {
         let version = source.version()?;
         let length = source.len()?;
         limits.check(ReadResource::InputBytes, length, limits.max_input_bytes())?;
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
         let snapshot = SourceSnapshot {
             source: Arc::clone(&source),
             version,
             length,
             monitor_reads: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            lineage: SourceLineage(Arc::new(())),
         };
         snapshot.ensure_current()?;
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
         let archive = IndexedArchive::from_reader_with_limits(
             SourceReader {
                 snapshot: snapshot.clone(),
@@ -1145,14 +1233,24 @@ impl SourceBackedPackage {
             limits.zip_limits(),
         )?;
         snapshot.ensure_current()?;
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
         let SourceCatalog {
             pkg_srels,
             parts,
             non_part_members,
         } = PackageReader::source_catalog(&archive, limits)?;
         snapshot.ensure_current()?;
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
 
-        let package_relationships = relationships_for_package(pkg_srels)?;
+        let package_relationships =
+            relationships_for_package_with_context(pkg_srels, context.as_ref())?;
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
         let mut catalog_parts = Vec::new();
         catalog_parts
             .try_reserve_exact(parts.len())
@@ -1168,7 +1266,14 @@ impl SourceBackedPackage {
                 source,
             })?;
         for (index, part) in parts.into_iter().enumerate() {
-            let relationships = relationships_for_part(&part.partname, part.srels)?;
+            if let Some(context) = context.as_ref() {
+                context.check().map_err(map_execution_error)?;
+            }
+            let relationships =
+                relationships_for_part_with_context(&part.partname, part.srels, context.as_ref())?;
+            if let Some(context) = context.as_ref() {
+                context.check().map_err(map_execution_error)?;
+            }
             let entry_id = archive
                 .entry_id(part.partname.membername())
                 .ok_or_else(|| OpcError::PartNotFound(part.partname.to_string()))?;
@@ -1179,6 +1284,9 @@ impl SourceBackedPackage {
                 relationships,
                 entry_id,
             });
+        }
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
         }
 
         let cache = context.map_or_else(
@@ -1263,6 +1371,34 @@ impl SourceBackedPackage {
     #[must_use]
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
         self.cache.diagnostics()
+    }
+
+    /// Check the caller-supplied execution policy for a source-backed
+    /// operation.
+    ///
+    /// Compatibility packages have no execution context and therefore always
+    /// pass this check. Managed packages use the check to let a semantic
+    /// facade honor cancellation even when its own parsed value is already
+    /// retained and no new [`PartData`] read is necessary.
+    pub fn check_execution(&self) -> Result<()> {
+        self.cache.check_context().map_err(map_execution_error)
+    }
+
+    /// Return the exact source lineage captured by this package.
+    ///
+    /// The returned token is clone-cheap and cannot be constructed by a
+    /// caller. It lets a semantic facade bind snapshots and patches to this
+    /// opened package rather than to a merely equal [`SourceVersion`].
+    #[must_use]
+    pub fn source_lineage(&self) -> SourceLineage {
+        self.source.lineage.clone()
+    }
+
+    /// Clone the caller-supplied execution context, if this package is on the
+    /// managed path. Compatibility packages return `None`.
+    #[must_use]
+    pub fn execution_context(&self) -> Option<ExecutionContext> {
+        self.cache.context().cloned()
     }
 
     /// Return the exact process-local source identity and revision captured at
@@ -1717,7 +1853,7 @@ impl SourceBackedPackage {
     }
 
     fn write_exact_source<W: Write>(self, writer: W) -> Result<()> {
-        write_exact_snapshot(&self.source, writer)
+        write_exact_snapshot(&self.source, writer, self.cache.context())
     }
 
     fn write_changed_overlays<W: Write>(
@@ -1793,7 +1929,9 @@ impl SourceBackedPackage {
         }
 
         self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
         let mut written = 0_u64;
+        let execution_failure = Arc::new(Mutex::new(None));
         let result = {
             let counted = Counted {
                 inner: writer,
@@ -1803,12 +1941,22 @@ impl SourceBackedPackage {
                 inner: counted,
                 snapshot: self.source.clone(),
             };
-            let result = index.write_to(&plan, Chunked { inner: checked });
+            let cooperative = ContextCheckedSink {
+                inner: checked,
+                context: self.cache.context().cloned(),
+                failure: Arc::clone(&execution_failure),
+            };
+            let result = index.write_to(&plan, Chunked { inner: cooperative });
             match result {
                 Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
                 Err(error) => Err(OpcError::ZipError(error.to_string())),
             }
         };
+        let result = execution_failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+            .map_or(result, |error| Err(map_execution_error(error)));
         finish_source_publication(result, &self.source, written)
     }
 
@@ -2052,8 +2200,18 @@ fn push_xml_escaped(output: &mut String, value: &str) {
 fn relationships_for_package(
     serialized: impl IntoIterator<Item = SerializedRelationship>,
 ) -> Result<Relationships> {
+    relationships_for_package_with_context(serialized, None)
+}
+
+fn relationships_for_package_with_context(
+    serialized: impl IntoIterator<Item = SerializedRelationship>,
+    context: Option<&ExecutionContext>,
+) -> Result<Relationships> {
     let mut relationships = Relationships::new(PACKAGE_URI.to_string());
     for relationship in serialized {
+        if let Some(context) = context {
+            context.check().map_err(map_execution_error)?;
+        }
         relationships.try_add_relationship(
             relationship.reltype,
             relationship.target_ref,
@@ -2068,8 +2226,19 @@ fn relationships_for_part(
     partname: &PackURI,
     serialized: impl IntoIterator<Item = SerializedRelationship>,
 ) -> Result<Relationships> {
+    relationships_for_part_with_context(partname, serialized, None)
+}
+
+fn relationships_for_part_with_context(
+    partname: &PackURI,
+    serialized: impl IntoIterator<Item = SerializedRelationship>,
+    context: Option<&ExecutionContext>,
+) -> Result<Relationships> {
     let mut relationships = Relationships::for_source(partname);
     for relationship in serialized {
+        if let Some(context) = context {
+            context.check().map_err(map_execution_error)?;
+        }
         relationships.try_add_relationship(
             relationship.reltype,
             relationship.target_ref,
@@ -2165,7 +2334,14 @@ fn finish_source_publication(
     }
 }
 
-fn write_exact_snapshot<W: Write>(source: &SourceSnapshot, writer: W) -> Result<()> {
+fn write_exact_snapshot<W: Write>(
+    source: &SourceSnapshot,
+    writer: W,
+    context: Option<&ExecutionContext>,
+) -> Result<()> {
+    if let Some(context) = context {
+        context.check().map_err(map_execution_error)?;
+    }
     source.monitor_publication();
     source.ensure_current()?;
     let mut buffer = Vec::new();
@@ -2189,6 +2365,9 @@ fn write_exact_snapshot<W: Write>(source: &SourceSnapshot, writer: W) -> Result<
         let mut offset = 0_u64;
         (|| {
             while offset < source.length {
+                if let Some(context) = context {
+                    context.check().map_err(map_execution_error)?;
+                }
                 let remaining = usize::try_from((source.length - offset).min(buffer.len() as u64))
                     .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
                 let read = source.source.read_at(offset, &mut buffer[..remaining])?;
@@ -2200,10 +2379,16 @@ fn write_exact_snapshot<W: Write>(source: &SourceSnapshot, writer: W) -> Result<
                     )));
                 }
                 source.ensure_current()?;
+                if let Some(context) = context {
+                    context.check().map_err(map_execution_error)?;
+                }
                 sink.write_all(&buffer[..read])?;
                 offset = offset
                     .checked_add(read as u64)
                     .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+            }
+            if let Some(context) = context {
+                context.check().map_err(map_execution_error)?;
             }
             sink.flush()?;
             Ok(())
@@ -2473,6 +2658,49 @@ mod tests {
         payload_offset: usize,
         cancellation_source: CancellationSource,
         armed: AtomicBool,
+    }
+
+    struct CancelDuringOpenSource {
+        bytes: Vec<u8>,
+        cancellation_source: CancellationSource,
+        reads: AtomicUsize,
+        cancel_after: usize,
+    }
+
+    impl CancelDuringOpenSource {
+        fn new(bytes: Vec<u8>, cancellation_source: CancellationSource) -> Self {
+            Self {
+                bytes,
+                cancellation_source,
+                reads: AtomicUsize::new(0),
+                cancel_after: 1,
+            }
+        }
+    }
+
+    impl ReadAt for CancelDuringOpenSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            let offset = usize::try_from(offset).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "offset too large")
+            })?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            if self.reads.fetch_add(1, Ordering::SeqCst) + 1 >= self.cancel_after {
+                self.cancellation_source.cancel();
+            }
+            Ok(count)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(95, 0))
+        }
     }
 
     impl CancelDuringPayloadSource {
@@ -2766,6 +2994,27 @@ mod tests {
         accepted: usize,
         limit: usize,
         largest_write: usize,
+    }
+
+    struct CancelAfterWriteSink {
+        cancellation_source: CancellationSource,
+        bytes: Vec<u8>,
+        cancelled: bool,
+    }
+
+    impl Write for CancelAfterWriteSink {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.bytes.extend_from_slice(bytes);
+            if !self.cancelled {
+                self.cancelled = true;
+                self.cancellation_source.cancel();
+            }
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
     }
 
     impl Write for BoundedFailingSink {
@@ -3399,6 +3648,25 @@ mod tests {
         assert_eq!(diagnostics.in_flight_loads, 0);
         assert_eq!(diagnostics.retained_entries, 0);
         assert_eq!(diagnostics.failed_loads, 1);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_open_checks_cancellation_after_indexing_before_catalog_publication() {
+        let (budget, cancellation_source, context) = managed_context_with_cancellation(u64::MAX);
+        let source = Arc::new(CancelDuringOpenSource::new(
+            archive_bytes(root_relationships(), b"open cancellation", false),
+            cancellation_source,
+        ));
+        assert!(matches!(
+            SourceBackedPackage::from_read_at_with_execution_context(
+                source.clone(),
+                ReadLimits::default(),
+                context,
+            ),
+            Err(OpcError::Cancelled)
+        ));
+        assert!(source.reads.load(Ordering::SeqCst) > 0);
         assert_eq!(budget.used(Resource::Memory), 0);
     }
 
@@ -4059,5 +4327,54 @@ mod tests {
             other => panic!("unexpected sink error: {other:?}"),
         }
         assert!(sink.largest_write <= SOURCE_PUBLICATION_CHUNK_BYTES);
+    }
+
+    #[test]
+    fn managed_publication_checks_before_output_and_between_copy_chunks() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
+        let target = PackURI::new("/word/document.xml").unwrap();
+
+        let (budget, cancellation_source, context) =
+            managed_context_with_cancellation(source_bytes.len() as u64);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        cancellation_source.cancel();
+        let mut output = Vec::new();
+        assert!(matches!(
+            package.write_part_overlay_to_stream(&mut output, &target, b"<before/>".to_vec()),
+            Err(OpcError::Cancelled)
+        ));
+        assert!(output.is_empty());
+        assert_eq!(budget.used(Resource::Memory), 0);
+
+        let (budget, cancellation_source, context) =
+            managed_context_with_cancellation(source_bytes.len() as u64);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source_bytes)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let mut sink = CancelAfterWriteSink {
+            cancellation_source,
+            bytes: Vec::new(),
+            cancelled: false,
+        };
+        let error = package
+            .write_part_overlay_to_stream(&mut sink, &target, b"<after/>".to_vec())
+            .unwrap_err();
+        match error {
+            OpcError::IncompleteOutput { written, source } => {
+                assert!(written > 0);
+                assert!(matches!(*source, OpcError::Cancelled));
+            },
+            other => panic!("unexpected managed cancellation error: {other:?}"),
+        }
+        assert!(!sink.bytes.is_empty());
+        assert_eq!(budget.used(Resource::Memory), 0);
     }
 }
