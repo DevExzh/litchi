@@ -354,6 +354,30 @@ impl Document {
         crate::edit::Edit::new_with_limits(self.clone(), limits)
     }
 
+    /// Starts a bounded preservation-first append before the exact root close.
+    ///
+    /// This transaction is distinct from [`crate::streaming::StreamingRtfWriter`]:
+    /// it is rooted at this immutable existing snapshot and publishes a new
+    /// artifact only after a complete source-proof, byte splice, reopen, and
+    /// semantic readback.
+    #[must_use]
+    pub fn tail_append(
+        &self,
+        selector: crate::tail_append::TailSelector,
+    ) -> crate::tail_append::TailAppendEdit {
+        crate::tail_append::TailAppendEdit::new(self, selector)
+    }
+
+    /// Starts a bounded preservation-first append with explicit limits.
+    #[must_use]
+    pub fn tail_append_with_limits(
+        &self,
+        selector: crate::tail_append::TailSelector,
+        limits: crate::tail_append::TailAppendLimits,
+    ) -> crate::tail_append::TailAppendEdit {
+        crate::tail_append::TailAppendEdit::with_limits(self, selector, limits)
+    }
+
     /// Applies a shared durable RTF semantic patch to this exact snapshot.
     ///
     /// # Errors

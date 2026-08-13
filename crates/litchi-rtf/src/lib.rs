@@ -76,6 +76,7 @@ mod policy;
 mod resource;
 pub mod review;
 pub mod streaming;
+pub mod tail_append;
 pub mod text;
 pub mod validation;
 
@@ -184,6 +185,10 @@ pub mod style {
 
 pub use api::Document;
 pub use codec::error::{RtfError as Error, RtfResult as Result};
+pub use tail_append::{
+    DurableTailAppendPatch, PlainParagraph, PlainRun, TailAppendCommit, TailAppendDiagnostics,
+    TailAppendEdit, TailAppendError, TailAppendLimits, TailAppendPatch, TailSelector,
+};
 pub use validation::{
     ValidationCheck, ValidationCounts, ValidationDependency, ValidationLimits, ValidationReport,
     ValidationStatus,
