@@ -80,6 +80,150 @@ mod flat_odp_tests {
     }
 }
 
+#[cfg(all(test, feature = "pptx", feature = "odp"))]
+mod ooxml_odf_polyglot_tests {
+    use super::Presentation;
+    use std::io::{Cursor, Write};
+
+    fn dual_marker_pptx() -> Vec<u8> {
+        let mut output = Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+
+        // Keep the valid ODF local mimetype first, while the remaining
+        // entries form a valid minimal OPC/PPTX package.
+        writer.start_file("mimetype", options).unwrap();
+        writer
+            .write_all(b"application/vnd.oasis.opendocument.presentation")
+            .unwrap();
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/></Types>"#,
+            )
+            .unwrap();
+        writer.start_file("_rels/.rels", options).unwrap();
+        writer
+            .write_all(
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.start_file("ppt/presentation.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>"#,
+            )
+            .unwrap();
+        writer
+            .start_file("ppt/_rels/presentation.xml.rels", options)
+            .unwrap();
+        writer
+            .write_all(
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.start_file("ppt/slides/slide1.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/></p:spTree></p:cSld></p:sld>"#,
+            )
+            .unwrap();
+        writer.finish().unwrap();
+        output.into_inner()
+    }
+
+    fn dual_marker_docx() -> Vec<u8> {
+        let mut output = Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+
+        writer.start_file("mimetype", options).unwrap();
+        writer
+            .write_all(b"application/vnd.oasis.opendocument.presentation")
+            .unwrap();
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#,
+            )
+            .unwrap();
+        writer.start_file("_rels/.rels", options).unwrap();
+        writer
+            .write_all(
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.start_file("word/document.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            )
+            .unwrap();
+        writer.finish().unwrap();
+        output.into_inner()
+    }
+
+    #[test]
+    fn ooxml_first_precedence_survives_an_odf_local_mimetype_marker() {
+        let bytes = dual_marker_pptx();
+        assert!(matches!(
+            crate::detection_smart::detect_format_smart(bytes.clone()),
+            Some(crate::detection_smart::DetectedFormat::Pptx(_))
+        ));
+        let presentation = Presentation::from_bytes(bytes)
+            .expect("OOXML-first precedence should select the valid PPTX owner");
+        assert_eq!(presentation.slide_count().unwrap(), 1);
+    }
+
+    #[cfg(not(feature = "docx"))]
+    #[test]
+    fn disabled_docx_owner_keeps_smart_precedence() {
+        let bytes = dual_marker_docx();
+        assert!(crate::detection_smart::detect_format_smart(bytes.clone()).is_none());
+        assert!(crate::detection_smart::detected::detect_prepared_odp(bytes.clone()).is_err());
+
+        let error = Presentation::from_bytes(bytes)
+            .err()
+            .expect("disabled DOCX owner must not fall through to ODP");
+        assert_eq!(error.to_string(), "Not a valid Office file");
+    }
+
+    #[test]
+    fn invalid_odf_body_still_falls_back_to_typed_odp_validation() {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_PRESENTATION)
+            .unwrap();
+        writer
+            .add_file("content.xml", b"<not-an-odp-document/>")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let error = Presentation::from_bytes(bytes)
+            .err()
+            .expect("invalid ODP body must not be accepted as PPTX");
+        assert!(error.to_string().contains("ODP"));
+    }
+
+    #[test]
+    fn valid_odp_wins_after_the_ooxml_probe_fails() {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_PRESENTATION)
+            .unwrap();
+        writer
+            .add_file(
+                "content.xml",
+                br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:presentation/></office:body></office:document-content>"#,
+            )
+            .unwrap();
+
+        assert!(Presentation::from_bytes(writer.finish_to_bytes().unwrap()).is_ok());
+    }
+}
+
 impl Presentation {
     /// Open a PowerPoint presentation from a file path.
     ///
@@ -170,6 +314,18 @@ impl Presentation {
     /// - Ideal for network data, streams, or in-memory content
     /// - No temporary files created
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        #[cfg(feature = "odp")]
+        let bytes = match crate::detection_smart::detected::detect_prepared_odp(bytes) {
+            Ok(prepared) => {
+                let doc = litchi_odp::Presentation::from_prepared_package(prepared)?;
+                return Ok(Self {
+                    inner: PresentationImpl::Odp(doc),
+                    cached_metadata: Some(litchi_core::Metadata::default()),
+                });
+            },
+            Err(bytes) => bytes,
+        };
+
         #[cfg(feature = "pptx")]
         {
             Self::from_bytes_with_limits(bytes, crate::pptx::ReadLimits::default())

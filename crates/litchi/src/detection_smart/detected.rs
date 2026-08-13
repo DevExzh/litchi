@@ -130,6 +130,81 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
     detect_format_smart_without_ooxml(bytes)
 }
 
+/// Prepare an ODS package for the unified spreadsheet facade without changing
+/// the public [`DetectedFormat`] enum's legacy byte payload.
+///
+/// This is deliberately an internal handoff: callers that use
+/// [`detect_format_smart`] continue to receive `DetectedFormat::Ods(Vec<u8>)`.
+/// The unified facade uses this fast path only after the local ODF MIME entry
+/// identifies ODS. When ODF wins, the accepted package's one ODF
+/// `OwnedPackage` index is transferred to the typed ODS owner without a
+/// second ODF semantic index scan. Other formats return their original bytes
+/// for the ordinary detector. In builds with any OOXML probe feature enabled,
+/// it first performs the same bounded OOXML probe as smart detection,
+/// preserving OOXML-first precedence for valid OOXML/ODF polyglots; that probe
+/// is an independent OPC scan and is not counted as an ODF index.
+#[cfg(feature = "ods")]
+pub(crate) fn detect_prepared_ods(
+    bytes: Vec<u8>,
+) -> std::result::Result<litchi_odf_common::PreparedPackage, Vec<u8>> {
+    use litchi_core::detection::FileFormat;
+
+    if litchi_odf_common::detect::packaged_mime(&bytes) != Some(FileFormat::Ods) {
+        return Err(bytes);
+    }
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    if ooxml_probe_wins(&bytes) {
+        return Err(bytes);
+    }
+    let prepared = litchi_odf_common::detect::prepared_or_original(bytes)?;
+    if prepared.format() == FileFormat::Ods {
+        Ok(prepared)
+    } else {
+        Err(prepared.into_package().into_inner())
+    }
+}
+
+/// Prepare an ODP package for the unified presentation facade while keeping
+/// the public smart-detection enum source-compatible. As with ODS, it first
+/// performs the bounded OOXML probe when any OOXML probe feature is enabled so
+/// OOXML-first polyglot precedence remains unchanged, including for a
+/// recognized OOXML leaf whose own facade feature is disabled. When ODF wins,
+/// the prepared ODF index transfers to the typed ODP owner without a second
+/// ODF semantic index scan.
+#[cfg(feature = "odp")]
+pub(crate) fn detect_prepared_odp(
+    bytes: Vec<u8>,
+) -> std::result::Result<litchi_odf_common::PreparedPackage, Vec<u8>> {
+    use litchi_core::detection::FileFormat;
+
+    if litchi_odf_common::detect::packaged_mime(&bytes) != Some(FileFormat::Odp) {
+        return Err(bytes);
+    }
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    if ooxml_probe_wins(&bytes) {
+        return Err(bytes);
+    }
+    let prepared = litchi_odf_common::detect::prepared_or_original(bytes)?;
+    if prepared.format() == FileFormat::Odp {
+        Ok(prepared)
+    } else {
+        Err(prepared.into_package().into_inner())
+    }
+}
+
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+fn ooxml_probe_wins(bytes: &[u8]) -> bool {
+    let Ok(package) =
+        crate::opc::OpcPackage::from_bytes_with_limits(bytes, crate::opc::ReadLimits::default())
+    else {
+        return false;
+    };
+    // Mirror the ordinary smart detector: recognition of any OOXML family
+    // wins the precedence decision, even when its leaf feature is disabled
+    // and the ordinary detector consequently returns `None` for that owner.
+    crate::detection_smart::ooxml::detect_ooxml_format_from_package(&package).is_some()
+}
+
 #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
 fn detect_format_smart_without_ooxml(bytes: Vec<u8>) -> Option<DetectedFormat> {
     use litchi_core::detection::simd_utils::check_office_signatures;
@@ -466,6 +541,66 @@ mod short_signature_tests {
         let document = litchi_odt::Document::from_prepared_package(prepared).unwrap();
         assert_eq!(document.prepared_index_identity(), index_identity);
         assert_eq!(document.text().unwrap(), "smart");
+    }
+
+    #[cfg(all(
+        feature = "ods",
+        not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))
+    ))]
+    #[test]
+    fn internal_ods_handoff_transfers_one_prepared_index_to_semantic_open() {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_SPREADSHEET)
+            .unwrap();
+        writer
+            .add_file(
+                litchi_odf_common::constants::ODF_CONTENT,
+                br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table table:name="Sheet1"/></office:spreadsheet></office:body></office:document-content>"#,
+            )
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        assert!(matches!(
+            detect_format_smart(bytes.clone()),
+            Some(super::DetectedFormat::Ods(_))
+        ));
+        let prepared = super::detect_prepared_ods(bytes).expect("ODS should prepare");
+        let index_identity = prepared.prepared_index_identity();
+        let spreadsheet = litchi_ods::Spreadsheet::from_prepared_package(prepared).unwrap();
+
+        assert_eq!(spreadsheet.prepared_index_identity(), index_identity);
+        assert!(spreadsheet.content_xml().contains("office:spreadsheet"));
+    }
+
+    #[cfg(all(
+        feature = "odp",
+        not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))
+    ))]
+    #[test]
+    fn internal_odp_handoff_transfers_one_prepared_index_to_semantic_open() {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_PRESENTATION)
+            .unwrap();
+        writer
+            .add_file(
+                litchi_odf_common::constants::ODF_CONTENT,
+                br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:presentation/></office:body></office:document-content>"#,
+            )
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        assert!(matches!(
+            detect_format_smart(bytes.clone()),
+            Some(super::DetectedFormat::Odp(_))
+        ));
+        let prepared = super::detect_prepared_odp(bytes).expect("ODP should prepare");
+        let index_identity = prepared.prepared_index_identity();
+        let presentation = litchi_odp::Presentation::from_prepared_package(prepared).unwrap();
+
+        assert_eq!(presentation.prepared_index_identity(), index_identity);
+        assert!(presentation.content_xml().contains("office:presentation"));
     }
 
     #[test]
