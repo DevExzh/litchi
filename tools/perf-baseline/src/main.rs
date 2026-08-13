@@ -6,6 +6,9 @@
 
 #![forbid(unsafe_code)]
 
+mod filesystem;
+mod process_metrics;
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error,
@@ -384,6 +387,11 @@ enum Case {
     OpcSourceCachedMainRead,
     OpcSourceConcurrentSamePart,
     OpcSourceOverlayOnePartSave,
+    OpcFileEagerOpen,
+    OpcFileSourceOpen,
+    OpcFileEagerOnePartAtomicSave,
+    OpcFileSourceOnePartAtomicSave,
+    CfbFileSameLengthOverlayAtomicSave,
     DocxSourceBackedOneEditSave,
     PptxSourceBackedOneEditSave,
     PptxEagerBatchEditSave,
@@ -590,6 +598,11 @@ impl Case {
             Self::OpcSourceCachedMainRead => "opc_source_cached_main_read",
             Self::OpcSourceConcurrentSamePart => "opc_source_concurrent_same_part",
             Self::OpcSourceOverlayOnePartSave => "opc_source_overlay_one_part_save",
+            Self::OpcFileEagerOpen => "opc_file_eager_open",
+            Self::OpcFileSourceOpen => "opc_file_source_open",
+            Self::OpcFileEagerOnePartAtomicSave => "opc_file_eager_one_part_atomic_save",
+            Self::OpcFileSourceOnePartAtomicSave => "opc_file_source_one_part_atomic_save",
+            Self::CfbFileSameLengthOverlayAtomicSave => "cfb_file_same_length_overlay_atomic_save",
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
             Self::PptxEagerBatchEditSave => "pptx_eager_batch_edit_save",
@@ -1025,6 +1038,17 @@ impl Case {
         matches!(self, Self::OpcSourceOverlayOnePartSave)
     }
 
+    const fn is_filesystem(self) -> bool {
+        matches!(
+            self,
+            Self::OpcFileEagerOpen
+                | Self::OpcFileSourceOpen
+                | Self::OpcFileEagerOnePartAtomicSave
+                | Self::OpcFileSourceOnePartAtomicSave
+                | Self::CfbFileSameLengthOverlayAtomicSave
+        )
+    }
+
     const fn is_docx_source_edit_save(self) -> bool {
         matches!(self, Self::DocxSourceBackedOneEditSave)
     }
@@ -1136,6 +1160,8 @@ impl Default for RangeSimulationConfig {
 struct Options {
     samples: usize,
     warmup_iterations: usize,
+    filesystem_cache: filesystem::CacheSelection,
+    filesystem_root: Option<PathBuf>,
     cases: Vec<Case>,
     shapes: Vec<CorpusShape>,
     payloads: Vec<PayloadKind>,
@@ -1179,6 +1205,8 @@ struct Report {
     environment: Environment,
     configuration: Configuration,
     results: Vec<CaseResult>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    filesystem_evidence: Option<Vec<filesystem::Evidence>>,
 }
 
 #[derive(Serialize)]
@@ -1200,12 +1228,25 @@ struct Environment {
     rustflags: Option<String>,
     cargo_build_target: Option<String>,
     perf_event_paranoid: Option<String>,
+    os: Option<String>,
+    kernel: Option<String>,
+    cpu_model: Option<String>,
+    total_memory_bytes: Option<u64>,
+    page_size_bytes: Option<u64>,
+    filesystem_type: Option<String>,
+    source_destination_same_device: Option<bool>,
+    cpu_affinity: Option<String>,
+    storage_identifier: Option<String>,
 }
 
 #[derive(Serialize)]
 struct Configuration {
     samples_per_case: usize,
     warmup_iterations_per_case: usize,
+    filesystem_cache_states: Vec<&'static str>,
+    filesystem_fresh_child_per_sample: bool,
+    filesystem_process_isolated: bool,
+    filesystem_root_selected: bool,
     cases: Vec<&'static str>,
     corpus_shapes: Vec<&'static str>,
     payload_kinds: Vec<&'static str>,
@@ -1259,6 +1300,8 @@ struct XlsxSourceMembersManifest {
 #[derive(Serialize)]
 struct CaseResult {
     case: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache_state: Option<&'static str>,
     corpus: CorpusManifest,
     elapsed_ns: Statistics,
     sink: Option<SinkSummary>,
@@ -1906,8 +1949,28 @@ impl SourceSummary {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    if filesystem::run_child_if_requested()? {
+        return Ok(());
+    }
     let options = parse_options()?;
     let mut results = Vec::new();
+    let filesystem_runs = filesystem::run_selected(
+        &options.cases,
+        options.warmup_iterations,
+        options.samples,
+        options.filesystem_cache,
+        options.filesystem_root.as_deref(),
+    )?;
+    let mut filesystem_evidence = Vec::with_capacity(filesystem_runs.len());
+    for run in filesystem_runs {
+        if let Some(result) = run.warm_result {
+            results.push(result);
+        }
+        if let Some(result) = run.cold_result {
+            results.push(result);
+        }
+        filesystem_evidence.push(run.evidence);
+    }
 
     for shape in &options.shapes {
         for payload in &options.payloads {
@@ -1941,6 +2004,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_odp_media()
                     && !case.uses_odp_text_box_batch()
                     && !case.is_opc_source_overlay_save()
+                    && !case.is_filesystem()
                     && !case.is_docx_source_edit_save()
                     && !case.is_pptx_source_edit_save()
                     && !case.is_xlsx_calculation_metadata_edit_save()
@@ -2549,10 +2613,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             target_os: std::env::consts::OS,
             target_arch: std::env::consts::ARCH,
         },
-        environment: environment(),
+        environment: environment(filesystem::host_evidence(
+            options.filesystem_root.as_deref(),
+            !filesystem_evidence.is_empty(),
+        )),
         configuration: Configuration {
             samples_per_case: options.samples,
             warmup_iterations_per_case: options.warmup_iterations,
+            filesystem_cache_states: options.filesystem_cache.names(),
+            filesystem_fresh_child_per_sample: true,
+            filesystem_process_isolated: true,
+            filesystem_root_selected: options.filesystem_root.is_some(),
             cases: options.cases.iter().map(|case| case.name()).collect(),
             corpus_shapes: options.shapes.iter().map(|shape| shape.name()).collect(),
             payload_kinds: options.payloads.iter().map(|kind| kind.name()).collect(),
@@ -2580,6 +2651,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             execution_workers: options.execution_workers,
         },
         results,
+        filesystem_evidence: (!filesystem_evidence.is_empty()).then_some(filesystem_evidence),
     };
 
     write_report(&report, options.output.as_ref())
@@ -2588,6 +2660,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut samples = DEFAULT_SAMPLES;
     let mut warmup_iterations = DEFAULT_WARMUP_ITERATIONS;
+    let mut filesystem_cache = filesystem::CacheSelection::default();
+    let mut filesystem_root = None;
     let mut cases = Case::DEFAULT.to_vec();
     let mut shapes = CorpusShape::ALL.to_vec();
     let mut payloads = PayloadKind::ALL.to_vec();
@@ -2616,6 +2690,18 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
                     .next()
                     .ok_or("--warmup requires a non-negative integer")?;
                 warmup_iterations = value.parse()?;
+            },
+            "--filesystem-cache" => {
+                filesystem_cache = filesystem::CacheSelection::parse(
+                    &arguments
+                        .next()
+                        .ok_or("--filesystem-cache requires warm,cold-requested")?,
+                )?;
+            },
+            "--filesystem-root" => {
+                filesystem_root = Some(PathBuf::from(
+                    arguments.next().ok_or("--filesystem-root requires PATH")?,
+                ));
             },
             "--case" => cases = parse_selection(arguments.next(), "--case", parse_case)?,
             "--shape" => shapes = parse_selection(arguments.next(), "--shape", parse_shape)?,
@@ -2676,6 +2762,8 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
     Ok(Options {
         samples,
         warmup_iterations,
+        filesystem_cache,
+        filesystem_root,
         cases,
         shapes,
         payloads,
@@ -2765,6 +2853,13 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_source_cached_main_read" => Some(Case::OpcSourceCachedMainRead),
         "opc_source_concurrent_same_part" => Some(Case::OpcSourceConcurrentSamePart),
         "opc_source_overlay_one_part_save" => Some(Case::OpcSourceOverlayOnePartSave),
+        "opc_file_eager_open" => Some(Case::OpcFileEagerOpen),
+        "opc_file_source_open" => Some(Case::OpcFileSourceOpen),
+        "opc_file_eager_one_part_atomic_save" => Some(Case::OpcFileEagerOnePartAtomicSave),
+        "opc_file_source_one_part_atomic_save" => Some(Case::OpcFileSourceOnePartAtomicSave),
+        "cfb_file_same_length_overlay_atomic_save" => {
+            Some(Case::CfbFileSameLengthOverlayAtomicSave)
+        },
         "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
         "pptx_source_backed_one_edit_save" => Some(Case::PptxSourceBackedOneEditSave),
         "pptx_eager_batch_edit_save" => Some(Case::PptxEagerBatchEditSave),
@@ -3009,11 +3104,17 @@ fn print_usage() {
          Options:\n\
            --samples N                 Samples per case (default: {DEFAULT_SAMPLES})\n\
            --warmup N                  Untimed iterations per case (default: {DEFAULT_WARMUP_ITERATIONS})\n\
+           --filesystem-cache LIST     Filesystem states: warm,cold-requested\n\
+           --filesystem-root PATH      Parent directory for filesystem samples\n\
            --case LIST                 zip_index,zip_read_one,opc_open,opc_open_owned,\n\
                                        opc_noop_save,opc_mutated_save,opc_source_open,\n\
                                        opc_source_open_main_read,opc_source_cached_main_read,\n\
                                        opc_source_concurrent_same_part,\n\
                                        opc_source_overlay_one_part_save,\n\
+                                       opc_file_eager_open,opc_file_source_open,\n\
+                                       opc_file_eager_one_part_atomic_save,\n\
+                                       opc_file_source_one_part_atomic_save,\n\
+                                       cfb_file_same_length_overlay_atomic_save,\n\
                                        docx_source_backed_one_edit_save,\n\
                                        pptx_source_backed_one_edit_save,\n\
                                        pptx_eager_batch_edit_save,\n\
@@ -5336,6 +5437,13 @@ fn run_case_with_config(
         },
         Case::OpcSourceOverlayOnePartSave => {
             run_opc_source_overlay_one_part_save(corpus, warmup_iterations, samples)
+        },
+        Case::OpcFileEagerOpen
+        | Case::OpcFileSourceOpen
+        | Case::OpcFileEagerOnePartAtomicSave
+        | Case::OpcFileSourceOnePartAtomicSave
+        | Case::CfbFileSameLengthOverlayAtomicSave => {
+            Err("filesystem cases are dispatched by the child-process evidence runner".into())
         },
         Case::DocxSourceBackedOneEditSave => {
             run_docx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
@@ -10630,6 +10738,7 @@ fn run_opc_source_overlay_one_part_save(
     }
     Ok(CaseResult {
         case: Case::OpcSourceOverlayOnePartSave.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -10797,6 +10906,7 @@ fn run_docx_source_backed_one_edit_save(
     }
     Ok(CaseResult {
         case: Case::DocxSourceBackedOneEditSave.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -11003,6 +11113,7 @@ fn run_pptx_source_backed_one_edit_save(
     }
     Ok(CaseResult {
         case: Case::PptxSourceBackedOneEditSave.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -11172,6 +11283,7 @@ fn run_pptx_batch_edit_save(
     }
     Ok(CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -11346,6 +11458,7 @@ fn run_pptx_multi_slide_batch_edit_save(
     }
     Ok(CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -11547,6 +11660,7 @@ fn run_xlsx_defined_names_edit_save(
     }
     Ok(CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -11731,6 +11845,7 @@ fn run_xlsx_calculation_metadata_edit_save(
     }
     Ok(CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -11924,6 +12039,7 @@ fn run_xlsx_page_break_edit_save(
     }
     Ok(CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -12126,6 +12242,7 @@ fn run_xlsx_page_margin_edit_save(
     }
     Ok(CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -12333,6 +12450,7 @@ fn run_xlsx_page_setup_edit_save(
     }
     Ok(CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -12531,6 +12649,7 @@ fn run_xlsx_print_options_edit_save(
     }
     Ok(CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -12768,6 +12887,7 @@ fn run_xlsx_sheet_protection_edit_save(
     }
     Ok(CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -13056,6 +13176,7 @@ fn run_xlsx_auto_filter_edit_save(
     }
     Ok(CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -13412,6 +13533,7 @@ fn run_xlsx_conditional_formatting_edit_save(
     }
     Ok(CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -13602,6 +13724,7 @@ fn run_xlsx_data_validation_edit_save(
     }
     Ok(CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
@@ -14285,6 +14408,7 @@ fn run_fresh_writer(
 fn result(case: Case, corpus: &Corpus, elapsed: Vec<u64>, sink: Option<SinkSummary>) -> CaseResult {
     CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink,
@@ -14302,6 +14426,7 @@ fn result_with_source(
 ) -> CaseResult {
     CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: None,
@@ -14319,6 +14444,7 @@ fn result_with_execution(
 ) -> CaseResult {
     CaseResult {
         case: case.name(),
+        cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: None,
@@ -14445,7 +14571,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     output
 }
 
-fn environment() -> Environment {
+fn environment(host: filesystem::HostEvidence) -> Environment {
     Environment {
         rustc_version: command_output(
             std::env::var_os("RUSTC").as_deref().unwrap_or_default(),
@@ -14466,6 +14592,15 @@ fn environment() -> Environment {
         perf_event_paranoid: fs::read_to_string("/proc/sys/kernel/perf_event_paranoid")
             .ok()
             .map(|value| value.trim().to_owned()),
+        os: host.os,
+        kernel: host.kernel,
+        cpu_model: host.cpu_model,
+        total_memory_bytes: host.total_memory_bytes,
+        page_size_bytes: host.page_size_bytes,
+        filesystem_type: host.filesystem_type,
+        source_destination_same_device: host.source_destination_same_device,
+        cpu_affinity: host.cpu_affinity,
+        storage_identifier: host.storage_identifier,
     }
 }
 
