@@ -870,6 +870,11 @@ enum Operation {
         before: bool,
         after: bool,
     },
+    Italic {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
     InsertParagraph {
         position: usize,
         span: TextSpan,
@@ -942,7 +947,7 @@ impl Operation {
                 let _ = (before, after);
                 0
             },
-            Self::Alignment { .. } | Self::Bold { .. } => 0,
+            Self::Alignment { .. } | Self::Bold { .. } | Self::Italic { .. } => 0,
         }
     }
 
@@ -960,6 +965,9 @@ impl Operation {
             } => layout_effect_keys(*position, *fields),
             Self::Bold { span, .. } => {
                 vec![format!("body:character:{}-{}:bold", span.start, span.end)]
+            },
+            Self::Italic { span, .. } => {
+                vec![format!("body:character:{}-{}:italic", span.start, span.end)]
             },
             Self::InsertParagraph { .. }
             | Self::RemoveParagraph { .. }
@@ -984,6 +992,7 @@ impl Operation {
         match self {
             Self::Text { span, .. }
             | Self::Bold { span, .. }
+            | Self::Italic { span, .. }
             | Self::InsertParagraph { span, .. } => Some(*span),
             Self::Alignment { .. }
             | Self::ParagraphLayout { .. }
@@ -1004,7 +1013,10 @@ impl Operation {
     const fn is_property(&self) -> bool {
         matches!(
             self,
-            Self::Alignment { .. } | Self::ParagraphLayout { .. } | Self::Bold { .. }
+            Self::Alignment { .. }
+                | Self::ParagraphLayout { .. }
+                | Self::Bold { .. }
+                | Self::Italic { .. }
         )
     }
 
@@ -1361,6 +1373,68 @@ impl Edit {
         Ok(self)
     }
 
+    /// Stages italic state for one non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one effective italic state and may
+    /// not consume a paragraph boundary. Unknown or mixed character ranges
+    /// are refused rather than normalized.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_italic(&mut self, span: TextSpan, italic: bool) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::ParagraphLayoutTextConflict);
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::UnsupportedSource(
+                "italic edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+            )
+        }) {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = italic_for_span(&self.source, span)?;
+        self.operations.push(Operation::Italic {
+            span,
+            before,
+            after: italic,
+        });
+        Ok(self)
+    }
+
     /// Inserts one ordinary paragraph immediately after a checked paragraph.
     ///
     /// This is the transaction's explicit structural class. The inserted text
@@ -1615,7 +1689,10 @@ impl Edit {
         if self.operations.iter().any(|operation| {
             matches!(
                 operation,
-                Operation::Text { .. } | Operation::Bold { .. } | Operation::InsertParagraph { .. }
+                Operation::Text { .. }
+                    | Operation::Bold { .. }
+                    | Operation::Italic { .. }
+                    | Operation::InsertParagraph { .. }
             )
         }) {
             return Err(Error::ParagraphLayoutTextConflict);
@@ -2018,6 +2095,7 @@ impl Edit {
                 Operation::Alignment { .. }
                     | Operation::ParagraphLayout { .. }
                     | Operation::Bold { .. }
+                    | Operation::Italic { .. }
             )
         });
         let mut alignments = if property_operation {
@@ -2030,7 +2108,13 @@ impl Edit {
         } else {
             false
         };
+        let base_italic = if property_operation && !layout_operation {
+            base_italic_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
         let mut projected_bold_ranges = Vec::new();
+        let mut projected_italic_ranges = Vec::new();
         let mut paragraph_properties = if layout_operation {
             source_paragraph_properties(&self.source)?
         } else {
@@ -2079,6 +2163,10 @@ impl Edit {
                     projected_bold_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
                 },
+                Operation::Italic { span, after, .. } => {
+                    projected_italic_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
                 Operation::Text { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
@@ -2104,13 +2192,17 @@ impl Edit {
         let has_bold_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::Bold { before, after, .. } if before != after)
         });
+        let has_italic_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Italic { before, after, .. } if before != after)
+        });
         let has_layout_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::ParagraphLayout { before, after, .. } if before != after)
         });
         let did_change = replacement != self.source.text()
             || alignments != original_alignments
             || has_layout_delta
-            || has_bold_delta;
+            || has_bold_delta
+            || has_italic_delta;
         let semantic_delta = semantic_changes(&self.operations, &projected_spans);
         if !did_change {
             return Ok(Commit::new(
@@ -2136,16 +2228,34 @@ impl Edit {
             .operations
             .iter()
             .any(|operation| matches!(operation, Operation::Bold { .. }));
+        let has_italic_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Italic { .. }));
+        if has_italic_operation && !source_bytes.is_ascii() {
+            return Err(Error::UnsupportedSource(
+                "italic edits refuse non-ASCII transport encodings",
+            ));
+        }
         if layout_operation {
             self.source
                 .model()
                 .local_paragraph_property_editability()
                 .map_err(Error::UnsupportedSource)?;
-        } else if has_bold_operation {
-            self.source
-                .model()
-                .plain_body_bold_editability()
+        } else if has_bold_operation || has_italic_operation {
+            if has_bold_operation && !has_italic_operation {
+                self.source
+                    .model()
+                    .plain_body_bold_editability()
+                    .map_err(Error::UnsupportedSource)?;
+            } else {
+                plain_body_character_editability(
+                    &self.source,
+                    has_bold_operation,
+                    has_italic_operation,
+                )
                 .map_err(Error::UnsupportedSource)?;
+            }
         } else {
             self.source
                 .model()
@@ -2155,7 +2265,7 @@ impl Edit {
         let span = retained_or_located_body_source_span(&self.source, source_bytes)?;
         validate_opaque_preservation(&self.source, source_bytes, &span)?;
         let replacement_bytes = if layout_operation {
-            if replacement != self.source.text() || has_bold_operation {
+            if replacement != self.source.text() || has_bold_operation || has_italic_operation {
                 return Err(Error::ParagraphLayoutTextConflict);
             }
             ensure_paragraph_layout_source(&self.source)?;
@@ -2170,6 +2280,8 @@ impl Edit {
                 &alignments,
                 base_bold,
                 &projected_bold_ranges,
+                base_italic,
+                &projected_italic_ranges,
                 self.source.limits(),
             )?
         } else {
@@ -2203,6 +2315,13 @@ impl Edit {
             if bold_for_span(&snapshot, bold_span)? != expected {
                 return Err(Error::UnsupportedSource(
                     "candidate bold property did not survive RTF validation",
+                ));
+            }
+        }
+        for (italic_span, expected) in projected_italic_ranges {
+            if italic_for_span(&snapshot, italic_span)? != expected {
+                return Err(Error::UnsupportedSource(
+                    "candidate italic property did not survive RTF validation",
                 ));
             }
         }
@@ -2269,6 +2388,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
+            | Operation::Italic { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -2343,6 +2463,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
+            | Operation::Italic { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -2668,6 +2789,7 @@ fn project_text(
             Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
+            | Operation::Italic { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
@@ -2806,6 +2928,7 @@ fn project_lifecycle_text(source: &Snapshot, operation: &Operation) -> Result<St
         | Operation::Alignment { .. }
         | Operation::ParagraphLayout { .. }
         | Operation::Bold { .. }
+        | Operation::Italic { .. }
         | Operation::InsertParagraph { .. }
         | Operation::TableCellText { .. }
         | Operation::HeaderFooterText { .. }
@@ -2949,6 +3072,46 @@ fn uniform_body_bold(source: &Snapshot) -> Result<bool, Error> {
     Ok(value.unwrap_or(false))
 }
 
+fn plain_body_character_editability(
+    source: &Snapshot,
+    allow_mixed_bold: bool,
+    allow_mixed_italic: bool,
+) -> Result<(), &'static str> {
+    source.model().local_paragraph_property_editability()?;
+    let mut paragraph_format = None;
+    let mut character_format = None;
+    for paragraph in source.body().paragraphs() {
+        let raw_paragraph = *paragraph.format().raw();
+        if paragraph_format.is_some_and(|existing| existing != raw_paragraph) {
+            return Err("the body has mixed run or paragraph formatting");
+        }
+        paragraph_format = Some(raw_paragraph);
+        for run in paragraph.runs() {
+            let mut raw_character = *run.format().raw();
+            if allow_mixed_bold {
+                raw_character.bold = false;
+            }
+            if allow_mixed_italic {
+                raw_character.italic = false;
+            }
+            if character_format.is_some_and(|existing| existing != raw_character) {
+                return Err("the body has mixed run or paragraph formatting");
+            }
+            character_format = Some(raw_character);
+        }
+    }
+    Ok(())
+}
+
+fn span_fully_covered(span: TextSpan, selected: &[TextSpan]) -> bool {
+    let covered = selected.iter().fold(0usize, |total, selected| {
+        let start = span.start.max(selected.start);
+        let end = span.end.min(selected.end);
+        total.saturating_add(end.saturating_sub(start))
+    });
+    covered >= span.end.saturating_sub(span.start)
+}
+
 fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<bool, Error> {
     let bold_spans = operations
         .iter()
@@ -2957,6 +3120,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::Italic { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -2983,10 +3147,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 start: run_position,
                 end: run_position.saturating_add(run.text().len()),
             };
-            if !bold_spans
-                .iter()
-                .any(|span| spans_conflict(*span, run_span))
-            {
+            if !span_fully_covered(run_span, &bold_spans) {
                 let value = run.format().bold();
                 if base.is_some_and(|existing| existing != value) {
                     return Err(Error::UnsupportedSource(
@@ -3009,6 +3170,97 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
+                | Operation::Italic { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn uniform_body_italic(source: &Snapshot) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let italic = run.format().italic();
+        if value.is_some_and(|existing| existing != italic) {
+            return Err(Error::UnsupportedSource(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(italic);
+    }
+    Ok(value.unwrap_or(false))
+}
+
+fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<bool, Error> {
+    let italic_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Italic { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::Bold { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if italic_spans.is_empty() {
+        return uniform_body_italic(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &italic_spans) {
+                let value = run.format().italic();
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::UnsupportedSource(
+                        "unselected body text has mixed italic state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::Italic { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::Bold { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -3063,6 +3315,43 @@ fn bold_for_span(source: &Snapshot, span: TextSpan) -> Result<bool, Error> {
     ))
 }
 
+fn italic_for_span(source: &Snapshot, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let italic = run.format().italic();
+                if value.is_some_and(|existing| existing != italic) {
+                    return Err(Error::UnsupportedSource(
+                        "the selected character span has mixed italic state",
+                    ));
+                }
+                value = Some(italic);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::UnsupportedSource(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::UnsupportedSource(
+        "the selected character span has no text run",
+    ))
+}
+
 fn project_base_span(span: TextSpan, operations: &[Operation]) -> Result<TextSpan, Error> {
     Ok(TextSpan {
         start: project_base_position(span.start, operations)?,
@@ -3081,6 +3370,7 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
+            | Operation::Italic { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
@@ -3254,12 +3544,15 @@ fn encoded_body_with_properties(
     alignments: &[Alignment],
     base_bold: bool,
     bold_changes: &[(TextSpan, bool)],
+    base_italic: bool,
+    italic_changes: &[(TextSpan, bool)],
     limits: crate::ParseLimits,
 ) -> Result<Vec<u8>, Error> {
     let extra = alignments
         .len()
         .checked_mul(4)
         .and_then(|bytes| bytes.checked_add(bold_changes.len().saturating_mul(6)))
+        .and_then(|bytes| bytes.checked_add(italic_changes.len().saturating_mul(6)))
         .ok_or(Error::InputTooLarge {
             observed: usize::MAX,
             limit: limits.max_source_bytes(),
@@ -3296,13 +3589,33 @@ fn encoded_body_with_properties(
             .iter()
             .copied()
             .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+            .map(|(span, value)| (span, value, false))
+            .chain(
+                italic_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, value, true)),
+            )
             .collect::<Vec<_>>();
-        paragraph_changes.sort_unstable_by_key(|(span, _)| (span.start, span.end));
-        for (span, bold) in paragraph_changes {
+        paragraph_changes.sort_unstable_by_key(|(span, _, _)| (span.start, span.end));
+        for (span, value, italic) in paragraph_changes {
             write_encoded_fragment(&mut output, text, cursor..span.start)?;
-            write_bold(&mut output, bold);
-            write_encoded_fragment(&mut output, text, span.start..span.end)?;
-            write_bold(&mut output, base_bold);
+            if italic {
+                // The parser flushes body text at bold controls but not at
+                // italic controls. Reasserting the current bold state around
+                // this italic fragment creates a run boundary without
+                // changing the effective formatting or source envelope.
+                write_bold(&mut output, base_bold);
+                write_italic(&mut output, value);
+                write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                write_bold(&mut output, base_bold);
+                write_italic(&mut output, base_italic);
+            } else {
+                write_bold(&mut output, value);
+                write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                write_bold(&mut output, base_bold);
+            }
             cursor = span.end;
         }
         write_encoded_fragment(&mut output, text, cursor..paragraph_end)?;
@@ -3438,6 +3751,10 @@ fn write_encoded_fragment(
 
 fn write_bold(output: &mut Vec<u8>, bold: bool) {
     output.extend_from_slice(if bold { br"\b " } else { br"\b0 " });
+}
+
+fn write_italic(output: &mut Vec<u8>, italic: bool) {
+    output.extend_from_slice(if italic { br"\i " } else { br"\i0 " });
 }
 
 fn write_alignment(output: &mut Vec<u8>, alignment: Option<Alignment>) -> Result<(), Error> {
@@ -3603,6 +3920,12 @@ enum Change {
         before: bool,
         after: bool,
     },
+    Italic {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
     InsertParagraph {
         position: usize,
         span: TextSpan,
@@ -3700,6 +4023,17 @@ impl Change {
                 before,
                 after,
             } => Self::Bold {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Italic {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Italic {
                 span: *after_span,
                 after_span: *span,
                 before: *after,
@@ -3863,6 +4197,16 @@ fn semantic_changes(
                 before: *before,
                 after: *after,
             }),
+            Operation::Italic {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Italic {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
             Operation::InsertParagraph {
                 position,
                 span,
@@ -3961,6 +4305,7 @@ fn semantic_changes(
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
+            | Operation::Italic { .. }
             | Operation::MoveParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
@@ -4133,6 +4478,21 @@ fn durable_operation(
             litchi_core::patch::PatchOperation::new(
                 limits,
                 "character-bold.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::Italic {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("italic".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-italic.set",
                 format!("body:utf8:{}-{}", span.start, span.end),
                 preconditions,
                 Value::Bool(*after),
@@ -4473,6 +4833,23 @@ pub(crate) fn apply_durable<Mode>(
                     .as_bool()
                     .ok_or_else(|| Error::DurablePatch("bold value must be Boolean".to_string()))?;
                 edit.set_text_bold(span, replacement)?;
+            },
+            "character-italic.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("italic")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing italic precondition".to_string())
+                    })?;
+                if italic_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character italic state differs"));
+                }
+                let replacement = operation.value.as_bool().ok_or_else(|| {
+                    Error::DurablePatch("italic value must be Boolean".to_string())
+                })?;
+                edit.set_text_italic(span, replacement)?;
             },
             "paragraph.insert-after" => {
                 let position = parse_paragraph_target(&operation.target)?;

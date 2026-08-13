@@ -47,6 +47,7 @@ assert_eq!(
 - Immutable, cheap-to-share `Document` snapshots for ordinary reads
 - Bounded source-checked `Document::edit()` transactions composing disjoint
   UTF-8 body spans, paragraph alignment, character bold ranges, ordinary
+  character italic ranges,
   paragraph insertion, table-cell text, header/footer text, comment bodies,
   footnote/endnote stories, and inert root shape text frames, with atomic
   commits, reversible durable patches, deterministic sub-edit/three-way

@@ -369,6 +369,299 @@ fn bold_property_and_paragraph_structure_have_durable_semantics() {
 }
 
 #[test]
+fn italic_property_is_bounded_batch_reversible_and_durable() {
+    let source = Document::parse(r"{\rtf1\ansi Alpha Beta Gamma}").unwrap();
+    let mut edit = source.edit();
+    edit.set_text_italic(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap()
+        .set_text_italic(TextSpan::new(6, 10).unwrap(), true)
+        .unwrap();
+    let formatted = edit.commit().unwrap();
+    let runs = formatted.snapshot().body().runs().collect::<Vec<_>>();
+    assert_eq!(
+        runs.iter()
+            .map(|run| (run.text(), run.format().italic()))
+            .collect::<Vec<_>>(),
+        vec![
+            ("Alpha", true),
+            (" ", false),
+            ("Beta", true),
+            (" Gamma", false)
+        ]
+    );
+    assert_eq!(formatted.snapshot().text(), source.text());
+    assert_eq!(
+        formatted
+            .patch()
+            .inverse()
+            .apply(formatted.snapshot())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        source.to_bytes().unwrap()
+    );
+
+    let prefix = br"{\rtf1\ansi{\*\futuremeta retained}\pard ";
+    let enveloped =
+        Document::from_bytes(&[prefix.as_slice(), b"Alpha", b"}\r\n"].concat()).unwrap();
+    let mut enveloped_edit = enveloped.edit();
+    enveloped_edit
+        .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let enveloped_bytes = enveloped_edit
+        .commit()
+        .unwrap()
+        .snapshot()
+        .to_bytes()
+        .unwrap();
+    assert!(enveloped_bytes.starts_with(prefix));
+    assert!(enveloped_bytes.ends_with(b"}\r\n"));
+
+    let durable = formatted.patch().to_durable(durable_limits(2)).unwrap();
+    assert_eq!(durable.operations().len(), 2);
+    assert!(
+        durable
+            .operations()
+            .iter()
+            .all(|operation| operation.op == "character-italic.set")
+    );
+    let encoded = durable.to_deterministic_json().unwrap();
+    let decoded =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &encoded,
+            durable_limits(2),
+        )
+        .unwrap();
+    let applied = source.apply_durable(&decoded).unwrap();
+    assert_eq!(
+        applied.to_bytes().unwrap(),
+        formatted.snapshot().to_bytes().unwrap()
+    );
+    let restored = applied.apply_durable(&decoded.inverse()).unwrap();
+    assert_eq!(restored.text(), source.text());
+    assert!(restored.body().runs().all(|run| !run.format().italic()));
+
+    let mut mixed_edit = source.edit();
+    mixed_edit
+        .set_text_bold(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap()
+        .set_text_italic(TextSpan::new(6, 10).unwrap(), true)
+        .unwrap();
+    let mixed = mixed_edit.commit().unwrap();
+    let mixed_runs = mixed.snapshot().body().runs().collect::<Vec<_>>();
+    assert!(
+        mixed_runs
+            .iter()
+            .any(|run| run.text() == "Alpha" && run.format().bold())
+    );
+    assert!(
+        mixed_runs
+            .iter()
+            .any(|run| run.text() == "Beta" && run.format().italic())
+    );
+}
+
+#[test]
+fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
+    let source = Document::parse(r"{\rtf1\ansi {\i Alpha} Beta}").unwrap();
+    let original = source.to_bytes().unwrap();
+    let mut noop = source.edit();
+    noop.set_text_italic(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let noop = noop.commit().unwrap();
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.snapshot().to_bytes().unwrap(), original);
+
+    let plain = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+    let mut overlap = plain.edit();
+    overlap
+        .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    assert!(matches!(
+        overlap.set_text_italic(TextSpan::new(4, 10).unwrap(), true),
+        Err(Error::Conflict {
+            existing: 0,
+            incoming: 1
+        })
+    ));
+    let mut bounded = plain.edit_with_limits(Limits::new(1));
+    bounded
+        .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    assert!(matches!(
+        bounded.set_text_italic(TextSpan::new(6, 10).unwrap(), true),
+        Err(Error::OperationLimit {
+            observed: 2,
+            limit: 1
+        })
+    ));
+
+    let utf8 = Document::parse(r"{\rtf1\ansi Caf\'e9}").unwrap();
+    assert_eq!(utf8.text(), "Café");
+    let mut utf8_edit = utf8.edit();
+    utf8_edit
+        .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    assert!(utf8_edit.commit().is_ok());
+    let mut misaligned = utf8.edit();
+    assert!(matches!(
+        misaligned.set_text_italic(TextSpan::new(4, 5).unwrap(), true),
+        Err(Error::SpanNotOnCharacterBoundary { position: 4 })
+    ));
+
+    let mixed = Document::parse(r"{\rtf1\ansi {\i Alpha} Beta}").unwrap();
+    let mut mixed_edit = mixed.edit();
+    assert!(matches!(
+        mixed_edit.set_text_italic(TextSpan::new(0, 10).unwrap(), false),
+        Err(Error::UnsupportedSource(
+            "the selected character span has mixed italic state"
+        ))
+    ));
+
+    let unrelated = Document::parse(r"{\rtf1\ansi \b Alpha\b0 Beta}").unwrap();
+    let mut unrelated_edit = unrelated.edit();
+    unrelated_edit
+        .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let unrelated_result = unrelated_edit.commit();
+    assert!(matches!(
+        unrelated_result,
+        Err(Error::UnsupportedSource(
+            "the body has mixed character formatting"
+        ))
+    ));
+
+    let protected = Document::parse(r"{\rtf1\ansi\readprot\enforceprot1 Alpha}").unwrap();
+    let mut protected_edit = protected.edit();
+    protected_edit
+        .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    assert!(matches!(
+        protected_edit.commit(),
+        Err(Error::ProtectedDocument { .. })
+    ));
+
+    let paragraph_source = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let mut paragraph_edit = paragraph_source.edit();
+    assert!(matches!(
+        paragraph_edit.set_text_italic(TextSpan::new(0, 6).unwrap(), true),
+        Err(Error::UnsupportedSource(
+            "italic edits require non-empty text within one paragraph"
+        ))
+    ));
+
+    let opaque = Document::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
+    let mut opaque_edit = opaque.edit();
+    opaque_edit
+        .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    assert!(matches!(
+        opaque_edit.commit(),
+        Err(Error::UnsupportedSource(_))
+    ));
+
+    let field = Document::parse(r"{\rtf1\ansi A{\field{\*\fldinst PAGE}{\fldrslt B}}}").unwrap();
+    let mut field_edit = field.edit();
+    field_edit
+        .set_text_italic(TextSpan::new(0, 1).unwrap(), true)
+        .unwrap();
+    assert!(matches!(
+        field_edit.commit(),
+        Err(Error::UnsupportedSource(_))
+    ));
+
+    let table = Document::parse(r"{\rtf1\ansi\trowd\cellx1000\intbl A\cell\row}").unwrap();
+    let mut table_edit = table.edit();
+    assert!(matches!(
+        table_edit.set_text_italic(TextSpan::new(0, 1).unwrap(), true),
+        Err(Error::SpanOutOfRange { .. })
+    ));
+
+    let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
+    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    assert_eq!(cp1252.text(), "Café");
+    let mut cp1252_edit = cp1252.edit();
+    cp1252_edit
+        .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    assert!(matches!(
+        cp1252_edit.commit(),
+        Err(Error::UnsupportedSource(
+            "italic edits refuse non-ASCII transport encodings"
+        ))
+    ));
+
+    let compressed_bytes = litchi_rtf::transport::compress(br"{\rtf1\ansi Alpha}", true).unwrap();
+    let compressed = Document::from_bytes(&compressed_bytes).unwrap();
+    let mut compressed_edit = compressed.edit();
+    compressed_edit
+        .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    assert!(matches!(
+        compressed_edit.commit(),
+        Err(Error::UnsupportedSource(
+            "compressed RTF needs a transport-aware rewrite"
+        ))
+    ));
+}
+
+#[test]
+fn italic_durable_patch_rejects_stale_property_and_artifact() {
+    use litchi_core::patch::{BlobBundle, Patch, PatchOperation, ReversibleOperation};
+    use serde_json::Value;
+    use std::collections::BTreeMap;
+
+    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let limits = durable_limits(1);
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert(
+        "artifact_sha256".to_string(),
+        Value::String(litchi_core::patch::BlobId::of(&source.to_bytes().unwrap()).as_hex()),
+    );
+    preconditions.insert("italic".to_string(), Value::Bool(true));
+    let forward = PatchOperation::new(
+        limits,
+        "character-italic.set",
+        "body:utf8:0-5",
+        preconditions.clone(),
+        Value::Bool(false),
+    )
+    .unwrap();
+    let inverse = PatchOperation::new(
+        limits,
+        "character-italic.set",
+        "body:utf8:0-5",
+        preconditions,
+        Value::Bool(true),
+    )
+    .unwrap();
+    let stale = Patch::<litchi_core::patch::Reversible>::new(
+        limits,
+        "litchi-rtf",
+        [ReversibleOperation::new(forward, inverse)],
+        BlobBundle::new(limits.blobs()),
+        BlobBundle::new(limits.blobs()),
+    )
+    .unwrap();
+    assert!(matches!(
+        source.apply_durable(&stale),
+        Err(Error::StalePrecondition("character italic state differs"))
+    ));
+
+    let foreign = Document::parse(r"{\rtf1\ansi Other}").unwrap();
+    let mut valid_edit = source.edit();
+    valid_edit
+        .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let valid = valid_edit.commit().unwrap();
+    let durable = valid.patch().to_durable(limits).unwrap();
+    assert!(matches!(
+        foreign.apply_durable(&durable),
+        Err(Error::PatchConflict)
+    ));
+}
+
+#[test]
 fn core_subedits_compose_and_report_typed_conflicts() {
     let source = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
     let limits = CompositionLimits::new(4, 8, 16, 8);
