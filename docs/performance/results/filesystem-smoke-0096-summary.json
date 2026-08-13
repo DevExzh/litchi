@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "source_artifact": "target/perf/filesystem-smoke-0096.json",
+  "tool_profile": "debug",
+  "git_revision": "0e86dfa22b247b0ce53eed774dc84b0fad5f371d",
+  "git_worktree_dirty": true,
+  "configuration": {
+    "samples_per_case": 1,
+    "warmup_iterations_per_case": 0,
+    "cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "fresh_child_per_sample": true,
+    "process_isolated": true
+  },
+  "counts": {
+    "results": 10,
+    "evidence_cases": 5
+  },
+  "assertions": {
+    "opc_source_open": {
+      "logical_read_calls": 13,
+      "logical_read_bytes": 1008,
+      "materialized_parts": 0,
+      "warm_physical_read_bytes": 0,
+      "cold_requested_physical_read_bytes": 20480
+    },
+    "opc_eager_open": {
+      "materialized_parts": 4
+    },
+    "opc_atomic_save": {
+      "eager_output_sha256": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009",
+      "source_output_sha256": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009",
+      "output_bytes": 16783632
+    },
+    "cfb_atomic_save": {
+      "output_sha256": "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc",
+      "changed_spans": 1,
+      "published_bytes": 16913408,
+      "cold_requested_physical_read_bytes": 16916480
+    }
+  },
+  "claim_boundary": "One-sample debug correctness/counter smoke only; no latency, allocation, memory, throughput, cache-temperature, or production-performance claim."
+}
