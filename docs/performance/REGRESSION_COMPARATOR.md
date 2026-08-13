@@ -42,7 +42,28 @@ metrics.
 The policy also requires a SHA-256 digest of all 198 exact `(case, canonical
 corpus JSON)` keys. Keys are sorted, then hashed as UTF-8 case name, a zero
 byte, compact canonical corpus JSON, and a newline. This prevents a reference
-and candidate from silently agreeing on the same replacement corpus.
+and candidate from silently agreeing on the same replacement corpus. The
+checked default manifest digest is
+`3b57c3b5aef77f5149d520fd885194d1fd8734460b28bff9d317d1cd840c246f`.
+
+The digest was derived from the current harness's default `Case::DEFAULT`
+selection and a fresh deterministic one-sample, zero-warmup report (the
+sample count is irrelevant to this identity-only calculation). The emitted
+198 keys decompose into:
+
+| harness branch | cases | corpus selection per case | records |
+| --- | ---: | --- | ---: |
+| ZIP/OPC and CFB/OLE2 substrate | 18 | 4 archive shapes × 2 payload kinds | 144 |
+| fresh DOC/XLS/PPT writers | 3 | 3 writer shapes | 9 |
+| XLSX semantic matrix | 15 | 3 XLSX shapes | 45 |
+| total | 36 | — | 198 |
+
+The archive shapes are `tiny`, `many-small`, `few-large`, and `wide-root`; the
+payload kinds are `compressible` and `incompressible`; writer shapes are
+`tiny`, `large`, and `payload-heavy`; and XLSX shapes are `tiny`, `medium`,
+and `dense-wide`. The exact identity-only manifest is recorded in
+[`perf-regression-default-manifest-v1.json`](results/perf-regression-default-manifest-v1.json);
+it contains no latency samples, resource counters, or output measurements.
 
 Git revisions are recorded in the result but deliberately differ between the
 reference and candidate. The compared build identity consists of Rust version,
@@ -118,9 +139,11 @@ gate, not the controlled environment needed for an acceptance claim. Teams
 making release decisions should run the same command on a pinned host and
 retain balanced ABBA evidence.
 
-No reference report is committed or silently selected. At the time this
-mechanism was added there was no qualifying current controlled reference, so
-`expected_result_keys_sha256` is deliberately `null`. The comparator treats
-that state as invalid and the hosted reference job cannot pass until a
-reviewed controlled reference manifest digest is committed. This document
-makes no passing-baseline or performance-regression claim.
+No reference report is committed or silently selected. The checked digest only
+authorizes the case/corpus key identity; it is not a latency baseline and does
+not authorize any performance claim. A qualifying controlled reference report
+must still be supplied separately, must satisfy the minimum sample count and
+build/configuration identity checks, and must have a distinct revision from
+the candidate. The hosted job therefore remains a conservative comparison
+gate, not evidence that a baseline has passed or that any optimization has
+improved performance.
