@@ -162,6 +162,9 @@ pub mod text_special_info;
 pub mod vba_info;
 pub mod view_set_info;
 
+/// Bounded, non-mutating semantic validation of legacy PowerPoint sources.
+pub mod validation;
+
 // Re-export main types for convenience
 pub use document_comparison::{
     DiffFlags, DiffNode, DiffRecordHeaders, DiffTree10, DiffType, DocDiffFlags, ElementType,
@@ -181,6 +184,9 @@ pub use slide::{
     SlideFactory, SpeakerNotes,
 };
 pub use sound_collection::{BuiltinId, Sound};
+pub use validation::{
+    PptValidationError, PptValidationLimits, validate_source, validate_source_with_limits,
+};
 pub use view_info::{
     Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewInformation, SlideViewPreferences,
     ViewKind, ViewOrigin, ZoomViewInfo,
