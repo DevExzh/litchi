@@ -116,6 +116,60 @@ def report(value=100, revision="baseline", corpus_sha="abc"):
 
 
 class PerfCompareTests(unittest.TestCase):
+    def test_checked_policy_pins_identity_only_default_manifest(self):
+        repository = Path(__file__).resolve().parents[1]
+        checked_policy = json.loads(
+            (repository / "docs/performance/perf-regression-policy-v1.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        manifest = json.loads(
+            (
+                repository
+                / "docs/performance/results/perf-regression-default-manifest-v1.json"
+            ).read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(manifest["manifest_kind"], "case-corpus-key-identity")
+        self.assertEqual(manifest["result_count"], 198)
+        self.assertEqual(manifest["case_count"], 36)
+        self.assertEqual(manifest["source_report_samples_per_case"], 1)
+        self.assertEqual(manifest["source_report_warmup_iterations_per_case"], 0)
+        self.assertEqual(manifest["default_cases"], checked_policy["required_cases"])
+        for field, expected in manifest["identity_configuration"].items():
+            self.assertEqual(
+                checked_policy["expected_configuration"][field], expected, field
+            )
+
+        keys = []
+        case_corpora = manifest["case_corpora"]
+        corpora = manifest["corpora"]
+        self.assertEqual(set(case_corpora), set(checked_policy["required_cases"]))
+        for case in manifest["default_cases"]:
+            names = case_corpora[case]
+            self.assertEqual(len(names), len(set(names)), case)
+            for name in names:
+                corpus = corpora[name]
+                corpus_identity = json.dumps(
+                    corpus, sort_keys=True, separators=(",", ":"), allow_nan=False
+                )
+                keys.append((case, corpus_identity))
+
+        self.assertEqual(len(keys), manifest["result_count"])
+        self.assertEqual(len(keys), len(set(keys)))
+        self.assertEqual(
+            set(corpora), {name for names in case_corpora.values() for name in names}
+        )
+        self.assertEqual(
+            sorted(len(names) for names in case_corpora.values()),
+            [3] * 18 + [8] * 18,
+        )
+        for forbidden in ("elapsed_ns", "metrics", "sink", "output_sha256"):
+            self.assertNotIn(forbidden, manifest)
+        digest = perf_compare.result_key_manifest_sha256(keys)
+        self.assertEqual(digest, manifest["result_keys_sha256"])
+        self.assertEqual(digest, checked_policy["expected_result_keys_sha256"])
+
     def test_pass_compares_latency_and_available_resource_counters(self):
         baseline = report()
         current = report(104, "current")

@@ -3,7 +3,7 @@
   "policy_id": "litchi-hosted-default-matrix-v1",
   "minimum_samples": 15,
   "expected_result_count": 198,
-  "expected_result_keys_sha256": null,
+  "expected_result_keys_sha256": "3b57c3b5aef77f5149d520fd885194d1fd8734460b28bff9d317d1cd840c246f",
   "required_cases": [
     "zip_index",
     "zip_read_one",
