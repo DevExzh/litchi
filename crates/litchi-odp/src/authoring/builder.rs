@@ -930,11 +930,29 @@ impl Builder {
 
     /// Generate meta.xml with metadata
     fn generate_meta_xml(&self) -> String {
-        let now = chrono::Utc::now().to_rfc3339();
-
-        let mut meta = format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator><meta:creation-date>{now}</meta:creation-date><dc:date>{now}</dc:date>"#
+        let mut meta = String::from(
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator>"#,
         );
+
+        if let Some(created) = self.metadata.created.as_ref() {
+            meta.push_str("<meta:creation-date>");
+            meta.push_str(&created.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true));
+            meta.push_str("</meta:creation-date>");
+        } else if let Some(created) = self.metadata.created_local.as_ref() {
+            meta.push_str("<meta:creation-date>");
+            meta.push_str(&created.format("%Y-%m-%dT%H:%M:%S%.f").to_string());
+            meta.push_str("</meta:creation-date>");
+        }
+
+        if let Some(modified) = self.metadata.modified.as_ref() {
+            meta.push_str("<dc:date>");
+            meta.push_str(&modified.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true));
+            meta.push_str("</dc:date>");
+        } else if let Some(modified) = self.metadata.modified_local.as_ref() {
+            meta.push_str("<dc:date>");
+            meta.push_str(&modified.format("%Y-%m-%dT%H:%M:%S%.f").to_string());
+            meta.push_str("</dc:date>");
+        }
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {
@@ -1018,7 +1036,44 @@ mod tests {
         Presentation, ScriptEventListener, Shape, ShapeEventListener, Sound, SoundShow, Speed,
         Style, Type,
     };
+    use chrono::{NaiveDate, TimeZone, Utc};
     use litchi_core::ShapeType;
+
+    #[test]
+    fn fresh_builder_output_is_deterministic_without_ambient_timestamps() {
+        let first = Builder::new().build().unwrap();
+        let second = Builder::new().build().unwrap();
+        assert_eq!(first, second);
+
+        let package = OwnedPackage::from_bytes(first).unwrap();
+        let meta = String::from_utf8(package.get_file("meta.xml").unwrap()).unwrap();
+        assert!(!meta.contains("meta:creation-date"));
+        assert!(!meta.contains("<dc:date>"));
+    }
+
+    #[test]
+    fn builder_serializes_explicit_utc_and_local_metadata_dates() {
+        let mut builder = Builder::new();
+        builder.set_metadata(Metadata {
+            title: Some("Title & details".to_string()),
+            author: Some("Ada <Lovelace>".to_string()),
+            created: Some(Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).single().unwrap()),
+            modified_local: Some(
+                NaiveDate::from_ymd_opt(2024, 6, 7)
+                    .unwrap()
+                    .and_hms_opt(8, 9, 10)
+                    .unwrap(),
+            ),
+            ..Default::default()
+        });
+
+        let package = OwnedPackage::from_bytes(builder.build().unwrap()).unwrap();
+        let meta = String::from_utf8(package.get_file("meta.xml").unwrap()).unwrap();
+        assert!(meta.contains("<meta:creation-date>2024-01-02T03:04:05Z</meta:creation-date>"));
+        assert!(meta.contains("<dc:date>2024-06-07T08:09:10</dc:date>"));
+        assert!(meta.contains("<dc:title>Title &amp; details</dc:title>"));
+        assert!(meta.contains("<dc:creator>Ada &lt;Lovelace&gt;</dc:creator>"));
+    }
 
     #[test]
     fn writes_native_rectangles_and_connectors() {

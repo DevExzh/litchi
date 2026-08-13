@@ -6,6 +6,7 @@
 //! Uses soapberry-zip for high-performance ZIP writing.
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
+use chrono::NaiveDate;
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -27,6 +28,105 @@ use super::package::OwnedPackage;
 use super::xml_splice::XmlSplicePublication;
 
 const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
+
+fn invalid_odf_datetime(value: &str, field: &str) -> Error {
+    Error::InvalidFormat(format!("invalid ODF {field} date-time '{value}'"))
+}
+
+fn parse_ascii_digits(value: &[u8]) -> Option<u32> {
+    if value.is_empty() || !value.iter().all(u8::is_ascii_digit) {
+        return None;
+    }
+    value.iter().try_fold(0_u32, |number, digit| {
+        number
+            .checked_mul(10)
+            .and_then(|number| number.checked_add(u32::from(digit - b'0')))
+    })
+}
+
+/// Validate the canonical writer date-time profile emitted by fresh ODF metadata.
+///
+/// The shared reader codec intentionally accepts a wider compatibility space.
+/// New writer input is narrower: it requires a four-digit year in
+/// `0001..=9999`, `YYYY-MM-DDThh:mm:ss`, optional decimal seconds, and either
+/// no timezone, `Z`, or a numeric offset in the inclusive range
+/// `-14:00..=+14:00`. Broader XSD lexical forms such as negative or five-digit
+/// years and `24:00:00` are intentionally refused by this writer profile.
+fn validate_canonical_odf_datetime(value: &str, field: &str) -> Result<()> {
+    let bytes = value.as_bytes();
+    if bytes.len() < 19
+        || bytes.get(4) != Some(&b'-')
+        || bytes.get(7) != Some(&b'-')
+        || bytes.get(10) != Some(&b'T')
+        || bytes.get(13) != Some(&b':')
+        || bytes.get(16) != Some(&b':')
+    {
+        return Err(invalid_odf_datetime(value, field));
+    }
+
+    let year = parse_ascii_digits(&bytes[0..4]);
+    let month = parse_ascii_digits(&bytes[5..7]);
+    let day = parse_ascii_digits(&bytes[8..10]);
+    let hour = parse_ascii_digits(&bytes[11..13]);
+    let minute = parse_ascii_digits(&bytes[14..16]);
+    let second = parse_ascii_digits(&bytes[17..19]);
+    let (Some(year), Some(month), Some(day), Some(hour), Some(minute), Some(second)) =
+        (year, month, day, hour, minute, second)
+    else {
+        return Err(invalid_odf_datetime(value, field));
+    };
+
+    if year == 0
+        || NaiveDate::from_ymd_opt(year as i32, month, day).is_none()
+        || hour > 23
+        || minute > 59
+        || second > 59
+    {
+        return Err(invalid_odf_datetime(value, field));
+    }
+
+    let mut index = 19;
+    if bytes.get(index) == Some(&b'.') {
+        index += 1;
+        let fraction_start = index;
+        while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+            index += 1;
+        }
+        if fraction_start == index {
+            return Err(invalid_odf_datetime(value, field));
+        }
+    }
+
+    if index < bytes.len() {
+        match bytes[index] {
+            b'Z' => index += 1,
+            b'+' | b'-' => {
+                if bytes.len() != index + 6 || bytes.get(index + 3) != Some(&b':') {
+                    return Err(invalid_odf_datetime(value, field));
+                }
+                let offset_hour = parse_ascii_digits(&bytes[index + 1..index + 3]);
+                let offset_minute = parse_ascii_digits(&bytes[index + 4..index + 6]);
+                let (Some(offset_hour), Some(offset_minute)) = (offset_hour, offset_minute) else {
+                    return Err(invalid_odf_datetime(value, field));
+                };
+                if offset_hour > 14
+                    || offset_minute > 59
+                    || (offset_hour == 14 && offset_minute != 0)
+                {
+                    return Err(invalid_odf_datetime(value, field));
+                }
+                index += 6;
+            },
+            _ => return Err(invalid_odf_datetime(value, field)),
+        }
+    }
+
+    if index == bytes.len() {
+        Ok(())
+    } else {
+        Err(invalid_odf_datetime(value, field))
+    }
+}
 
 /// Builder for creating ODF packages (ZIP archives)
 ///
@@ -896,9 +996,62 @@ impl Structure {
     /// Generate a default meta.xml skeleton
     #[must_use]
     pub fn default_meta_xml() -> String {
-        let now = chrono::Utc::now().to_rfc3339();
+        Self::default_meta_xml_inner(None, None)
+    }
+
+    /// Generate a metadata skeleton from explicitly supplied canonical writer
+    /// date-time values.
+    ///
+    /// The no-argument [`Self::default_meta_xml`] intentionally contains no
+    /// creation or modification timestamp. New package output must not read
+    /// the host clock. Callers that need document dates can provide checked
+    /// ODF date-time values here; invalid values are rejected before any XML
+    /// is returned. The accepted writer profile is exactly a four-digit year
+    /// in `0001..=9999`, `YYYY-MM-DDThh:mm:ss`, an optional fractional
+    /// second, and either no timezone, `Z`, or an offset in `±14:00`. Broader
+    /// XSD lexical forms are intentionally refused. Other metadata fields are
+    /// deliberately not accepted by this minimal skeleton API, so they cannot
+    /// be silently dropped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a supplied creation or modification date is not
+    /// valid under the canonical writer profile.
+    pub fn default_meta_xml_with_dates(
+        creation_date: Option<&str>,
+        modification_date: Option<&str>,
+    ) -> Result<String> {
+        if let Some(value) = creation_date {
+            validate_canonical_odf_datetime(value, "creation")?;
+        }
+        if let Some(value) = modification_date {
+            validate_canonical_odf_datetime(value, "modification")?;
+        }
+
+        Ok(Self::default_meta_xml_inner(
+            creation_date,
+            modification_date,
+        ))
+    }
+
+    fn default_meta_xml_inner(
+        creation_date: Option<&str>,
+        modification_date: Option<&str>,
+    ) -> String {
+        let mut dates = String::new();
+        if let Some(value) = creation_date {
+            dates.push_str("<meta:creation-date>");
+            dates.push_str(value);
+            dates.push_str("</meta:creation-date>");
+        }
+        if let Some(value) = modification_date {
+            dates.push_str("<dc:date>");
+            dates.push_str(value);
+            dates.push_str("</dc:date>");
+        }
         format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:ooo="http://openoffice.org/2004/office" xmlns:grddl="http://www.w3.org/2003/g/data-view#" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator><meta:creation-date>{now}</meta:creation-date><dc:date>{now}</dc:date></office:meta></office:document-meta>"#
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:ooo="http://openoffice.org/2004/office" xmlns:grddl="http://www.w3.org/2003/g/data-view#" office:version="1.3"><office:meta><meta:generator>{}</meta:generator>{}</office:meta></office:document-meta>"#,
+            "Litchi/0.0.1", dates,
         )
     }
 
@@ -1293,7 +1446,83 @@ mod tests {
         let meta = Structure::default_meta_xml();
         assert!(meta.contains("office:document-meta"));
         assert!(meta.contains("Litchi"));
-        assert!(meta.contains("meta:creation-date"));
+        assert!(!meta.contains("meta:creation-date"));
+        assert!(!meta.contains("<dc:date>"));
+    }
+
+    #[test]
+    fn default_meta_xml_is_byte_identical_without_ambient_time() {
+        assert_eq!(Structure::default_meta_xml(), Structure::default_meta_xml());
+
+        let build = || {
+            let mut writer = PackageWriter::new();
+            writer
+                .set_mimetype("application/vnd.oasis.opendocument.text")
+                .unwrap();
+            writer
+                .add_file(
+                    "content.xml",
+                    Structure::default_content_xml("office:text").as_bytes(),
+                )
+                .unwrap();
+            writer
+                .add_file("styles.xml", Structure::default_styles_xml().as_bytes())
+                .unwrap();
+            writer
+                .add_file("meta.xml", Structure::default_meta_xml().as_bytes())
+                .unwrap();
+            writer.finish_to_bytes().unwrap()
+        };
+        assert_eq!(build(), build());
+    }
+
+    #[test]
+    fn default_meta_xml_serializes_checked_explicit_metadata() {
+        let meta = Structure::default_meta_xml_with_dates(
+            Some("2024-01-02T03:04:05.123456Z"),
+            Some("2024-06-07T08:09:10+02:00"),
+        )
+        .unwrap();
+        assert!(meta.contains("<meta:generator>Litchi/0.0.1</meta:generator>"));
+        assert!(
+            meta.contains("<meta:creation-date>2024-01-02T03:04:05.123456Z</meta:creation-date>")
+        );
+        assert!(meta.contains("<dc:date>2024-06-07T08:09:10+02:00</dc:date>"));
+    }
+
+    #[test]
+    fn default_meta_xml_rejects_invalid_explicit_metadata_dates() {
+        for value in [
+            "not-a-date",
+            "2024-01-02 03:04:05Z",
+            "2024-01-02T03:04:05z",
+            "2024-01-02T03:04:05+14:01",
+            "2024-01-02T03:04:05+23:59",
+            "2024-01-02T03:04:05.Z",
+            "2024-02-30T03:04:05Z",
+            "0000-01-02T03:04:05Z",
+            "-0001-01-02T03:04:05Z",
+            "10000-01-02T03:04:05Z",
+            "2024-01-02T24:00:00Z",
+        ] {
+            assert!(
+                Structure::default_meta_xml_with_dates(Some(value), None).is_err(),
+                "accepted invalid date-time {value}"
+            );
+        }
+
+        for value in [
+            "2024-01-02T03:04:05Z",
+            "2024-01-02T03:04:05.123456Z",
+            "2024-01-02T03:04:05+14:00",
+            "2024-01-02T03:04:05-14:00",
+            "2024-01-02T03:04:05",
+        ] {
+            assert!(
+                Structure::default_meta_xml_with_dates(Some(value), None).is_ok(),
+                "rejected valid date-time {value}"
+            );
+        }
     }
 
     #[test]
