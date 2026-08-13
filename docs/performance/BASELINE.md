@@ -222,7 +222,8 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**184 selectable cases**; its preceding committed revision had 180. The
+**184 selectable cases**; 180 was the count before the four XLS visibility
+selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
 
@@ -250,13 +251,18 @@ exact/one-under managed Budget boundary and matched finite-control/managed
 same-Part plus fixed-work disjoint-Part contention across `1/2x`, `1x`, and
 `2x` capacities. They enforce exact gate, cache, pinning and Budget-release
 counters and classify Amdahl results only where request count remains fixed.
-The committed implementation charges retained and in-flight payload memory;
-`InputBytes`, `Work`, and `Objects` accounting remains an active follow-up and
-is not attributed to this baseline. The fixed-delay harness is a coordination
-instrument, not production latency. Its controlled release ABBA now provides
-structural and distribution evidence, but no managed-versus-control speedup is
-accepted; allocation, peak-memory/RSS, hardware-counter, copied/decompressed-
-byte, and CPU-utilization evidence remain absent. See
+The committed managed source-backed OPC change (`f8d417ac3`) charges exact
+physical `InputBytes`, cumulative declared cold-load `Work`, retained
+catalog/flight/payload `Objects`, and retained/in-flight payload `Memory` to the
+caller-owned hierarchical `Budget`; compatibility opens remain on the finite
+unmanaged `SourceCacheLimits` path. Focused correctness tests cover these
+resource charges, retained-resource releases, pinning, eviction, single-flight,
+cancellation, sibling competition, and contention invariants. The fixed-delay
+harness is a coordination instrument, not production latency. Its controlled
+release ABBA provides structural and distribution evidence only; no
+managed-versus-control speedup is accepted. Allocation, peak-memory/RSS,
+hardware-counter, copied/decompressed-byte, CPU-utilization, and
+production-performance evidence remain absent. See
 [`0086`](changes/0086-opc-source-cache-budget-management.md) and
 [`0088`](changes/0088-opc-source-cache-contention-evidence.md).
 
@@ -842,14 +848,17 @@ incomplete program and CRUD matrix.
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
 [`0007`](changes/0007-source-backed-opc-and-facades.md). Managed source-backed
-OPC caches now charge retained and in-flight payload memory to a hierarchical
-`Budget`; compatibility opens retain the finite `SourceCacheLimits` path. The
-opt-in harness supplies deterministic boundary and controlled-contention
-counter evidence, including exact pin pressure and release accounting, plus a
-committed release ABBA with no accepted speedup. `InputBytes`, `Work`, and
-`Objects` accounting, allocation/peak-memory/RSS, hardware, copied/decompressed
-byte, and production-latency evidence remain pending. The release filesystem
-evidence is likewise descriptive tmpfs data, not physical cold-cache proof.
+OPC caches now charge exact physical `InputBytes`, cumulative declared
+cold-load `Work`, retained catalog/flight/payload `Objects`, and
+retained/in-flight payload `Memory` to a hierarchical `Budget`; compatibility
+opens retain the finite unmanaged `SourceCacheLimits` path. Focused correctness
+tests cover these resource charges, retained-resource releases, pin pressure, eviction,
+single-flight, cancellation, sibling competition, and release accounting. The
+committed release ABBA provides structural/distribution evidence only with no
+accepted speedup. Allocation/peak-memory/RSS, hardware, copied/decompressed-
+byte, CPU-utilization, and production-latency evidence remain pending. The
+release filesystem evidence is likewise descriptive tmpfs data, not physical
+cold-cache proof.
 
 Consolidated changed-crate tests, formatter checks, warning-denied production
 Clippy and rustdoc gates passed. The current ODS all-target Clippy gate retains

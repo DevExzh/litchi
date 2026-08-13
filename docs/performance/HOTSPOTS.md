@@ -116,13 +116,16 @@ Current work shape:
   97.75% and 97.75%, respectively; see changes 0061, 0067, 0070, 0073, 0078
   and 0079.
 
-The committed managed source-cache path charges retained and active-flight
-payload memory to the caller's hierarchical Budget. Its release contention
-capture validates flights, waiters, pinning, eviction and release counters, but
-accepts no managed-versus-control speedup. `InputBytes`, `Work`, and `Objects`
-accounting, allocation/peak-memory/RSS, hardware, and copied/decompressed-byte
-evidence remain open; compatibility constructors retain their finite
-`SourceCacheLimits` behavior.
+The committed managed source-cache change (`f8d417ac3`) charges exact
+physical `InputBytes`, cumulative declared cold-load `Work`, retained
+catalog/flight/payload `Objects`, and retained/in-flight payload `Memory` to the
+caller's hierarchical `Budget`; compatibility constructors retain the finite
+unmanaged `SourceCacheLimits` behavior. Focused correctness tests cover these
+resource charges, retained-resource releases, flights, waiters, pinning, eviction,
+cancellation, sibling competition, and contention invariants. Release
+contention accepts no managed-versus-control speedup; allocation/peak-memory/
+RSS, hardware, copied/decompressed-byte, CPU-utilization, and production-performance
+evidence remain open.
 
 ## XLSX selective read and edit path
 
@@ -153,15 +156,17 @@ Confirmed source facts:
   profiler evidence remains pending.
 - The legacy eager path still materializes all admitted Parts. The additive
   source-backed XLSX facade avoids timed source reads while listing after open;
-  managed source-backed OPC caches charge retained and in-flight payloads to a
-  caller's hierarchical `Budget`, preserve externally pinned handles, and
-  coordinate same-Part cold loads through one flight. Compatibility opens
-  remain finite under `SourceCacheLimits`. Correctness tests cover budget
-  hierarchy, eviction, pinning, sibling competition, cancellation and failure;
-  the release contention ABBA adds structural/distribution evidence but
-  accepts no speedup. Allocation, peak-memory/RSS, hardware,
-  copied/decompressed-byte, and complete `InputBytes`/`Work`/`Objects`
-  accounting remain missing.
+  managed source-backed OPC caches charge exact physical `InputBytes`,
+  cumulative declared cold-load `Work`, retained catalog/flight/payload
+  `Objects`, and retained/in-flight payload `Memory` to a caller's hierarchical
+  `Budget`, preserve externally pinned handles, and coordinate same-Part cold
+  loads through one flight. Compatibility opens remain finite under the
+  unmanaged `SourceCacheLimits` path. Correctness tests cover these resource
+  charges, retained-resource releases, budget hierarchy, eviction, pinning, sibling
+  competition, cancellation and failure; the release contention ABBA adds
+  structural/distribution evidence but accepts no speedup. Allocation,
+  peak-memory/RSS, hardware, copied/decompressed-byte, CPU, and
+  production-performance evidence remain missing.
 - The additive source-backed calculation-metadata editor loads only the
   workbook Part, stages existing typed `calcPr`/feature edits, reparses the
   complete candidate workbook XML, and consumes the commit into the accepted
@@ -769,7 +774,7 @@ pattern elsewhere.
 |---:|---|---|
 | 1 | Refined: legacy OPC path and `Read` ingress slurp the source; source-backed ingress is positional. Five filesystem cases now record process-isolated warm/cold-requested counters and atomic-save hashes, including a repeated release tmpfs capture. | Repeat on a controlled block-backed filesystem/cache host. The release run's accepted cold advice and zero process `read_bytes` on tmpfs are counters/output evidence only, not physical cold-cache behavior. |
 | 2 | Confirmed: ordinary OPC open inflates every admitted Part. | Open/list/one-object scaling against total uncompressed bytes and member count. |
-| 3 | Implemented for managed source-backed OPC: finite weighted eviction, pinned-handle preservation, per-entry single-flight, retained/in-flight memory Budget charging and content-free diagnostics exist; legacy eager open does not use that cache. | Release contention ABBA now covers structural/distribution counters but accepts no speedup. Add allocation, peak-memory/RSS, hardware, copied/decompressed-byte and CPU evidence, and complete the `InputBytes`/`Work`/`Objects` budget dimensions. |
+| 3 | Implemented for managed source-backed OPC: finite weighted eviction, pinned-handle preservation, per-entry single-flight, exact physical `InputBytes`, cumulative declared cold-load `Work`, retained catalog/flight/payload `Objects`, retained/in-flight payload `Memory` Budget charging and content-free diagnostics exist; compatibility/unmanaged opens retain finite `SourceCacheLimits`, and legacy eager open does not use that managed cache. | Correctness tests cover all managed resource dimensions and charging/release invariants. Release contention ABBA covers structural/distribution counters but accepts no speedup. Add allocation, peak-memory/RSS, hardware, copied/decompressed-byte, CPU-utilization and production-performance evidence. |
 | 4 | Measured: ordinary OPC open is serial and explicit eager open has a local bounded session. Six large ZIP tasks reach 4.52x p50 at 12 CPUs; small tasks regress. | Broader real-package scaling and threshold tuning. |
 | 5 | Confirmed: stored entries are CRC-checked then copied. | Stored-media one-Part read and package-open copied-byte/RSS deltas. |
 | 6 | Refined by measurement: exact unchanged saves copy the source; owned same-topology mutations raw-copy unchanged entries; changed Parts share their immutable logical payload and validated generated local span without extra copies; the bounded source-backed publisher materializes only selected targets and raw-copies the rest; guarded DOCX, atomic same-slide and multi-slide PPTX shape-text batches, and XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation/auto-filter facades consume it; borrowed/topology-changing paths rewrite fully, while unsupported source-backed layouts refuse. | Real-producer media-heavy multi-Part updates, broader semantic closures, signature/topology policies, and attribution of the remaining selected-Part/compressor-buffer memory cost. |
@@ -789,7 +794,7 @@ The order below is provisional until baseline measurements are recorded.
 
 | Rank | Candidate | Expected CRUD reach | Risk | ADR fit |
 |---:|---|---|---|---|
-| 1 | Extend source-backed OPC from selective reads and the bounded consuming publisher to broad query/edit/patch coverage. | All OOXML selective read/query/edit paths; offsets eager full-package work. | High | Positional source/descriptors, low-level one-Part/bounded multi-Part publication and managed cache memory charging are implemented; broader semantic CRUD, full budget dimensions and controlled cache acceptance remain. |
+| 1 | Extend source-backed OPC from selective reads and the bounded consuming publisher to broad query/edit/patch coverage. | All OOXML selective read/query/edit paths; offsets eager full-package work. | High | Positional source/descriptors, low-level one-Part/bounded multi-Part publication and managed cache charging across physical `InputBytes`, cumulative declared cold-load `Work`, retained `Objects`, and `Memory` are implemented and correctness-tested; broader semantic CRUD and controlled cache acceptance remain. |
 | 2 | Broaden the accepted source-backed DOCX/PPTX and XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation/auto-filter transactions only where complete semantic closures can be proved, with real media/signature/topology matrices. | Targeted OOXML save, especially media-heavy packages; avoids eager all-Part inflate/recompression where the same-topology proof applies. | High | DOCX is accepted in change 0039, guarded same-slide PPTX in 0044/0063 and bounded multi-slide PPTX in 0077, XLSX calculation metadata in 0046, page breaks in 0061, page margins in 0067, print options in 0070, relationship-free page setup in 0073, defined names in 0076, sheet protection in 0078, data validation in 0079, and auto filters in 0080. General XLSX cells/formulas/chains, table filters, printer settings and structural PPTX edits require wider closures; all accepted facades still need real-producer and broader topology/signature policy matrices. |
 | 3 | Tune explicit bounded-session thresholds and complete remaining I/O budget policy. | Large multi-Part open/save/validation. | Medium-high | 1/2/4/8/12 evidence exists; large tasks scale, small tasks regress; no hidden Rayon path remains. |
 | 4 | Build one validated OPC publication plan and reuse its generated XML and Part order during emission. | Every rewritten OPC save. | Low-medium | Implemented; see `changes/0001-opc-publication-plan.md`. |
@@ -798,7 +803,7 @@ The order below is provisional until baseline measurements are recorded.
 | 7 | Use validated cached CFB sibling-tree descent and reusable sector buffers. | Legacy stream-heavy open/rebuild workflows. | Medium | Implemented; see `changes/0002-cfb-lookup-and-sector-buffers.md`. |
 | 8 | Extend the accepted XLSX row-start index and bounded validated-store handoff to broader selector and edit matrices. | Sparse range queries and first reads after eligible changed-sheet commits. | Low-medium | Narrow ranges and bounded commit/read reuse are accepted in changes 0006 and 0025; dense-wide handoff is intentionally excluded, and preservation/readback gates and broad CRUD coverage remain unchanged. |
 | 9 | Coalesce DOCX same-structure paragraph replacements and measure PPTX capture/fingerprint reuse. | 1% semantic document/presentation edits. | Medium-high | Implemented for canonical direct-body DOCX batches and PPTX selected-scene reuse; complete source validation and candidate readback remain. See changes 0010 and 0012. |
-| 10 | Measure and tune the managed source-backed cache under controlled contention. | Concurrent repeated Part reads. | Medium-high | Hierarchical memory charging, pinned-aware eviction and per-entry single-flight are implemented and correctness-tested in change 0086; release ABBA in 0088 covers structural/distribution counters but accepts no speedup. Allocation, peak-memory/RSS, hardware, copied/decompressed-byte and remaining budget dimensions are open. |
+| 10 | Measure and tune the managed source-backed cache under controlled contention. | Concurrent repeated Part reads. | Medium-high | Hierarchical charging across physical `InputBytes`, cumulative declared cold-load `Work`, retained `Objects`, and `Memory`, plus pinned-aware eviction and per-entry single-flight, are implemented and correctness-tested in change 0086; release ABBA in 0088 covers structural/distribution counters but accepts no speedup. Allocation, peak-memory/RSS, hardware, copied/decompressed-byte, CPU-utilization and production-performance evidence are open. |
 | 11 | Extend ODF beyond accepted ODS snapshot, row-local provenance reuse/shared worksheet ownership, ODS/ODP/ODT unchanged-member publication, adaptive cell lookup, ODP indexed-slide retention/snapshot handoffs and ODT byte/full-text/indexed-query/audit/envelope/batch/final-byte ownership: positional source-backed reads, repeated independent ODP scans, richer non-text/bulk edits, resource-adding/richer structural publication and real-producer media. | ODT/ODS/ODP open/query and changed save. | High | Same-topology ODS row splicing now carries exact range proofs through raw ZIP emission and the adjacent nested worksheet/package owners share and move their archive allocation; compact ODS/ODP/ODT content raw preservation, bounded facade lookup, direct/existing/final-result ODT byte sharing, consuming full-text blocks, indexed paragraph/slide retention, ODP staging and final slide-only snapshot projection reuse, matched ODP text-box and ODT embedded-resource scalar/bounded evidence, compact-audit/envelope sharing, consecutive paragraph coalescing and scalar line-break/run/hyperlink plus plain paragraph insertion/removal publication are accepted. ODS content-validation catalog CRUD is correctness-covered but unmeasured. Parsed final-document adoption remains reverted for a read regression; other structural fallback, exact no-op and full readback remain. See changes 0011, 0014, 0018, 0019, 0020, 0023, 0027, 0031, 0034, 0035, 0038, 0041, 0042, 0045, 0047, 0049, 0052, 0057, 0060, 0065, 0068, 0071, 0072, 0074, 0075, 0084 and 0085. |
 | 12 | Extend accepted native RTF work beyond the capability-bounded variant matrix after parser-state, transport batching, byte-delimiter scanning, retained ordinary-body ranges, retained story-length/cardinality handoffs and sparse paragraph selection. | RTF formatted/media, malformed/security, broader real-producer and broad edit paths. | Medium | Plain, raw CP-1252, LZFu and producer-watermark read/no-op inputs plus a narrow native shape-text chain are covered; plain generated paragraph queries and editing are timed, public paragraph cardinality is parser-retained, and explicit sparse `nth` no longer constructs discarded paragraph views. Cached full text, byte-valued fallback, revisions, candidate readback and native forward-only output contracts remain. See changes 0013, 0019, 0020, 0029, 0040, 0048, 0064, 0066 and 0069. |
 | 13 | Attribute and integrate remaining native OLE2 final-owner/public-reader work. | OLE2 spreadsheet/document/presentation edit publication rather than substrate-only insertion. | Medium-high | XLS editor/inventory reuse, committed source-backed visibility overlays (`bac279116`), DOC batching/indexes, and PPT root-open/text-resolver/root-adoption work are accepted through changes 0016/0059, 0017/0050/0051/0053/0056, 0091, and 0024/0026/0062. XLS terminal-render and common CFB handoffs are rejected in 0028/0033/0036. Change 0091 is correctness/coverage only; matched release ABBA, speedup, resource evidence, and broader semantic visibility remain before performance adoption. |
