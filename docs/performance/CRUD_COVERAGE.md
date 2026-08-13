@@ -1,8 +1,8 @@
 # Performance CRUD coverage
 
-Date: 2026-08-12
+Date: 2026-08-13
 
-This is a coverage map, not a completion claim. It compares the 167 selectable
+This is a coverage map, not a completion claim. It compares the 169 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -26,7 +26,7 @@ performance claim.
 | Clear/remove/hide/detach/GC distinctions | Partial | Measured: ODT exact paragraph removal intentionally preserves orphaned resources, and RTF removes one exact middle ordinary paragraph on its narrow generated plain-source closure. API-only: OLE2 deletes one or a bounded stream set while retaining storages and unrelated streams; XLS shows/hides/very-hides worksheets, while XLSX additionally shows/hides/very-hides/activates tabs, hides/unhides existing rows, clears scalar cell values without deleting owners, or physically removes supported existing scalar `<c>` owners; ODS clears only unbound validation definitions; DOCX removes direct plain main-document paragraphs; PPTX and ODP remove only dependency-free supported slides; RTF removes standalone PNG/JPEG picture groups; ODT removes selected resource owners while retaining payloads. DOCX reversible hyperlink-wrapper detachment remains distinct from irreversible relationship/URL redaction. Opt-in ODT GC remains exact-source and explicit-name only. General cascading delete, orphan collection and dependency-aware removal remain missing |
 | Sanitization and irreversible redaction | Partial | API-only: DOCX now has two deliberately separate exact-source flows. Reversible detachment unwraps selected main-document external `w:hyperlink` owners but retains relationship records and target URLs. Irreversible redaction inventories and selects exact target URLs, unwraps their visible owners, removes the corresponding external hyperlink relationships, exposes effects before publication, and intentionally provides no inverse. It is bounded, fail-closed and main-document-only; it is not general personal-data cleanup, field/DDE sanitization, embedded-object cleanup or package-wide external-reference removal |
 | Copy object with dependency closure | Partial (correctness only) | PPTX atomically applies a bounded in-package slide-copy plan for its supported finite owned dependency graph while reusing shared layout dependencies and refusing unsupported/shared ownership; ODP copies only dependency-free blank slides; ODS copies only dependency-free worksheets; DOCX copies only direct plain main-document paragraphs. These APIs have reopen and preservation tests but no selectable timing evidence. General cross-document copy, arbitrary charts/media/themes/notes/formulas/styles, name-collision reconciliation and complete dependency closure remain missing |
-| Merge and split | Missing | No measured format case |
+| Merge and split | Partial (selectable correctness evidence) | XLSX now has two opt-in eager commit-plus-bounded-save cases over one deterministic sparse `Sheet1` A1:B2 fixture: merge and unmerge prepare the transaction outside timing and time only commit plus `Workbook::write_to`; untimed checks reopen merge membership, anchor retention, covered/uncovered and unrelated-cell semantics, exact durable patch apply/inverse restoration, and stale-source refusal. These cases make no latency claim without controlled ABBA evidence; broader format merge/split coverage remains missing |
 | Patch encode/apply/invert/merge | Partial | Durable encode/decode/apply/inverse coverage now also includes exact DOCX plain-paragraph copy/removal, ODT plain-paragraph move, PPTX dependency-free slide removal, ODS worksheet move/copy, XLS worksheet visibility, and RTF picture-payload/removal edits. Source-backed XLSX scalar-cell and row-visibility edits and RTF paragraph-layout edits have source-bound apply/inverse but no durable wire claim. The selectable RTF paragraph remove/move cases still keep durable work outside timing. DOCX irreversible hyperlink redaction intentionally has no inverse. Patch merge/join/three-way conflict resolution remains incomplete and unmeasured |
 | Validate without mutation | Partial (correctness only) | Distinct bounded reports now exist for CFB, OPC and generic ODF. CFB reruns canonical container ingress; OPC reports ZIP/catalog/loaded-relationship/signature-presence capabilities with exact failure attribution; ODF indexes bounded ZIP metadata and materializes only `mimetype`, the manifest and `content.xml` to report package declarations, root XML and encryption/signature/macro/external-reference presence. These are API correctness tests, not selectable benchmarks. They do not validate DOC/XLS/PPT or OOXML/ODF family semantics, decrypt content, verify signatures, execute macros, fetch links or offer general repair; ODF exposes only the separately identified narrow `mimetype` local-extra repair target described below |
 | Explicit repair plan | Partial (correctness only) | Generic ODF exposes one bounded forward-only plan for an otherwise-valid first/stored `mimetype` with one recognized Extended Timestamp local-header extra. It binds source length and SHA-256 evidence, rejects stale/foreign reports and unsafe ZIP/security/semantic cases before output, serializes deterministic metadata without source bytes, removes only that local extra, reopens the candidate, proves member digest equality and raw preservation, and reports sequential-sink progress. It is not a general repair planner, has no inverse, and offers no latency claim |
@@ -560,6 +560,15 @@ logical-Part materialization diagnostics, so none are fabricated. This is
 selectable evidence only, with no latency, allocation, memory, I/O, or
 materialization claim before frozen CPU-pinned ABBA.
 
+The current XLSX merge/split tranche adds two independent opt-in lifecycle cases over a
+deterministic sparse A1:B2 fixture. The eager merge and eager unmerge paths
+prepare their inputs and transaction edits outside timing, then measure only
+semantic commit plus bounded sequential save. Reopen semantics, anchor and
+covered/uncovered-cell behavior, unrelated-cell preservation, exact durable
+apply/inverse restoration, and stale-source refusal remain untimed. This is
+selectable correctness evidence only; no latency claim is made without
+controlled ABBA evidence.
+
 The 2026-08-12 non-iWork wave from `cb797b382` through `f6bbdf19c` adds
 correctness-only bounded validation reports for CFB, OPC and generic ODF;
 exact CFB stream/storage moves; reversible DOCX plain-paragraph copy/removal
@@ -569,9 +578,9 @@ dependency-free removal; ODP dependency-free blank-slide copy/removal; ODS
 worksheet move and dependency-free copy; source-backed XLSX scalar-cell
 set/clear/remove and row visibility; XLS worksheet visibility; ODT plain
 paragraph move; and RTF paragraph layout plus standalone picture
-replace/removal. These commits add no selectable case to the 167-case harness
+replace/removal. These commits added no selectable case to the then-167-case harness
 and make no latency, allocation, memory, I/O or materialization claim. Large
-streaming authoring, general dependency closure, merge/split, repair,
+streaming authoring, general dependency closure, broader merge/split, repair,
 format-semantic validation, broad real-producer/security evidence and matching
 benchmarks remain open. The matrix also records the immediately preceding
 `cbf581c91` same-length CFB stream-splice substrate under the same

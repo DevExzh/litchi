@@ -38,9 +38,10 @@ two matched XLSX sheet-protection publication cases,
 two matched XLSX data-validation publication cases,
 two matched XLSX auto-filter/sort-state publication cases,
 two matched XLSX conditional-formatting publication cases,
+two XLSX merge/unmerge commit-plus-save cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, 13 RTF semantic cases, and 36 ODF semantic cases
-are opt-in, for 167 selectable cases in total:
+are opt-in, for 169 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -369,6 +370,24 @@ topology, worksheet relationships, all unselected Part/media payloads, raw ZIP
 members, output hash, source reads, and sequential-sink bounds are verified
 outside timing. This selectable evidence makes no latency claim until a
 balanced ABBA measurement is retained.
+
+Measure the two opt-in XLSX merge/split lifecycle controls:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 \
+  --case xlsx_eager_merge_commit_save,xlsx_eager_unmerge_commit_save \
+  --json target/perf/xlsx-merge-unmerge.json
+```
+
+Both cases use the same deterministic sparse `Sheet1` A1:B2 fixture with a
+retained A1 anchor and unrelated C1 cell. Inputs and transaction edits are
+prepared before timing; each sample times only one semantic commit and bounded
+sequential `Workbook::write_to`. Reopen, merge membership, covered/uncovered
+views, anchor/unrelated-cell retention, exact durable patch apply/inverse, and
+stale-source refusal are verified outside timing. These cases add selectable
+correctness evidence only and make no latency claim without controlled ABBA
+evidence.
 
 For just the end-to-end legacy writer packaging runs:
 
@@ -875,6 +894,13 @@ remain distinguishable.
   while materializing only `xl/workbook.xml` and
   `xl/worksheets/sheet1.xml`. The other ten ordinary Parts remain deferred and
   are physically raw-copied during one-Part overlay publication.
+- `xlsx_eager_merge_commit_save` / `xlsx_eager_unmerge_commit_save`: on the
+  deterministic sparse A1:B2 fixture, prepare the merge or unmerge transaction
+  outside timing, then time only eager semantic commit plus bounded sequential
+  save. Complete merge/split membership, anchor and covered/uncovered cell
+  semantics, unrelated-cell retention, exact durable patch apply/inverse, and
+  stale-source refusal are checked outside timing. These cases make no latency
+  claim without controlled ABBA evidence.
 - `cfb_open`: parse the complete generated container into `litchi_cfb::OleFile`.
 - `cfb_list_streams`: enumerate and materialize all stream paths from an
   already-open CFB container.
