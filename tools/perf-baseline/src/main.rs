@@ -19,23 +19,26 @@ use std::{
     path::PathBuf,
     process::Command,
     sync::{
-        Arc, Barrier, Mutex,
+        Arc, Barrier, Condvar, Mutex,
         atomic::{AtomicU64, Ordering},
+        mpsc,
     },
+    thread::JoinHandle,
     time::{Duration, Instant},
 };
 
 use litchi_cfb::{OleFile, OleWriter, SharedOleFile, SharedOleFileLimits};
 use litchi_core::{
-    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, SourceVersion,
+    Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, ReadAt,
+    SourceVersion,
 };
-use litchi_core::{OwnedSource, Position};
+use litchi_core::{OwnedSource, Position, Resource};
 use litchi_ole_common::object::{
     Editor as OleObjectEditor, Limits as OleObjectLimits, Targets as OleObjectTargets,
 };
 use litchi_opc::{
-    BlobPart, OpcPackage, OpenSession, PackURI, PackageWriter, ReadLimits, Relationships,
-    SourceBackedPackage, SourceCacheLimits, TargetMode,
+    BlobPart, OpcError, OpcPackage, OpenSession, PackURI, PackageWriter, PartData, ReadLimits,
+    Relationships, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits, TargetMode,
     constants::{content_type as opc_content_type, relationship_type},
 };
 use litchi_xlsx::{
@@ -54,6 +57,8 @@ const DEFAULT_RANGE_FIXED_LATENCY_US: u64 = 100;
 const DEFAULT_RANGE_REQUEST_OVERHEAD_US: u64 = 25;
 const DEFAULT_RANGE_BANDWIDTH_BYTES_PER_SECOND: u64 = 50 * 1024 * 1024;
 const DEFAULT_RANGE_MAX_PHYSICAL_BYTES: usize = 4 * 1024;
+const OPC_CACHE_SLOW_SOURCE_DELAY_US: u64 = 10_000;
+const OPC_CACHE_COHORT_TIMEOUT: Duration = Duration::from_secs(10);
 const CONTENT_TYPE: &str = "application/octet-stream";
 const OPC_CORPUS_GENERATOR: &str = "litchi-opc-synthetic-v2";
 const CFB_CORPUS_GENERATOR: &str = "litchi-cfb-synthetic-v1";
@@ -407,6 +412,9 @@ enum Case {
     OpcSourceOpenMainRead,
     OpcSourceCachedMainRead,
     OpcSourceConcurrentSamePart,
+    OpcSourceCacheBudgetBoundary,
+    OpcSourceCacheControlContention,
+    OpcSourceCacheManagedContention,
     OpcSourceOverlayOnePartSave,
     OpcFileEagerOpen,
     OpcFileSourceOpen,
@@ -626,6 +634,9 @@ impl Case {
             Self::OpcSourceOpenMainRead => "opc_source_open_main_read",
             Self::OpcSourceCachedMainRead => "opc_source_cached_main_read",
             Self::OpcSourceConcurrentSamePart => "opc_source_concurrent_same_part",
+            Self::OpcSourceCacheBudgetBoundary => "opc_source_cache_budget_boundary",
+            Self::OpcSourceCacheControlContention => "opc_source_cache_control_contention",
+            Self::OpcSourceCacheManagedContention => "opc_source_cache_managed_contention",
             Self::OpcSourceOverlayOnePartSave => "opc_source_overlay_one_part_save",
             Self::OpcFileEagerOpen => "opc_file_eager_open",
             Self::OpcFileSourceOpen => "opc_file_source_open",
@@ -1087,6 +1098,15 @@ impl Case {
         matches!(self, Self::OpcOpenSessionScaling | Self::CfbBulkReadScaling)
     }
 
+    const fn is_opc_source_cache_evidence(self) -> bool {
+        matches!(
+            self,
+            Self::OpcSourceCacheBudgetBoundary
+                | Self::OpcSourceCacheControlContention
+                | Self::OpcSourceCacheManagedContention
+        )
+    }
+
     const fn is_opc_source_overlay_save(self) -> bool {
         matches!(self, Self::OpcSourceOverlayOnePartSave)
     }
@@ -1413,6 +1433,73 @@ struct SourceSummary {
     xls_comments: Option<XlsCommentsSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     simulation: Option<RangeSimulationSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    opc_cache: Option<OpcCacheEvidenceSummary>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct OpcCacheEvidenceSummary {
+    cache_mode: &'static str,
+    scenario: &'static str,
+    capacity_ratio: &'static str,
+    capacity_entries: usize,
+    capacity_bytes: usize,
+    working_set_parts: usize,
+    working_set_bytes: u64,
+    worker_count: usize,
+    persistent_worker_teams_created: usize,
+    fixed_source_delay_us: u64,
+    timing_scope: &'static str,
+    diagnostics: OpcCacheDiagnosticsSummary,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    gate: Option<OpcCacheGateSummary>,
+    budget_used_after_handles_drop: Vec<u64>,
+    budget_used_after_package_drop: Vec<u64>,
+    scaling: OpcCacheScalingSummary,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+struct OpcCacheDiagnosticsSummary {
+    hits: Vec<u64>,
+    cold_loads: Vec<u64>,
+    waiter_joins: Vec<u64>,
+    successful_loads: Vec<u64>,
+    failed_loads: Vec<u64>,
+    evictions: Vec<u64>,
+    bypasses: Vec<u64>,
+    oversized_bypasses: Vec<u64>,
+    allocation_bypasses: Vec<u64>,
+    budget_reservation_failures: Vec<u64>,
+    retained_entries: Vec<usize>,
+    retained_bytes: Vec<usize>,
+    in_flight_loads: Vec<usize>,
+    budget_memory_used: Vec<u64>,
+    budget_cache_reserved_bytes: Vec<u64>,
+    budget_memory_limit: Vec<Option<u64>>,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+struct OpcCacheGateSummary {
+    initial_arrivals: Vec<u64>,
+    delayed_payload_arrivals: Vec<u64>,
+    max_concurrent_delays: Vec<u64>,
+    pre_release_flights: Vec<usize>,
+    pre_release_waiters: Vec<u64>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct OpcCacheScalingSummary {
+    model: &'static str,
+    classification: &'static str,
+    baseline_worker_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    p50_speedup: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    p50_efficiency: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    amdahl_serial_fraction: Option<f64>,
+    p50_requests_per_second: f64,
+    relative_request_throughput: f64,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -2228,6 +2315,50 @@ fn main() -> Result<(), Box<dyn Error>> {
         filesystem_evidence.push(run.evidence);
     }
 
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_opc_source_cache_evidence())
+    {
+        let corpus = build_opc_corpus(CorpusShape::ManySmall, PayloadKind::Incompressible)?;
+        for case in options
+            .cases
+            .iter()
+            .filter(|case| case.is_opc_source_cache_evidence())
+        {
+            match case {
+                Case::OpcSourceCacheBudgetBoundary => {
+                    results.extend(run_opc_source_cache_budget_boundary(
+                        &corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                    )?)
+                },
+                Case::OpcSourceCacheControlContention => {
+                    results.extend(run_opc_source_cache_contention(
+                        *case,
+                        &corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                        &options.execution_workers,
+                        OpcCacheMode::Control,
+                    )?)
+                },
+                Case::OpcSourceCacheManagedContention => {
+                    results.extend(run_opc_source_cache_contention(
+                        *case,
+                        &corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                        &options.execution_workers,
+                        OpcCacheMode::Managed,
+                    )?)
+                },
+                _ => unreachable!("filtered OPC source-cache evidence case"),
+            }
+        }
+    }
+
     for shape in &options.shapes {
         for payload in &options.payloads {
             let opc_corpus = options
@@ -2261,6 +2392,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_odp_media()
                     && !case.uses_odp_text_box_batch()
                     && !case.is_opc_source_overlay_save()
+                    && !case.is_opc_source_cache_evidence()
                     && !case.is_filesystem()
                     && !case.is_docx_source_edit_save()
                     && !case.is_pptx_source_edit_save()
@@ -3173,6 +3305,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_source_open_main_read" => Some(Case::OpcSourceOpenMainRead),
         "opc_source_cached_main_read" => Some(Case::OpcSourceCachedMainRead),
         "opc_source_concurrent_same_part" => Some(Case::OpcSourceConcurrentSamePart),
+        "opc_source_cache_budget_boundary" => Some(Case::OpcSourceCacheBudgetBoundary),
+        "opc_source_cache_control_contention" => Some(Case::OpcSourceCacheControlContention),
+        "opc_source_cache_managed_contention" => Some(Case::OpcSourceCacheManagedContention),
         "opc_source_overlay_one_part_save" => Some(Case::OpcSourceOverlayOnePartSave),
         "opc_file_eager_open" => Some(Case::OpcFileEagerOpen),
         "opc_file_source_open" => Some(Case::OpcFileSourceOpen),
@@ -3441,6 +3576,9 @@ fn print_usage() {
                                        opc_noop_save,opc_mutated_save,opc_source_open,\n\
                                        opc_source_open_main_read,opc_source_cached_main_read,\n\
                                        opc_source_concurrent_same_part,\n\
+                                       opc_source_cache_budget_boundary,\n\
+                                       opc_source_cache_control_contention,\n\
+                                       opc_source_cache_managed_contention,\n\
                                        opc_source_overlay_one_part_save,\n\
                                        opc_file_eager_open,opc_file_source_open,\n\
                                        opc_file_eager_one_part_atomic_save,\n\
@@ -5854,6 +5992,11 @@ fn run_case_with_config(
         },
         Case::OpcSourceConcurrentSamePart => {
             run_opc_source_concurrent_same_part(corpus, warmup_iterations, samples)
+        },
+        Case::OpcSourceCacheBudgetBoundary
+        | Case::OpcSourceCacheControlContention
+        | Case::OpcSourceCacheManagedContention => {
+            Err("OPC source-cache evidence uses its fixed matrix runner".into())
         },
         Case::OpcSourceOverlayOnePartSave => {
             run_opc_source_overlay_one_part_save(corpus, warmup_iterations, samples)
@@ -11507,6 +11650,1335 @@ fn xlsx_instrumented_source(corpus: &Corpus) -> Result<Arc<InstrumentedSource>, 
     )))
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OpcCacheMode {
+    Control,
+    Managed,
+}
+
+impl OpcCacheMode {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Control => "finite-control",
+            Self::Managed => "budget-managed",
+        }
+    }
+
+    const fn is_managed(self) -> bool {
+        matches!(self, Self::Managed)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OpcCacheScenario {
+    SamePart,
+    DisjointParts,
+}
+
+impl OpcCacheScenario {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::SamePart => "same-part",
+            Self::DisjointParts => "disjoint-parts",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OpcCacheCapacity {
+    Half,
+    One,
+    Two,
+}
+
+impl OpcCacheCapacity {
+    const ALL: [Self; 3] = [Self::Half, Self::One, Self::Two];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Half => "1/2x",
+            Self::One => "1x",
+            Self::Two => "2x",
+        }
+    }
+
+    const fn parts(self, working_set_parts: usize) -> usize {
+        match self {
+            Self::Half => working_set_parts / 2,
+            Self::One => working_set_parts,
+            Self::Two => working_set_parts * 2,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct OpcCacheCounterDelta {
+    hits: u64,
+    cold_loads: u64,
+    waiter_joins: u64,
+    successful_loads: u64,
+    failed_loads: u64,
+    evictions: u64,
+    bypasses: u64,
+    oversized_bypasses: u64,
+    allocation_bypasses: u64,
+    budget_reservation_failures: u64,
+}
+
+fn opc_cache_counter_delta(
+    before: SourceCacheDiagnostics,
+    after: SourceCacheDiagnostics,
+) -> Result<OpcCacheCounterDelta, Box<dyn Error>> {
+    let subtract = |name: &str, after: u64, before: u64| -> Result<u64, Box<dyn Error>> {
+        after
+            .checked_sub(before)
+            .ok_or_else(|| format!("OPC cache counter {name} moved backwards").into())
+    };
+    Ok(OpcCacheCounterDelta {
+        hits: subtract("hits", after.hits, before.hits)?,
+        cold_loads: subtract("cold_loads", after.cold_loads, before.cold_loads)?,
+        waiter_joins: subtract("waiter_joins", after.waiter_joins, before.waiter_joins)?,
+        successful_loads: subtract(
+            "successful_loads",
+            after.successful_loads,
+            before.successful_loads,
+        )?,
+        failed_loads: subtract("failed_loads", after.failed_loads, before.failed_loads)?,
+        evictions: subtract("evictions", after.evictions, before.evictions)?,
+        bypasses: subtract("bypasses", after.bypasses, before.bypasses)?,
+        oversized_bypasses: subtract(
+            "oversized_bypasses",
+            after.oversized_bypasses,
+            before.oversized_bypasses,
+        )?,
+        allocation_bypasses: subtract(
+            "allocation_bypasses",
+            after.allocation_bypasses,
+            before.allocation_bypasses,
+        )?,
+        budget_reservation_failures: subtract(
+            "budget_reservation_failures",
+            after.budget_reservation_failures,
+            before.budget_reservation_failures,
+        )?,
+    })
+}
+
+impl OpcCacheDiagnosticsSummary {
+    fn record(&mut self, delta: OpcCacheCounterDelta, current: SourceCacheDiagnostics) {
+        self.hits.push(delta.hits);
+        self.cold_loads.push(delta.cold_loads);
+        self.waiter_joins.push(delta.waiter_joins);
+        self.successful_loads.push(delta.successful_loads);
+        self.failed_loads.push(delta.failed_loads);
+        self.evictions.push(delta.evictions);
+        self.bypasses.push(delta.bypasses);
+        self.oversized_bypasses.push(delta.oversized_bypasses);
+        self.allocation_bypasses.push(delta.allocation_bypasses);
+        self.budget_reservation_failures
+            .push(delta.budget_reservation_failures);
+        self.retained_entries.push(current.retained_entries);
+        self.retained_bytes.push(current.retained_bytes);
+        self.in_flight_loads.push(current.in_flight_loads);
+        self.budget_memory_used.push(current.budget_memory_used);
+        self.budget_cache_reserved_bytes
+            .push(current.budget_cache_reserved_bytes);
+        self.budget_memory_limit.push(current.budget_memory_limit);
+    }
+}
+
+#[derive(Debug, Default)]
+struct OpcCacheGateState {
+    armed: bool,
+    released: bool,
+    expected_initial: usize,
+    initial_arrivals: u64,
+    initial_started: usize,
+    delayed_payload_arrivals: u64,
+    seen_ranges: BTreeSet<usize>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct OpcCacheGateSnapshot {
+    initial_arrivals: u64,
+    delayed_payload_arrivals: u64,
+    max_concurrent_delays: u64,
+}
+
+#[derive(Debug)]
+struct CoordinatedSlowSource {
+    backing: Arc<InstrumentedSource>,
+    payload_ranges: Vec<Range<u64>>,
+    delay: Duration,
+    state: Mutex<OpcCacheGateState>,
+    changed: Condvar,
+    current_delays: AtomicU64,
+    max_concurrent_delays: AtomicU64,
+}
+
+impl CoordinatedSlowSource {
+    fn new(
+        backing: Arc<InstrumentedSource>,
+        payload_ranges: Vec<Range<u64>>,
+        delay: Duration,
+    ) -> Self {
+        Self {
+            backing,
+            payload_ranges,
+            delay,
+            state: Mutex::new(OpcCacheGateState::default()),
+            changed: Condvar::new(),
+            current_delays: AtomicU64::new(0),
+            max_concurrent_delays: AtomicU64::new(0),
+        }
+    }
+
+    fn arm(&self, expected_initial: usize) -> Result<(), Box<dyn Error>> {
+        if expected_initial == 0 {
+            return Err("OPC cache slow-source gate requires an initial arrival".into());
+        }
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_error| "OPC cache slow-source gate is poisoned")?;
+        if state.armed {
+            return Err("OPC cache slow-source gate was armed twice".into());
+        }
+        state.armed = true;
+        state.expected_initial = expected_initial;
+        Ok(())
+    }
+
+    fn wait_for_initial_arrivals(&self, timeout: Duration) -> Result<(), Box<dyn Error>> {
+        let deadline = Instant::now() + timeout;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_error| "OPC cache slow-source gate is poisoned")?;
+        while state.initial_arrivals < state.expected_initial as u64 {
+            let now = Instant::now();
+            if now >= deadline {
+                return Err(format!(
+                    "OPC cache slow-source gate observed {} of {} initial arrivals",
+                    state.initial_arrivals, state.expected_initial
+                )
+                .into());
+            }
+            let remaining = deadline.saturating_duration_since(now);
+            let (next, _) = self
+                .changed
+                .wait_timeout(state, remaining)
+                .map_err(|_error| "OPC cache slow-source gate is poisoned")?;
+            state = next;
+        }
+        Ok(())
+    }
+
+    fn release(&self) {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.released = true;
+        self.changed.notify_all();
+    }
+
+    fn snapshot(&self) -> Result<OpcCacheGateSnapshot, Box<dyn Error>> {
+        let state = self
+            .state
+            .lock()
+            .map_err(|_error| "OPC cache slow-source gate is poisoned")?;
+        Ok(OpcCacheGateSnapshot {
+            initial_arrivals: state.initial_arrivals,
+            delayed_payload_arrivals: state.delayed_payload_arrivals,
+            max_concurrent_delays: self.max_concurrent_delays.load(Ordering::SeqCst),
+        })
+    }
+
+    fn payload_range_index(&self, offset: u64, requested: usize) -> Option<usize> {
+        let end = offset.saturating_add(u64::try_from(requested).unwrap_or(u64::MAX));
+        self.payload_ranges
+            .iter()
+            .position(|range| offset < range.end && range.start < end)
+    }
+}
+
+impl ReadAt for CoordinatedSlowSource {
+    fn len(&self) -> io::Result<u64> {
+        self.backing.len()
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let range_index = self.payload_range_index(offset, output.len());
+        let mut initial = false;
+        let delayed = if let Some(range_index) = range_index {
+            let mut state = self
+                .state
+                .lock()
+                .map_err(|_error| io::Error::other("OPC cache slow-source gate is poisoned"))?;
+            if state.armed && state.seen_ranges.insert(range_index) {
+                state.delayed_payload_arrivals = state.delayed_payload_arrivals.saturating_add(1);
+                if !state.released {
+                    initial = true;
+                    state.initial_arrivals = state.initial_arrivals.saturating_add(1);
+                    self.changed.notify_all();
+                    while !state.released {
+                        state = self.changed.wait(state).map_err(|_error| {
+                            io::Error::other("OPC cache slow-source gate is poisoned")
+                        })?;
+                    }
+                }
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if delayed {
+            let current = self.current_delays.fetch_add(1, Ordering::SeqCst) + 1;
+            self.max_concurrent_delays
+                .fetch_max(current, Ordering::SeqCst);
+            let _guard = InFlightReadGuard {
+                counter: &self.current_delays,
+            };
+            if initial {
+                let mut state = self
+                    .state
+                    .lock()
+                    .map_err(|_error| io::Error::other("OPC cache slow-source gate is poisoned"))?;
+                state.initial_started = state.initial_started.saturating_add(1);
+                self.changed.notify_all();
+                while state.initial_started < state.expected_initial {
+                    state = self.changed.wait(state).map_err(|_error| {
+                        io::Error::other("OPC cache slow-source gate is poisoned")
+                    })?;
+                }
+                self.changed.notify_all();
+            }
+            std::thread::sleep(self.delay);
+        }
+        self.backing.read_at(offset, output)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        self.backing.version()
+    }
+}
+
+#[derive(Clone)]
+struct OpcCacheRequest {
+    logical_index: usize,
+    partname: PackURI,
+}
+
+struct OpcCacheWorkerJob {
+    package: Arc<SourceBackedPackage>,
+    start: Arc<Barrier>,
+    requests: Vec<OpcCacheRequest>,
+}
+
+enum OpcCacheWorkerCommand {
+    Run(OpcCacheWorkerJob),
+    Stop,
+}
+
+type OpcCacheWorkerResult = std::result::Result<Vec<(usize, PartData)>, String>;
+
+struct OpcCacheWorkerTeam {
+    senders: Vec<mpsc::Sender<OpcCacheWorkerCommand>>,
+    results: mpsc::Receiver<OpcCacheWorkerResult>,
+    workers: Vec<JoinHandle<()>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct OpcCacheCellConfig {
+    case: Case,
+    mode: OpcCacheMode,
+    scenario: OpcCacheScenario,
+    capacity: OpcCacheCapacity,
+    working_set_parts: usize,
+    worker_count: usize,
+    warmup_iterations: usize,
+    samples: usize,
+}
+
+impl OpcCacheWorkerTeam {
+    fn new(worker_count: usize) -> Result<Self, Box<dyn Error>> {
+        if worker_count == 0 {
+            return Err("OPC cache worker team cannot be empty".into());
+        }
+        let (result_sender, results) = mpsc::channel();
+        let mut senders = Vec::with_capacity(worker_count);
+        let mut workers = Vec::with_capacity(worker_count);
+        for index in 0..worker_count {
+            let (sender, receiver) = mpsc::channel();
+            let result_sender = result_sender.clone();
+            let worker = std::thread::Builder::new()
+                .name(format!("litchi-opc-cache-{index}"))
+                .spawn(move || {
+                    while let Ok(command) = receiver.recv() {
+                        let OpcCacheWorkerCommand::Run(job) = command else {
+                            break;
+                        };
+                        let OpcCacheWorkerJob {
+                            package,
+                            start,
+                            requests,
+                        } = job;
+                        start.wait();
+                        let result: OpcCacheWorkerResult = requests
+                            .into_iter()
+                            .map(|request| {
+                                package
+                                    .part(&request.partname)
+                                    .and_then(|part| part.data())
+                                    .map(|data| (request.logical_index, data))
+                                    .map_err(|error| error.to_string())
+                            })
+                            .collect();
+                        drop(package);
+                        if result_sender.send(result).is_err() {
+                            break;
+                        }
+                    }
+                })?;
+            senders.push(sender);
+            workers.push(worker);
+        }
+        Ok(Self {
+            senders,
+            results,
+            workers,
+        })
+    }
+
+    fn dispatch(
+        &self,
+        package: Arc<SourceBackedPackage>,
+        assignments: Vec<Vec<OpcCacheRequest>>,
+    ) -> Result<(), Box<dyn Error>> {
+        if assignments.len() != self.senders.len()
+            || assignments.iter().any(|requests| requests.is_empty())
+        {
+            return Err("OPC cache worker assignments must be nonempty and match the team".into());
+        }
+        let start = Arc::new(Barrier::new(self.senders.len() + 1));
+        for (sender, requests) in self.senders.iter().zip(assignments) {
+            sender
+                .send(OpcCacheWorkerCommand::Run(OpcCacheWorkerJob {
+                    package: Arc::clone(&package),
+                    start: Arc::clone(&start),
+                    requests,
+                }))
+                .map_err(|_error| "OPC cache worker stopped before dispatch")?;
+        }
+        start.wait();
+        Ok(())
+    }
+
+    fn collect(&self) -> Result<Vec<(usize, PartData)>, Box<dyn Error>> {
+        let mut collected = Vec::new();
+        for _ in 0..self.senders.len() {
+            let worker = self.results.recv()?;
+            collected.extend(worker.map_err(|error| format!("OPC cache worker failed: {error}"))?);
+        }
+        Ok(collected)
+    }
+}
+
+impl Drop for OpcCacheWorkerTeam {
+    fn drop(&mut self) {
+        for sender in &self.senders {
+            let _ = sender.send(OpcCacheWorkerCommand::Stop);
+        }
+        for worker in std::mem::take(&mut self.workers) {
+            let _ = worker.join();
+        }
+    }
+}
+
+fn validate_opc_cache_corpus(corpus: &Corpus) -> Result<(), Box<dyn Error>> {
+    if corpus.manifest.generator != OPC_CORPUS_GENERATOR
+        || corpus.manifest.shape != CorpusShape::ManySmall.name()
+        || corpus.manifest.payload_kind != PayloadKind::Incompressible.name()
+        || corpus.manifest.entry_bytes != CorpusShape::ManySmall.entry_bytes()
+        || corpus.manifest.entry_count != CorpusShape::ManySmall.entry_count()
+        || sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256
+    {
+        return Err(
+            "OPC cache evidence requires its fixed many-small incompressible corpus".into(),
+        );
+    }
+    Ok(())
+}
+
+fn opc_cache_parts_and_ranges(
+    corpus: &Corpus,
+) -> Result<(Vec<PackURI>, Vec<Range<u64>>), Box<dyn Error>> {
+    let mut by_name = zip_member_ranges(&corpus.archive)?
+        .into_iter()
+        .collect::<BTreeMap<_, _>>();
+    let mut parts = Vec::with_capacity(corpus.manifest.entry_count);
+    let mut ranges = Vec::with_capacity(corpus.manifest.entry_count);
+    for index in 0..corpus.manifest.entry_count {
+        let name = entry_name(index);
+        parts.push(PackURI::new(format!("/{name}"))?);
+        ranges.push(
+            by_name
+                .remove(&name)
+                .ok_or("OPC cache evidence Part has no compressed source range")?,
+        );
+    }
+    if parts.len() != corpus.manifest.entry_count {
+        return Err("OPC cache evidence Part count differs from corpus manifest".into());
+    }
+    Ok((parts, ranges))
+}
+
+fn opc_cache_context(
+    memory_limit: u64,
+    worker_count: usize,
+) -> Result<(Budget, ExecutionContext), Box<dyn Error>> {
+    let workers =
+        NonZeroUsize::new(worker_count).ok_or("OPC cache worker count must be nonzero")?;
+    let in_flight = NonZeroU64::new(memory_limit.max(1))
+        .ok_or("OPC cache in-flight byte limit must be nonzero")?;
+    let execution_limits = ExecutionLimits::new(workers, workers, in_flight, 0)?;
+    let budget = Budget::root(
+        "litchi-perf-opc-source-cache",
+        Limits::new(
+            memory_limit,
+            64 * 1024 * 1024,
+            64 * 1024 * 1024,
+            1_000_000,
+            256,
+            1_000_000_000,
+        ),
+    );
+    let (_cancellation_source, cancellation) = CancellationSource::pair();
+    let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+    Ok((budget, context))
+}
+
+fn opc_cache_package(
+    mode: OpcCacheMode,
+    source: Arc<dyn ReadAt>,
+    cache_limits: SourceCacheLimits,
+    memory_limit: u64,
+    worker_count: usize,
+) -> Result<(Arc<SourceBackedPackage>, Option<Budget>), Box<dyn Error>> {
+    match mode {
+        OpcCacheMode::Control => Ok((
+            Arc::new(
+                SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+                    source,
+                    ReadLimits::default(),
+                    cache_limits,
+                )?,
+            ),
+            None,
+        )),
+        OpcCacheMode::Managed => {
+            let (budget, context) = opc_cache_context(memory_limit, worker_count)?;
+            let package =
+                SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                    source,
+                    ReadLimits::default(),
+                    cache_limits,
+                    context,
+                )?;
+            Ok((Arc::new(package), Some(budget)))
+        },
+    }
+}
+
+fn opc_cache_budget_used(budget: Option<&Budget>) -> u64 {
+    budget.map_or(0, |budget| budget.used(Resource::Memory))
+}
+
+fn opc_cache_assert_diagnostics_mode(
+    mode: OpcCacheMode,
+    diagnostics: SourceCacheDiagnostics,
+    memory_limit: u64,
+) -> Result<(), Box<dyn Error>> {
+    if diagnostics.budget_managed != mode.is_managed()
+        || diagnostics.budget_memory_limit != mode.is_managed().then_some(memory_limit)
+        || (!mode.is_managed()
+            && (diagnostics.budget_memory_used != 0
+                || diagnostics.budget_cache_reserved_bytes != 0
+                || diagnostics.budget_reservation_failures != 0))
+    {
+        return Err("OPC cache diagnostics disagree with the selected cache mode".into());
+    }
+    Ok(())
+}
+
+fn opc_cache_expected_delta(
+    scenario: OpcCacheScenario,
+    capacity: OpcCacheCapacity,
+    worker_count: usize,
+    working_set_parts: usize,
+    capacity_parts: usize,
+) -> Result<OpcCacheCounterDelta, Box<dyn Error>> {
+    Ok(match scenario {
+        OpcCacheScenario::SamePart => OpcCacheCounterDelta {
+            cold_loads: 1,
+            waiter_joins: u64::try_from(worker_count.saturating_sub(1))?,
+            successful_loads: 1,
+            evictions: u64::from(matches!(capacity, OpcCacheCapacity::One)),
+            bypasses: u64::from(matches!(capacity, OpcCacheCapacity::Half)),
+            oversized_bypasses: u64::from(matches!(capacity, OpcCacheCapacity::Half)),
+            ..OpcCacheCounterDelta::default()
+        },
+        OpcCacheScenario::DisjointParts => {
+            let bypasses = working_set_parts.saturating_sub(capacity_parts);
+            let evictions = match capacity {
+                OpcCacheCapacity::Half => capacity_parts,
+                OpcCacheCapacity::One => working_set_parts,
+                OpcCacheCapacity::Two => 0,
+            };
+            OpcCacheCounterDelta {
+                cold_loads: u64::try_from(working_set_parts)?,
+                successful_loads: u64::try_from(working_set_parts)?,
+                evictions: u64::try_from(evictions)?,
+                bypasses: u64::try_from(bypasses)?,
+                ..OpcCacheCounterDelta::default()
+            }
+        },
+    })
+}
+
+fn opc_cache_wait_for_cohort(
+    package: &SourceBackedPackage,
+    expected_flights: usize,
+    expected_waiters: u64,
+    timeout: Duration,
+) -> Result<SourceCacheDiagnostics, Box<dyn Error>> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let diagnostics = package.cache_diagnostics();
+        if diagnostics.in_flight_loads == expected_flights
+            && diagnostics.waiter_joins >= expected_waiters
+        {
+            return Ok(diagnostics);
+        }
+        if Instant::now() >= deadline {
+            return Err(format!(
+                "OPC cache cohort reached {} flights and {} waiters, expected {expected_flights} flights and at least {expected_waiters} waiters",
+                diagnostics.in_flight_loads, diagnostics.waiter_joins
+            )
+            .into());
+        }
+        std::thread::yield_now();
+    }
+}
+
+fn opc_cache_result(
+    case: Case,
+    corpus: &Corpus,
+    elapsed: Vec<u64>,
+    mut source: SourceSummary,
+    evidence: OpcCacheEvidenceSummary,
+) -> CaseResult {
+    source.opc_cache = Some(evidence);
+    result_with_source(case, corpus, elapsed, source)
+}
+
+fn opc_cache_empty_scaling(model: &'static str) -> OpcCacheScalingSummary {
+    OpcCacheScalingSummary {
+        model,
+        classification: "not-applicable",
+        baseline_worker_count: 1,
+        p50_speedup: None,
+        p50_efficiency: None,
+        amdahl_serial_fraction: None,
+        p50_requests_per_second: 0.0,
+        relative_request_throughput: 1.0,
+    }
+}
+
+fn run_opc_source_cache_budget_boundary(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<Vec<CaseResult>, Box<dyn Error>> {
+    validate_opc_cache_corpus(corpus)?;
+    let (parts, ranges) = opc_cache_parts_and_ranges(corpus)?;
+    let target_index = corpus.manifest.entry_count / 2;
+    let target_part = parts
+        .get(target_index)
+        .ok_or("OPC cache boundary target index is outside the corpus")?;
+    let payload_size = u64::try_from(corpus.manifest.entry_bytes)?;
+    let cache_limits = SourceCacheLimits::new(corpus.manifest.entry_bytes, 1)?;
+    let mut results = Vec::with_capacity(2);
+
+    for (scenario, memory_limit, succeeds) in [
+        ("exact-budget", payload_size, true),
+        (
+            "one-under-budget",
+            payload_size
+                .checked_sub(1)
+                .ok_or("OPC cache payload must be nonempty")?,
+            false,
+        ),
+    ] {
+        let mut elapsed = Vec::with_capacity(samples);
+        let mut source_summary = SourceSummary::default();
+        let mut diagnostics_summary = OpcCacheDiagnosticsSummary::default();
+        let mut after_handles = Vec::with_capacity(samples);
+        let mut after_packages = Vec::with_capacity(samples);
+        for iteration in 0..iteration_count(warmup_iterations, samples)? {
+            let source = Arc::new(InstrumentedSource::new(
+                corpus.archive.clone(),
+                ranges.clone(),
+            ));
+            let read_at: Arc<dyn ReadAt> = source.clone();
+            let (package, budget) = opc_cache_package(
+                OpcCacheMode::Managed,
+                read_at,
+                cache_limits,
+                memory_limit,
+                1,
+            )?;
+            source.reset();
+            let before = package.cache_diagnostics();
+            opc_cache_assert_diagnostics_mode(OpcCacheMode::Managed, before, memory_limit)?;
+
+            let started = Instant::now();
+            let loaded = package.part(target_part)?.data();
+            let duration = started.elapsed();
+            let after = package.cache_diagnostics();
+            opc_cache_assert_diagnostics_mode(OpcCacheMode::Managed, after, memory_limit)?;
+            let delta = opc_cache_counter_delta(before, after)?;
+            let source_snapshot = source.snapshot();
+
+            if succeeds {
+                let data = loaded?;
+                let expected = payload_bytes(
+                    PayloadKind::Incompressible,
+                    target_index,
+                    corpus.manifest.entry_bytes,
+                );
+                if data.as_bytes() != expected
+                    || delta
+                        != (OpcCacheCounterDelta {
+                            cold_loads: 1,
+                            successful_loads: 1,
+                            ..OpcCacheCounterDelta::default()
+                        })
+                    || after.retained_entries != 1
+                    || after.retained_bytes != corpus.manifest.entry_bytes
+                    || after.in_flight_loads != 0
+                    || after.budget_memory_used != payload_size
+                    || after.budget_cache_reserved_bytes != payload_size
+                    || opc_cache_budget_used(budget.as_ref()) != payload_size
+                    || source_snapshot.ordinary_payload_read_calls == 0
+                    || source_snapshot.ordinary_payload_read_bytes == 0
+                {
+                    return Err("OPC exact-budget boundary invariant failed".into());
+                }
+                drop(data);
+                let used_after_handle = opc_cache_budget_used(budget.as_ref());
+                if used_after_handle != payload_size {
+                    return Err(
+                        "OPC exact-budget cache reservation did not outlive its handle".into(),
+                    );
+                }
+                if iteration >= warmup_iterations {
+                    after_handles.push(used_after_handle);
+                }
+            } else {
+                if !matches!(
+                    loaded,
+                    Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
+                        if limit.resource == Resource::Memory
+                ) || delta
+                    != (OpcCacheCounterDelta {
+                        budget_reservation_failures: 2,
+                        ..OpcCacheCounterDelta::default()
+                    })
+                    || after.retained_entries != 0
+                    || after.retained_bytes != 0
+                    || after.in_flight_loads != 0
+                    || after.budget_memory_used != 0
+                    || after.budget_cache_reserved_bytes != 0
+                    || opc_cache_budget_used(budget.as_ref()) != 0
+                    || source_snapshot != SourceSnapshot::default()
+                {
+                    return Err(
+                        "OPC one-under-budget refusal was not exact and zero-payload-I/O".into(),
+                    );
+                }
+                if iteration >= warmup_iterations {
+                    after_handles.push(0);
+                }
+            }
+
+            drop(package);
+            let used_after_package = opc_cache_budget_used(budget.as_ref());
+            if used_after_package != 0 {
+                return Err("OPC boundary package drop leaked a memory reservation".into());
+            }
+            if iteration >= warmup_iterations {
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+                source_summary.record_opc(source_snapshot, delta.successful_loads);
+                diagnostics_summary.record(delta, after);
+                after_packages.push(used_after_package);
+            }
+        }
+
+        results.push(opc_cache_result(
+            Case::OpcSourceCacheBudgetBoundary,
+            corpus,
+            elapsed,
+            source_summary,
+            OpcCacheEvidenceSummary {
+                cache_mode: OpcCacheMode::Managed.name(),
+                scenario,
+                capacity_ratio: "1x",
+                capacity_entries: 1,
+                capacity_bytes: corpus.manifest.entry_bytes,
+                working_set_parts: 1,
+                working_set_bytes: payload_size,
+                worker_count: 1,
+                persistent_worker_teams_created: 0,
+                fixed_source_delay_us: 0,
+                timing_scope: "single PartData request; package open and verification excluded",
+                diagnostics: diagnostics_summary,
+                gate: None,
+                budget_used_after_handles_drop: after_handles,
+                budget_used_after_package_drop: after_packages,
+                scaling: opc_cache_empty_scaling("budget-boundary-no-scaling"),
+            },
+        ));
+    }
+    Ok(results)
+}
+
+fn opc_cache_assignments(
+    scenario: OpcCacheScenario,
+    worker_count: usize,
+    working_set_parts: usize,
+    timed_parts: &[PackURI],
+) -> Result<Vec<Vec<OpcCacheRequest>>, Box<dyn Error>> {
+    let mut assignments = vec![Vec::new(); worker_count];
+    match scenario {
+        OpcCacheScenario::SamePart => {
+            let target = timed_parts
+                .first()
+                .ok_or("OPC same-Part scenario has no target")?;
+            for requests in &mut assignments {
+                requests.push(OpcCacheRequest {
+                    logical_index: 0,
+                    partname: target.clone(),
+                });
+            }
+        },
+        OpcCacheScenario::DisjointParts => {
+            if timed_parts.len() != working_set_parts || working_set_parts < worker_count {
+                return Err("OPC disjoint-Part worker assignments cannot make progress".into());
+            }
+            for (logical_index, partname) in timed_parts.iter().enumerate() {
+                assignments[logical_index % worker_count].push(OpcCacheRequest {
+                    logical_index,
+                    partname: partname.clone(),
+                });
+            }
+        },
+    }
+    Ok(assignments)
+}
+
+fn opc_cache_verify_outputs(
+    scenario: OpcCacheScenario,
+    corpus: &Corpus,
+    timed_start_index: usize,
+    outputs: &mut [(usize, PartData)],
+    expected_outputs: usize,
+) -> Result<(), Box<dyn Error>> {
+    if outputs.len() != expected_outputs {
+        return Err("OPC cache worker team returned an unexpected result count".into());
+    }
+    outputs.sort_by_key(|(logical_index, _data)| *logical_index);
+    for (position, (logical_index, data)) in outputs.iter().enumerate() {
+        let payload_index = match scenario {
+            OpcCacheScenario::SamePart => timed_start_index,
+            OpcCacheScenario::DisjointParts => timed_start_index
+                .checked_add(position)
+                .ok_or("OPC cache verification index overflows")?,
+        };
+        if *logical_index
+            != if matches!(scenario, OpcCacheScenario::SamePart) {
+                0
+            } else {
+                position
+            }
+            || data.as_bytes()
+                != payload_bytes(
+                    PayloadKind::Incompressible,
+                    payload_index,
+                    corpus.manifest.entry_bytes,
+                )
+        {
+            return Err("OPC cache worker result differs from deterministic payload".into());
+        }
+    }
+    if matches!(scenario, OpcCacheScenario::SamePart)
+        && outputs.first().is_some_and(|(_, first)| {
+            outputs
+                .iter()
+                .skip(1)
+                .any(|(_, other)| !first.shares_allocation_with(other))
+        })
+    {
+        return Err("OPC same-Part waiters did not share one payload allocation".into());
+    }
+    Ok(())
+}
+
+fn run_opc_source_cache_contention_cell(
+    config: OpcCacheCellConfig,
+    corpus: &Corpus,
+    parts: &[PackURI],
+    ranges: &[Range<u64>],
+) -> Result<CaseResult, Box<dyn Error>> {
+    let OpcCacheCellConfig {
+        case,
+        mode,
+        scenario,
+        capacity,
+        working_set_parts,
+        worker_count,
+        warmup_iterations,
+        samples,
+    } = config;
+    let entry_bytes = corpus.manifest.entry_bytes;
+    let working_set_bytes = u64::try_from(working_set_parts)?
+        .checked_mul(u64::try_from(entry_bytes)?)
+        .ok_or("OPC cache working-set byte count overflows")?;
+    let capacity_parts = capacity.parts(working_set_parts);
+    let capacity_entries = capacity_parts.max(1);
+    let capacity_bytes = match (scenario, capacity) {
+        (OpcCacheScenario::SamePart, OpcCacheCapacity::Half) => entry_bytes / 2,
+        _ => capacity_entries
+            .checked_mul(entry_bytes)
+            .ok_or("OPC cache capacity byte count overflows")?,
+    };
+    let cache_limits = SourceCacheLimits::new(capacity_bytes, capacity_entries)?;
+    let memory_limit = working_set_bytes
+        .checked_mul(2)
+        .ok_or("OPC managed cache memory limit overflows")?;
+    let prefill_start = 0usize;
+    let timed_start = working_set_parts;
+    let timed_end = timed_start
+        .checked_add(working_set_parts)
+        .ok_or("OPC cache timed working set overflows")?;
+    if timed_end > parts.len() || ranges.len() != parts.len() {
+        return Err("OPC cache working sets exceed the fixed corpus".into());
+    }
+    let expected_outputs = match scenario {
+        OpcCacheScenario::SamePart => worker_count,
+        OpcCacheScenario::DisjointParts => working_set_parts,
+    };
+    let timed_parts = match scenario {
+        OpcCacheScenario::SamePart => &parts[timed_start..timed_start + 1],
+        OpcCacheScenario::DisjointParts => &parts[timed_start..timed_end],
+    };
+    let expected_initial = match scenario {
+        OpcCacheScenario::SamePart => 1,
+        OpcCacheScenario::DisjointParts => worker_count,
+    };
+    let expected_pre_release_flights = expected_initial;
+    let expected_pre_release_waiters = match scenario {
+        OpcCacheScenario::SamePart => u64::try_from(worker_count.saturating_sub(1))?,
+        OpcCacheScenario::DisjointParts => 0,
+    };
+    let expected_delta = opc_cache_expected_delta(
+        scenario,
+        capacity,
+        worker_count,
+        working_set_parts,
+        capacity_parts,
+    )?;
+    let expected_retained_entries = match (scenario, capacity) {
+        (OpcCacheScenario::SamePart, OpcCacheCapacity::Half) => 0,
+        (OpcCacheScenario::SamePart, OpcCacheCapacity::One) => 1,
+        (OpcCacheScenario::SamePart, OpcCacheCapacity::Two) => 2,
+        (OpcCacheScenario::DisjointParts, OpcCacheCapacity::Half) => capacity_parts,
+        (OpcCacheScenario::DisjointParts, OpcCacheCapacity::One) => working_set_parts,
+        (OpcCacheScenario::DisjointParts, OpcCacheCapacity::Two) => working_set_parts * 2,
+    };
+    let expected_retained_bytes = expected_retained_entries
+        .checked_mul(entry_bytes)
+        .ok_or("OPC cache retained byte count overflows")?;
+    let expected_live_budget = if mode.is_managed() {
+        match (scenario, capacity) {
+            (OpcCacheScenario::SamePart, OpcCacheCapacity::Two) => {
+                u64::try_from(entry_bytes)?.checked_mul(2)
+            },
+            (OpcCacheScenario::SamePart, _) => Some(u64::try_from(entry_bytes)?),
+            (OpcCacheScenario::DisjointParts, OpcCacheCapacity::Two) => {
+                working_set_bytes.checked_mul(2)
+            },
+            (OpcCacheScenario::DisjointParts, _) => Some(working_set_bytes),
+        }
+        .ok_or("OPC cache live Budget use overflows")?
+    } else {
+        0
+    };
+    let expected_cache_budget = if mode.is_managed() {
+        u64::try_from(expected_retained_bytes)?
+    } else {
+        0
+    };
+
+    let worker_team = OpcCacheWorkerTeam::new(worker_count)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut diagnostics_summary = OpcCacheDiagnosticsSummary::default();
+    let mut gate_summary = OpcCacheGateSummary::default();
+    let mut after_handles = Vec::with_capacity(samples);
+    let mut after_packages = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let backing = Arc::new(InstrumentedSource::new(
+            corpus.archive.clone(),
+            ranges.to_vec(),
+        ));
+        let source = Arc::new(CoordinatedSlowSource::new(
+            Arc::clone(&backing),
+            ranges.to_vec(),
+            Duration::from_micros(OPC_CACHE_SLOW_SOURCE_DELAY_US),
+        ));
+        let read_at: Arc<dyn ReadAt> = source.clone();
+        let (package, budget) =
+            opc_cache_package(mode, read_at, cache_limits, memory_limit, worker_count)?;
+
+        for index in prefill_start..timed_start {
+            let data = package.part(&parts[index])?.data()?;
+            if data.as_bytes()
+                != payload_bytes(
+                    PayloadKind::Incompressible,
+                    index,
+                    corpus.manifest.entry_bytes,
+                )
+            {
+                return Err("OPC cache prefill differs from deterministic payload".into());
+            }
+        }
+        backing.reset();
+        source.arm(expected_initial)?;
+        let before = package.cache_diagnostics();
+        opc_cache_assert_diagnostics_mode(mode, before, memory_limit)?;
+        let assignments =
+            opc_cache_assignments(scenario, worker_count, working_set_parts, timed_parts)?;
+        worker_team.dispatch(Arc::clone(&package), assignments)?;
+        if let Err(error) = source.wait_for_initial_arrivals(OPC_CACHE_COHORT_TIMEOUT) {
+            source.release();
+            let _ = worker_team.collect();
+            return Err(error);
+        }
+        let pre_release = match opc_cache_wait_for_cohort(
+            &package,
+            expected_pre_release_flights,
+            before
+                .waiter_joins
+                .checked_add(expected_pre_release_waiters)
+                .ok_or("OPC cache waiter count overflows")?,
+            OPC_CACHE_COHORT_TIMEOUT,
+        ) {
+            Ok(diagnostics) => diagnostics,
+            Err(error) => {
+                source.release();
+                let _ = worker_team.collect();
+                return Err(error);
+            },
+        };
+        let started = Instant::now();
+        source.release();
+        let mut outputs = worker_team.collect()?;
+        let duration = started.elapsed();
+
+        opc_cache_verify_outputs(
+            scenario,
+            corpus,
+            timed_start,
+            &mut outputs,
+            expected_outputs,
+        )?;
+        let after = package.cache_diagnostics();
+        opc_cache_assert_diagnostics_mode(mode, after, memory_limit)?;
+        let delta = opc_cache_counter_delta(before, after)?;
+        let source_snapshot = backing.snapshot();
+        let gate = source.snapshot()?;
+        if delta != expected_delta
+            || after.retained_entries != expected_retained_entries
+            || after.retained_bytes != expected_retained_bytes
+            || after.in_flight_loads != 0
+            || after.budget_memory_used != expected_live_budget
+            || after.budget_cache_reserved_bytes != expected_cache_budget
+            || opc_cache_budget_used(budget.as_ref()) != expected_live_budget
+            || gate.initial_arrivals != u64::try_from(expected_initial)?
+            || gate.delayed_payload_arrivals != u64::try_from(working_set_parts)?
+            || gate.max_concurrent_delays != u64::try_from(expected_initial)?
+            || pre_release.in_flight_loads != expected_pre_release_flights
+            || pre_release.waiter_joins.checked_sub(before.waiter_joins)
+                != Some(expected_pre_release_waiters)
+            || source_snapshot.ordinary_payload_read_calls == 0
+            || source_snapshot.ordinary_payload_read_bytes == 0
+        {
+            return Err(format!(
+                "OPC cache contention invariant failed for {}/{}/{}/workers={worker_count}: delta={delta:?}, after={after:?}, gate={gate:?}",
+                mode.name(), scenario.name(), capacity.name()
+            )
+            .into());
+        }
+
+        drop(outputs);
+        let after_handle_diagnostics = package.cache_diagnostics();
+        let used_after_handle = opc_cache_budget_used(budget.as_ref());
+        if used_after_handle != expected_cache_budget
+            || after_handle_diagnostics.budget_memory_used != expected_cache_budget
+            || after_handle_diagnostics.budget_cache_reserved_bytes != expected_cache_budget
+        {
+            return Err(
+                "OPC cache handle drop did not leave exactly the retained reservation".into(),
+            );
+        }
+        drop(package);
+        let used_after_package = opc_cache_budget_used(budget.as_ref());
+        if used_after_package != 0 {
+            return Err("OPC cache package drop leaked a memory reservation".into());
+        }
+
+        if iteration >= warmup_iterations {
+            record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            source_summary.record_opc(source_snapshot, delta.successful_loads);
+            diagnostics_summary.record(delta, after);
+            gate_summary.initial_arrivals.push(gate.initial_arrivals);
+            gate_summary
+                .delayed_payload_arrivals
+                .push(gate.delayed_payload_arrivals);
+            gate_summary
+                .max_concurrent_delays
+                .push(gate.max_concurrent_delays);
+            gate_summary
+                .pre_release_flights
+                .push(pre_release.in_flight_loads);
+            gate_summary.pre_release_waiters.push(
+                pre_release
+                    .waiter_joins
+                    .checked_sub(before.waiter_joins)
+                    .ok_or("OPC cache waiter count moved backwards")?,
+            );
+            after_handles.push(used_after_handle);
+            after_packages.push(used_after_package);
+        }
+    }
+
+    Ok(opc_cache_result(
+        case,
+        corpus,
+        elapsed,
+        source_summary,
+        OpcCacheEvidenceSummary {
+            cache_mode: mode.name(),
+            scenario: scenario.name(),
+            capacity_ratio: capacity.name(),
+            capacity_entries,
+            capacity_bytes,
+            working_set_parts,
+            working_set_bytes,
+            worker_count,
+            persistent_worker_teams_created: 1,
+            fixed_source_delay_us: OPC_CACHE_SLOW_SOURCE_DELAY_US,
+            timing_scope: "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+            diagnostics: diagnostics_summary,
+            gate: Some(gate_summary),
+            budget_used_after_handles_drop: after_handles,
+            budget_used_after_package_drop: after_packages,
+            scaling: opc_cache_empty_scaling("pending-group-classification"),
+        },
+    ))
+}
+
+fn opc_cache_set_scaling(
+    result: &mut CaseResult,
+    scenario: OpcCacheScenario,
+    baseline_p50_ns: u64,
+    worker_count: usize,
+    request_count: usize,
+) -> Result<(), Box<dyn Error>> {
+    if baseline_p50_ns == 0 || result.elapsed_ns.p50 == 0 {
+        return Err("OPC cache scaling sample has a zero duration".into());
+    }
+    let duration_ns = result.elapsed_ns.p50 as f64;
+    let baseline_duration_ns = baseline_p50_ns as f64;
+    let speedup = baseline_duration_ns / duration_ns;
+    let throughput = request_count as f64 * 1_000_000_000.0 / duration_ns;
+    let baseline_request_count = match scenario {
+        OpcCacheScenario::SamePart => 1,
+        OpcCacheScenario::DisjointParts => request_count,
+    };
+    let baseline_throughput =
+        baseline_request_count as f64 * 1_000_000_000.0 / baseline_duration_ns;
+    let (model, classification, p50_speedup, efficiency, serial_fraction) = match scenario {
+        OpcCacheScenario::SamePart => (
+            "throughput-only-variable-request-count",
+            "amdahl-not-applicable-variable-request-count",
+            None,
+            None,
+            None,
+        ),
+        OpcCacheScenario::DisjointParts if worker_count == 1 => (
+            "amdahl-fixed-request-count",
+            "baseline",
+            Some(1.0),
+            Some(1.0),
+            None,
+        ),
+        OpcCacheScenario::DisjointParts => {
+            let workers = worker_count as f64;
+            let fraction = (1.0 / speedup - 1.0 / workers) / (1.0 - 1.0 / workers);
+            let classification = if speedup > workers {
+                "superlinear-observed-model-invalid"
+            } else if speedup < 1.0 {
+                "slowdown-observed-model-invalid"
+            } else if !(0.0..=1.0).contains(&fraction) {
+                "serial-fraction-outside-model"
+            } else {
+                "valid-amdahl-observation"
+            };
+            (
+                "amdahl-fixed-request-count",
+                classification,
+                Some(speedup),
+                Some(speedup / workers),
+                Some(fraction),
+            )
+        },
+    };
+    let scaling = &mut result
+        .source
+        .as_mut()
+        .and_then(|source| source.opc_cache.as_mut())
+        .ok_or("OPC cache result is missing structured evidence")?
+        .scaling;
+    *scaling = OpcCacheScalingSummary {
+        model,
+        classification,
+        baseline_worker_count: 1,
+        p50_speedup,
+        p50_efficiency: efficiency,
+        amdahl_serial_fraction: serial_fraction,
+        p50_requests_per_second: throughput,
+        relative_request_throughput: throughput / baseline_throughput,
+    };
+    Ok(())
+}
+
+fn run_opc_source_cache_contention(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    worker_counts: &[usize],
+    mode: OpcCacheMode,
+) -> Result<Vec<CaseResult>, Box<dyn Error>> {
+    validate_opc_cache_corpus(corpus)?;
+    if !matches!(
+        (case, mode),
+        (Case::OpcSourceCacheControlContention, OpcCacheMode::Control)
+            | (Case::OpcSourceCacheManagedContention, OpcCacheMode::Managed)
+    ) {
+        return Err("OPC cache contention case disagrees with its selected mode".into());
+    }
+    if worker_counts.first().copied() != Some(1)
+        || worker_counts.contains(&0)
+        || !worker_counts.windows(2).all(|pair| pair[0] < pair[1])
+    {
+        return Err(
+            "OPC cache contention requires sorted, unique worker widths including one".into(),
+        );
+    }
+    let largest_worker_count = worker_counts
+        .last()
+        .copied()
+        .ok_or("OPC cache contention requires a worker width")?;
+    let minimum_disjoint_parts = largest_worker_count.max(2);
+    let disjoint_parts = minimum_disjoint_parts
+        .checked_add(minimum_disjoint_parts % 2)
+        .ok_or("OPC cache disjoint working-set size overflows")?;
+    if disjoint_parts
+        .checked_mul(2)
+        .is_none_or(|required| required > corpus.manifest.entry_count)
+    {
+        return Err("OPC cache contention worker widths exceed the fixed corpus".into());
+    }
+    let (parts, ranges) = opc_cache_parts_and_ranges(corpus)?;
+    let mut results = Vec::with_capacity(
+        worker_counts
+            .len()
+            .checked_mul(2)
+            .and_then(|count| count.checked_mul(OpcCacheCapacity::ALL.len()))
+            .ok_or("OPC cache contention matrix size overflows")?,
+    );
+
+    for scenario in [OpcCacheScenario::SamePart, OpcCacheScenario::DisjointParts] {
+        let working_set_parts = match scenario {
+            OpcCacheScenario::SamePart => 1,
+            OpcCacheScenario::DisjointParts => disjoint_parts,
+        };
+        let request_count = match scenario {
+            OpcCacheScenario::SamePart => None,
+            OpcCacheScenario::DisjointParts => Some(disjoint_parts),
+        };
+        for capacity in OpcCacheCapacity::ALL {
+            let group_start = results.len();
+            for &worker_count in worker_counts {
+                results.push(run_opc_source_cache_contention_cell(
+                    OpcCacheCellConfig {
+                        case,
+                        mode,
+                        scenario,
+                        capacity,
+                        working_set_parts,
+                        worker_count,
+                        warmup_iterations,
+                        samples,
+                    },
+                    corpus,
+                    &parts,
+                    &ranges,
+                )?);
+            }
+            let baseline_p50 = results
+                .get(group_start)
+                .ok_or("OPC cache contention matrix has no baseline")?
+                .elapsed_ns
+                .p50;
+            for result in &mut results[group_start..] {
+                let worker_count = result
+                    .source
+                    .as_ref()
+                    .and_then(|source| source.opc_cache.as_ref())
+                    .ok_or("OPC cache result is missing structured evidence")?
+                    .worker_count;
+                opc_cache_set_scaling(
+                    result,
+                    scenario,
+                    baseline_p50,
+                    worker_count,
+                    request_count.unwrap_or(worker_count),
+                )?;
+            }
+        }
+    }
+    Ok(results)
+}
+
 fn opc_source_cache_limits(corpus: &Corpus) -> Result<SourceCacheLimits, Box<dyn Error>> {
     Ok(SourceCacheLimits::new(
         corpus.manifest.uncompressed_payload_bytes.max(1),
@@ -16229,9 +17701,9 @@ mod tests {
 
     use super::{
         Case, CorpusShape, CountingSink, InstrumentedSource, ODP_TEXT_BOX_BATCH_COUNT,
-        ODT_RESOURCE_BATCH_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RangeSimulationConfig,
-        RequestSizeBuckets, RtfSemanticVariant, SemanticShape, SimulatedRangeSource,
-        SourceBackedPackage, WriterShape, XlsxShape, build_cfb_corpus,
+        ODT_RESOURCE_BATCH_COUNT, OpcCacheMode, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind,
+        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
+        SimulatedRangeSource, SourceBackedPackage, WriterShape, XlsxShape, build_cfb_corpus,
         build_docx_source_edit_corpus, build_odp_media_corpus, build_odp_text_box_batch_corpus,
         build_ods_media_corpus, build_odt_media_corpus, build_odt_resource_batch_corpus,
         build_ole_common_corpus, build_opc_corpus, build_pptx_source_edit_corpus,
@@ -16247,7 +17719,8 @@ mod tests {
         build_xlsx_sheet_protection_edit_corpus, expected_opc_overlay_output,
         ole_common_changed_output, opc_overlay_replacement_payload, payload_bytes,
         resolve_execution_workers, run_case, run_case_with_config,
-        run_docx_source_backed_one_edit_save, run_opc_source_overlay_one_part_save,
+        run_docx_source_backed_one_edit_save, run_opc_source_cache_budget_boundary,
+        run_opc_source_cache_contention, run_opc_source_overlay_one_part_save,
         run_pptx_batch_edit_save, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_one_edit_save, run_scaling_case, run_streaming_creation,
         run_xls_comments_edit_save, run_xlsx_auto_filter_edit_save,
@@ -16453,6 +17926,79 @@ mod tests {
         assert!(source.read_calls.windows(2).all(|pair| pair[0] == pair[1]));
         assert!(source.read_bytes.windows(2).all(|pair| pair[0] == pair[1]));
         assert_eq!(source.ordinary_payload_materializations, Some(vec![1, 1]));
+    }
+
+    #[test]
+    fn opc_source_cache_budget_boundary_emits_exact_accounting_evidence() {
+        let corpus = build_opc_corpus(CorpusShape::ManySmall, PayloadKind::Incompressible).unwrap();
+        let measured = run_opc_source_cache_budget_boundary(&corpus, 0, 1).unwrap();
+
+        assert_eq!(measured.len(), 2);
+        let exact = measured[0]
+            .source
+            .as_ref()
+            .unwrap()
+            .opc_cache
+            .as_ref()
+            .unwrap();
+        assert_eq!(exact.scenario, "exact-budget");
+        assert_eq!(exact.diagnostics.successful_loads, vec![1]);
+        assert_eq!(exact.diagnostics.budget_reservation_failures, vec![0]);
+        assert_eq!(exact.budget_used_after_handles_drop, vec![1_024]);
+        assert_eq!(exact.budget_used_after_package_drop, vec![0]);
+
+        let refused_source = measured[1].source.as_ref().unwrap();
+        let refused = refused_source.opc_cache.as_ref().unwrap();
+        assert_eq!(refused.scenario, "one-under-budget");
+        assert_eq!(refused_source.read_calls, vec![0]);
+        assert_eq!(refused_source.read_bytes, vec![0]);
+        assert_eq!(refused.diagnostics.cold_loads, vec![0]);
+        assert_eq!(refused.diagnostics.budget_reservation_failures, vec![2]);
+        assert_eq!(refused.diagnostics.budget_memory_used, vec![0]);
+        assert_eq!(refused.budget_used_after_handles_drop, vec![0]);
+        assert_eq!(refused.budget_used_after_package_drop, vec![0]);
+    }
+
+    #[test]
+    fn opc_source_cache_contention_matrix_is_gated_and_mode_explicit() {
+        let corpus = build_opc_corpus(CorpusShape::ManySmall, PayloadKind::Incompressible).unwrap();
+        for (case, mode, managed) in [
+            (
+                Case::OpcSourceCacheControlContention,
+                OpcCacheMode::Control,
+                false,
+            ),
+            (
+                Case::OpcSourceCacheManagedContention,
+                OpcCacheMode::Managed,
+                true,
+            ),
+        ] {
+            let measured =
+                run_opc_source_cache_contention(case, &corpus, 0, 1, &[1, 2], mode).unwrap();
+            assert_eq!(measured.len(), 12);
+            for result in &measured {
+                assert_eq!(result.elapsed_ns.samples.len(), 1);
+                let evidence = result.source.as_ref().unwrap().opc_cache.as_ref().unwrap();
+                assert_eq!(evidence.persistent_worker_teams_created, 1);
+                assert_eq!(evidence.diagnostics.cold_loads.len(), 1);
+                assert_eq!(evidence.cache_mode == "budget-managed", managed);
+                assert_eq!(
+                    evidence.diagnostics.budget_memory_limit[0].is_some(),
+                    managed
+                );
+                assert_eq!(evidence.budget_used_after_package_drop, vec![0]);
+                let gate = evidence.gate.as_ref().unwrap();
+                assert_eq!(gate.initial_arrivals.len(), 1);
+                assert_eq!(gate.max_concurrent_delays, gate.initial_arrivals);
+                if evidence.scenario == "same-part" {
+                    assert!(evidence.scaling.p50_speedup.is_none());
+                    assert!(evidence.scaling.amdahl_serial_fraction.is_none());
+                } else {
+                    assert!(evidence.scaling.p50_speedup.is_some());
+                }
+            }
+        }
     }
 
     #[test]

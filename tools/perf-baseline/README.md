@@ -96,6 +96,43 @@ relationships and topology, raw-copies every other member, and writes to a
 sequential sink. Payload preparation and complete output verification stay
 outside timing.
 
+Measure the opt-in OPC source-cache Budget boundary and controlled contention
+matrix on one fixed many-small incompressible corpus:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 --workers 1,2,4,8,available \
+  --case opc_source_cache_budget_boundary,\
+opc_source_cache_control_contention,opc_source_cache_managed_contention \
+  --json target/perf/opc-source-cache.json
+```
+
+The boundary selector emits an exact-budget success and a one-byte-under
+managed refusal. The refusal must report two reservation failures and perform
+zero payload I/O. Each contention selector emits same-Part and fixed-work
+disjoint-Part cells at `1/2x`, `1x`, and `2x` cache capacity for every capped,
+deduplicated worker width. With five resolved widths, the three selectors emit
+62 records: two boundary records plus 30 finite-control and 30 Budget-managed
+records.
+
+Every cell creates one persistent worker team and reuses it across warm-ups and
+samples. Each iteration opens and prefills a fresh package, admits the initial
+cohort through an explicit source gate, then times only post-admission service
+completion. A distinct compressed payload incurs one fixed 10 ms source delay.
+Returned `PartData` handles stay live until the whole wave completes, making
+pin pressure observable. The report records exact cache counters, pre-release
+flights/waiters, gate arrivals and concurrency, retained bytes/entries, Budget
+use after handle/package drop, request throughput, and an Amdahl classification
+only for the fixed-request disjoint cells. Same-Part widths change request
+count, so they are explicitly throughput-only and do not receive a speedup or
+serial-fraction estimate.
+
+These deterministic delays and classifications are correctness and contention
+evidence, not production-latency results. Do not make a performance claim from
+them without clean release builds, CPU affinity, balanced control/managed ABBA
+ordering, retained raw samples, allocation and peak-memory evidence, and stable
+counter identities.
+
 Measure the controlled filesystem tranche (five opt-in cases):
 
 ```sh

@@ -220,7 +220,7 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **169
+The stage-1 records above are retained unchanged. The current harness has **178
 selectable cases**. The historical 36-default-case/198-default-record tranche
 remains measured as documented below; newer selectable cases do not inherit
 those measurements.
@@ -244,10 +244,15 @@ production-performance claim. See
 Source-backed OPC payload retention is now optionally charged to a caller's
 hierarchical `Budget`. The managed cache preserves pinned handles, reserves
 active single-flight loads, evicts only unpinned clean entries, and reports
-content-free budget diagnostics. Focused tests cover hierarchy, sibling
-competition, cancellation, failure and release, but no controlled contention
-or latency artifact exists. See
-[`0086`](changes/0086-opc-source-cache-budget-management.md).
+content-free budget diagnostics. Three opt-in harness selectors now cover the
+exact/one-under managed Budget boundary and matched finite-control/managed
+same-Part plus fixed-work disjoint-Part contention across `1/2x`, `1x`, and
+`2x` capacities. They enforce exact gate, cache, pinning and Budget-release
+counters and classify Amdahl results only where request count remains fixed.
+The fixed-delay harness is correctness evidence; no release ABBA, allocation,
+peak-memory or production-latency artifact exists. See
+[`0086`](changes/0086-opc-source-cache-budget-management.md) and
+[`0088`](changes/0088-opc-source-cache-contention-evidence.md).
 
 Bounded forward-only one-sheet XLSX creation and RTF authoring exist in
 production (`8245da20d` and `5918be8ec`). Their performance and peak-memory
@@ -793,8 +798,10 @@ See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0007`](changes/0007-source-backed-opc-and-facades.md). Managed source-backed
 OPC caches now charge retained and in-flight payloads to a hierarchical
 `Budget`; compatibility opens retain the finite `SourceCacheLimits` path. The
-budget implementation has correctness tests but no controlled contention or
-latency measurement.
+opt-in harness now supplies deterministic boundary and controlled-contention
+counter evidence, including exact pin pressure and release accounting. It is
+not a production-latency measurement; controlled release ABBA, allocation and
+peak-memory evidence remain pending.
 
 Consolidated changed-crate tests, formatter checks, warning-denied production
 Clippy and rustdoc gates passed. The current ODS all-target Clippy gate retains
