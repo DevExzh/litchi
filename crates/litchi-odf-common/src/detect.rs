@@ -13,6 +13,7 @@
 //! ```
 
 use crate::constants;
+use crate::core::{OwnedPackage, PreparedPackage};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -128,6 +129,29 @@ pub fn bytes(value: &[u8]) -> Option<Format> {
     flat(value)
 }
 
+/// Detect a packaged ODF document while retaining its validated ZIP index.
+///
+/// This is the ownership-taking counterpart to [`bytes`]. The local
+/// `mimetype` framing contract is checked before the bounded archive index is
+/// built, and the retained index is transferred to a concrete family facade
+/// without a second central-directory scan.
+#[must_use]
+pub fn prepared(value: Vec<u8>) -> Option<PreparedPackage> {
+    let format = mime(packaged_mime(&value)?)?;
+    let package = OwnedPackage::from_prepared_bytes(value).ok()?;
+    if !package.is_stored(MIMETYPE_PATH).ok()? {
+        return None;
+    }
+    Some(PreparedPackage::new(package, format))
+}
+
+/// Compatibility spelling for callers that prefer the full detector name.
+#[inline]
+#[must_use]
+pub fn prepared_package(value: Vec<u8>) -> Option<PreparedPackage> {
+    prepared(value)
+}
+
 /// Detect a packaged or flat `OpenDocument` stream.
 ///
 /// Detection reads the complete stream from its beginning and restores the
@@ -204,7 +228,86 @@ fn trim_ascii(mut value: &[u8]) -> &[u8] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
+    use std::io::{Cursor, Write};
+
+    fn zip_with_entries(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut output = Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for (path, value) in entries {
+            writer
+                .start_file(*path, options)
+                .unwrap_or_else(|error| panic!("test ZIP entry must start: {error}"));
+            writer
+                .write_all(value)
+                .unwrap_or_else(|error| panic!("test ZIP entry must write: {error}"));
+        }
+        writer
+            .finish()
+            .unwrap_or_else(|error| panic!("test ZIP must finish: {error}"));
+        output.into_inner()
+    }
+
+    fn central_record(bytes: &[u8], target: &[u8]) -> usize {
+        let mut offset = bytes
+            .windows(4)
+            .position(|signature| signature == b"PK\x01\x02")
+            .expect("test ZIP must have a central directory");
+        loop {
+            let name_len = usize::from(u16::from_le_bytes(
+                bytes[offset + 28..offset + 30]
+                    .try_into()
+                    .expect("central name length"),
+            ));
+            let extra_len = usize::from(u16::from_le_bytes(
+                bytes[offset + 30..offset + 32]
+                    .try_into()
+                    .expect("central extra length"),
+            ));
+            let comment_len = usize::from(u16::from_le_bytes(
+                bytes[offset + 32..offset + 34]
+                    .try_into()
+                    .expect("central comment length"),
+            ));
+            if &bytes[offset + 46..offset + 46 + name_len] == target {
+                return offset;
+            }
+            offset += 46 + name_len + extra_len + comment_len;
+            assert_eq!(&bytes[offset..offset + 4], b"PK\x01\x02");
+        }
+    }
+
+    fn local_record(bytes: &[u8], target: &[u8]) -> usize {
+        let mut offset = 0;
+        while let Some(relative) = bytes[offset..]
+            .windows(4)
+            .position(|signature| signature == b"PK\x03\x04")
+        {
+            offset += relative;
+            let name_len = usize::from(u16::from_le_bytes(
+                bytes[offset + 26..offset + 28]
+                    .try_into()
+                    .expect("local name length"),
+            ));
+            if &bytes[offset + 30..offset + 30 + name_len] == target {
+                return offset;
+            }
+            let extra_len = usize::from(u16::from_le_bytes(
+                bytes[offset + 28..offset + 30]
+                    .try_into()
+                    .expect("local extra length"),
+            ));
+            let compressed_len = usize::try_from(u32::from_le_bytes(
+                bytes[offset + 18..offset + 22]
+                    .try_into()
+                    .expect("local compressed length"),
+            ))
+            .expect("test ZIP size");
+            offset += 30 + name_len + extra_len + compressed_len;
+        }
+        panic!("test ZIP local record not found");
+    }
 
     #[test]
     fn classifies_every_packaged_family_and_template_without_lossy_text() {
@@ -335,5 +438,74 @@ mod tests {
         assert_eq!(bytes(&package[..LOCAL_HEADER_BYTES]), None);
         let local_entry_end = LOCAL_HEADER_BYTES + MIMETYPE_NAME.len() + constants::ODF_TEXT.len();
         assert_eq!(bytes(&package[..local_entry_end]), None);
+    }
+
+    #[test]
+    fn prepared_detection_retains_one_bounded_index_and_rejects_hostile_archives() {
+        crate::package::reset_index_build_count();
+        let mut writer = crate::core::PackageWriter::new();
+        writer
+            .set_mimetype(constants::ODF_TEXT)
+            .unwrap_or_else(|error| panic!("test package mimetype must be accepted: {error}"));
+        let package = writer
+            .finish_to_bytes()
+            .unwrap_or_else(|error| panic!("test package must be writable: {error}"));
+        let retained = prepared(package).expect("valid package must prepare");
+        assert_eq!(retained.format(), Format::Odt);
+        assert_ne!(retained.prepared_index_identity(), 0);
+        assert_eq!(crate::package::index_build_count(), 1);
+        let _semantic_package = retained
+            .package()
+            .package()
+            .expect("prepared package must expose its indexed view");
+        assert_eq!(crate::package::index_build_count(), 1);
+
+        let duplicate = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("Pictures/a", b"one"),
+            ("./Pictures/a", b"two"),
+        ]);
+        assert!(prepared(duplicate).is_none());
+
+        let traversal = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("../Pictures/a", b"one"),
+            ("Pictures/a", b"two"),
+        ]);
+        assert!(prepared(traversal).is_none());
+
+        let oversized_name = format!("{}.xml", "x".repeat(4 * 1024));
+        let oversized = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            (&oversized_name, b"one"),
+        ]);
+        assert!(prepared(oversized).is_none());
+        assert!(prepared(b"PK\x03\x04truncated".to_vec()).is_none());
+
+        let mut forged = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("content.xml", b"<office:document-content/>"),
+        ]);
+        let content_local_offset = local_record(&forged, b"content.xml");
+        let mimetype_central_offset = central_record(&forged, b"mimetype");
+        forged[mimetype_central_offset + 42..mimetype_central_offset + 46]
+            .copy_from_slice(&(content_local_offset as u32).to_le_bytes());
+        assert!(prepared(forged).is_none());
+
+        let mut invalid_utf8 = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("content.xml", b"<office:document-content/>"),
+        ]);
+        let invalid_local = local_record(&invalid_utf8, b"content.xml");
+        invalid_utf8[invalid_local + 30] = 0xff;
+        let invalid_central = central_record(&invalid_utf8, b"content.xml");
+        invalid_utf8[invalid_central + 46] = 0xff;
+        assert!(prepared(invalid_utf8).is_none());
+
+        let traversal = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("../content.xml", b"junk"),
+        ]);
+        assert!(prepared(traversal).is_none());
     }
 }

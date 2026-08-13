@@ -15,6 +15,86 @@ fn document(content: &str) -> Document {
     Document::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
 }
 
+fn raw_package(content: &[u8]) -> Vec<u8> {
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    writer
+        .write_stored("mimetype", constants::ODF_TEXT.as_bytes())
+        .unwrap();
+    writer
+        .write_stored(constants::ODF_CONTENT, content)
+        .unwrap();
+    writer.finish_to_bytes().unwrap()
+}
+
+#[test]
+fn prepared_detection_transfers_the_same_archive_index_into_semantic_open() {
+    let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:body><o:text><t:p>prepared</t:p></o:text></o:body></o:document-content>"#;
+    let mut writer = PackageWriter::new();
+    writer.set_mimetype(constants::ODF_TEXT).unwrap();
+    writer
+        .add_file(constants::ODF_CONTENT, content.as_bytes())
+        .unwrap();
+    let bytes = writer.finish_to_bytes().unwrap();
+
+    let prepared = litchi_odf_common::detect::prepared(bytes.clone()).unwrap();
+    let index_identity = prepared.prepared_index_identity();
+    let document = Document::from_prepared_package(prepared).unwrap();
+
+    assert_eq!(document.prepared_index_identity(), index_identity);
+    assert_eq!(document.text().unwrap(), "prepared");
+    assert_eq!(
+        Document::from_bytes(bytes).unwrap().text().unwrap(),
+        "prepared"
+    );
+}
+
+#[test]
+fn prepared_detection_rejects_a_wrong_family_before_semantic_open() {
+    let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:spreadsheet/></o:body></o:document-content>"#;
+    let mut writer = PackageWriter::new();
+    writer.set_mimetype(constants::ODF_SPREADSHEET).unwrap();
+    writer
+        .add_file(constants::ODF_CONTENT, content.as_bytes())
+        .unwrap();
+    let prepared = litchi_odf_common::detect::prepared(writer.finish_to_bytes().unwrap())
+        .expect("valid ODS package should be detected");
+
+    assert!(Document::from_prepared_package(prepared).is_err());
+}
+
+#[test]
+fn prepared_detection_rejects_junk_and_malformed_odt_content_xml() {
+    for content in [
+        br#"<junk/>"#.as_slice(),
+        br#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:spreadsheet/></o:body></o:document-content>"#.as_slice(),
+        &[0xff, 0xfe][..],
+    ] {
+        let prepared = litchi_odf_common::detect::prepared(raw_package(content))
+            .expect("archive structure should prepare before XML validation");
+        assert!(Document::from_prepared_package(prepared).is_err());
+    }
+}
+
+#[test]
+fn prepared_semantic_open_rejects_invalid_xml_references_and_late_declarations() {
+    for content in [
+        br#"<!--bad--comment--><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:text>bad comment</o:text></o:body></o:document-content>"#.as_slice(),
+        br#"<?xml version="1.0"?><?xml version="1.0"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:text>duplicate declaration</o:text></o:body></o:document-content>"#.as_slice(),
+        br#"
+<?xml version="1.0"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:text>whitespace-delayed declaration</o:text></o:body></o:document-content>"#.as_slice(),
+        br#"<!--comment--><?xml version="1.0"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:text>late declaration</o:text></o:body></o:document-content>"#.as_slice(),
+        br#"<?odf-prologue?><?xml version="1.0"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:text>late declaration</o:text></o:body></o:document-content>"#.as_slice(),
+        br#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:text>&#0;</o:text></o:body></o:document-content>"#.as_slice(),
+        br#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:text>&#xD800;</o:text></o:body></o:document-content>"#.as_slice(),
+        br#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:text>&#x110000;</o:text></o:body></o:document-content>"#.as_slice(),
+        br#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:text>ok</o:text></o:body></o:document-content><?xml version="1.0"?>"#.as_slice(),
+    ] {
+        let prepared = litchi_odf_common::detect::prepared(raw_package(content))
+            .expect("archive structure should prepare before XML validation");
+        assert!(Document::from_prepared_package(prepared).is_err());
+    }
+}
+
 #[test]
 fn text_model_accepts_arbitrary_prefixes_and_decodes_mixed_text() {
     let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:body><o:text><t:h t:outline-level="2">Title &amp; More</t:h><t:p t:style-name="Body">A<t:span>B</t:span>C<t:s t:c="2"/>D<![CDATA[!]]></t:p></o:text></o:body></o:document-content>"#;

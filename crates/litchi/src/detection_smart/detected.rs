@@ -1,8 +1,9 @@
 //! Smart format detection with reusable owned results.
 //!
 //! This module provides the `DetectedFormat` enum and the `detect_format_smart`
-//! function. OOXML and OLE results retain their parsed owners; iWork, ODF, and
-//! RTF results retain the caller's moved byte buffer for subsequent parsing.
+//! function. OOXML and OLE results retain their parsed owners; packaged ODF
+//! results retain a validated archive index, while iWork and RTF results retain
+//! the caller's moved byte buffer for subsequent parsing.
 
 /// Detected format with reusable parsed owners or moved source bytes.
 ///
@@ -10,12 +11,13 @@
 /// includes the most reusable representation available at this layer:
 /// - OOXML formats (DOCX, PPTX, XLSX, XLSB): include parsed OPC package
 /// - OLE2 formats (DOC, PPT, XLS): include parsed OleFile
-/// - iWork and ODF formats: include owned bytes after leaf detection
+/// - ODF formats: include an owned, validated package index after detection
+/// - iWork formats: include owned bytes after leaf detection
 /// - RTF: includes owned bytes
 ///
-/// iWork and ODF leaf detectors may scan a container before a later document
-/// parser reads the retained bytes again. No parsing-once guarantee is made for
-/// those formats.
+/// iWork leaf detectors may scan a container before a later document parser
+/// reads the retained bytes again. ODF packaged detection retains its bounded
+/// index and makes the handoff parsing-once at the archive-structure layer.
 pub enum DetectedFormat {
     // OOXML formats with parsed OPC package
     #[cfg(feature = "docx")]
@@ -43,9 +45,9 @@ pub enum DetectedFormat {
     #[cfg(feature = "numbers")]
     Numbers(Vec<u8>),
 
-    // ODF formats with validated ZIP archive data (lazy parsing)
+    // ODF formats with a validated, reusable ZIP archive index
     #[cfg(feature = "odt")]
-    Odt(Vec<u8>),
+    Odt(litchi_odf_common::PreparedPackage),
     #[cfg(feature = "odp")]
     Odp(Vec<u8>),
     #[cfg(feature = "ods")]
@@ -105,7 +107,8 @@ impl std::fmt::Debug for DetectedFormat {
 /// The result retains a reusable representation for immediate follow-up work:
 /// - OOXML files: parse OPC package once and return it
 /// - OLE2 files: parse OLE file once and return it
-/// - iWork, ODF, and RTF files: return the moved bytes after detection
+/// - ODF files: retain one validated archive index for semantic opening
+/// - iWork and RTF files: return the moved bytes after detection
 ///
 /// # Arguments
 ///
@@ -167,14 +170,19 @@ fn detect_format_smart_without_ooxml(bytes: Vec<u8>) -> Option<DetectedFormat> {
 
     if mask.is_zip() {
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
-        if let Some(format) = litchi_odf_common::detect::bytes(&bytes) {
+        if let Some(prepared) = litchi_odf_common::detect::prepared(bytes) {
+            let format = prepared.format();
             return match format {
                 #[cfg(feature = "odt")]
-                litchi_core::detection::FileFormat::Odt => Some(DetectedFormat::Odt(bytes)),
+                litchi_core::detection::FileFormat::Odt => Some(DetectedFormat::Odt(prepared)),
                 #[cfg(feature = "odp")]
-                litchi_core::detection::FileFormat::Odp => Some(DetectedFormat::Odp(bytes)),
+                litchi_core::detection::FileFormat::Odp => {
+                    Some(DetectedFormat::Odp(prepared.into_package().into_inner()))
+                },
                 #[cfg(feature = "ods")]
-                litchi_core::detection::FileFormat::Ods => Some(DetectedFormat::Ods(bytes)),
+                litchi_core::detection::FileFormat::Ods => {
+                    Some(DetectedFormat::Ods(prepared.into_package().into_inner()))
+                },
                 _ => None,
             };
         }
@@ -288,14 +296,15 @@ pub fn detect_format_smart_with_limits(
         }
 
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
-        if let Some(format) = litchi_odf_common::detect::bytes(&bytes) {
+        if let Some(prepared) = litchi_odf_common::detect::prepared(bytes) {
+            let format = prepared.format();
             return match format {
                 #[cfg(feature = "odt")]
-                FileFormat::Odt => Some(DetectedFormat::Odt(bytes)),
+                FileFormat::Odt => Some(DetectedFormat::Odt(prepared)),
                 #[cfg(feature = "odp")]
-                FileFormat::Odp => Some(DetectedFormat::Odp(bytes)),
+                FileFormat::Odp => Some(DetectedFormat::Odp(prepared.into_package().into_inner())),
                 #[cfg(feature = "ods")]
-                FileFormat::Ods => Some(DetectedFormat::Ods(bytes)),
+                FileFormat::Ods => Some(DetectedFormat::Ods(prepared.into_package().into_inner())),
                 _ => None,
             };
         }
@@ -415,6 +424,31 @@ fn detect_ooxml_package(package: crate::opc::OpcPackage) -> Option<DetectedForma
 #[cfg(test)]
 mod short_signature_tests {
     use super::detect_format_smart;
+
+    #[cfg(feature = "odt")]
+    #[test]
+    fn odt_smart_detection_transfers_the_prepared_index_to_semantic_open() {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_TEXT)
+            .unwrap();
+        writer
+            .add_file(
+                litchi_odf_common::constants::ODF_CONTENT,
+                br#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:body><o:text><t:p>smart</t:p></o:text></o:body></o:document-content>"#,
+            )
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let detected = detect_format_smart(bytes).expect("ODT should be detected");
+        let super::DetectedFormat::Odt(prepared) = detected else {
+            panic!("smart ODT detection did not retain a prepared package");
+        };
+        let index_identity = prepared.prepared_index_identity();
+        let document = litchi_odt::Document::from_prepared_package(prepared).unwrap();
+        assert_eq!(document.prepared_index_identity(), index_identity);
+        assert_eq!(document.text().unwrap(), "smart");
+    }
 
     #[test]
     fn short_zip_candidate_is_rejected_without_short_read_failure() {

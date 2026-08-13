@@ -72,7 +72,7 @@ pub mod xml_splice;
 // Re-export main types for convenience
 // Manifest is internal to the package system
 pub use encryption::{Cipher, Kdf, Profile, StartKey};
-pub use family::{Package, validate_content_part};
+pub use family::{Package, PreparedPackage, validate_content_document_part, validate_content_part};
 #[allow(
     unused_imports,
     reason = "The manifest descriptors are intentionally re-exported as the core public API."

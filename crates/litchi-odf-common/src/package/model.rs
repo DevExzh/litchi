@@ -1,12 +1,65 @@
 //! Neutral ODF package and manifest models.
 
-use soapberry_zip::office::ArchiveReader;
+use soapberry_zip::office::{
+    ArchiveReader, ArchiveReaderNames, IndexedArchive, IndexedArchiveNames,
+};
 use std::collections::HashMap;
+use std::sync::Arc;
+
+#[cfg(test)]
+use std::cell::Cell;
+
+#[cfg(test)]
+thread_local! {
+    static INDEX_BUILDS: Cell<usize> = const { Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn note_index_build() {
+    INDEX_BUILDS.with(|count| count.set(count.get().saturating_add(1)));
+}
+
+#[cfg(test)]
+pub(crate) fn reset_index_build_count() {
+    INDEX_BUILDS.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+pub(crate) fn index_build_count() -> usize {
+    INDEX_BUILDS.with(Cell::get)
+}
 
 /// A borrowed, lazily decoded ODF ZIP archive.
 pub struct Archive<'data> {
-    pub(super) reader: ArchiveReader<'data>,
+    pub(super) reader: ArchiveReaderKind<'data>,
 }
+
+/// The archive index retained by an owned ODF package.
+pub(crate) type PreparedArchive = Arc<IndexedArchive<Arc<Vec<u8>>>>;
+
+/// A borrowed archive reader or an already-indexed owned archive.
+pub(super) enum ArchiveReaderKind<'data> {
+    Borrowed(ArchiveReader<'data>),
+    Prepared(PreparedArchive),
+}
+
+pub enum ArchiveNames<'data> {
+    Borrowed(ArchiveReaderNames<'data>),
+    Prepared(IndexedArchiveNames<'data, Arc<Vec<u8>>>),
+}
+
+impl<'data> Iterator for ArchiveNames<'data> {
+    type Item = &'data str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Borrowed(names) => names.next(),
+            Self::Prepared(names) => names.next(),
+        }
+    }
+}
+
+impl ExactSizeIterator for ArchiveNames<'_> {}
 
 /// The family-neutral portion of `META-INF/manifest.xml`.
 #[derive(Debug, Clone, PartialEq, Eq)]

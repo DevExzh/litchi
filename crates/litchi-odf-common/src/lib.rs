@@ -26,6 +26,7 @@ pub mod signature;
 pub mod style;
 pub mod validation;
 
+pub use core::{OwnedPackage, PreparedPackage};
 pub use repair::{
     MIMETYPE_LOCAL_EXTRA_ISSUE, MIMETYPE_LOCAL_EXTRA_REPAIR, MimetypeRepairPlan, OdfRepairLimits,
     OutputProgress as RepairOutputProgress, RemoveMimetypeLocalExtra, RepairError,

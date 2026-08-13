@@ -572,8 +572,8 @@ impl Document {
                 )))
             },
             #[cfg(feature = "odt")]
-            DetectedFormat::Odt(data) => {
-                let doc = litchi_odt::Document::from_bytes(data).map_err(|e| {
+            DetectedFormat::Odt(prepared) => {
+                let doc = litchi_odt::Document::from_prepared_package(prepared).map_err(|e| {
                     Error::ParseError(format!("Failed to parse ODT document from bytes: {}", e))
                 })?;
 
