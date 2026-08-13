@@ -592,7 +592,7 @@ mod tests {
     impl Write for FailAfter {
         fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
             if self.accepted.len() == self.limit {
-                return Err(io::Error::new(io::ErrorKind::Other, "injected failure"));
+                return Err(io::Error::other("injected failure"));
             }
             let remaining = self.limit.saturating_sub(self.accepted.len());
             let accepted = remaining.min(bytes.len());
