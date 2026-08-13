@@ -212,18 +212,21 @@ remaining program scope are summarized in [`REPORT.md`](REPORT.md).
    that compressed source increases the large profile's peak heap by 22.6%,
    so lazy Part materialization remains the next architectural dependency.
 
-The harness now has 14 cases and 97 default result records. In addition to the
-original matrix it measures owned OPC open, one-Part mutated save, and public
+The original stage-1 harness had 14 cases and 97 default result records. In
+addition to the original matrix it measured owned OPC open, one-Part mutated
+save, and public
 DOC/XLS/PPT writer packaging with tiny, moderate, and 4-5 MiB stream-heavy
 shapes. Scheduled CI records the deterministic full matrix without applying
 machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **178
-selectable cases**. The historical 36-default-case/198-default-record tranche
-remains measured as documented below; newer selectable cases do not inherit
-those measurements.
+The stage-1 records above are retained unchanged. The committed HEAD harness has
+**180 selectable cases**; its preceding committed revision had 178. Dirty
+worktree additions, including the uncommitted XLS visibility harness, are not
+included in this count. The historical 36-default-case/198-default-record
+tranche remains measured as documented below; newer selectable cases do not
+inherit those measurements.
 
 Five filesystem cases now exercise eager/source-backed OPC open, eager/source-
 backed one-Part atomic save, and same-length CFB atomic overlay save. A
@@ -234,7 +237,7 @@ four Parts. Both OPC saves produce SHA-256
 `f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009`;
 CFB reports one changed span and SHA-256
 `7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc`.
-Cold-requested records contain nonzero physical `read_bytes`, but do not prove
+Cold-requested records contain nonzero process `read_bytes`, but do not prove
 a reproducible cold cache. The debug, dirty-worktree, one-sample artifact makes
 no latency, allocation, memory, throughput, warm/cold comparison, or
 production-performance claim. See
@@ -249,14 +252,47 @@ exact/one-under managed Budget boundary and matched finite-control/managed
 same-Part plus fixed-work disjoint-Part contention across `1/2x`, `1x`, and
 `2x` capacities. They enforce exact gate, cache, pinning and Budget-release
 counters and classify Amdahl results only where request count remains fixed.
-The fixed-delay harness is correctness evidence; no release ABBA, allocation,
-peak-memory or production-latency artifact exists. See
+The committed implementation charges retained and in-flight payload memory;
+`InputBytes`, `Work`, and `Objects` accounting remains an active follow-up and
+is not attributed to this baseline. The fixed-delay harness is a coordination
+instrument, not production latency. Its controlled release ABBA now provides
+structural and distribution evidence, but no managed-versus-control speedup is
+accepted; allocation, peak-memory/RSS, hardware-counter, copied/decompressed-
+byte, and CPU-utilization evidence remain absent. See
 [`0086`](changes/0086-opc-source-cache-budget-management.md) and
 [`0088`](changes/0088-opc-source-cache-contention-evidence.md).
+
+The five filesystem cases also have a repeated release capture: 30 fresh-child
+samples in each of `warm` and `cold-requested` state on a CPU-pinned tmpfs
+process (300 samples total). It records logical and process I/O counters,
+materializations, changed spans, output hashes, and descriptive latency
+distributions. `cold-requested` remains only an accepted advisory
+`posix_fadvise(DONTNEED)` request; tmpfs process `read_bytes == 0` is a
+process-I/O observation and does not establish physical cold-cache behavior or
+a storage-device claim. No comparator, allocation, or peak-memory acceptance
+follows from this run. See
+[`0089`](changes/0089-filesystem-release-repeated-evidence.md).
 
 Bounded forward-only one-sheet XLSX creation and RTF authoring exist in
 production (`8245da20d` and `5918be8ec`). Their performance and peak-memory
 evidence is pending; no result in this baseline is attributed to them.
+
+Bounded semantic validation reports are now implemented for DOCX, PPTX, RTF,
+and XLS, alongside the existing CFB, OPC, and ODF validation reports. They
+retain finite limits, typed failure attribution, and format-specific
+preservation/security checks, but are correctness APIs rather than measured
+performance cases. ODF's repair surface remains deliberately narrow: the typed
+non-destructive plan removes only one recognized local-header extra from a
+first, stored `mimetype` member after source/provenance and full reopen checks;
+structural, encrypted, signed, macro, and semantic repairs remain unsupported.
+
+Existing-document RTF logical-tail append now has two opt-in harness selectors
+over tiny, medium, and large plain corpora. They verify bounded sequential
+publication, complete reopen, patch/inverse and foreign-source refusal. The
+16 KiB sink write window caps accepted bytes per write and retains zero output;
+it does not bound the transaction's validated candidate snapshot. No release
+latency, allocation, RSS, or speedup claim is made. See
+[`0090`](changes/0090-rtf-logical-tail-append-evidence.md).
 
 The previously measured tranche includes six opt-in simulated-range cases,
 two opt-in execution-scaling cases, one opt-in XLSX
@@ -796,12 +832,14 @@ incomplete program and CRUD matrix.
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
 [`0007`](changes/0007-source-backed-opc-and-facades.md). Managed source-backed
-OPC caches now charge retained and in-flight payloads to a hierarchical
+OPC caches now charge retained and in-flight payload memory to a hierarchical
 `Budget`; compatibility opens retain the finite `SourceCacheLimits` path. The
-opt-in harness now supplies deterministic boundary and controlled-contention
-counter evidence, including exact pin pressure and release accounting. It is
-not a production-latency measurement; controlled release ABBA, allocation and
-peak-memory evidence remain pending.
+opt-in harness supplies deterministic boundary and controlled-contention
+counter evidence, including exact pin pressure and release accounting, plus a
+committed release ABBA with no accepted speedup. `InputBytes`, `Work`, and
+`Objects` accounting, allocation/peak-memory/RSS, hardware, copied/decompressed
+byte, and production-latency evidence remain pending. The release filesystem
+evidence is likewise descriptive tmpfs data, not physical cold-cache proof.
 
 Consolidated changed-crate tests, formatter checks, warning-denied production
 Clippy and rustdoc gates passed. The current ODS all-target Clippy gate retains
