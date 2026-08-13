@@ -14,8 +14,8 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **184 selectable cases**; 180 was the count before the
-four XLS visibility selectors were added. The measured 36-default-case,
+HEAD harness contains **200 selectable cases**; 196 was the count before the
+four CFB selective-range selectors were added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
 opt-in simulated-range cases, two opt-in scaling cases, one opt-in XLSX
@@ -38,6 +38,7 @@ is still not broad program or CRUD coverage.
 | XLSX row-start index | ABBA p50 geomean **-80.499%**, mean geomean **-79.962%**; full scan **+0.03%** mean; first cell **-1.31%** mean | Heap allocations **+17**, RSS **+0.25%**; narrow-range query only |
 | Targeted OPC raw publication | Four-cell ABBA p50 geomean **-84.98%**; few-large/incompressible **-71.70%**; matched cycles **-69.21%** | Initial peak heap **+37.18%**, one-shot RSS **+22.26%** from retained source/provenance and a changed-payload copy; the copy is removed by the shared-payload follow-up below |
 | Positional CFB/ZIP and explicit execution | Large-task p50 scaling at 12 CPUs: OPC **4.52x**, CFB **5.93x**; no hidden global Rayon | Many-small tasks regress at high worker counts; default/legacy paths remain serial |
+| CFB selective exact-range read | MiniFAT source bytes **261,184 -> 36** (many-small) and **2,096,192 -> 36** (wide-root), one request in each; read-stage p50 **-95.1%/-94.8%** and **-99.2%/-99.2%** across ABBA directions; read-stage p95 **-94.4%/-94.8%** and **-98.9%/-99.1%**; total p50 **-8.4%/-14.2%** and **-6.6%/-11.9%** | FAT retains one 4 MiB request/call and paired read/total p50 changes stay within 5% control drift. No p95/p99 FAT, MiniFAT p99, cold-filesystem, simulated high-latency range, allocation, peak-RSS, or DOC/XLS/PPT semantic claim |
 | Source-backed OPC and DOCX/XLSX/PPTX facades | EOCD structural-open source bytes **-73.6% to -98.5%**; ordinary payload overlap zero | No latency claim: later EntryId/cache-diagnostic changes confound comparison and some cells exceed 5% variance |
 | Source-backed PPTX selected-slide publication | Media-rich one-edit/save p50 **-97.12%**; atomic same-slide batch p50 **-97.45%**, materializations **229 -> 2**; atomic eight-slide batch p50 **-95.78%**, allocations **-32.54%**, materializations **229 -> 9**; byte-identical output | At most 32 existing slides with one bounded 256-selector shape-text operation each; MCE rewrites, relationships/topology changes and changed signed packages refuse before output |
 | Source-backed XLSX calculation-metadata publication | Media-rich one-edit/save p50 **-99.2519%** (133.67x), mean **-99.2507%**; instructions **-77.78%**; materializations **12 -> 1**; byte-identical output | Existing `xl/workbook.xml` calculation properties/features only; cells, formulas, cached results, chains, relationships and topology remain outside the capability |
@@ -854,6 +855,12 @@ remain linked from change 0023.
   cached comparison keys rather than scanning the complete sibling tree.
 - CFB FAT/DIFAT/MiniFAT parsing reuses a bounded sector buffer, MiniFAT decodes
   into its final table, and directory sectors read into their final buffer.
+- `SharedOleFile::read_stream_range` follows only the logical sectors needed by
+  a caller-owned bounded range and leaves the lazy MiniFAT root-stream cache
+  untouched. Change 0094's MiniFAT ABBA removes the full-stream source request
+  amplification while preserving exact payload hashes; FAT remains a one-call,
+  one-4-MiB-request control. The release result is substrate evidence only and
+  does not imply DOC/XLS/PPT semantic adoption.
 - Fresh XLS and PPT writers transfer already-owned generated stream buffers to
   CFB without a second payload copy. DOC deliberately retains its measured
   faster exact-sized copy.
@@ -946,10 +953,16 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 184 selectable cases. Change
-0091 adds four committed opt-in XLS visibility selectors; they are
-correctness/coverage evidence only and make no release ABBA, speedup,
-allocation, RSS, peak-memory, or physical-I/O claim. The previously measured
+The committed HEAD standalone harness provides 200 selectable cases. Change
+0091 adds four committed opt-in XLS visibility selectors, and change 0094 adds
+four committed opt-in CFB selective-range selectors. The visibility selectors
+are correctness/coverage evidence only. Change 0094 has a pinned 30-warmup,
+500-sample release ABBA summary: MiniFAT exact-range source bytes fall from
+261,184 to 36 and from 2,096,192 to 36, with stable read-stage p50/p95 gains
+and only modest total-p50 movement; FAT retains one 4 MiB read request/call.
+No p99, cold-filesystem, simulated high-latency range, allocation, peak-RSS,
+or DOC/XLS/PPT semantic claim is accepted. See the [compact ABBA summary](results/cfb-selective-range-abba-0106-summary.json).
+The previously measured
 default matrix remains 198 records across deterministic ZIP/OPC, positional
 CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
@@ -1064,6 +1077,11 @@ facades, topology changes, signatures and real-producer/media matrices remain.
 The changed-Part handoff and post-validation local-span copies are removed;
 the required selected-Part/compressor buffer remains to be attributed and
 reduced independently.
+
+CFB now has a public bounded exact-range read with release ABBA evidence for a
+MiniFAT target, but that result is still substrate-only: no DOC/XLS/PPT
+semantic owner consumes the seam, FAT tail behavior is withheld, and p99,
+cold/high-latency range, allocation, and peak-RSS evidence remain open.
 
 Other high-priority gaps are physical cold-filesystem and real range-source
 matrices beyond the debug smoke and repeated tmpfs release capture, threshold

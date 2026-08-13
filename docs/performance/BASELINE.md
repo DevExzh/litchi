@@ -133,6 +133,30 @@ The complete CFB matrix took 0.29 seconds wall, 0.19 seconds user CPU, 0.11
 seconds system CPU, and 44,468 KiB maximum RSS. These figures include corpus
 generation and all 40 measurement cells, so they are not per-case peaks.
 
+## CFB selective exact-range ABBA
+
+Change 0094 measures the public `SharedOleFile::read_stream_range` seam against
+the legacy full-stream reader on the same deterministic archives. The release
+run used a pinned before-A/after-A/after-B/before-B order, 30 warm-ups and 500
+samples per cell. The paired values below are in ABBA order; percentages
+are after versus its adjacent before control.
+
+| Target / shape | Source bytes, legacy -> range | Read p50, legacy -> range | Read p95, legacy -> range | Total p50, legacy -> range |
+|---|---:|---:|---:|---:|
+| 36-byte MiniFAT / many-small | 261,184 -> 36 (one request) | 9,823/9,238 -> 481/480 ns (-95.1%/-94.8%) | 12,967/12,828 -> 731/671 ns (-94.4%/-94.8%) | 138,936/148,224 -> 127,265/127,175 ns (-8.4%/-14.2%) |
+| 36-byte MiniFAT / wide-root | 2,096,192 -> 36 (one request) | 84,276/82,613 -> 671/651 ns (-99.2%/-99.2%) | 95,602/92,907 -> 1,052/821 ns (-98.9%/-99.1%) | 1,163,541/1,240,638 -> 1,086,951/1,092,570 ns (-6.6%/-11.9%) |
+
+The FAT controls retain exactly one 4,194,304-byte request and one source read
+call before and after. Their p50s are control-like rather than an accepted
+FAT improvement (many-small read p50 117,416/114,287 -> 112,960/112,094 ns;
+wide-root 152,310/153,601 -> 157,311/152,194 ns). Paired FAT read and total
+p50 changes stay within 5% control drift; p95 and p99 FAT tail claims are not
+accepted. Recorded p99 values, cold-filesystem behavior, simulated high-latency
+range behavior, allocation, and peak-RSS conclusions remain withheld. This is generic CFB substrate
+evidence; it does not certify DOC/XLS/PPT semantic CRUD adoption. See the
+[change record](changes/0094-cfb-selective-read-evidence.md) and
+[compact ABBA summary](results/cfb-selective-range-abba-0106-summary.json).
+
 ## Parallel scaling observation
 
 `opc_open` currently uses Rayon through the global pool. Separate processes set
@@ -222,7 +246,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**184 selectable cases**; 180 was the count before the four XLS visibility
+**200 selectable cases**; 196 was the count before the four CFB selective-range
 selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -337,7 +361,12 @@ incomplete program and CRUD matrix.
   opaque ZIP `EntryId`, local `ParallelReadSession`, and the runtime-neutral
   `ExecutionContext`/OPC `OpenSession` are implemented. Default/legacy opens
   are serial; hidden global Rayon scheduling is removed. Current evidence is
-  correctness and boundedness, not a new aggregate latency claim.
+  correctness and boundedness, not a new aggregate latency claim. Change 0094
+  adds pinned ABBA evidence for exact CFB range reads: MiniFAT source bytes fall
+  from 261,184 to 36 (many-small) and from 2,096,192 to 36 (wide-root), with
+  stable read-stage p50/p95 reductions and only modest total p50 movement.
+  FAT remains one 4 MiB request/call with no accepted tail claim; the result is
+  substrate-only and does not adopt a DOC/XLS/PPT semantic speedup.
 - Source-backed OPC now has source versions, finite weighted-LRU/single-flight
   cache diagnostics, and additive DOCX/XLSX/PPTX facades. EOCD terminal-probe
   samples show structural-open bytes down **73.6% to 98.5%** and payload overlap
@@ -847,7 +876,8 @@ incomplete program and CRUD matrix.
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
-[`0007`](changes/0007-source-backed-opc-and-facades.md). Managed source-backed
+[`0007`](changes/0007-source-backed-opc-and-facades.md), and
+[`0094`](changes/0094-cfb-selective-read-evidence.md). Managed source-backed
 OPC caches now charge exact physical `InputBytes`, cumulative declared
 cold-load `Work`, retained catalog/flight/payload `Objects`, and
 retained/in-flight payload `Memory` to a hierarchical `Budget`; compatibility

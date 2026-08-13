@@ -3,8 +3,8 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0091`](changes/0091-xls-visibility-source-overlay-evidence.md) (the latest
-correctness/coverage tranche; release filesystem evidence is [`0089`](changes/0089-filesystem-release-repeated-evidence.md))
+[`change 0094`](changes/0094-cfb-selective-read-evidence.md) (the latest
+bounded CFB substrate evidence; release filesystem evidence is [`0089`](changes/0089-filesystem-release-repeated-evidence.md))
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -503,7 +503,7 @@ reads and changed-member publication remain.
 ## Legacy CFB data path
 
 ```text
-Read + Seek
+Read + Seek or positional `ReadAt`
   -> header and complete FAT
   -> complete directory bytes
      -> structural validation pass
@@ -512,7 +512,7 @@ Read + Seek
   -> validate every stream allocation chain
   -> semantic DOC / XLS / PPT owner
      -> lookup a child by cached validated sibling-tree keys
-     -> materialize selected stream Vecs
+     -> materialize selected stream Vecs or a bounded caller-owned range
   -> edit/rebuild
      -> retain all output stream Vecs
      -> copy borrowed stream slices into OleWriter
@@ -525,6 +525,18 @@ Confirmed source facts:
 - `SharedOleFile` provides positional CFB access and explicit bounded bulk
   operations. Four 4 MiB streams reach 5.93x p50 at 12 visible CPUs, while 256
   1 KiB streams regress at high worker counts; thresholds remain essential.
+- Public `SharedOleFile::read_stream_range` now has pinned release ABBA evidence
+  against legacy full-stream materialization. For the final 36-byte MiniFAT
+  target, one physical source request falls from 261,184 to 36 bytes among 256
+  siblings and from 2,096,192 to 36 bytes among 2,048 siblings. Read-stage p50
+  improves 95.1%/94.8% and 99.2%/99.2% across the two ABBA directions; p95
+  improves 94.4%/94.8% and 98.9%/99.1%. Total p50 moves 8.4%/14.2% and
+  6.6%/11.9%. The 4 MiB FAT controls retain one request and one call; paired
+  read and total p50 changes stay within 5% control drift. FAT p95/p99 and all
+  MiniFAT p99 tails are not accepted. p99, cold
+  filesystem, simulated high-latency range, allocation, and peak-RSS claims
+  remain open. This is substrate evidence only, not DOC/XLS/PPT semantic
+  adoption.
 - Open eagerly materializes FAT, directory, MiniFAT, and allocation topology,
   while ordinary large stream payloads remain lazy.
 - MiniFAT now parses directly into its final `Vec<u32>`; FAT/DIFAT/MiniFAT use
@@ -782,7 +794,7 @@ pattern elsewhere.
 | 8 | Refined: source-backed XLSX structural open/list avoids timed reads; selected first/range reads physically overlap only the selected worksheet; guarded calculation-metadata, defined-name, worksheet page-break, page-margin, print-options, relationship-free page-setup, sheet-protection, data-validation and auto-filter edits materialize only their one- to three-Part semantic closures. | Broader source-backed selectors, general cell/formula edits and real workbook matrices. |
 | 9 | Refined by measurement: small XLSX edits scan/rebuild/reparse the complete touched sheet; bounded commits can reuse the validation store for first read, while large sheets fall back cold. Direct writer-local action regrouping was immaterial and reverted. | Attribute larger semantic-planning/emission/readback passes, first/middle/last cells, distinct bulk actions, structural edits, large-sheet retention and commit-versus-save separation without reviving direct regrouping alone. |
 | 10 | Plausible but unmeasured: per-cell semantic ownership and transient parse duplication may dominate large stores. | Allocation count/bytes, type sizes, peak RSS and cache-miss profiles. |
-| 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile` and bounded bulk reads; MiniFAT parsing and sector reads no longer require the former temporary buffers; child lookup descends the validated tree; native DOC/XLS/PPT semantic baselines, XLS editor and inventory reuse, DOC batched publication and indexes, PPT root-open reuse, text-edit resolver reuse, and checked root text-publication adoption are accepted. The XLS terminal-render handoff was neutral on large changed saves and regressed exact no-op. The opaque-heavy common case rejected direct shared writer payloads, an editor-wide validated-render cache, and inline recapture-allocation reuse; its open/publication/finish/end-to-end stage split is non-additive. | Attribute materially different final owner/public-reader work without reviving the rejected handoffs or recapture reuse; add deep-directory, MiniFAT-heavy, concurrent-read, real-producer, and security scenarios beyond generated corpora. |
+| 11 | Refined by implementation and measurement: CFB has positional `SharedOleFile`, bounded bulk reads, and an exact-range `read_stream_range`; MiniFAT parsing and sector reads no longer require the former temporary buffers; child lookup descends the validated tree; native DOC/XLS/PPT semantic baselines, XLS editor and inventory reuse, DOC batched publication and indexes, PPT root-open reuse, text-edit resolver reuse, and checked root text-publication adoption are accepted. Change 0094 accepts only the generic MiniFAT read-stage/source-byte and modest total-p50 evidence: FAT calls/bytes remain stable, but its tail is withheld. The XLS terminal-render handoff was neutral on large changed saves and regressed exact no-op. The opaque-heavy common case rejected direct shared writer payloads, an editor-wide validated-render cache, and inline recapture-allocation reuse; its open/publication/finish/end-to-end stage split is non-additive. | Attribute materially different final owner/public-reader work without reviving the rejected handoffs or recapture reuse; add deep-directory, MiniFAT-heavy, concurrent-read, real-producer, and security scenarios beyond generated corpora. The range seam still needs semantic consumers, cold/high-latency sources, and allocation/RSS evidence. |
 | 12 | Confirmed for generic detection; disproved for focused prepared iWork detection. | Generic detect-then-open versus prepared-source handoff. |
 | 13 | Measured for ODS snapshots: one package clone and duplicate package parse were removable. Same-topology ODS row-local publication retains exact range provenance through raw ZIP emission, its unified worksheet handoff now shares/moves the exact archive allocation through the nested snapshot and package validation, and compact ODS/ODP/ODT content publication avoids rebuilding untouched data; repeated ODS cell lookup uses a bounded lazy locator. ODT existing-document/direct-byte/final-result snapshots, changed-operation compact audits and envelope classification share exact validated package allocations, consuming full-text block strings and an indexed one-paragraph retention path are accepted, consecutive plain-text replacements publish one candidate, and scalar line-break/run/hyperlink plus plain paragraph insertion/removal use the accepted content-only publisher. ODP one-slide lookup retains only its requested semantic projection while validating through EOF, ODP transaction staging reuses its snapshot-validated complete slide projection, and exact slide-only commits adopt that already validated candidate only after final package audits. Parsed final-document adoption remains reverted. All accepted paths retain readback and source lineage. | Broader ODF source-backed reads, repeated independent ODP semantic scans, formatted/non-text bulk edits, resource-adding/richer structural publication, real-producer media, and structural-edit profiles. |
 | 14 | Confirmed for DOCX direct-body batches: repeated full XML rebuild/parse work was removable while retaining ordinary durable operations and complete readback. | Real-producer/extension/security corpora and broader structural/bulk edit semantics. |
@@ -806,7 +818,7 @@ The order below is provisional until baseline measurements are recorded.
 | 10 | Measure and tune the managed source-backed cache under controlled contention. | Concurrent repeated Part reads. | Medium-high | Hierarchical charging across physical `InputBytes`, cumulative declared cold-load `Work`, retained `Objects`, and `Memory`, plus pinned-aware eviction and per-entry single-flight, are implemented and correctness-tested in change 0086; release ABBA in 0088 covers structural/distribution counters but accepts no speedup. Allocation, peak-memory/RSS, hardware, copied/decompressed-byte, CPU-utilization and production-performance evidence are open. |
 | 11 | Extend ODF beyond accepted ODS snapshot, row-local provenance reuse/shared worksheet ownership, ODS/ODP/ODT unchanged-member publication, adaptive cell lookup, ODP indexed-slide retention/snapshot handoffs and ODT byte/full-text/indexed-query/audit/envelope/batch/final-byte ownership: positional source-backed reads, repeated independent ODP scans, richer non-text/bulk edits, resource-adding/richer structural publication and real-producer media. | ODT/ODS/ODP open/query and changed save. | High | Same-topology ODS row splicing now carries exact range proofs through raw ZIP emission and the adjacent nested worksheet/package owners share and move their archive allocation; compact ODS/ODP/ODT content raw preservation, bounded facade lookup, direct/existing/final-result ODT byte sharing, consuming full-text blocks, indexed paragraph/slide retention, ODP staging and final slide-only snapshot projection reuse, matched ODP text-box and ODT embedded-resource scalar/bounded evidence, compact-audit/envelope sharing, consecutive paragraph coalescing and scalar line-break/run/hyperlink plus plain paragraph insertion/removal publication are accepted. ODS content-validation catalog CRUD is correctness-covered but unmeasured. Parsed final-document adoption remains reverted for a read regression; other structural fallback, exact no-op and full readback remain. See changes 0011, 0014, 0018, 0019, 0020, 0023, 0027, 0031, 0034, 0035, 0038, 0041, 0042, 0045, 0047, 0049, 0052, 0057, 0060, 0065, 0068, 0071, 0072, 0074, 0075, 0084 and 0085. |
 | 12 | Extend accepted native RTF work beyond the capability-bounded variant matrix after parser-state, transport batching, byte-delimiter scanning, retained ordinary-body ranges, retained story-length/cardinality handoffs and sparse paragraph selection. | RTF formatted/media, malformed/security, broader real-producer and broad edit paths. | Medium | Plain, raw CP-1252, LZFu and producer-watermark read/no-op inputs plus a narrow native shape-text chain are covered; plain generated paragraph queries and editing are timed, public paragraph cardinality is parser-retained, and explicit sparse `nth` no longer constructs discarded paragraph views. Cached full text, byte-valued fallback, revisions, candidate readback and native forward-only output contracts remain. See changes 0013, 0019, 0020, 0029, 0040, 0048, 0064, 0066 and 0069. |
-| 13 | Attribute and integrate remaining native OLE2 final-owner/public-reader work. | OLE2 spreadsheet/document/presentation edit publication rather than substrate-only insertion. | Medium-high | XLS editor/inventory reuse, committed source-backed visibility overlays (`bac279116`), DOC batching/indexes, and PPT root-open/text-resolver/root-adoption work are accepted through changes 0016/0059, 0017/0050/0051/0053/0056, 0091, and 0024/0026/0062. XLS terminal-render and common CFB handoffs are rejected in 0028/0033/0036. Change 0091 is correctness/coverage only; matched release ABBA, speedup, resource evidence, and broader semantic visibility remain before performance adoption. |
+| 13 | Attribute and integrate remaining native OLE2 final-owner/public-reader work. | OLE2 spreadsheet/document/presentation edit publication rather than substrate-only insertion. | Medium-high | XLS editor/inventory reuse, committed source-backed visibility overlays (`bac279116`), DOC batching/indexes, and PPT root-open/text-resolver/root-adoption work are accepted through changes 0016/0059, 0017/0050/0051/0053/0056, 0091, and 0024/0026/0062. Change 0094 adds generic positional exact-range evidence but no DOC/XLS/PPT semantic consumer or speedup claim. XLS terminal-render and common CFB handoffs are rejected in 0028/0033/0036. Change 0091 remains correctness/coverage only; matched release ABBA, speedup, resource evidence, and broader semantic visibility remain before performance adoption. |
 | 14 | Share existing ODT transaction bytes when a validated document creates a snapshot. | ODT no-op and changed edit/save. | Low-medium | Implemented with private `Arc` identity proof; no-op p50 -18.51% large, guardrails within 3%. See change 0014. |
 | 15 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |
 
@@ -822,6 +834,11 @@ changes. Remaining gaps are:
   0087's one-sample debug warm/cold-requested run and change 0089's repeated
   tmpfs release run are correctness/counter and descriptive distributions only;
   neither proves a cold device or storage result.
+- CFB selective-range acceptance is bounded to exact source-byte counters,
+  MiniFAT read-stage p50/p95, and the modest total-p50 direction in change
+  0094. FAT tail behavior, p99, simulated high-latency range sources,
+  allocation, and peak-RSS evidence remain open, and no DOC/XLS/PPT semantic
+  consumer is covered.
 - Decompressed and recompressed byte observers. Positional range-request
   distributions now exist for OPC and XLSX, but not yet for every format/source.
 - Broad hardware-counter evidence. A matched targeted-OPC run is committed now

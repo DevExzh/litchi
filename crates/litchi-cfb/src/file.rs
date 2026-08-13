@@ -176,6 +176,8 @@ pub struct OleFile<R: Read + Seek> {
     fat: Vec<u32>,
     /// Mini FAT - for streams smaller than cutoff size
     minifat: Vec<u32>,
+    /// Validated physical sectors of the root mini stream in logical order.
+    root_chain: Vec<u32>,
     /// First sector of directory stream
     first_dir_sector: u32,
     /// Root directory entry
@@ -201,6 +203,8 @@ pub(crate) struct ParsedOleIndex {
     pub(crate) mini_sector_size: usize,
     pub(crate) fat: Vec<u32>,
     pub(crate) minifat: Vec<u32>,
+    /// Validated physical sectors of the root mini stream in logical order.
+    pub(crate) root_chain: Vec<u32>,
     pub(crate) first_dir_sector: u32,
     pub(crate) root: Option<DirectoryEntry>,
     pub(crate) dir_entries: Vec<Option<DirectoryEntry>>,
@@ -360,6 +364,7 @@ impl<R: Read + Seek> OleFile<R> {
             mini_sector_size: self.mini_sector_size,
             fat: self.fat,
             minifat: self.minifat,
+            root_chain: self.root_chain,
             first_dir_sector: self.first_dir_sector,
             root: self.root,
             dir_entries: self.dir_entries,
@@ -495,6 +500,7 @@ impl<R: Read + Seek> OleFile<R> {
             mini_stream_cutoff,
             fat: Vec::new(),
             minifat: Vec::new(),
+            root_chain: Vec::new(),
             first_dir_sector,
             root: None,
             dir_entries: Vec::new(),
@@ -863,6 +869,7 @@ impl<R: Read + Seek> OleFile<R> {
             "root mini stream",
         )?;
         self.claim_chain(&root_chain, PhysicalSectorRole::MiniStream)?;
+        self.root_chain = root_chain;
 
         let mini_sector_capacity =
             usize::try_from(root_size.div_ceil(self.mini_sector_size as u64)).map_err(|_err| {
@@ -2317,6 +2324,7 @@ mod tests {
             mini_stream_cutoff: 4096,
             fat: vec![1, ENDOFCHAIN],
             minifat: Vec::new(),
+            root_chain: Vec::new(),
             first_dir_sector: ENDOFCHAIN,
             root: None,
             dir_entries: Vec::new(),
@@ -2341,6 +2349,7 @@ mod tests {
             mini_stream_cutoff: 4096,
             fat: Vec::new(),
             minifat: Vec::new(),
+            root_chain: Vec::new(),
             first_dir_sector: ENDOFCHAIN,
             root: None,
             dir_entries: Vec::new(),
@@ -2398,6 +2407,7 @@ mod tests {
             mini_stream_cutoff: 4096,
             fat: Vec::new(),
             minifat: Vec::new(),
+            root_chain: Vec::new(),
             first_dir_sector: ENDOFCHAIN,
             root: None,
             dir_entries: Vec::new(),
@@ -2434,6 +2444,7 @@ mod tests {
             mini_stream_cutoff: 4096,
             fat: vec![1, ENDOFCHAIN],
             minifat: Vec::new(),
+            root_chain: Vec::new(),
             first_dir_sector: ENDOFCHAIN,
             root: None,
             dir_entries: Vec::new(),
@@ -2459,6 +2470,7 @@ mod tests {
             mini_stream_cutoff: 4096,
             fat: vec![ENDOFCHAIN],
             minifat: Vec::new(),
+            root_chain: Vec::new(),
             first_dir_sector: ENDOFCHAIN,
             root: None,
             dir_entries: Vec::new(),
@@ -2499,6 +2511,7 @@ mod tests {
             mini_stream_cutoff: 4096,
             fat: Vec::new(),
             minifat: Vec::new(),
+            root_chain: Vec::new(),
             first_dir_sector: ENDOFCHAIN,
             root: None,
             dir_entries: Vec::new(),
@@ -2524,6 +2537,7 @@ mod tests {
             mini_stream_cutoff: 4096,
             fat: Vec::new(),
             minifat: Vec::new(),
+            root_chain: Vec::new(),
             first_dir_sector: ENDOFCHAIN,
             root: None,
             dir_entries: Vec::new(),
@@ -2596,6 +2610,7 @@ mod tests {
             mini_stream_cutoff: 4096,
             fat: Vec::new(),
             minifat: Vec::new(),
+            root_chain: Vec::new(),
             first_dir_sector: ENDOFCHAIN,
             root: Some(DirectoryEntry {
                 sid: 0,

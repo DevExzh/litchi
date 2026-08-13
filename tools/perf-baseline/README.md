@@ -53,12 +53,13 @@ two XLSX merge/unmerge commit-plus-save cases, six matched XLSX scalar-cell
 publication cases (one cell, `ceil(1%)`, and the exact 256-cell bound, each
 eager/source-backed),
 two bounded XLSX/RTF streaming-creation cases,
+four matched CFB selective-read cases,
 four matched native XLS existing-comment publication cases,
 four matched native XLS worksheet-visibility publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, 15 RTF semantic cases (13 transport/read/edit
 cases plus two logical-tail publication cases), and 36 ODF semantic cases are
-opt-in. The current `Case` matrix exposes 196 selectable case names in total;
+opt-in. The current `Case` matrix exposes 200 selectable case names in total;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 
@@ -1165,6 +1166,29 @@ remain distinguishable.
 - `cfb_shared_concurrent_reads`: start reads of the first and final root streams
   together after open. The result records observed maximum in-flight reads
   without requiring overlap on very small corpora.
+- `cfb_selective_mini_legacy_read` / `cfb_selective_mini_shared_read`: paired
+  legacy full-stream materialization and positional exact-range reads of a
+  deterministic 36-byte MiniFAT target at the final position among 256 or
+  2,048 sibling streams. The positional case allocates an exact caller buffer
+  inside the read stage and does not populate the root-mini-stream cache.
+- `cfb_selective_fat_legacy_read` / `cfb_selective_fat_shared_read`: the same
+  paired control for a deterministic 4 MiB FAT target. These four selectors
+  are opt-in and only emit the `many-small` and `wide-root` shapes; each result
+  records separate open/read/total timings, stage-local instrumented read
+  calls/bytes/range sizes, returned payload bytes, and hashes. They retain no
+  sink. Change 0094 records the accepted pinned ABBA result and its explicit
+  claim boundary; a one-sample invocation remains correctness evidence only.
+
+Run the matched selective-read evidence explicitly (it is not in the default
+matrix):
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 15 --shape many-small,wide-root \
+  --case cfb_selective_mini_legacy_read,cfb_selective_mini_shared_read,\
+cfb_selective_fat_legacy_read,cfb_selective_fat_shared_read \
+  --json target/perf/cfb-selective-read.json
+```
 - `doc_fresh_write_to`: construct a new `litchi_doc::writer::Writer`, add the
   selected fixed paragraphs through its public API, and package it with public
   `write_to`.

@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "record": "cfb-selective-range-abba-0106",
+  "date": "2026-08-14",
+  "git_revision": "acf94d61b2dfe3843a582cc71926f9c59b9f6011",
+  "worktree_dirty": true,
+  "metric_order": ["before_a", "after_a", "after_b", "before_b"],
+  "protocol": {
+    "cpu_affinity": "0",
+    "warmups": 30,
+    "samples": 500,
+    "profile": "release",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "os": "linux",
+    "kernel": "Linux 6.8.0-101-generic"
+  },
+  "binaries": {
+    "before_sha256": "d8b5ce65e685347785833422cbf9b852573a074e74cb7bfcca14d499afb796b9",
+    "after_sha256": "df1e5c2af6d4a9fe701334d4c5b054628efaa24a9ac75a6ae724682e9aea5657"
+  },
+  "cells": [
+    {
+      "case": "cfb_selective_mini_shared_read",
+      "shape": "many-small",
+      "archive_sha256": "988be74585fe447a2695a8a584ce459181ab7a20b5bc4dd79d24ebf9e1d49557",
+      "target_sha256": "bfef92407b49c20492ba3a6b991bbe6ada9678f50c4d7f241865239870e35fd7",
+      "archive_bytes": 314368,
+      "target_bytes": 36,
+      "read_p50_ns": [9823, 481, 480, 9238],
+      "read_p95_ns": [12967, 731, 671, 12828],
+      "total_p50_ns": [138936, 127265, 127175, 148224],
+      "total_p95_ns": [172517, 177935, 151178, 200066],
+      "total_p99_ns": [202138, 191894, 190051, 214826],
+      "read_calls": [1, 1, 1, 1],
+      "read_bytes": [261184, 36, 36, 261184]
+    },
+    {
+      "case": "cfb_selective_mini_shared_read",
+      "shape": "wide-root",
+      "archive_sha256": "3bc17d57a6504792a3b04d47db237891ddd6615daaa512c6aa05d833427a56f3",
+      "target_sha256": "576db38a7fe2ab2dea96350bcc49e7f4aa2dfd0fc51648419fc9b6f07d2f337f",
+      "archive_bytes": 2510848,
+      "target_bytes": 36,
+      "read_p50_ns": [84276, 671, 651, 82613],
+      "read_p95_ns": [95602, 1052, 821, 92907],
+      "total_p50_ns": [1163541, 1086951, 1092570, 1240638],
+      "total_p95_ns": [1201123, 1172564, 1173657, 1317173],
+      "total_p99_ns": [1225237, 1297536, 1245215, 1372629],
+      "read_calls": [1, 1, 1, 1],
+      "read_bytes": [2096192, 36, 36, 2096192]
+    },
+    {
+      "case": "cfb_selective_fat_shared_read",
+      "shape": "many-small",
+      "archive_sha256": "27ebd0a4280e068e93f915f6b58f3199a6e15eaf0d506990d046cbf2cd7f66b9",
+      "target_sha256": "631416b01a32fc6ff0f57b7215b5665837891e217928d6de4b4dc9d3c8efbf49",
+      "archive_bytes": 4541440,
+      "target_bytes": 4194304,
+      "read_p50_ns": [117416, 112960, 112094, 114287],
+      "read_p95_ns": [139463, 139351, 150426, 141355],
+      "total_p50_ns": [300925, 294640, 298601, 304719],
+      "total_p95_ns": [340329, 343502, 372042, 388425],
+      "total_p99_ns": [403075, 405229, 452913, 417264],
+      "read_calls": [1, 1, 1, 1],
+      "read_bytes": [4194304, 4194304, 4194304, 4194304]
+    },
+    {
+      "case": "cfb_selective_fat_shared_read",
+      "shape": "wide-root",
+      "archive_sha256": "fdb1cb7aa2eca3ccdc4af6b1a54372526801d5c508d194dc947656bf4a95fa5b",
+      "target_sha256": "96c293c75513a15370279c3e87ab876094ae0443389981bed54651c211d745ed",
+      "archive_bytes": 6737408,
+      "target_bytes": 4194304,
+      "read_p50_ns": [152310, 157311, 152194, 153601],
+      "read_p95_ns": [173598, 208637, 190913, 182021],
+      "total_p50_ns": [1327637, 1365685, 1346578, 1409885],
+      "total_p95_ns": [1384196, 1564564, 1477064, 1500316],
+      "total_p99_ns": [1439222, 2127258, 1801279, 1546449],
+      "read_calls": [1, 1, 1, 1],
+      "read_bytes": [4194304, 4194304, 4194304, 4194304]
+    }
+  ],
+  "claim_boundary": {
+    "accepted": [
+      "deterministic source calls and bytes",
+      "MiniFAT read-stage p50 and p95",
+      "total p50 direction"
+    ],
+    "withheld": [
+      "p99 latency",
+      "cold filesystem",
+      "simulated high-latency range",
+      "allocation and peak RSS"
+    ],
+    "guard_note": "FAT retained one exact 4 MiB request; paired read and total p50 changes stayed within 5% control drift, while p95/p99 remained noisy and are not claimed"
+  }
+}

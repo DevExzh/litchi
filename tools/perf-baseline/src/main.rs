@@ -62,6 +62,7 @@ const OPC_CACHE_COHORT_TIMEOUT: Duration = Duration::from_secs(10);
 const CONTENT_TYPE: &str = "application/octet-stream";
 const OPC_CORPUS_GENERATOR: &str = "litchi-opc-synthetic-v2";
 const CFB_CORPUS_GENERATOR: &str = "litchi-cfb-synthetic-v1";
+const CFB_SELECTIVE_CORPUS_GENERATOR: &str = "litchi-cfb-selective-read-v1";
 const LEGACY_WRITER_CORPUS_GENERATOR: &str = "litchi-legacy-writer-v1";
 const XLSX_CORPUS_GENERATOR: &str = "litchi-xlsx-synthetic-v1";
 const SEMANTIC_DOCX_CORPUS_GENERATOR: &str = "litchi-docx-semantic-v1";
@@ -426,6 +427,28 @@ enum PayloadKind {
     Incompressible,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CfbSelectiveTarget {
+    Mini,
+    Fat,
+}
+
+impl CfbSelectiveTarget {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Mini => "minifat-36-byte",
+            Self::Fat => "fat-4mib",
+        }
+    }
+
+    const fn target_bytes(self) -> usize {
+        match self {
+            Self::Mini => 36,
+            Self::Fat => 4 * 1024 * 1024,
+        }
+    }
+}
+
 impl PayloadKind {
     const ALL: [Self; 2] = [Self::Compressible, Self::Incompressible];
 
@@ -504,6 +527,10 @@ enum Case {
     CfbSharedOpen,
     CfbSharedReadOne,
     CfbSharedConcurrentReads,
+    CfbSelectiveMiniLegacyRead,
+    CfbSelectiveMiniSharedRead,
+    CfbSelectiveFatLegacyRead,
+    CfbSelectiveFatSharedRead,
     DocFreshWriteTo,
     XlsFreshWriteTo,
     PptFreshWriteTo,
@@ -770,6 +797,10 @@ impl Case {
             Self::CfbSharedOpen => "cfb_shared_open",
             Self::CfbSharedReadOne => "cfb_shared_read_one",
             Self::CfbSharedConcurrentReads => "cfb_shared_concurrent_reads",
+            Self::CfbSelectiveMiniLegacyRead => "cfb_selective_mini_legacy_read",
+            Self::CfbSelectiveMiniSharedRead => "cfb_selective_mini_shared_read",
+            Self::CfbSelectiveFatLegacyRead => "cfb_selective_fat_legacy_read",
+            Self::CfbSelectiveFatSharedRead => "cfb_selective_fat_shared_read",
             Self::DocFreshWriteTo => "doc_fresh_write_to",
             Self::XlsFreshWriteTo => "xls_fresh_write_to",
             Self::PptFreshWriteTo => "ppt_fresh_write_to",
@@ -927,6 +958,10 @@ impl Case {
                 | Self::CfbSharedOpen
                 | Self::CfbSharedReadOne
                 | Self::CfbSharedConcurrentReads
+                | Self::CfbSelectiveMiniLegacyRead
+                | Self::CfbSelectiveMiniSharedRead
+                | Self::CfbSelectiveFatLegacyRead
+                | Self::CfbSelectiveFatSharedRead
                 | Self::CfbBulkReadScaling
         )
     }
@@ -1225,6 +1260,16 @@ impl Case {
 
     const fn is_scaling(self) -> bool {
         matches!(self, Self::OpcOpenSessionScaling | Self::CfbBulkReadScaling)
+    }
+
+    const fn is_cfb_selective(self) -> bool {
+        matches!(
+            self,
+            Self::CfbSelectiveMiniLegacyRead
+                | Self::CfbSelectiveMiniSharedRead
+                | Self::CfbSelectiveFatLegacyRead
+                | Self::CfbSelectiveFatSharedRead
+        )
     }
 
     const fn is_opc_source_cache_evidence(self) -> bool {
@@ -1557,6 +1602,30 @@ struct CaseResult {
     output_sha256: Option<String>,
 }
 
+#[derive(Clone, Debug, Serialize)]
+struct CfbSelectiveImplementationEvidence {
+    implementation: &'static str,
+    open_ns: Vec<u64>,
+    read_ns: Vec<u64>,
+    total_ns: Vec<u64>,
+    open_read_calls: Vec<u64>,
+    open_read_bytes: Vec<u64>,
+    open_range_sizes: Vec<Vec<u64>>,
+    read_calls: Vec<u64>,
+    read_bytes: Vec<u64>,
+    read_range_sizes: Vec<Vec<u64>>,
+    returned_payload_bytes: Vec<u64>,
+    selected_payload_sha256: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct CfbSelectiveEvidence {
+    timing_scope: &'static str,
+    sink: &'static str,
+    selected_target_kind: &'static str,
+    legacy_or_positional: CfbSelectiveImplementationEvidence,
+}
+
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 struct ValidationSummary {
     report_sha256: String,
@@ -1634,6 +1703,8 @@ struct SourceSummary {
     opc_cache: Option<OpcCacheEvidenceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     validation: Option<ValidationSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cfb_selective: Option<CfbSelectiveEvidence>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1863,6 +1934,161 @@ struct InstrumentedSource {
     xlsx_unselected_worksheets: AtomicRangeCounter,
     xlsx_shared_strings: AtomicRangeCounter,
     xlsx_styles: AtomicRangeCounter,
+}
+
+#[derive(Clone, Debug, Default)]
+struct SelectiveReadSnapshot {
+    read_calls: u64,
+    read_bytes: u64,
+    range_sizes: Vec<u64>,
+}
+
+#[derive(Debug, Default)]
+struct SelectiveReadMetrics {
+    read_calls: AtomicU64,
+    read_bytes: AtomicU64,
+    range_sizes: Mutex<Vec<u64>>,
+}
+
+impl SelectiveReadMetrics {
+    fn reset(&self) -> io::Result<()> {
+        self.read_calls.store(0, Ordering::SeqCst);
+        self.read_bytes.store(0, Ordering::SeqCst);
+        self.range_sizes
+            .lock()
+            .map_err(|_| io::Error::other("selective CFB range metrics are poisoned"))?
+            .clear();
+        Ok(())
+    }
+
+    fn snapshot(&self) -> io::Result<SelectiveReadSnapshot> {
+        let mut range_sizes = self
+            .range_sizes
+            .lock()
+            .map_err(|_| io::Error::other("selective CFB range metrics are poisoned"))?
+            .clone();
+        range_sizes.sort_unstable();
+        Ok(SelectiveReadSnapshot {
+            read_calls: self.read_calls.load(Ordering::SeqCst),
+            read_bytes: self.read_bytes.load(Ordering::SeqCst),
+            range_sizes,
+        })
+    }
+
+    fn record(&self, count: usize) -> io::Result<()> {
+        let count = u64::try_from(count)
+            .map_err(|_| io::Error::other("selective CFB range does not fit u64"))?;
+        self.read_calls.fetch_add(1, Ordering::SeqCst);
+        self.read_bytes.fetch_add(count, Ordering::SeqCst);
+        self.range_sizes
+            .lock()
+            .map_err(|_| io::Error::other("selective CFB range metrics are poisoned"))?
+            .push(count);
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct SelectiveReadAt {
+    bytes: Arc<Vec<u8>>,
+    metrics: Arc<SelectiveReadMetrics>,
+    version: SourceVersion,
+}
+
+impl SelectiveReadAt {
+    fn new(bytes: Arc<Vec<u8>>, metrics: Arc<SelectiveReadMetrics>) -> Self {
+        Self {
+            bytes,
+            metrics,
+            version: SourceVersion::new(
+                NEXT_INSTRUMENTED_SOURCE_ID.fetch_add(1, Ordering::Relaxed),
+                0,
+            ),
+        }
+    }
+}
+
+impl ReadAt for SelectiveReadAt {
+    fn len(&self) -> io::Result<u64> {
+        u64::try_from(self.bytes.len())
+            .map_err(|_| io::Error::other("selective CFB source length does not fit u64"))
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let start = usize::try_from(offset).unwrap_or(usize::MAX);
+        let count = self
+            .bytes
+            .get(start..)
+            .map_or(0, |remaining| remaining.len().min(output.len()));
+        if count != 0 {
+            output[..count].copy_from_slice(&self.bytes[start..start + count]);
+        }
+        self.metrics.record(count)?;
+        Ok(count)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(self.version)
+    }
+}
+
+#[derive(Debug)]
+struct SelectiveCursor {
+    bytes: Arc<Vec<u8>>,
+    position: u64,
+    metrics: Arc<SelectiveReadMetrics>,
+}
+
+impl SelectiveCursor {
+    fn new(bytes: Arc<Vec<u8>>, metrics: Arc<SelectiveReadMetrics>) -> Self {
+        Self {
+            bytes,
+            position: 0,
+            metrics,
+        }
+    }
+}
+
+impl io::Read for SelectiveCursor {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        let start = usize::try_from(self.position).unwrap_or(usize::MAX);
+        let count = self
+            .bytes
+            .get(start..)
+            .map_or(0, |remaining| remaining.len().min(output.len()));
+        if count != 0 {
+            output[..count].copy_from_slice(&self.bytes[start..start + count]);
+            self.position =
+                self.position
+                    .checked_add(u64::try_from(count).map_err(|_| {
+                        io::Error::other("selective CFB cursor count does not fit u64")
+                    })?)
+                    .ok_or_else(|| io::Error::other("selective CFB cursor position overflows"))?;
+        }
+        self.metrics.record(count)?;
+        Ok(count)
+    }
+}
+
+impl Seek for SelectiveCursor {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        let length = u64::try_from(self.bytes.len())
+            .map_err(|_| io::Error::other("selective CFB cursor length does not fit u64"))?;
+        let next = match position {
+            SeekFrom::Start(offset) => i128::from(offset),
+            SeekFrom::Current(offset) => i128::from(self.position) + i128::from(offset),
+            SeekFrom::End(offset) => i128::from(length) + i128::from(offset),
+        };
+        if next < 0 || next > i128::from(u64::MAX) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "selective CFB cursor seek is outside the source",
+            ));
+        }
+        self.position = u64::try_from(next)
+            .map_err(|_| io::Error::other("selective CFB cursor seek does not fit u64"))?;
+        Ok(self.position)
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -3058,6 +3284,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_validation_docx()
                     && !case.uses_validation_pptx()
                     && !case.uses_validation_odf()
+                    && !case.is_cfb_selective()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
                     cfb_corpus
@@ -3085,6 +3312,45 @@ fn main() -> Result<(), Box<dyn Error>> {
                         options.warmup_iterations,
                         options.samples,
                         options.range_simulation,
+                    )?);
+                }
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.is_cfb_selective()) {
+        for shape in options
+            .shapes
+            .iter()
+            .copied()
+            .filter(|shape| matches!(shape, CorpusShape::ManySmall | CorpusShape::WideRoot))
+        {
+            for target in [CfbSelectiveTarget::Mini, CfbSelectiveTarget::Fat] {
+                let corpus = build_cfb_selective_corpus(shape, target)?;
+                for case in options.cases.iter().copied().filter(|case| {
+                    case.is_cfb_selective()
+                        && match target {
+                            CfbSelectiveTarget::Mini => {
+                                matches!(
+                                    case,
+                                    Case::CfbSelectiveMiniLegacyRead
+                                        | Case::CfbSelectiveMiniSharedRead
+                                )
+                            },
+                            CfbSelectiveTarget::Fat => {
+                                matches!(
+                                    case,
+                                    Case::CfbSelectiveFatLegacyRead
+                                        | Case::CfbSelectiveFatSharedRead
+                                )
+                            },
+                        }
+                }) {
+                    results.push(run_cfb_selective_read(
+                        case,
+                        &corpus,
+                        options.warmup_iterations,
+                        options.samples,
                     )?);
                 }
             }
@@ -4145,6 +4411,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "cfb_file_same_length_overlay_atomic_save" => {
             Some(Case::CfbFileSameLengthOverlayAtomicSave)
         },
+        "cfb_selective_mini_legacy_read" => Some(Case::CfbSelectiveMiniLegacyRead),
+        "cfb_selective_mini_shared_read" => Some(Case::CfbSelectiveMiniSharedRead),
+        "cfb_selective_fat_legacy_read" => Some(Case::CfbSelectiveFatLegacyRead),
+        "cfb_selective_fat_shared_read" => Some(Case::CfbSelectiveFatSharedRead),
         "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
         "pptx_source_backed_one_edit_save" => Some(Case::PptxSourceBackedOneEditSave),
         "pptx_eager_batch_edit_save" => Some(Case::PptxEagerBatchEditSave),
@@ -4484,6 +4754,10 @@ fn print_usage() {
                                        ole_common_one_edit_save,\n\
                                        cfb_shared_open,cfb_shared_read_one,\n\
                                        cfb_shared_concurrent_reads,\n\
+                                       cfb_selective_mini_legacy_read,\n\
+                                       cfb_selective_mini_shared_read,\n\
+                                       cfb_selective_fat_legacy_read,\n\
+                                       cfb_selective_fat_shared_read,\n\
                                        doc_fresh_write_to,xls_fresh_write_to,ppt_fresh_write_to,\n\
                                        doc_semantic_open,doc_semantic_list_paragraphs,\n\
                                        doc_semantic_one_paragraph,doc_semantic_full_text,\n\
@@ -4711,6 +4985,75 @@ fn build_cfb_corpus(
         },
         archive,
         target_name,
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn build_cfb_selective_corpus(
+    shape: CorpusShape,
+    target: CfbSelectiveTarget,
+) -> Result<Corpus, Box<dyn Error>> {
+    let entry_count: usize = match shape {
+        CorpusShape::ManySmall => 256,
+        CorpusShape::WideRoot => 2048,
+        _ => return Err("CFB selective corpus requires 256 or 2048 siblings".into()),
+    };
+    let base_entry_bytes = 1024usize;
+    let target_index = entry_count
+        .checked_sub(1)
+        .ok_or("CFB selective corpus has no target stream")?;
+    let target_payload = payload_bytes(
+        PayloadKind::Incompressible,
+        900_000 + target_index,
+        target.target_bytes(),
+    );
+    let mut writer = OleWriter::new();
+    for index in 0..entry_count {
+        let payload = if index == target_index {
+            target_payload.clone()
+        } else {
+            payload_bytes(PayloadKind::Incompressible, index, base_entry_bytes)
+        };
+        let name = cfb_entry_name(index);
+        writer.create_stream_owned(&[name.as_str()], payload)?;
+    }
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output)?;
+    let archive = output.into_inner();
+    let target_name = cfb_entry_name(target_index);
+    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    if parsed.list_streams().len() != entry_count
+        || parsed.open_stream(&[target_name.as_str()])? != target_payload
+    {
+        return Err("CFB selective corpus failed deterministic stream validation".into());
+    }
+    let uncompressed_payload_bytes = (entry_count - 1)
+        .checked_mul(base_entry_bytes)
+        .and_then(|bytes| bytes.checked_add(target_payload.len()))
+        .ok_or("CFB selective corpus payload byte count overflows usize")?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("cfb-selective-{}-{}", target.name(), shape.name()),
+            generator: CFB_SELECTIVE_CORPUS_GENERATOR,
+            package_format: "CFB/OLE2",
+            shape: shape.name(),
+            payload_kind: "incompressible",
+            compression: "none",
+            entry_count,
+            archive_member_count: entry_count,
+            entry_bytes: base_entry_bytes,
+            uncompressed_payload_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: target_name,
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: cfb_entry_name(target_index),
         target_payload,
         xlsx: None,
     })
@@ -7580,6 +7923,12 @@ fn run_case_with_config(
         Case::CfbSharedReadOne => run_cfb_shared_read_one(corpus, warmup_iterations, samples),
         Case::CfbSharedConcurrentReads => {
             run_cfb_shared_concurrent_reads(corpus, warmup_iterations, samples)
+        },
+        Case::CfbSelectiveMiniLegacyRead
+        | Case::CfbSelectiveMiniSharedRead
+        | Case::CfbSelectiveFatLegacyRead
+        | Case::CfbSelectiveFatSharedRead => {
+            Err("selective CFB case requires its dedicated corpus dispatcher".into())
         },
         Case::DocFreshWriteTo | Case::XlsFreshWriteTo | Case::PptFreshWriteTo => {
             run_fresh_writer(case, corpus, warmup_iterations, samples)
@@ -19343,6 +19692,135 @@ fn run_cfb_shared_read_one(
     ))
 }
 
+fn run_cfb_selective_read(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shared = matches!(
+        case,
+        Case::CfbSelectiveMiniSharedRead | Case::CfbSelectiveFatSharedRead
+    );
+    let implementation = if shared {
+        "shared-positional-exact-range"
+    } else {
+        "legacy-cursor-full-stream"
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut open_ns = Vec::with_capacity(samples);
+    let mut read_ns = Vec::with_capacity(samples);
+    let mut total_ns = Vec::with_capacity(samples);
+    let mut open_read_calls = Vec::with_capacity(samples);
+    let mut open_read_bytes = Vec::with_capacity(samples);
+    let mut open_range_sizes = Vec::with_capacity(samples);
+    let mut read_calls = Vec::with_capacity(samples);
+    let mut read_bytes = Vec::with_capacity(samples);
+    let mut read_range_sizes = Vec::with_capacity(samples);
+    let mut returned_payload_bytes = Vec::with_capacity(samples);
+    let mut selected_hash = None;
+    let limits = cfb_shared_limits(corpus)?;
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let bytes = Arc::new(corpus.archive.clone());
+        let metrics = Arc::new(SelectiveReadMetrics::default());
+        let total_started = Instant::now();
+        let open_started = Instant::now();
+        let selected = if shared {
+            let source = Arc::new(SelectiveReadAt::new(bytes, Arc::clone(&metrics)));
+            let ole = SharedOleFile::open_with_limits(source, limits)?;
+            let open_duration = open_started.elapsed();
+            let open_snapshot = metrics.snapshot()?;
+            metrics.reset()?;
+            let read_started = Instant::now();
+            let path = [corpus.target_name.as_str()];
+            let mut payload = Vec::new();
+            payload.try_reserve_exact(corpus.target_payload.len())?;
+            payload.resize(corpus.target_payload.len(), 0);
+            ole.read_stream_range(&path, 0, &mut payload)?;
+            let read_duration = read_started.elapsed();
+            (payload, open_duration, read_duration, open_snapshot)
+        } else {
+            let cursor = SelectiveCursor::new(bytes, Arc::clone(&metrics));
+            let mut ole = OleFile::open(cursor)?;
+            let open_duration = open_started.elapsed();
+            let open_snapshot = metrics.snapshot()?;
+            metrics.reset()?;
+            let read_started = Instant::now();
+            let path = [corpus.target_name.as_str()];
+            let payload = ole.open_stream(&path)?;
+            let read_duration = read_started.elapsed();
+            (payload, open_duration, read_duration, open_snapshot)
+        };
+        let (payload, open_duration, read_duration, open_snapshot) = selected;
+        let total_duration = total_started.elapsed();
+        if payload != corpus.target_payload {
+            return Err("CFB selective read differs from deterministic target payload".into());
+        }
+        let read_snapshot = metrics.snapshot()?;
+        if open_snapshot.read_calls == 0
+            || open_snapshot.read_bytes == 0
+            || read_snapshot.read_calls == 0
+            || read_snapshot.read_bytes == 0
+        {
+            return Err("CFB selective read performed no measured source I/O".into());
+        }
+        let hash = sha256_hex(&payload);
+        if let Some(expected) = selected_hash.as_deref() {
+            if expected != hash {
+                return Err("CFB selective read hash changed across samples".into());
+            }
+        } else {
+            selected_hash = Some(hash);
+        }
+        std::hint::black_box(&payload);
+        if iteration >= warmup_iterations {
+            let open_duration = elapsed_ns(open_duration)?;
+            let read_duration = elapsed_ns(read_duration)?;
+            let total_duration = elapsed_ns(total_duration)?;
+            elapsed.push(total_duration);
+            open_ns.push(open_duration);
+            read_ns.push(read_duration);
+            total_ns.push(total_duration);
+            open_read_calls.push(open_snapshot.read_calls);
+            open_read_bytes.push(open_snapshot.read_bytes);
+            open_range_sizes.push(open_snapshot.range_sizes);
+            read_calls.push(read_snapshot.read_calls);
+            read_bytes.push(read_snapshot.read_bytes);
+            read_range_sizes.push(read_snapshot.range_sizes);
+            returned_payload_bytes.push(u64::try_from(payload.len())?);
+        }
+    }
+    let selected_payload_sha256 = selected_hash.ok_or("CFB selective read produced no hash")?;
+    let evidence = CfbSelectiveEvidence {
+        timing_scope: "open and selected read are separate stages; legacy materializes the full stream, while shared fills a newly allocated exact-length caller range; corpus construction and validation excluded",
+        sink: "none",
+        selected_target_kind: if corpus.target_payload.len() < 4096 {
+            "minifat-36-byte"
+        } else {
+            "fat-4mib"
+        },
+        legacy_or_positional: CfbSelectiveImplementationEvidence {
+            implementation,
+            open_ns,
+            read_ns,
+            total_ns,
+            open_read_calls,
+            open_read_bytes,
+            open_range_sizes,
+            read_calls,
+            read_bytes,
+            read_range_sizes,
+            returned_payload_bytes,
+            selected_payload_sha256,
+        },
+    };
+    let source = SourceSummary {
+        cfb_selective: Some(evidence),
+        ..SourceSummary::default()
+    };
+    Ok(result_with_source(case, corpus, elapsed, source))
+}
+
 fn corpus_payload_kind(corpus: &Corpus) -> Result<PayloadKind, Box<dyn Error>> {
     match corpus.manifest.payload_kind {
         "compressible" => Ok(PayloadKind::Compressible),
@@ -20365,12 +20843,13 @@ mod tests {
     use litchi_core::ReadAt;
 
     use super::{
-        Case, CorpusShape, CountingSink, InstrumentedSource, ODP_TEXT_BOX_BATCH_COUNT,
-        ODT_RESOURCE_BATCH_COUNT, OpcCacheMode, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind,
-        RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
-        RtfSemanticVariant, SemanticShape, SimulatedRangeSource, SourceBackedPackage, WriterShape,
-        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
-        XlsxCellCrudShape, XlsxShape, build_cfb_corpus, build_docx_source_edit_corpus,
+        Case, CfbSelectiveTarget, CorpusShape, CountingSink, InstrumentedSource,
+        ODP_TEXT_BOX_BATCH_COUNT, ODT_RESOURCE_BATCH_COUNT, OpcCacheMode,
+        PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
+        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
+        SimulatedRangeSource, SourceBackedPackage, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
+        XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape, XlsxShape,
+        build_cfb_corpus, build_cfb_selective_corpus, build_docx_source_edit_corpus,
         build_odp_media_corpus, build_odp_text_box_batch_corpus, build_ods_media_corpus,
         build_odt_media_corpus, build_odt_resource_batch_corpus, build_ole_common_corpus,
         build_opc_corpus, build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus,
@@ -20386,11 +20865,12 @@ mod tests {
         build_xlsx_print_options_edit_corpus, build_xlsx_sheet_protection_edit_corpus,
         expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
         payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
-        run_docx_source_backed_one_edit_save, run_opc_source_cache_budget_boundary,
-        run_opc_source_cache_contention, run_opc_source_overlay_one_part_save,
-        run_pptx_batch_edit_save, run_pptx_multi_slide_batch_edit_save,
-        run_pptx_source_backed_one_edit_save, run_scaling_case, run_streaming_creation,
-        run_xls_comments_edit_save, run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
+        run_cfb_selective_read, run_docx_source_backed_one_edit_save,
+        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        run_opc_source_overlay_one_part_save, run_pptx_batch_edit_save,
+        run_pptx_multi_slide_batch_edit_save, run_pptx_source_backed_one_edit_save,
+        run_scaling_case, run_streaming_creation, run_xls_comments_edit_save,
+        run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
         run_xlsx_data_validation_edit_save, run_xlsx_defined_names_edit_save,
         run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
@@ -20422,6 +20902,61 @@ mod tests {
                 .membername(),
             first.target_name
         );
+    }
+
+    #[test]
+    fn selective_cfb_corpora_are_bounded_and_deterministic() {
+        for shape in [CorpusShape::ManySmall, CorpusShape::WideRoot] {
+            for target in [CfbSelectiveTarget::Mini, CfbSelectiveTarget::Fat] {
+                let first = build_cfb_selective_corpus(shape, target).unwrap();
+                let second = build_cfb_selective_corpus(shape, target).unwrap();
+                assert_eq!(first.archive, second.archive);
+                assert_eq!(
+                    first.manifest.archive_sha256,
+                    second.manifest.archive_sha256
+                );
+                assert_eq!(
+                    first.manifest.target_payload_sha256,
+                    sha256_hex(&first.target_payload)
+                );
+                assert_eq!(first.manifest.entry_count, shape.entry_count());
+                assert_eq!(first.manifest.target_payload_bytes, target.target_bytes());
+                assert_eq!(
+                    first.manifest.uncompressed_payload_bytes,
+                    (shape.entry_count() - 1) * 1024 + target.target_bytes()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn selective_cfb_read_records_exact_payload_and_io_stages() {
+        let corpus =
+            build_cfb_selective_corpus(CorpusShape::ManySmall, CfbSelectiveTarget::Mini).unwrap();
+        for case in [
+            Case::CfbSelectiveMiniLegacyRead,
+            Case::CfbSelectiveMiniSharedRead,
+        ] {
+            let result = run_cfb_selective_read(case, &corpus, 0, 1).unwrap();
+            let evidence = result
+                .source
+                .unwrap()
+                .cfb_selective
+                .unwrap()
+                .legacy_or_positional;
+            assert_eq!(evidence.returned_payload_bytes, vec![36]);
+            assert_eq!(
+                evidence.selected_payload_sha256,
+                corpus.manifest.target_payload_sha256
+            );
+            assert_eq!(evidence.open_ns.len(), 1);
+            assert_eq!(evidence.read_ns.len(), 1);
+            assert_eq!(evidence.total_ns.len(), 1);
+            assert!(evidence.open_read_calls[0] > 0);
+            assert!(!evidence.open_range_sizes[0].is_empty());
+            assert!(evidence.read_calls[0] > 0);
+            assert!(!evidence.read_range_sizes[0].is_empty());
+        }
     }
 
     #[test]
