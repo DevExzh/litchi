@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "artifact": "filesystem-release-0100-5b70f19e.json",
+  "artifact_sha256": "e62fca57282fbfc8b5bad7f32d04f9caceccff32f6b37c2a237991ceb286b1e7",
+  "snapshot_revision": "5b70f19e01abdcc660a37918742bfbf3a214a02a",
+  "snapshot_worktree_dirty": false,
+  "binary_sha256": "571d7d1b776dda11779758a60a176aa923879ce0499b45a769403fc42d07e407",
+  "build": {
+    "profile": "release",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "os": "linux",
+    "kernel": "Linux 6.8.0-101-generic",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "cpu_affinity": "2",
+    "filesystem": "tmpfs",
+    "same_source_destination_device": true,
+    "allocator": "Rust system allocator"
+  },
+  "configuration": {
+    "warmups_per_case": 3,
+    "samples_per_state": 30,
+    "states": ["warm", "cold-requested"],
+    "fresh_child_per_sample": true,
+    "process_isolated": true,
+    "cold_advice": "Linux posix_fadvise(DONTNEED); requested is advisory and does not prove a physically cold cache"
+  },
+  "corpora": {
+    "opc": {
+      "shape": "few-large-incompressible",
+      "archive_bytes": 16783632,
+      "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+      "entry_count": 4,
+      "uncompressed_payload_bytes": 16777216,
+      "target_entry": "benchmark/parts/00002.bin",
+      "target_payload_bytes": 4194304,
+      "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098"
+    },
+    "cfb": {
+      "shape": "ole-common-few-large-incompressible",
+      "archive_bytes": 16913408,
+      "archive_sha256": "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d",
+      "entry_count": 5,
+      "uncompressed_payload_bytes": 16777252,
+      "target_entry": "ole_common_edit_target.bin",
+      "target_payload_bytes": 36
+    }
+  },
+  "cases": [
+    {
+      "case": "opc_file_eager_open",
+      "materialized_parts": 4,
+      "states": {
+        "warm": {
+          "n": 30,
+          "child_elapsed_ns": {"p50": 18791047, "p95": 20946611, "p99": 21648623, "mean": 19006215.1, "sd": 810199.201272486, "ci95_mean": [18703715.715247784, 19308714.48475222]},
+          "parent_wall_p50_ns": 290277756,
+          "cold_advice": "not_requested",
+          "logical_read": {"calls": 0, "requested_bytes": 0, "returned_bytes": 0},
+          "process": {"read_bytes": 0, "write_bytes": 0, "syscr": 20, "syscw": 0, "rss_median_bytes": 1421312, "peak_rss_median_bytes": 55836672}
+        },
+        "cold-requested": {
+          "n": 30,
+          "child_elapsed_ns": {"p50": 18902756, "p95": 20043946, "p99": 22843628, "mean": 19078913.83333333, "sd": 855523.0881330043, "ci95_mean": [18759492.131367825, 19398335.53529883]},
+          "parent_wall_p50_ns": 290526967,
+          "cold_advice": "requested",
+          "logical_read": {"calls": 0, "requested_bytes": 0, "returned_bytes": 0},
+          "process": {"read_bytes": 0, "write_bytes": 0, "syscr": 20, "syscw": 0, "rss_median_bytes": 1419264, "peak_rss_median_bytes": 55836672}
+        }
+      }
+    },
+    {
+      "case": "opc_file_source_open",
+      "materialized_parts": 0,
+      "states": {
+        "warm": {
+          "n": 30,
+          "child_elapsed_ns": {"p50": 218087, "p95": 236287, "p99": 237310, "mean": 218152.86666666664, "sd": 12032.003326569313, "ci95_mean": [213660.5472495314, 222645.18608380188]},
+          "parent_wall_p50_ns": 258158525,
+          "cold_advice": "not_requested",
+          "logical_read": {"calls": 13, "requested_bytes": 1008, "returned_bytes": 1008},
+          "process": {"read_bytes": 0, "write_bytes": 0, "syscr": 29, "syscw": 0, "rss_median_bytes": 1724416, "peak_rss_median_bytes": 5931008}
+        },
+        "cold-requested": {
+          "n": 30,
+          "child_elapsed_ns": {"p50": 218157, "p95": 260021, "p99": 262144, "mean": 222249.10000000003, "sd": 18816.457571535055, "ci95_mean": [215223.70818319026, 229274.4918168098]},
+          "parent_wall_p50_ns": 258836605,
+          "cold_advice": "requested",
+          "logical_read": {"calls": 13, "requested_bytes": 1008, "returned_bytes": 1008},
+          "process": {"read_bytes": 0, "write_bytes": 0, "syscr": 29, "syscw": 0, "rss_median_bytes": 1724416, "peak_rss_median_bytes": 5982208}
+        }
+      }
+    },
+    {
+      "case": "opc_file_eager_one_part_atomic_save",
+      "materialized_parts": 4,
+      "output": {"bytes": 16783632, "sha256": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"},
+      "states": {
+        "warm": {
+          "n": 30,
+          "child_elapsed_ns": {"p50": 237448214, "p95": 245352687, "p99": 246025482, "mean": 237393305.76666668, "sd": 4581747.499764873, "ci95_mean": [235682645.23084772, 239103966.30248564]},
+          "parent_wall_p50_ns": 553479607,
+          "cold_advice": "not_requested",
+          "logical_read": {"calls": 0, "requested_bytes": 0, "returned_bytes": 0},
+          "process": {"read_bytes": 0, "write_bytes": 0, "syscr": 20, "syscw": 557, "rss_median_bytes": 6897664, "peak_rss_median_bytes": 60162048}
+        },
+        "cold-requested": {
+          "n": 30,
+          "child_elapsed_ns": {"p50": 235475465, "p95": 247000368, "p99": 250390949, "mean": 236623605.83333337, "sd": 4736614.989824155, "ci95_mean": [234855123.31942868, 238392088.34723806]},
+          "parent_wall_p50_ns": 550288088,
+          "cold_advice": "requested",
+          "logical_read": {"calls": 0, "requested_bytes": 0, "returned_bytes": 0},
+          "process": {"read_bytes": 0, "write_bytes": 0, "syscr": 20, "syscw": 557, "rss_median_bytes": 6701056, "peak_rss_median_bytes": 60096512}
+        }
+      }
+    },
+    {
+      "case": "opc_file_source_one_part_atomic_save",
+      "materialized_parts": 0,
+      "output": {"bytes": 16783632, "sha256": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"},
+      "states": {
+        "warm": {
+          "n": 30,
+          "child_elapsed_ns": {"p50": 64461139, "p95": 65775751, "p99": 65862134, "mean": 64460892.93333334, "sd": 861425.3202528248, "ci95_mean": [64139267.549134985, 64782518.31753169]},
+          "parent_wall_p50_ns": 377595940.5,
+          "cold_advice": "not_requested",
+          "logical_read": {"calls": 549, "requested_bytes": 16785201, "returned_bytes": 16785201},
+          "process": {"read_bytes": 0, "write_bytes": 0, "syscr": 564, "syscw": 461, "rss_median_bytes": 2471936, "peak_rss_median_bytes": 23461888}
+        },
+        "cold-requested": {
+          "n": 30,
+          "child_elapsed_ns": {"p50": 64486494, "p95": 67249981, "p99": 67539539, "mean": 64600648.266666666, "sd": 1100219.6297133344, "ci95_mean": [64189865.63375629, 65011430.899577044]},
+          "parent_wall_p50_ns": 376966020,
+          "cold_advice": "requested",
+          "logical_read": {"calls": 549, "requested_bytes": 16785201, "returned_bytes": 16785201},
+          "process": {"read_bytes": 0, "write_bytes": 0, "syscr": 564, "syscw": 461, "rss_median_bytes": 2437120, "peak_rss_median_bytes": 23396352}
+        }
+      }
+    },
+    {
+      "case": "cfb_file_same_length_overlay_atomic_save",
+      "output": {"bytes": 16913408, "sha256": "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc", "changed_spans": 1, "published_bytes": 16913408},
+      "states": {
+        "warm": {
+          "n": 30,
+          "child_elapsed_ns": {"p50": 99061497, "p95": 102335275, "p99": 102617400, "mean": 99426255.56666668, "sd": 1247290.483833615, "ci95_mean": [98960561.94048885, 99891949.19284451]},
+          "parent_wall_p50_ns": 424222321.5,
+          "cold_advice": "not_requested",
+          "logical_read": {"calls": 2084, "requested_bytes": 101751908, "returned_bytes": 101751908},
+          "process": {"read_bytes": 0, "write_bytes": 0, "syscr": 2102, "syscw": 259, "rss_median_bytes": 1163264, "peak_rss_median_bytes": 5505024}
+        },
+        "cold-requested": {
+          "n": 30,
+          "child_elapsed_ns": {"p50": 99237288, "p95": 101449432, "p99": 104285558, "mean": 99411968.69999999, "sd": 1246638.5711896392, "ci95_mean": [98946518.47467148, 99877418.9253285]},
+          "parent_wall_p50_ns": 425188999,
+          "cold_advice": "requested",
+          "logical_read": {"calls": 2084, "requested_bytes": 101751908, "returned_bytes": 101751908},
+          "process": {"read_bytes": 0, "write_bytes": 0, "syscr": 2102, "syscw": 259, "rss_median_bytes": 1097728, "peak_rss_median_bytes": 5505024}
+        }
+      }
+    }
+  ],
+  "correctness": {
+    "all_output_hashes_stable": true,
+    "opc_eager_and_source_output_hashes_match": true,
+    "opc_output_sha256": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009",
+    "cfb_output_sha256": "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc",
+    "cfb_changed_spans": 1,
+    "source_hash_rechecked_after_each_child": true,
+    "semantic_reopen_checks": true
+  },
+  "claim_boundary": "This is controlled release evidence with repeated distributions and counters on tmpfs. cold-requested means the advisory request was accepted; tmpfs read_bytes stayed zero and the run does not establish physical cold-cache behavior. It makes no production latency, warm/cold, storage-device, allocation, or comparator-baseline claim."
+}
