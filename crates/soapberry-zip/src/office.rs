@@ -43,9 +43,11 @@ use flate2::Compression;
 use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
 use rayon::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub use crate::LimitResource;
 
@@ -1290,61 +1292,946 @@ impl std::fmt::Debug for ArchiveReader<'_> {
     }
 }
 
-/// High-performance streaming ZIP archive writer for Office document formats.
+/// Bounded limits for the ZIP transport streaming writer.
 ///
-/// This is the recommended writer for creating complete ZIP archives.
+/// The writer deliberately supports only ZIP32 output in this first transport
+/// substrate. The output ceiling, per-entry ceiling, aggregate uncompressed
+/// ceiling, member count, and metadata ceiling are finite by default and are
+/// checked before an entry starts or before an input chunk is accepted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StreamingArchiveLimits {
+    /// Maximum number of file members accepted by a writer.
+    pub max_entries: usize,
+    /// Maximum UTF-8 member-name bytes for one file member.
+    pub max_member_name_bytes: u64,
+    /// Maximum aggregate variable central-directory metadata bytes.
+    ///
+    /// The streaming convenience methods currently add no extra fields, so
+    /// this is the aggregate member-name budget.  ZIP fixed-size headers are
+    /// not included, matching [`ArchiveLimits::max_metadata_bytes`].
+    pub max_metadata_bytes: u64,
+    /// Maximum compressed bytes accepted for one streamed member.
+    ///
+    /// This is the compressed payload ceiling, excluding the local header,
+    /// data descriptor, and central-directory record. It is checked before a
+    /// compressed write can exceed the limit and again before the entry is
+    /// finalized.
+    pub max_compressed_size: u64,
+    /// Maximum uncompressed bytes accepted for one streamed member.
+    pub max_entry_size: u64,
+    /// Maximum aggregate uncompressed bytes accepted across members.
+    pub max_total_size: u64,
+    /// Maximum complete ZIP bytes accepted by the output sink.
+    pub max_output_bytes: u64,
+}
+
+impl StreamingArchiveLimits {
+    /// Creates explicit streaming metadata limits while retaining the default
+    /// finite payload and output ceilings.
+    #[must_use]
+    pub const fn new(
+        max_entries: usize,
+        max_member_name_bytes: u64,
+        max_metadata_bytes: u64,
+    ) -> Self {
+        Self {
+            max_entries,
+            max_member_name_bytes,
+            max_metadata_bytes,
+            max_compressed_size: DEFAULT_STREAM_MAX_COMPRESSED_SIZE,
+            max_entry_size: DEFAULT_STREAM_MAX_ENTRY_SIZE,
+            max_total_size: DEFAULT_STREAM_MAX_TOTAL_SIZE,
+            max_output_bytes: DEFAULT_STREAM_MAX_OUTPUT_BYTES,
+        }
+    }
+
+    /// Replaces the finite payload and output ceilings.
+    #[must_use]
+    pub const fn with_byte_limits(
+        mut self,
+        max_entry_size: u64,
+        max_total_size: u64,
+        max_output_bytes: u64,
+    ) -> Self {
+        self.max_entry_size = max_entry_size;
+        self.max_total_size = max_total_size;
+        self.max_output_bytes = max_output_bytes;
+        if self.max_compressed_size > max_output_bytes {
+            self.max_compressed_size = max_output_bytes;
+        }
+        self
+    }
+
+    /// Replaces the finite compressed-payload ceiling for one member.
+    #[must_use]
+    pub const fn with_compressed_size_limit(mut self, max_compressed_size: u64) -> Self {
+        self.max_compressed_size = max_compressed_size;
+        self
+    }
+}
+
+impl Default for StreamingArchiveLimits {
+    fn default() -> Self {
+        let limits = ArchiveLimits::default();
+        Self {
+            max_entries: DEFAULT_STREAM_MAX_ENTRIES,
+            max_member_name_bytes: limits.max_member_name_bytes,
+            max_metadata_bytes: limits.max_metadata_bytes,
+            max_compressed_size: DEFAULT_STREAM_MAX_COMPRESSED_SIZE,
+            max_entry_size: DEFAULT_STREAM_MAX_ENTRY_SIZE,
+            max_total_size: DEFAULT_STREAM_MAX_TOTAL_SIZE,
+            max_output_bytes: DEFAULT_STREAM_MAX_OUTPUT_BYTES,
+        }
+    }
+}
+
+const ZIP32_MAX_VALUE: u64 = u32::MAX as u64;
+const ZIP32_MAX_ENTRIES: usize = u16::MAX as usize - 1;
+const ZIP32_MAX_MEMBER_NAME_BYTES: u64 = u16::MAX as u64;
+const MIN_STREAM_OUTPUT_BYTES: u64 = 22;
+const DEFAULT_STREAM_MAX_ENTRIES: usize = 65_534;
+const DEFAULT_STREAM_MAX_COMPRESSED_SIZE: u64 = 512 * 1024 * 1024;
+const DEFAULT_STREAM_MAX_ENTRY_SIZE: u64 = 512 * 1024 * 1024;
+const DEFAULT_STREAM_MAX_TOTAL_SIZE: u64 = 2 * 1024 * 1024 * 1024;
+const DEFAULT_STREAM_MAX_OUTPUT_BYTES: u64 = 512 * 1024 * 1024;
+const STREAM_COPY_BUFFER_SIZE: usize = 16 * 1024;
+
+/// Content-free progress exposed after a non-atomic streaming failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StreamingArchiveProgress {
+    /// Bytes reported as accepted by the output sink.
+    output_bytes: u64,
+    /// Whether a failed entry permanently poisoned the writer.
+    poisoned: bool,
+}
+
+impl StreamingArchiveProgress {
+    /// Bytes reported as accepted by the output sink.
+    #[must_use]
+    pub const fn output_bytes(self) -> u64 {
+        self.output_bytes
+    }
+
+    /// Whether the writer rejects all subsequent entry and finish operations.
+    #[must_use]
+    pub const fn is_poisoned(self) -> bool {
+        self.poisoned
+    }
+}
+
+/// A byte resource bounded by the sequential streaming transport.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum StreamingLimitResource {
+    /// Compressed payload bytes for one member.
+    CompressedBytes,
+    /// Bytes accepted by the output sink for the complete ZIP stream.
+    OutputBytes,
+}
+
+impl std::fmt::Display for StreamingLimitResource {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::CompressedBytes => "compressed member bytes",
+            Self::OutputBytes => "output bytes",
+        })
+    }
+}
+
+/// Typed attribution for a streaming byte ceiling reached after publication
+/// has started.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct StreamingLimitExceeded {
+    resource: StreamingLimitResource,
+    actual: u64,
+    maximum: u64,
+}
+
+impl StreamingLimitExceeded {
+    /// The bounded resource that exceeded its ceiling.
+    #[must_use]
+    pub const fn resource(self) -> StreamingLimitResource {
+        self.resource
+    }
+
+    /// The attempted or observed byte count.
+    #[must_use]
+    pub const fn actual(self) -> u64 {
+        self.actual
+    }
+
+    /// The configured byte ceiling.
+    #[must_use]
+    pub const fn maximum(self) -> u64 {
+        self.maximum
+    }
+}
+
+impl std::fmt::Display for StreamingLimitExceeded {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "streaming ZIP {} limit exceeded: attempted {}, maximum {}",
+            self.resource, self.actual, self.maximum
+        )
+    }
+}
+
+impl std::error::Error for StreamingLimitExceeded {}
+
+#[derive(Debug)]
+struct StreamingLimitMarker {
+    limit: StreamingLimitExceeded,
+}
+
+impl std::fmt::Display for StreamingLimitMarker {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.limit.fmt(formatter)
+    }
+}
+
+impl std::error::Error for StreamingLimitMarker {}
+
+fn streaming_limit_io_error(
+    resource: StreamingLimitResource,
+    actual: u64,
+    maximum: u64,
+) -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::Other,
+        StreamingLimitMarker {
+            limit: StreamingLimitExceeded {
+                resource,
+                actual,
+                maximum,
+            },
+        },
+    )
+}
+
+fn streaming_limit_from_error(error: &Error) -> Option<StreamingLimitExceeded> {
+    let io_error = match error.kind() {
+        ErrorKind::IO(error) | ErrorKind::Io(error) => error,
+        _ => return None,
+    };
+    io_error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<StreamingLimitMarker>())
+        .map(|marker| marker.limit)
+}
+
+/// A streaming publication failure with content-free output progress.
+#[derive(Debug)]
+pub struct StreamingArchiveFailure {
+    error: Error,
+    progress: StreamingArchiveProgress,
+    limit: Option<StreamingLimitExceeded>,
+}
+
+impl StreamingArchiveFailure {
+    /// The underlying ZIP or sink error.
+    #[must_use]
+    pub fn error(&self) -> &Error {
+        &self.error
+    }
+
+    /// Bytes accepted before the failure and poison state.
+    #[must_use]
+    pub const fn progress(&self) -> StreamingArchiveProgress {
+        self.progress
+    }
+
+    /// Returns typed attribution when a streaming byte ceiling caused this
+    /// incomplete publication.
+    #[must_use]
+    pub const fn limit(&self) -> Option<StreamingLimitExceeded> {
+        self.limit
+    }
+
+    /// Consume the typed failure and return its underlying ZIP error.
+    #[must_use]
+    pub fn into_error(self) -> Error {
+        self.error
+    }
+}
+
+impl std::fmt::Display for StreamingArchiveFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.error.fmt(formatter)
+    }
+}
+
+impl std::error::Error for StreamingArchiveFailure {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.error)
+    }
+}
+
+#[derive(Debug)]
+struct BoundedOutput<W> {
+    writer: W,
+    accepted: u64,
+    maximum: u64,
+    counter: Arc<AtomicU64>,
+}
+
+impl<W> BoundedOutput<W> {
+    fn new(writer: W, maximum: u64, counter: Arc<AtomicU64>) -> Self {
+        Self {
+            writer,
+            accepted: 0,
+            maximum,
+            counter,
+        }
+    }
+
+    fn into_inner(self) -> W {
+        self.writer
+    }
+}
+
+impl<W: Write> Write for BoundedOutput<W> {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        if buffer.is_empty() {
+            return Ok(0);
+        }
+        let requested = u64::try_from(buffer.len()).unwrap_or(u64::MAX);
+        let remaining = self.maximum.saturating_sub(self.accepted);
+        if requested > remaining {
+            return Err(streaming_limit_io_error(
+                StreamingLimitResource::OutputBytes,
+                self.accepted.saturating_add(requested),
+                self.maximum,
+            ));
+        }
+        let written = self.writer.write(buffer)?;
+        self.accepted = self.accepted.saturating_add(written as u64);
+        self.counter.store(self.accepted, Ordering::Release);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.writer.flush()
+    }
+}
+
+/// A ZIP entry sink that bounds compressed payload bytes before forwarding
+/// them to the archive writer.
+struct LimitedEntryWriter<'entry, 'archive, W> {
+    inner: &'entry mut crate::ZipEntryWriter<'archive, BoundedOutput<W>>,
+    maximum: u64,
+}
+
+impl<'entry, 'archive, W> LimitedEntryWriter<'entry, 'archive, W> {
+    fn new(
+        inner: &'entry mut crate::ZipEntryWriter<'archive, BoundedOutput<W>>,
+        maximum: u64,
+    ) -> Self {
+        Self { inner, maximum }
+    }
+
+    fn compressed_bytes(&self) -> u64 {
+        self.inner.compressed_bytes()
+    }
+
+    fn ensure_within_limit(&self) -> Result<(), Error> {
+        let compressed = self.compressed_bytes();
+        if compressed > self.maximum {
+            Err(limit_error(
+                LimitResource::CompressedSize,
+                compressed,
+                self.maximum,
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl<W: Write> Write for LimitedEntryWriter<'_, '_, W> {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        let requested = u64::try_from(buffer.len()).unwrap_or(u64::MAX);
+        let compressed = self.compressed_bytes();
+        let remaining = self.maximum.saturating_sub(compressed);
+        if requested > remaining {
+            return Err(streaming_limit_io_error(
+                StreamingLimitResource::CompressedBytes,
+                compressed.saturating_add(requested),
+                self.maximum,
+            ));
+        }
+        self.inner.write(buffer)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+/// Bounded ZIP transport writer for sequential Office package members.
+///
+/// This substrate does not construct semantic XLSX, DOCX, PPTX, or ODF
+/// models. Format crates remain responsible for validating and serializing
+/// those models before handing a member reader to this writer.
 pub struct StreamingArchiveWriter<W: Write> {
-    archive: ZipArchiveWriter<W>,
+    archive: ZipArchiveWriter<BoundedOutput<W>>,
+    limits: StreamingArchiveLimits,
+    entries: usize,
+    metadata_bytes: u64,
+    total_uncompressed_bytes: u64,
+    output_bytes: u64,
+    poisoned: bool,
+    names: HashSet<String>,
+    last_limit: Option<StreamingLimitExceeded>,
+    output_counter: Arc<AtomicU64>,
 }
 
 impl StreamingArchiveWriter<std::io::Cursor<Vec<u8>>> {
     /// Create a new streaming archive writer that writes to memory.
     pub fn new() -> Self {
+        Self::with_limits(StreamingArchiveLimits::default())
+    }
+
+    /// Create a new in-memory writer with explicit finite metadata limits.
+    pub fn with_limits(limits: StreamingArchiveLimits) -> Self {
+        let output_counter = Arc::new(AtomicU64::new(0));
         Self {
-            archive: ZipArchiveWriter::new(std::io::Cursor::new(Vec::new())),
+            archive: ZipArchiveWriter::new(BoundedOutput::new(
+                std::io::Cursor::new(Vec::new()),
+                limits.max_output_bytes,
+                Arc::clone(&output_counter),
+            )),
+            limits,
+            entries: 0,
+            metadata_bytes: 0,
+            total_uncompressed_bytes: 0,
+            output_bytes: 0,
+            poisoned: false,
+            names: HashSet::new(),
+            last_limit: None,
+            output_counter,
         }
     }
 
     /// Finish writing and return the ZIP archive bytes.
     pub fn finish_to_bytes(self) -> Result<Vec<u8>, Error> {
-        let cursor = self.archive.finish()?;
-        Ok(cursor.into_inner())
+        Ok(self.finish()?.into_inner())
     }
 }
 
 impl<W: Write> StreamingArchiveWriter<W> {
     /// Create a new streaming archive writer with a custom writer.
     pub fn with_writer(writer: W) -> Self {
+        Self::with_writer_and_limits(writer, StreamingArchiveLimits::default())
+    }
+
+    /// Create a new streaming archive writer with a custom writer and
+    /// explicit metadata limits.
+    pub fn with_writer_and_limits(writer: W, limits: StreamingArchiveLimits) -> Self {
+        let output_counter = Arc::new(AtomicU64::new(0));
         Self {
-            archive: ZipArchiveWriter::new(writer),
+            archive: ZipArchiveWriter::new(BoundedOutput::new(
+                writer,
+                limits.max_output_bytes,
+                Arc::clone(&output_counter),
+            )),
+            limits,
+            entries: 0,
+            metadata_bytes: 0,
+            total_uncompressed_bytes: 0,
+            output_bytes: 0,
+            poisoned: false,
+            names: HashSet::new(),
+            last_limit: None,
+            output_counter,
         }
+    }
+
+    /// Return the metadata policy used by this writer.
+    #[must_use]
+    pub const fn limits(&self) -> StreamingArchiveLimits {
+        self.limits
+    }
+
+    /// Return the number of successfully finalized file members.
+    #[must_use]
+    pub const fn entry_count(&self) -> usize {
+        self.entries
+    }
+
+    /// Return the aggregate variable central-directory metadata bytes retained
+    /// for finalized members.
+    #[must_use]
+    pub const fn metadata_bytes(&self) -> u64 {
+        self.metadata_bytes
+    }
+
+    /// Return aggregate uncompressed bytes accepted for finalized members.
+    #[must_use]
+    pub const fn total_uncompressed_bytes(&self) -> u64 {
+        self.total_uncompressed_bytes
+    }
+
+    /// Return content-free progress for this non-atomic writer.
+    #[must_use]
+    pub const fn progress(&self) -> StreamingArchiveProgress {
+        StreamingArchiveProgress {
+            output_bytes: self.output_bytes,
+            poisoned: self.poisoned,
+        }
+    }
+
+    /// Return bytes reported as accepted by the output sink.
+    #[must_use]
+    pub const fn output_bytes(&self) -> u64 {
+        self.output_bytes
+    }
+
+    /// Whether a failed entry permanently poisons this writer.
+    #[must_use]
+    pub const fn is_poisoned(&self) -> bool {
+        self.poisoned
+    }
+
+    /// Returns typed attribution for the byte ceiling that poisoned this
+    /// writer, when the failure came from a streaming byte limit.
+    #[must_use]
+    pub const fn last_limit(&self) -> Option<StreamingLimitExceeded> {
+        self.last_limit
+    }
+
+    fn refresh_output_bytes(&mut self) {
+        self.output_bytes = self.output_counter.load(Ordering::Acquire);
+    }
+
+    fn invalid_limits(&self) -> Option<Error> {
+        let reason = if self.limits.max_entries > ZIP32_MAX_ENTRIES {
+            "max_entries must be below the ZIP32 entry-count ceiling"
+        } else if self.limits.max_member_name_bytes > ZIP32_MAX_MEMBER_NAME_BYTES {
+            "max_member_name_bytes exceeds the ZIP32 member-name field"
+        } else if self.limits.max_metadata_bytes > self.limits.max_output_bytes {
+            "max_metadata_bytes exceeds max_output_bytes"
+        } else if self.limits.max_compressed_size >= ZIP32_MAX_VALUE {
+            "max_compressed_size must be below the ZIP32 size ceiling"
+        } else if self.limits.max_compressed_size > self.limits.max_output_bytes {
+            "max_compressed_size exceeds max_output_bytes"
+        } else if self.limits.max_entry_size >= ZIP32_MAX_VALUE {
+            "max_entry_size must be below the ZIP32 size ceiling"
+        } else if self.limits.max_total_size >= ZIP32_MAX_VALUE {
+            "max_total_size must be below the ZIP32 size ceiling"
+        } else if self.limits.max_output_bytes >= ZIP32_MAX_VALUE {
+            "max_output_bytes must be below the ZIP32 size ceiling"
+        } else if self.limits.max_output_bytes < MIN_STREAM_OUTPUT_BYTES {
+            "max_output_bytes is too small for an empty ZIP archive"
+        } else {
+            return None;
+        };
+        Some(ErrorKind::InvalidInput { msg: reason.into() }.into())
+    }
+
+    fn ensure_usable(&self) -> Result<(), Error> {
+        if self.poisoned {
+            return Err(ErrorKind::InvalidInput {
+                msg: format!(
+                    "streaming archive writer is poisoned after {} accepted output bytes",
+                    self.output_bytes
+                ),
+            }
+            .into());
+        }
+        if let Some(error) = self.invalid_limits() {
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    fn poison(&mut self, error: Error) -> Error {
+        let limit = streaming_limit_from_error(&error);
+        self.last_limit = limit;
+        self.refresh_output_bytes();
+        self.poisoned = true;
+        match limit {
+            Some(StreamingLimitExceeded {
+                resource: StreamingLimitResource::CompressedBytes,
+                actual,
+                maximum,
+            }) => limit_error(LimitResource::CompressedSize, actual, maximum),
+            Some(StreamingLimitExceeded {
+                resource: StreamingLimitResource::OutputBytes,
+                ..
+            })
+            | None => error,
+        }
+    }
+
+    fn validate_streaming_entry(&self, name: &str) -> Result<(String, u64), Error> {
+        self.ensure_usable()?;
+        let raw_name = name.trim_end_matches('/');
+        let raw_name_bytes = u64::try_from(raw_name.len()).unwrap_or(u64::MAX);
+        let maximum_name_bytes = self
+            .limits
+            .max_member_name_bytes
+            .min(ZIP32_MAX_MEMBER_NAME_BYTES);
+        if raw_name_bytes > maximum_name_bytes {
+            return Err(limit_error(
+                LimitResource::MemberNameBytes,
+                raw_name_bytes,
+                maximum_name_bytes,
+            ));
+        }
+        let path = ZipFilePath::from_str(raw_name);
+        let normalized_name: String = path.into();
+        let name_bytes = u64::try_from(normalized_name.len()).unwrap_or(u64::MAX);
+        if name_bytes > ZIP32_MAX_MEMBER_NAME_BYTES
+            || name_bytes > self.limits.max_member_name_bytes
+        {
+            return Err(limit_error(
+                LimitResource::MemberNameBytes,
+                name_bytes,
+                maximum_name_bytes,
+            ));
+        }
+
+        if self.names.contains(&normalized_name) {
+            return Err(ErrorKind::InvalidInput {
+                msg: format!("duplicate normalized member name: {normalized_name}"),
+            }
+            .into());
+        }
+
+        let next_metadata = self.metadata_bytes.saturating_add(name_bytes);
+        if next_metadata > self.limits.max_metadata_bytes {
+            return Err(limit_error(
+                LimitResource::MetadataBytes,
+                next_metadata,
+                self.limits.max_metadata_bytes,
+            ));
+        }
+
+        let next_entries = self.entries.saturating_add(1);
+        let max_entries = u64::try_from(self.limits.max_entries).unwrap_or(u64::MAX);
+        let actual_entries = u64::try_from(next_entries).unwrap_or(u64::MAX);
+        if next_entries > self.limits.max_entries {
+            return Err(limit_error(
+                LimitResource::FileCount,
+                actual_entries,
+                max_entries,
+            ));
+        }
+
+        Ok((normalized_name, name_bytes))
+    }
+
+    fn validate_known_entry(
+        &self,
+        name: &str,
+        uncompressed_bytes: u64,
+    ) -> Result<(String, u64), Error> {
+        let (normalized_name, name_bytes) = self.validate_streaming_entry(name)?;
+        if uncompressed_bytes > self.limits.max_entry_size {
+            return Err(limit_error(
+                LimitResource::EntrySize,
+                uncompressed_bytes,
+                self.limits.max_entry_size,
+            ));
+        }
+        let total = self
+            .total_uncompressed_bytes
+            .saturating_add(uncompressed_bytes);
+        if total > self.limits.max_total_size {
+            return Err(limit_error(
+                LimitResource::TotalSize,
+                total,
+                self.limits.max_total_size,
+            ));
+        }
+        Ok((normalized_name, name_bytes))
+    }
+
+    fn record_streaming_entry(&mut self, normalized_name: String, name_bytes: u64) {
+        debug_assert!(self.names.insert(normalized_name));
+        self.entries += 1;
+        self.metadata_bytes += name_bytes;
+    }
+
+    fn copy_stream<R: Read, O: Write>(
+        reader: &mut R,
+        output: &mut O,
+        max_entry_size: u64,
+        max_total_size: u64,
+        committed_total: u64,
+    ) -> Result<u64, Error> {
+        let mut buffer = [0u8; STREAM_COPY_BUFFER_SIZE];
+        let mut accepted_uncompressed = 0_u64;
+        loop {
+            let read = match reader.read(&mut buffer) {
+                Ok(read) => read,
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(error) => return Err(error.into()),
+            };
+            if read == 0 {
+                return Ok(accepted_uncompressed);
+            }
+            if read > buffer.len() {
+                return Err(ErrorKind::InvalidInput {
+                    msg: "stream source returned more bytes than requested".to_string(),
+                }
+                .into());
+            }
+            let read = u64::try_from(read).unwrap_or(u64::MAX);
+            let next_entry = accepted_uncompressed.saturating_add(read);
+            if next_entry > max_entry_size {
+                return Err(limit_error(
+                    LimitResource::EntrySize,
+                    next_entry,
+                    max_entry_size,
+                ));
+            }
+            let next_total = committed_total
+                .saturating_add(accepted_uncompressed)
+                .saturating_add(read);
+            if next_total > max_total_size {
+                return Err(limit_error(
+                    LimitResource::TotalSize,
+                    next_total,
+                    max_total_size,
+                ));
+            }
+            output.write_all(&buffer[..usize::try_from(read).unwrap_or(usize::MAX)])?;
+            accepted_uncompressed = next_entry;
+        }
+    }
+
+    fn write_reader<R: Read>(
+        &mut self,
+        name: &str,
+        mut reader: R,
+        compression_method: CompressionMethod,
+    ) -> Result<(), Error> {
+        let (normalized_name, name_bytes) = self.validate_streaming_entry(name)?;
+        let started = self
+            .archive
+            .new_file(&normalized_name)
+            .compression_method(compression_method)
+            .start();
+        let (mut entry, config) = match started {
+            Ok(started) => started,
+            Err(error) => return Err(self.poison(error)),
+        };
+
+        let max_entry_size = self.limits.max_entry_size;
+        let max_total_size = self.limits.max_total_size;
+        let max_compressed_size = self.limits.max_compressed_size;
+        let committed_total = self.total_uncompressed_bytes;
+
+        let result = match compression_method {
+            CompressionMethod::Store => (|| {
+                let (accepted, descriptor) = {
+                    let mut limited_entry =
+                        LimitedEntryWriter::new(&mut entry, max_compressed_size);
+                    let mut data_writer = config.wrap(&mut limited_entry);
+                    let accepted = Self::copy_stream(
+                        &mut reader,
+                        &mut data_writer,
+                        max_entry_size,
+                        max_total_size,
+                        committed_total,
+                    )?;
+                    let (_, descriptor) = data_writer.finish()?;
+                    limited_entry.ensure_within_limit()?;
+                    (accepted, descriptor)
+                };
+                entry.finish(descriptor)?;
+                Ok(accepted)
+            })(),
+            CompressionMethod::Deflate => (|| {
+                let (accepted, descriptor) = {
+                    let mut limited_entry =
+                        LimitedEntryWriter::new(&mut entry, max_compressed_size);
+                    let encoder = DeflateEncoder::new(&mut limited_entry, Compression::default());
+                    let mut data_writer = config.wrap(encoder);
+                    let accepted = Self::copy_stream(
+                        &mut reader,
+                        &mut data_writer,
+                        max_entry_size,
+                        max_total_size,
+                        committed_total,
+                    )?;
+                    let (encoder, descriptor) = data_writer.finish()?;
+                    encoder.finish()?;
+                    limited_entry.ensure_within_limit()?;
+                    (accepted, descriptor)
+                };
+                entry.finish(descriptor)?;
+                Ok(accepted)
+            })(),
+            other => Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                other.as_id().as_u16(),
+            ))),
+        };
+
+        let accepted_uncompressed = match result {
+            Ok(accepted) => accepted,
+            Err(error) => return Err(self.poison(error)),
+        };
+        self.total_uncompressed_bytes = self
+            .total_uncompressed_bytes
+            .saturating_add(accepted_uncompressed);
+        self.record_streaming_entry(normalized_name, name_bytes);
+        self.refresh_output_bytes();
+        Ok(())
     }
 
     /// Write a file without compression (stored).
     pub fn write_stored(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
-        self.archive.write_stored_file(name, data)
+        let data_bytes = u64::try_from(data.len()).unwrap_or(u64::MAX);
+        let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+        if data_bytes > self.limits.max_compressed_size {
+            return Err(limit_error(
+                LimitResource::CompressedSize,
+                data_bytes,
+                self.limits.max_compressed_size,
+            ));
+        }
+        match self.archive.write_stored_file(&normalized_name, data) {
+            Ok(()) => {
+                self.total_uncompressed_bytes =
+                    self.total_uncompressed_bytes.saturating_add(data_bytes);
+                self.record_streaming_entry(normalized_name, name_bytes);
+                self.refresh_output_bytes();
+                Ok(())
+            },
+            Err(error) => Err(self.poison(error)),
+        }
     }
 
     /// Write a file with Deflate compression.
     pub fn write_deflated(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
-        let (mut entry, config) = self
+        let data_bytes = u64::try_from(data.len()).unwrap_or(u64::MAX);
+        let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+        let started = self
             .archive
-            .new_file(name)
+            .new_file(&normalized_name)
             .compression_method(CompressionMethod::Deflate)
-            .start()?;
-
-        let encoder = DeflateEncoder::new(&mut entry, Compression::default());
-        let mut writer = config.wrap(encoder);
-        writer.write_all(data)?;
-        let (encoder, desc) = writer.finish()?;
-        encoder.finish()?;
-        entry.finish(desc)?;
+            .start();
+        let result = match started {
+            Ok((mut entry, config)) => (|| {
+                let descriptor = {
+                    let mut limited_entry =
+                        LimitedEntryWriter::new(&mut entry, self.limits.max_compressed_size);
+                    let encoder = DeflateEncoder::new(&mut limited_entry, Compression::default());
+                    let mut writer = config.wrap(encoder);
+                    writer.write_all(data)?;
+                    let (encoder, desc) = writer.finish()?;
+                    encoder.finish()?;
+                    limited_entry.ensure_within_limit()?;
+                    desc
+                };
+                entry.finish(descriptor)?;
+                Ok(())
+            })(),
+            Err(error) => Err(error),
+        };
+        if let Err(error) = result {
+            return Err(self.poison(error));
+        }
+        self.total_uncompressed_bytes = self.total_uncompressed_bytes.saturating_add(data_bytes);
+        self.record_streaming_entry(normalized_name, name_bytes);
+        self.refresh_output_bytes();
         Ok(())
+    }
+
+    /// Consume a reader value into a stored ZIP member.
+    ///
+    /// The source is read incrementally and is not retained after this method
+    /// returns.  The output uses a data descriptor, so `W` only needs to
+    /// implement [`Write`], not [`std::io::Seek`].
+    pub fn write_stored_stream<R: Read>(&mut self, name: &str, reader: R) -> Result<(), Error> {
+        self.write_reader(name, reader, CompressionMethod::Store)
+    }
+
+    /// Consume a reader value into a Deflate-compressed ZIP member.
+    ///
+    /// The source is read incrementally and is not retained after this method
+    /// returns.  Compression and CRC state are bounded to the encoder's
+    /// working buffers plus the central-directory metadata retained by the
+    /// archive.
+    pub fn write_deflated_stream<R: Read>(&mut self, name: &str, reader: R) -> Result<(), Error> {
+        self.write_reader(name, reader, CompressionMethod::Deflate)
+    }
+
+    /// Consume a reader value with one of the supported Office ZIP methods.
+    ///
+    /// [`CompressionMethod::Store`] and [`CompressionMethod::Deflate`] are
+    /// supported.  Other methods are rejected before any archive bytes are
+    /// written.
+    pub fn write_stream<R: Read>(
+        &mut self,
+        name: &str,
+        reader: R,
+        compression_method: CompressionMethod,
+    ) -> Result<(), Error> {
+        if !matches!(
+            compression_method,
+            CompressionMethod::Store | CompressionMethod::Deflate
+        ) {
+            return Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                compression_method.as_id().as_u16(),
+            )));
+        }
+        self.write_reader(name, reader, compression_method)
+    }
+
+    /// Alias for [`Self::write_stored_stream`] using reader-oriented naming.
+    pub fn write_stored_reader<R: Read>(&mut self, name: &str, reader: R) -> Result<(), Error> {
+        self.write_stored_stream(name, reader)
+    }
+
+    /// Alias for [`Self::write_deflated_stream`] using reader-oriented naming.
+    pub fn write_deflated_reader<R: Read>(&mut self, name: &str, reader: R) -> Result<(), Error> {
+        self.write_deflated_stream(name, reader)
     }
 
     /// Finish writing the archive.
     pub fn finish(self) -> Result<W, Error> {
-        self.archive.finish()
+        self.finish_with_progress()
+            .map(|(writer, _progress)| writer)
+            .map_err(StreamingArchiveFailure::into_error)
+    }
+
+    /// Finish writing the archive while preserving typed progress on failure.
+    ///
+    /// This is useful for caller-owned non-atomic sinks: if central-directory
+    /// or final-flush output fails, the returned error still reports the
+    /// content-free number of bytes accepted by the sink.
+    pub fn finish_with_progress(
+        mut self,
+    ) -> Result<(W, StreamingArchiveProgress), StreamingArchiveFailure> {
+        if let Err(error) = self.ensure_usable() {
+            return Err(StreamingArchiveFailure {
+                error,
+                progress: self.progress(),
+                limit: self.last_limit,
+            });
+        }
+        self.refresh_output_bytes();
+        match self.archive.finish() {
+            Ok(output) => {
+                let progress = StreamingArchiveProgress {
+                    output_bytes: self.output_counter.load(Ordering::Acquire),
+                    poisoned: false,
+                };
+                Ok((output.into_inner(), progress))
+            },
+            Err(error) => Err(StreamingArchiveFailure {
+                limit: streaming_limit_from_error(&error).or(self.last_limit),
+                error,
+                progress: StreamingArchiveProgress {
+                    output_bytes: self.output_counter.load(Ordering::Acquire),
+                    poisoned: true,
+                },
+            }),
+        }
     }
 }
 
@@ -1633,6 +2520,123 @@ const _: () = {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{self, Cursor};
+
+    #[derive(Debug)]
+    struct ShortWriter {
+        bytes: Vec<u8>,
+        max_write: usize,
+    }
+
+    impl ShortWriter {
+        fn new(max_write: usize) -> Self {
+            assert!(max_write > 0);
+            Self {
+                bytes: Vec::new(),
+                max_write,
+            }
+        }
+    }
+
+    impl Write for ShortWriter {
+        fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+            let written = data.len().min(self.max_write);
+            self.bytes.extend_from_slice(&data[..written]);
+            Ok(written)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[derive(Debug)]
+    struct FailingWriter {
+        bytes: Vec<u8>,
+        fail_after: usize,
+    }
+
+    impl FailingWriter {
+        fn new(fail_after: usize) -> Self {
+            Self {
+                bytes: Vec::new(),
+                fail_after,
+            }
+        }
+    }
+
+    impl Write for FailingWriter {
+        fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+            if self.bytes.len() >= self.fail_after {
+                return Err(io::Error::new(io::ErrorKind::BrokenPipe, "sink failed"));
+            }
+            let available = self.fail_after - self.bytes.len();
+            let written = data.len().min(available);
+            self.bytes.extend_from_slice(&data[..written]);
+            Ok(written)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[derive(Debug)]
+    struct ZeroWriter;
+
+    impl Write for ZeroWriter {
+        fn write(&mut self, _data: &[u8]) -> io::Result<usize> {
+            Ok(0)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[derive(Debug)]
+    enum ReadStep {
+        Interrupted,
+        Bytes(Vec<u8>),
+        Error,
+    }
+
+    #[derive(Debug)]
+    struct ScriptedReader {
+        steps: std::collections::VecDeque<ReadStep>,
+    }
+
+    impl ScriptedReader {
+        fn new(steps: impl IntoIterator<Item = ReadStep>) -> Self {
+            Self {
+                steps: steps.into_iter().collect(),
+            }
+        }
+    }
+
+    impl Read for ScriptedReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            match self
+                .steps
+                .pop_front()
+                .unwrap_or(ReadStep::Bytes(Vec::new()))
+            {
+                ReadStep::Interrupted => {
+                    Err(io::Error::new(io::ErrorKind::Interrupted, "try again"))
+                },
+                ReadStep::Bytes(bytes) => {
+                    let count = bytes.len().min(output.len());
+                    output[..count].copy_from_slice(&bytes[..count]);
+                    if count < bytes.len() {
+                        self.steps
+                            .push_front(ReadStep::Bytes(bytes[count..].to_vec()));
+                    }
+                    Ok(count)
+                },
+                ReadStep::Error => Err(io::Error::new(io::ErrorKind::InvalidData, "source failed")),
+            }
+        }
+    }
 
     #[test]
     fn test_round_trip_stored() {
@@ -1656,6 +2660,371 @@ mod tests {
         let reader = ArchiveReader::new(&bytes).unwrap();
         assert!(reader.contains("content.xml"));
         assert_eq!(reader.read("content.xml").unwrap(), b"<root>Hello</root>");
+    }
+
+    #[test]
+    fn owned_stream_entries_handle_empty_and_large_members() {
+        let large = (0..(1024 * 1024))
+            .map(|index| (index as u8).wrapping_mul(31))
+            .collect::<Vec<_>>();
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored_stream("empty.bin", Cursor::new(Vec::<u8>::new()))
+            .unwrap();
+        writer
+            .write_deflated_stream("large.bin", Cursor::new(large.clone()))
+            .unwrap();
+
+        assert_eq!(writer.entry_count(), 2);
+        assert_eq!(writer.metadata_bytes(), "empty.binlarge.bin".len() as u64);
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(reader.read("empty.bin").unwrap(), Vec::<u8>::new());
+        assert_eq!(reader.read("large.bin").unwrap(), large);
+        assert!(local_member_has_data_descriptor(&bytes, b"empty.bin"));
+        assert!(local_member_has_data_descriptor(&bytes, b"large.bin"));
+    }
+
+    #[test]
+    fn owned_stream_entries_preserve_order_crc_and_descriptor_metadata() {
+        let first = b"first stream payload".to_vec();
+        let second = b"second stream payload with deflate".to_vec();
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored_reader("first.bin", Cursor::new(first.clone()))
+            .unwrap();
+        writer
+            .write_deflated_reader("second.bin", Cursor::new(second.clone()))
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let archive = ZipArchive::from_slice(&bytes).unwrap();
+        let mut entries = archive.entries();
+        let first_entry = entries.next_entry().unwrap().unwrap();
+        assert_eq!(first_entry.file_path().as_ref(), b"first.bin");
+        assert_eq!(first_entry.crc32(), crate::crc32(&first));
+        assert!(first_entry.has_data_descriptor());
+        let second_entry = entries.next_entry().unwrap().unwrap();
+        assert_eq!(second_entry.file_path().as_ref(), b"second.bin");
+        assert_eq!(second_entry.crc32(), crate::crc32(&second));
+        assert!(second_entry.has_data_descriptor());
+        assert!(entries.next_entry().unwrap().is_none());
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(
+            reader.file_names().collect::<Vec<_>>(),
+            ["first.bin", "second.bin"]
+        );
+        assert_eq!(reader.read("first.bin").unwrap(), first);
+        assert_eq!(reader.read("second.bin").unwrap(), second);
+    }
+
+    #[test]
+    fn owned_stream_output_accepts_short_non_seek_writes() {
+        let mut sink = ShortWriter::new(3);
+        {
+            let mut writer = StreamingArchiveWriter::with_writer(&mut sink);
+            writer
+                .write_deflated_stream("short.xml", Cursor::new(b"short sink".to_vec()))
+                .unwrap();
+            writer.finish().unwrap();
+        }
+
+        let reader = ArchiveReader::new(&sink.bytes).unwrap();
+        assert_eq!(reader.read("short.xml").unwrap(), b"short sink");
+    }
+
+    #[test]
+    fn owned_stream_output_reports_failing_sink_after_partial_output() {
+        let mut sink = FailingWriter::new(64);
+        let error = {
+            let mut writer = StreamingArchiveWriter::with_writer(&mut sink);
+            writer
+                .write_deflated_stream("failing.xml", Cursor::new(vec![b'x'; 4096]))
+                .unwrap_err()
+        };
+
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(sink.bytes.len() <= sink.fail_after);
+    }
+
+    #[test]
+    fn owned_stream_output_is_deterministic_and_rejects_unsupported_methods_early() {
+        fn build_archive() -> Vec<u8> {
+            let mut writer = StreamingArchiveWriter::new();
+            writer
+                .write_stored_stream("a", Cursor::new(b"stored".to_vec()))
+                .unwrap();
+            writer
+                .write_stream(
+                    "b",
+                    Cursor::new(b"deflated".to_vec()),
+                    CompressionMethod::Deflate,
+                )
+                .unwrap();
+            writer.finish_to_bytes().unwrap()
+        }
+
+        let first = build_archive();
+        let second = build_archive();
+        assert_eq!(first, second);
+
+        let mut writer = StreamingArchiveWriter::new();
+        let error = writer
+            .write_stream(
+                "unsupported",
+                Cursor::new(b"payload".to_vec()),
+                CompressionMethod::Bzip2,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedCompressionMethod(12)
+        ));
+        assert_eq!(writer.entry_count(), 0);
+        writer
+            .write_stored_stream("after-error", Cursor::new(b"ok".to_vec()))
+            .unwrap();
+        assert!(ArchiveReader::new(&writer.finish_to_bytes().unwrap()).is_ok());
+    }
+
+    #[test]
+    fn owned_stream_output_enforces_finite_metadata_limits() {
+        let mut writer = StreamingArchiveWriter::with_limits(StreamingArchiveLimits::new(1, 8, 16));
+        writer
+            .write_stored_stream("first", Cursor::new(b"one".to_vec()))
+            .unwrap();
+        assert_eq!(writer.metadata_bytes(), 5);
+
+        let error = writer
+            .write_stored_stream("second", Cursor::new(b"two".to_vec()))
+            .unwrap_err();
+        assert_limit(error, LimitResource::FileCount, 2, 1);
+
+        let mut name_limited =
+            StreamingArchiveWriter::with_limits(StreamingArchiveLimits::new(4, 3, 16));
+        let error = name_limited
+            .write_stored_stream("four", Cursor::new(b"payload".to_vec()))
+            .unwrap_err();
+        assert_limit(error, LimitResource::MemberNameBytes, 4, 3);
+
+        let mut metadata_limited =
+            StreamingArchiveWriter::with_limits(StreamingArchiveLimits::new(4, 16, 5));
+        metadata_limited
+            .write_stored_stream("one", Cursor::new(b"one".to_vec()))
+            .unwrap();
+        let error = metadata_limited
+            .write_stored_stream("three", Cursor::new(b"three".to_vec()))
+            .unwrap_err();
+        assert_limit(error, LimitResource::MetadataBytes, 8, 5);
+    }
+
+    #[test]
+    fn owned_stream_output_enforces_exact_and_one_over_byte_limits() {
+        let mut exact = StreamingArchiveWriter::new();
+        exact
+            .write_stored_stream("exact", Cursor::new(b"abc".to_vec()))
+            .unwrap();
+        assert_eq!(exact.total_uncompressed_bytes, 3);
+
+        let mut entry_limited = StreamingArchiveWriter::with_limits(
+            StreamingArchiveLimits::new(4, 16, 16).with_byte_limits(3, 8, 4096),
+        );
+        entry_limited
+            .write_stored_stream("exact", Cursor::new(b"abc".to_vec()))
+            .unwrap();
+        let error = entry_limited
+            .write_stored_stream("over", Cursor::new(b"over".to_vec()))
+            .unwrap_err();
+        assert_limit(error, LimitResource::EntrySize, 4, 3);
+
+        let mut aggregate_limited = StreamingArchiveWriter::with_limits(
+            StreamingArchiveLimits::new(4, 16, 16).with_byte_limits(8, 3, 4096),
+        );
+        aggregate_limited
+            .write_stored_stream("first", Cursor::new(b"abc".to_vec()))
+            .unwrap();
+        let error = aggregate_limited
+            .write_stored_stream("second", Cursor::new(b"d".to_vec()))
+            .unwrap_err();
+        assert_limit(error, LimitResource::TotalSize, 4, 3);
+
+        let mut output_probe = StreamingArchiveWriter::new();
+        output_probe.write_stored("one", b"payload").unwrap();
+        let output = output_probe.finish_to_bytes().unwrap();
+        let expected_output_bytes = output.len() as u64;
+
+        let output_limits =
+            StreamingArchiveLimits::new(4, 16, 16).with_byte_limits(8, 8, expected_output_bytes);
+        let mut output_exact = StreamingArchiveWriter::with_limits(output_limits);
+        output_exact.write_stored("one", b"payload").unwrap();
+        assert_eq!(output_exact.finish_to_bytes().unwrap(), output);
+
+        let output_limits = output_limits.with_byte_limits(8, 8, expected_output_bytes - 1);
+        let mut output_over = StreamingArchiveWriter::with_limits(output_limits);
+        output_over.write_stored("one", b"payload").unwrap();
+        let failure = output_over.finish_with_progress().unwrap_err();
+        assert!(matches!(
+            failure.error().kind(),
+            ErrorKind::IO(_) | ErrorKind::Io(_)
+        ));
+        let limit = failure.limit().expect("typed output limit");
+        assert_eq!(limit.resource(), StreamingLimitResource::OutputBytes);
+        assert_eq!(limit.maximum(), expected_output_bytes - 1);
+        assert!(failure.progress().is_poisoned());
+        assert!(failure.progress().output_bytes() < expected_output_bytes);
+    }
+
+    #[test]
+    fn owned_stream_output_enforces_compressed_member_limits() {
+        let limits = StreamingArchiveLimits::new(4, 16, 64)
+            .with_byte_limits(16, 32, 4096)
+            .with_compressed_size_limit(3);
+
+        let mut exact = StreamingArchiveWriter::with_limits(limits);
+        exact
+            .write_stored_stream("exact", Cursor::new(b"abc".to_vec()))
+            .unwrap();
+        let bytes = exact.finish_to_bytes().unwrap();
+        assert_eq!(
+            ArchiveReader::new(&bytes).unwrap().read("exact").unwrap(),
+            b"abc"
+        );
+
+        let mut one_over = StreamingArchiveWriter::with_limits(limits);
+        let error = one_over
+            .write_stored_stream("over", Cursor::new(b"abcd".to_vec()))
+            .unwrap_err();
+        assert_limit(error, LimitResource::CompressedSize, 4, 3);
+        let limit = one_over.last_limit().expect("typed compressed limit");
+        assert_eq!(limit.resource(), StreamingLimitResource::CompressedBytes);
+        assert_eq!(limit.actual(), 4);
+        assert_eq!(limit.maximum(), 3);
+        assert!(one_over.is_poisoned());
+
+        let mut deflated = StreamingArchiveWriter::with_limits(
+            StreamingArchiveLimits::new(4, 16, 64)
+                .with_byte_limits(16, 32, 4096)
+                .with_compressed_size_limit(1),
+        );
+        let error = deflated
+            .write_deflated_stream("deflated", Cursor::new(b"payload".to_vec()))
+            .unwrap_err();
+        match error.kind() {
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::CompressedSize,
+                actual,
+                maximum: 1,
+            } => assert!(*actual > 1),
+            other => panic!("expected compressed limit error, got {other:?}"),
+        }
+        assert!(deflated.is_poisoned());
+    }
+
+    #[test]
+    fn owned_stream_deflate_limit_applies_to_compressed_bytes_not_input_bytes() {
+        let payload = vec![b'a'; 4096];
+        let mut probe = StreamingArchiveWriter::new();
+        probe.write_deflated("probe", &payload).unwrap();
+        let bytes = probe.finish_to_bytes().unwrap();
+        let archive = ZipArchive::from_slice(&bytes).unwrap();
+        let entry = archive.entries().next_entry().unwrap().unwrap();
+        let compressed = entry.compressed_size_hint();
+        assert!(compressed < payload.len() as u64);
+
+        let limits = StreamingArchiveLimits::new(4, 16, 64)
+            .with_byte_limits(8192, 8192, 4096)
+            .with_compressed_size_limit(compressed);
+        let mut writer = StreamingArchiveWriter::with_limits(limits);
+        writer.write_deflated("compressed", &payload).unwrap();
+        let output = writer.finish_to_bytes().unwrap();
+        assert_eq!(
+            ArchiveReader::new(&output)
+                .unwrap()
+                .read("compressed")
+                .unwrap(),
+            payload
+        );
+    }
+
+    #[test]
+    fn owned_stream_output_rejects_duplicate_normalized_names_before_header() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("dir/../same", b"one").unwrap();
+        let output_before_duplicate = writer.output_bytes();
+        let error = writer
+            .write_stored_stream("same/", Cursor::new(b"two".to_vec()))
+            .unwrap_err();
+        assert!(
+            matches!(error.kind(), ErrorKind::InvalidInput { msg } if msg.contains("duplicate normalized member name"))
+        );
+        assert_eq!(writer.output_bytes(), output_before_duplicate);
+        assert_eq!(writer.entry_count(), 1);
+        assert!(!writer.is_poisoned());
+        let bytes = writer.finish_to_bytes().unwrap();
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(reader.file_names().collect::<Vec<_>>(), ["same"]);
+        assert_eq!(reader.read("same").unwrap(), b"one");
+    }
+
+    #[test]
+    fn owned_stream_output_handles_interrupted_and_source_errors_with_poisoning() {
+        let mut writer = StreamingArchiveWriter::new();
+        let reader =
+            ScriptedReader::new([ReadStep::Interrupted, ReadStep::Bytes(b"accepted".to_vec())]);
+        writer.write_stored_stream("ok", reader).unwrap();
+        assert!(!writer.is_poisoned());
+
+        let reader = ScriptedReader::new([ReadStep::Bytes(b"partial".to_vec()), ReadStep::Error]);
+        let error = writer.write_stored_stream("bad", reader).unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(writer.is_poisoned());
+        let progress = writer.progress();
+        assert!(progress.is_poisoned());
+        assert!(progress.output_bytes() > 0);
+
+        let error = writer
+            .write_stored_stream("after", Cursor::new(b"rejected".to_vec()))
+            .unwrap_err();
+        assert!(
+            matches!(error.kind(), ErrorKind::InvalidInput { msg } if msg.contains("poisoned"))
+        );
+    }
+
+    #[test]
+    fn owned_stream_output_reports_write_zero_and_rejects_post_failure_finish() {
+        let mut writer = StreamingArchiveWriter::with_writer_and_limits(
+            ZeroWriter,
+            StreamingArchiveLimits::default(),
+        );
+        let error = writer
+            .write_stored_stream("zero", Cursor::new(b"payload".to_vec()))
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(writer.is_poisoned());
+        assert_eq!(writer.output_bytes(), 0);
+
+        let error = writer.finish().unwrap_err();
+        assert!(
+            matches!(error.kind(), ErrorKind::InvalidInput { msg } if msg.contains("poisoned"))
+        );
+    }
+
+    #[test]
+    fn streaming_limits_reject_zip32_overrides_before_output() {
+        let invalid = StreamingArchiveLimits::new(usize::MAX, u64::MAX, u64::MAX).with_byte_limits(
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+        );
+        let mut writer = StreamingArchiveWriter::with_limits(invalid);
+        let error = writer
+            .write_stored_stream("x", Cursor::new(b"x".to_vec()))
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+        assert_eq!(writer.output_bytes(), 0);
+        assert!(!writer.is_poisoned());
     }
 
     #[test]
