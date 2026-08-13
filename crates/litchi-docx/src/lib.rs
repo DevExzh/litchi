@@ -50,6 +50,8 @@ pub mod table;
 pub mod template;
 pub mod textbox;
 pub mod theme;
+/// Read-only, bounded DOCX package and main-document validation.
+pub mod validation;
 pub mod variables;
 #[cfg(feature = "vba-inspection")]
 pub mod vba_project;
@@ -111,6 +113,10 @@ pub use settings::{
 pub use statistics::{
     Statistics, count_characters, count_characters_no_spaces, count_words, estimate_line_count,
     estimate_page_count,
+};
+pub use validation::{
+    DEFAULT_DOCX_VALIDATION_LIMITS, DocxValidationError, DocxValidationLimits, validate_read_at,
+    validate_read_at_with_limits,
 };
 pub use variables::{Variables, parse_variables};
 
