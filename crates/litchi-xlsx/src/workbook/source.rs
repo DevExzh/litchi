@@ -3,13 +3,26 @@
 //! This facade intentionally does not adapt into [`super::Workbook`]: that
 //! snapshot owns a mutable OPC graph, while this type must keep ordinary part
 //! payloads deferred. It exposes only semantic catalog and worksheet reads.
+//!
+//! Managed [`ExecutionContext`] opens are supported for this read-only
+//! facade. The focused source-backed edit modules elsewhere in this crate
+//! still materialize their immutable edit snapshots through the compatibility
+//! owned-`Arc` path; they do not expose managed-package constructors here. That
+//! boundary is deliberate until those snapshots can retain
+//! [`litchi_opc::PartData`] (or a
+//! bounded owned copy) without detaching a managed reservation.
 
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
-use litchi_core::{ReadAt, Selector as CoreSelector};
+use litchi_core::{
+    ExecutionContext, ExecutionError, ReadAt, Selector as CoreSelector, SourceVersion,
+};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{PackURI, PartView, ReadLimits, SourceBackedPackage};
+use litchi_opc::{
+    PackURI, PartData, PartView, ReadLimits, SourceBackedPackage, SourceCacheDiagnostics,
+    SourceCacheLimits,
+};
 use litchi_sheet::{Area, At, Cell as Address, Rect};
 
 use super::{DateSystem, Flavor, Selector, Visibility, WorksheetKind, codec};
@@ -29,6 +42,18 @@ const INTL_MACROSHEET_REL: &str =
 const CHARTSHEET_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
 
+fn check_execution(context: Option<&ExecutionContext>) -> Result<()> {
+    let Some(context) = context else {
+        return Ok(());
+    };
+    context.check().map_err(|error| {
+        Error::Package(match error {
+            ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+            error => litchi_opc::OpcError::Execution(error),
+        })
+    })
+}
+
 struct SourceSheetData {
     position: usize,
     name: String,
@@ -41,6 +66,13 @@ struct SourceSheetData {
 
 struct SourceInner {
     package: SourceBackedPackage,
+    execution: Option<ExecutionContext>,
+    // Keep the mandatory workbook payload pinned for managed facades. Besides
+    // avoiding a second root extraction, this makes an exact managed budget
+    // boundary meaningful: the selected worksheet cannot evict the root while
+    // callers still hold the workbook snapshot. Compatibility facades retain
+    // the historical finite-cache behavior and do not pin this payload.
+    _catalog_data: Option<PartData>,
     shared_strings_uri: Option<PackURI>,
     shared_strings: OnceLock<Box<[Text]>>,
     styles_uri: Option<PackURI>,
@@ -129,8 +161,87 @@ impl SourceBackedWorkbook {
         )?)
     }
 
+    /// Open an XLSX source with an explicit finite deferred-Part cache policy.
+    ///
+    /// This compatibility constructor remains unmanaged: the cache is
+    /// bounded by [`SourceCacheLimits`] but is not charged to a hierarchical
+    /// execution budget. Use
+    /// [`Self::from_read_at_with_limits_and_cache_limits_and_execution_context`]
+    /// when the caller owns a managed budget.
+    pub fn from_read_at_with_cache_limits(
+        source: Arc<dyn ReadAt>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits(source, ReadLimits::default(), cache_limits)
+    }
+
+    /// Open an XLSX source with explicit read and finite cache policies.
+    pub fn from_read_at_with_limits_and_cache_limits(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+                source,
+                limits,
+                cache_limits,
+            )?,
+        )
+    }
+
+    /// Open an XLSX source with an explicit caller-owned execution context.
+    ///
+    /// The context checks cancellation before mandatory open reads and before
+    /// every deferred semantic materialization. Retained and in-flight
+    /// payloads are charged to its hierarchical memory budget. Managed
+    /// [`litchi_opc::PartData`] handles never escape as unbudgeted `Arc`
+    /// allocations through this read-only facade.
+    pub fn from_read_at_with_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            limits,
+            context.clone(),
+        )?;
+        Self::from_source_backed_package_with_execution_context(package, Some(context))
+    }
+
+    /// Open an XLSX source with explicit read, cache, and execution policies.
+    ///
+    /// This is the fully explicit managed constructor. The read-only
+    /// workbook/sheet facade retains only owned semantic values and bounded
+    /// OPC cache handles; it does not detach managed payloads.
+    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                limits,
+                cache_limits,
+                context.clone(),
+            )?;
+        Self::from_source_backed_package_with_execution_context(package, Some(context))
+    }
+
     /// Build the read-only XLSX facade from a validated deferred OPC package.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
+        Self::from_source_backed_package_with_execution_context(package, None)
+    }
+
+    fn from_source_backed_package_with_execution_context(
+        package: SourceBackedPackage,
+        execution: Option<ExecutionContext>,
+    ) -> Result<Self> {
+        check_execution(execution.as_ref())?;
+        let retain_catalog = execution.is_some() || package.cache_diagnostics().budget_managed;
         let workbook = package.main_document_part()?;
         let flavor = codec::flavor(workbook.content_type()).ok_or_else(|| {
             invalid(format!(
@@ -141,9 +252,12 @@ impl SourceBackedWorkbook {
         })?;
         let catalog_bytes = workbook.data()?;
         let catalog = raw::parse_catalog(catalog_bytes.as_bytes())?;
+        check_execution(execution.as_ref())?;
         let sheet_parts = validate_sheet_graph(&package, &workbook, &catalog.sheets)?;
+        check_execution(execution.as_ref())?;
         let shared_strings_uri = validate_shared_strings(&package, &workbook)?;
         let styles_uri = validate_styles(&package, &workbook)?;
+        check_execution(execution.as_ref())?;
 
         let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
         let mut sheets = Vec::new();
@@ -162,10 +276,18 @@ impl SourceBackedWorkbook {
             }));
         }
         let sheets = sheets.into_boxed_slice();
+        // The source can change after the mandatory root and relationship
+        // reads, including while the semantic sheet metadata above is being
+        // allocated. Do not publish a facade whose catalog was assembled from
+        // a stale positional snapshot. This also covers an empty sheet list.
+        package.source_version()?;
+        check_execution(execution.as_ref())?;
 
         Ok(Self {
             inner: Arc::new(SourceInner {
                 package,
+                execution,
+                _catalog_data: retain_catalog.then_some(catalog_bytes),
                 shared_strings_uri,
                 shared_strings: OnceLock::new(),
                 styles_uri,
@@ -192,6 +314,17 @@ impl SourceBackedWorkbook {
     #[must_use]
     pub fn date_system(&self) -> DateSystem {
         self.inner.date_system
+    }
+
+    /// Content-free deferred-Part cache diagnostics.
+    #[must_use]
+    pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
+        self.inner.package.cache_diagnostics()
+    }
+
+    /// Exact source identity and revision captured by this facade.
+    pub fn source_version(&self) -> Result<SourceVersion> {
+        self.inner.package.source_version().map_err(Into::into)
     }
 
     /// Number of logical workbook sheets.
@@ -223,6 +356,7 @@ impl SourceBackedWorkbook {
 
     /// Look up a sheet by developer-facing name or checked zero-based position.
     pub fn sheet<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<SourceWorksheet>> {
+        self.inner.execution_check()?;
         let data = match selector.into() {
             CoreSelector::Position(position) => self.inner.sheets.get(position.get()).cloned(),
             CoreSelector::Name(name) => {
@@ -291,11 +425,17 @@ impl SourceWorksheet {
     /// Look up an exact logical cell state, returning an owning semantic value.
     pub fn cell<'a>(&self, at: impl Into<At<'a>>) -> Result<SourceCellView> {
         let address = at.into().resolve()?;
-        Ok(match self.store()?.view(address) {
+        let value = match self.store()?.view(address) {
             View::Missing => SourceCellView::Missing,
             View::Covered(range) => SourceCellView::Covered(range),
             View::Stored(cell) => SourceCellView::Stored(cell.clone()),
-        })
+        };
+        // `Store::view` returns an owned clone, so the source may change
+        // during that clone without being observed by the earlier store
+        // check. Revalidate immediately before publishing the value.
+        self.owner.package.source_version()?;
+        self.owner.execution_check()?;
+        Ok(value)
     }
 
     /// Read every stored cell selected by a checked range into owning values.
@@ -315,10 +455,16 @@ impl SourceWorksheet {
                 cell: cell.clone(),
             });
         }
+        // The collection owns cloned cells and may take arbitrarily long for
+        // a sparse range. Final source/version and cancellation checks keep a
+        // returned collection tied to the exact opened snapshot.
+        self.owner.package.source_version()?;
+        self.owner.execution_check()?;
         Ok(values)
     }
 
     fn store(&self) -> Result<&Store> {
+        self.owner.execution_check()?;
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
                 sheet: self.data.name.clone(),
@@ -330,12 +476,21 @@ impl SourceWorksheet {
         // change has invalidated the snapshot.
         let part = self.owner.package.part(&self.data.part_uri)?;
         if let Some(store) = self.data.cells.get() {
+            // A cached semantic Store must still honor the managed package's
+            // cancellation and source-version checks. `PartView::data()` is
+            // a cache hit when the bounded payload is retained and does not
+            // detach its managed `PartData` reservation.
+            let _payload = part.data()?;
+            self.owner.execution_check()?;
+            self.owner.package.source_version()?;
             return Ok(store);
         }
 
         let data = part.data()?;
         let parsed = raw::worksheet::parse(data.as_bytes(), || self.owner.shared_strings())?;
         self.owner.validate_styles(&parsed)?;
+        self.owner.execution_check()?;
+        self.owner.package.source_version()?;
         let _publish_result = self.data.cells.set(parsed);
         self.data.cells.get().ok_or_else(|| {
             invalid("source-backed worksheet cache initialization did not publish a value")
@@ -344,16 +499,26 @@ impl SourceWorksheet {
 }
 
 impl SourceInner {
+    fn execution_check(&self) -> Result<()> {
+        check_execution(self.execution.as_ref())
+    }
+
     fn shared_strings(&self) -> Result<Option<&[Text]>> {
+        self.execution_check()?;
         let Some(uri) = self.shared_strings_uri.as_ref() else {
             return Ok(None);
         };
         if let Some(strings) = self.shared_strings.get() {
+            let _payload = self.package.part(uri)?.data()?;
+            self.execution_check()?;
+            self.package.source_version()?;
             return Ok(Some(strings));
         }
 
         let data = self.package.part(uri)?.data()?;
         let parsed = raw::strings::parse(data.as_bytes())?;
+        self.execution_check()?;
+        self.package.source_version()?;
         let _publish_result = self.shared_strings.set(parsed);
         self.shared_strings
             .get()
@@ -364,15 +529,21 @@ impl SourceInner {
     }
 
     fn style_count(&self) -> Result<u32> {
+        self.execution_check()?;
         let Some(uri) = self.styles_uri.as_ref() else {
             return Ok(0);
         };
         if let Some(styles) = self.styles.get() {
+            let _payload = self.package.part(uri)?.data()?;
+            self.execution_check()?;
+            self.package.source_version()?;
             return Ok(styles.len());
         }
 
         let data = self.package.part(uri)?.data()?;
         let parsed = raw::styles::parse(data.as_bytes())?;
+        self.execution_check()?;
+        self.package.source_version()?;
         let _publish_result = self.styles.set(parsed);
         self.styles
             .get()
@@ -565,34 +736,48 @@ fn require_content_type(sheet: &raw::Sheet, actual: &str, expected: &str) -> Res
 #[cfg(test)]
 mod tests {
     use std::io;
+    use std::num::{NonZeroU64, NonZeroUsize};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
-    use litchi_core::{ReadAt, SourceVersion};
+    use litchi_core::{
+        Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
+        ReadAt, Resource, SourceVersion,
+    };
     use litchi_opc::constants::content_type as ct;
+    use litchi_opc::{OpcError, OpcPackage, PackURI, SourceCacheLimits};
     use soapberry_zip::office::StreamingArchiveWriter;
 
-    use super::{SourceBackedWorkbook, SourceCellView};
+    use super::{ReadLimits, SourceBackedWorkbook, SourceCellView};
     use crate::{Cell, Error, Value};
 
+    const FIRST_MARKER: &[u8] = b"source-backed-requested-first-sheet";
     const SECOND_MARKER: &[u8] = b"source-backed-unrequested-second-sheet";
 
     struct CountingSource {
         bytes: Vec<u8>,
+        first_marker_offset: usize,
         marker_offset: usize,
+        first_body_marker_reads: AtomicUsize,
         second_body_marker_reads: AtomicUsize,
         revision: AtomicU64,
     }
 
     impl CountingSource {
         fn new(bytes: Vec<u8>) -> Self {
+            let first_marker_offset = bytes
+                .windows(FIRST_MARKER.len())
+                .position(|window| window == FIRST_MARKER)
+                .expect("first worksheet marker is stored in archive");
             let marker_offset = bytes
                 .windows(SECOND_MARKER.len())
                 .position(|window| window == SECOND_MARKER)
                 .expect("second worksheet marker is stored in archive");
             Self {
                 bytes,
+                first_marker_offset,
                 marker_offset,
+                first_body_marker_reads: AtomicUsize::new(0),
                 second_body_marker_reads: AtomicUsize::new(0),
                 revision: AtomicU64::new(0),
             }
@@ -600,6 +785,52 @@ mod tests {
 
         fn changed(&self) {
             self.revision.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    /// Source whose revision flips immediately before one selected version
+    /// observation. The returned version is therefore already different on
+    /// that observation, deterministically exercising a final-check race.
+    struct VersionFlipSource {
+        bytes: Vec<u8>,
+        version_calls: AtomicUsize,
+        revision: AtomicU64,
+        flip_before_call: Option<usize>,
+    }
+
+    impl VersionFlipSource {
+        fn new(bytes: Vec<u8>, flip_before_call: Option<usize>) -> Self {
+            Self {
+                bytes,
+                version_calls: AtomicUsize::new(0),
+                revision: AtomicU64::new(0),
+                flip_before_call,
+            }
+        }
+    }
+
+    impl ReadAt for VersionFlipSource {
+        fn len(&self) -> io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let offset = usize::try_from(offset)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset too large"))?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            let call = self.version_calls.fetch_add(1, Ordering::SeqCst) + 1;
+            if self.flip_before_call == Some(call) {
+                self.revision.store(1, Ordering::SeqCst);
+            }
+            Ok(SourceVersion::new(92, self.revision.load(Ordering::SeqCst)))
         }
     }
 
@@ -616,6 +847,11 @@ mod tests {
             }
             let count = output.len().min(self.bytes.len() - offset);
             let end = offset + count;
+            if offset < self.first_marker_offset + FIRST_MARKER.len()
+                && self.first_marker_offset < end
+            {
+                self.first_body_marker_reads.fetch_add(1, Ordering::SeqCst);
+            }
             if offset < self.marker_offset + SECOND_MARKER.len() && self.marker_offset < end {
                 self.second_body_marker_reads.fetch_add(1, Ordering::SeqCst);
             }
@@ -663,7 +899,7 @@ mod tests {
         writer
             .write_stored(
                 "xl/worksheets/sheet1.xml",
-                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData></worksheet>"#,
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><!--source-backed-requested-first-sheet--><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData></worksheet>"#,
             )
             .unwrap();
         let padding = "x".repeat(128 * 1024);
@@ -675,6 +911,65 @@ mod tests {
             .write_stored("xl/worksheets/sheet2.xml", second.as_bytes())
             .unwrap();
         writer.finish_to_bytes().unwrap()
+    }
+
+    fn empty_source_backed_xlsx() -> Vec<u8> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                format!(
+                    r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="{}"/></Types>"#,
+                    ct::SML_SHEET_MAIN,
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+        writer
+            .write_stored(
+                "_rels/.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored(
+                "xl/workbook.xml",
+                br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets/></workbook>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored(
+                "xl/_rels/workbook.xml.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#,
+            )
+            .unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn part_len(bytes: &[u8], member: &str) -> u64 {
+        let package = OpcPackage::from_bytes(bytes).unwrap();
+        package
+            .get_part(&PackURI::new(member).unwrap())
+            .unwrap()
+            .blob()
+            .len() as u64
+    }
+
+    fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+        let budget = Budget::root(
+            "xlsx-source-facade-test",
+            Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(memory.max(1)).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+        (budget, cancellation_source, context)
     }
 
     #[test]
@@ -729,7 +1024,184 @@ mod tests {
 
         assert!(matches!(
             sheet.cell("A1"),
-            Err(Error::Package(litchi_opc::OpcError::SourceChanged { .. }))
+            Err(Error::Package(OpcError::SourceChanged { .. }))
         ));
+    }
+
+    #[test]
+    fn final_catalog_check_rejects_revision_flip_after_empty_metadata_build() {
+        let bytes = empty_source_backed_xlsx();
+        let baseline_source = Arc::new(VersionFlipSource::new(bytes.clone(), None));
+        let baseline = SourceBackedWorkbook::from_read_at(baseline_source.clone()).unwrap();
+        assert!(baseline.is_empty());
+        let final_check_call = baseline_source.version_calls.load(Ordering::SeqCst);
+        drop(baseline);
+
+        let source = Arc::new(VersionFlipSource::new(bytes, Some(final_check_call)));
+        assert!(matches!(
+            SourceBackedWorkbook::from_read_at(source),
+            Err(Error::Package(OpcError::SourceChanged { .. }))
+        ));
+    }
+
+    #[test]
+    fn final_cell_and_collection_checks_reject_revision_flips_after_owned_clones() {
+        let bytes = source_backed_xlsx();
+        let baseline_source = Arc::new(VersionFlipSource::new(bytes.clone(), None));
+        let baseline = SourceBackedWorkbook::from_read_at(baseline_source.clone()).unwrap();
+        let baseline_sheet = baseline.sheet("First").unwrap().unwrap();
+        baseline_sheet.cell("A1").unwrap();
+        let cell_check_call = baseline_source.version_calls.load(Ordering::SeqCst);
+        drop(baseline_sheet);
+        drop(baseline);
+
+        let source = Arc::new(VersionFlipSource::new(bytes.clone(), Some(cell_check_call)));
+        let workbook = SourceBackedWorkbook::from_read_at(source).unwrap();
+        let sheet = workbook.sheet("First").unwrap().unwrap();
+        assert!(matches!(
+            sheet.cell("A1"),
+            Err(Error::Package(OpcError::SourceChanged { .. }))
+        ));
+        drop(sheet);
+        drop(workbook);
+
+        let baseline_source = Arc::new(VersionFlipSource::new(bytes.clone(), None));
+        let baseline = SourceBackedWorkbook::from_read_at(baseline_source.clone()).unwrap();
+        let baseline_sheet = baseline.sheet("First").unwrap().unwrap();
+        baseline_sheet.cells("A1:B2").unwrap();
+        let cells_check_call = baseline_source.version_calls.load(Ordering::SeqCst);
+        drop(baseline_sheet);
+        drop(baseline);
+
+        let source = Arc::new(VersionFlipSource::new(bytes, Some(cells_check_call)));
+        let workbook = SourceBackedWorkbook::from_read_at(source).unwrap();
+        let sheet = workbook.sheet("First").unwrap().unwrap();
+        assert!(matches!(
+            sheet.cells("A1:B2"),
+            Err(Error::Package(OpcError::SourceChanged { .. }))
+        ));
+    }
+
+    #[test]
+    fn managed_facade_selectively_materializes_with_exact_budget_and_releases_on_drop() {
+        let archive = source_backed_xlsx();
+        let workbook_bytes = part_len(&archive, "/xl/workbook.xml");
+        let first_sheet_bytes = part_len(&archive, "/xl/worksheets/sheet1.xml");
+        let exact = workbook_bytes + first_sheet_bytes;
+        let source = Arc::new(CountingSource::new(archive));
+        let (budget, _cancellation_source, context) = managed_context(exact);
+        let cache_limits = SourceCacheLimits::new(usize::try_from(exact).unwrap(), 4).unwrap();
+        let workbook =
+            SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source.clone(),
+                ReadLimits::default(),
+                cache_limits,
+                context,
+            )
+            .unwrap();
+
+        assert_eq!(workbook.source_version().unwrap().revision(), 0);
+        assert_eq!(workbook.cache_diagnostics().successful_loads, 1);
+        assert!(workbook.cache_diagnostics().budget_managed);
+        assert_eq!(budget.used(Resource::Memory), workbook_bytes);
+        assert_eq!(source.first_body_marker_reads.load(Ordering::SeqCst), 0);
+        assert_eq!(source.second_body_marker_reads.load(Ordering::SeqCst), 0);
+
+        let first = workbook.sheet("First").unwrap().unwrap();
+        assert!(matches!(
+            first.cell("A1").unwrap(),
+            SourceCellView::Stored(Cell::Value(Value::Number(ref value))) if value.as_str() == "7"
+        ));
+        assert!(source.first_body_marker_reads.load(Ordering::SeqCst) > 0);
+        assert_eq!(source.second_body_marker_reads.load(Ordering::SeqCst), 0);
+        let diagnostics = workbook.cache_diagnostics();
+        assert_eq!(diagnostics.successful_loads, 2);
+        assert_eq!(diagnostics.retained_bytes as u64, exact);
+        assert_eq!(diagnostics.budget_cache_reserved_bytes, exact);
+        assert_eq!(budget.used(Resource::Memory), exact);
+
+        drop(first);
+        drop(workbook);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_facade_one_under_budget_rejects_before_selected_part_io() {
+        let archive = source_backed_xlsx();
+        let workbook_bytes = part_len(&archive, "/xl/workbook.xml");
+        let first_sheet_bytes = part_len(&archive, "/xl/worksheets/sheet1.xml");
+        let exact = workbook_bytes + first_sheet_bytes;
+        let source = Arc::new(CountingSource::new(archive));
+        let (budget, _cancellation_source, context) = managed_context(exact - 1);
+        let cache_limits = SourceCacheLimits::new(usize::try_from(exact).unwrap(), 4).unwrap();
+        let workbook =
+            SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source.clone(),
+                ReadLimits::default(),
+                cache_limits,
+                context,
+            )
+            .unwrap();
+
+        assert_eq!(workbook.cache_diagnostics().successful_loads, 1);
+        assert_eq!(budget.used(Resource::Memory), workbook_bytes);
+        let first = workbook.sheet("First").unwrap().unwrap();
+        let result = first.cell("A1");
+        assert!(matches!(
+            result,
+            Err(Error::Package(OpcError::Execution(
+                ExecutionError::ResourceLimit(_)
+            )))
+        ));
+        assert_eq!(source.first_body_marker_reads.load(Ordering::SeqCst), 0);
+        assert_eq!(source.second_body_marker_reads.load(Ordering::SeqCst), 0);
+        assert_eq!(workbook.cache_diagnostics().successful_loads, 1);
+        assert!(workbook.cache_diagnostics().budget_reservation_failures > 0);
+        drop(first);
+        drop(workbook);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_facade_cancellation_is_typed_before_open_and_on_cached_reads() {
+        let archive = source_backed_xlsx();
+        let source = Arc::new(CountingSource::new(archive.clone()));
+        let (budget, cancellation_source, context) = managed_context(u64::MAX);
+        cancellation_source.cancel();
+        assert!(matches!(
+            SourceBackedWorkbook::from_read_at_with_execution_context(
+                source.clone(),
+                ReadLimits::default(),
+                context,
+            ),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+        assert_eq!(source.first_body_marker_reads.load(Ordering::SeqCst), 0);
+        assert_eq!(source.second_body_marker_reads.load(Ordering::SeqCst), 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
+
+        let source = Arc::new(CountingSource::new(archive));
+        let (budget, cancellation_source, context) = managed_context(u64::MAX);
+        let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let first = workbook.sheet("First").unwrap().unwrap();
+        assert!(first.cell("A1").is_ok());
+        let reads_before_cancel = source.first_body_marker_reads.load(Ordering::SeqCst);
+        cancellation_source.cancel();
+        assert!(matches!(
+            first.cell("A1"),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+        assert_eq!(
+            source.first_body_marker_reads.load(Ordering::SeqCst),
+            reads_before_cancel
+        );
+        drop(first);
+        drop(workbook);
+        assert_eq!(budget.used(Resource::Memory), 0);
     }
 }
