@@ -36,6 +36,7 @@ pub(crate) mod sheet_order;
 mod table;
 pub(crate) mod table_cell_edit;
 pub(crate) mod table_cells;
+pub(crate) mod table_dimension;
 pub(crate) mod table_headers;
 mod table_lock;
 pub(crate) mod table_title;
@@ -47,7 +48,8 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use std::sync::Arc;
 
-use litchi_iwa_archive::{ComponentCatalog, SourceCatalog};
+use litchi_iwa_archive::package::SharedBytes;
+use litchi_iwa_archive::{ComponentCatalog, OwnedSourceCatalog, SourceCatalog};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
 use litchi_iwa_core::{Archive, RawMessage};
@@ -366,20 +368,33 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 enum Components {
-    Physical(Box<SourceCatalog>),
+    PhysicalShared(Box<SourceCatalog>),
+    PhysicalOwned(Box<OwnedSourceCatalog>),
     Semantic(Arc<ComponentCatalog>),
 }
 
 impl Components {
     fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
-        Ok(Self::Physical(Box::new(
+        Ok(Self::PhysicalShared(Box::new(
             SourceCatalog::from_bytes_with_limits(bytes, limits)?,
         )))
     }
 
     fn from_shared_bytes(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
-        Ok(Self::Physical(Box::new(
+        Ok(Self::PhysicalShared(Box::new(
             SourceCatalog::from_shared_bytes_with_limits(source, limits)?,
+        )))
+    }
+
+    fn from_owned_bytes(source: Vec<u8>, limits: Limits) -> Result<Self> {
+        Ok(Self::PhysicalOwned(Box::new(
+            OwnedSourceCatalog::__from_owned_bytes_with_limits(source, limits)?,
+        )))
+    }
+
+    fn from_source_owner(source: SharedBytes, limits: Limits) -> Result<Self> {
+        Ok(Self::PhysicalOwned(Box::new(
+            OwnedSourceCatalog::__from_source_owner_with_limits(source, limits)?,
         )))
     }
 
@@ -389,14 +404,16 @@ impl Components {
 
     fn catalog(&self) -> &ComponentCatalog {
         match self {
-            Self::Physical(source) => source.components(),
+            Self::PhysicalShared(source) => source.components(),
+            Self::PhysicalOwned(source) => source.__as_source_catalog().components(),
             Self::Semantic(catalog) => catalog,
         }
     }
 
     fn physical(&self) -> Option<&SourceCatalog> {
         match self {
-            Self::Physical(source) => Some(source),
+            Self::PhysicalShared(source) => Some(source.as_ref()),
+            Self::PhysicalOwned(source) => Some(source.__as_source_catalog()),
             Self::Semantic(_) => None,
         }
     }
@@ -437,7 +454,7 @@ impl fmt::Debug for Package {
 
 #[derive(Debug)]
 struct State {
-    source: Arc<[u8]>,
+    source: SharedBytes,
     components: Components,
     index: Index,
     document: Document,
@@ -559,6 +576,22 @@ impl Package {
         Self::from_components_with_options(components, options)
     }
 
+    pub(crate) fn from_owned_bytes_with_options(
+        source: Vec<u8>,
+        options: ReadOptions,
+    ) -> Result<Self> {
+        let components = Components::from_owned_bytes(source, options.archive())?;
+        Self::from_components_with_options(components, options)
+    }
+
+    pub(crate) fn from_source_owner_with_options(
+        source: SharedBytes,
+        options: ReadOptions,
+    ) -> Result<Self> {
+        let components = Components::from_source_owner(source, options.archive())?;
+        Self::from_components_with_options(components, options)
+    }
+
     fn from_components_with_options(components: Components, options: ReadOptions) -> Result<Self> {
         let source = components
             .physical()
@@ -567,7 +600,7 @@ impl Package {
                     "semantic-only Numbers components cannot construct a package".to_owned(),
                 )
             })?
-            .shared_source();
+            .__source_owner();
         validate_numbers_application(&components, options.archive())?;
         let semantic = options.semantic();
         let index = Index::from_components(&components, semantic.max_objects())?;
@@ -604,7 +637,7 @@ impl Package {
     /// source even though the ordinary package API exposes semantic values.
     #[must_use]
     pub(crate) fn source_bytes(&self) -> &[u8] {
-        &self.state.source
+        self.state.source.as_ref()
     }
 
     /// Write this validated package artifact to a byte sink.

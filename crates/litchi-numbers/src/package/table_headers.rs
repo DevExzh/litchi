@@ -17,7 +17,7 @@ pub(super) mod rewrite;
 
 use std::{fmt, sync::Arc};
 
-use litchi_iwa_archive::package::ExactArtifacts;
+use litchi_iwa_archive::package::OwnedExactArtifacts;
 use thiserror::Error as ThisError;
 
 use super::Package;
@@ -293,12 +293,12 @@ impl Edit<'_> {
     /// one component, reassembles once, and fully reopens one candidate.
     pub fn commit(self) -> Result<Commit, Error> {
         let catalog = physical_source(self.source)?;
-        let source = catalog.shared_source();
+        let source = catalog.__source_owner();
         if self.before == self.settings {
             return Ok(Commit {
                 package: self.source.snapshot(),
                 patch: Patch {
-                    artifacts: ExactArtifacts::new(Arc::clone(&source), source),
+                    artifacts: OwnedExactArtifacts::new(source.clone(), source),
                     sheet_position: self.sheet_position,
                     table_position: self.table_position,
                     before: self.before,
@@ -334,11 +334,11 @@ impl Edit<'_> {
         let source_payload = clone_selected_payload(self.source, target)?;
         let (package, target_payload) = rewrite(self.source, target, self.settings, &previews)?;
         verify_exact_locality(self.source, &package, target, &previews, 0, &target_payload)?;
-        let target_bytes = physical_source(&package)?.shared_source();
+        let target_bytes = physical_source(&package)?.__source_owner();
         Ok(Commit {
             package,
             patch: Patch {
-                artifacts: ExactArtifacts::new(source, Arc::clone(&target_bytes)),
+                artifacts: OwnedExactArtifacts::new(source, target_bytes.clone()),
                 sheet_position: self.sheet_position,
                 table_position: self.table_position,
                 before: self.before,
@@ -358,7 +358,7 @@ impl Edit<'_> {
 /// A reversible, process-local exact-source patch.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
-    artifacts: ExactArtifacts,
+    artifacts: OwnedExactArtifacts,
     sheet_position: usize,
     table_position: usize,
     before: Settings,

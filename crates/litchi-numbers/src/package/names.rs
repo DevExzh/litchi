@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use litchi_iwa_archive::{
     SourceCatalog,
-    package::{Entry, EntryEdit},
+    package::{Entry, EntryEdit, SharedBytes},
 };
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
@@ -454,8 +454,8 @@ impl<'a> Edit<'a> {
 /// An exact-source-checked, reversible process-local names patch.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
-    source: Arc<[u8]>,
-    target: Arc<[u8]>,
+    source: SharedBytes,
+    target: SharedBytes,
     source_fingerprint: u64,
     target_fingerprint: u64,
     operations: Arc<[Operation]>,
@@ -506,8 +506,8 @@ impl Patch {
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
-            source: Arc::clone(&self.target),
-            target: Arc::clone(&self.source),
+            source: self.target.clone(),
+            target: self.source.clone(),
             source_fingerprint: self.target_fingerprint,
             target_fingerprint: self.source_fingerprint,
             operations: Arc::clone(&self.operations),
@@ -672,7 +672,7 @@ impl Package {
             return Err(Error::PatchConflict);
         }
         let candidate =
-            Package::from_shared_bytes_with_options(Arc::clone(&patch.target), self.state.options)
+            Package::from_source_owner_with_options(patch.target.clone(), self.state.options)
                 .map_err(map_candidate_read_error)?;
         if !verify_operation_state(&candidate, &patch.operations, patch.direction, true) {
             return Err(Error::Verification);
@@ -732,11 +732,11 @@ fn commit_edit(source: &Package, mut operations: Vec<Operation>) -> Result<Commi
         .filter(|operation| operation.before != operation.after)
         .count();
     let source_catalog = physical_source(source)?;
-    let source_bytes = source_catalog.shared_source();
+    let source_bytes = source_catalog.__source_owner();
     let source_fingerprint = fingerprint(&source_bytes);
     if changed == 0 {
         let patch = Patch {
-            source: Arc::clone(&source_bytes),
+            source: source_bytes.clone(),
             target: source_bytes,
             source_fingerprint,
             target_fingerprint: source_fingerprint,
@@ -771,7 +771,7 @@ fn commit_edit(source: &Package, mut operations: Vec<Operation>) -> Result<Commi
         Direction::Forward,
         preview_names.len(),
     )?;
-    let target = physical_source(&package)?.shared_source();
+    let target = physical_source(&package)?.__source_owner();
     let target_fingerprint = fingerprint(&target);
     let patch = Patch {
         source: source_bytes,

@@ -2167,3 +2167,43 @@ boundary units pass 237/237 and both live retirement/API audits report zero
 findings. Broad host all-target Clippy remains blocked by unrelated existing
 lints; the global boundary policy still reports 14 unrelated
 `soapberry-zip`/`xml-minifier` debt findings.
+
+## 2026-08-13 amendment: Numbers dimension-size API
+
+The focused public read/edit surface is
+`Package::{table_dimension_size, edit_table_dimension_size,
+apply_table_dimension_size}`. Reads and edits select a sheet and table through
+the existing selector contracts and then select one zero-based
+`Dimension::Row` or `Dimension::Column`. The transaction module exports
+`Edit`, `Patch`, `Commit`, `Diagnostics`, `Path`, `LimitKind`, and
+`TransactionError`. `Path` reports semantic sheet/table/axis positions only;
+native IDs and archive/component vocabulary stay private.
+
+`Points::new` accepts only a strictly positive finite `f32`. `Size::Default`
+is the semantic default-override state, representing native zero or physical
+absence and resolving through the table model's row-height or column-width
+default. `Size::Points(points)` is an explicit override. It must not collapse
+to `Default` merely because `points.value()` equals the current model default,
+and `Default` must not be presented as an explicit zero-point size.
+
+The edit is deliberately singular: one selected dimension and one requested
+`Size`. It validates the selector, axis index, unique table/header ownership,
+stored header shape, strict/Buffa agreement, finite value, transaction limits,
+wire rewrite, exact reopen, and locality before publication. The existing
+strict/raw and private Buffa header-storage codec remains the read oracle; a
+new generated-Prost-only compatibility decoder is not part of the public cut.
+
+Despite the word “dimension,” this API controls display size only. It does not
+change row count, column count, cell addressability, table area, or structure.
+`resize_table`, axis insertion/deletion, automatic fit, equal distribution,
+style-default authoring, and bulk multi-axis sizing are outside this cut.
+
+The API is frozen by 13/13 focused dimension tests and 11/11 strict/Buffa codec
+tests. The complete protos suite passes 194/194 plus doctests; Numbers passes
+241 library tests with four ignored, 91 integration tests, and five doctests
+with one ignored. Archive passes 130/130 plus doctests. Focused Numbers/archive
+all-target check and strict all-target Clippy, formatting, and diff checks
+pass. Boundary units pass 243/243 and both live retirement/API audits report
+zero findings. Host all-target/all-feature check and no-run, retained-axis 2/2,
+Pages-layout 1/1, generated-roundtrip 1/1, scoped boundary 6/6, and strict
+library Clippy pass; broad host all-target Clippy retains nine unrelated lints.

@@ -422,7 +422,7 @@ fn central_record_preserved(source: &[u8], candidate: &[u8]) -> bool {
         && source[OFFSET.end..] == candidate[OFFSET.end..]
 }
 
-fn package_member_preserved(
+pub(in crate::package) fn package_member_preserved(
     source: &litchi_iwa_archive::package::Entry,
     candidate: &litchi_iwa_archive::package::Entry,
 ) -> bool {
@@ -435,7 +435,7 @@ fn package_member_preserved(
         )
 }
 
-fn selected_package_member_preserved(
+pub(in crate::package) fn selected_package_member_preserved(
     source: &litchi_iwa_archive::package::Entry,
     candidate: &litchi_iwa_archive::package::Entry,
 ) -> bool {
@@ -550,7 +550,7 @@ pub(in crate::package) fn physical_source(package: &Package) -> Result<&SourceCa
 pub(in crate::package) fn preflight_transaction_work(
     source: &Package,
     retained_target: Option<&[u8]>,
-) -> Result<(), Error> {
+) -> Result<usize, Error> {
     let maximum =
         usize::try_from(source.state.options.archive().max_total_bytes()).unwrap_or(usize::MAX);
     let source_bytes = source.source_bytes();
@@ -570,5 +570,5 @@ pub(in crate::package) fn preflight_transaction_work(
             )?;
         }
     }
-    Ok(())
+    Ok(observed)
 }

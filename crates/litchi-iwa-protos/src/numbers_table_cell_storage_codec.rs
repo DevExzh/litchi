@@ -134,6 +134,8 @@ pub enum DecodeLimit {
     Work { observed: usize, maximum: usize },
     /// Configured or traversed nesting exceeds its finite ceiling.
     Nesting { observed: u32, maximum: u32 },
+    /// A fallible transaction-staging allocation was refused.
+    Allocation { requested: usize },
 }
 
 /// Strict table-cell storage decode failure.
@@ -147,6 +149,15 @@ impl DecodeError {
     #[must_use]
     pub const fn resource_limit(&self) -> Option<DecodeLimit> {
         self.limit
+    }
+
+    /// Requested element count for a refused staging allocation.
+    #[must_use]
+    pub const fn allocation_requested(&self) -> Option<usize> {
+        match self.limit {
+            Some(DecodeLimit::Allocation { requested }) => Some(requested),
+            _ => None,
+        }
     }
 
     pub(crate) const fn invalid() -> Self {
@@ -221,6 +232,28 @@ pub struct ReferenceRecord<'source> {
     pub(crate) reference: ReferenceSnapshot,
 }
 
+/// One source-ordered, fully validated table header record.
+///
+/// The raw payload remains caller-owned and authoritative. `snapshot` is the
+/// generated-free strict/Buffa parity result for those exact bytes.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct HeaderRecord<'source> {
+    raw: &'source [u8],
+    snapshot: HeaderSnapshot,
+}
+
+impl<'source> HeaderRecord<'source> {
+    #[must_use]
+    pub const fn raw(self) -> &'source [u8] {
+        self.raw
+    }
+
+    #[must_use]
+    pub const fn snapshot(self) -> HeaderSnapshot {
+        self.snapshot
+    }
+}
+
 impl<'source> ReferenceRecord<'source> {
     #[must_use]
     pub const fn raw(self) -> &'source [u8] {
@@ -254,6 +287,14 @@ pub trait StorageVisitor {
     }
     fn visit_header(&mut self, _header: HeaderSnapshot) -> Result<(), DecodeError> {
         Ok(())
+    }
+    /// Visit a validated header together with its exact source payload.
+    ///
+    /// The default forwards to `visit_header`, preserving existing visitor
+    /// implementations. New consumers that need wire-exact mutation should
+    /// override this method.
+    fn visit_header_record(&mut self, record: HeaderRecord<'_>) -> Result<(), DecodeError> {
+        self.visit_header(record.snapshot())
     }
     fn visit_list_entry(
         &mut self,
@@ -669,12 +710,235 @@ macro_rules! impl_redacted_debug {
 impl_redacted_debug!(
     TileReferenceRecord,
     ReferenceRecord,
+    HeaderRecord,
     TableModelSnapshot,
     DataStoreSnapshot,
     TileRowInfoSnapshot,
     TableDataListEntrySnapshot,
     TableDataListSegmentSnapshot,
 );
+
+/// One source-indexed size mutation for a header-storage bucket.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeaderSizeEdit {
+    index: u32,
+    replacement_size_bits: Option<u32>,
+}
+
+impl HeaderSizeEdit {
+    /// Set the exact IEEE-754 bits, inserting a canonical minimal header when
+    /// the source bucket has no record for `index`.
+    #[must_use]
+    pub const fn set(index: u32, replacement_size_bits: u32) -> Self {
+        Self {
+            index,
+            replacement_size_bits: Some(replacement_size_bits),
+        }
+    }
+
+    /// Clear a size override. Exact canonical minimal headers are removed;
+    /// non-minimal records retain all facets/unknowns and are patched to +0.
+    #[must_use]
+    pub const fn remove(index: u32) -> Self {
+        Self {
+            index,
+            replacement_size_bits: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn index(self) -> u32 {
+        self.index
+    }
+
+    #[must_use]
+    pub const fn replacement_size_bits(self) -> Option<u32> {
+        self.replacement_size_bits
+    }
+}
+
+/// Exact preflight and readback accounting for a header-size rewrite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeaderSizeRewriteReport {
+    source: DecodeReport,
+    result: DecodeReport,
+    inserted: usize,
+    removed: usize,
+    updated: usize,
+    header_count: usize,
+    edit_count: usize,
+    output_bytes: usize,
+    rewrite_work_bytes: usize,
+}
+
+impl HeaderSizeRewriteReport {
+    #[must_use]
+    pub const fn source(self) -> DecodeReport {
+        self.source
+    }
+
+    #[must_use]
+    pub const fn result(self) -> DecodeReport {
+        self.result
+    }
+
+    #[must_use]
+    pub const fn inserted(self) -> usize {
+        self.inserted
+    }
+
+    #[must_use]
+    pub const fn removed(self) -> usize {
+        self.removed
+    }
+
+    #[must_use]
+    pub const fn updated(self) -> usize {
+        self.updated
+    }
+
+    #[must_use]
+    pub const fn header_count(self) -> usize {
+        self.header_count
+    }
+
+    #[must_use]
+    pub const fn edit_count(self) -> usize {
+        self.edit_count
+    }
+
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+
+    #[must_use]
+    pub const fn rewrite_work_bytes(self) -> usize {
+        self.rewrite_work_bytes
+    }
+}
+
+/// Conservative result-decode resources known before output allocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DecodeResourceUpperBound {
+    source_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    max_depth: u32,
+    references: usize,
+    reference_bytes: usize,
+    text_bytes: usize,
+}
+
+impl DecodeResourceUpperBound {
+    #[must_use]
+    pub const fn source_bytes(self) -> usize {
+        self.source_bytes
+    }
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+    #[must_use]
+    pub const fn max_depth(self) -> u32 {
+        self.max_depth
+    }
+    #[must_use]
+    pub const fn references(self) -> usize {
+        self.references
+    }
+    #[must_use]
+    pub const fn reference_bytes(self) -> usize {
+        self.reference_bytes
+    }
+    #[must_use]
+    pub const fn text_bytes(self) -> usize {
+        self.text_bytes
+    }
+}
+
+/// All ledger requirements computed before an output buffer is reserved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeaderSizeRewriteRequirements {
+    source: DecodeReport,
+    result_upper_bound: DecodeResourceUpperBound,
+    inserted: usize,
+    removed: usize,
+    updated: usize,
+    header_count: usize,
+    edit_count: usize,
+    output_bytes: usize,
+    rewrite_work_bytes: usize,
+}
+
+impl HeaderSizeRewriteRequirements {
+    #[must_use]
+    pub const fn source(self) -> DecodeReport {
+        self.source
+    }
+    #[must_use]
+    pub const fn result_upper_bound(self) -> DecodeResourceUpperBound {
+        self.result_upper_bound
+    }
+    #[must_use]
+    pub const fn inserted(self) -> usize {
+        self.inserted
+    }
+    #[must_use]
+    pub const fn removed(self) -> usize {
+        self.removed
+    }
+    #[must_use]
+    pub const fn updated(self) -> usize {
+        self.updated
+    }
+    #[must_use]
+    pub const fn header_count(self) -> usize {
+        self.header_count
+    }
+    #[must_use]
+    pub const fn edit_count(self) -> usize {
+        self.edit_count
+    }
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+    #[must_use]
+    pub const fn rewrite_work_bytes(self) -> usize {
+        self.rewrite_work_bytes
+    }
+}
+
+/// Opaque validated rewrite plan borrowing the caller-authoritative source.
+pub struct HeaderSizeRewritePlan<'source> {
+    source: &'source [u8],
+    records: Vec<StagedHeaderRecord>,
+    header_indices: Vec<u32>,
+    edits: Vec<HeaderSizeEdit>,
+    requirements: HeaderSizeRewriteRequirements,
+}
+
+impl fmt::Debug for HeaderSizeRewritePlan<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("HeaderSizeRewritePlan")
+            .field("requirements", &self.requirements)
+            .field("payloads", &"<redacted>")
+            .finish()
+    }
+}
+
+impl HeaderSizeRewritePlan<'_> {
+    #[must_use]
+    pub const fn requirements(&self) -> HeaderSizeRewriteRequirements {
+        self.requirements
+    }
+}
 
 /// Decode one table model without retaining collection-width state.
 pub fn decode_table_model(
@@ -1281,6 +1545,546 @@ pub fn decode_header_storage_bucket_with_visitor(
     Ok((snapshot, budget.report()))
 }
 
+/// Rewrite a batch of header-size records after strict handwritten/Buffa
+/// preflight, preserving every untouched source byte and existing record order.
+pub fn rewrite_header_storage_bucket_sizes(
+    source: &[u8],
+    dimension_limit: u32,
+    edits: &[HeaderSizeEdit],
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, HeaderSizeRewriteReport), DecodeError> {
+    let plan = plan_header_storage_bucket_sizes(source, dimension_limit, edits, options)?;
+    execute_header_storage_bucket_size_plan(plan, options)
+}
+
+/// Validate and budget a rewrite without allocating its output buffer.
+pub fn plan_header_storage_bucket_sizes<'source>(
+    source: &'source [u8],
+    dimension_limit: u32,
+    edits: &[HeaderSizeEdit],
+    options: DecodeOptions,
+) -> Result<HeaderSizeRewritePlan<'source>, DecodeError> {
+    if dimension_limit == 0 {
+        return Err(DecodeError::invalid());
+    }
+
+    let mut records = HeaderRecordStage::new(source);
+    let (_bucket, source_report) =
+        decode_header_storage_bucket_with_visitor(source, options, &mut records)?;
+    let header_indices = records.validate(dimension_limit)?;
+    let mut ordered_edits = fallible_copy(edits)?;
+    ordered_edits.sort_unstable_by_key(|edit| edit.index);
+    validate_sorted_edits(&ordered_edits, dimension_limit)?;
+    let mut output_len = source.len();
+    let mut inserted = 0usize;
+    let mut removed = 0usize;
+    let mut updated = 0usize;
+    let mut removed_payload_bytes = 0usize;
+    let mut inserted_payload_bytes = 0usize;
+    for record in &records.records {
+        let Some(edit) = edit_for(&ordered_edits, record.snapshot.index()) else {
+            continue;
+        };
+        match edit.replacement_size_bits {
+            Some(bits) if bits != record.snapshot.size_bits() => {
+                updated = updated.checked_add(1).ok_or_else(DecodeError::invalid)?;
+            },
+            None if is_canonical_minimal(source, record) => {
+                output_len = output_len
+                    .checked_sub(record.end - record.start)
+                    .ok_or_else(DecodeError::invalid)?;
+                removed = removed.checked_add(1).ok_or_else(DecodeError::invalid)?;
+                removed_payload_bytes = removed_payload_bytes
+                    .checked_add(record.payload_end - record.payload_start)
+                    .ok_or_else(DecodeError::invalid)?;
+            },
+            None if record.snapshot.size_bits() != 0 => {
+                updated = updated.checked_add(1).ok_or_else(DecodeError::invalid)?;
+            },
+            _ => {},
+        }
+    }
+    for edit in &ordered_edits {
+        if let Some(bits) = edit.replacement_size_bits
+            && header_indices.binary_search(&edit.index).is_err()
+        {
+            let (_, payload_len) = canonical_minimal_header(edit.index, bits);
+            output_len = output_len
+                .checked_add(encoded_header_field_length(payload_len)?)
+                .ok_or_else(DecodeError::invalid)?;
+            inserted = inserted.checked_add(1).ok_or_else(DecodeError::invalid)?;
+            inserted_payload_bytes = inserted_payload_bytes
+                .checked_add(payload_len)
+                .ok_or_else(DecodeError::invalid)?;
+        }
+    }
+    if output_len > options.max_message_bytes
+        || output_len
+            > usize::try_from(buffa::MAX_MESSAGE_BYTES).map_err(|_| DecodeError::invalid())?
+    {
+        return Err(DecodeError::limited(DecodeLimit::Bytes {
+            observed: output_len,
+            maximum: options.max_message_bytes,
+        }));
+    }
+    let result_upper_bound = result_decode_upper_bound(
+        source_report,
+        source.len(),
+        output_len,
+        inserted,
+        removed,
+        inserted_payload_bytes,
+        removed_payload_bytes,
+    )?;
+    validate_result_ceiling(result_upper_bound, options)?;
+    let requirements = HeaderSizeRewriteRequirements {
+        source: source_report,
+        result_upper_bound,
+        inserted,
+        removed,
+        updated,
+        header_count: records.records.len(),
+        edit_count: ordered_edits.len(),
+        output_bytes: output_len,
+        rewrite_work_bytes: rewrite_work_upper_bound(
+            source.len(),
+            output_len,
+            records.records.len(),
+            ordered_edits.len(),
+        )?,
+    };
+    Ok(HeaderSizeRewritePlan {
+        source,
+        records: records.records,
+        header_indices,
+        edits: ordered_edits,
+        requirements,
+    })
+}
+
+/// Execute a validated plan after refusing insufficient result ceilings and
+/// before reserving the exact output allocation.
+pub fn execute_header_storage_bucket_size_plan(
+    plan: HeaderSizeRewritePlan<'_>,
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, HeaderSizeRewriteReport), DecodeError> {
+    validate_result_ceiling(plan.requirements.result_upper_bound, options)?;
+    let result = assemble_rewritten_bucket(
+        plan.source,
+        &plan.records,
+        &plan.header_indices,
+        &plan.edits,
+        plan.requirements.output_bytes,
+    )?;
+    let (_bucket, result_report) = decode_header_storage_bucket_with_report(&result, options)?;
+    let requirements = plan.requirements;
+    Ok((
+        result,
+        HeaderSizeRewriteReport {
+            source: requirements.source,
+            result: result_report,
+            inserted: requirements.inserted,
+            removed: requirements.removed,
+            updated: requirements.updated,
+            header_count: requirements.header_count,
+            edit_count: requirements.edit_count,
+            output_bytes: requirements.output_bytes,
+            rewrite_work_bytes: requirements.rewrite_work_bytes,
+        },
+    ))
+}
+
+struct StagedHeaderRecord {
+    start: usize,
+    end: usize,
+    payload_start: usize,
+    payload_end: usize,
+    snapshot: HeaderSnapshot,
+}
+
+struct HeaderRecordStage {
+    source_start: *const u8,
+    source_len: usize,
+    records: Vec<StagedHeaderRecord>,
+}
+
+impl HeaderRecordStage {
+    fn new(source: &[u8]) -> Self {
+        Self {
+            source_start: source.as_ptr(),
+            source_len: source.len(),
+            records: Vec::new(),
+        }
+    }
+}
+
+impl HeaderRecordStage {
+    fn validate(&self, dimension_limit: u32) -> Result<Vec<u32>, DecodeError> {
+        let mut indices = Vec::new();
+        indices.try_reserve_exact(self.records.len()).map_err(|_| {
+            DecodeError::limited(DecodeLimit::Allocation {
+                requested: self.records.len(),
+            })
+        })?;
+        indices.extend(self.records.iter().map(|record| record.snapshot.index()));
+        indices.sort_unstable();
+        if indices
+            .last()
+            .is_some_and(|index| *index >= dimension_limit)
+            || indices.windows(2).any(|pair| pair[0] == pair[1])
+        {
+            return Err(DecodeError::invalid());
+        }
+        Ok(indices)
+    }
+}
+
+impl StorageVisitor for HeaderRecordStage {
+    fn visit_header_record(&mut self, record: HeaderRecord<'_>) -> Result<(), DecodeError> {
+        let payload_start = (record.raw().as_ptr() as usize)
+            .checked_sub(self.source_start as usize)
+            .ok_or_else(DecodeError::invalid)?;
+        let payload_end = payload_start
+            .checked_add(record.raw().len())
+            .filter(|end| *end <= self.source_len)
+            .ok_or_else(DecodeError::invalid)?;
+        let prefix = protobuf_length_delimited_prefix_len(record.raw().len())?;
+        let start = payload_start
+            .checked_sub(prefix)
+            .ok_or_else(DecodeError::invalid)?;
+        self.records
+            .try_reserve(1)
+            .map_err(|_| DecodeError::limited(DecodeLimit::Allocation { requested: 1 }))?;
+        self.records.push(StagedHeaderRecord {
+            start,
+            end: payload_end,
+            payload_start,
+            payload_end,
+            snapshot: record.snapshot(),
+        });
+        Ok(())
+    }
+}
+
+fn canonical_minimal_header(index: u32, size_bits: u32) -> ([u8; 16], usize) {
+    let mut output = [0u8; 16];
+    let mut length = 0usize;
+    length += encode_varint_array(&mut output[length..], 8);
+    length += encode_varint_array(&mut output[length..], u64::from(index));
+    output[length] = 21;
+    length += 1;
+    output[length..length + 4].copy_from_slice(&size_bits.to_le_bytes());
+    length += 4;
+    output[length..length + 4].copy_from_slice(&[24, 0, 32, 0]);
+    length += 4;
+    (output, length)
+}
+
+fn header_size_offset(source: &[u8]) -> Result<usize, DecodeError> {
+    let mut remaining = source;
+    let mut offset = 0usize;
+    let mut found = None;
+    let mut budget = Budget::new(
+        source,
+        DecodeOptions::new(
+            source.len().max(1),
+            usize::MAX,
+            usize::MAX,
+            MAX_RECURSION,
+            usize::MAX,
+            usize::MAX,
+        ),
+    )?;
+    while !remaining.is_empty() {
+        let before = remaining.len();
+        let field = next_field(&mut remaining, &mut budget, 1)?.ok_or_else(DecodeError::invalid)?;
+        let consumed = before
+            .checked_sub(remaining.len())
+            .ok_or_else(DecodeError::invalid)?;
+        if field.number == 2 {
+            let _ = field.fixed32()?;
+            if found.replace(offset + consumed - 4).is_some() {
+                return Err(DecodeError::invalid());
+            }
+        }
+        offset = offset
+            .checked_add(consumed)
+            .ok_or_else(DecodeError::invalid)?;
+    }
+    found.ok_or_else(DecodeError::invalid)
+}
+
+fn encode_key(output: &mut Vec<u8>, field: u32, wire: u8) {
+    encode_varint(output, (u64::from(field) << 3) | u64::from(wire));
+}
+
+fn encode_varint(output: &mut Vec<u8>, mut value: u64) {
+    loop {
+        let mut byte = (value & 0x7f) as u8;
+        value >>= 7;
+        if value != 0 {
+            byte |= 0x80;
+        }
+        output.push(byte);
+        if value == 0 {
+            return;
+        }
+    }
+}
+
+fn encode_varint_array(output: &mut [u8], mut value: u64) -> usize {
+    let mut index = 0usize;
+    loop {
+        let mut byte = (value & 0x7f) as u8;
+        value >>= 7;
+        if value != 0 {
+            byte |= 0x80;
+        }
+        output[index] = byte;
+        index += 1;
+        if value == 0 {
+            return index;
+        }
+    }
+}
+
+fn encoded_header_field_length(payload_length: usize) -> Result<usize, DecodeError> {
+    let length = u64::try_from(payload_length).map_err(|_| DecodeError::invalid())?;
+    1usize
+        .checked_add(encoded_varint_len(length))
+        .and_then(|value| value.checked_add(payload_length))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn protobuf_length_delimited_prefix_len(payload_length: usize) -> Result<usize, DecodeError> {
+    let payload = u64::try_from(payload_length).map_err(|_| DecodeError::invalid())?;
+    1usize
+        .checked_add(encoded_varint_len(payload))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn append_header_field(output: &mut Vec<u8>, payload: &[u8]) -> Result<(), DecodeError> {
+    encode_key(output, 2, 2);
+    encode_varint(
+        output,
+        u64::try_from(payload.len()).map_err(|_| DecodeError::invalid())?,
+    );
+    output.extend_from_slice(payload);
+    Ok(())
+}
+
+fn assemble_rewritten_bucket(
+    source: &[u8],
+    records: &[StagedHeaderRecord],
+    header_indices: &[u32],
+    edits: &[HeaderSizeEdit],
+    output_len: usize,
+) -> Result<Vec<u8>, DecodeError> {
+    let mut output = Vec::new();
+    output.try_reserve_exact(output_len).map_err(|_| {
+        DecodeError::limited(DecodeLimit::Allocation {
+            requested: output_len,
+        })
+    })?;
+    let mut cursor = 0usize;
+    for record in records {
+        output.extend_from_slice(&source[cursor..record.start]);
+        match edit_for(edits, record.snapshot.index()) {
+            None => output.extend_from_slice(&source[record.start..record.end]),
+            Some(edit) => match edit.replacement_size_bits {
+                None if is_canonical_minimal(source, record) => {},
+                replacement => {
+                    let bits = replacement.unwrap_or(0);
+                    if bits == record.snapshot.size_bits() {
+                        output.extend_from_slice(&source[record.start..record.end]);
+                    } else {
+                        let raw = &source[record.payload_start..record.payload_end];
+                        let size_offset = header_size_offset(raw)?;
+                        encode_key(&mut output, 2, 2);
+                        encode_varint(
+                            &mut output,
+                            u64::try_from(raw.len()).map_err(|_| DecodeError::invalid())?,
+                        );
+                        output.extend_from_slice(&raw[..size_offset]);
+                        output.extend_from_slice(&bits.to_le_bytes());
+                        output.extend_from_slice(&raw[size_offset + 4..]);
+                    }
+                },
+            },
+        }
+        cursor = record.end;
+    }
+    output.extend_from_slice(&source[cursor..]);
+    for edit in edits {
+        if let Some(bits) = edit.replacement_size_bits
+            && header_indices.binary_search(&edit.index).is_err()
+        {
+            let (payload, length) = canonical_minimal_header(edit.index, bits);
+            append_header_field(&mut output, &payload[..length])?;
+        }
+    }
+    if output.len() != output_len {
+        return Err(DecodeError::invalid());
+    }
+    Ok(output)
+}
+
+fn edit_for(edits: &[HeaderSizeEdit], index: u32) -> Option<HeaderSizeEdit> {
+    edits
+        .binary_search_by_key(&index, |edit| edit.index)
+        .ok()
+        .map(|position| edits[position])
+}
+
+fn validate_sorted_edits(
+    edits: &[HeaderSizeEdit],
+    dimension_limit: u32,
+) -> Result<(), DecodeError> {
+    if edits
+        .last()
+        .is_some_and(|edit| edit.index >= dimension_limit)
+        || edits.windows(2).any(|pair| pair[0].index == pair[1].index)
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+fn fallible_copy<T: Copy>(source: &[T]) -> Result<Vec<T>, DecodeError> {
+    let mut output = Vec::new();
+    output.try_reserve_exact(source.len()).map_err(|_| {
+        DecodeError::limited(DecodeLimit::Allocation {
+            requested: source.len(),
+        })
+    })?;
+    output.extend_from_slice(source);
+    Ok(output)
+}
+
+fn ceil_log2(value: usize) -> usize {
+    if value <= 1 {
+        0
+    } else {
+        usize::BITS as usize - (value - 1).leading_zeros() as usize
+    }
+}
+
+fn rewrite_work_upper_bound(
+    source_bytes: usize,
+    output_bytes: usize,
+    header_count: usize,
+    edit_count: usize,
+) -> Result<usize, DecodeError> {
+    let header_sort = header_count
+        .checked_mul(ceil_log2(header_count))
+        .and_then(|work| work.checked_mul(2))
+        .ok_or_else(DecodeError::invalid)?;
+    let edit_sort = edit_count
+        .checked_mul(ceil_log2(edit_count))
+        .and_then(|work| work.checked_mul(2))
+        .ok_or_else(DecodeError::invalid)?;
+    let header_searches = header_count
+        .checked_mul(ceil_log2(edit_count).saturating_add(1))
+        .ok_or_else(DecodeError::invalid)?;
+    let edit_searches = edit_count
+        .checked_mul(ceil_log2(header_count).saturating_add(1))
+        .ok_or_else(DecodeError::invalid)?;
+    source_bytes
+        .checked_add(output_bytes)
+        .and_then(|work| work.checked_add(header_count))
+        .and_then(|work| work.checked_add(edit_count))
+        .and_then(|work| work.checked_add(header_sort))
+        .and_then(|work| work.checked_add(edit_sort))
+        .and_then(|work| work.checked_add(header_searches))
+        .and_then(|work| work.checked_add(edit_searches))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn result_decode_upper_bound(
+    source: DecodeReport,
+    source_bytes: usize,
+    output_bytes: usize,
+    inserted: usize,
+    removed: usize,
+    inserted_payload_bytes: usize,
+    removed_payload_bytes: usize,
+) -> Result<DecodeResourceUpperBound, DecodeError> {
+    let fields = source
+        .fields
+        .checked_sub(removed.checked_mul(5).ok_or_else(DecodeError::invalid)?)
+        .and_then(|value| value.checked_add(inserted.checked_mul(5)?))
+        .ok_or_else(DecodeError::invalid)?;
+    let work_bytes = source
+        .work_bytes
+        .checked_sub(
+            source_bytes
+                .checked_mul(2)
+                .ok_or_else(DecodeError::invalid)?,
+        )
+        .and_then(|value| value.checked_sub(removed_payload_bytes.checked_mul(2)?))
+        .and_then(|value| value.checked_add(output_bytes.checked_mul(2)?))
+        .and_then(|value| value.checked_add(inserted_payload_bytes.checked_mul(2)?))
+        .ok_or_else(DecodeError::invalid)?;
+    Ok(DecodeResourceUpperBound {
+        source_bytes: output_bytes,
+        fields,
+        work_bytes,
+        max_depth: source.max_depth.max(if inserted == 0 { 1 } else { 2 }),
+        references: source.references,
+        reference_bytes: source.reference_bytes,
+        text_bytes: source.text_bytes,
+    })
+}
+
+fn validate_result_ceiling(
+    bound: DecodeResourceUpperBound,
+    options: DecodeOptions,
+) -> Result<(), DecodeError> {
+    if bound.source_bytes > options.max_message_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Bytes {
+            observed: bound.source_bytes,
+            maximum: options.max_message_bytes,
+        }));
+    }
+    if bound.fields > options.max_fields {
+        return Err(DecodeError::limited(DecodeLimit::Fields {
+            observed: bound.fields,
+            maximum: options.max_fields,
+        }));
+    }
+    if bound.work_bytes > options.max_work_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Work {
+            observed: bound.work_bytes,
+            maximum: options.max_work_bytes,
+        }));
+    }
+    if bound.max_depth > options.recursion_limit {
+        return Err(DecodeError::limited(DecodeLimit::Nesting {
+            observed: bound.max_depth,
+            maximum: options.recursion_limit,
+        }));
+    }
+    if bound.references > options.max_references {
+        return Err(DecodeError::limited(DecodeLimit::References {
+            observed: bound.references,
+            maximum: options.max_references,
+        }));
+    }
+    if bound.text_bytes > options.max_text_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Text {
+            observed: bound.text_bytes,
+            maximum: options.max_text_bytes,
+        }));
+    }
+    Ok(())
+}
+
+fn is_canonical_minimal(source: &[u8], record: &StagedHeaderRecord) -> bool {
+    let (expected, length) =
+        canonical_minimal_header(record.snapshot.index(), record.snapshot.size_bits());
+    source[record.payload_start..record.payload_end] == expected[..length]
+}
+
 fn decode_header_storage_bucket_in(
     source: &[u8],
     budget: &mut Budget,
@@ -1294,7 +2098,11 @@ fn decode_header_storage_bucket_in(
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
         match field.number {
             1 => set_once(&mut bucket_hash_function, canonical_u32(field.varint()?)?)?,
-            2 => visitor.visit_header(decode_header_in(field.bytes()?, budget, child_depth)?)?,
+            2 => {
+                let raw = field.bytes()?;
+                let snapshot = decode_header_in(raw, budget, child_depth)?;
+                visitor.visit_header_record(HeaderRecord { raw, snapshot })?;
+            },
             _ => {},
         }
     }
@@ -2200,6 +3008,41 @@ mod tests {
         out
     }
 
+    fn header_record(index: u32, size_bits: u32) -> Vec<u8> {
+        let mut header = Vec::new();
+        v(&mut header, 1, u64::from(index));
+        f32_bits(&mut header, 2, size_bits);
+        v(&mut header, 3, 0);
+        v(&mut header, 4, 0);
+        header
+    }
+
+    fn header_bucket(records: &[Vec<u8>]) -> Vec<u8> {
+        let mut bucket = Vec::new();
+        v(&mut bucket, 1, 7);
+        for record in records {
+            b(&mut bucket, 2, record);
+        }
+        bucket
+    }
+
+    #[derive(Default)]
+    struct RawHeaders {
+        records: Vec<(Vec<u8>, HeaderSnapshot)>,
+    }
+
+    impl StorageVisitor for RawHeaders {
+        fn visit_header_record(&mut self, record: HeaderRecord<'_>) -> Result<(), DecodeError> {
+            self.records
+                .push((record.raw().to_vec(), record.snapshot()));
+            Ok(())
+        }
+    }
+
+    fn rewrite_options() -> DecodeOptions {
+        DecodeOptions::new(4096, 4096, 100_000, 64, 128, 1024)
+    }
+
     #[test]
     fn model_store_and_private_lazy_views_have_full_parity() {
         let store = minimal_store();
@@ -2326,6 +3169,181 @@ mod tests {
             ),
             (2, 2, 1, 2, 1, 1)
         );
+    }
+
+    #[test]
+    fn raw_header_records_and_size_rewrite_preserve_unknowns_and_order() {
+        let mut third = header_record(3, 40.0f32.to_bits());
+        v(&mut third, 99, 990);
+        let first = header_record(1, 20.0f32.to_bits());
+        let mut source = header_bucket(&[third.clone(), first.clone()]);
+        v(&mut source, 100, 1);
+
+        let mut raw = RawHeaders::default();
+        decode_header_storage_bucket_with_visitor(&source, rewrite_options(), &mut raw).unwrap();
+        assert_eq!(raw.records[0].0, third);
+        assert_eq!(raw.records[0].1.index(), 3);
+        assert_eq!(raw.records[1].0, first);
+
+        let edits = [
+            HeaderSizeEdit::set(3, 98.0f32.to_bits()),
+            HeaderSizeEdit::set(2, 44.0f32.to_bits()),
+        ];
+        let plan = plan_header_storage_bucket_sizes(&source, 4, &edits, rewrite_options()).unwrap();
+        let requirements = plan.requirements();
+        let (rewritten, report) =
+            execute_header_storage_bucket_size_plan(plan, rewrite_options()).unwrap();
+        assert_eq!(
+            (report.updated(), report.inserted(), report.removed()),
+            (1, 1, 0)
+        );
+        assert_eq!(requirements.output_bytes(), rewritten.len());
+        assert_eq!(
+            requirements.result_upper_bound().fields(),
+            report.result().fields()
+        );
+        assert_eq!(
+            requirements.result_upper_bound().work_bytes(),
+            report.result().work_bytes()
+        );
+        let mut after = RawHeaders::default();
+        decode_header_storage_bucket_with_visitor(&rewritten, rewrite_options(), &mut after)
+            .unwrap();
+        assert_eq!(
+            after
+                .records
+                .iter()
+                .map(|record| record.1.index())
+                .collect::<Vec<_>>(),
+            [3, 1, 2]
+        );
+        assert_eq!(after.records[0].1.size_bits(), 98.0f32.to_bits());
+        assert!(after.records[0].0.ends_with(&third[third.len() - 3..]));
+        assert_eq!(after.records[1].0, first);
+        assert!(
+            rewritten
+                .windows(3)
+                .any(|window| window == [0xa0, 0x06, 0x01])
+        );
+    }
+
+    #[test]
+    fn clear_removes_only_canonical_minimal_and_otherwise_patches_positive_zero() {
+        let canonical = header_record(0, 25.0f32.to_bits());
+        let mut unknown = header_record(1, 30.0f32.to_bits());
+        b(&mut unknown, 5, &reference(9));
+        v(&mut unknown, 99, 7);
+        let source = header_bucket(&[canonical, unknown.clone()]);
+        let edits = [HeaderSizeEdit::remove(0), HeaderSizeEdit::remove(1)];
+        let (rewritten, report) =
+            rewrite_header_storage_bucket_sizes(&source, 2, &edits, rewrite_options()).unwrap();
+        assert_eq!(
+            (report.updated(), report.inserted(), report.removed()),
+            (1, 0, 1)
+        );
+        let mut after = RawHeaders::default();
+        decode_header_storage_bucket_with_visitor(&rewritten, rewrite_options(), &mut after)
+            .unwrap();
+        assert_eq!(after.records.len(), 1);
+        assert_eq!(after.records[0].1.index(), 1);
+        assert_eq!(after.records[0].1.size_bits(), 0.0f32.to_bits());
+        assert_eq!(after.records[0].1.cell_style().unwrap().identifier(), 9);
+        assert!(after.records[0].0.ends_with(&unknown[unknown.len() - 2..]));
+    }
+
+    #[test]
+    fn size_rewrite_rejects_duplicate_and_out_of_range_source_or_edits() {
+        let record = header_record(1, 10.0f32.to_bits());
+        let duplicate = header_bucket(&[record.clone(), record]);
+        assert!(
+            rewrite_header_storage_bucket_sizes(
+                &duplicate,
+                2,
+                &[HeaderSizeEdit::set(1, 20.0f32.to_bits())],
+                rewrite_options(),
+            )
+            .is_err()
+        );
+
+        let out_of_range = header_bucket(&[header_record(2, 10.0f32.to_bits())]);
+        assert!(
+            rewrite_header_storage_bucket_sizes(&out_of_range, 2, &[], rewrite_options(),).is_err()
+        );
+
+        let source = header_bucket(&[header_record(0, 10.0f32.to_bits())]);
+        assert!(
+            rewrite_header_storage_bucket_sizes(
+                &source,
+                2,
+                &[HeaderSizeEdit::set(1, 1), HeaderSizeEdit::remove(1)],
+                rewrite_options(),
+            )
+            .is_err()
+        );
+        assert!(
+            rewrite_header_storage_bucket_sizes(
+                &source,
+                2,
+                &[HeaderSizeEdit::set(2, 1)],
+                rewrite_options(),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn size_rewrite_scales_linearly_and_refuses_output_max_minus_one() {
+        let make_bucket = |count: u32| {
+            let mut bucket = Vec::new();
+            v(&mut bucket, 1, 7);
+            for index in 0..count {
+                b(&mut bucket, 2, &header_record(index, 10.0f32.to_bits()));
+            }
+            bucket
+        };
+        let small = make_bucket(4096);
+        let large = make_bucket(8192);
+        let scalable = |source: &[u8]| {
+            DecodeOptions::new(
+                source.len().saturating_add(64),
+                usize::MAX,
+                usize::MAX,
+                64,
+                0,
+                0,
+            )
+        };
+        let (_, small_report) =
+            rewrite_header_storage_bucket_sizes(&small, 4096, &[], scalable(&small)).unwrap();
+        let (_, large_report) =
+            rewrite_header_storage_bucket_sizes(&large, 8192, &[], scalable(&large)).unwrap();
+        assert!(
+            large_report.rewrite_work_bytes()
+                <= small_report.rewrite_work_bytes().saturating_mul(23) / 10 + 64
+        );
+
+        let source = header_bucket(&[]);
+        let generous = DecodeOptions::new(128, 128, 4096, 64, 0, 0);
+        let plan = plan_header_storage_bucket_sizes(
+            &source,
+            1,
+            &[HeaderSizeEdit::set(0, 10.0f32.to_bits())],
+            generous,
+        )
+        .unwrap();
+        let requirements = plan.requirements();
+        let exact = requirements.output_bytes();
+        assert_eq!(requirements.result_upper_bound().source_bytes(), exact);
+        let error = execute_header_storage_bucket_size_plan(
+            plan,
+            DecodeOptions::new(exact - 1, 128, 4096, 64, 0, 0),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Bytes { observed, maximum })
+                if observed == exact && maximum == exact - 1
+        ));
     }
 
     #[test]

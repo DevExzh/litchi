@@ -60,7 +60,7 @@ impl Package {
     /// retained directional source and read profile, or when directional
     /// locality verification rejects the retained target snapshot.
     pub fn apply_table_cells(&self, patch: &Patch) -> Result<Commit, Error> {
-        let source = Arc::clone(&self.state.source);
+        let source = self.state.source.clone();
         if !patch.authorizes_source(&source) {
             return Err(Error::PatchConflict);
         }
@@ -208,8 +208,8 @@ fn commit_plan(plan: Plan<'_>) -> Result<Commit, Error> {
         }
     }
     if changed_count == 0 {
-        let source_bytes = Arc::clone(&source.state.source);
-        let patch = Patch::from_exact(path, requested, 0, Arc::clone(&source_bytes), source_bytes);
+        let source_bytes = source.state.source.clone();
+        let patch = Patch::from_exact(path, requested, 0, source_bytes.clone(), source_bytes);
         return Ok(Commit::new(
             source.snapshot(),
             patch,
@@ -1139,8 +1139,8 @@ fn commit_existing_scalar_tiles(
         }
     }
 
-    let source_bytes = Arc::clone(&source.state.source);
-    let target_bytes = Arc::clone(&outcome.package.state.source);
+    let source_bytes = source.state.source.clone();
+    let target_bytes = outcome.package.state.source.clone();
     let patch = Patch::from_exact_with_evidence(
         path,
         requested,

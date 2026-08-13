@@ -72,8 +72,8 @@ impl Package {
     /// target artifact and verifies its semantic state and physical locality.
     pub fn apply_table_headers(&self, patch: &Patch) -> Result<Commit, Error> {
         let source_catalog = physical_source(self)?;
-        let source = source_catalog.shared_source();
-        if !patch.artifacts.authorizes_source(&source) {
+        let source = source_catalog.__source_owner();
+        if !patch.artifacts.authorizes_owner(&source) {
             return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
@@ -92,9 +92,9 @@ impl Package {
         if !source_catalog.source_is_exact() {
             return Err(Error::PatchConflict);
         }
-        let target_bytes = patch.artifacts.target();
-        preflight_transaction_work(self, Some(&target_bytes))?;
-        let candidate = Package::from_shared_bytes_with_options(target_bytes, self.state.options)
+        let target_bytes = patch.artifacts.target_owner();
+        preflight_transaction_work(self, Some(target_bytes.as_ref()))?;
+        let candidate = Package::from_source_owner_with_options(target_bytes, self.state.options)
             .map_err(map_candidate_read_error)?;
         if settings_at_target(&candidate, patch.target)? != patch.after {
             return Err(Error::Verification);

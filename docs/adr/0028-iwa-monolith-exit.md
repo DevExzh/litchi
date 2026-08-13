@@ -2841,3 +2841,56 @@ The monolith exit remains incomplete. `NumbersEditor`,
 editing, examples, and broad compatibility tests still live in `litchi-iwa`.
 They continue to use `litchi-numbers`, so ordered debt 015 and the manifest
 edge remain unchanged.
+
+## 2026-08-13 amendment: Numbers dimension-size host exit
+
+The Numbers-specific row-height/column-width facade leaves the monolith.
+Focused `Package` owns selector-first read, edit,
+source-bound patch apply, inverse, diagnostics, limits, strict reopen, and one
+header-bucket locality. `Size::Default` retains the native absence/zero
+override meaning; explicit positive finite `Points` remains a distinct state.
+Raw IDs, archive names, generated messages, and physical bucket references do
+not cross the focused public boundary.
+
+The retirement changes five paths with four list-format insertions and 312
+deletions, net -308. It removes the six public `NumbersEditor` size methods (65
+source lines, 63 method-body lines), 200 test-section lines (about 197
+test-body lines), the 41-line `edit_numbers_table_dimension` example, and the
+host `Dimension`/`Points`/`Size` re-export names. Boundary ratchets keep those
+names and facades retired without rejecting direct focused-package use.
+
+This advances the Numbers portion of deletion gate 3 but does not complete it.
+Pages and Keynote still depend on a private host `IWorkPackage` header-bucket
+helper for their embedded tables, and the host still owns the shared table-
+resize/axis-topology machinery. That helper remains explicit ordered debt; it
+must not be recast as a public Numbers compatibility layer. Debt 015 and the
+manifest edge therefore remain open.
+
+The isolated native candidate opened in Numbers 14.4 build 7043.0.93 without
+repair, recovery, or conversion UI. Row 5 remained 32 pt, column C 124 pt, and
+preserved column F 98 pt before save and after save/close/reopen; the one-sheet,
+one-table 22-by-7 topology, headers 1/1/0, `B2` marker, and `B3 = 42` remained.
+The saved 136,615-byte 43-entry ZIP has SHA-256
+`1ae4986ce53fab82afb4f7f4d8df50dbf04170fa81679e8ae259fd6e04ab4115`.
+The tracked 136,357-byte source was never opened and remains SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`.
+The separate isolated clear candidate opened without repair or conversion and
+showed row 5 at its effective 20 pt `Default`, column C at its effective 98 pt
+`Default`, and preserved explicit column F at 98 pt. Save/close/reopen retained
+those values, `B2`/`B3`, the 22-by-7 topology, and headers 1/1/0. Its post-save
+valid 43-entry ZIP is 136,938 bytes, inode 43005403, with SHA-256
+`4db6e27e3893ca1892dd61dc221640d06c912db8f4f1d4aa51498607c5ca1325`.
+The combined explicit and clear runs establish semantic native acceptance, not
+byte-inertness or exact-artifact preservation: the explicit candidate changed
+by 258 bytes, and earlier read-only evidence also showed silent normalization.
+No general resize capability follows.
+
+Focused dimension tests pass 13/13; codec tests pass 11/11; complete protos
+passes 194/194 plus doctests. Numbers passes 241 library tests with four
+ignored, 91 integration tests, and five doctests with one ignored. Archive
+passes 130/130 plus doctests. Focused all-target check and strict all-target
+Clippy pass. Boundary units pass 243/243 with zero retirement/API findings.
+Host all-target/all-feature check/no-run, retained-axis 2/2, Pages-layout 1/1,
+generated-roundtrip 1/1, scoped boundary 6/6, strict library Clippy,
+formatting, and diff gates pass. Broad host all-target Clippy retains nine
+unrelated existing lints.

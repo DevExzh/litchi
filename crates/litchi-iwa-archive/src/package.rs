@@ -25,6 +25,115 @@ use crate::{Error, Limits, Result};
 pub use crate::package_state::{GetOrInsertError, PackageState, ParseError};
 use soapberry_zip::office::StreamingArchiveWriter;
 
+/// An immutable, clone-cheap owner for exact package bytes.
+///
+/// This owner accepts both the historical shared-slice representation and an
+/// owned [`Vec`] representation. Converting a `Vec` retains its existing
+/// payload allocation: only the small [`Arc`] control allocation is new.
+/// Package facades can therefore publish a bounded reassembly buffer without
+/// copying the complete package into a second allocation.
+#[doc(hidden)]
+#[derive(Clone)]
+pub struct SharedBytes {
+    storage: SharedBytesStorage,
+}
+
+#[derive(Clone)]
+enum SharedBytesStorage {
+    Slice(Arc<[u8]>),
+    Vec(Arc<Vec<u8>>),
+}
+
+impl SharedBytes {
+    /// Retain an existing immutable shared slice without copying it.
+    #[must_use]
+    pub const fn from_shared_slice(source: Arc<[u8]>) -> Self {
+        Self {
+            storage: SharedBytesStorage::Slice(source),
+        }
+    }
+
+    /// Retain an owned byte vector without copying its payload allocation.
+    #[must_use]
+    pub(crate) fn from_owned_vec(source: Vec<u8>) -> Self {
+        Self {
+            storage: SharedBytesStorage::Vec(Arc::new(source)),
+        }
+    }
+
+    /// Borrow the exact immutable bytes.
+    #[must_use]
+    pub fn as_slice(&self) -> &[u8] {
+        match &self.storage {
+            SharedBytesStorage::Slice(source) => source,
+            SharedBytesStorage::Vec(source) => source,
+        }
+    }
+
+    /// Return whether two handles retain the same underlying allocation.
+    #[must_use]
+    pub fn ptr_eq(left: &Self, right: &Self) -> bool {
+        match (&left.storage, &right.storage) {
+            (SharedBytesStorage::Slice(left), SharedBytesStorage::Slice(right)) => {
+                Arc::ptr_eq(left, right)
+            },
+            (SharedBytesStorage::Vec(left), SharedBytesStorage::Vec(right)) => {
+                Arc::ptr_eq(left, right)
+            },
+            (SharedBytesStorage::Slice(_), SharedBytesStorage::Vec(_))
+            | (SharedBytesStorage::Vec(_), SharedBytesStorage::Slice(_)) => false,
+        }
+    }
+
+    /// Clone the historical shared-slice handle when this owner has one.
+    ///
+    /// Owned-vector backing deliberately returns `None`; materializing an
+    /// `Arc<[u8]>` would require another package-sized allocation and copy.
+    #[must_use]
+    pub(crate) fn shared_slice(&self) -> Option<Arc<[u8]>> {
+        match &self.storage {
+            SharedBytesStorage::Slice(source) => Some(Arc::clone(source)),
+            SharedBytesStorage::Vec(_) => None,
+        }
+    }
+}
+
+impl AsRef<[u8]> for SharedBytes {
+    fn as_ref(&self) -> &[u8] {
+        self.as_slice()
+    }
+}
+
+impl std::ops::Deref for SharedBytes {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl fmt::Debug for SharedBytes {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let backing = match self.storage {
+            SharedBytesStorage::Slice(_) => "shared-slice",
+            SharedBytesStorage::Vec(_) => "owned-vector",
+        };
+        formatter
+            .debug_struct("SharedBytes")
+            .field("len", &self.len())
+            .field("backing", &backing)
+            .finish()
+    }
+}
+
+impl PartialEq for SharedBytes {
+    fn eq(&self, other: &Self) -> bool {
+        Self::ptr_eq(self, other) || self.as_slice() == other.as_slice()
+    }
+}
+
+impl Eq for SharedBytes {}
+
 #[derive(Debug)]
 struct PreparedEdit {
     compressed: Vec<u8>,
@@ -94,14 +203,14 @@ impl Write for BoundedBuffer {
 /// in a different part of the archive. Neither view is normalized.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawEntryRecord {
-    source: Arc<[u8]>,
+    source: SharedBytes,
     local_record: Range<usize>,
     compressed_data: Range<usize>,
     central_directory_record: Range<usize>,
 }
 
 impl RawEntryRecord {
-    fn new(source: Arc<[u8]>, entry: &PhysicalEntry) -> Self {
+    fn new(source: SharedBytes, entry: &PhysicalEntry) -> Self {
         Self {
             source,
             local_record: entry.local_record(),
@@ -302,19 +411,7 @@ impl<'a> EntryEdit<'a> {
     }
 }
 
-/// A process-local pair of exact immutable package artifacts.
-///
-/// Focused semantic patches can retain this pair instead of independently
-/// reimplementing source-byte authorization and source/target ownership. The
-/// complete source and target allocations are retained behind private,
-/// immutable handles for the lifetime of the pair. Cloning and inversion are
-/// `O(1)` [`Arc`] operations; constructing the pair reads each distinct
-/// artifact allocation once to cache compact diagnostic fingerprints.
-///
-/// Fingerprints are diagnostics only. They never authorize patch application:
-/// [`Self::authorizes_source`] requires either allocation identity or one exact
-/// byte comparison. This type is process-local in-memory state, not a compact
-/// or durable patch serialization format.
+/// A process-local pair of exact immutable shared-slice artifacts.
 #[derive(Clone, PartialEq, Eq)]
 pub struct ExactArtifacts {
     source: Arc<[u8]>,
@@ -335,15 +432,7 @@ impl fmt::Debug for ExactArtifacts {
 
 impl ExactArtifacts {
     /// Retain one exact source/target artifact pair.
-    ///
-    /// The supplied allocations are owned immutably and are never exposed as
-    /// mutable or borrowed raw slices. Callers remain responsible for
-    /// constructing the target through their bounded, semantically verified
-    /// focused transaction.
-    ///
-    /// # Costs
-    ///
-    /// Reads each distinct complete artifact once to cache diagnostics.
+    /// Return the source artifact's compact diagnostic fingerprint.
     #[must_use]
     pub fn new(source: Arc<[u8]>, target: Arc<[u8]>) -> Self {
         let source_fingerprint = diagnostic_fingerprint(&source);
@@ -360,10 +449,118 @@ impl ExactArtifacts {
         }
     }
 
+    /// Return the target artifact's compact diagnostic fingerprint.
+    #[must_use]
+    pub const fn source_fingerprint(&self) -> u64 {
+        self.source_fingerprint
+    }
+
+    /// Return whether `candidate` exactly matches the retained source.
+    #[must_use]
+    pub const fn target_fingerprint(&self) -> u64 {
+        self.target_fingerprint
+    }
+
+    /// Return whether source and target are byte-for-byte identical.
+    #[must_use]
+    pub fn authorizes_source(&self, candidate: &Arc<[u8]>) -> bool {
+        Arc::ptr_eq(candidate, &self.source) || candidate.as_ref() == self.source.as_ref()
+    }
+
+    /// Return the exact target-to-source inverse pair.
+    #[must_use]
+    pub fn is_byte_noop(&self) -> bool {
+        Arc::ptr_eq(&self.source, &self.target) || self.source.as_ref() == self.target.as_ref()
+    }
+
+    /// Clone the retained source allocation without copying bytes.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            source: Arc::clone(&self.target),
+            target: Arc::clone(&self.source),
+            source_fingerprint: self.target_fingerprint,
+            target_fingerprint: self.source_fingerprint,
+        }
+    }
+
+    /// Clone the retained target allocation without copying bytes.
+    #[must_use]
+    pub fn source(&self) -> Arc<[u8]> {
+        Arc::clone(&self.source)
+    }
+
+    #[must_use]
+    pub fn target(&self) -> Arc<[u8]> {
+        Arc::clone(&self.target)
+    }
+}
+
+/// A process-local pair of exact immutable package byte owners.
+///
+/// Focused semantic patches can retain this pair instead of independently
+/// reimplementing source-byte authorization and source/target ownership. The
+/// complete source and target allocations are retained behind private,
+/// immutable handles for the lifetime of the pair. Cloning and inversion are
+/// `O(1)` [`Arc`] operations; constructing the pair reads each distinct
+/// artifact allocation once to cache compact diagnostic fingerprints.
+///
+/// Fingerprints are diagnostics only. They never authorize patch application:
+/// [`Self::authorizes_owner`] requires either allocation identity or one exact
+/// byte comparison. This type is process-local in-memory state, not a compact
+/// or durable patch serialization format.
+#[derive(Clone, PartialEq, Eq)]
+#[doc(hidden)]
+pub struct OwnedExactArtifacts {
+    source: SharedBytes,
+    target: SharedBytes,
+    source_fingerprint: u64,
+    target_fingerprint: u64,
+}
+
+impl fmt::Debug for OwnedExactArtifacts {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("OwnedExactArtifacts")
+            .field("source_fingerprint", &self.source_fingerprint)
+            .field("target_fingerprint", &self.target_fingerprint)
+            .finish_non_exhaustive()
+    }
+}
+
+impl OwnedExactArtifacts {
+    /// Retain one exact source/target artifact pair.
+    ///
+    /// The supplied allocations are owned immutably and are never exposed as
+    /// mutable or borrowed raw slices. Callers remain responsible for
+    /// constructing the target through their bounded, semantically verified
+    /// focused transaction.
+    ///
+    /// # Costs
+    ///
+    /// Reads each distinct complete artifact once to cache diagnostics.
+    /// Retain one exact source/target owner pair without copying payloads.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn new(source: SharedBytes, target: SharedBytes) -> Self {
+        let source_fingerprint = diagnostic_fingerprint(&source);
+        let target_fingerprint = if SharedBytes::ptr_eq(&source, &target) {
+            source_fingerprint
+        } else {
+            diagnostic_fingerprint(&target)
+        };
+        Self {
+            source,
+            target,
+            source_fingerprint,
+            target_fingerprint,
+        }
+    }
+
     /// Return the source artifact's compact diagnostic fingerprint.
     ///
     /// This value is not collision-resistant and never authorizes source
-    /// identity. Use [`Self::authorizes_source`] for exact authorization.
+    /// identity. Use [`Self::authorizes_owner`] for exact authorization.
     #[must_use]
     pub const fn source_fingerprint(&self) -> u64 {
         self.source_fingerprint
@@ -378,13 +575,14 @@ impl ExactArtifacts {
     }
 
     /// Return whether `candidate` is the exact retained source artifact.
+    #[doc(hidden)]
     ///
     /// Allocation identity is an `O(1)` fast path. A different allocation is
     /// authorized only by one complete byte equality comparison. Cached
     /// fingerprints do not participate in this decision.
     #[must_use]
-    pub fn authorizes_source(&self, candidate: &Arc<[u8]>) -> bool {
-        Arc::ptr_eq(candidate, &self.source) || candidate.as_ref() == self.source.as_ref()
+    pub fn authorizes_owner(&self, candidate: &SharedBytes) -> bool {
+        SharedBytes::ptr_eq(candidate, &self.source) || candidate.as_ref() == self.source.as_ref()
     }
 
     /// Return whether source and target are byte-for-byte identical.
@@ -393,7 +591,8 @@ impl ExactArtifacts {
     /// artifacts for exact equality. Fingerprint equality is insufficient.
     #[must_use]
     pub fn is_byte_noop(&self) -> bool {
-        Arc::ptr_eq(&self.source, &self.target) || self.source.as_ref() == self.target.as_ref()
+        SharedBytes::ptr_eq(&self.source, &self.target)
+            || self.source.as_ref() == self.target.as_ref()
     }
 
     /// Return the exact target-to-source inverse pair.
@@ -402,31 +601,25 @@ impl ExactArtifacts {
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
-            source: Arc::clone(&self.target),
-            target: Arc::clone(&self.source),
+            source: self.target.clone(),
+            target: self.source.clone(),
             source_fingerprint: self.target_fingerprint,
             target_fingerprint: self.source_fingerprint,
         }
     }
 
-    /// Clone the retained exact source allocation for an internal consumer.
-    ///
-    /// This is an `O(1)` shared-handle operation. The returned slice remains
-    /// immutable.
+    /// Clone the retained exact source owner without copying bytes.
+    #[doc(hidden)]
     #[must_use]
-    pub fn source(&self) -> Arc<[u8]> {
-        Arc::clone(&self.source)
+    pub fn source_owner(&self) -> SharedBytes {
+        self.source.clone()
     }
 
-    /// Clone the retained exact target allocation for an internal consumer.
-    ///
-    /// This is an `O(1)` shared-handle operation. The returned slice remains
-    /// immutable; focused consumers must still reopen and semantically verify
-    /// a changed target before publication. Cloning the privately retained
-    /// target does not rehash its bytes.
+    /// Clone the retained exact target owner without copying bytes.
+    #[doc(hidden)]
     #[must_use]
-    pub fn target(&self) -> Arc<[u8]> {
-        Arc::clone(&self.target)
+    pub fn target_owner(&self) -> SharedBytes {
+        self.target.clone()
     }
 }
 
@@ -591,7 +784,7 @@ impl LogicalEntryLimits {
 #[derive(Debug)]
 pub struct Catalog {
     entries: Vec<Entry>,
-    source: Arc<[u8]>,
+    source: SharedBytes,
     source_is_exact: bool,
     semantic_profile: Option<LogicalEntryLimitProfile>,
     legacy_outer_prefix: Option<Box<[u8]>>,
@@ -795,7 +988,11 @@ impl Catalog {
             })?;
         source_bytes.extend_from_slice(bytes);
         let shared_source: Arc<[u8]> = source_bytes.into();
-        Self::from_source_with_checked_limits(shared_source, checked_limits, logical_entry_limits)
+        Self::from_source_with_checked_limits(
+            SharedBytes::from_shared_slice(shared_source),
+            checked_limits,
+            logical_entry_limits,
+        )
     }
 
     /// Parse a package from an immutable positional source under the default
@@ -832,6 +1029,37 @@ impl Catalog {
         Self::from_shared_bytes_with_optional_logical_entry_limits(source, limits, None)
     }
 
+    /// Parse an owned package vector without copying its payload allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the ZIP envelope or a configured physical limit
+    /// is invalid.
+    #[cfg(any(test, feature = "internal-iwork-source"))]
+    pub(crate) fn from_owned_bytes_with_limits(source: Vec<u8>, limits: Limits) -> Result<Self> {
+        let checked_limits = limits.validate()?;
+        Self::from_source_with_checked_limits(
+            SharedBytes::from_owned_vec(source),
+            checked_limits,
+            None,
+        )
+    }
+
+    /// Parse an immutable source owner without copying package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the ZIP envelope or a configured physical limit
+    /// is invalid.
+    #[cfg(feature = "internal-iwork-source")]
+    pub(crate) fn from_source_owner_with_limits(
+        source: SharedBytes,
+        limits: Limits,
+    ) -> Result<Self> {
+        let checked_limits = limits.validate()?;
+        Self::from_source_with_checked_limits(source, checked_limits, None)
+    }
+
     /// Parse shared package bytes while applying a fixed logical-member
     /// profile before any ZIP payload is decoded.
     ///
@@ -859,7 +1087,11 @@ impl Catalog {
         logical_entry_limits: Option<LogicalEntryLimits>,
     ) -> Result<Self> {
         let checked_limits = limits.validate()?;
-        Self::from_source_with_checked_limits(source, checked_limits, logical_entry_limits)
+        Self::from_source_with_checked_limits(
+            SharedBytes::from_shared_slice(source),
+            checked_limits,
+            logical_entry_limits,
+        )
     }
 
     /// Parse a package from an immutable positional source under caller-
@@ -876,11 +1108,15 @@ impl Catalog {
     pub fn from_read_at_with_limits(source: &dyn ReadAt, limits: Limits) -> Result<Self> {
         let checked_limits = limits.validate()?;
         let source_bytes = read_source(source, checked_limits)?;
-        Self::from_source_with_checked_limits(source_bytes, checked_limits, None)
+        Self::from_source_with_checked_limits(
+            SharedBytes::from_shared_slice(source_bytes),
+            checked_limits,
+            None,
+        )
     }
 
     fn from_source_with_checked_limits(
-        source: Arc<[u8]>,
+        source: SharedBytes,
         checked_limits: Limits,
         logical_entry_limits: Option<LogicalEntryLimits>,
     ) -> Result<Self> {
@@ -976,7 +1212,16 @@ impl Catalog {
     /// semantic entry index.
     #[must_use]
     pub fn shared_source(&self) -> Arc<[u8]> {
-        Arc::clone(&self.source)
+        self.source
+            .shared_slice()
+            .unwrap_or_else(|| Arc::<[u8]>::from(self.source.as_slice()))
+    }
+
+    /// Clone the exact immutable source owner without copying package bytes.
+    #[must_use]
+    #[cfg(any(test, feature = "internal-iwork-source"))]
+    pub(crate) fn source_owner(&self) -> SharedBytes {
+        self.source.clone()
     }
 
     /// Borrow the authoritative immutable source bytes.
@@ -986,7 +1231,7 @@ impl Catalog {
     /// document state.
     #[must_use]
     pub fn source_bytes(&self) -> &[u8] {
-        &self.source
+        self.source.as_slice()
     }
 
     /// Return whether the catalog's logical entries still describe the
@@ -2430,7 +2675,7 @@ fn preflight_logical_entry(
     Ok(())
 }
 
-fn collect_flat(archive: &ZipArchive<'_>, source: &Arc<[u8]>) -> Result<Vec<Entry>> {
+fn collect_flat(archive: &ZipArchive<'_>, source: &SharedBytes) -> Result<Vec<Entry>> {
     let mut entries = Vec::new();
     let mut seen = HashSet::new();
     for entry in archive
@@ -2451,7 +2696,7 @@ fn collect_flat(archive: &ZipArchive<'_>, source: &Arc<[u8]>) -> Result<Vec<Entr
 
 fn collect_semantic_flat(
     archive: &ZipArchive<'_>,
-    source: &Arc<[u8]>,
+    source: &SharedBytes,
     include_metadata: bool,
 ) -> Result<Vec<Entry>> {
     preflight_semantic_iwa_entries(archive, false)?;
@@ -2490,7 +2735,7 @@ fn collect_legacy(
     archive: &ZipArchive<'_>,
     index_name: &str,
     limits: Limits,
-    source: &Arc<[u8]>,
+    source: &SharedBytes,
 ) -> Result<Vec<Entry>> {
     let prefix = index_name.strip_suffix("Index.zip").ok_or_else(|| {
         Error::InvalidBundle(format!("invalid legacy package index name: {index_name}"))
@@ -2512,7 +2757,7 @@ fn collect_legacy(
         ))
     })?;
     limits.check_input_size(index_size, "legacy iWork Index.zip")?;
-    let index_source: Arc<[u8]> = index_data.into();
+    let index_source = SharedBytes::from_owned_vec(index_data);
     let index = ZipArchive::new_with_limits(index_source.as_ref(), limits).map_err(|error| {
         if matches!(&error, Error::Limit { .. }) {
             error
@@ -2572,7 +2817,7 @@ fn collect_semantic_legacy(
     archive: &ZipArchive<'_>,
     index_name: &str,
     limits: Limits,
-    source: &Arc<[u8]>,
+    source: &SharedBytes,
     raw_prefix: &[u8],
     include_metadata: bool,
 ) -> Result<Vec<Entry>> {
@@ -2594,7 +2839,7 @@ fn collect_semantic_legacy(
         ))
     })?;
     limits.check_input_size(index_size, "legacy iWork Index.zip")?;
-    let index_source: Arc<[u8]> = index_data.into();
+    let index_source = SharedBytes::from_owned_vec(index_data);
     let index = ZipArchive::new_with_limits(index_source.as_ref(), limits).map_err(|error| {
         if matches!(&error, Error::Limit { .. }) {
             error
@@ -2673,7 +2918,7 @@ fn is_semantic_irrelevant_payload(raw_name: &[u8]) -> bool {
 
 fn push_entry(
     archive: &ZipArchive<'_>,
-    source: Arc<[u8]>,
+    source: SharedBytes,
     physical: &PhysicalEntry,
     normalized_name: &str,
     entries: &mut Vec<Entry>,
@@ -3101,6 +3346,24 @@ mod tests {
         assert!(Arc::ptr_eq(&inverse.target(), &source));
         assert_eq!(inverse.source_fingerprint(), artifacts.target_fingerprint());
         assert_eq!(inverse.target_fingerprint(), artifacts.source_fingerprint());
+    }
+
+    #[test]
+    fn exact_artifacts_retain_owned_vector_buffers_through_inverse() {
+        let source = b"owned source bytes".to_vec();
+        let target = b"owned target bytes".to_vec();
+        let source_pointer = source.as_ptr();
+        let target_pointer = target.as_ptr();
+        let source = SharedBytes::from_owned_vec(source);
+        let target = SharedBytes::from_owned_vec(target);
+        let artifacts = OwnedExactArtifacts::new(source.clone(), target.clone());
+
+        assert!(artifacts.authorizes_owner(&source));
+        assert_eq!(artifacts.source_owner().as_ref().as_ptr(), source_pointer);
+        assert_eq!(artifacts.target_owner().as_ref().as_ptr(), target_pointer);
+        let inverse = artifacts.inverse();
+        assert_eq!(inverse.source_owner().as_ref().as_ptr(), target_pointer);
+        assert_eq!(inverse.target_owner().as_ref().as_ptr(), source_pointer);
     }
 
     #[test]
@@ -3662,7 +3925,29 @@ mod tests {
         let source: Arc<[u8]> = bytes.into();
         let catalog = Catalog::from_shared_bytes(source.clone())?;
 
-        assert!(Arc::ptr_eq(&source, &catalog.source));
+        assert!(Arc::ptr_eq(
+            &source,
+            &catalog
+                .source
+                .shared_slice()
+                .expect("shared ingress keeps its Arc<[u8]> owner")
+        ));
+        assert_eq!(catalog.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn accepts_owned_source_without_copying_payload_buffer() -> Result<()> {
+        let (bytes, _central_offset, _central_end) = physical_zip(0);
+        let original_pointer = bytes.as_ptr();
+        let original_capacity = bytes.capacity();
+        let catalog = Catalog::from_owned_bytes_with_limits(bytes, Limits::default())?;
+        let owner = catalog.source_owner();
+
+        assert_eq!(owner.as_ref().as_ptr(), original_pointer);
+        assert!(original_capacity >= owner.as_ref().len());
+        assert_eq!(catalog.source_bytes().as_ptr(), original_pointer);
+        assert!(SharedBytes::ptr_eq(&owner, &catalog.source_owner()));
         assert_eq!(catalog.len(), 1);
         Ok(())
     }

@@ -695,6 +695,13 @@ pub struct SourceCatalog {
     limits: Limits,
 }
 
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct OwnedSourceCatalog {
+    inner: SourceCatalog,
+}
+
 impl SourceCatalog {
     /// Parse borrowed package bytes using the default physical limits.
     ///
@@ -762,6 +769,12 @@ impl SourceCatalog {
         Self::from_package(package, limits)
     }
 
+    /// Parse an owned package vector without copying its payload allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when ZIP ingress, legacy normalization, Snappy/IWA
+    /// decoding, or a configured physical ceiling fails.
     /// Parse shared package bytes while applying a fixed logical-member
     /// admission profile before any ZIP payload is decoded.
     ///
@@ -843,6 +856,14 @@ impl SourceCatalog {
         self.package.shared_source()
     }
 
+    /// Clone the authoritative immutable source owner without copying bytes.
+    #[cfg(feature = "internal-iwork-source")]
+    #[doc(hidden)]
+    #[must_use]
+    pub fn __source_owner(&self) -> crate::package::SharedBytes {
+        self.package.source_owner()
+    }
+
     /// Borrow the authoritative physical source bytes.
     #[must_use]
     pub fn source_bytes(&self) -> &[u8] {
@@ -876,6 +897,40 @@ impl SourceCatalog {
     #[must_use]
     pub fn into_components(self) -> ComponentCatalog {
         self.components
+    }
+}
+
+#[cfg(feature = "internal-iwork-source")]
+impl OwnedSourceCatalog {
+    #[doc(hidden)]
+    pub fn __from_owned_bytes_with_limits(source: Vec<u8>, limits: Limits) -> Result<Self> {
+        let package = Catalog::from_owned_bytes_with_limits(source, limits)?;
+        Ok(Self {
+            inner: SourceCatalog::from_package(package, limits)?,
+        })
+    }
+
+    #[doc(hidden)]
+    pub fn __from_source_owner_with_limits(
+        source: crate::package::SharedBytes,
+        limits: Limits,
+    ) -> Result<Self> {
+        let package = Catalog::from_source_owner_with_limits(source, limits)?;
+        Ok(Self {
+            inner: SourceCatalog::from_package(package, limits)?,
+        })
+    }
+
+    #[doc(hidden)]
+    #[must_use]
+    pub fn __source_owner(&self) -> crate::package::SharedBytes {
+        self.inner.package.source_owner()
+    }
+
+    #[doc(hidden)]
+    #[must_use]
+    pub fn __as_source_catalog(&self) -> &SourceCatalog {
+        &self.inner
     }
 }
 
@@ -979,6 +1034,7 @@ mod tests {
         ComponentCatalog::from_bytes(&writer.finish_to_bytes()?)
     }
 
+    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn semantic_object_budget_accepts_the_exact_cap_and_rejects_one_more() {
         assert_eq!(
@@ -1307,6 +1363,26 @@ mod tests {
                 .map(Component::name),
             Some("Index/Document.iwa")
         );
+        Ok(())
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    #[test]
+    fn source_catalog_reuses_owned_vector_payload_without_copy() -> Result<()> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
+        let bytes = writer.finish_to_bytes()?;
+        let original_pointer = bytes.as_ptr();
+
+        let catalog = OwnedSourceCatalog::__from_owned_bytes_with_limits(bytes, Limits::default())?;
+        let owner = catalog.__source_owner();
+
+        assert_eq!(owner.as_ref().as_ptr(), original_pointer);
+        assert_eq!(
+            catalog.__as_source_catalog().source_bytes().as_ptr(),
+            original_pointer
+        );
+        assert_eq!(catalog.__as_source_catalog().components().len(), 1);
         Ok(())
     }
 

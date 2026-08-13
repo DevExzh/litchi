@@ -2,6 +2,9 @@
 
 use std::fmt;
 
+/// Exact-source row and column size transactions.
+pub mod transaction;
+
 /// One physical table axis addressed by a zero-based index.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Dimension {

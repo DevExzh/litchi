@@ -10495,3 +10495,90 @@ are the deletion of duplicate parsing, constant-time shared snapshots, bounded
 sparse semantic retention, and release of source/package state after semantic
 projection. The Numbers editor, builder, host table adapters, examples, tests,
 manifest edge, and ordered debt 015 remain.
+
+## 2026-08-13 amendment: Numbers dimension-size verification
+
+The migration gate moves Numbers row-height and column-width reads and edits to
+`litchi_numbers::Package::{table_dimension_size,
+edit_table_dimension_size, apply_table_dimension_size}`. Host callers migrate
+to exact sheet/table selectors and `Dimension`; the public
+`NumbersEditor::{table_dimension_size, set_table_dimension_size,
+table_row_height, set_table_row_height, table_column_width,
+set_table_column_width}` surface and the three host re-export names are then
+retired. Permanent boundary coverage rejects aliases, globs, Rustdoc, the host
+`edit_numbers_table_dimension` example, and facade reintroduction while
+allowing the private cross-format `IWorkPackage` helper used by Pages and
+Keynote.
+
+The frozen semantic matrix covers row and column reads, exact-name and index
+selectors, ambiguity/missing/out-of-range refusal, `Default`, explicit
+`Points`, explicit points numerically equal to the model default, and rejection
+of zero/negative/non-finite scalar construction. Physical gates cover absent
+entries, canonical size-only removal, facet-bearing default retention,
+unknown-field preservation, duplicate indices, malformed/wrong-wire headers,
+strict/Buffa disagreement, missing or reused buckets, and atomic refusal.
+
+Transaction gates freeze exact no-op identity, changed commit, source-bound
+apply, inverse restoration, one selected header-bucket semantic rewrite, three
+canonical preview deletions, one full reopen, allocation/work ceilings, and
+maximum-minus-one refusal. Exact no-op reports zero components, previews, and
+reopens. The phase maximum-minus-one refusal reports zero component encodes,
+reassemblies, output allocations, reopens, locality checks, and fingerprint
+passes. Table row/column counts, cells, formulas, UID maps, merges, strokes,
+styles, other headers, components, and unrelated ZIP members remain unchanged.
+This is dimension-size evidence, not table-resize evidence.
+
+Native validation used only the isolated candidate at
+`/private/tmp/litchi-numbers-dimension.2upFef/candidate.numbers`. The focused
+transaction set semantic row index 4 (Numbers UI row 5) to 32 pt and semantic
+column index 2 (UI C) to 124 pt. Apple Numbers 14.4 build 7043.0.93 opened the
+candidate without repair, recovery, or conversion UI. Before save, the UI
+showed `Sheet 1` / `Table 1`, 22 rows by 7 columns, one header row, one header
+column, no footer rows, row 5 at 32 pt, column C at 124 pt, preserved column F
+at 98 pt, `B2` marker `Litchi native Numbers fixture`, and numeric `B3 = 42`.
+Save, close, and reopen retained those values and topology.
+
+After native save the candidate remained a valid 43-entry ZIP, 136,615 bytes,
+inode 43004322, with SHA-256
+`1ae4986ce53fab82afb4f7f4d8df50dbf04170fa81679e8ae259fd6e04ab4115`.
+The tracked `test-data/iwork/numbers/basic.numbers` source was never opened and
+remains a valid 43-entry ZIP, 136,357 bytes, inode 34625835, with SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`.
+
+Native UI units may round displayed point values, and Numbers may silently
+normalize the disposable package or materialize a default representation.
+The explicit edit changed the candidate bytes by 258 bytes; earlier read-only
+open/close evidence also showed silent normalization. Therefore UI rounding is
+not an exact wire oracle, app-open is not byte-inertness evidence, and
+post-save bytes need not equal the focused pre-open candidate. A separate
+isolated clear candidate at
+`/private/tmp/litchi-dimension-clear.Geqpqi/clear.numbers` cleared semantic row
+index 4 and column index 2 from explicit values to `Default`. Numbers 14.4
+build 7043.0.93 opened it without repair, recovery, or conversion UI and showed
+UI row 5 at its effective 20 pt default and column C at its effective 98 pt
+default, while explicit peer column F remained 98 pt. `B2`, `B3`, the 22-by-7
+topology, and headers 1/1/0 remained unchanged. Save, close without a prompt,
+and reopen retained the same semantics. The post-native clear artifact is a
+valid 43-entry ZIP, 136,938 bytes, inode 43005403, with SHA-256
+`4db6e27e3893ca1892dd61dc221640d06c912db8f4f1d4aa51498607c5ca1325`.
+Together the explicit and clear runs establish native semantic acceptance, not
+byte-inertness or exact-artifact preservation. Exact locality, no-op, and
+inverse claims come from Rust gates before native application save.
+
+The host cut changes five paths with four list-format insertions and 312
+deletions, net -308. It removes the six public methods (65 source lines/63
+method bodies), 200 test-section lines (about 197 test-body lines), the 41-line
+example, and public facade re-exports. Private Pages/Keynote aliases and
+physical helpers remain ordered debt; the shared table-resize engine is
+untouched.
+
+Focused dimension integration passes 13/13; the codec passes 11/11 and full
+protos passes 194/194 plus doctests. Full Numbers all-feature verification
+passes 241 library tests with four ignored, 91 integration tests, and five
+doctests with one ignored. Archive passes 130/130 (128 unit plus two
+integration) plus doctests. Focused Numbers/archive all-target check and strict
+all-target Clippy pass. Boundary units pass 243/243 and the live retirement/API
+audits report zero findings. Host all-target/all-feature check and no-run,
+retained-axis 2/2, Pages-layout 1/1, generated-roundtrip 1/1, scoped boundary
+6/6, strict library Clippy, formatting, and diff checks pass. Broad host
+all-target Clippy retains nine unrelated existing lints.

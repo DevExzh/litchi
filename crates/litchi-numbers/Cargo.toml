@@ -13,7 +13,7 @@ default = []
 internal-iwork-source = []
 
 [dependencies]
-litchi-iwa-archive = { workspace = true }
+litchi-iwa-archive = { workspace = true, features = ["internal-iwork-source"] }
 litchi-iwa-common  = { workspace = true }
 litchi-iwa-core    = { workspace = true }
 litchi-iwa-detect  = { workspace = true }

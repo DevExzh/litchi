@@ -70,7 +70,7 @@ impl From<litchi_numbers::table::merge::Error> for crate::Error {
 
 pub use creation::NumbersDocumentBuilder;
 pub use editor::{
-    Dimension, Direction, NumbersEditor, NumbersPivotCategoryInfo, NumbersSheetAudioInfo,
+    Direction, NumbersEditor, NumbersPivotCategoryInfo, NumbersSheetAudioInfo,
     NumbersSheetAudioOptions, NumbersSheetChartInfo, NumbersSheetImageInfo,
     NumbersSheetImageOptions, NumbersSheetInfo, NumbersSheetMovieInfo, NumbersSheetMovieOptions,
     NumbersSheetShapeInfo, NumbersTableCellParagraphList, NumbersTableCellParagraphListBullet,
@@ -86,10 +86,9 @@ pub use editor::{
     NumbersTableCellTextOutline, NumbersTableCellTextScript, NumbersTableCellTextShadow,
     NumbersTableCellTextStyle, NumbersTableInfo, NumbersTableSortColumnIndex,
     NumbersTableSortDirection, NumbersTableSortOrder, NumbersTableSortRowRange,
-    NumbersTableSortRule, NumbersTableSortScope, NumbersTextBoxInfo, Points,
-    RemovedNumbersSheetAudio, RemovedNumbersSheetChart, RemovedNumbersSheetImage,
-    RemovedNumbersSheetMovie, RemovedNumbersSheetShape, RemovedNumbersTextBox, Settings, Size,
-    TableCellConditionalHighlightInfo,
+    NumbersTableSortRule, NumbersTableSortScope, NumbersTextBoxInfo, RemovedNumbersSheetAudio,
+    RemovedNumbersSheetChart, RemovedNumbersSheetImage, RemovedNumbersSheetMovie,
+    RemovedNumbersSheetShape, RemovedNumbersTextBox, Settings, TableCellConditionalHighlightInfo,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,

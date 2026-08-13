@@ -36,7 +36,7 @@
 
 use std::{fmt, sync::Arc};
 
-use litchi_iwa_archive::package::ExactArtifacts;
+use litchi_iwa_archive::package::{OwnedExactArtifacts, SharedBytes};
 
 use crate::{
     Package,
@@ -1043,8 +1043,8 @@ impl PackagePair {
     fn new(
         source: Package,
         target: Package,
-        source_artifact: &Arc<[u8]>,
-        target_artifact: &Arc<[u8]>,
+        source_artifact: &SharedBytes,
+        target_artifact: &SharedBytes,
         path: Path,
     ) -> Result<Self, Error> {
         if source.read_options() != target.read_options()
@@ -1095,7 +1095,7 @@ pub struct Patch {
     path: Path,
     requested: usize,
     changed: usize,
-    artifacts: ExactArtifacts,
+    artifacts: OwnedExactArtifacts,
     evidence: PatchEvidence,
     packages: Option<PackagePair>,
 }
@@ -1150,12 +1150,12 @@ impl Patch {
         }
     }
 
-    pub(crate) fn authorizes_source(&self, source: &Arc<[u8]>) -> bool {
-        self.artifacts.authorizes_source(source)
+    pub(crate) fn authorizes_source(&self, source: &SharedBytes) -> bool {
+        self.artifacts.authorizes_owner(source)
     }
 
-    pub(crate) fn target_bytes(&self) -> Arc<[u8]> {
-        self.artifacts.target()
+    pub(crate) fn target_bytes(&self) -> SharedBytes {
+        self.artifacts.target_owner()
     }
 
     pub(crate) fn changed_cells(&self) -> usize {
@@ -1178,14 +1178,14 @@ impl Patch {
         path: Path,
         requested: usize,
         changed: usize,
-        source: Arc<[u8]>,
-        target: Arc<[u8]>,
+        source: SharedBytes,
+        target: SharedBytes,
     ) -> Self {
         Self {
             path,
             requested,
             changed,
-            artifacts: ExactArtifacts::new(source, target),
+            artifacts: OwnedExactArtifacts::new(source, target),
             evidence: PatchEvidence::empty(),
             packages: None,
         }
@@ -1195,8 +1195,8 @@ impl Patch {
         path: Path,
         requested: usize,
         changed: usize,
-        source: Arc<[u8]>,
-        target: Arc<[u8]>,
+        source: SharedBytes,
+        target: SharedBytes,
         source_package: Package,
         target_package: Package,
         evidence: PatchEvidence,
@@ -1206,7 +1206,7 @@ impl Patch {
             path,
             requested,
             changed,
-            artifacts: ExactArtifacts::new(source, target),
+            artifacts: OwnedExactArtifacts::new(source, target),
             evidence,
             packages: Some(packages),
         })
@@ -1720,8 +1720,8 @@ mod tests {
             Path::Package,
             1,
             0,
-            Arc::from(&b"source"[..]),
-            Arc::from(&b"target"[..]),
+            SharedBytes::from_shared_slice(Arc::from(&b"source"[..])),
+            SharedBytes::from_shared_slice(Arc::from(&b"target"[..])),
         );
         let inverse = patch.inverse();
 

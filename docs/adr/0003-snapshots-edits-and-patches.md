@@ -1551,3 +1551,48 @@ boundary units pass 237/237 and both live retirement/API audits report zero
 findings. Broad host all-target Clippy remains blocked by unrelated existing
 lints; the global boundary policy still reports 14 unrelated
 `soapberry-zip`/`xml-minifier` debt findings.
+
+## 2026-08-13 amendment: Numbers dimension-size transactions
+
+`Package::edit_table_dimension_size` stages one selector-first row-height or
+column-width change against an immutable exact package snapshot. The public
+transaction vocabulary is re-exported from `table::dimension::transaction` as
+`Edit`, `Patch`, `Commit`, `Diagnostics`, `Path`, `LimitKind`, and
+`TransactionError`; scalar validation continues to use
+`table::dimension::Error`. `Package::table_dimension_size` reads the same
+semantic value, and `Package::apply_table_dimension_size` accepts only a patch
+bound to its exact source package.
+
+`Size::Default` and `Size::Points` are not interchangeable snapshots.
+`Default` is the absence/native-zero override state and uses the table model's
+axis default; explicit `Points` remains explicit even when numerically equal to
+that default. Clearing a standalone canonical size-only header may remove it,
+while clearing a header that also carries styles, hiding state, cell counts, or
+unknown wire must retain that header and encode the default state without
+discarding its other facets.
+
+An exact no-op shares its exact owner and reports zero touched components, zero
+preview deletions, and no reopen. A changed commit rewrites exactly one selected
+`HeaderStorageBucket` component, deletes the three canonical root previews,
+performs one full reopen, and preserves every other component and ZIP local/
+central record. Apply is source-authorized and the inverse restores the exact
+source artifact. Component/package publication remains atomic: malformed or
+ambiguous ownership, an out-of-range axis, invalid stored size, resource
+refusal, or reopen/locality disagreement publishes no candidate. The phase
+maximum-minus-one gate reports zero component encodes, reassemblies, output
+allocations, reopens, locality checks, and fingerprint passes.
+
+This transaction does not alter `Table::dimensions`, cells, formulas, UID
+maps, merges, strokes, row/column insertion or deletion, or the host's broader
+table-resize transaction. Those operations keep their existing snapshot and
+patch contracts.
+
+Frozen verification passes 13/13 focused dimension integration tests, 11/11
+codec tests, 194/194 complete protos tests plus doctests, 241 Numbers library
+tests with four ignored, 91 Numbers integration tests, and five Numbers
+doctests with one ignored. Archive coverage passes 130/130 plus doctests.
+Focused all-target check/strict Clippy, formatting, and diff checks pass.
+Boundary units pass 243/243 with zero live retirement/API findings. Host gates
+pass retained-axis 2/2, Pages-layout 1/1, generated-roundtrip 1/1,
+all-target/all-feature check and no-run, scoped boundary 6/6, and strict library
+Clippy; broad host all-target Clippy retains nine unrelated existing lints.
