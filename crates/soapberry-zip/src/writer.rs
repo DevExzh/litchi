@@ -9,6 +9,8 @@ use crate::{
     path::{NormalizedPath, ZipFilePath},
     time::{DosDateTime, UtcDateTime},
 };
+use flate2::Compression;
+use flate2::write::DeflateEncoder;
 use std::io::{self, Write};
 
 // ZIP64 constants
@@ -555,6 +557,16 @@ where
 
         let name_bytes = file_path.as_ref().as_bytes();
         let name_len = name_bytes.len() as u16;
+        self.file_names
+            .try_reserve(name_bytes.len())
+            .map_err(|error| ErrorKind::InvalidInput {
+                msg: format!("could not reserve ZIP member-name storage: {error}"),
+            })?;
+        self.files
+            .try_reserve(1)
+            .map_err(|error| ErrorKind::InvalidInput {
+                msg: format!("could not reserve ZIP file-header storage: {error}"),
+            })?;
         self.file_names.extend_from_slice(name_bytes);
 
         let crc32 = crc::crc32(data);
@@ -708,6 +720,16 @@ where
         // Store the name bytes in the central buffer
         let name_bytes = file_path.as_ref().as_bytes();
         let name_len = name_bytes.len() as u16;
+        self.file_names
+            .try_reserve(name_bytes.len())
+            .map_err(|error| ErrorKind::InvalidInput {
+                msg: format!("could not reserve ZIP member-name storage: {error}"),
+            })?;
+        self.files
+            .try_reserve(1)
+            .map_err(|error| ErrorKind::InvalidInput {
+                msg: format!("could not reserve ZIP file-header storage: {error}"),
+            })?;
         self.file_names.extend_from_slice(name_bytes);
 
         self.write_local_header(&file_path, flags, CompressionMethod::Store, &mut options)?;
@@ -785,6 +807,16 @@ where
         // Store the name bytes in the central buffer
         let name_bytes = file_path.as_ref().as_bytes();
         let name_len = name_bytes.len() as u16;
+        self.file_names
+            .try_reserve(name_bytes.len())
+            .map_err(|error| ErrorKind::InvalidInput {
+                msg: format!("could not reserve ZIP member-name storage: {error}"),
+            })?;
+        self.files
+            .try_reserve(1)
+            .map_err(|error| ErrorKind::InvalidInput {
+                msg: format!("could not reserve ZIP file-header storage: {error}"),
+            })?;
         self.file_names.extend_from_slice(name_bytes);
 
         self.write_local_header(&file_path, flags, options.compression_method, &mut options)?;
@@ -799,6 +831,122 @@ where
             modification_time: options.modification_time,
             unix_permissions: options.unix_permissions,
             extra_fields: options.extra_fields,
+        })
+    }
+
+    /// Starts a file entry while consuming this archive writer.
+    ///
+    /// Unlike [`ZipFileBuilder::start`], this API does not borrow the archive
+    /// while the entry is being written. The returned entry owns the archive
+    /// state and returns it from [`ZipOwnedEntryWriter::finish`]. This makes it
+    /// possible to pass an entry writer through a streaming pipeline without
+    /// constructing a self-referential wrapper around `ZipArchiveWriter`.
+    ///
+    /// The entry writer accepts uncompressed bytes through [`Write`]. `Store`
+    /// forwards those bytes directly and `Deflate` compresses them
+    /// incrementally. Other compression methods are rejected before the local
+    /// header is emitted.
+    pub fn start_file_owned(
+        self,
+        name: &str,
+        compression_method: CompressionMethod,
+    ) -> Result<ZipOwnedEntryWriter<W>, Error> {
+        if !matches!(
+            compression_method,
+            CompressionMethod::Store | CompressionMethod::Deflate
+        ) {
+            return Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                compression_method.as_id().as_u16(),
+            )));
+        }
+
+        let options = ZipEntryOptions {
+            compression_method,
+            modification_time: None,
+            unix_permissions: None,
+            extra_fields: ExtraFieldsContainer::new(),
+        };
+        self.start_file_owned_with_options(name, options)
+    }
+
+    /// Alias for [`Self::start_file_owned`] using the entry-oriented name used
+    /// by higher-level package writers.
+    pub fn start_entry_owned(
+        self,
+        name: &str,
+        compression_method: CompressionMethod,
+    ) -> Result<ZipOwnedEntryWriter<W>, Error> {
+        self.start_file_owned(name, compression_method)
+    }
+
+    fn start_file_owned_with_options(
+        mut self,
+        name: &str,
+        mut options: ZipEntryOptions,
+    ) -> Result<ZipOwnedEntryWriter<W>, Error> {
+        let file_path = ZipFilePath::from_str(name.trim_end_matches('/'));
+        if file_path.len() > u16::MAX as usize {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "file name too long".to_string(),
+            }));
+        }
+
+        let local_header_offset = self.writer.count();
+        let mut flags = FLAG_DATA_DESCRIPTOR;
+        if file_path.needs_utf8_encoding() {
+            flags |= FLAG_UTF8_ENCODING;
+        }
+
+        let name_bytes = file_path.as_ref().as_bytes();
+        let name_len = name_bytes.len() as u16;
+        self.file_names
+            .try_reserve(name_bytes.len())
+            .map_err(|error| ErrorKind::InvalidInput {
+                msg: format!("could not reserve ZIP member-name storage: {error}"),
+            })?;
+        self.files
+            .try_reserve(1)
+            .map_err(|error| ErrorKind::InvalidInput {
+                msg: format!("could not reserve ZIP file-header storage: {error}"),
+            })?;
+        self.file_names.extend_from_slice(name_bytes);
+        self.write_local_header(&file_path, flags, options.compression_method, &mut options)?;
+
+        let state = OwnedEntryState {
+            name_len,
+            local_header_offset,
+            compression_method: options.compression_method,
+            flags,
+            modification_time: options.modification_time,
+            unix_permissions: options.unix_permissions,
+            extra_fields: options.extra_fields,
+        };
+        let compressed = OwnedCompressedEntry {
+            archive: self,
+            state,
+            compressed_bytes: 0,
+            compressed_limit: None,
+        };
+        let compressor = match options.compression_method {
+            CompressionMethod::Store => OwnedCompressor::Store(compressed),
+            CompressionMethod::Deflate => {
+                OwnedCompressor::Deflate(DeflateEncoder::new(compressed, Compression::default()))
+            },
+            // `start_file_owned` checks this before calling this helper. Keep
+            // the internal helper defensive for future callers with custom
+            // options.
+            other => {
+                return Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                    other.as_id().as_u16(),
+                )));
+            },
+        };
+
+        Ok(ZipOwnedEntryWriter {
+            inner: Some(ZipDataWriter::with_crc32(
+                compressor,
+                Crc32Option::default(),
+            )),
         })
     }
 
@@ -1022,6 +1170,254 @@ where
 
     fn flush(&mut self) -> io::Result<()> {
         self.inner.writer.flush()
+    }
+}
+
+/// Internal state retained by an owned entry while its payload is emitted.
+#[derive(Debug)]
+struct OwnedEntryState {
+    name_len: u16,
+    local_header_offset: u64,
+    compression_method: CompressionMethod,
+    flags: u16,
+    modification_time: Option<UtcDateTime>,
+    unix_permissions: Option<u32>,
+    extra_fields: ExtraFieldsContainer,
+}
+
+/// A compressed payload sink that owns the archive it is writing into.
+#[derive(Debug)]
+struct OwnedCompressedEntry<W> {
+    archive: ZipArchiveWriter<W>,
+    state: OwnedEntryState,
+    compressed_bytes: u64,
+    compressed_limit: Option<u64>,
+}
+
+impl<W> OwnedCompressedEntry<W> {
+    fn compressed_bytes(&self) -> u64 {
+        self.compressed_bytes
+    }
+
+    fn set_compressed_limit(&mut self, maximum: u64) {
+        self.compressed_limit = Some(maximum);
+    }
+
+    fn finish(self, mut output: DataDescriptorOutput) -> Result<ZipArchiveWriter<W>, Error>
+    where
+        W: Write,
+    {
+        output.compressed_size = self.compressed_bytes;
+        let mut archive = self.archive;
+
+        let mut buffer = [0u8; 24];
+        buffer[0..4].copy_from_slice(&DataDescriptor::SIGNATURE.to_le_bytes());
+        buffer[4..8].copy_from_slice(&output.crc.to_le_bytes());
+
+        let out_data = if output.compressed_size >= ZIP64_THRESHOLD_FILE_SIZE
+            || output.uncompressed_size >= ZIP64_THRESHOLD_FILE_SIZE
+        {
+            buffer[8..16].copy_from_slice(&output.compressed_size.to_le_bytes());
+            buffer[16..24].copy_from_slice(&output.uncompressed_size.to_le_bytes());
+            &buffer[..]
+        } else {
+            buffer[8..12].copy_from_slice(&(output.compressed_size as u32).to_le_bytes());
+            buffer[12..16].copy_from_slice(&(output.uncompressed_size as u32).to_le_bytes());
+            &buffer[..16]
+        };
+        archive.writer.write_all(out_data)?;
+
+        let mut file_header = FileHeader {
+            name_len: self.state.name_len,
+            compression_method: self.state.compression_method,
+            local_header_offset: self.state.local_header_offset,
+            compressed_size: output.compressed_size,
+            uncompressed_size: output.uncompressed_size,
+            crc: output.crc,
+            flags: self.state.flags,
+            modification_time: self.state.modification_time,
+            unix_permissions: self.state.unix_permissions,
+            extra_fields: self.state.extra_fields,
+        };
+        file_header.finalize_extra_fields()?;
+        archive.files.push(file_header);
+
+        Ok(archive)
+    }
+}
+
+#[derive(Debug)]
+enum OwnedCompressor<W: Write> {
+    Store(OwnedCompressedEntry<W>),
+    Deflate(DeflateEncoder<OwnedCompressedEntry<W>>),
+}
+
+impl<W: Write> OwnedCompressor<W> {
+    fn compressed_bytes(&self) -> u64 {
+        match self {
+            Self::Store(entry) => entry.compressed_bytes(),
+            Self::Deflate(encoder) => encoder.get_ref().compressed_bytes(),
+        }
+    }
+
+    fn set_compressed_limit(&mut self, maximum: u64) {
+        match self {
+            Self::Store(entry) => entry.set_compressed_limit(maximum),
+            Self::Deflate(encoder) => encoder.get_mut().set_compressed_limit(maximum),
+        }
+    }
+
+    fn finish(self, output: DataDescriptorOutput) -> Result<ZipArchiveWriter<W>, Error>
+    where
+        W: Write,
+    {
+        match self {
+            Self::Store(entry) => entry.finish(output),
+            Self::Deflate(encoder) => encoder.finish()?.finish(output),
+        }
+    }
+}
+
+impl<W: Write> Write for OwnedCompressor<W> {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        match self {
+            Self::Store(entry) => entry.write(buffer),
+            Self::Deflate(encoder) => encoder.write(buffer),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            Self::Store(entry) => entry.flush(),
+            Self::Deflate(encoder) => encoder.flush(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct OwnedEntryLimitMarker {
+    actual: u64,
+    maximum: u64,
+}
+
+impl std::fmt::Display for OwnedEntryLimitMarker {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "owned ZIP entry compressed limit exceeded: attempted {}, maximum {}",
+            self.actual, self.maximum
+        )
+    }
+}
+
+impl std::error::Error for OwnedEntryLimitMarker {}
+
+fn owned_entry_limit_io_error(actual: u64, maximum: u64) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::Other,
+        OwnedEntryLimitMarker { actual, maximum },
+    )
+}
+
+pub(crate) fn owned_entry_limit_from_io_error(error: &io::Error) -> Option<(u64, u64)> {
+    error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<OwnedEntryLimitMarker>())
+        .map(|marker| (marker.actual, marker.maximum))
+}
+
+impl<W: Write> Write for OwnedCompressedEntry<W> {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        if buffer.is_empty() {
+            return Ok(0);
+        }
+        if let Some(maximum) = self.compressed_limit {
+            let requested = u64::try_from(buffer.len()).unwrap_or(u64::MAX);
+            let remaining = maximum.saturating_sub(self.compressed_bytes);
+            if requested > remaining {
+                return Err(owned_entry_limit_io_error(
+                    self.compressed_bytes.saturating_add(requested),
+                    maximum,
+                ));
+            }
+        }
+        let written = self.archive.writer.write(buffer)?;
+        self.compressed_bytes = self.compressed_bytes.saturating_add(written as u64);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.archive.writer.flush()
+    }
+}
+
+/// A consuming ZIP entry writer that owns its parent archive.
+///
+/// The entry implements [`Write`] for uncompressed payload bytes. Store data
+/// is forwarded directly; Deflate data is compressed incrementally with a
+/// bounded working buffer. Calling [`Self::finish`] consumes the entry and
+/// returns the archive writer so another entry can be started without a
+/// borrow tied to the original archive value.
+#[derive(Debug)]
+pub struct ZipOwnedEntryWriter<W: Write> {
+    inner: Option<ZipDataWriter<OwnedCompressor<W>>>,
+}
+
+impl<W: Write> ZipOwnedEntryWriter<W> {
+    /// Sets a compressed-payload ceiling enforced before bytes reach the
+    /// archive sink.
+    #[must_use]
+    pub fn with_compressed_limit(mut self, maximum: u64) -> Self {
+        if let Some(inner) = self.inner.as_mut() {
+            inner.inner.set_compressed_limit(maximum);
+        }
+        self
+    }
+
+    /// Number of uncompressed bytes accepted by this entry.
+    #[must_use]
+    pub fn uncompressed_bytes(&self) -> u64 {
+        self.inner
+            .as_ref()
+            .map(|inner| inner.uncompressed_bytes)
+            .unwrap_or(0)
+    }
+
+    /// Number of compressed payload bytes accepted by this entry.
+    #[must_use]
+    pub fn compressed_bytes(&self) -> u64 {
+        self.inner
+            .as_ref()
+            .map(|inner| inner.inner.compressed_bytes())
+            .unwrap_or(0)
+    }
+
+    /// Finishes the entry and recovers the parent archive writer.
+    pub fn finish(mut self) -> Result<ZipArchiveWriter<W>, Error>
+    where
+        W: Write,
+    {
+        let inner = self.inner.take().ok_or_else(|| ErrorKind::InvalidInput {
+            msg: "owned ZIP entry writer was already finished".to_string(),
+        })?;
+        let (compressor, descriptor) = inner.finish()?;
+        compressor.finish(descriptor)
+    }
+}
+
+impl<W: Write> Write for ZipOwnedEntryWriter<W> {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        self.inner
+            .as_mut()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "owned ZIP entry finished"))?
+            .write(buffer)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner
+            .as_mut()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "owned ZIP entry finished"))?
+            .flush()
     }
 }
 
@@ -1485,6 +1881,29 @@ mod tests {
 
         entry.finish(descriptor).unwrap();
         archive.finish().unwrap();
+    }
+
+    #[test]
+    fn test_owned_entry_writer_recovers_archive_for_store_and_deflate() {
+        use std::io::Write;
+
+        let mut output = Cursor::new(Vec::new());
+        let archive = ZipArchiveWriter::new(&mut output);
+        let mut entry = archive
+            .start_file_owned("stored.txt", CompressionMethod::Store)
+            .unwrap();
+        entry.write_all(b"stored payload").unwrap();
+        let archive = entry.finish().unwrap();
+
+        let mut entry = archive
+            .start_entry_owned("deflated.txt", CompressionMethod::Deflate)
+            .unwrap();
+        entry.write_all(b"deflated payload").unwrap();
+        let archive = entry.finish().unwrap();
+        archive.finish().unwrap();
+        let reader = crate::office::ArchiveReader::new(output.get_ref()).unwrap();
+        assert_eq!(reader.read("stored.txt").unwrap(), b"stored payload");
+        assert_eq!(reader.read("deflated.txt").unwrap(), b"deflated payload");
     }
 
     #[test]
