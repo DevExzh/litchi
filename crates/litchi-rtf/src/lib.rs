@@ -75,6 +75,7 @@ mod numbering;
 mod policy;
 mod resource;
 pub mod review;
+pub mod streaming;
 pub mod text;
 
 pub use content::{field, math, section, table};
@@ -128,6 +129,9 @@ pub mod write {
         MAX_DEFAULT_TAB_WIDTH_TWIPS, RtfWriter as Writer, WriterOptions as Options,
     };
     pub use crate::model::types::Formatting as Format;
+    pub use crate::streaming::{
+        StreamingRtfError, StreamingRtfLimits, StreamingRtfOptions, StreamingRtfWriter,
+    };
 }
 
 /// Bounded Outlook/MAPI compressed-RTF transport codec.
