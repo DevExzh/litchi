@@ -3,7 +3,7 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0090`](changes/0090-rtf-logical-tail-append-evidence.md) (the latest
+[`change 0091`](changes/0091-xls-visibility-source-overlay-evidence.md) (the latest
 correctness/coverage tranche; release filesystem evidence is [`0089`](changes/0089-filesystem-release-repeated-evidence.md))
 
 This document records facts established by source inspection. It is not a
@@ -579,6 +579,16 @@ p50. The previous
 spare-capacity DOC move remains rejected and must remain an independent writer
 guardrail.
 
+The source-backed XLS worksheet-visibility overlay landed in committed
+production change `bac279116`. Change `0091` adds four opt-in eager/source-backed
+scalar and bounded-batch selectors for one-owner and 64-owner visibility edits.
+They verify complete worksheet/catalog/opaque-stream readback, exact overlay
+bytes, patch/inverse, source fingerprints/spans, and cap/protection refusals.
+This is correctness/coverage evidence only: no release ABBA, speedup,
+allocation, RSS, peak-memory, or physical-I/O claim is made. The source-backed
+path retains its complete candidate snapshot; the 64 KiB sink bound limits
+writes, and retained output is only for digest/reopen assertions.
+
 An XLS-only immediate handoff of the first validated terminal CFB rendering was
 also measured and fully reverted. Tiny changed save improved 7.55%, but large
 changed save was neutral at -0.39% p50 and four repeated large exact-no-op
@@ -791,7 +801,7 @@ The order below is provisional until baseline measurements are recorded.
 | 10 | Measure and tune the managed source-backed cache under controlled contention. | Concurrent repeated Part reads. | Medium-high | Hierarchical memory charging, pinned-aware eviction and per-entry single-flight are implemented and correctness-tested in change 0086; release ABBA in 0088 covers structural/distribution counters but accepts no speedup. Allocation, peak-memory/RSS, hardware, copied/decompressed-byte and remaining budget dimensions are open. |
 | 11 | Extend ODF beyond accepted ODS snapshot, row-local provenance reuse/shared worksheet ownership, ODS/ODP/ODT unchanged-member publication, adaptive cell lookup, ODP indexed-slide retention/snapshot handoffs and ODT byte/full-text/indexed-query/audit/envelope/batch/final-byte ownership: positional source-backed reads, repeated independent ODP scans, richer non-text/bulk edits, resource-adding/richer structural publication and real-producer media. | ODT/ODS/ODP open/query and changed save. | High | Same-topology ODS row splicing now carries exact range proofs through raw ZIP emission and the adjacent nested worksheet/package owners share and move their archive allocation; compact ODS/ODP/ODT content raw preservation, bounded facade lookup, direct/existing/final-result ODT byte sharing, consuming full-text blocks, indexed paragraph/slide retention, ODP staging and final slide-only snapshot projection reuse, matched ODP text-box and ODT embedded-resource scalar/bounded evidence, compact-audit/envelope sharing, consecutive paragraph coalescing and scalar line-break/run/hyperlink plus plain paragraph insertion/removal publication are accepted. ODS content-validation catalog CRUD is correctness-covered but unmeasured. Parsed final-document adoption remains reverted for a read regression; other structural fallback, exact no-op and full readback remain. See changes 0011, 0014, 0018, 0019, 0020, 0023, 0027, 0031, 0034, 0035, 0038, 0041, 0042, 0045, 0047, 0049, 0052, 0057, 0060, 0065, 0068, 0071, 0072, 0074, 0075, 0084 and 0085. |
 | 12 | Extend accepted native RTF work beyond the capability-bounded variant matrix after parser-state, transport batching, byte-delimiter scanning, retained ordinary-body ranges, retained story-length/cardinality handoffs and sparse paragraph selection. | RTF formatted/media, malformed/security, broader real-producer and broad edit paths. | Medium | Plain, raw CP-1252, LZFu and producer-watermark read/no-op inputs plus a narrow native shape-text chain are covered; plain generated paragraph queries and editing are timed, public paragraph cardinality is parser-retained, and explicit sparse `nth` no longer constructs discarded paragraph views. Cached full text, byte-valued fallback, revisions, candidate readback and native forward-only output contracts remain. See changes 0013, 0019, 0020, 0029, 0040, 0048, 0064, 0066 and 0069. |
-| 13 | Attribute and integrate remaining native OLE2 final-owner/public-reader work. | OLE2 spreadsheet/document/presentation edit publication rather than substrate-only insertion. | Medium-high | XLS editor/inventory reuse, DOC batching/indexes, and PPT root-open/text-resolver/root-adoption work are accepted through changes 0016/0059, 0017/0050/0051/0053/0056, and 0024/0026/0062. XLS terminal-render and common CFB handoffs are rejected in 0028/0033/0036. Validated FAT/MiniFAT same-length direct-sink/atomic-path overlays now exist only as a correctness substrate; format owners, matched end-to-end ABBA and semantic reopen gates remain before adoption. |
+| 13 | Attribute and integrate remaining native OLE2 final-owner/public-reader work. | OLE2 spreadsheet/document/presentation edit publication rather than substrate-only insertion. | Medium-high | XLS editor/inventory reuse, committed source-backed visibility overlays (`bac279116`), DOC batching/indexes, and PPT root-open/text-resolver/root-adoption work are accepted through changes 0016/0059, 0017/0050/0051/0053/0056, 0091, and 0024/0026/0062. XLS terminal-render and common CFB handoffs are rejected in 0028/0033/0036. Change 0091 is correctness/coverage only; matched release ABBA, speedup, resource evidence, and broader semantic visibility remain before performance adoption. |
 | 14 | Share existing ODT transaction bytes when a validated document creates a snapshot. | ODT no-op and changed edit/save. | Low-medium | Implemented with private `Arc` identity proof; no-op p50 -18.51% large, guardrails within 3%. See change 0014. |
 | 15 | SIMD or lock-free work. | Unknown. | High | Deferred until remaining hot loops/locks are measured after work elimination. |
 
@@ -815,6 +825,10 @@ changes. Remaining gaps are:
 - Cache contention acceptance: change 0088 has release structural/distribution
   ABBA evidence, but no accepted speedup, allocation, RSS, hardware,
   copied/decompressed-byte, or CPU-utilization result.
+- XLS visibility overlay performance/resource evidence. Change 0091 is
+  correctness/coverage only: it has no release ABBA, speedup, allocation, RSS,
+  peak-memory, or physical-I/O claim, and its complete source-backed candidate
+  snapshot is not bounded by the 64 KiB publication sink.
 - Format-semantic preservation evidence beyond the generated
   DOC/XLS/PPT/DOCX/PPTX/RTF/ODT/ODS/ODP slices and native targeted-OPC raw
   passthrough corpus.
