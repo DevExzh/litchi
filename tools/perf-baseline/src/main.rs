@@ -38,7 +38,7 @@ use litchi_opc::{
     SourceBackedPackage, SourceCacheLimits, TargetMode,
     constants::{content_type as opc_content_type, relationship_type},
 };
-use litchi_xlsx::{Cell as XlsxCell, SourceBackedWorkbook, Value as XlsxValue, Workbook};
+use litchi_xlsx::{Cell as XlsxCell, Rect, SourceBackedWorkbook, Value as XlsxValue, Workbook};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::ArchiveReader;
@@ -80,6 +80,7 @@ const XLSX_AUTO_FILTER_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-auto-filter-source-edit-media-v1";
 const XLSX_CONDITIONAL_FORMATTING_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-conditional-formatting-source-edit-media-v1";
+const XLSX_MERGE_EDIT_CORPUS_GENERATOR: &str = "litchi-xlsx-merge-edit-sparse-a1-b2-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
 const ODT_MEDIA_CORPUS_GENERATOR: &str = "litchi-odt-media-paragraph-publication-v1";
 const ODT_RESOURCE_BATCH_CORPUS_GENERATOR: &str =
@@ -418,6 +419,8 @@ enum Case {
     XlsxSourceBackedAutoFilterEditSave,
     XlsxEagerConditionalFormattingEditSave,
     XlsxSourceBackedConditionalFormattingEditSave,
+    XlsxEagerMergeCommitSave,
+    XlsxEagerUnmergeCommitSave,
     CfbOpen,
     CfbListStreams,
     CfbReadOne,
@@ -647,6 +650,8 @@ impl Case {
             Self::XlsxSourceBackedConditionalFormattingEditSave => {
                 "xlsx_source_backed_conditional_formatting_edit_save"
             },
+            Self::XlsxEagerMergeCommitSave => "xlsx_eager_merge_commit_save",
+            Self::XlsxEagerUnmergeCommitSave => "xlsx_eager_unmerge_commit_save",
             Self::CfbOpen => "cfb_open",
             Self::CfbListStreams => "cfb_list_streams",
             Self::CfbReadOne => "cfb_read_one",
@@ -1133,6 +1138,13 @@ impl Case {
             self,
             Self::XlsxEagerConditionalFormattingEditSave
                 | Self::XlsxSourceBackedConditionalFormattingEditSave
+        )
+    }
+
+    const fn is_xlsx_merge_edit_save(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxEagerMergeCommitSave | Self::XlsxEagerUnmergeCommitSave
         )
     }
 }
@@ -2017,6 +2029,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_data_validation_edit_save()
                     && !case.is_xlsx_auto_filter_edit_save()
                     && !case.is_xlsx_conditional_formatting_edit_save()
+                    && !case.is_xlsx_merge_edit_save()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
                     cfb_corpus
@@ -2307,6 +2320,26 @@ fn main() -> Result<(), Box<dyn Error>> {
             .filter(|case| case.is_xlsx_defined_names_edit_save())
         {
             results.push(run_xlsx_defined_names_edit_save(
+                *case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_xlsx_merge_edit_save())
+    {
+        for case in options
+            .cases
+            .iter()
+            .filter(|case| case.is_xlsx_merge_edit_save())
+        {
+            let corpus = build_xlsx_merge_edit_corpus(*case)?;
+            results.push(run_xlsx_merge_edit_save(
                 *case,
                 &corpus,
                 options.warmup_iterations,
@@ -2908,6 +2941,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_backed_conditional_formatting_edit_save" => {
             Some(Case::XlsxSourceBackedConditionalFormattingEditSave)
         },
+        "xlsx_eager_merge_commit_save" => Some(Case::XlsxEagerMergeCommitSave),
+        "xlsx_eager_unmerge_commit_save" => Some(Case::XlsxEagerUnmergeCommitSave),
         "cfb_open" => Some(Case::CfbOpen),
         "cfb_list_streams" => Some(Case::CfbListStreams),
         "cfb_read_one" => Some(Case::CfbReadOne),
@@ -3141,6 +3176,8 @@ fn print_usage() {
                                        xlsx_source_backed_auto_filter_edit_save,\n\
                                        xlsx_eager_conditional_formatting_edit_save,\n\
                                        xlsx_source_backed_conditional_formatting_edit_save,\n\
+                                       xlsx_eager_merge_commit_save,\n\
+                                       xlsx_eager_unmerge_commit_save,\n\
                                        cfb_open,cfb_list_streams,cfb_read_one,\n\
                                        cfb_create_stream_borrowed,cfb_create_stream_owned,\n\
                                        ole_common_open,ole_common_put_stream_publish,\n\
@@ -4353,6 +4390,87 @@ fn build_xlsx_conditional_formatting_edit_corpus() -> Result<Corpus, Box<dyn Err
     Ok(corpus)
 }
 
+fn xlsx_merge_fixture() -> Result<(Workbook, Workbook), Box<dyn Error>> {
+    let workbook = Workbook::new()?;
+    let mut edit = workbook.edit()?;
+    let mut sheet = edit
+        .sheet("Sheet1")?
+        .ok_or("XLSX merge fixture is missing Sheet1")?;
+    sheet
+        .set("A1", "litchi-xlsx-merge-anchor-v1")?
+        .set("C1", "litchi-xlsx-merge-unrelated-v1")?;
+    let unmerged = edit.commit()?.into_workbook();
+
+    let mut merge_edit = unmerged.edit()?;
+    merge_edit
+        .sheet("Sheet1")?
+        .ok_or("XLSX merge fixture is missing Sheet1")?
+        .merge("A1:B2")?;
+    let merged = merge_edit.commit()?.into_workbook();
+    Ok((unmerged, merged))
+}
+
+fn build_xlsx_merge_edit_corpus(case: Case) -> Result<Corpus, Box<dyn Error>> {
+    if !case.is_xlsx_merge_edit_save() {
+        return Err("XLSX merge corpus requires a merge or unmerge case".into());
+    }
+    let (unmerged, merged) = xlsx_merge_fixture()?;
+    let source = if case == Case::XlsxEagerMergeCommitSave {
+        &unmerged
+    } else {
+        &merged
+    };
+    let archive = source.to_bytes()?;
+    let opc = OpcPackage::from_bytes(&archive)?;
+    let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    let target_payload = opc.get_part(&worksheet_uri)?.blob().to_vec();
+    let entry_count = opc.part_count();
+    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
+        total
+            .checked_add(part.blob().len())
+            .ok_or("XLSX merge fixture logical byte count overflows usize")
+    })?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!(
+                "xlsx-{}-edit-sparse-a1-b2",
+                if case == Case::XlsxEagerMergeCommitSave {
+                    "merge"
+                } else {
+                    "unmerge"
+                }
+            ),
+            generator: XLSX_MERGE_EDIT_CORPUS_GENERATOR,
+            package_format: "XLSX/OPC/ZIP",
+            shape: "sparse-a1-b2",
+            payload_kind: "deterministic-semantic-cells",
+            compression: "deflate",
+            entry_count,
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: target_payload.len(),
+            uncompressed_payload_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: format!(
+                "worksheet:Sheet1:{}:A1:B2",
+                if case == Case::XlsxEagerMergeCommitSave {
+                    "merge"
+                } else {
+                    "unmerge"
+                }
+            ),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "xl/worksheets/sheet1.xml".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
 fn semantic_pptx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut package = litchi_pptx::Package::new()?;
     let presentation = package.presentation_mut()?;
@@ -5488,6 +5606,9 @@ fn run_case_with_config(
         Case::XlsxEagerConditionalFormattingEditSave
         | Case::XlsxSourceBackedConditionalFormattingEditSave => {
             run_xlsx_conditional_formatting_edit_save(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsxEagerMergeCommitSave | Case::XlsxEagerUnmergeCommitSave => {
+            run_xlsx_merge_edit_save(case, corpus, warmup_iterations, samples)
         },
         Case::CfbOpen => run_cfb_open(corpus, warmup_iterations, samples),
         Case::CfbListStreams => run_cfb_list_streams(corpus, warmup_iterations, samples),
@@ -10094,6 +10215,169 @@ fn run_xlsx_update_commit_save(
     Ok(result(case, corpus, elapsed, Some(sink)))
 }
 
+fn prepare_xlsx_merge_edit(
+    workbook: &Workbook,
+    merge: bool,
+) -> Result<litchi_xlsx::Edit, Box<dyn Error>> {
+    let mut edit = workbook.edit()?;
+    let mut sheet = edit
+        .sheet("Sheet1")?
+        .ok_or("XLSX merge fixture is missing Sheet1")?;
+    if merge {
+        sheet.merge("A1:B2")?;
+    } else {
+        sheet.unmerge("B2")?;
+    }
+    Ok(edit)
+}
+
+fn verify_xlsx_merge_output(output: &[u8], merged: bool) -> Result<(), Box<dyn Error>> {
+    let workbook = Workbook::from_bytes(output.to_vec())?;
+    let sheet = workbook
+        .sheet("Sheet1")?
+        .ok_or("XLSX merge output is missing Sheet1")?;
+    let ranges = sheet.merges()?.map(Rect::a1).collect::<Vec<_>>();
+    let expected_ranges = if merged { vec!["A1:B2"] } else { Vec::new() };
+    if ranges != expected_ranges {
+        return Err("XLSX merge output has unexpected merge membership".into());
+    }
+
+    let anchor = sheet.cell("A1")?;
+    if !matches!(
+        anchor,
+        litchi_xlsx::cell::View::Stored(
+            XlsxCell::Value(XlsxValue::Text(text))
+        ) if text.as_str() == "litchi-xlsx-merge-anchor-v1"
+    ) {
+        return Err("XLSX merge output did not retain the anchor cell".into());
+    }
+    let unrelated = sheet.cell("C1")?;
+    if !matches!(
+        unrelated,
+        litchi_xlsx::cell::View::Stored(
+            XlsxCell::Value(XlsxValue::Text(text))
+        ) if text.as_str() == "litchi-xlsx-merge-unrelated-v1"
+    ) {
+        return Err("XLSX merge output changed an unrelated cell".into());
+    }
+
+    for address in ["A2", "B1", "B2"] {
+        let view = sheet.cell(address)?;
+        if merged {
+            if view.merge().map(Rect::a1).as_deref() != Some("A1:B2") {
+                return Err(format!("XLSX merge output did not cover {address}").into());
+            }
+        } else if !view.is_missing() {
+            return Err(format!("XLSX unmerge output retained {address}").into());
+        }
+    }
+    if !sheet.cell("C2")?.is_missing() {
+        return Err("XLSX merge output changed an uncovered cell".into());
+    }
+    Ok(())
+}
+
+fn verify_xlsx_merge_durable_patch(
+    source: &Workbook,
+    commit: &litchi_xlsx::Commit,
+    expected: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    if commit.patch().is_empty() || commit.patch().len() != 1 {
+        return Err("XLSX merge edit produced an unexpected semantic patch".into());
+    }
+    let durable = commit.patch().durable()?;
+    let first_json = durable.to_deterministic_json()?;
+    if first_json != durable.to_deterministic_json()? {
+        return Err("XLSX merge durable patch encoding is not deterministic".into());
+    }
+    let parsed = litchi_xlsx::DurablePatch::from_deterministic_json(&first_json)?;
+    let applied = parsed.apply(source)?;
+    if applied.to_plain_bytes()? != expected {
+        return Err("XLSX merge durable patch did not reproduce the expected output".into());
+    }
+    let restored = parsed.inverse().apply(&applied)?;
+    if restored.to_plain_bytes()? != source.to_plain_bytes()? {
+        return Err("XLSX merge durable inverse did not restore the exact source".into());
+    }
+
+    let mut stale_edit = source.edit()?;
+    stale_edit
+        .sheet("Sheet1")?
+        .ok_or("XLSX merge fixture is missing Sheet1")?
+        .set("C1", "litchi-xlsx-merge-stale-v1")?;
+    let stale = stale_edit.commit()?.into_workbook();
+    if parsed.apply(&stale).is_ok() {
+        return Err("XLSX merge durable patch accepted a stale source".into());
+    }
+    Ok(())
+}
+
+fn run_xlsx_merge_edit_save(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != XLSX_MERGE_EDIT_CORPUS_GENERATOR
+        || !case.is_xlsx_merge_edit_save()
+    {
+        return Err("XLSX merge case requires its sparse A1:B2 corpus".into());
+    }
+    let merge = case == Case::XlsxEagerMergeCommitSave;
+    let (unmerged, merged) = xlsx_merge_fixture()?;
+    let source = if merge { unmerged } else { merged };
+    let source_bytes = source.to_bytes()?;
+    if source_bytes != corpus.archive {
+        return Err("XLSX merge corpus source bytes differ from its fixture".into());
+    }
+    let expected_commit = prepare_xlsx_merge_edit(&source, merge)?.commit()?;
+    let expected = expected_commit.workbook().to_bytes()?;
+    verify_xlsx_merge_output(&expected, merge)?;
+    verify_xlsx_merge_durable_patch(&source, &expected_commit, &expected)?;
+    let expected_digest = sha256_hex(&expected);
+    let maximum = xlsx_output_ceiling(expected.len())?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let workbook = Workbook::from_bytes(source_bytes.clone())?;
+        let edit = prepare_xlsx_merge_edit(&workbook, merge)?;
+        let mut sink = CountingSink::bounded(maximum, 64 * 1024);
+        sink.reserve_budget()?;
+        let started = Instant::now();
+        let commit = edit.commit()?;
+        commit.workbook().write_to(&mut sink)?;
+        let duration = started.elapsed();
+        if sink.bytes != expected {
+            return Err("XLSX merge commit/save differs from deterministic output".into());
+        }
+        if sink.summary().largest_write > 64 * 1024 {
+            return Err("XLSX merge save exceeded the sequential sink write bound".into());
+        }
+        verify_xlsx_merge_output(&sink.bytes, merge)?;
+        if sha256_hex(&sink.bytes) != expected_digest {
+            return Err("XLSX merge output digest differs from expected output".into());
+        }
+        if iteration >= warmup_iterations {
+            sink_summaries.push(sink.summary());
+        }
+        std::hint::black_box(&sink.bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let sink = deterministic_sink_summary(&sink_summaries, case.name())?;
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: None,
+        execution: None,
+        output_sha256: Some(expected_digest),
+    })
+}
+
 fn xlsx_expected_output(
     corpus: &Corpus,
     updates: &[XlsxCoordinate],
@@ -14676,7 +14960,8 @@ mod tests {
         build_xlsx_calculation_metadata_edit_corpus, build_xlsx_conditional_formatting_edit_corpus,
         build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
         build_xlsx_defined_names_edit_corpus, build_xlsx_page_break_edit_corpus,
-        build_xlsx_page_margin_edit_corpus, build_xlsx_page_setup_edit_corpus,
+        build_xlsx_merge_edit_corpus, build_xlsx_page_margin_edit_corpus,
+        build_xlsx_page_setup_edit_corpus,
         build_xlsx_print_options_edit_corpus, build_xlsx_sheet_protection_edit_corpus,
         expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
         payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
@@ -16294,6 +16579,19 @@ mod tests {
         let measured = run_case(Case::XlsxOneCellCommitFirstRead, &first, 0, 1).unwrap();
         assert_eq!(measured.case, "xlsx_one_cell_commit_first_read");
         assert_eq!(measured.elapsed_ns.samples.len(), 1);
+    }
+
+    #[test]
+    fn xlsx_merge_and_unmerge_cases_are_deterministic_and_reversible() {
+        for case in [Case::XlsxEagerMergeCommitSave, Case::XlsxEagerUnmergeCommitSave] {
+            let first = build_xlsx_merge_edit_corpus(case).unwrap();
+            let second = build_xlsx_merge_edit_corpus(case).unwrap();
+            assert_eq!(first.archive, second.archive, "{}", case.name());
+            let measured = run_case(case, &first, 0, 1).unwrap();
+            assert_eq!(measured.case, case.name());
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            assert!(measured.output_sha256.is_some());
+        }
     }
 
     #[test]
