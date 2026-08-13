@@ -12,11 +12,18 @@ use crate::cell_values::{Reference, Selector};
 use crate::records::{BoundSheetRecord, Encoding, SheetType};
 use crate::{Error, Result, Workbook};
 use litchi_biff::Records;
+use litchi_cfb::{
+    ArtifactFingerprint, ComposedOverlaySource, OverlayError, OverlayLimits, PublishReport,
+    SameLengthStreamOverlay, ValidatedOverlayPlan,
+};
 use litchi_core::binary;
+use litchi_core::{ReadAt, SourceVersion};
 use litchi_ole_common::object::{Editor as PackageEditor, Limits, Targets};
+use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
-use std::io::{Cursor, Read, Seek};
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
+use std::path::Path;
 use std::sync::Arc;
 
 const EOF: u16 = 0x000A;
@@ -513,6 +520,7 @@ impl Edit {
                         &self.source.inner.workbook_stream,
                         entry,
                         &change.after.text,
+                        None,
                     )?,
                 ));
             }
@@ -559,6 +567,139 @@ impl Edit {
                 changed_comments: effective.len(),
                 touched_streams: 1,
             },
+        })
+    }
+
+    /// Plans a protected, source-backed same-length comment publication.
+    ///
+    /// This path owns only existing NOTE/TXO families. Every generated
+    /// replacement must retain its exact source range length and its source
+    /// compressed/UTF-16 encoding width. The complete Workbook/Book stream is
+    /// then submitted as one equal-length overlay to
+    /// [`SourceBackedOverlayPublisher`]. No CFB render fallback is attempted;
+    /// callers needing length-changing edits must explicitly call
+    /// [`Self::commit`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for protected CFB markers, stale or malformed
+    /// source state, unsupported encoding transitions, length/topology changes,
+    /// overlapping NOTE/TXO ownership, or failed semantic readback.
+    pub fn commit_source_backed(self) -> Result<SourceBackedCommit> {
+        let effective: Vec<_> = self
+            .changes
+            .iter()
+            .filter(|change| change.before != change.after)
+            .collect();
+
+        let mut replacements = Vec::new();
+        let replacement_capacity = effective
+            .len()
+            .checked_mul(2)
+            .ok_or_else(|| Error::UnsafeEdit("comment replacement count overflow".into()))?;
+        replacements
+            .try_reserve_exact(replacement_capacity)
+            .map_err(|_error| Error::Allocation("retaining source-backed XLS comment ranges"))?;
+        for change in &effective {
+            let sheet =
+                self.source.inner.sheets.get(change.sheet).ok_or_else(|| {
+                    Error::UnsafeEdit("source-backed comment sheet is stale".into())
+                })?;
+            let entry = sheet
+                .entries
+                .get(change.entry)
+                .ok_or_else(|| Error::UnsafeEdit("source-backed comment entry is stale".into()))?;
+
+            if change.before.author != change.after.author {
+                let compressed = ensure_author_encoding_width(
+                    &self.source.inner.workbook_stream,
+                    entry,
+                    &change.after.author,
+                )?;
+                let replacement =
+                    encode_note_with_compression(&entry.comment, &change.after, compressed)?;
+                ensure_equal_range_length(
+                    entry.site.note.start,
+                    entry.site.note.end,
+                    &replacement,
+                )?;
+                replacements.push((entry.site.note.start, entry.site.note.end, replacement));
+            }
+            if change.before.text != change.after.text {
+                let compressed = ensure_text_encoding_width(
+                    &self.source.inner.workbook_stream,
+                    entry,
+                    &change.after.text,
+                )?;
+                let first = entry.site.txo_family.first().ok_or_else(|| {
+                    Error::InvalidData("comment TXO source family is empty".into())
+                })?;
+                let last = entry.site.txo_family.last().ok_or_else(|| {
+                    Error::InvalidData("comment TXO source family is empty".into())
+                })?;
+                let replacement = encode_txo_family(
+                    &self.source.inner.workbook_stream,
+                    entry,
+                    &change.after.text,
+                    Some(compressed),
+                )?;
+                ensure_equal_range_length(first.start, last.end, &replacement)?;
+                replacements.push((first.start, last.end, replacement));
+            }
+        }
+        replacements.sort_by_key(|replacement| std::cmp::Reverse(replacement.0));
+        ensure_disjoint(&replacements)?;
+
+        let target_workbook_bytes = u64::try_from(self.source.inner.workbook_stream.len())
+            .map_err(|_error| Error::InvalidData("candidate Workbook length exceeds u64".into()))?;
+        let replacement_bytes: Arc<[u8]> = if replacements.is_empty() {
+            Arc::clone(&self.source.inner.workbook_stream)
+        } else {
+            let mut workbook = self.source.inner.workbook_stream.to_vec();
+            apply_equal_length_replacements(&mut workbook, &replacements)?;
+            if workbook.len() != self.source.inner.workbook_stream.len() {
+                return Err(Error::UnsafeEdit(
+                    "source-backed comment publication changed Workbook stream length".into(),
+                ));
+            }
+            Arc::from(workbook)
+        };
+
+        // Keep the source bytes in their existing Arc-backed allocation. The
+        // common publisher only needs a positional ReadAt view and never
+        // requires a second complete source Vec.
+        let source: Arc<dyn ReadAt> =
+            Arc::new(SnapshotSource::new(Arc::clone(&self.source.inner.bytes)));
+        let publisher = SourceBackedOverlayPublisher::open(source).map_err(overlay_to_error)?;
+        let replacement = SameLengthStreamOverlay::new(
+            self.source.inner.workbook_path.clone(),
+            replacement_bytes,
+        );
+        let plan = publisher
+            .plan(vec![replacement], OverlayLimits::default())
+            .map_err(overlay_to_error)?;
+        if !effective.is_empty() {
+            verify_source_backed_readback(&plan, &self.source, &effective)?;
+        }
+
+        let source_workbook_bytes = u64::try_from(self.source.inner.workbook_stream.len())
+            .map_err(|_error| Error::InvalidData("Workbook stream length exceeds u64".into()))?;
+        let source_bytes = u64::try_from(self.source.inner.bytes.len())
+            .map_err(|_error| Error::InvalidData("source CFB length exceeds u64".into()))?;
+        let diagnostics = SourceBackedDiagnostics {
+            changed_comments: effective.len(),
+            touched_streams: usize::from(!plan.is_noop()),
+            changed_spans: plan.changed_spans(),
+            source_bytes,
+            source_workbook_bytes,
+            target_workbook_bytes,
+            source_fingerprint: plan.source_fingerprint(),
+            target_fingerprint: plan.target_fingerprint(),
+        };
+        Ok(SourceBackedCommit {
+            source: self.source,
+            plan,
+            diagnostics,
         })
     }
 }
@@ -737,6 +878,418 @@ impl Commit {
     pub fn into_parts(self) -> (Snapshot, Patch, Diagnostics) {
         (self.snapshot, self.patch, self.diagnostics)
     }
+}
+
+/// Content-free evidence for a same-length source-backed comment publication.
+///
+/// The diagnostics intentionally retain only counts, lengths, and opaque CFB
+/// fingerprints. Comment authors, text, and physical payload bytes are never
+/// copied into this value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceBackedDiagnostics {
+    changed_comments: usize,
+    touched_streams: usize,
+    changed_spans: usize,
+    source_bytes: u64,
+    source_workbook_bytes: u64,
+    target_workbook_bytes: u64,
+    source_fingerprint: ArtifactFingerprint,
+    target_fingerprint: ArtifactFingerprint,
+}
+
+impl SourceBackedDiagnostics {
+    /// Number of semantic comments changed by the transaction.
+    #[must_use]
+    pub const fn changed_comments(self) -> usize {
+        self.changed_comments
+    }
+
+    /// Number of logical streams selected for the overlay.
+    #[must_use]
+    pub const fn touched_streams(self) -> usize {
+        self.touched_streams
+    }
+
+    /// Number of physical CFB spans changed by the overlay.
+    #[must_use]
+    pub const fn changed_spans(self) -> usize {
+        self.changed_spans
+    }
+
+    /// Complete source CFB length.
+    #[must_use]
+    pub const fn source_bytes(self) -> u64 {
+        self.source_bytes
+    }
+
+    /// Source Workbook/Book stream length.
+    #[must_use]
+    pub const fn source_workbook_bytes(self) -> u64 {
+        self.source_workbook_bytes
+    }
+
+    /// Candidate Workbook/Book stream length.
+    #[must_use]
+    pub const fn target_workbook_bytes(self) -> u64 {
+        self.target_workbook_bytes
+    }
+
+    /// Exact source CFB fingerprint.
+    #[must_use]
+    pub const fn source_fingerprint(self) -> ArtifactFingerprint {
+        self.source_fingerprint
+    }
+
+    /// Exact candidate CFB fingerprint.
+    #[must_use]
+    pub const fn target_fingerprint(self) -> ArtifactFingerprint {
+        self.target_fingerprint
+    }
+}
+
+/// A checked source-bound same-length XLS comment publication plan.
+///
+/// Unlike [`Commit`], this value does not retain a rendered replacement CFB
+/// artifact. It retains the exact source-backed overlay plan and streams the
+/// validated candidate to either a sequential sink or an atomic destination.
+/// A caller that needs variable-length record edits must explicitly use
+/// [`Edit::commit`].
+pub struct SourceBackedCommit {
+    source: Snapshot,
+    plan: ValidatedOverlayPlan,
+    diagnostics: SourceBackedDiagnostics,
+}
+
+impl SourceBackedCommit {
+    /// Exact immutable source snapshot used by this plan.
+    #[must_use]
+    pub const fn source(&self) -> &Snapshot {
+        &self.source
+    }
+
+    /// Underlying checked common CFB overlay plan.
+    #[must_use]
+    pub const fn plan(&self) -> &ValidatedOverlayPlan {
+        &self.plan
+    }
+
+    /// Content-free publication evidence.
+    #[must_use]
+    pub const fn diagnostics(&self) -> SourceBackedDiagnostics {
+        self.diagnostics
+    }
+
+    /// Whether this publication is an exact source identity no-op.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.plan.is_noop()
+    }
+
+    /// Streams the complete source-backed candidate to a sequential sink.
+    ///
+    /// The common overlay publisher rechecks the exact source and target
+    /// fingerprints before and during output. A sink failure retains the
+    /// typed [`litchi_cfb::OutputProgress`] inside [`OverlayError`].
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
+        self.plan.write_to(writer)
+    }
+
+    /// Alias for [`Self::write_to`] emphasizing that this is publication.
+    pub fn publish_to_stream<W: Write>(
+        &self,
+        writer: &mut W,
+    ) -> Result<PublishReport, OverlayError> {
+        self.write_to(writer)
+    }
+
+    /// Streams the candidate through the common synced sibling-file and
+    /// atomic-rename path.
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<PublishReport, OverlayError> {
+        self.plan.save(path)
+    }
+}
+
+impl fmt::Debug for SourceBackedCommit {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SourceBackedCommit")
+            .field("source", &self.source)
+            .field("plan", &self.plan)
+            .field("diagnostics", &self.diagnostics)
+            .finish()
+    }
+}
+
+#[derive(Clone)]
+struct SnapshotSource {
+    bytes: Arc<[u8]>,
+    version: SourceVersion,
+}
+
+impl SnapshotSource {
+    fn new(bytes: Arc<[u8]>) -> Self {
+        let identity = bytes.as_ptr() as usize as u64;
+        let length = bytes.len() as u64;
+        Self {
+            bytes,
+            version: SourceVersion::new(identity, length),
+        }
+    }
+}
+
+impl ReadAt for SnapshotSource {
+    fn len(&self) -> std::io::Result<u64> {
+        u64::try_from(self.bytes.len())
+            .map_err(|_error| std::io::Error::other("source length exceeds u64"))
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+        if output.is_empty() || offset >= self.bytes.len() as u64 {
+            return Ok(0);
+        }
+        let start = usize::try_from(offset)
+            .map_err(|_error| std::io::Error::other("source offset exceeds usize"))?;
+        let count = output.len().min(self.bytes.len() - start);
+        output[..count].copy_from_slice(&self.bytes[start..start + count]);
+        Ok(count)
+    }
+
+    fn version(&self) -> std::io::Result<SourceVersion> {
+        Ok(self.version)
+    }
+}
+
+struct PositionalReader {
+    source: ComposedOverlaySource,
+    position: u64,
+}
+
+impl PositionalReader {
+    fn new(source: ComposedOverlaySource) -> Self {
+        Self {
+            source,
+            position: 0,
+        }
+    }
+}
+
+impl Read for PositionalReader {
+    fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+        let count = self.source.read_at(self.position, output)?;
+        self.position = self
+            .position
+            .checked_add(count as u64)
+            .ok_or_else(|| std::io::Error::other("positional reader offset overflow"))?;
+        Ok(count)
+    }
+}
+
+impl Seek for PositionalReader {
+    fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+        let length = self.source.len()?;
+        let target = match position {
+            SeekFrom::Start(offset) => i128::from(offset),
+            SeekFrom::Current(offset) => i128::from(self.position) + i128::from(offset),
+            SeekFrom::End(offset) => i128::from(length) + i128::from(offset),
+        };
+        if target < 0 || target > i128::from(u64::MAX) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "positional reader seek is outside the source",
+            ));
+        }
+        self.position = target as u64;
+        Ok(self.position)
+    }
+}
+
+fn overlay_to_error(error: OverlayError) -> Error {
+    match error {
+        OverlayError::Ole(error) => Error::Cfb(error),
+        OverlayError::Io(error) => Error::Io(error),
+        other => Error::UnsafeEdit(format!("source-backed comment overlay refused: {other}")),
+    }
+}
+
+fn ensure_equal_range_length(start: usize, end: usize, replacement: &[u8]) -> Result<()> {
+    let source_length = end.checked_sub(start).ok_or_else(|| {
+        Error::UnsafeEdit("source-backed comment range has reversed bounds".into())
+    })?;
+    if source_length != replacement.len() {
+        return Err(Error::UnsafeEdit(
+            "source-backed comment replacement changes a NOTE/TXO range length".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn apply_equal_length_replacements(
+    workbook: &mut [u8],
+    replacements: &[(usize, usize, Vec<u8>)],
+) -> Result<()> {
+    for (start, end, replacement) in replacements {
+        ensure_equal_range_length(*start, *end, replacement)?;
+        let target = workbook.get_mut(*start..*end).ok_or_else(|| {
+            Error::UnsafeEdit("source-backed comment range is outside Workbook".into())
+        })?;
+        target.copy_from_slice(replacement);
+    }
+    Ok(())
+}
+
+fn ensure_author_encoding_width(stream: &[u8], entry: &Entry, author: &str) -> Result<bool> {
+    let payload = stream
+        .get(entry.site.note.start + 4..entry.site.note.end)
+        .ok_or_else(|| Error::InvalidData("comment NOTE source payload is truncated".into()))?;
+    let source_compressed = payload
+        .get(10)
+        .ok_or_else(|| Error::InvalidData("comment NOTE source flags are truncated".into()))?
+        & 1
+        == 0;
+    let target_compressed = author.encode_utf16().all(|unit| unit <= 0x00FF);
+    if source_compressed && !target_compressed {
+        return Err(Error::UnsafeEdit(
+            "source-backed comment author changes encoding width".into(),
+        ));
+    }
+    Ok(source_compressed)
+}
+
+fn ensure_text_encoding_width(stream: &[u8], entry: &Entry, text: &str) -> Result<bool> {
+    let source_compressed = source_text_compression(stream, entry)?;
+    let target_compressed = text.encode_utf16().all(|unit| unit <= 0x00FF);
+    if source_compressed.is_some_and(|value| value && !target_compressed) {
+        return Err(Error::UnsafeEdit(
+            "source-backed comment text changes encoding width".into(),
+        ));
+    }
+    source_compressed.ok_or_else(|| {
+        Error::UnsafeEdit(
+            "source-backed comment text has no source encoding width for replacement".into(),
+        )
+    })
+}
+
+fn source_text_compression(stream: &[u8], entry: &Entry) -> Result<Option<bool>> {
+    let txo = entry
+        .site
+        .txo_family
+        .first()
+        .ok_or_else(|| Error::InvalidData("comment TXO source family is empty".into()))?;
+    let txo_payload = stream
+        .get(txo.start + 4..txo.end)
+        .ok_or_else(|| Error::InvalidData("comment TXO source payload is truncated".into()))?;
+    if txo_payload.len() < 14 {
+        return Err(Error::InvalidData("comment TXO source is truncated".into()));
+    }
+    let character_count =
+        usize::from(u16::from_le_bytes(txo_payload[10..12].try_into().map_err(
+            |_error| Error::InvalidData("comment TXO cchText is truncated".into()),
+        )?));
+    if character_count == 0 {
+        return Ok(None);
+    }
+    let mut remaining = character_count;
+    let mut source_compressed = None;
+    for continuation in entry.site.txo_family.iter().skip(1) {
+        if remaining == 0 {
+            break;
+        }
+        let payload = stream
+            .get(continuation.start + 4..continuation.end)
+            .ok_or_else(|| Error::InvalidData("comment TXO continuation is truncated".into()))?;
+        let flags = *payload.first().ok_or_else(|| {
+            Error::InvalidData("comment TXO continuation flags are missing".into())
+        })?;
+        if flags & !1 != 0 {
+            return Err(Error::InvalidData(
+                "comment TXO continuation has reserved encoding bits".into(),
+            ));
+        }
+        let compressed = flags & 1 == 0;
+        if source_compressed.is_some_and(|value| value != compressed) {
+            return Err(Error::UnsafeEdit(
+                "source-backed comment TXO uses mixed encoding widths".into(),
+            ));
+        }
+        source_compressed = Some(compressed);
+        let width = if compressed { 1 } else { 2 };
+        let bytes = payload.len().checked_sub(1).ok_or_else(|| {
+            Error::InvalidData("comment TXO continuation has no text payload".into())
+        })?;
+        if bytes == 0 || bytes % width != 0 {
+            return Err(Error::InvalidData(
+                "comment TXO continuation has an invalid text width".into(),
+            ));
+        }
+        let count = bytes / width;
+        if count > remaining {
+            return Err(Error::InvalidData(
+                "comment TXO continuation exceeds source text length".into(),
+            ));
+        }
+        remaining -= count;
+    }
+    if remaining != 0 {
+        return Err(Error::InvalidData(
+            "comment TXO source text continuation is incomplete".into(),
+        ));
+    }
+    source_compressed
+        .ok_or_else(|| Error::InvalidData("comment TXO source text continuation is missing".into()))
+        .map(Some)
+}
+
+fn verify_source_backed_readback(
+    plan: &ValidatedOverlayPlan,
+    source: &Snapshot,
+    changes: &[&Change],
+) -> Result<()> {
+    let candidate = plan.composed_source().map_err(overlay_to_error)?;
+    let workbook = Workbook::new(PositionalReader::new(candidate))?;
+    let worksheet_count = workbook
+        .sheets()
+        .iter()
+        .filter(|sheet| sheet.parsed_worksheet_index().is_some())
+        .count();
+    if worksheet_count != source.inner.sheets.len() {
+        return Err(Error::UnsafeEdit(
+            "source-backed comment publication changed the worksheet inventory".into(),
+        ));
+    }
+    for change in changes {
+        let sheet = source.inner.sheets.get(change.sheet).ok_or_else(|| {
+            Error::UnsafeEdit("source-backed comment sheet disappeared during readback".into())
+        })?;
+        let metadata = workbook.sheet(sheet.workbook_position).ok_or_else(|| {
+            Error::UnsafeEdit("source-backed comment worksheet disappeared during readback".into())
+        })?;
+        let worksheet_index = metadata.parsed_worksheet_index().ok_or_else(|| {
+            Error::UnsafeEdit(
+                "source-backed comment worksheet is not parsed during readback".into(),
+            )
+        })?;
+        let comments = workbook.xls_worksheet(worksheet_index)?.comments();
+        let comment = comments.iter().find(|comment| {
+            comment.row()
+                == source.inner.sheets[change.sheet].entries[change.entry]
+                    .comment
+                    .row()
+                && comment.column()
+                    == source.inner.sheets[change.sheet].entries[change.entry]
+                        .comment
+                        .column()
+        });
+        let comment = comment.ok_or_else(|| {
+            Error::UnsafeEdit("source-backed comment NOTE disappeared during readback".into())
+        })?;
+        if Value::from_comment(comment) != change.after {
+            return Err(Error::UnsafeEdit(
+                "source-backed comment semantic readback disagreed with the staged value".into(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_value(value: &Value) -> Result<()> {
@@ -983,23 +1536,37 @@ fn parse_sheet_sites(
                 );
                 pending_object = Some(object_id);
             },
-            MSODRAWING_TYPE if pending_object.is_some() => {
-                let object_id = pending_object
-                    .ok_or_else(|| Error::InvalidData("missing pending comment object".into()))?;
-                if record.payload() != [0, 0, 0x0D, 0xF0, 0, 0, 0, 0] {
+            MSODRAWING_TYPE => {
+                let boundary = record.payload() == [0, 0, 0x0D, 0xF0, 0, 0, 0, 0];
+                let Some(object_id) = pending_object else {
+                    if boundary {
+                        return Err(Error::UnsafeEdit(
+                            "orphan or duplicate comment ClientTextbox drawing boundary".into(),
+                        ));
+                    }
+                    continue;
+                };
+                if !boundary {
                     return Err(Error::UnsafeEdit(
                         "comment object has an ambiguous ClientTextbox drawing boundary".into(),
                     ));
                 }
-                sites
+                let site = sites
                     .get_mut(&object_id)
-                    .ok_or_else(|| Error::InvalidData("comment site disappeared".into()))?
-                    .drawing = Some(raw.clone());
+                    .ok_or_else(|| Error::InvalidData("comment site disappeared".into()))?;
+                if site.drawing.is_some() {
+                    return Err(Error::UnsafeEdit(
+                        "comment object has duplicate ClientTextbox drawing boundaries".into(),
+                    ));
+                }
+                site.drawing = Some(raw.clone());
             },
-            TXO_TYPE if pending_object.is_some() => {
-                let object_id = pending_object
-                    .take()
-                    .ok_or_else(|| Error::InvalidData("missing pending comment object".into()))?;
+            TXO_TYPE => {
+                let Some(object_id) = pending_object.take() else {
+                    return Err(Error::UnsafeEdit(
+                        "orphan or duplicate comment TXO record".into(),
+                    ));
+                };
                 let payload = record.payload();
                 if payload.len() < 18 {
                     return Err(Error::InvalidData("comment TXO is truncated".into()));
@@ -1009,6 +1576,16 @@ fn parse_sheet_sites(
                 let site = sites
                     .get_mut(&object_id)
                     .ok_or_else(|| Error::InvalidData("comment site disappeared".into()))?;
+                if site.drawing.is_none() {
+                    return Err(Error::UnsafeEdit(
+                        "comment TXO has no ClientTextbox drawing boundary".into(),
+                    ));
+                }
+                if !site.txo_family.is_empty() {
+                    return Err(Error::UnsafeEdit(
+                        "comment object has duplicate TXO records".into(),
+                    ));
+                }
                 site.txo_family.push(raw.clone());
                 if characters != 0 || runs != 0 {
                     pending_text = Some(PendingText {
@@ -1129,6 +1706,15 @@ fn comment_object_id(payload: &[u8]) -> Result<Option<u16>> {
 fn encode_note(comment: &Comment, value: &Value) -> Result<Vec<u8>> {
     let units: Vec<_> = value.author.encode_utf16().collect();
     let compressed = units.iter().all(|unit| *unit <= 0x00FF);
+    encode_note_with_compression(comment, value, compressed)
+}
+
+fn encode_note_with_compression(
+    comment: &Comment,
+    value: &Value,
+    compressed: bool,
+) -> Result<Vec<u8>> {
+    let units: Vec<_> = value.author.encode_utf16().collect();
     let mut payload = Vec::new();
     payload.extend_from_slice(&comment.row().to_le_bytes());
     payload.extend_from_slice(&u16::from(comment.column()).to_le_bytes());
@@ -1166,7 +1752,12 @@ fn encode_note(comment: &Comment, value: &Value) -> Result<Vec<u8>> {
     encode_record(RECORD_TYPE, &payload)
 }
 
-fn encode_txo_family(stream: &[u8], entry: &Entry, text: &str) -> Result<Vec<u8>> {
+fn encode_txo_family(
+    stream: &[u8],
+    entry: &Entry,
+    text: &str,
+    compression: Option<bool>,
+) -> Result<Vec<u8>> {
     let txo = entry
         .site
         .txo_family
@@ -1195,7 +1786,7 @@ fn encode_txo_family(stream: &[u8], entry: &Entry, text: &str) -> Result<Vec<u8>
     );
     let mut output = encode_record(TXO_TYPE, &payload)?;
     if !units.is_empty() {
-        let compressed = units.iter().all(|unit| *unit <= 0x00FF);
+        let compressed = compression.unwrap_or_else(|| units.iter().all(|unit| *unit <= 0x00FF));
         let per_record = if compressed { 8_223 } else { 4_111 };
         let mut offset = 0;
         while offset < units.len() {

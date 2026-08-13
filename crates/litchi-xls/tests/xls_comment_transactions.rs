@@ -3,7 +3,7 @@ use litchi_xls::comments::{Snapshot, Update, Value};
 use litchi_xls::writer::Writer;
 use litchi_xls::{Visibility, Workbook};
 use std::collections::BTreeMap;
-use std::io::Cursor;
+use std::io::{self, Cursor, Write};
 
 fn authored(comments: usize) -> Vec<u8> {
     let mut writer = Writer::new();
@@ -73,6 +73,82 @@ fn replace_workbook_record_kind(bytes: Vec<u8>, from: u16, to: u16) -> Vec<u8> {
         }
         offset += 4 + length;
     }
+    let mut writer = litchi_cfb::OleWriter::new();
+    writer.create_stream(&["Workbook"], &workbook).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn duplicate_workbook_record_before_first_worksheet_eof(
+    bytes: Vec<u8>,
+    kind: u16,
+    matches: impl Fn(&[u8]) -> bool,
+) -> Vec<u8> {
+    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let mut offset = 0_usize;
+    let mut eof_count = 0_usize;
+    let mut duplicate = None;
+    let mut insertion = None;
+    while offset < workbook.len() {
+        let end = offset
+            + 4
+            + usize::from(u16::from_le_bytes(
+                workbook[offset + 2..offset + 4].try_into().unwrap(),
+            ));
+        let record_kind = u16::from_le_bytes(workbook[offset..offset + 2].try_into().unwrap());
+        if record_kind == kind && duplicate.is_none() && matches(&workbook[offset + 4..end]) {
+            duplicate = Some(workbook[offset..end].to_vec());
+        }
+        if record_kind == 0x000A {
+            eof_count += 1;
+            if eof_count == 2 {
+                insertion = Some(offset);
+                break;
+            }
+        }
+        offset = end;
+    }
+    let duplicate = duplicate.unwrap();
+    let insertion = insertion.unwrap();
+    workbook.splice(insertion..insertion, duplicate);
+    let mut writer = litchi_cfb::OleWriter::new();
+    writer.create_stream(&["Workbook"], &workbook).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn orphan_workbook_record_after_first_worksheet_bof(
+    bytes: Vec<u8>,
+    kind: u16,
+    matches: impl Fn(&[u8]) -> bool,
+) -> Vec<u8> {
+    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let mut offset = 0_usize;
+    let mut duplicate = None;
+    let mut insertion = None;
+    while offset < workbook.len() {
+        let length = usize::from(u16::from_le_bytes(
+            workbook[offset + 2..offset + 4].try_into().unwrap(),
+        ));
+        let end = offset + 4 + length;
+        let record_kind = u16::from_le_bytes(workbook[offset..offset + 2].try_into().unwrap());
+        let payload = &workbook[offset + 4..end];
+        if record_kind == kind && duplicate.is_none() && matches(payload) {
+            duplicate = Some(workbook[offset..end].to_vec());
+        }
+        if record_kind == 0x0809 && payload.get(2..4) == Some(&[0x10, 0x00]) && insertion.is_none()
+        {
+            insertion = Some(end);
+        }
+        offset = end;
+    }
+    let duplicate = duplicate.unwrap();
+    let insertion = insertion.unwrap();
+    workbook.splice(insertion..insertion, duplicate);
     let mut writer = litchi_cfb::OleWriter::new();
     writer.create_stream(&["Workbook"], &workbook).unwrap();
     let mut output = Cursor::new(Vec::new());
@@ -312,6 +388,33 @@ fn refuses_protected_signed_encrypted_and_invalid_values() {
 }
 
 #[test]
+fn refuses_orphan_and_duplicate_comment_txo_or_drawing_boundaries() {
+    let orphan_txo =
+        orphan_workbook_record_after_first_worksheet_bof(authored(1), 0x01B6, |payload| {
+            payload.len() >= 18
+        });
+    assert!(Snapshot::from_bytes(orphan_txo).is_err());
+
+    let orphan_drawing =
+        orphan_workbook_record_after_first_worksheet_bof(authored(1), 0x00EC, |payload| {
+            payload == [0, 0, 0x0D, 0xF0, 0, 0, 0, 0]
+        });
+    assert!(Snapshot::from_bytes(orphan_drawing).is_err());
+
+    let duplicate_txo =
+        duplicate_workbook_record_before_first_worksheet_eof(authored(1), 0x01B6, |payload| {
+            payload.len() >= 18
+        });
+    assert!(Snapshot::from_bytes(duplicate_txo).is_err());
+
+    let duplicate_drawing =
+        duplicate_workbook_record_before_first_worksheet_eof(authored(1), 0x00EC, |payload| {
+            payload == [0, 0, 0x0D, 0xF0, 0, 0, 0, 0]
+        });
+    assert!(Snapshot::from_bytes(duplicate_drawing).is_err());
+}
+
+#[test]
 fn updates_poi_fixture_and_reopens() {
     let corpus = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet");
@@ -352,4 +455,257 @@ fn updates_poi_fixture_and_reopens() {
         workbook.xls_worksheet(0).unwrap().comments()[0].text(),
         "comment beside unrelated drawing shapes"
     );
+}
+
+#[test]
+fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
+    let snapshot = Snapshot::from_bytes(authored(256)).unwrap();
+    let mut one = snapshot.edit();
+    one.replace(
+        Selector::Position(0),
+        Reference::new(0, 1).unwrap(),
+        Value::new("AuthoR 0", "texT 0").unwrap(),
+    )
+    .unwrap();
+    let one = one.commit_source_backed().unwrap();
+    assert_eq!(one.diagnostics().changed_comments(), 1);
+    assert_eq!(one.diagnostics().touched_streams(), 1);
+    assert_eq!(
+        one.diagnostics().source_workbook_bytes(),
+        one.diagnostics().target_workbook_bytes()
+    );
+    let mut output = Vec::new();
+    one.write_to(&mut output).unwrap();
+    let reopened = Snapshot::from_bytes(output).unwrap();
+    assert_eq!(
+        reopened
+            .worksheet(Selector::Position(0))
+            .unwrap()
+            .unwrap()
+            .comment(Reference::new(0, 1).unwrap())
+            .unwrap()
+            .unwrap()
+            .author(),
+        "AuthoR 0"
+    );
+
+    let snapshot = Snapshot::from_bytes(authored(256)).unwrap();
+    let mut all = snapshot.edit();
+    let updates = (0..256).map(|row| {
+        Update::new(
+            Reference::new(row, 1).unwrap(),
+            Value::new(format!("AuthoR {row}"), format!("texT {row}")).unwrap(),
+        )
+    });
+    all.replace_many(Selector::Position(0), updates).unwrap();
+    let all = all.commit_source_backed().unwrap();
+    assert_eq!(all.diagnostics().changed_comments(), 256);
+    assert_eq!(all.diagnostics().touched_streams(), 1);
+    assert!(!all.is_noop());
+    let mut output = Vec::new();
+    all.write_to(&mut output).unwrap();
+    let reopened = Snapshot::from_bytes(output).unwrap();
+    assert_eq!(
+        reopened
+            .worksheet(Selector::Position(0))
+            .unwrap()
+            .unwrap()
+            .comment(Reference::new(255, 1).unwrap())
+            .unwrap()
+            .unwrap()
+            .text(),
+        "texT 255"
+    );
+}
+
+#[test]
+fn source_backed_commit_preserves_compressed_and_utf16_widths() {
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Widths").unwrap();
+    writer.add_comment(sheet, 0, 0, "AB", "AB").unwrap();
+    writer.add_comment(sheet, 1, 0, "作者", "😀😀").unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
+    let mut edit = snapshot.edit();
+    edit.replace(
+        Selector::Position(0),
+        Reference::new(0, 0).unwrap(),
+        Value::new("CD", "CD").unwrap(),
+    )
+    .unwrap();
+    edit.replace(
+        Selector::Position(0),
+        Reference::new(1, 0).unwrap(),
+        Value::new("文字", "😃😃").unwrap(),
+    )
+    .unwrap();
+    let commit = edit.commit_source_backed().unwrap();
+    assert_eq!(commit.diagnostics().changed_comments(), 2);
+    let mut output = Vec::new();
+    commit.write_to(&mut output).unwrap();
+    let reopened = Snapshot::from_bytes(output).unwrap();
+    assert_eq!(
+        reopened
+            .worksheet(Selector::Position(0))
+            .unwrap()
+            .unwrap()
+            .comment(Reference::new(1, 0).unwrap())
+            .unwrap()
+            .unwrap()
+            .text(),
+        "😃😃"
+    );
+}
+
+#[test]
+fn source_backed_commit_refuses_length_or_encoding_width_changes() {
+    let snapshot = Snapshot::from_bytes(authored(1)).unwrap();
+    let mut edit = snapshot.edit();
+    edit.replace(
+        Selector::Position(0),
+        Reference::new(0, 1).unwrap(),
+        Value::new("Author 0", "text 00").unwrap(),
+    )
+    .unwrap();
+    assert!(edit.commit_source_backed().is_err());
+
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Widths").unwrap();
+    writer.add_comment(sheet, 0, 0, "AB", "AB").unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
+    let mut edit = snapshot.edit();
+    // Both strings occupy two encoded bytes, but this changes compressed BIFF
+    // text into UTF-16 and must remain an explicit refusal.
+    edit.replace(
+        Selector::Position(0),
+        Reference::new(0, 0).unwrap(),
+        Value::new("é", "é").unwrap(),
+    )
+    .unwrap();
+    assert!(edit.commit_source_backed().is_err());
+}
+
+#[test]
+fn source_backed_commit_exact_noop_unknown_stream_and_atomic_save() {
+    let source = add_stream(authored(1), "OpaquePayload");
+    let before_streams = streams(&source);
+    let snapshot = Snapshot::from_bytes(source.clone()).unwrap();
+    let original = read_value(snapshot.bytes(), 0, 0);
+    let mut edit = snapshot.edit();
+    edit.replace(
+        Selector::Position(0),
+        Reference::new(0, 1).unwrap(),
+        original,
+    )
+    .unwrap();
+    let noop = edit.commit_source_backed().unwrap();
+    assert!(noop.is_noop());
+    assert_eq!(noop.diagnostics().changed_comments(), 0);
+    let mut output = Vec::new();
+    noop.write_to(&mut output).unwrap();
+    assert_eq!(output, source);
+
+    let mut edit = Snapshot::from_bytes(source.clone()).unwrap().edit();
+    edit.replace(
+        Selector::Position(0),
+        Reference::new(0, 1).unwrap(),
+        Value::new("Author 9", "text 9").unwrap(),
+    )
+    .unwrap();
+    let changed = edit.commit_source_backed().unwrap();
+    let path = std::env::temp_dir().join(format!(
+        "litchi-xls-source-backed-{}-{}.xls",
+        std::process::id(),
+        changed.diagnostics().target_fingerprint().as_bytes()[0]
+    ));
+    let _ = std::fs::remove_file(&path);
+    changed.save(&path).unwrap();
+    let saved = std::fs::read(&path).unwrap();
+    let _ = std::fs::remove_file(&path);
+    let after_streams = streams(&saved);
+    for (path, before) in before_streams {
+        if path
+            .last()
+            .is_some_and(|name| name == "Workbook" || name == "Book")
+        {
+            continue;
+        }
+        assert_eq!(after_streams.get(&path), Some(&before));
+    }
+    assert_eq!(read_value(&saved, 0, 0).author(), "Author 9");
+}
+
+struct ShortSink {
+    bytes: Vec<u8>,
+    maximum: usize,
+}
+
+impl Write for ShortSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let count = bytes.len().min(self.maximum);
+        self.bytes.extend_from_slice(&bytes[..count]);
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+struct PartialSink {
+    accepted: usize,
+    limit: usize,
+}
+
+impl Write for PartialSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.accepted >= self.limit {
+            return Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "test sink stopped",
+            ));
+        }
+        let count = bytes.len().min(self.limit - self.accepted);
+        self.accepted += count;
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn source_backed_commit_handles_short_and_partial_sinks() {
+    let snapshot = Snapshot::from_bytes(authored(1)).unwrap();
+    let mut edit = snapshot.edit();
+    edit.replace(
+        Selector::Position(0),
+        Reference::new(0, 1).unwrap(),
+        Value::new("Author 9", "text 9").unwrap(),
+    )
+    .unwrap();
+    let commit = edit.commit_source_backed().unwrap();
+    let mut short = ShortSink {
+        bytes: Vec::new(),
+        maximum: 7,
+    };
+    commit.write_to(&mut short).unwrap();
+    assert_eq!(short.bytes.len(), snapshot.bytes().len());
+
+    let mut partial = PartialSink {
+        accepted: 0,
+        limit: 23,
+    };
+    let error = commit.write_to(&mut partial).unwrap_err();
+    assert!(matches!(
+        error,
+        litchi_cfb::OverlayError::IncompleteOutput {
+            progress: litchi_cfb::OutputProgress::Prefix { .. },
+            ..
+        }
+    ));
 }
