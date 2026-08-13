@@ -130,7 +130,7 @@ pub(crate) fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             path: Path::section(position),
         });
     }
-    verify_unselected_members(source, &candidate, target, &before, &after)?;
+    verify_unselected_members(source, &candidate, target, &before, &after, None)?;
     budget.settle_transaction_reservation();
 
     let target_artifact = candidate.state.source.shared_source();
@@ -213,6 +213,7 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
         source_target,
         patch.before(),
         patch.after(),
+        None,
     )?;
     budget.settle_transaction_reservation();
     Ok(Commit::from_parts(
@@ -905,12 +906,13 @@ fn validate_reference_metadata(
     Ok(())
 }
 
-fn verify_unselected_members(
+pub(super) fn verify_unselected_members(
     source: &Package,
     candidate: &Package,
     target: transaction::Target,
     settings_before: &Settings,
     settings_after: &Settings,
+    additionally_ignored_field: Option<u32>,
 ) -> Result<(), Error> {
     let selected_name = source
         .state
@@ -957,6 +959,7 @@ fn verify_unselected_members(
         selected_name,
         settings_before,
         settings_after,
+        additionally_ignored_field,
     )
 }
 
@@ -967,6 +970,7 @@ fn verify_selected_component(
     selected_name: &str,
     settings_before: &Settings,
     settings_after: &Settings,
+    additionally_ignored_field: Option<u32>,
 ) -> Result<(), Error> {
     let path = Path::section(target.position);
     let before_stream = selected_component_stream(source, selected_name)?;
@@ -1039,6 +1043,7 @@ fn verify_selected_component(
                         source,
                         settings_before,
                         settings_after,
+                        additionally_ignored_field,
                     )?
                 {
                     return Err(Error::Verification { path });
@@ -1156,17 +1161,20 @@ fn unchanged_section_fields_preserved(
     package: &Package,
     before: &Settings,
     after: &Settings,
+    additionally_ignored_field: Option<u32>,
 ) -> Result<bool, Error> {
     let limits = transaction::wire_limits(package)?;
     let left = WireView::parse_with_limits(source, limits).map_err(transaction::map_wire_error)?;
     let right =
         WireView::parse_with_limits(candidate, limits).map_err(transaction::map_wire_error)?;
-    let mut left_fields = left
-        .fields()
-        .filter(|field| !owned_field_changed(field.number(), before, after));
-    let mut right_fields = right
-        .fields()
-        .filter(|field| !owned_field_changed(field.number(), before, after));
+    let mut left_fields = left.fields().filter(|field| {
+        Some(field.number()) != additionally_ignored_field
+            && !owned_field_changed(field.number(), before, after)
+    });
+    let mut right_fields = right.fields().filter(|field| {
+        Some(field.number()) != additionally_ignored_field
+            && !owned_field_changed(field.number(), before, after)
+    });
     loop {
         match (left_fields.next(), right_fields.next()) {
             (Some(left), Some(right)) if left.raw() == right.raw() => {},
@@ -1366,7 +1374,7 @@ fn production_test_run(
             path: Path::Package,
         });
     }
-    verify_unselected_members(source, &candidate, target, &before, after)?;
+    verify_unselected_members(source, &candidate, target, &before, after, None)?;
     budget.settle_transaction_reservation();
     Ok(())
 }

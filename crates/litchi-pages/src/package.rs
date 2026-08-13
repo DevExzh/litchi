@@ -6,6 +6,7 @@
 
 pub(crate) mod document_settings;
 mod page_layout;
+pub(crate) mod section_background;
 mod section_name;
 mod section_pagination;
 pub(crate) mod section_settings;

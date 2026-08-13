@@ -10,7 +10,6 @@ use litchi_iwa_common::comment::{
 use litchi_iwa_text::columns::Columns;
 use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
 use litchi_iwa_text::position::TextPosition;
-use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
@@ -51,10 +50,9 @@ use crate::text::{
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
-    patch_nested_fixed32_field, patch_nested_varint_field, patch_varint_field,
-    remove_repeated_length_delimited_field_where, repeated_length_delimited_payloads,
-    rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
-    transform_length_delimited_fields_at_path,
+    patch_varint_field, remove_repeated_length_delimited_field_where,
+    repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
+    transform_length_delimited_field, transform_length_delimited_fields_at_path,
 };
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
 
@@ -4650,9 +4648,7 @@ mod footnotes;
 mod images;
 mod movies;
 mod number_attachments;
-mod section_background;
 mod section_content;
-mod section_settings;
 mod tables;
 mod text_box_create;
 mod types;

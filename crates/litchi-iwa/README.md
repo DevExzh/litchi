@@ -1077,10 +1077,8 @@ use litchi_iwa::numbers::{
     FormulaAxisReference, FormulaCellReference, FormulaExpression, NumbersEditor,
 };
 use litchi_iwa::pages::PagesEditor;
-use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_numbers::{SheetSelector, TableSelector};
 use litchi_pages::header_footer::Kind;
-use litchi_pages::section::Background;
 use litchi_iwa::keynote::{
     KeynoteBuildSettings, KeynoteBuildStart, KeynoteEditor, KeynoteFlipDirection,
     KeynoteHorizontalBuildDirection, KeynoteKeyboardDirection, KeynoteRotationDirection,
@@ -1211,10 +1209,8 @@ pages.set_header_footer_text(first_header.storage.object_id, "Quarterly report")
 // litchi-pages/examples/edit_section_settings.rs.
 // Section-pagination editing now lives in litchi-pages and uses
 // SectionSelector; see litchi-pages/examples/edit_section_pagination.rs.
-pages.set_section_background(
-    section_id,
-    Background::Solid(Rgba::new(1.0, 0.59, 0.55, 1.0, RgbColorSpace::Srgb)?),
-)?;
+// Section-background editing now lives in litchi-pages and uses
+// SectionSelector; see litchi-pages/examples/edit_section_background.rs.
 let inserted = pages.insert_section(section_id, 8, "Methods")?;
 pages.remove_section(inserted.object_id)?;
 let appended = pages.append_section(section_id, "Appendix")?;

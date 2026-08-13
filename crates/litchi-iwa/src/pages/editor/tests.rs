@@ -7,14 +7,13 @@ use crate::protobuf::tswp::{
     ObjectAttributeTable, StorageArchive, object_attribute_table::ObjectAttribute,
 };
 use crate::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_pages::footnote::{
     Format as FootnoteFormat, Gap as FootnoteGap, Kind as FootnoteKind,
     Numbering as FootnoteNumbering,
 };
 use litchi_pages::header_footer::{Kind, Template};
 use litchi_pages::page_layout::Orientation as PageOrientation;
-use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Start};
+use litchi_pages::section::{PageNumber, PageNumbering, Start};
 
 #[test]
 fn pages_native_discriminants_are_typed_and_lossless() {
@@ -89,171 +88,6 @@ fn semantic_body_update_and_clear_are_transactional() {
     assert_eq!(editor.body_text().unwrap(), "A東京B");
     editor.clear_body().unwrap();
     assert_eq!(editor.body_text().unwrap(), "");
-}
-
-#[test]
-fn solid_section_background_crud_preserves_nested_unknown_wire() {
-    let body_id = 42;
-    let section_id = 43;
-    let root = DocumentArchive {
-        body_storage: Some(reference(body_id)),
-        section: Some(reference(section_id)),
-        ..Default::default()
-    };
-    let body = StorageArchive {
-        text: vec!["Body".to_owned()],
-        ..Default::default()
-    };
-    let original_color =
-        Rgba::new(1.0, 0.588_738_74, 0.552_926_2, 1.0, RgbColorSpace::Srgb).unwrap();
-    let mut color_payload = tsp::Color {
-        model: tsp::color::ColorModel::Rgb as i32,
-        r: Some(original_color.red()),
-        g: Some(original_color.green()),
-        b: Some(original_color.blue()),
-        rgbspace: Some(tsp::color::RgbColorSpace::Srgb as i32),
-        a: Some(original_color.alpha()),
-        ..Default::default()
-    }
-    .encode_to_vec();
-    let mut unknown_color_field = litchi_iwa_common::varint::encode_varint(99 << 3);
-    unknown_color_field.extend(litchi_iwa_common::varint::encode_varint(123));
-    color_payload.extend_from_slice(&unknown_color_field);
-    let mut fill_payload = tsd::FillArchive {
-        color: Some(tsp::Color {
-            model: tsp::color::ColorModel::Rgb as i32,
-            ..Default::default()
-        }),
-        ..Default::default()
-    }
-    .encode_to_vec();
-    fill_payload =
-        patch_length_delimited_field(&fill_payload, 1, true, Some(&color_payload)).unwrap();
-    let mut unknown_fill_field = litchi_iwa_common::varint::encode_varint(100 << 3);
-    unknown_fill_field.extend(litchi_iwa_common::varint::encode_varint(456));
-    fill_payload.extend_from_slice(&unknown_fill_field);
-    let mut section_data = SectionArchive {
-        name: Some("Blank".to_owned()),
-        background_fill: Some(tsd::FillArchive::default()),
-        ..Default::default()
-    }
-    .encode_to_vec();
-    section_data =
-        patch_length_delimited_field(&section_data, 30, true, Some(&fill_payload)).unwrap();
-    let objects = vec![
-        object(1, 10000, root.encode_to_vec()),
-        object(body_id, 2001, body.encode_to_vec()),
-        object(section_id, SECTION_MESSAGE_TYPE, section_data),
-    ];
-    let mut package = IWorkPackage::new();
-    package
-        .replace_archive("Index/Document.iwa", &Archive { objects })
-        .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
-    assert_eq!(
-        editor.section_background(section_id).unwrap(),
-        Background::Solid(original_color)
-    );
-    let baseline = editor.to_bytes().unwrap();
-    editor
-        .set_section_background(section_id, Background::Solid(original_color))
-        .unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-
-    let updated = Rgba::new(
-        0.125,
-        original_color.green(),
-        0.75,
-        0.5,
-        RgbColorSpace::DisplayP3,
-    )
-    .unwrap();
-    editor
-        .set_section_background(section_id, Background::Solid(updated))
-        .unwrap();
-    assert_eq!(
-        editor.section_background(section_id).unwrap(),
-        Background::Solid(updated)
-    );
-    let section_payload = editor
-        .package()
-        .archive("Index/Document.iwa")
-        .unwrap()
-        .object(section_id)
-        .unwrap()
-        .messages[0]
-        .data
-        .clone();
-    let payload = repeated_length_delimited_payloads(&section_payload, 30)
-        .unwrap()
-        .into_iter()
-        .next()
-        .unwrap();
-    for unknown in [&unknown_color_field, &unknown_fill_field] {
-        assert!(
-            payload
-                .windows(unknown.len())
-                .any(|window| window == unknown.as_slice())
-        );
-    }
-    editor
-        .set_section_background(section_id, Background::Solid(original_color))
-        .unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-
-    assert!(
-        Rgba::new(
-            f32::NAN,
-            original_color.green(),
-            original_color.blue(),
-            original_color.alpha(),
-            original_color.color_space(),
-        )
-        .is_err()
-    );
-    assert!(
-        Rgba::new(
-            original_color.red(),
-            original_color.green(),
-            original_color.blue(),
-            1.01,
-            original_color.color_space(),
-        )
-        .is_err()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-    assert!(
-        editor
-            .set_section_background(
-                section_id,
-                Background::Opaque(Opaque::from_slice(&[0xff]).unwrap()),
-            )
-            .is_err()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-
-    editor
-        .set_section_background(section_id, Background::None)
-        .unwrap();
-    assert_eq!(
-        editor.section_background(section_id).unwrap(),
-        Background::None
-    );
-    let opaque = tsd::FillArchive {
-        gradient: Some(tsd::GradientArchive::default()),
-        ..Default::default()
-    }
-    .encode_to_vec();
-    editor
-        .set_section_background(
-            section_id,
-            Background::Opaque(Opaque::from_slice(&opaque).unwrap()),
-        )
-        .unwrap();
-    assert_eq!(
-        editor.section_background(section_id).unwrap(),
-        Background::Opaque(Opaque::from_slice(&opaque).unwrap())
-    );
 }
 
 #[test]

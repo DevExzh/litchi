@@ -3137,3 +3137,28 @@ This does not add a public formula-authoring API or change crate ownership.
 The production `litchi-iwa` formula setters and raw formula vocabulary remain.
 No dependency edge or ordered debt closes, and this amendment makes no native
 application or performance claim.
+
+## 2026-08-13 amendment: Pages section-background ownership
+
+The direct field-30 section-background vertical now belongs to `litchi-pages`.
+The public surface is `Package::{section_background, edit_section_background,
+apply_section_background}` and the contextual transaction vocabulary is
+`section::background::{Edit, Patch, Commit, Diagnostics, Error, LimitKind,
+Path}`. Selection is by exact `SectionSelector` name or checked semantic
+position. No supported signature exposes an object identifier, member name,
+archive, wire value, protobuf/Buffa value, or raw background bytes.
+
+`section::Background` is deliberately byte-free: `None`, validated RGB
+`Solid`, or observable `Unsupported`. The last case preserves the native
+payload privately and cannot be authored or changed. The former public opaque
+payload value and the host's raw-ID getter/setter are removed rather than
+wrapped. This transfers one focused mutation owner only; section text,
+templates, header/footer content, section lifecycle, tables, and the broader
+Pages host debt remain open.
+
+Apple Pages 14.4.1 (build `M14.4-7043.0.93-4`) opened the focused replacement
+and clear candidates without a repair or conversion prompt, then saved, closed,
+and reopened their exact paths. The UI showed page 1's Section Background as
+`Color Fill` / `dark red 34` for replacement and `No Fill` for clear. This is
+focused field-30 acceptance only, not a claim about broader Pages ownership or
+about the locality of Pages' own resave.
