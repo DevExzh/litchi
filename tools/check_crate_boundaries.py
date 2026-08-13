@@ -1316,6 +1316,159 @@ NUMBERS_TABLE_TITLE_SETTINGS_WIRE_TYPES = frozenset(
 NUMBERS_TABLE_TITLE_SETTINGS_PROTO_ORIGINS = frozenset(
     {"buffa", "prost", "prost_types", "tn", "tsp", "tswp"}
 )
+RETIRED_IWA_NUMBERS_TABLE_DIMENSION_METHODS = (
+    "table_dimension_size",
+    "set_table_dimension_size",
+    "table_row_height",
+    "set_table_row_height",
+    "table_column_width",
+    "set_table_column_width",
+)
+RETIRED_IWA_NUMBERS_TABLE_DIMENSION_METHOD_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_DIMENSION_METHODS
+)
+RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TYPES = (
+    "Dimension",
+    "Points",
+    "Size",
+)
+RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TYPE_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TYPES
+)
+IWA_NUMBERS_PRIVATE_TABLE_DIMENSION_ALIASES = frozenset(
+    {
+        "NumbersTableDimension",
+        "NumbersTablePoints",
+        "NumbersTableDimensionSize",
+    }
+)
+RETIRED_IWA_NUMBERS_TABLE_DIMENSION_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/edit_numbers_table_dimension.rs"
+)
+RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TESTS = (
+    "table_dimension_sizes_are_typed_transactional_and_wire_exact",
+    "table_dimension_size_preserves_unknown_header_fields",
+    "table_dimension_size_rejects_malformed_headers_transactionally",
+)
+RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TEST_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TESTS
+)
+NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE = Path(
+    "crates/litchi-numbers/src/table/dimension.rs"
+)
+NUMBERS_TABLE_DIMENSION_TRANSACTION_SOURCE = Path(
+    "crates/litchi-numbers/src/table/dimension/transaction.rs"
+)
+NUMBERS_TABLE_DIMENSION_OWNER_SOURCE = Path(
+    "crates/litchi-numbers/src/package/table_dimension.rs"
+)
+NUMBERS_TABLE_DIMENSION_OWNER_HELPER_ROOT = Path(
+    "crates/litchi-numbers/src/package/table_dimension"
+)
+NUMBERS_TABLE_DIMENSION_IMPLEMENTATION_SOURCES = (
+    NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE,
+    NUMBERS_TABLE_DIMENSION_TRANSACTION_SOURCE,
+    NUMBERS_TABLE_DIMENSION_OWNER_SOURCE,
+)
+NUMBERS_TABLE_DIMENSION_EXPORT_SOURCES = (
+    Path("crates/litchi-numbers/src/lib.rs"),
+    Path("crates/litchi-numbers/src/package.rs"),
+    Path("crates/litchi-numbers/src/table.rs"),
+    NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE,
+)
+NUMBERS_TABLE_DIMENSION_SEMANTIC_TYPES = (
+    "Dimension",
+    "Points",
+    "Size",
+)
+NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Path",
+    "LimitKind",
+    "TransactionError",
+)
+NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPE_SET = frozenset(
+    NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPES
+)
+NUMBERS_TABLE_DIMENSION_PACKAGE_METHODS = (
+    "table_dimension_size",
+    "edit_table_dimension_size",
+    "apply_table_dimension_size",
+)
+NUMBERS_TABLE_DIMENSION_PACKAGE_METHOD_SET = frozenset(
+    NUMBERS_TABLE_DIMENSION_PACKAGE_METHODS
+)
+NUMBERS_TABLE_DIMENSION_FLAT_ALIAS_PREFIXES = (
+    "Dimension",
+    "DimensionSize",
+    "TableDimension",
+    "TableDimensionSize",
+)
+NUMBERS_TABLE_DIMENSION_FLAT_ALIASES = frozenset(
+    prefix + suffix
+    for prefix in NUMBERS_TABLE_DIMENSION_FLAT_ALIAS_PREFIXES
+    for suffix in NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPES
+)
+NUMBERS_TABLE_DIMENSION_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_dimension|table[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?dimension)"
+    r"(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_NUMBERS_PACKAGE_TABLE_DIMENSION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table_dimension\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_PACKAGE_TABLE_DIMENSION_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?table_dimension\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_TABLE_DIMENSION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?dimension\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_TABLE_DIMENSION_TRANSACTION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?transaction\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_TABLE_DIMENSION_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+        "TableDimensionSnapshot",
+        "TableInfoSnapshot",
+    }
+)
+NUMBERS_TABLE_DIMENSION_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+NUMBERS_TABLE_DIMENSION_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tn", "tsp", "tswp"}
+)
 NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE = Path(
     "crates/litchi-numbers/src/table/cells.rs"
 )
@@ -3597,6 +3750,49 @@ def _is_numbers_table_title_settings_public_declaration(
     }
     return bool(identifiers & NUMBERS_TABLE_TITLE_SETTINGS_FLAT_ALIASES) or (
         _numbers_table_title_settings_owner_declaration(declaration)
+    )
+
+
+def _numbers_table_dimension_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in dimension transactions."""
+
+    if identifier in NUMBERS_TABLE_DIMENSION_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in NUMBERS_TABLE_DIMENSION_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in NUMBERS_TABLE_DIMENSION_WIRE_TYPES:
+        return "wire type"
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    return _iwork_public_leak(identifier)
+
+
+def _numbers_table_dimension_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return (
+        NUMBERS_TABLE_DIMENSION_OWNER_PATH.search(declaration) is not None
+        or any(
+            identifier in NUMBERS_TABLE_DIMENSION_PACKAGE_METHOD_SET
+            for identifier in identifiers
+        )
+    )
+
+
+def _is_numbers_table_dimension_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(identifiers & NUMBERS_TABLE_DIMENSION_FLAT_ALIASES) or (
+        _numbers_table_dimension_owner_declaration(declaration)
     )
 
 
@@ -6427,6 +6623,397 @@ def audit_numbers_table_title_settings_facade_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_numbers_table_dimension_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep public Numbers sizing ownership out of the shared IWA host."""
+
+    violations: list[str] = []
+    example = root / RETIRED_IWA_NUMBERS_TABLE_DIMENSION_EXAMPLE
+    if example.exists():
+        violations.append(
+            "retired litchi-iwa Numbers table-dimension example returned: "
+            + str(RETIRED_IWA_NUMBERS_TABLE_DIMENSION_EXAMPLE)
+        )
+
+    tests_path = root / IWA_NUMBERS_EDITOR_TEST_SOURCE
+    if tests_path.is_file():
+        source = tests_path.read_text(encoding="utf-8")
+        for name, line_number in _rust_function_declarations(source):
+            if name not in RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TEST_SET:
+                continue
+            violations.append(
+                "retired litchi-iwa Numbers table-dimension test "
+                f"{name}: {IWA_NUMBERS_EDITOR_TEST_SOURCE}:{line_number}"
+            )
+
+    source_root = root / IWA_NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir():
+        return sorted(set(violations))
+
+    for path in sorted(source_root.rglob("*.rs")):
+        raw_source = path.read_text(encoding="utf-8")
+        source = _mask_rust_non_code(raw_source)
+        focused_aliases = set(RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TYPE_SET)
+        focused_aliases.update(IWA_NUMBERS_PRIVATE_TABLE_DIMENSION_ALIASES)
+        focused_modules: set[str] = set()
+
+        focused_imports = tuple(
+            re.finditer(
+                r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+                r"use[ \t\r\n]+(?P<body>[^;]*\blitchi_numbers\b[^;]*);",
+                source,
+                re.MULTILINE,
+            )
+        )
+        for imported in focused_imports:
+            body = imported.group("body")
+            for module_pattern in (
+                r"\blitchi_numbers\b[ \t\r\n]+as[ \t\r\n]+"
+                r"(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)",
+                r"\blitchi_numbers\b[ \t\r\n]*::[ \t\r\n]*"
+                r"(?:(?:r#)?table[ \t\r\n]*::[ \t\r\n]*)?"
+                r"(?:r#)?dimension\b(?:[ \t\r\n]+as[ \t\r\n]+"
+                r"(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*))?",
+            ):
+                module_alias = re.search(module_pattern, body)
+                if module_alias is not None:
+                    focused_modules.add(module_alias.group("alias") or "dimension")
+            if "*" in body:
+                focused_aliases.update(RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TYPE_SET)
+            for name in RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TYPE_SET:
+                named = re.search(
+                    rf"(?<![A-Za-z0-9_#])(?:r#)?{name}\b"
+                    rf"(?:[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
+                    rf"(?P<alias>[A-Za-z_][A-Za-z0-9_]*))?",
+                    body,
+                )
+                if named is not None:
+                    focused_aliases.add(named.group("alias") or name)
+
+        type_aliases = tuple(
+            re.finditer(
+                r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?type"
+                r"[ \t\r\n]+(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)"
+                r"[^=;]*=[ \t\r\n]*(?P<target>[^;]+);",
+                source,
+                re.MULTILINE,
+            )
+        )
+        changed = True
+        while changed:
+            changed = False
+            for alias in type_aliases:
+                identifiers = {
+                    match.group(1)
+                    for match in RUST_IDENTIFIER.finditer(alias.group("target"))
+                }
+                if not (
+                    identifiers & focused_aliases
+                    or identifiers & focused_modules
+                    and identifiers & RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TYPE_SET
+                ):
+                    continue
+                alias_name = alias.group("alias")
+                if alias_name not in focused_aliases:
+                    focused_aliases.add(alias_name)
+                    changed = True
+
+        for declaration, line_number in _rust_public_declarations(raw_source):
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            for method in sorted(
+                set(identifiers) & RETIRED_IWA_NUMBERS_TABLE_DIMENSION_METHOD_SET
+            ):
+                identifier = next(
+                    match
+                    for match in RUST_IDENTIFIER.finditer(declaration)
+                    if match.group(1) == method
+                )
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, identifier.start(1)
+                )
+                violations.append(
+                    "retired litchi-iwa Numbers public table-dimension method "
+                    f"{method}: {path.relative_to(root)}:{identifier_line}"
+                )
+
+            exposed = set(identifiers) & focused_aliases
+            declaration_is_facade = identifiers[:2] in (
+                ["pub", "type"],
+                ["pub", "use"],
+            )
+            if declaration_is_facade:
+                exposed.update(set(identifiers) & focused_modules)
+                if re.search(
+                    r"^[ \t]*pub[ \t\r\n]+use[ \t\r\n]+"
+                    r"(?:r#)?litchi_numbers[ \t\r\n]*(?:;|::[ \t\r\n]*\*)",
+                    declaration,
+                ):
+                    exposed.add("litchi_numbers")
+            if set(identifiers) & focused_modules:
+                exposed.update(
+                    set(identifiers) & RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TYPE_SET
+                )
+            for name in sorted(exposed):
+                identifier = next(
+                    match
+                    for match in RUST_IDENTIFIER.finditer(declaration)
+                    if match.group(1) == name
+                )
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, identifier.start(1)
+                )
+                violations.append(
+                    "retired litchi-iwa Numbers table-dimension public facade "
+                    f"{name}: {path.relative_to(root)}:{identifier_line}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_numbers_table_dimension_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Numbers sizing transaction API."""
+
+    source_root = root / NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    dedicated_sources = {
+        root / path
+        for path in NUMBERS_TABLE_DIMENSION_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    owner_helper_root = root / NUMBERS_TABLE_DIMENSION_OWNER_HELPER_ROOT
+    if owner_helper_root.is_dir():
+        dedicated_sources.update(owner_helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in NUMBERS_TABLE_DIMENSION_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    violations: list[str] = []
+
+    semantic_path = root / NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
+    semantic_source = (
+        semantic_path.read_text(encoding="utf-8")
+        if semantic_path.is_file()
+        else ""
+    )
+    semantic_exports = _rust_canonical_exports(
+        semantic_source, frozenset(NUMBERS_TABLE_DIMENSION_SEMANTIC_TYPES)
+    )
+    for name in NUMBERS_TABLE_DIMENSION_SEMANTIC_TYPES:
+        if name not in semantic_exports:
+            violations.append(
+                "focused litchi-numbers table-dimension public API is missing "
+                f"canonical table::dimension type {name}: "
+                f"{NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE}"
+            )
+    masked_semantic = _mask_rust_non_code(semantic_source)
+    if PUBLIC_NUMBERS_TABLE_DIMENSION_TRANSACTION_MODULE.search(masked_semantic) is None:
+        violations.append(
+            "focused litchi-numbers table-dimension public API is missing "
+            "canonical table::dimension::transaction module: "
+            f"{NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE}"
+        )
+
+    transaction_path = root / NUMBERS_TABLE_DIMENSION_TRANSACTION_SOURCE
+    transaction_source = (
+        transaction_path.read_text(encoding="utf-8")
+        if transaction_path.is_file()
+        else ""
+    )
+    transaction_exports = _rust_canonical_exports(
+        transaction_source, NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPE_SET
+    )
+    for name in NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPES:
+        if name not in transaction_exports:
+            violations.append(
+                "focused litchi-numbers table-dimension public API is missing "
+                f"canonical table::dimension::transaction type {name}: "
+                f"{NUMBERS_TABLE_DIMENSION_TRANSACTION_SOURCE}"
+            )
+
+    lib_path = root / NUMBERS_SOURCE_ROOT / "lib.rs"
+    lib_source = (
+        lib_path.read_text(encoding="utf-8") if lib_path.is_file() else ""
+    )
+    root_exports = _rust_canonical_exports(
+        lib_source, frozenset(NUMBERS_TABLE_DIMENSION_SEMANTIC_TYPES)
+    )
+    for name in NUMBERS_TABLE_DIMENSION_SEMANTIC_TYPES:
+        if name not in root_exports:
+            violations.append(
+                "focused litchi-numbers table-dimension public API is missing "
+                f"canonical root semantic type {name}: {NUMBERS_SOURCE_ROOT / 'lib.rs'}"
+            )
+
+    table_path = root / NUMBERS_SOURCE_ROOT / "table.rs"
+    table_source = (
+        _mask_rust_non_code(table_path.read_text(encoding="utf-8"))
+        if table_path.is_file()
+        else ""
+    )
+    if PUBLIC_NUMBERS_TABLE_DIMENSION_MODULE.search(table_source) is None:
+        violations.append(
+            "focused litchi-numbers table-dimension public API is missing "
+            f"canonical table::dimension module: {NUMBERS_SOURCE_ROOT / 'table.rs'}"
+        )
+
+    package_export = root / NUMBERS_SOURCE_ROOT / "package.rs"
+    if package_export.is_file():
+        package_source = _mask_rust_non_code(
+            package_export.read_text(encoding="utf-8")
+        )
+        if NUMBERS_PACKAGE_TABLE_DIMENSION_MODULE.search(package_source) is None:
+            violations.append(
+                "focused litchi-numbers table-dimension public API is missing "
+                f"private package owner module: {package_export.relative_to(root)}"
+            )
+        for match in PUBLIC_NUMBERS_PACKAGE_TABLE_DIMENSION_MODULE.finditer(
+            package_source
+        ):
+            line_number = package_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-numbers table-dimension public API exposes "
+                "duplicate package::table_dimension module: "
+                f"{package_export.relative_to(root)}:{line_number}"
+            )
+    else:
+        violations.append(
+            "focused litchi-numbers table-dimension public API is missing "
+            f"private package owner module: {NUMBERS_SOURCE_ROOT / 'package.rs'}"
+        )
+
+    owner_path = root / NUMBERS_TABLE_DIMENSION_OWNER_SOURCE
+    if not owner_path.is_file():
+        violations.append(
+            "focused litchi-numbers table-dimension public API is missing "
+            f"private package owner source: {NUMBERS_TABLE_DIMENSION_OWNER_SOURCE}"
+        )
+    else:
+        owner_sources = {owner_path}
+        if owner_helper_root.is_dir():
+            owner_sources.update(owner_helper_root.rglob("*.rs"))
+        owner_methods: set[str] = set()
+        for path in owner_sources:
+            for declaration, _line_number in _rust_public_declarations(
+                path.read_text(encoding="utf-8")
+            ):
+                identifiers = [
+                    match.group(1)
+                    for match in RUST_IDENTIFIER.finditer(declaration)
+                ]
+                if identifiers[:2] == ["pub", "fn"] and len(identifiers) > 2:
+                    owner_methods.add(identifiers[2])
+        for method in NUMBERS_TABLE_DIMENSION_PACKAGE_METHODS:
+            if method not in owner_methods:
+                violations.append(
+                    "focused litchi-numbers table-dimension public API is missing "
+                    f"Package method {method}: {NUMBERS_TABLE_DIMENSION_OWNER_SOURCE}"
+                )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for declaration, line_number, public_declaration, complete_source_scope in declarations:
+            if not _is_numbers_table_dimension_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            public_use_or_type = identifiers[:2] in (["pub", "use"], ["pub", "type"])
+            canonical_semantic_reexport = (
+                public_declaration
+                and identifiers[:2] == ["pub", "use"]
+                and path == lib_path
+                and "*" not in declaration
+                and not re.search(r"\bas\b", declaration)
+                and bool(set(identifiers) & set(NUMBERS_TABLE_DIMENSION_SEMANTIC_TYPES))
+                and not bool(set(identifiers) & NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPE_SET)
+            )
+            canonical_module = (
+                public_declaration
+                and identifiers[:3] in (["pub", "mod", "dimension"], ["pub", "mod", "transaction"])
+            )
+            owner_declaration = _numbers_table_dimension_owner_declaration(declaration)
+            if (
+                public_declaration
+                and path in export_sources
+                and owner_declaration
+                and identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-numbers table-dimension public API retains "
+                    "flat aliases via dimension glob: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            if (
+                public_declaration
+                and path in export_sources
+                and owner_declaration
+                and public_use_or_type
+                and not canonical_semantic_reexport
+                and not canonical_module
+            ):
+                violations.append(
+                    "focused litchi-numbers table-dimension public API exposes "
+                    "public dimension owner alias: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if public_declaration and identifier in NUMBERS_TABLE_DIMENSION_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-numbers table-dimension public API retains "
+                        f"flat alias {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and path in export_sources
+                    and public_use_or_type
+                    and identifier in NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPE_SET
+                ):
+                    violations.append(
+                        "focused litchi-numbers table-dimension public API retains "
+                        f"transaction alias outside table::dimension::transaction {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _numbers_table_dimension_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-numbers table-dimension public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count("\n", 0, match.start())
+                violations.append(
+                    "focused litchi-numbers table-dimension public API exposes "
+                    f"raw byte slice {byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_table_cells_facade_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -8648,6 +9235,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_table_header_settings_facade_source_topology()
         + audit_iwa_numbers_table_title_settings_source_topology()
         + audit_numbers_table_title_settings_facade_source_topology()
+        + audit_iwa_numbers_table_dimension_source_topology()
+        + audit_numbers_table_dimension_facade_source_topology()
         + audit_numbers_table_cells_facade_source_topology()
         + audit_numbers_table_cells_mutation_facade_source_topology()
         + audit_iwa_numbers_table_cell_mutation_source_topology()

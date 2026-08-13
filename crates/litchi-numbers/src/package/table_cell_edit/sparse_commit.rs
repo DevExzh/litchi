@@ -631,8 +631,8 @@ pub(super) fn commit_sparse_scalar_tiles(
         path,
     )?;
     let changed_cells = changes.len();
-    let source_bytes = Arc::clone(&source.state.source);
-    let target_bytes = Arc::clone(&outcome.package.state.source);
+    let source_bytes = source.state.source.clone();
+    let target_bytes = outcome.package.state.source.clone();
     let patch = Patch::from_exact_with_evidence(
         path,
         requested,

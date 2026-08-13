@@ -2227,3 +2227,37 @@ The native evidence and its silent-normalization caveat are frozen in ADR
 0008. The tracked 136,357-byte source remains exact at SHA-256
 `f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`;
 only an isolated copy was opened in Numbers 14.4 build 7043.0.93.
+
+## 2026-08-13 current-status amendment: Numbers dimension sizes
+
+`litchi_numbers::Package` is the Numbers owner for one
+selector-first row-height or column-width override. Its public seam is
+`table_dimension_size`, `edit_table_dimension_size`, and
+`apply_table_dimension_size`, with transaction types under
+`table::dimension::transaction`. The semantic leaf keeps `Dimension`, checked
+positive finite `Points`, and the lossless distinction between `Size::Default`
+and `Size::Points`.
+
+The focused implementation reuses the existing strict/raw plus private Buffa
+header-storage codec. One changed request owns one selected header-bucket
+rewrite, deletes three canonical previews, performs one full reopen, and
+preserves every other header facet, component, ZIP record, and unknown field. It does
+not change table row/column counts and is not a table resize, axis lifecycle,
+automatic-fit, or bulk-sizing API.
+
+The public Numbers host exit changes five paths with four formatting
+insertions and 312 deletions, net -308. It removes six methods (65 file lines,
+63 method bodies), 200 test-section lines, the 41-line example, and the public
+legacy re-export names. Private
+header-bucket helpers remain in `litchi-iwa` because Pages and Keynote attached
+tables call them. That cross-format helper, `NumbersEditor`, broader table
+editing, debt 015, and the `litchi-iwa -> litchi-numbers` manifest edge remain.
+
+Focused dimension tests pass 13/13, codec tests pass 11/11, protos passes
+194/194 plus doctests, and Numbers passes 241 library tests with four ignored,
+91 integration tests, and five doctests with one ignored. Archive passes
+130/130 plus doctests. Focused strict checks/Clippy pass; boundary units pass
+243/243 with zero live audit findings. Host retained-axis, Pages-layout,
+generated-roundtrip, scoped boundary, check/no-run, strict library Clippy,
+formatting, and diff gates pass. Broad host all-target Clippy retains nine
+unrelated existing lints. ADR 0008 records the accepted native oracle.

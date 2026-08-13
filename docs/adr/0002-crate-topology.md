@@ -3343,3 +3343,58 @@ zero findings. The host-scoped retirement changes 15 files with 329 insertions
 and 888 deletions, net -559. Broad host all-target Clippy remains blocked by
 unrelated existing lints; the global boundary policy still reports 14 unrelated
 `soapberry-zip`/`xml-minifier` debt findings.
+
+## 2026-08-13 amendment: Numbers dimension-size ownership
+
+Per-row height and per-column width ownership moves to the focused exact
+artifact owner, `litchi_numbers::Package`. The selector-first public seam is
+`Package::{table_dimension_size, edit_table_dimension_size,
+apply_table_dimension_size}`. Selection is an exact or checked semantic sheet
+and table selector plus `table::dimension::Dimension::{Row, Column}`; no native
+object identifier, component name, protobuf message, or raw package byte enters
+the public transaction.
+This supersedes this ADR's earlier leaf-only extraction state, in which
+`litchi-iwa` still owned Numbers header-bucket mutation; the retained private
+cross-format helper below is now the only host exception.
+
+The leaf vocabulary remains `Size::{Default, Points}` and checked `Points`.
+`Default` means the selected axis entry has no explicit positive size override
+and therefore uses the table model's row-height or column-width default.
+`Points` is a distinct explicit positive finite `f32` measurement, even when
+its numeric value equals the model default. Native zero and physical absence
+both project as `Default`; zero, negative, infinite, and NaN input cannot be
+constructed as `Points`.
+
+The transaction reuses the existing strict/raw plus private Buffa
+`HeaderStorageBucket` codec rather than introducing a second header decoder.
+A changed dimension-size commit is physically local to the one selected row or
+column header bucket. It deletes the three canonical root previews, reopens the
+complete candidate once, and preserves every other component, object, message,
+ZIP member/local/central record, header entry, style, hiding state, cell count,
+and unknown field. An exact no-op shares the exact owner with zero components,
+zero preview deletions, and no reopen. This mutation changes only a size
+override; it does not resize the table, insert or remove an axis, change
+addressable cell dimensions, or claim ownership of the shared host resize
+engine.
+
+The host retirement changes five paths: four list-format insertions and 312
+deletions, net -308. It removes six public `NumbersEditor` methods (65 source
+lines, 63 method-body lines), 200 test-section lines (about 197 test-body
+lines), the 41-line `edit_numbers_table_dimension` example, and the public
+`Dimension`/`Points`/`Size` re-exports. Private `IWorkPackage` header-bucket
+helpers and aliases remain because Pages and Keynote attached-table paths still
+call them. That retained cross-format physical seam is ordered migration debt,
+not a public Numbers facade, so debt 015 and the
+`litchi-iwa -> litchi-numbers` edge remain open.
+
+Frozen verification passes the focused dimension integration suite 13/13 and
+the header codec 11/11; the complete protos suite passes 194/194 plus doctests.
+Full Numbers all-feature verification passes 241 library tests with four
+ignored, 91 integration tests, and five doctests with one ignored. Archive
+coverage passes 130/130 (128 unit plus two integration) plus doctests. Focused
+Numbers/archive all-target check and strict all-target Clippy pass. Boundary
+units pass 243/243 and the live retirement/API audits report zero findings.
+Host all-target/all-feature check and no-run, retained-axis 2/2, Pages-layout
+1/1, generated-roundtrip 1/1, scoped boundary 6/6, strict library Clippy,
+formatting, and diff checks pass. Broad host all-target Clippy remains blocked
+by nine unrelated existing lints.

@@ -291,6 +291,49 @@ def add_numbers_table_title_settings_canonical_scaffold(root: Path) -> None:
     table_export.write_text("pub mod title;\n", encoding="utf-8")
 
 
+def add_numbers_table_dimension_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction;\n"
+        + "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_TYPES
+        ),
+        encoding="utf-8",
+    )
+    transaction = root / boundaries.NUMBERS_TABLE_DIMENSION_TRANSACTION_SOURCE
+    transaction.parent.mkdir(parents=True, exist_ok=True)
+    transaction.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPES
+        ),
+        encoding="utf-8",
+    )
+    owner = root / boundaries.NUMBERS_TABLE_DIMENSION_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "impl Package {\n"
+        + "".join(
+            f"pub fn {name}(&self, selector: TableSelector, dimension: Dimension) {{}}\n"
+            for name in boundaries.NUMBERS_TABLE_DIMENSION_PACKAGE_METHODS
+        )
+        + "}\n",
+        encoding="utf-8",
+    )
+    lib_export, package_export, table_export, _semantic_export = (
+        root / path for path in boundaries.NUMBERS_TABLE_DIMENSION_EXPORT_SOURCES
+    )
+    lib_export.write_text(
+        "pub mod table;\n"
+        "pub use table::dimension::{Dimension, Points, Size};\n",
+        encoding="utf-8",
+    )
+    package_export.write_text("pub(crate) mod table_dimension;\n", encoding="utf-8")
+    table_export.write_text("pub mod dimension;\n", encoding="utf-8")
+
+
 def add_numbers_table_cells_read_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -9878,6 +9921,280 @@ class BoundaryPolicyTests(unittest.TestCase):
                 ),
                 [],
             )
+
+    def test_numbers_table_dimension_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_DIMENSION_METHODS,
+            (
+                "table_dimension_size",
+                "set_table_dimension_size",
+                "table_row_height",
+                "set_table_row_height",
+                "table_column_width",
+                "set_table_column_width",
+            ),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TYPES,
+            ("Dimension", "Points", "Size"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_DIMENSION_EXAMPLE,
+            Path("crates/litchi-iwa/examples/edit_numbers_table_dimension.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TESTS,
+            (
+                "table_dimension_sizes_are_typed_transactional_and_wire_exact",
+                "table_dimension_size_preserves_unknown_header_fields",
+                "table_dimension_size_rejects_malformed_headers_transactionally",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_DIMENSION_TRANSACTION_SOURCE,
+            Path("crates/litchi-numbers/src/table/dimension/transaction.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_DIMENSION_OWNER_SOURCE,
+            Path("crates/litchi-numbers/src/package/table_dimension.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPES,
+            (
+                "Edit",
+                "Patch",
+                "Commit",
+                "Diagnostics",
+                "Path",
+                "LimitKind",
+                "TransactionError",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_DIMENSION_PACKAGE_METHODS,
+            (
+                "table_dimension_size",
+                "edit_table_dimension_size",
+                "apply_table_dimension_size",
+            ),
+        )
+
+    def test_retired_iwa_numbers_table_dimension_public_surface_cannot_return(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/table_dimension.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "impl NumbersEditor {\n"
+                + "".join(
+                    f"pub fn {name}(&self, value: Dimension) -> Size {{ todo!() }}\n"
+                    for name in boundaries.RETIRED_IWA_NUMBERS_TABLE_DIMENSION_METHODS
+                )
+                + "}\n"
+                "pub(super) fn set_attached_table_dimension_size() {}\n"
+                "pub(super) fn read_attached_table_dimension_size() {}\n",
+                encoding="utf-8",
+            )
+            editor_facade = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor.rs"
+            editor_facade.write_text(
+                "pub use litchi_numbers::table::dimension::{\n"
+                "Dimension, Points, Size\n"
+                "};\n",
+                encoding="utf-8",
+            )
+            root_facade = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "mod.rs"
+            root_facade.write_text(
+                "pub use editor::{Dimension, Points, Size};\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_DIMENSION_EXAMPLE
+            example.parent.mkdir(parents=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+            tests = root / boundaries.IWA_NUMBERS_EDITOR_TEST_SOURCE
+            tests.write_text(
+                "".join(
+                    f"fn {name}() {{}}\n"
+                    for name in boundaries.RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TESTS
+                )
+                + "fn table_dimension_private_helpers_stay_covered() {}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_numbers_table_dimension_source_topology(
+                root
+            )
+
+            self.assertTrue(any("example returned" in item for item in violations))
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_DIMENSION_METHODS:
+                self.assertTrue(
+                    any(f"public table-dimension method {method}:" in item for item in violations),
+                    msg=f"missing retired method {method!r}: {violations!r}",
+                )
+            for exposed in ("Dimension", "Points", "Size"):
+                self.assertTrue(
+                    any(f"public facade {exposed}:" in item for item in violations),
+                    msg=f"missing host facade {exposed!r}: {violations!r}",
+                )
+            for name in boundaries.RETIRED_IWA_NUMBERS_TABLE_DIMENSION_TESTS:
+                self.assertTrue(
+                    any(f"table-dimension test {name}:" in item for item in violations),
+                    msg=f"missing retired test {name!r}: {violations!r}",
+                )
+            self.assertFalse(any("attached_table" in item for item in violations))
+            self.assertFalse(any("private_helpers" in item for item in violations))
+
+    def test_iwa_numbers_table_dimension_rejects_laundered_focused_facades(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "facade.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "use litchi_numbers::table::dimension::{Dimension as Axis};\n"
+                "use litchi_numbers::table::dimension as sizing;\n"
+                "type HiddenAxis = Axis;\n"
+                "pub type PublicAxis = HiddenAxis;\n"
+                "pub use sizing as public_sizing;\n"
+                "pub use litchi_numbers as focused_numbers;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_numbers_table_dimension_source_topology(
+                root
+            )
+
+            for exposed in ("HiddenAxis", "sizing", "focused_numbers"):
+                self.assertTrue(
+                    any(f"public facade {exposed}:" in item for item in violations),
+                    msg=f"missing laundered facade {exposed!r}: {violations!r}",
+                )
+
+    def test_iwa_numbers_table_dimension_allows_private_shared_physical_helpers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "mod.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "pub(crate) use litchi_numbers::table::dimension::{\n"
+                "Dimension as NumbersTableDimension,\n"
+                "Points as NumbersTablePoints,\n"
+                "Size as NumbersTableDimensionSize,\n"
+                "};\n"
+                "pub(super) fn set_attached_table_dimension_size() {}\n"
+                "pub(super) fn read_attached_table_dimension_size() {}\n"
+                "pub(crate) fn table_dimension_size_in_package() {}\n"
+                "pub(crate) fn set_table_dimension_size_in_package() {}\n",
+                encoding="utf-8",
+            )
+            canonical = root / "crates/litchi/src/numbers.rs"
+            canonical.parent.mkdir(parents=True)
+            canonical.write_text(
+                "pub use litchi_numbers::{Dimension, Points, Size};\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_dimension_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_table_dimension_requires_canonical_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_dimension_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_dimension_facade_source_topology(root),
+                [],
+            )
+
+            transaction = root / boundaries.NUMBERS_TABLE_DIMENSION_TRANSACTION_SOURCE
+            transaction.write_text("pub struct Edit;\n", encoding="utf-8")
+            owner = root / boundaries.NUMBERS_TABLE_DIMENSION_OWNER_SOURCE
+            owner.write_text(
+                "impl Package { pub fn table_dimension_size(&self) {} }\n",
+                encoding="utf-8",
+            )
+            semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub struct Dimension;\npub struct Points;\npub struct Size;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_table_dimension_facade_source_topology(
+                root
+            )
+            for missing in boundaries.NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPES[1:]:
+                self.assertTrue(
+                    any(f"transaction type {missing}:" in item for item in violations),
+                    msg=f"missing canonical type gate {missing!r}: {violations!r}",
+                )
+            for missing in boundaries.NUMBERS_TABLE_DIMENSION_PACKAGE_METHODS[1:]:
+                self.assertTrue(
+                    any(f"Package method {missing}:" in item for item in violations),
+                    msg=f"missing Package method gate {missing!r}: {violations!r}",
+                )
+            self.assertTrue(
+                any("missing canonical table::dimension::transaction module" in item for item in violations)
+            )
+
+    def test_focused_numbers_table_dimension_rejects_aliases_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_dimension_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_DIMENSION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn edit_table_dimension_size_raw(\n"
+                "object_id: u64, native_object: NativeObjectIdentifier,\n"
+                "source_bytes: &[u8], archive: Archive, wire: WireView,\n"
+                "generated: GeneratedProjection, prost: prost_types::MessageInfo\n"
+                ") {}\n",
+                encoding="utf-8",
+            )
+            transaction = root / boundaries.NUMBERS_TABLE_DIMENSION_TRANSACTION_SOURCE
+            transaction.write_text(
+                transaction.read_text(encoding="utf-8")
+                + "pub type DimensionSizeEdit = Edit;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_DIMENSION_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use table::dimension::transaction::{Edit, TransactionError};\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_table_dimension_facade_source_topology(
+                root
+            )
+
+            for fragment in (
+                "retains flat alias DimensionSizeEdit",
+                "transaction alias outside table::dimension::transaction Edit",
+                "transaction alias outside table::dimension::transaction TransactionError",
+                "exposes raw identifier object_id",
+                "exposes raw identifier NativeObjectIdentifier",
+                "exposes native object native_object",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes archive/IWA type Archive",
+                "exposes wire type WireView",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
 
     def test_pages_section_settings_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(

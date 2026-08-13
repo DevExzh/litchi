@@ -23,6 +23,9 @@ mod package_state;
 mod semantic;
 mod zip;
 
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use catalog::OwnedSourceCatalog;
 pub use catalog::{Component, ComponentCatalog, SourceCatalog};
 pub use directory::{
     DirectoryMarkers, DirectoryMetadataSidecars, DirectoryProvenance, FrozenDirectoryBundle,

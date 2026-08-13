@@ -3,10 +3,9 @@
 use std::{
     fmt,
     mem::{size_of, size_of_val},
-    sync::Arc,
 };
 
-use litchi_iwa_archive::package::ExactArtifacts;
+use litchi_iwa_archive::package::OwnedExactArtifacts;
 use litchi_iwa_common::{WireLimits, wire::WireView};
 use litchi_iwa_protos::{numbers_table_title_codec, table_info_codec};
 use thiserror::Error as ThisError;
@@ -215,7 +214,7 @@ impl Edit<'_> {
 /// A reversible, process-local exact-source title patch.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
-    artifacts: ExactArtifacts,
+    artifacts: OwnedExactArtifacts,
     target: Target,
     before: Settings,
     after: Settings,
@@ -1446,12 +1445,12 @@ fn reopen_cost(source: &Package) -> Result<ReopenCost, Error> {
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let catalog =
         super::table_headers::rewrite::physical_source(edit.source).map_err(map_header_error)?;
-    let source = catalog.shared_source();
+    let source = catalog.__source_owner();
     if edit.before == edit.settings {
         return Ok(Commit {
             package: edit.source.snapshot(),
             patch: Patch {
-                artifacts: ExactArtifacts::new(Arc::clone(&source), source),
+                artifacts: OwnedExactArtifacts::new(source.clone(), source),
                 target: edit.target,
                 before: edit.before,
                 after: edit.settings,
@@ -1499,7 +1498,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             .map_err(map_header_error)?;
     let target_bytes = super::table_headers::rewrite::physical_source(&package)
         .map_err(map_header_error)?
-        .shared_source();
+        .__source_owner();
     let target_reopen = reopen_cost(&package)?;
     budget.charge_transaction_work(source.len().saturating_add(target_bytes.len()))?;
     budget.charge_references(
@@ -1520,7 +1519,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     Ok(Commit {
         package,
         patch: Patch {
-            artifacts: ExactArtifacts::new(source, Arc::clone(&target_bytes)),
+            artifacts: OwnedExactArtifacts::new(source, target_bytes.clone()),
             target: edit.target,
             before: edit.before,
             after: edit.settings,
@@ -1536,10 +1535,10 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
 fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
     let source_catalog =
         super::table_headers::rewrite::physical_source(source).map_err(map_header_error)?;
-    let bytes = source_catalog.shared_source();
+    let bytes = source_catalog.__source_owner();
     let mut budget = TransactionBudget::new(source);
     budget.charge_transaction_work(bytes.len())?;
-    if !patch.artifacts.authorizes_source(&bytes) {
+    if !patch.artifacts.authorizes_owner(&bytes) {
         return Err(Error::PatchConflict);
     }
     if patch.is_noop() {
@@ -1559,7 +1558,7 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
     if !source_catalog.source_is_exact() {
         return Err(Error::PatchConflict);
     }
-    let target_bytes = patch.artifacts.target();
+    let target_bytes = patch.artifacts.target_owner();
     let target_bytes_len = target_bytes.len();
     budget.charge_transaction_work(
         bytes
@@ -1568,7 +1567,7 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
     )?;
     budget.charge_references(patch.target_reopen.references)?;
     budget.charge_transaction_work(patch.target_reopen.work)?;
-    let candidate = Package::from_shared_bytes_with_options(target_bytes, source.state.options)
+    let candidate = Package::from_source_owner_with_options(target_bytes, source.state.options)
         .map_err(|_error| Error::Verification)?;
     let selected = resolve_title_at_positions_with_budget(
         &candidate,

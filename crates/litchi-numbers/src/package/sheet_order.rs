@@ -17,7 +17,7 @@ mod rewrite;
 
 use std::{fmt, sync::Arc};
 
-use litchi_iwa_archive::package::ExactArtifacts;
+use litchi_iwa_archive::package::OwnedExactArtifacts;
 use thiserror::Error as ThisError;
 
 use super::Package;
@@ -262,12 +262,12 @@ impl Edit<'_> {
     pub fn commit(self) -> Result<Commit, Error> {
         let operation = self.operation.ok_or(Error::NoStagedOperation)?;
         let source_catalog = physical_source(self.source)?;
-        let source_bytes = source_catalog.shared_source();
+        let source_bytes = source_catalog.__source_owner();
         if operation.source_position == operation.destination_position {
             return Ok(Commit {
                 package: self.source.snapshot(),
                 patch: Patch {
-                    artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
+                    artifacts: OwnedExactArtifacts::new(source_bytes.clone(), source_bytes),
                     operation,
                     moved_sheet_identifier: None,
                     source_previews: 0,
@@ -309,7 +309,7 @@ impl Edit<'_> {
             &previews,
             0,
         )?;
-        let target_bytes = physical_source(&rewritten.package)?.shared_source();
+        let target_bytes = physical_source(&rewritten.package)?.__source_owner();
         budget.charge_transaction_work(
             source_bytes
                 .len()
@@ -324,7 +324,7 @@ impl Edit<'_> {
         Ok(Commit {
             package: rewritten.package,
             patch: Patch {
-                artifacts: ExactArtifacts::new(source_bytes, Arc::clone(&target_bytes)),
+                artifacts: OwnedExactArtifacts::new(source_bytes, target_bytes.clone()),
                 operation,
                 source_target: Some(source_target),
                 target_target: Some(target_target),
@@ -346,7 +346,7 @@ impl Edit<'_> {
 /// positions but no retained content or implementation identifiers.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
-    artifacts: ExactArtifacts,
+    artifacts: OwnedExactArtifacts,
     operation: Operation,
     source_target: Option<Arc<NativeTarget>>,
     target_target: Option<Arc<NativeTarget>>,
@@ -586,8 +586,8 @@ impl Package {
     /// artifact and performs one linear locality verification.
     pub fn apply_sheet_order(&self, patch: &Patch) -> Result<Commit, Error> {
         let source_catalog = physical_source(self)?;
-        let source = source_catalog.shared_source();
-        if !patch.artifacts.authorizes_source(&source) {
+        let source = source_catalog.__source_owner();
+        if !patch.artifacts.authorizes_owner(&source) {
             return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
@@ -614,11 +614,11 @@ impl Package {
         {
             return Err(Error::PatchConflict);
         }
-        let target_bytes = patch.artifacts.target();
-        preflight_transaction_work(self, Some(&target_bytes), &mut budget)?;
+        let target_bytes = patch.artifacts.target_owner();
+        preflight_transaction_work(self, Some(target_bytes.as_ref()), &mut budget)?;
         budget.charge_transaction_work(patch.target_reopen.work)?;
         budget.charge_references(patch.target_reopen.references)?;
-        let candidate = Package::from_shared_bytes_with_options(target_bytes, self.state.options)
+        let candidate = Package::from_source_owner_with_options(target_bytes, self.state.options)
             .map_err(map_candidate_read_error)?;
         let candidate_target = resolve_native_target(&candidate, &mut budget)?;
         if candidate_target != *expected_target

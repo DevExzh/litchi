@@ -1,9 +1,8 @@
 //! Immutable, exact-source transactions for attached Numbers table locks.
 
 use std::fmt;
-use std::sync::Arc;
 
-use litchi_iwa_archive::package::EntryEdit;
+use litchi_iwa_archive::package::{EntryEdit, SharedBytes};
 use litchi_iwa_common::{
     decode_varint_from_bytes,
     varint::encoded_len,
@@ -175,13 +174,13 @@ impl TableLockEdit<'_> {
     /// resource ceiling is exceeded, or candidate verification fails.
     pub fn commit(self) -> Result<TableLockCommit, TableLockError> {
         let source = physical_source(self.source)?;
-        let source_bytes = source.shared_source();
+        let source_bytes = source.__source_owner();
         let source_fingerprint = fingerprint(&source_bytes);
         if self.before == self.state {
             return Ok(TableLockCommit {
                 package: self.source.snapshot(),
                 patch: TableLockPatch {
-                    source: Arc::clone(&source_bytes),
+                    source: source_bytes.clone(),
                     target: source_bytes,
                     source_fingerprint,
                     target_fingerprint: source_fingerprint,
@@ -204,7 +203,7 @@ impl TableLockEdit<'_> {
             self.before,
             self.state,
         )?;
-        let target = physical_source(&package)?.shared_source();
+        let target = physical_source(&package)?.__source_owner();
         let target_fingerprint = fingerprint(&target);
         Ok(TableLockCommit {
             package,
@@ -229,8 +228,8 @@ impl TableLockEdit<'_> {
 /// unlocked table encoded the lock field as absent or explicit false.
 #[derive(Clone, PartialEq, Eq)]
 pub struct TableLockPatch {
-    source: Arc<[u8]>,
-    target: Arc<[u8]>,
+    source: SharedBytes,
+    target: SharedBytes,
     source_fingerprint: u64,
     target_fingerprint: u64,
     sheet_position: usize,
@@ -274,8 +273,8 @@ impl TableLockPatch {
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
-            source: Arc::clone(&self.target),
-            target: Arc::clone(&self.source),
+            source: self.target.clone(),
+            target: self.source.clone(),
             source_fingerprint: self.target_fingerprint,
             target_fingerprint: self.source_fingerprint,
             sheet_position: self.sheet_position,
@@ -474,7 +473,7 @@ impl Package {
         }
 
         let candidate =
-            Package::from_shared_bytes_with_options(Arc::clone(&patch.target), self.state.options)
+            Package::from_source_owner_with_options(patch.target.clone(), self.state.options)
                 .map_err(map_candidate_read_error)?;
         if candidate.table_lock_at(patch.sheet_position, patch.table_position)? != patch.after {
             return Err(TableLockError::Verification);

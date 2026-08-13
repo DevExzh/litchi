@@ -20,7 +20,6 @@ use litchi_numbers::cell::data_format::{
     Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
     Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
 };
-pub use litchi_numbers::table::dimension::{Dimension, Points, Size};
 use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 use litchi_numbers::table::merge::Region;
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
