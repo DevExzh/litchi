@@ -54,7 +54,7 @@ impl Snapshot {
     ) -> Result<Self> {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
-        let bytes = workbook.data()?.into_arc();
+        let bytes = workbook.data()?.into_arc()?;
         if bytes.len() > limits.max_raw_bytes() {
             return Err(invalid(
                 "workbook calculation metadata exceeds raw byte limit",

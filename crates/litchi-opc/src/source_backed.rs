@@ -16,7 +16,7 @@ use crate::pkgreader::{
     ValidationCatalogPhase,
 };
 use crate::rel::{Relationships, TargetMode};
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{ExecutionContext, ExecutionError, ReadAt, Reservation, Resource, SourceVersion};
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::ReaderAt as ZipReaderAt;
 use soapberry_zip::office::{EntryId, IndexedArchive};
@@ -24,6 +24,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+use std::time::Duration;
 
 const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
 const MAX_SOURCE_OVERLAY_PARTS: usize = 64;
@@ -154,6 +155,22 @@ pub struct SourceCacheDiagnostics {
     pub retained_bytes: usize,
     /// Same-part cold loads currently coordinated by a flight.
     pub in_flight_loads: usize,
+    /// Whether this cache charges retained and in-flight payloads to a caller
+    /// supplied hierarchical memory budget.
+    pub budget_managed: bool,
+    /// Managed payload reservations rejected by the hierarchical budget.
+    pub budget_reservation_failures: u64,
+    /// Current memory usage observed on the managed context's local budget.
+    /// This is content-free and may include sibling operations sharing the
+    /// same budget.
+    pub budget_memory_used: u64,
+    /// Bytes reserved by retained cache entries and active cold-load flights.
+    /// This deliberately excludes ordinary caller-owned [`PartData`] handles
+    /// that were returned after a cache entry was evicted or bypassed.
+    pub budget_cache_reserved_bytes: u64,
+    /// Local memory limit observed on the managed context's budget. `None`
+    /// means that the compatibility, unmanaged cache path is active.
+    pub budget_memory_limit: Option<u64>,
 }
 
 #[derive(Debug, Default)]
@@ -167,6 +184,7 @@ struct CacheCounters {
     bypasses: AtomicU64,
     oversized_bypasses: AtomicU64,
     allocation_bypasses: AtomicU64,
+    budget_reservation_failures: AtomicU64,
 }
 
 #[derive(Clone)]
@@ -383,23 +401,29 @@ impl PartView<'_> {
     }
 }
 
-/// Pinned immutable bytes returned by [`PartView::data`].
+/// Shared immutable bytes returned by [`PartView::data`].
 #[derive(Clone, Debug)]
 pub struct PartData {
-    bytes: Arc<Vec<u8>>,
+    payload: CachedPayload,
 }
 
 impl PartData {
     /// Borrow the part payload.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
-        self.bytes.as_slice()
+        self.payload.bytes.as_slice()
     }
 
-    /// Share the pinned payload allocation with another owner.
-    #[must_use]
-    pub fn into_arc(self) -> Arc<Vec<u8>> {
-        self.bytes
+    /// Share an unmanaged payload allocation with another owner.
+    ///
+    /// Managed payloads retain a hierarchical memory reservation for the
+    /// lifetime of this handle and cannot be detached as a bare `Arc`. Use
+    /// [`Self::as_bytes`] or clone the [`PartData`] handle instead.
+    pub fn into_arc(&self) -> Result<Arc<Vec<u8>>> {
+        if self.payload.reservation.is_some() {
+            return Err(OpcError::ManagedPartDataArcEscape);
+        }
+        Ok(Arc::clone(&self.payload.bytes))
     }
 
     /// Return whether both values pin the same payload allocation.
@@ -408,13 +432,29 @@ impl PartData {
     /// return `false`.
     #[must_use]
     pub fn shares_allocation_with(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.bytes, &other.bytes)
+        Arc::ptr_eq(&self.payload.bytes, &other.payload.bytes)
+    }
+}
+
+/// One payload allocation and, for managed packages, the reservation retained
+/// by a cache entry or active same-Part flight.
+#[derive(Clone, Debug)]
+struct CachedPayload {
+    bytes: Arc<Vec<u8>>,
+    reservation: Option<Arc<Reservation>>,
+}
+
+impl CachedPayload {
+    fn reserved_bytes(&self) -> u64 {
+        self.reservation
+            .as_ref()
+            .map_or(0, |reservation| reservation.amount())
     }
 }
 
 #[derive(Debug)]
 struct CacheEntry {
-    bytes: Arc<Vec<u8>>,
+    payload: CachedPayload,
     last_used: u64,
 }
 
@@ -429,36 +469,61 @@ struct CacheState {
 #[derive(Debug, Default)]
 struct FlightState {
     complete: bool,
-    bytes: Option<Arc<Vec<u8>>>,
+    payload: Option<CachedPayload>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct LoadFlight {
     state: Mutex<FlightState>,
     completed: Condvar,
+    reservation: Option<Arc<Reservation>>,
 }
 
 impl LoadFlight {
-    fn wait(&self) -> Option<Arc<Vec<u8>>> {
+    fn new(reservation: Option<Arc<Reservation>>) -> Self {
+        Self {
+            state: Mutex::new(FlightState::default()),
+            completed: Condvar::new(),
+            reservation,
+        }
+    }
+
+    fn reservation(&self) -> Option<Arc<Reservation>> {
+        self.reservation.as_ref().map(Arc::clone)
+    }
+
+    fn wait(
+        &self,
+        context: Option<&ExecutionContext>,
+    ) -> std::result::Result<Option<CachedPayload>, ExecutionError> {
         let mut state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         while !state.complete {
-            state = self
+            if let Some(context) = context {
+                context.check()?;
+            }
+            state = match self
                 .completed
-                .wait(state)
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+                .wait_timeout(state, Duration::from_millis(10))
+            {
+                Ok((state, _)) => state,
+                Err(poisoned) => poisoned.into_inner().0,
+            };
         }
-        state.bytes.as_ref().map(Arc::clone)
+        if let Some(context) = context {
+            context.check()?;
+        }
+        Ok(state.payload.clone())
     }
 
-    fn finish_success(&self, bytes: Arc<Vec<u8>>) {
+    fn finish_success(&self, payload: CachedPayload) {
         let mut state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        state.bytes = Some(bytes);
+        state.payload = Some(payload);
         state.complete = true;
         self.completed.notify_all();
     }
@@ -474,10 +539,10 @@ impl LoadFlight {
 }
 
 enum CacheAccess {
-    Hit(Arc<Vec<u8>>),
+    Hit(CachedPayload),
     Loader(Arc<LoadFlight>),
     Waiter(Arc<LoadFlight>),
-    Bypass,
+    Bypass(Option<Arc<Reservation>>),
 }
 
 #[derive(Debug)]
@@ -485,6 +550,7 @@ struct PartCache {
     limits: SourceCacheLimits,
     state: Mutex<CacheState>,
     counters: CacheCounters,
+    budget: Option<ExecutionContext>,
 }
 
 impl PartCache {
@@ -493,10 +559,40 @@ impl PartCache {
             limits,
             state: Mutex::new(CacheState::default()),
             counters: CacheCounters::default(),
+            budget: None,
         }
     }
 
-    fn enter(&self, entry_id: EntryId) -> CacheAccess {
+    fn new_managed(limits: SourceCacheLimits, context: ExecutionContext) -> Self {
+        Self {
+            limits,
+            state: Mutex::new(CacheState::default()),
+            counters: CacheCounters::default(),
+            budget: Some(context),
+        }
+    }
+
+    fn is_managed(&self) -> bool {
+        self.budget.is_some()
+    }
+
+    fn check_context(&self) -> std::result::Result<(), ExecutionError> {
+        if let Some(context) = self.budget.as_ref() {
+            context.check()?;
+        }
+        Ok(())
+    }
+
+    fn context(&self) -> Option<&ExecutionContext> {
+        self.budget.as_ref()
+    }
+
+    fn enter(
+        &self,
+        entry_id: EntryId,
+        declared_bytes: u64,
+    ) -> std::result::Result<CacheAccess, ExecutionError> {
+        self.check_context()?;
         let mut state = self
             .state
             .lock()
@@ -506,65 +602,167 @@ impl PartCache {
         if let Some(entry) = state.entries.get_mut(&entry_id) {
             entry.last_used = clock;
             self.counters.hits.fetch_add(1, Ordering::Relaxed);
-            return CacheAccess::Hit(Arc::clone(&entry.bytes));
+            return Ok(CacheAccess::Hit(entry.payload.clone()));
         }
         if let Some(flight) = state.flights.get(&entry_id) {
             self.counters.waiter_joins.fetch_add(1, Ordering::Relaxed);
-            return CacheAccess::Waiter(Arc::clone(flight));
+            return Ok(CacheAccess::Waiter(Arc::clone(flight)));
         }
+
+        let reservation = self.reserve_for_load(&mut state, declared_bytes)?;
         if state.flights.try_reserve(1).is_err() {
             self.counters.cold_loads.fetch_add(1, Ordering::Relaxed);
             self.counters
                 .allocation_bypasses
                 .fetch_add(1, Ordering::Relaxed);
-            return CacheAccess::Bypass;
+            return Ok(CacheAccess::Bypass(reservation));
         }
-        let flight = Arc::new(LoadFlight::default());
+        let flight = Arc::new(LoadFlight::new(reservation));
         state.flights.insert(entry_id, Arc::clone(&flight));
         self.counters.cold_loads.fetch_add(1, Ordering::Relaxed);
-        CacheAccess::Loader(flight)
+        Ok(CacheAccess::Loader(flight))
     }
 
-    fn complete_success(&self, entry_id: EntryId, flight: &Arc<LoadFlight>, bytes: Arc<Vec<u8>>) {
-        let delivered = Arc::clone(&bytes);
-        let mut state = self
-            .state
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        self.counters
-            .successful_loads
-            .fetch_add(1, Ordering::Relaxed);
-        self.record_retention(self.insert_locked(&mut state, entry_id, bytes));
+    fn reserve_for_load(
+        &self,
+        state: &mut CacheState,
+        declared_bytes: u64,
+    ) -> std::result::Result<Option<Arc<Reservation>>, ExecutionError> {
+        let Some(context) = self.budget.as_ref() else {
+            return Ok(None);
+        };
+
+        context.check()?;
+        self.make_room_for_load(state, declared_bytes);
+        match context.reserve(Resource::Memory, declared_bytes) {
+            Ok(reservation) => Ok(Some(Arc::new(reservation))),
+            Err(first_error) => {
+                if matches!(first_error, ExecutionError::ResourceLimit(_)) {
+                    self.counters
+                        .budget_reservation_failures
+                        .fetch_add(1, Ordering::Relaxed);
+                }
+                // Cache retention is best effort. If a shared ancestor is
+                // currently full, dropping all clean entries can make room
+                // without ever exceeding that ancestor's limit.
+                self.evict_all(state);
+                match context.reserve(Resource::Memory, declared_bytes) {
+                    Ok(reservation) => Ok(Some(Arc::new(reservation))),
+                    Err(error) => {
+                        if matches!(error, ExecutionError::ResourceLimit(_)) {
+                            self.counters
+                                .budget_reservation_failures
+                                .fetch_add(1, Ordering::Relaxed);
+                        }
+                        Err(error)
+                    },
+                }
+            },
+        }
+    }
+
+    fn make_room_for_load(&self, state: &mut CacheState, declared_bytes: u64) {
+        let weight = usize::try_from(declared_bytes).unwrap_or(usize::MAX);
+        if weight > self.limits.max_bytes {
+            self.evict_all(state);
+            return;
+        }
+        while state.entries.len() >= self.limits.max_entries
+            || state.total_bytes.saturating_add(weight) > self.limits.max_bytes
+        {
+            if !self.evict_oldest(state) {
+                break;
+            }
+        }
+    }
+
+    fn evict_all(&self, state: &mut CacheState) {
+        while self.evict_oldest(state) {}
+    }
+
+    fn evict_oldest(&self, state: &mut CacheState) -> bool {
+        let Some((&oldest, _)) = state
+            .entries
+            .iter()
+            .filter(|(_, entry)| !payload_is_externally_pinned(&entry.payload))
+            .min_by_key(|(_, entry)| entry.last_used)
+        else {
+            return false;
+        };
+        if let Some(removed) = state.entries.remove(&oldest) {
+            state.total_bytes = state
+                .total_bytes
+                .saturating_sub(removed.payload.bytes.len());
+            self.counters.evictions.fetch_add(1, Ordering::Relaxed);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn complete_success(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+    ) -> std::result::Result<(), ExecutionError> {
+        self.check_context()?;
+        let delivered = payload.clone();
+        {
+            let mut state = self
+                .state
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            // This is the final cooperative cancellation point immediately
+            // before publishing a clean value into the shared cache.
+            self.check_context()?;
+            self.counters
+                .successful_loads
+                .fetch_add(1, Ordering::Relaxed);
+            self.record_retention(self.insert_locked(&mut state, entry_id, payload));
+        }
         // Complete before removing the flight so an oversized, deliberately
         // uncached value still has no gap in which a late peer can start a
         // duplicate load instead of joining this successful delivery.
         flight.finish_success(delivered);
-        remove_flight(&mut state, entry_id, flight);
-        drop(state);
-    }
-
-    fn complete_failure(&self, entry_id: EntryId, flight: &Arc<LoadFlight>) {
         let mut state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        remove_flight(&mut state, entry_id, flight);
+        Ok(())
+    }
+
+    fn complete_failure(&self, entry_id: EntryId, flight: &Arc<LoadFlight>) {
         self.counters.failed_loads.fetch_add(1, Ordering::Relaxed);
         // Publish failure to current waiters before allowing a new retrying
         // loader to install a replacement flight.
         flight.finish_failure();
-        remove_flight(&mut state, entry_id, flight);
-        drop(state);
-    }
-
-    fn complete_bypass_success(&self, entry_id: EntryId, bytes: Arc<Vec<u8>>) {
         let mut state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        remove_flight(&mut state, entry_id, flight);
+    }
+
+    fn complete_bypass_success(
+        &self,
+        entry_id: EntryId,
+        payload: CachedPayload,
+    ) -> std::result::Result<(), ExecutionError> {
+        self.check_context()?;
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // Keep the no-flight allocation-fallback path under the same
+        // pre-publication cancellation contract as the normal flight path.
+        self.check_context()?;
         self.counters
             .successful_loads
             .fetch_add(1, Ordering::Relaxed);
-        self.record_retention(self.insert_locked(&mut state, entry_id, bytes));
+        self.record_retention(self.insert_locked(&mut state, entry_id, payload));
+        Ok(())
     }
 
     fn complete_bypass_failure(&self) {
@@ -580,6 +778,9 @@ impl PartCache {
                     .oversized_bypasses
                     .fetch_add(1, Ordering::Relaxed);
             },
+            CacheRetention::Pinned => {
+                self.counters.bypasses.fetch_add(1, Ordering::Relaxed);
+            },
             CacheRetention::AllocationFailure => {
                 self.counters.bypasses.fetch_add(1, Ordering::Relaxed);
                 self.counters
@@ -593,9 +794,9 @@ impl PartCache {
         &self,
         state: &mut CacheState,
         entry_id: EntryId,
-        bytes: Arc<Vec<u8>>,
+        payload: CachedPayload,
     ) -> CacheRetention {
-        let weight = bytes.len();
+        let weight = payload.bytes.len();
         if weight > self.limits.max_bytes {
             return CacheRetention::Oversized;
         }
@@ -604,16 +805,8 @@ impl PartCache {
         while state.entries.len() >= self.limits.max_entries
             || state.total_bytes.saturating_add(weight) > self.limits.max_bytes
         {
-            let Some((&oldest, _)) = state
-                .entries
-                .iter()
-                .min_by_key(|(_, entry)| entry.last_used)
-            else {
-                break;
-            };
-            if let Some(removed) = state.entries.remove(&oldest) {
-                state.total_bytes = state.total_bytes.saturating_sub(removed.bytes.len());
-                self.counters.evictions.fetch_add(1, Ordering::Relaxed);
+            if !self.evict_oldest(state) {
+                return CacheRetention::Pinned;
             }
         }
         if state.entries.try_reserve(1).is_err() {
@@ -622,11 +815,13 @@ impl PartCache {
         if let Some(previous) = state.entries.insert(
             entry_id,
             CacheEntry {
-                bytes,
+                payload,
                 last_used: clock,
             },
         ) {
-            state.total_bytes = state.total_bytes.saturating_sub(previous.bytes.len());
+            state.total_bytes = state
+                .total_bytes
+                .saturating_sub(previous.payload.bytes.len());
         }
         state.total_bytes = state.total_bytes.saturating_add(weight);
         CacheRetention::Retained
@@ -637,6 +832,31 @@ impl PartCache {
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // A successful loader briefly owns the same reservation through its
+        // cache entry, completion payload, and returned handles. Count only
+        // unique reservation identities so a diagnostic snapshot cannot
+        // report more retained cache bytes than the hierarchical budget.
+        let mut budget_cache_reserved_bytes = state
+            .entries
+            .values()
+            .map(|entry| entry.payload.reserved_bytes())
+            .sum::<u64>();
+        for flight in state.flights.values() {
+            let Some(reservation) = flight.reservation.as_ref() else {
+                continue;
+            };
+            let already_counted = state.entries.values().any(|entry| {
+                entry
+                    .payload
+                    .reservation
+                    .as_ref()
+                    .is_some_and(|existing| Arc::ptr_eq(existing, reservation))
+            });
+            if !already_counted {
+                budget_cache_reserved_bytes =
+                    budget_cache_reserved_bytes.saturating_add(reservation.amount());
+            }
+        }
         SourceCacheDiagnostics {
             hits: self.counters.hits.load(Ordering::Relaxed),
             cold_loads: self.counters.cold_loads.load(Ordering::Relaxed),
@@ -650,6 +870,20 @@ impl PartCache {
             retained_entries: state.entries.len(),
             retained_bytes: state.total_bytes,
             in_flight_loads: state.flights.len(),
+            budget_managed: self.budget.is_some(),
+            budget_reservation_failures: self
+                .counters
+                .budget_reservation_failures
+                .load(Ordering::Relaxed),
+            budget_memory_used: self
+                .budget
+                .as_ref()
+                .map_or(0, |context| context.budget().used(Resource::Memory)),
+            budget_cache_reserved_bytes,
+            budget_memory_limit: self
+                .budget
+                .as_ref()
+                .map(|context| context.budget().limit(Resource::Memory)),
         }
     }
 }
@@ -658,6 +892,7 @@ impl PartCache {
 enum CacheRetention {
     Retained,
     Oversized,
+    Pinned,
     AllocationFailure,
 }
 
@@ -669,6 +904,17 @@ fn remove_flight(state: &mut CacheState, entry_id: EntryId, flight: &Arc<LoadFli
     {
         state.flights.remove(&entry_id);
     }
+}
+
+fn payload_is_externally_pinned(payload: &CachedPayload) -> bool {
+    // Unmanaged `PartData::into_arc` can outlive its handle, while managed
+    // handles retain a reservation. Check both identities before evicting an
+    // entry so either form of caller ownership keeps the bytes pinned.
+    Arc::strong_count(&payload.bytes) > 1
+        || payload
+            .reservation
+            .as_ref()
+            .is_some_and(|reservation| Arc::strong_count(reservation) > 1)
 }
 
 /// A structurally validated OPC package backed by an immutable positional source.
@@ -825,6 +1071,41 @@ impl SourceBackedPackage {
         Self::from_read_at_with_limits_and_cache_limits(source, ReadLimits::default(), cache_limits)
     }
 
+    /// Open a source-backed package whose lazy payload cache is charged to an
+    /// explicit hierarchical execution budget.
+    ///
+    /// Compatibility constructors remain unmanaged and keep their existing
+    /// behavior. This opt-in path checks cancellation before opening and
+    /// reserves each Part's declared uncompressed size before reading its
+    /// payload. The reservation is retained with the clean cache entry and
+    /// active same-Part flight. A returned [`PartData`] is a budgeted handle;
+    /// use [`PartData::as_bytes`] or clone that handle while consuming the
+    /// payload. Its [`PartData::into_arc`] escape is rejected on this managed
+    /// path so the reservation cannot be silently detached.
+    pub fn from_read_at_with_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            source,
+            limits,
+            SourceCacheLimits::default(),
+            context,
+        )
+    }
+
+    /// Open a managed source-backed package with explicit read, cache, and
+    /// hierarchical execution policies.
+    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_inner(source, limits, cache_limits, Some(context))
+    }
+
     /// Open a source-backed package with explicit read and cache policies.
     ///
     /// The source version is captured before indexing and checked after every
@@ -834,6 +1115,18 @@ impl SourceBackedPackage {
         limits: ReadLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
+        Self::from_read_at_inner(source, limits, cache_limits, None)
+    }
+
+    fn from_read_at_inner(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: Option<ExecutionContext>,
+    ) -> Result<Self> {
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
         let version = source.version()?;
         let length = source.len()?;
         limits.check(ReadResource::InputBytes, length, limits.max_input_bytes())?;
@@ -888,6 +1181,10 @@ impl SourceBackedPackage {
             });
         }
 
+        let cache = context.map_or_else(
+            || PartCache::new(cache_limits),
+            |context| PartCache::new_managed(cache_limits, context),
+        );
         Ok(Self {
             source: snapshot,
             archive,
@@ -896,7 +1193,7 @@ impl SourceBackedPackage {
             parts: catalog_parts,
             parts_by_name,
             non_part_members,
-            cache: PartCache::new(cache_limits),
+            cache,
         })
     }
 
@@ -1516,31 +1813,54 @@ impl SourceBackedPackage {
     }
 
     fn read_part(&self, index: usize) -> Result<PartData> {
+        self.cache.check_context().map_err(map_execution_error)?;
         let entry_id = self
             .parts
             .get(index)
             .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?
             .entry_id;
+        let declared_bytes = if self.cache.is_managed() {
+            let declared = self.archive.metadata_for(entry_id)?.uncompressed_size();
+            self.limits.check(
+                ReadResource::PartBytes,
+                declared,
+                self.limits.max_part_bytes(),
+            )?;
+            Some(declared)
+        } else {
+            None
+        };
         loop {
             self.source.ensure_current()?;
-            match self.cache.enter(entry_id) {
+            match self
+                .cache
+                .enter(entry_id, declared_bytes.unwrap_or_default())
+                .map_err(map_execution_error)?
+            {
                 CacheAccess::Hit(bytes) => {
                     self.source.ensure_current()?;
-                    return Ok(PartData { bytes });
+                    self.cache.check_context().map_err(map_execution_error)?;
+                    return Ok(PartData { payload: bytes });
                 },
                 CacheAccess::Waiter(flight) => {
-                    if let Some(bytes) = flight.wait() {
+                    if let Some(payload) = flight
+                        .wait(self.cache.context())
+                        .map_err(map_execution_error)?
+                    {
                         self.source.ensure_current()?;
-                        return Ok(PartData { bytes });
+                        self.cache.check_context().map_err(map_execution_error)?;
+                        return Ok(PartData { payload });
                     }
                     // The loader may have failed; in that case the flight is
                     // removed and this caller retries rather than observing a
                     // retained error. This also re-checks source freshness.
                 },
                 CacheAccess::Loader(flight) => {
-                    return self.load_part(index, entry_id, Some(flight));
+                    return self.load_part(index, entry_id, declared_bytes, Some(flight), None);
                 },
-                CacheAccess::Bypass => return self.load_part(index, entry_id, None),
+                CacheAccess::Bypass(reservation) => {
+                    return self.load_part(index, entry_id, declared_bytes, None, reservation);
+                },
             }
         }
     }
@@ -1549,7 +1869,9 @@ impl SourceBackedPackage {
         &self,
         index: usize,
         entry_id: EntryId,
+        declared_bytes: Option<u64>,
         flight: Option<Arc<LoadFlight>>,
+        bypass_reservation: Option<Arc<Reservation>>,
     ) -> Result<PartData> {
         let result = (|| {
             let part = self
@@ -1557,6 +1879,17 @@ impl SourceBackedPackage {
                 .get(index)
                 .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
             let bytes = self.archive.read_entry(part.entry_id)?;
+            // The decompressor has finished and no payload has been
+            // published yet. Cancellation here discards the cold result.
+            self.cache.check_context().map_err(map_execution_error)?;
+            if let Some(declared) = declared_bytes {
+                if bytes.len() as u64 != declared {
+                    return Err(OpcError::ZipError(format!(
+                        "source-backed OPC Part declared {declared} uncompressed bytes but read {}",
+                        bytes.len()
+                    )));
+                }
+            }
             self.source.ensure_current()?;
             self.limits.check(
                 ReadResource::PartBytes,
@@ -1566,22 +1899,39 @@ impl SourceBackedPackage {
             // Check immediately before publishing. If the source changed
             // during the cold read, no stale payload enters the cache.
             self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
             Ok(Arc::new(bytes))
         })();
+        let reservation = flight
+            .as_ref()
+            .and_then(|flight| flight.reservation())
+            .or(bypass_reservation);
         match (flight, result) {
             (Some(flight), Ok(bytes)) => {
-                self.cache
-                    .complete_success(entry_id, &flight, Arc::clone(&bytes));
-                Ok(PartData { bytes })
+                let payload = CachedPayload { bytes, reservation };
+                if let Err(error) = self
+                    .cache
+                    .complete_success(entry_id, &flight, payload.clone())
+                {
+                    self.cache.complete_failure(entry_id, &flight);
+                    return Err(map_execution_error(error));
+                }
+                Ok(PartData { payload })
             },
             (Some(flight), Err(error)) => {
                 self.cache.complete_failure(entry_id, &flight);
                 Err(error)
             },
             (None, Ok(bytes)) => {
-                self.cache
-                    .complete_bypass_success(entry_id, Arc::clone(&bytes));
-                Ok(PartData { bytes })
+                let payload = CachedPayload { bytes, reservation };
+                if let Err(error) = self
+                    .cache
+                    .complete_bypass_success(entry_id, payload.clone())
+                {
+                    self.cache.complete_bypass_failure();
+                    return Err(map_execution_error(error));
+                }
+                Ok(PartData { payload })
             },
             (None, Err(error)) => {
                 self.cache.complete_bypass_failure();
@@ -1787,6 +2137,13 @@ fn overlay_unavailable(reason: impl Into<String>) -> OpcError {
     }
 }
 
+fn map_execution_error(error: ExecutionError) -> OpcError {
+    match error {
+        ExecutionError::Cancelled => OpcError::Cancelled,
+        error => OpcError::Execution(error),
+    }
+}
+
 fn finish_source_publication(
     result: Result<()>,
     source: &SourceSnapshot,
@@ -1902,9 +2259,14 @@ mod tests {
 
     use super::*;
     use std::collections::HashMap;
+    use std::num::{NonZeroU64, NonZeroUsize};
     use std::sync::Barrier;
     use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
     use std::time::Duration;
+
+    use litchi_core::{
+        Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, Resource,
+    };
 
     struct CountingSource {
         bytes: Vec<u8>,
@@ -1946,6 +2308,64 @@ mod tests {
 
         fn version(&self) -> std::io::Result<SourceVersion> {
             Ok(SourceVersion::new(42, self.revision.load(Ordering::SeqCst)))
+        }
+    }
+
+    struct CancelOnHitVersionSource {
+        bytes: Vec<u8>,
+        cancellation_source: CancellationSource,
+        skip_versions: AtomicUsize,
+        armed: AtomicBool,
+    }
+
+    impl CancelOnHitVersionSource {
+        fn new(bytes: Vec<u8>, cancellation_source: CancellationSource) -> Self {
+            Self {
+                bytes,
+                cancellation_source,
+                skip_versions: AtomicUsize::new(0),
+                armed: AtomicBool::new(false),
+            }
+        }
+
+        fn arm_after_cache_enter(&self) {
+            // The part lookup and `read_part` perform three freshness checks
+            // before a hit's post-entry check can run.
+            self.skip_versions.store(3, Ordering::SeqCst);
+            self.armed.store(true, Ordering::SeqCst);
+        }
+    }
+
+    impl ReadAt for CancelOnHitVersionSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            let offset = usize::try_from(offset).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "offset too large")
+            })?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            if self.armed.load(Ordering::SeqCst)
+                && self
+                    .skip_versions
+                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                        remaining.checked_sub(1)
+                    })
+                    .is_err()
+            {
+                self.armed.store(false, Ordering::SeqCst);
+                self.cancellation_source.cancel();
+            }
+            Ok(SourceVersion::new(43, 0))
         }
     }
 
@@ -2046,6 +2466,123 @@ mod tests {
         fn version(&self) -> std::io::Result<SourceVersion> {
             Ok(SourceVersion::new(77, 0))
         }
+    }
+
+    struct CancelDuringPayloadSource {
+        bytes: Vec<u8>,
+        payload_offset: usize,
+        cancellation_source: CancellationSource,
+        armed: AtomicBool,
+    }
+
+    impl CancelDuringPayloadSource {
+        fn new(
+            bytes: Vec<u8>,
+            payload_offset: usize,
+            cancellation_source: CancellationSource,
+        ) -> Self {
+            Self {
+                bytes,
+                payload_offset,
+                cancellation_source,
+                armed: AtomicBool::new(true),
+            }
+        }
+    }
+
+    impl ReadAt for CancelDuringPayloadSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            let offset = usize::try_from(offset).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "offset too large")
+            })?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            if offset == self.payload_offset && self.armed.swap(false, Ordering::SeqCst) {
+                // The bytes have been decompressed into the loader's private
+                // allocation, but the publication checks must reject them.
+                self.cancellation_source.cancel();
+            }
+            Ok(count)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(79, 0))
+        }
+    }
+
+    struct ChangeDuringPayloadSource {
+        bytes: Vec<u8>,
+        payload_offset: usize,
+        revision: AtomicU64,
+        armed: AtomicBool,
+    }
+
+    impl ChangeDuringPayloadSource {
+        fn new(bytes: Vec<u8>, payload_offset: usize) -> Self {
+            Self {
+                bytes,
+                payload_offset,
+                revision: AtomicU64::new(0),
+                armed: AtomicBool::new(false),
+            }
+        }
+    }
+
+    impl ReadAt for ChangeDuringPayloadSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            let offset = usize::try_from(offset).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "offset too large")
+            })?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            if offset == self.payload_offset && self.armed.swap(false, Ordering::SeqCst) {
+                self.revision.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(count)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(88, self.revision.load(Ordering::SeqCst)))
+        }
+    }
+
+    fn managed_context_with_cancellation(
+        memory: u64,
+    ) -> (Budget, CancellationSource, ExecutionContext) {
+        let budget = Budget::root(
+            "opc-source-cache-test",
+            Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(memory.max(1)).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+        (budget, cancellation_source, context)
+    }
+
+    fn managed_context(memory: u64) -> (Budget, ExecutionContext) {
+        let (budget, cancellation_source, context) = managed_context_with_cancellation(memory);
+        drop(cancellation_source);
+        (budget, context)
     }
 
     fn archive_bytes(root_relationships: &[u8], document: &[u8], include_junk: bool) -> Vec<u8> {
@@ -2317,6 +2854,555 @@ mod tests {
     }
 
     #[test]
+    fn managed_cache_reserves_declared_payload_and_releases_on_package_drop() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"managed payload",
+            false,
+        )));
+        let (budget, context) = managed_context(1024);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        assert_eq!(budget.used(Resource::Memory), 0);
+
+        let data = package.main_document_part().unwrap().data().unwrap();
+        assert_eq!(data.as_bytes(), b"managed payload");
+        assert_eq!(
+            budget.used(Resource::Memory),
+            b"managed payload".len() as u64
+        );
+        let diagnostics = package.cache_diagnostics();
+        assert!(diagnostics.budget_managed);
+        assert_eq!(diagnostics.budget_reservation_failures, 0);
+        assert_eq!(
+            diagnostics.budget_cache_reserved_bytes,
+            b"managed payload".len() as u64
+        );
+        assert_eq!(
+            diagnostics.budget_memory_used,
+            b"managed payload".len() as u64
+        );
+
+        drop(data);
+        // The clean cache entry owns the reservation until the package drops.
+        assert_eq!(
+            budget.used(Resource::Memory),
+            b"managed payload".len() as u64
+        );
+        drop(package);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_constructor_honors_pre_cancellation_without_source_reads() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"cancelled before open",
+            false,
+        )));
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        let budget = Budget::root(
+            "opc-source-cache-cancel-test",
+            Limits::new(1024, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        cancellation_source.cancel();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(1024).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget, cancellation, execution_limits);
+
+        assert!(matches!(
+            SourceBackedPackage::from_read_at_with_execution_context(
+                source.clone(),
+                ReadLimits::default(),
+                context,
+            ),
+            Err(OpcError::Cancelled)
+        ));
+        assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
+    }
+
+    #[test]
+    fn managed_cache_hit_honors_cancellation_without_releasing_cached_budget() {
+        const DOCUMENT: &[u8] = b"managed cancellation hit";
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let source = Arc::new(CancelOnHitVersionSource::new(
+            archive_bytes(root_relationships(), DOCUMENT, false),
+            cancellation_source,
+        ));
+        let budget = Budget::root(
+            "opc-source-cache-hit-cancel-test",
+            Limits::new(
+                DOCUMENT.len() as u64,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            ),
+        );
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(DOCUMENT.len() as u64).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let first = package.main_document_part().unwrap().data().unwrap();
+        assert_eq!(budget.used(Resource::Memory), DOCUMENT.len() as u64);
+        source.arm_after_cache_enter();
+
+        assert!(matches!(
+            package.main_document_part().unwrap().data(),
+            Err(OpcError::Cancelled)
+        ));
+        assert_eq!(package.cache_diagnostics().hits, 1);
+        // Cancellation rejects the handle request, but never steals the
+        // clean entry's reservation from the package-owned cache.
+        assert_eq!(budget.used(Resource::Memory), DOCUMENT.len() as u64);
+        drop(first);
+        drop(package);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_cache_eviction_releases_unpinned_reservation_before_next_read() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"document",
+            false,
+        )));
+        let (budget, context) = managed_context(64);
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                ReadLimits::default(),
+                SourceCacheLimits::new(9, 2).unwrap(),
+                context,
+            )
+            .unwrap();
+        let first_name = package.parts[0].partname.clone();
+        let second_name = package.parts[1].partname.clone();
+        let first = package.part(&first_name).unwrap().data().unwrap();
+        assert_eq!(budget.used(Resource::Memory), b"document".len() as u64);
+        drop(first);
+
+        let second = package.part(&second_name).unwrap().data().unwrap();
+        assert_eq!(second.as_bytes(), b"<orphan/>");
+        assert_eq!(budget.used(Resource::Memory), b"<orphan/>".len() as u64);
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.evictions, 1);
+        assert_eq!(diagnostics.retained_bytes, b"<orphan/>".len());
+        assert_eq!(
+            diagnostics.budget_cache_reserved_bytes,
+            b"<orphan/>".len() as u64
+        );
+        drop(second);
+        drop(package);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_cache_does_not_evict_externally_pinned_entry_and_bypasses_retention() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"document",
+            false,
+        )));
+        let (budget, context) = managed_context(64);
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                ReadLimits::default(),
+                SourceCacheLimits::new(b"document".len(), 1).unwrap(),
+                context,
+            )
+            .unwrap();
+        let first_name = package.parts[0].partname.clone();
+        let second_name = package.parts[1].partname.clone();
+        let first = package.part(&first_name).unwrap().data().unwrap();
+        let first_error = first.into_arc().expect_err("managed Arc escape must fail");
+        assert_eq!(budget.used(Resource::Memory), b"document".len() as u64);
+        assert_eq!(
+            package.cache_diagnostics().retained_bytes,
+            b"document".len()
+        );
+        let second = package.part(&second_name).unwrap().data().unwrap();
+
+        assert!(matches!(first_error, OpcError::ManagedPartDataArcEscape));
+        assert_eq!(first.as_bytes(), b"document");
+        assert_eq!(second.as_bytes(), b"<orphan/>");
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.retained_entries, 1);
+        assert_eq!(diagnostics.retained_bytes, b"document".len());
+        assert_eq!(diagnostics.bypasses, 1);
+        assert_eq!(
+            budget.used(Resource::Memory),
+            (b"document".len() + b"<orphan/>".len()) as u64
+        );
+        assert!(
+            package
+                .cache
+                .state
+                .lock()
+                .unwrap()
+                .entries
+                .contains_key(&package.parts[0].entry_id)
+        );
+
+        drop(second);
+        drop(first);
+        drop(package);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_budget_rejects_before_payload_io_and_reports_content_free_failure() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"payload too large",
+            false,
+        )));
+        let (budget, context) = managed_context((b"payload too large".len() - 1) as u64);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        let error = package.main_document_part().unwrap().data().unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                if limit.resource == Resource::Memory
+        ));
+        assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        let diagnostics = package.cache_diagnostics();
+        assert!(diagnostics.budget_managed);
+        assert_eq!(diagnostics.budget_reservation_failures, 2);
+        assert_eq!(diagnostics.retained_entries, 0);
+        assert_eq!(diagnostics.retained_bytes, 0);
+    }
+
+    #[test]
+    fn managed_cache_respects_hierarchical_parent_memory_limit() {
+        const DOCUMENT: &[u8] = b"hierarchical budget payload";
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            DOCUMENT,
+            false,
+        )));
+        let root = Budget::root(
+            "opc-source-cache-root",
+            Limits::new(
+                (DOCUMENT.len() - 1) as u64,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            ),
+        );
+        let child = root.child(
+            "opc-source-cache-child",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        drop(cancellation_source);
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(DOCUMENT.len() as u64).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(child, cancellation, execution_limits);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let reads_before = source.reads.load(Ordering::SeqCst);
+
+        assert!(matches!(
+            package.main_document_part().unwrap().data(),
+            Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
+                if limit.resource == Resource::Memory
+        ));
+        assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
+        assert_eq!(root.used(Resource::Memory), 0);
+        assert_eq!(package.cache_diagnostics().budget_reservation_failures, 2);
+    }
+
+    #[test]
+    fn managed_sibling_caches_compete_for_parent_memory_before_payload_io() {
+        const DOCUMENT: &[u8] = b"sibling parent budget payload";
+        let root = Budget::root(
+            "opc-source-cache-sibling-root",
+            Limits::new(
+                DOCUMENT.len() as u64,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            ),
+        );
+        let first_budget = root.child(
+            "opc-source-cache-sibling-first",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let second_budget = root.child(
+            "opc-source-cache-sibling-second",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(DOCUMENT.len() as u64).unwrap(),
+            0,
+        )
+        .unwrap();
+        let (first_cancellation_source, first_cancellation) = CancellationSource::pair();
+        let (second_cancellation_source, second_cancellation) = CancellationSource::pair();
+        let first_context =
+            ExecutionContext::new(first_budget, first_cancellation, execution_limits);
+        let second_context =
+            ExecutionContext::new(second_budget, second_cancellation, execution_limits);
+        drop(first_cancellation_source);
+        drop(second_cancellation_source);
+        let first_source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            DOCUMENT,
+            false,
+        )));
+        let second_source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            DOCUMENT,
+            false,
+        )));
+        let first_package = SourceBackedPackage::from_read_at_with_execution_context(
+            first_source,
+            ReadLimits::default(),
+            first_context,
+        )
+        .unwrap();
+        let second_package = SourceBackedPackage::from_read_at_with_execution_context(
+            second_source.clone(),
+            ReadLimits::default(),
+            second_context,
+        )
+        .unwrap();
+        let reads_before = second_source.reads.load(Ordering::SeqCst);
+        let first = first_package.main_document_part().unwrap().data().unwrap();
+        assert_eq!(root.used(Resource::Memory), DOCUMENT.len() as u64);
+        drop(first);
+
+        assert!(matches!(
+            second_package.main_document_part().unwrap().data(),
+            Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
+                if limit.resource == Resource::Memory
+        ));
+        assert_eq!(second_source.reads.load(Ordering::SeqCst), reads_before);
+        assert_eq!(root.used(Resource::Memory), DOCUMENT.len() as u64);
+        assert_eq!(
+            second_package
+                .cache_diagnostics()
+                .budget_reservation_failures,
+            2
+        );
+        drop(second_package);
+        drop(first_package);
+        assert_eq!(root.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_same_part_waiters_share_one_reservation_and_flight() {
+        const DOCUMENT: &[u8] = b"managed single-flight payload";
+        let bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let payload_offset = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        let source = Arc::new(SlowPayloadSource::new(bytes, payload_offset));
+        let (budget, context) = managed_context(DOCUMENT.len() as u64);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let start = Arc::new(Barrier::new(3));
+        let (first, second) = std::thread::scope(|scope| {
+            let package = &package;
+            let first_start = Arc::clone(&start);
+            let first_task = scope.spawn(move || {
+                first_start.wait();
+                package.main_document_part().unwrap().data().unwrap()
+            });
+            let second_start = Arc::clone(&start);
+            let second_task = scope.spawn(move || {
+                second_start.wait();
+                package.main_document_part().unwrap().data().unwrap()
+            });
+            start.wait();
+            std::thread::sleep(Duration::from_millis(10));
+            let diagnostics = package.cache_diagnostics();
+            assert_eq!(diagnostics.in_flight_loads, 1);
+            assert_eq!(
+                diagnostics.budget_cache_reserved_bytes,
+                DOCUMENT.len() as u64
+            );
+            (first_task.join().unwrap(), second_task.join().unwrap())
+        });
+        assert_eq!(source.payload_reads.load(Ordering::SeqCst), 1);
+        assert!(first.shares_allocation_with(&second));
+        assert_eq!(budget.used(Resource::Memory), DOCUMENT.len() as u64);
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.cold_loads, 1);
+        assert_eq!(diagnostics.waiter_joins, 1);
+        assert_eq!(diagnostics.successful_loads, 1);
+        assert_eq!(
+            diagnostics.budget_cache_reserved_bytes,
+            DOCUMENT.len() as u64
+        );
+        drop(first);
+        drop(second);
+        drop(package);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_waiter_cancellation_does_not_block_or_publish_loader_payload() {
+        const DOCUMENT: &[u8] = b"managed waiter cancellation payload";
+        let bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let payload_offset = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        let source = Arc::new(SlowPayloadSource::new(bytes, payload_offset));
+        let (budget, cancellation_source, context) =
+            managed_context_with_cancellation(DOCUMENT.len() as u64);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let start = Arc::new(Barrier::new(3));
+        let (first, second) = std::thread::scope(|scope| {
+            let package = &package;
+            let first_start = Arc::clone(&start);
+            let first_task = scope.spawn(move || {
+                first_start.wait();
+                package.main_document_part().unwrap().data()
+            });
+            let second_start = Arc::clone(&start);
+            let second_task = scope.spawn(move || {
+                second_start.wait();
+                package.main_document_part().unwrap().data()
+            });
+            start.wait();
+            std::thread::sleep(Duration::from_millis(10));
+            assert_eq!(package.cache_diagnostics().in_flight_loads, 1);
+            cancellation_source.cancel();
+            (first_task.join().unwrap(), second_task.join().unwrap())
+        });
+
+        assert!(matches!(first, Err(OpcError::Cancelled)));
+        assert!(matches!(second, Err(OpcError::Cancelled)));
+        assert_eq!(source.payload_reads.load(Ordering::SeqCst), 1);
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.in_flight_loads, 0);
+        assert_eq!(diagnostics.retained_entries, 0);
+        assert_eq!(diagnostics.failed_loads, 1);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        drop(package);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_source_change_drops_reservation_and_does_not_retain_payload() {
+        const DOCUMENT: &[u8] = b"source changes during managed read";
+        let bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let payload_offset = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        let source = Arc::new(ChangeDuringPayloadSource::new(bytes, payload_offset));
+        let (budget, context) = managed_context(1024);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        source.armed.store(true, Ordering::SeqCst);
+
+        assert!(matches!(
+            package.main_document_part().unwrap().data(),
+            Err(OpcError::SourceChanged { .. })
+        ));
+        assert_eq!(budget.used(Resource::Memory), 0);
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.failed_loads, 1);
+        assert_eq!(diagnostics.retained_entries, 0);
+        assert_eq!(diagnostics.budget_cache_reserved_bytes, 0);
+    }
+
+    #[test]
+    fn managed_cancellation_after_decompression_prevents_publication() {
+        const DOCUMENT: &[u8] = b"managed prepublication cancellation payload";
+        let bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let payload_offset = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        let (budget, cancellation_source, context) =
+            managed_context_with_cancellation(DOCUMENT.len() as u64);
+        let source = Arc::new(CancelDuringPayloadSource::new(
+            bytes,
+            payload_offset,
+            cancellation_source,
+        ));
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            package.main_document_part().unwrap().data(),
+            Err(OpcError::Cancelled)
+        ));
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.in_flight_loads, 0);
+        assert_eq!(diagnostics.retained_entries, 0);
+        assert_eq!(diagnostics.failed_loads, 1);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
     fn concurrent_cold_reads_share_one_archive_load_and_one_arc() {
         const DOCUMENT: &[u8] = b"single-flight source-backed payload";
         let bytes = archive_bytes(root_relationships(), DOCUMENT, false);
@@ -2338,6 +3424,7 @@ mod tests {
                     .data()
                     .unwrap()
                     .into_arc()
+                    .unwrap()
             });
             let second_start = Arc::clone(&start);
             let second_task = scope.spawn(move || {
@@ -2348,6 +3435,7 @@ mod tests {
                     .data()
                     .unwrap()
                     .into_arc()
+                    .unwrap()
             });
             start.wait();
             std::thread::sleep(Duration::from_millis(10));
@@ -2373,18 +3461,51 @@ mod tests {
         let second_id = package.parts[1].entry_id;
         let cache = PartCache::new(SourceCacheLimits::new(3, 3).unwrap());
         let first = Arc::new(vec![1, 2]);
-        cache.complete_bypass_success(first_id, Arc::clone(&first));
+        cache
+            .complete_bypass_success(
+                first_id,
+                CachedPayload {
+                    bytes: Arc::clone(&first),
+                    reservation: None,
+                },
+            )
+            .unwrap();
         assert!(Arc::ptr_eq(
-            &cache.state.lock().unwrap().entries[&first_id].bytes,
+            &cache.state.lock().unwrap().entries[&first_id].payload.bytes,
             &first
         ));
-        cache.complete_bypass_success(second_id, Arc::new(vec![3, 4]));
+        drop(first);
+        cache
+            .complete_bypass_success(
+                second_id,
+                CachedPayload {
+                    bytes: Arc::new(vec![3, 4]),
+                    reservation: None,
+                },
+            )
+            .unwrap();
         assert!(!cache.state.lock().unwrap().entries.contains_key(&first_id));
         assert!(cache.state.lock().unwrap().entries.contains_key(&second_id));
 
         let entry_limited = PartCache::new(SourceCacheLimits::new(10, 1).unwrap());
-        entry_limited.complete_bypass_success(first_id, Arc::new(vec![1, 2]));
-        entry_limited.complete_bypass_success(second_id, Arc::new(vec![3, 4]));
+        entry_limited
+            .complete_bypass_success(
+                first_id,
+                CachedPayload {
+                    bytes: Arc::new(vec![1, 2]),
+                    reservation: None,
+                },
+            )
+            .unwrap();
+        entry_limited
+            .complete_bypass_success(
+                second_id,
+                CachedPayload {
+                    bytes: Arc::new(vec![3, 4]),
+                    reservation: None,
+                },
+            )
+            .unwrap();
         assert!(
             !entry_limited
                 .state
@@ -2402,7 +3523,15 @@ mod tests {
                 .contains_key(&second_id)
         );
 
-        cache.complete_bypass_success(first_id, Arc::new(vec![0, 0, 0, 0]));
+        cache
+            .complete_bypass_success(
+                first_id,
+                CachedPayload {
+                    bytes: Arc::new(vec![0, 0, 0, 0]),
+                    reservation: None,
+                },
+            )
+            .unwrap();
         assert!(!cache.state.lock().unwrap().entries.contains_key(&first_id));
         assert_eq!(cache.diagnostics().evictions, 1);
         assert_eq!(cache.diagnostics().oversized_bypasses, 1);

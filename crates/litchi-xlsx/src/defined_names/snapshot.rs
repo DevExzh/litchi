@@ -33,7 +33,7 @@ impl Snapshot {
     pub(super) fn load_source_backed(package: &SourceBackedPackage) -> Result<Self> {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
-        let bytes = workbook.data()?.into_arc();
+        let bytes = workbook.data()?.into_arc()?;
         let owner = current_owner_relationship(package.rels())
             .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?;
         Self::from_source_backed_parts(&workbook, bytes, owner)

@@ -953,7 +953,11 @@ impl Package {
             .main_document_part()
             .map_err(crate::Error::from)?;
         validate_document_main_content_type(main.content_type())?;
-        let xml = main.data().map_err(crate::Error::from)?.into_arc();
+        let xml = main
+            .data()
+            .map_err(crate::Error::from)?
+            .into_arc()
+            .map_err(crate::Error::from)?;
         let layout = scan_document(xml.as_slice(), limits)?;
         let artifact_fingerprint = fingerprint_artifact(&self.package.source_artifact())?;
         let observed = self.package.source_version().map_err(crate::Error::from)?;

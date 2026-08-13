@@ -120,7 +120,7 @@ impl Package {
     pub fn document(&self) -> Result<Document> {
         let main = self.package.main_document_part()?;
         validate_document_main_content_type(main.content_type())?;
-        let xml = visible_document_xml(main.data()?.into_arc())?;
+        let xml = visible_document_xml(main.data()?.into_arc()?)?;
         let source_version = self.package.source_version()?;
         Ok(Document {
             xml,
@@ -557,7 +557,11 @@ impl Package {
         let main = self.package.main_document_part().map_err(Error::from)?;
         validate_document_main_content_type(main.content_type())?;
         let partname = main.partname().clone();
-        let raw = main.data().map_err(Error::from)?.into_arc();
+        let raw = main
+            .data()
+            .map_err(Error::from)?
+            .into_arc()
+            .map_err(Error::from)?;
         let visible = visible_document_xml(Arc::clone(&raw))?;
         if !Arc::ptr_eq(&raw, &visible) {
             return Err(Error::UnsafeEdit {
@@ -625,7 +629,7 @@ impl Package {
                 got: settings_part.content_type().into(),
             });
         }
-        let raw = settings_part.data()?.into_arc();
+        let raw = settings_part.data()?.into_arc()?;
         if raw.len() > variables::MAX_DOCUMENT_VARIABLE_XML_BYTES {
             return Err(Error::InvalidFormat(format!(
                 "settings XML exceeds the {} byte document-variable limit",

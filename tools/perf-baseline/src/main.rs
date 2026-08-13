@@ -10330,7 +10330,7 @@ fn verify_opc_main_payload(
     if main.partname().membername() != corpus.target_name {
         return Err("source-backed OPC main relationship resolved the wrong part".into());
     }
-    let bytes = main.data()?.into_arc();
+    let bytes = main.data()?.into_arc()?;
     if bytes.as_slice() != corpus.target_payload {
         return Err("source-backed OPC main payload differs from deterministic corpus".into());
     }
@@ -10459,7 +10459,7 @@ fn run_opc_source_concurrent_same_part(
                 first_package
                     .main_document_part()
                     .and_then(|part| part.data())
-                    .map(|data| data.into_arc())
+                    .and_then(|data| data.into_arc())
             });
             let second_start = Arc::clone(&start);
             let second_package = &package;
@@ -10468,7 +10468,7 @@ fn run_opc_source_concurrent_same_part(
                 second_package
                     .main_document_part()
                     .and_then(|part| part.data())
-                    .map(|data| data.into_arc())
+                    .and_then(|data| data.into_arc())
             });
             start.wait();
             (first_task.join(), second_task.join())

@@ -146,6 +146,12 @@ pub enum OpcError {
     #[error("signed OPC source requires an explicit signature edit policy")]
     SignedSourceRequiresExplicitPolicy,
 
+    /// A managed source-backed payload cannot be detached from the cache's
+    /// hierarchical memory reservation. Keep the returned [`crate::PartData`] handle
+    /// (or borrow it with `as_bytes`) until the operation is complete.
+    #[error("managed source-backed OPC PartData cannot escape its budgeted handle")]
+    ManagedPartDataArcEscape,
+
     /// The destination was atomically replaced, but its parent directory
     /// could not be synchronized. Callers must not blindly retry as if the
     /// old destination were still present.
@@ -262,6 +268,7 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::UnsupportedExecutionAffinity
             | OpcError::SourceBackedOverlayUnavailable { .. }
             | OpcError::SignedSourceRequiresExplicitPolicy
+            | OpcError::ManagedPartDataArcEscape
             | OpcError::PackageNotFound(_)
             | OpcError::InvalidPackUri(_)
             | OpcError::DuplicatePartName(_)

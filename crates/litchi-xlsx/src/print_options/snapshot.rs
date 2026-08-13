@@ -73,7 +73,7 @@ impl Snapshot {
     ) -> Result<Self> {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
-        let workbook_xml = workbook.data()?.into_arc();
+        let workbook_xml = workbook.data()?.into_arc()?;
         let catalog = raw::parse_catalog(workbook_xml.as_slice())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
         let sheet_position = resolve_selector(&catalog.sheets, selector.into())?
@@ -92,7 +92,7 @@ impl Snapshot {
             worksheet.partname(),
             worksheet.content_type(),
         )?;
-        let worksheet_xml = worksheet.data()?.into_arc();
+        let worksheet_xml = worksheet.data()?.into_arc()?;
         let owner = current_owner_relationship(package.rels())
             .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?;
 

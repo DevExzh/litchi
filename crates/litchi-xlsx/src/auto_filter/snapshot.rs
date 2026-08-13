@@ -81,7 +81,7 @@ impl Snapshot {
     ) -> Result<Self> {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
-        let workbook_xml = workbook.data()?.into_arc();
+        let workbook_xml = workbook.data()?.into_arc()?;
         let catalog = raw::parse_catalog(workbook_xml.as_slice())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
         let sheet_position = resolve_selector(&catalog.sheets, selector.into())?
@@ -100,7 +100,7 @@ impl Snapshot {
             worksheet.partname(),
             worksheet.content_type(),
         )?;
-        let worksheet_xml = worksheet.data()?.into_arc();
+        let worksheet_xml = worksheet.data()?.into_arc()?;
         let owner_relationship = current_owner_relationship(package.rels())
             .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?;
         let value = super::parse_auto_filter(worksheet_xml.as_slice())?;
@@ -489,7 +489,7 @@ fn load_styles_source_backed(
     let uri = relationship.target_partname()?;
     let part = package.part(&uri)?;
     require_styles_content_type(part.content_type())?;
-    let bytes = part.data()?.into_arc();
+    let bytes = part.data()?.into_arc()?;
     let count = crate::conditional_formatting::parse_differential_formats(bytes.as_slice())?.len();
     Ok(Some(StylesState {
         part: PartState::new(

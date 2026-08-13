@@ -560,7 +560,7 @@ impl OpcPackage {
 
     /// Whether a package-level signature-origin relationship is present.
     ///
-    /// This is a cheap capability check. Use [`Self::signatures`] when graph
+    /// This is a cheap capability check. Use `signatures` when graph
     /// validation and cryptographic verification are required.
     #[must_use]
     pub fn is_signed(&self) -> bool {

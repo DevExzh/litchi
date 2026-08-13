@@ -37,7 +37,7 @@ impl Snapshot {
                 "value-only edits require an ordinary XLSX workbook",
             ));
         }
-        let workbook_xml = workbook.data()?.into_arc();
+        let workbook_xml = workbook.data()?.into_arc()?;
         validation::workbook_xml(workbook_xml.as_slice())?;
         let catalog = raw::parse_catalog(workbook_xml.as_slice())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
@@ -64,7 +64,7 @@ impl Snapshot {
             .rels()
             .get(&sheet.relationship_id)
             .ok_or_else(|| invalid("selected worksheet relationship is missing"))?;
-        let worksheet_xml = worksheet.data()?.into_arc();
+        let worksheet_xml = worksheet.data()?.into_arc()?;
         validation::worksheet_xml(worksheet_xml.as_slice())?;
         let (style_count, auxiliary) = capture_auxiliary_source(package, &workbook)?;
         let owner = unique_owner(package.rels())?;
@@ -449,7 +449,7 @@ fn capture_auxiliary_source(
                 "value-only edits refuse styles and theme relationships",
             ));
         }
-        let data = part.data()?.into_arc();
+        let data = part.data()?.into_arc()?;
         match relationship.reltype() {
             rt::STYLES | rt::STRICT_STYLES if part.content_type() == ct::SML_STYLES => {
                 style_count = raw::styles::parse(data.as_slice())?.len();

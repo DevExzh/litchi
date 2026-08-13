@@ -26,6 +26,75 @@ fn package_bytes(content_types: &[u8], relationships: &[u8], payload: &[u8]) -> 
     writer.finish_to_bytes().unwrap()
 }
 
+fn push_u16(bytes: &mut Vec<u8>, value: u16) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn push_u32(bytes: &mut Vec<u8>, value: u32) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn duplicate_package_bytes() -> Vec<u8> {
+    let entries = [
+        ("[Content_Types].xml", CONTENT_TYPES),
+        ("_rels/.rels", ROOT_RELS),
+        ("word/document.xml", b"one".as_slice()),
+        ("word/document.xml", b"two".as_slice()),
+    ];
+    let mut bytes = Vec::new();
+    let mut central = Vec::new();
+    for (name, data) in entries {
+        let name = name.as_bytes();
+        let local_offset = u32::try_from(bytes.len()).unwrap();
+        let size = u32::try_from(data.len()).unwrap();
+        let crc = soapberry_zip::crc32(data);
+        bytes.extend_from_slice(&0x0403_4b50_u32.to_le_bytes());
+        push_u16(&mut bytes, 20);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u32(&mut bytes, crc);
+        push_u32(&mut bytes, size);
+        push_u32(&mut bytes, size);
+        push_u16(&mut bytes, u16::try_from(name.len()).unwrap());
+        push_u16(&mut bytes, 0);
+        bytes.extend_from_slice(name);
+        bytes.extend_from_slice(data);
+
+        central.extend_from_slice(&0x0201_4b50_u32.to_le_bytes());
+        push_u16(&mut central, 20);
+        push_u16(&mut central, 20);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u32(&mut central, crc);
+        push_u32(&mut central, size);
+        push_u32(&mut central, size);
+        push_u16(&mut central, u16::try_from(name.len()).unwrap());
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u32(&mut central, 0);
+        push_u32(&mut central, local_offset);
+        central.extend_from_slice(name);
+    }
+    let central_offset = u32::try_from(bytes.len()).unwrap();
+    let central_size = u32::try_from(central.len()).unwrap();
+    bytes.extend_from_slice(&central);
+    bytes.extend_from_slice(&0x0605_4b50_u32.to_le_bytes());
+    push_u16(&mut bytes, 0);
+    push_u16(&mut bytes, 0);
+    push_u16(&mut bytes, u16::try_from(entries.len()).unwrap());
+    push_u16(&mut bytes, u16::try_from(entries.len()).unwrap());
+    push_u32(&mut bytes, central_size);
+    push_u32(&mut bytes, central_offset);
+    push_u16(&mut bytes, 0);
+    bytes
+}
+
 fn status<'a>(report: &'a litchi_core::ValidateReport, id: &str) -> &'a CheckStatus {
     report
         .checks()
@@ -321,14 +390,10 @@ fn relationship_part_source_topology_belongs_to_catalog_admission() {
 
 #[test]
 fn duplicate_physical_entries_are_reported_as_structural_rejection() {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
-    writer
-        .write_stored("[Content_Types].xml", CONTENT_TYPES)
-        .unwrap();
-    writer.write_stored("_rels/.rels", ROOT_RELS).unwrap();
-    writer.write_stored("word/document.xml", b"one").unwrap();
-    writer.write_stored("word/document.xml", b"two").unwrap();
-    let bytes = writer.finish_to_bytes().unwrap();
+    // The production writer intentionally rejects duplicate names. Build this
+    // hostile input at the ZIP record level so validation can exercise its
+    // duplicate-physical-entry rejection path.
+    let bytes = duplicate_package_bytes();
 
     let report = validate_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
     assert!(report.has_errors());

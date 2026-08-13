@@ -393,7 +393,7 @@ impl SourceBackedPresentationEditor {
                 len: catalog.slides.len(),
             })?;
         let view = self.package.part(&data.part_uri)?;
-        let raw = view.data()?.into_arc();
+        let raw = view.data()?.into_arc()?;
         let part = owned_part_shared(&view, Arc::clone(&raw))?;
         SlidePart::from_part(&part)?;
         let scene = crate::shape::Scene::read(raw.as_slice())?;
@@ -959,7 +959,7 @@ fn source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalog> {
 }
 
 fn owned_part(view: &PartView<'_>, data: PartData) -> Result<BlobPart> {
-    owned_part_shared(view, data.into_arc())
+    owned_part_shared(view, data.into_arc()?)
 }
 
 fn owned_part_shared(view: &PartView<'_>, bytes: Arc<Vec<u8>>) -> Result<BlobPart> {
