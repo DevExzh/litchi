@@ -9,19 +9,22 @@
 //!
 //! Planning is fully preflighted: no caller sink is touched until the source,
 //! report, candidate archive, semantic member digests, and preservation proof
-//! all succeed.  The returned plan does not own generated output and offers no
-//! inverse operation.  Callers own any atomic replacement policy.
+//! all succeed.  The returned plan is previewable and carries a
+//! `RepairPlan<NonDestructive>` policy.  Calling `apply` explicitly creates a
+//! bounded source-checked reversible patch; ordinary save paths do not invoke
+//! this module.
 
 use std::{
     borrow::Cow,
     collections::HashSet,
     fmt,
     io::{self, Write},
+    marker::PhantomData,
     num::TryFromIntError,
     ops::Range,
 };
 
-use litchi_core::{EvidenceDigest, EvidenceValue, IssueSeverity, ValidateReport};
+use litchi_core::{EvidenceDigest, EvidenceValue, IssueId, IssueSeverity, ValidateReport};
 use quick_xml::{
     XmlVersion,
     events::{BytesDecl, BytesStart, Event, attributes::Attribute},
@@ -42,6 +45,8 @@ use crate::{OdfValidationError, OdfValidationLimits, validate_package_with_limit
 pub const MIMETYPE_LOCAL_EXTRA_ISSUE: &str = "odf.mimetype.local_header_extra";
 /// Stable format-owned repair identifier.
 pub const MIMETYPE_LOCAL_EXTRA_REPAIR: &str = "odf.repair.mimetype_local_extra";
+/// Versioned deterministic metadata schema for the supported repair plan.
+pub const MIMETYPE_REPAIR_PLAN_SCHEMA: &str = "odf-repair/mimetype-local-extra/v1";
 
 const MIMETYPE: &[u8] = b"mimetype";
 const DECLARATION_CHECK: &str = "odf.package.mimetype_manifest";
@@ -294,22 +299,257 @@ impl RemoveMimetypeLocalExtra {
     }
 }
 
+/// A marker for repairs that preserve all semantic member payloads.
+///
+/// The marker is used as a type parameter on [`RepairPlan`].  The generic
+/// plan API intentionally exposes no constructor for [`Destructive`]; a
+/// future destructive operation must add an explicit, separately reviewed
+/// constructor and policy rather than being smuggled through this safe path.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct NonDestructive;
+
+/// A marker for repairs that may discard or materially rewrite content.
+///
+/// No ODF operation currently constructs this plan.  Keeping the marker in
+/// the public vocabulary makes destructive intent explicit at the type level
+/// when a future, separately authorized operation is added.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Destructive;
+
+mod intent_sealed {
+    pub trait Sealed {}
+
+    impl Sealed for super::NonDestructive {}
+    impl Sealed for super::Destructive {}
+}
+
+/// Type-level policy carried by an ODF repair plan.
+pub trait RepairIntent: intent_sealed::Sealed + Copy + Send + Sync + 'static {
+    /// Whether the operation may discard or materially rewrite content.
+    const IS_DESTRUCTIVE: bool;
+
+    /// Stable deterministic intent text used by previews and plan metadata.
+    const NAME: &'static str;
+}
+
+impl RepairIntent for NonDestructive {
+    const IS_DESTRUCTIVE: bool = false;
+    const NAME: &'static str = "non_destructive";
+}
+
+impl RepairIntent for Destructive {
+    const IS_DESTRUCTIVE: bool = true;
+    const NAME: &'static str = "destructive";
+}
+
+/// Stable intent value suitable for diagnostics and deterministic JSON.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum RepairIntentKind {
+    /// The operation preserves all semantic member payloads.
+    NonDestructive,
+    /// The operation may discard or materially rewrite content.
+    Destructive,
+}
+
+impl RepairIntentKind {
+    /// Returns the stable wire spelling.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::NonDestructive => "non_destructive",
+            Self::Destructive => "destructive",
+        }
+    }
+}
+
+/// Physical archive region changed by a planned repair.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum RepairChangedRegion {
+    /// The local header of the `mimetype` member loses one extra field.
+    MimetypeLocalHeader,
+    /// Local-header offsets in central records move with the removed bytes.
+    CentralDirectoryOffsets,
+    /// The EOCD central-directory offset moves with the removed bytes.
+    EndOfCentralDirectory,
+}
+
+impl RepairChangedRegion {
+    /// Returns the stable wire spelling.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::MimetypeLocalHeader => "mimetype_local_header",
+            Self::CentralDirectoryOffsets => "central_directory_offsets",
+            Self::EndOfCentralDirectory => "end_of_central_directory",
+        }
+    }
+}
+
+const MIMETYPE_CHANGED_MEMBERS: &[&str] = &["mimetype"];
+const MIMETYPE_CHANGED_REGIONS: &[RepairChangedRegion] = &[
+    RepairChangedRegion::MimetypeLocalHeader,
+    RepairChangedRegion::CentralDirectoryOffsets,
+    RepairChangedRegion::EndOfCentralDirectory,
+];
+
+/// Explicit effects and preservation guarantees of one repair operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RepairEffects {
+    changed_members: &'static [&'static str],
+    changed_regions: &'static [RepairChangedRegion],
+    member_payloads_preserved: bool,
+    reversible: bool,
+}
+
+impl RepairEffects {
+    const MIMETYPE_LOCAL_EXTRA: Self = Self {
+        changed_members: MIMETYPE_CHANGED_MEMBERS,
+        changed_regions: MIMETYPE_CHANGED_REGIONS,
+        member_payloads_preserved: true,
+        reversible: true,
+    };
+
+    /// Names of logical members whose physical framing changes.
+    #[must_use]
+    pub const fn changed_members(self) -> &'static [&'static str] {
+        self.changed_members
+    }
+
+    /// Archive regions whose bytes or offsets change.
+    #[must_use]
+    pub const fn changed_regions(self) -> &'static [RepairChangedRegion] {
+        self.changed_regions
+    }
+
+    /// Whether every logical member payload is byte-for-byte preserved.
+    #[must_use]
+    pub const fn member_payloads_preserved(self) -> bool {
+        self.member_payloads_preserved
+    }
+
+    /// Whether the operation has a source-checked inverse.
+    #[must_use]
+    pub const fn reversible(self) -> bool {
+        self.reversible
+    }
+}
+
+/// Content-free, deterministic preview of a validated repair plan.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RepairPreview {
+    intent: RepairIntentKind,
+    repair_id: &'static str,
+    source_len: u64,
+    output_len: u64,
+    source_fingerprint: RepairFingerprint,
+    output_fingerprint: RepairFingerprint,
+    validation_issue_id: IssueId,
+    member_count: usize,
+    effects: RepairEffects,
+}
+
+impl RepairPreview {
+    /// Versioned deterministic preview schema.
+    #[must_use]
+    pub const fn schema(self) -> &'static str {
+        MIMETYPE_REPAIR_PLAN_SCHEMA
+    }
+
+    /// Stable format-owned repair identifier.
+    #[must_use]
+    pub const fn repair_id(self) -> &'static str {
+        self.repair_id
+    }
+
+    /// Type-level intent represented by this preview.
+    #[must_use]
+    pub const fn intent(self) -> RepairIntentKind {
+        self.intent
+    }
+
+    /// Exact source length authorized by validation.
+    #[must_use]
+    pub const fn source_len(self) -> u64 {
+        self.source_len
+    }
+
+    /// Exact output length proved during planning.
+    #[must_use]
+    pub const fn output_len(self) -> u64 {
+        self.output_len
+    }
+
+    /// Exact source fingerprint authorized by validation.
+    #[must_use]
+    pub const fn source_fingerprint(self) -> RepairFingerprint {
+        self.source_fingerprint
+    }
+
+    /// Exact output fingerprint proved during planning.
+    #[must_use]
+    pub const fn output_fingerprint(self) -> RepairFingerprint {
+        self.output_fingerprint
+    }
+
+    /// Stable validation issue identity authorizing this plan.
+    #[must_use]
+    pub const fn validation_issue_id(self) -> IssueId {
+        self.validation_issue_id
+    }
+
+    /// Number of central-directory records retained by the plan.
+    #[must_use]
+    pub const fn member_count(self) -> usize {
+        self.member_count
+    }
+
+    /// Explicit changed-member and preservation effects.
+    #[must_use]
+    pub const fn effects(self) -> RepairEffects {
+        self.effects
+    }
+
+    /// Whether this preview represents an exact no-op.
+    ///
+    /// The current repair constructor refuses to create no-op plans because
+    /// it is authorized only by a concrete validation issue. This accessor is
+    /// nevertheless part of the generic preview vocabulary so callers do not
+    /// infer that an empty effect set means "repair on save".
+    #[must_use]
+    pub const fn is_noop(self) -> bool {
+        false
+    }
+}
+
 /// A fully preflighted, borrowed ODF repair plan.
-pub struct MimetypeRepairPlan<'source> {
+///
+/// The public alias [`MimetypeRepairPlan`] remains available for source
+/// compatibility and names the currently supported
+/// `RepairPlan<NonDestructive>` specialization.
+pub struct RepairPlan<'source, Intent = NonDestructive>
+where
+    Intent: RepairIntent,
+{
     source: &'source [u8],
     limits: OdfRepairLimits,
     source_len: u64,
     source_fingerprint: RepairFingerprint,
     target_len: u64,
     target_fingerprint: RepairFingerprint,
+    validation_issue_id: IssueId,
     members: usize,
     action: RemoveMimetypeLocalExtra,
+    _intent: PhantomData<Intent>,
 }
 
-impl fmt::Debug for MimetypeRepairPlan<'_> {
+/// Backwards-compatible name for the supported non-destructive ODF plan.
+pub type MimetypeRepairPlan<'source> = RepairPlan<'source, NonDestructive>;
+
+impl<Intent: RepairIntent> fmt::Debug for RepairPlan<'_, Intent> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("MimetypeRepairPlan")
+            .field("intent", &Intent::NAME)
             .field("source_len", &self.source_len)
             .field("target_len", &self.target_len)
             .field("members", &self.members)
@@ -318,7 +558,7 @@ impl fmt::Debug for MimetypeRepairPlan<'_> {
     }
 }
 
-impl<'source> MimetypeRepairPlan<'source> {
+impl<'source, Intent: RepairIntent> RepairPlan<'source, Intent> {
     /// Source length bound to this plan.
     #[must_use]
     pub const fn source_len(&self) -> u64 {
@@ -355,19 +595,100 @@ impl<'source> MimetypeRepairPlan<'source> {
         self.action
     }
 
+    /// Returns the type-level repair intent.
+    #[must_use]
+    pub const fn intent(&self) -> RepairIntentKind {
+        if Intent::IS_DESTRUCTIVE {
+            RepairIntentKind::Destructive
+        } else {
+            RepairIntentKind::NonDestructive
+        }
+    }
+
+    /// Returns the explicit changed-member and preservation effects.
+    #[must_use]
+    pub const fn effects(&self) -> RepairEffects {
+        RepairEffects::MIMETYPE_LOCAL_EXTRA
+    }
+
+    /// Builds a content-free preview of the already-authorized plan.
+    #[must_use]
+    pub const fn preview(&self) -> RepairPreview {
+        RepairPreview {
+            intent: if Intent::IS_DESTRUCTIVE {
+                RepairIntentKind::Destructive
+            } else {
+                RepairIntentKind::NonDestructive
+            },
+            repair_id: MIMETYPE_LOCAL_EXTRA_REPAIR,
+            source_len: self.source_len,
+            output_len: self.target_len,
+            source_fingerprint: self.source_fingerprint,
+            output_fingerprint: self.target_fingerprint,
+            validation_issue_id: self.validation_issue_id,
+            member_count: self.members,
+            effects: RepairEffects::MIMETYPE_LOCAL_EXTRA,
+        }
+    }
+
+    /// Materializes a bounded, source-checked reversible patch.
+    ///
+    /// Planning itself never retains generated output. Calling this method is
+    /// the explicit point at which the caller requests an owned patch target;
+    /// the same preflight, source identity, preservation, and candidate
+    /// validation checks run before the allocation is returned.
+    pub fn apply(&self) -> Result<RepairPatch<'source>, RepairError> {
+        let layout = self.preflight()?;
+        let candidate = build_candidate(self.source, &layout, self.action, self.limits)?;
+        verify_candidate(
+            self.source,
+            &candidate,
+            &layout,
+            self.limits,
+            Some(self.target_fingerprint),
+        )?;
+        let observed_target = RepairFingerprint::of(&candidate);
+        if observed_target != self.target_fingerprint {
+            return Err(RepairError::TargetChanged {
+                expected: self.target_fingerprint,
+                observed: observed_target,
+            });
+        }
+        Ok(RepairPatch {
+            source: self.source,
+            target: candidate.into_boxed_slice(),
+            source_len: self.source_len,
+            target_len: self.target_len,
+            source_fingerprint: self.source_fingerprint,
+            target_fingerprint: self.target_fingerprint,
+            action: self.action,
+            effects: self.effects(),
+        })
+    }
+
     /// Serializes deterministic bounded plan metadata without source bytes.
     pub fn to_json(&self) -> Result<String, RepairError> {
         let value = json!({
-            "schema": "odf-repair/mimetype-local-extra/v1",
+            "schema": MIMETYPE_REPAIR_PLAN_SCHEMA,
             "repair_id": MIMETYPE_LOCAL_EXTRA_REPAIR,
+            "intent": Intent::NAME,
             "action": "remove_mimetype_local_extra",
             "source_len": self.source_len,
             "source_sha256": self.source_fingerprint.as_hex(),
             "output_len": self.target_len,
             "output_sha256": self.target_fingerprint.as_hex(),
+            "validation_issue_id": self.validation_issue_id.to_string(),
             "member_count": self.members,
             "extra_field_id": self.action.field_id,
             "extra_field_bytes": self.action.field_bytes,
+            "changed_members": self.effects().changed_members(),
+            "changed_regions": [
+                RepairChangedRegion::MimetypeLocalHeader.as_str(),
+                RepairChangedRegion::CentralDirectoryOffsets.as_str(),
+                RepairChangedRegion::EndOfCentralDirectory.as_str(),
+            ],
+            "member_payloads_preserved": self.effects().member_payloads_preserved(),
+            "reversible": self.effects().reversible(),
         });
         let encoded = serde_json::to_vec(&value).map_err(|_| RepairError::PlanJsonEncoding)?;
         if encoded.len() > self.limits.max_plan_json_bytes {
@@ -487,7 +808,7 @@ impl<'source> MimetypeRepairPlan<'source> {
                 observed: target,
             });
         }
-        verify_streaming_proof(self.source, &layout, self.limits)?;
+        verify_streaming_proof(self.source, &layout, self.validation_issue_id, self.limits)?;
         Ok(layout)
     }
 }
@@ -527,6 +848,263 @@ impl RepairPublication {
     }
 }
 
+/// A source-checked, reversible patch produced by an explicit plan apply.
+///
+/// The patch owns only the generated target. The immutable source remains
+/// borrowed from the plan, so creating a preview does not duplicate the
+/// source archive. [`Self::inverse`] retains that same source reference and
+/// can restore it byte-for-byte after the target fingerprint is checked.
+pub struct RepairPatch<'source> {
+    source: &'source [u8],
+    target: Box<[u8]>,
+    source_len: u64,
+    target_len: u64,
+    source_fingerprint: RepairFingerprint,
+    target_fingerprint: RepairFingerprint,
+    action: RemoveMimetypeLocalExtra,
+    effects: RepairEffects,
+}
+
+impl fmt::Debug for RepairPatch<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RepairPatch")
+            .field("source_len", &self.source_len)
+            .field("target_len", &self.target_len)
+            .field("source_fingerprint", &self.source_fingerprint)
+            .field("target_fingerprint", &self.target_fingerprint)
+            .field("action", &self.action)
+            .field("effects", &self.effects)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'source> RepairPatch<'source> {
+    /// Exact source fingerprint required before applying this patch.
+    #[must_use]
+    pub const fn source_fingerprint(&self) -> RepairFingerprint {
+        self.source_fingerprint
+    }
+
+    /// Exact target fingerprint proved by the plan.
+    #[must_use]
+    pub const fn target_fingerprint(&self) -> RepairFingerprint {
+        self.target_fingerprint
+    }
+
+    /// Exact source length required before applying this patch.
+    #[must_use]
+    pub const fn source_len(&self) -> u64 {
+        self.source_len
+    }
+
+    /// Exact target length emitted by this patch.
+    #[must_use]
+    pub const fn target_len(&self) -> u64 {
+        self.target_len
+    }
+
+    /// The operation represented by this patch.
+    #[must_use]
+    pub const fn action(&self) -> RemoveMimetypeLocalExtra {
+        self.action
+    }
+
+    /// Explicit changed-member and preservation effects.
+    #[must_use]
+    pub const fn effects(&self) -> RepairEffects {
+        self.effects
+    }
+
+    /// Returns the generated target bytes without exposing mutable storage.
+    #[must_use]
+    pub fn target_bytes(&self) -> &[u8] {
+        &self.target
+    }
+
+    /// Applies the patch to its exact bound source.
+    pub fn write_to<W: Write>(&self, sink: &mut W) -> Result<RepairPublication, RepairError> {
+        self.apply_to(self.source, sink)
+    }
+
+    /// Applies the patch to an exact source artifact.
+    ///
+    /// The input is fingerprinted and length-checked before the first sink
+    /// byte. A stale or foreign artifact returns [`RepairError::SourceChanged`]
+    /// and leaves the sink untouched.
+    pub fn apply_to<W: Write>(
+        &self,
+        source: &[u8],
+        sink: &mut W,
+    ) -> Result<RepairPublication, RepairError> {
+        let observed = RepairFingerprint::of(source);
+        let observed_len = u64::try_from(source.len()).map_err(RepairError::Integer)?;
+        if observed_len != self.source_len || observed != self.source_fingerprint {
+            return Err(RepairError::SourceChanged {
+                expected: self.source_fingerprint,
+                observed,
+            });
+        }
+        write_patch_bytes(
+            &self.target,
+            self.target_len,
+            self.source_fingerprint,
+            self.target_fingerprint,
+            self.action,
+            sink,
+        )
+    }
+
+    /// Returns the exact-source inverse operation.
+    #[must_use]
+    pub fn inverse(&self) -> RepairInversePatch<'source, '_> {
+        RepairInversePatch {
+            original_source: self.source,
+            target: &self.target,
+            source_len: self.target_len,
+            target_len: self.source_len,
+            source_fingerprint: self.target_fingerprint,
+            target_fingerprint: self.source_fingerprint,
+            action: self.action,
+            effects: self.effects,
+        }
+    }
+}
+
+/// The exact-source inverse of a reversible [`RepairPatch`].
+pub struct RepairInversePatch<'source, 'target> {
+    original_source: &'source [u8],
+    target: &'target [u8],
+    source_len: u64,
+    target_len: u64,
+    source_fingerprint: RepairFingerprint,
+    target_fingerprint: RepairFingerprint,
+    action: RemoveMimetypeLocalExtra,
+    effects: RepairEffects,
+}
+
+impl fmt::Debug for RepairInversePatch<'_, '_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RepairInversePatch")
+            .field("source_len", &self.source_len)
+            .field("target_len", &self.target_len)
+            .field("source_fingerprint", &self.source_fingerprint)
+            .field("target_fingerprint", &self.target_fingerprint)
+            .field("action", &self.action)
+            .field("effects", &self.effects)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'source, 'target> RepairInversePatch<'source, 'target> {
+    /// Exact target fingerprint required before applying this inverse.
+    #[must_use]
+    pub const fn source_fingerprint(&self) -> RepairFingerprint {
+        self.source_fingerprint
+    }
+
+    /// Exact original-source fingerprint restored by this inverse.
+    #[must_use]
+    pub const fn target_fingerprint(&self) -> RepairFingerprint {
+        self.target_fingerprint
+    }
+
+    /// Exact target length required before applying this inverse.
+    #[must_use]
+    pub const fn source_len(&self) -> u64 {
+        self.source_len
+    }
+
+    /// Exact original-source length restored by this inverse.
+    #[must_use]
+    pub const fn target_len(&self) -> u64 {
+        self.target_len
+    }
+
+    /// The operation whose effects this inverse reverses.
+    #[must_use]
+    pub const fn action(&self) -> RemoveMimetypeLocalExtra {
+        self.action
+    }
+
+    /// Explicit changed-member and preservation effects.
+    #[must_use]
+    pub const fn effects(&self) -> RepairEffects {
+        self.effects
+    }
+
+    /// Applies the inverse to its exact bound target artifact.
+    pub fn write_to<W: Write>(&self, sink: &mut W) -> Result<RepairPublication, RepairError> {
+        self.apply_to(self.target, sink)
+    }
+
+    /// Applies the inverse to an exact target artifact.
+    pub fn apply_to<W: Write>(
+        &self,
+        source: &[u8],
+        sink: &mut W,
+    ) -> Result<RepairPublication, RepairError> {
+        let observed = RepairFingerprint::of(source);
+        let observed_len = u64::try_from(source.len()).map_err(RepairError::Integer)?;
+        if observed_len != self.source_len || observed != self.source_fingerprint {
+            return Err(RepairError::SourceChanged {
+                expected: self.source_fingerprint,
+                observed,
+            });
+        }
+        write_patch_bytes(
+            self.original_source,
+            self.target_len,
+            self.source_fingerprint,
+            self.target_fingerprint,
+            self.action,
+            sink,
+        )
+    }
+}
+
+fn write_patch_bytes<W: Write>(
+    bytes: &[u8],
+    expected_len: u64,
+    source_fingerprint: RepairFingerprint,
+    target_fingerprint: RepairFingerprint,
+    action: RemoveMimetypeLocalExtra,
+    sink: &mut W,
+) -> Result<RepairPublication, RepairError> {
+    let mut accepted = 0_u64;
+    let mut hasher = Sha256::new();
+    let result = write_piece(bytes, sink, &mut accepted, &mut hasher);
+    if let Err(error) = result {
+        let indeterminate = matches!(&error, RepairError::SinkOverreported);
+        return Err(with_progress(error, accepted, expected_len, indeterminate));
+    }
+    let observed = RepairFingerprint(hasher.finalize().into());
+    if accepted != expected_len || observed != target_fingerprint {
+        return Err(with_progress(
+            RepairError::TargetChanged {
+                expected: target_fingerprint,
+                observed,
+            },
+            accepted,
+            expected_len,
+            false,
+        ));
+    }
+    if let Err(error) = sink.flush() {
+        return Err(RepairError::IncompleteOutput {
+            progress: OutputProgress::CompleteUnflushed { bytes: accepted },
+            source: Box::new(RepairError::Io(error)),
+        });
+    }
+    Ok(RepairPublication {
+        bytes: accepted,
+        source_fingerprint,
+        target_fingerprint,
+        action,
+    })
+}
+
 /// Failure to construct or publish the narrow repair.
 #[derive(Debug)]
 #[non_exhaustive]
@@ -534,6 +1112,9 @@ pub enum RepairError {
     /// A zero or too-small bound was supplied.
     InvalidLimits,
     /// The supplied report did not identify exactly this repair target.
+    ///
+    /// This also covers a canonical no-op package: no repair plan is emitted
+    /// when validation found no supported repair issue.
     ReportMismatch,
     /// The source is outside the bounded repair contract.
     Unsupported { reason: &'static str },
@@ -700,10 +1281,10 @@ pub fn plan_mimetype_local_extra<'source>(
             limit: limits.max_input_bytes,
         });
     }
-    check_report(source, report, limits)?;
+    let validation_issue_id = check_report(source, report, limits)?;
     let layout = inspect_layout(source, limits)?;
     let candidate = build_candidate(source, &layout, layout.action, limits)?;
-    verify_candidate(source, &candidate, &layout, limits)?;
+    verify_candidate(source, &candidate, &layout, limits, None)?;
     let target_len = u64::try_from(candidate.len()).map_err(RepairError::Integer)?;
     let source_fingerprint = RepairFingerprint::of(source);
     let target_fingerprint = RepairFingerprint::of(&candidate);
@@ -714,8 +1295,10 @@ pub fn plan_mimetype_local_extra<'source>(
         source_fingerprint,
         target_len,
         target_fingerprint,
+        validation_issue_id,
         members: layout.member_count,
         action: layout.action,
+        _intent: PhantomData,
     };
     let _ = plan.to_json()?;
     Ok(plan)
@@ -730,11 +1313,36 @@ pub fn plan_mimetype_repair<'source>(
     plan_mimetype_local_extra(source, report, limits)
 }
 
+/// Build the currently supported non-destructive ODF repair plan.
+///
+/// This operation is intentionally narrow: it accepts only the completed
+/// validation evidence for the first stored `mimetype` local-header Extended
+/// Timestamp repair. Unsupported structural, XML, encryption, signature,
+/// macro, and external-reference cases return a typed refusal.
+/// A canonical package with no repair issue is likewise refused as an exact
+/// no-op rather than rewritten or silently normalized.
+pub fn plan_odf_repair<'source>(
+    source: &'source [u8],
+    report: &ValidateReport,
+    limits: OdfRepairLimits,
+) -> Result<RepairPlan<'source, NonDestructive>, RepairError> {
+    plan_mimetype_local_extra(source, report, limits)
+}
+
+/// Operation-oriented alias for [`plan_odf_repair`].
+pub fn plan_repair<'source>(
+    source: &'source [u8],
+    report: &ValidateReport,
+    limits: OdfRepairLimits,
+) -> Result<RepairPlan<'source, NonDestructive>, RepairError> {
+    plan_odf_repair(source, report, limits)
+}
+
 fn check_report(
     source: &[u8],
     report: &ValidateReport,
     limits: OdfRepairLimits,
-) -> Result<(), RepairError> {
+) -> Result<IssueId, RepairError> {
     if !report.is_complete() || report.issues().len() != 1 {
         return Err(RepairError::ReportMismatch);
     }
@@ -775,7 +1383,7 @@ fn check_report(
     if !fresh.is_complete() || fresh.issues().len() != 1 || fresh.issues()[0].id() != issue.id() {
         return Err(RepairError::ReportMismatch);
     }
-    Ok(())
+    Ok(issue.id())
 }
 
 fn archive_limits(limits: OdfRepairLimits) -> ArchiveLimits {
@@ -1114,7 +1722,13 @@ fn inspect_layout(source: &[u8], limits: OdfRepairLimits) -> Result<Layout, Repa
             reason: "source archive has no members",
         });
     }
-    let mut index_buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+    let mut index_buffer = Vec::new();
+    index_buffer
+        .try_reserve_exact(soapberry_zip::RECOMMENDED_BUFFER_SIZE)
+        .map_err(|_| RepairError::Allocation {
+            resource: "repair preservation index buffer",
+        })?;
+    index_buffer.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0);
     let index = PreservationIndex::new(&archive, &mut index_buffer)?;
     let entries = index.entries();
     if entries.len() != central_preflight.record_count {
@@ -1128,7 +1742,7 @@ fn inspect_layout(source: &[u8], limits: OdfRepairLimits) -> Result<Layout, Repa
         });
     }
 
-    check_repair_metadata(
+    let metadata_base = check_repair_metadata(
         central_preflight.record_count,
         central_preflight.raw_name_bytes,
         central_preflight.central_record_bytes,
@@ -1255,7 +1869,13 @@ fn inspect_layout(source: &[u8], limits: OdfRepairLimits) -> Result<Layout, Repa
         });
     }
 
-    let mut local_order: Vec<usize> = (0..layouts.len()).collect();
+    let mut local_order = Vec::new();
+    local_order
+        .try_reserve_exact(layouts.len())
+        .map_err(|_| RepairError::Allocation {
+            resource: "repair local member order",
+        })?;
+    local_order.extend(0..layouts.len());
     local_order.sort_unstable_by_key(|index| layouts[*index].local.start);
     if layouts[local_order[0]].local.start != 0
         || local_order
@@ -1470,7 +2090,7 @@ fn inspect_layout(source: &[u8], limits: OdfRepairLimits) -> Result<Layout, Repa
             limit: limits.max_output_bytes,
         });
     }
-    scan_package_xml(source, limits)?;
+    scan_package_xml(source, limits, metadata_base)?;
     Ok(Layout {
         member_count: layouts.len(),
         non_directory_count: central_preflight.non_directory_count,
@@ -1490,7 +2110,11 @@ fn inspect_layout(source: &[u8], limits: OdfRepairLimits) -> Result<Layout, Repa
 /// sink can be touched. The generic validator deliberately inspects only the
 /// declaration and root XML; this repair emits the complete package, so its
 /// authorization must also reject hostile XML anywhere else in the package.
-fn scan_package_xml(source: &[u8], limits: OdfRepairLimits) -> Result<(), RepairError> {
+fn scan_package_xml(
+    source: &[u8],
+    limits: OdfRepairLimits,
+    metadata_base: u64,
+) -> Result<(), RepairError> {
     let archive = ArchiveReader::new_with_limits(source, archive_limits(limits))?;
     for name in archive.file_names() {
         if name != MANIFEST_PATH && is_xml_family_name(name) {
@@ -1500,7 +2124,7 @@ fn scan_package_xml(source: &[u8], limits: OdfRepairLimits) -> Result<(), Repair
 
     let manifest = archive.read(MANIFEST_PATH)?;
     scan_xml_security(MANIFEST_PATH, &manifest, limits)?;
-    scan_manifest_xml_types(&archive, &manifest, limits)
+    scan_manifest_xml_types(&archive, &manifest, limits, metadata_base)
 }
 
 fn scan_archive_xml_member(
@@ -1523,11 +2147,13 @@ fn scan_manifest_xml_types(
     archive: &ArchiveReader<'_>,
     manifest: &[u8],
     limits: OdfRepairLimits,
+    metadata_base: u64,
 ) -> Result<(), RepairError> {
     let mut reader = NsReader::from_reader(manifest);
     reader.config_mut().check_end_names = true;
     let validation_limits = OdfValidationLimits::default();
     let mut events = 0_usize;
+    let mut metadata_used = metadata_base;
     loop {
         if events >= validation_limits.max_xml_events() {
             return Err(RepairError::Limit {
@@ -1552,8 +2178,8 @@ fn scan_manifest_xml_types(
             Event::Eof => return Ok(()),
             _ => continue,
         };
-        let mut full_path = None;
-        let mut media_type = None;
+        let mut full_path: Option<String> = None;
+        let mut media_type: Option<String> = None;
         for attribute in element.attributes() {
             let attribute = attribute.map_err(|_| RepairError::Unsupported {
                 reason: "manifest XML attributes are malformed during package-wide security scan",
@@ -1569,15 +2195,29 @@ fn scan_manifest_xml_types(
                     reason: "manifest XML attribute value is malformed during package-wide security scan",
                 })?;
             match local.as_ref() {
-                b"full-path" => full_path = Some(value.into_owned()),
-                b"media-type" => media_type = Some(value.into_owned()),
+                b"full-path" => {
+                    full_path = Some(retain_manifest_metadata(
+                        value,
+                        &mut metadata_used,
+                        limits,
+                        "manifest full-path",
+                    )?);
+                },
+                b"media-type" => {
+                    media_type = Some(retain_manifest_metadata(
+                        value,
+                        &mut metadata_used,
+                        limits,
+                        "manifest media-type",
+                    )?);
+                },
                 _ => {},
             }
         }
         let Some(path) = full_path else {
             continue;
         };
-        if path != "/" && !safe_manifest_member_path(&path) {
+        if path.as_str() != "/" && !safe_manifest_member_path(path.as_str()) {
             return Err(RepairError::Unsupported {
                 reason: "manifest XML type path is not a safe package path",
             });
@@ -1587,6 +2227,33 @@ fn scan_manifest_xml_types(
             scan_archive_xml_member(archive, &path, limits)?;
         }
     }
+}
+
+fn retain_manifest_metadata(
+    value: Cow<'_, str>,
+    metadata_used: &mut u64,
+    limits: OdfRepairLimits,
+    resource: &'static str,
+) -> Result<String, RepairError> {
+    let bytes = u64::try_from(value.len()).map_err(RepairError::Integer)?;
+    *metadata_used = metadata_used
+        .checked_add(bytes)
+        .ok_or(RepairError::Unsupported {
+            reason: "decoded manifest metadata estimate overflow",
+        })?;
+    if *metadata_used > limits.max_metadata_bytes {
+        return Err(RepairError::Limit {
+            resource: "repair metadata bytes",
+            observed: *metadata_used,
+            limit: limits.max_metadata_bytes,
+        });
+    }
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(value.len())
+        .map_err(|_| RepairError::Allocation { resource })?;
+    owned.push_str(value.as_ref());
+    Ok(owned)
 }
 
 fn is_xml_family_name(name: &str) -> bool {
@@ -1904,6 +2571,14 @@ fn try_boxed_copy(bytes: &[u8], resource: &'static str) -> Result<Box<[u8]>, Rep
     Ok(copy.into_boxed_slice())
 }
 
+fn try_vec_copy(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>, RepairError> {
+    let mut copy = Vec::new();
+    copy.try_reserve_exact(bytes.len())
+        .map_err(|_| RepairError::Allocation { resource })?;
+    copy.extend_from_slice(bytes);
+    Ok(copy)
+}
+
 fn validate_xml_declaration(declaration: &BytesDecl<'_>) -> Result<(), RepairError> {
     if declaration
         .xml_version()
@@ -2176,7 +2851,10 @@ fn build_candidate(
                 limit: limits.max_scratch_bytes as u64,
             });
         }
-        let mut central = source[entry.central.clone()].to_vec();
+        let mut central = try_vec_copy(
+            &source[entry.central.clone()],
+            "repair candidate central record",
+        )?;
         let new_offset = if entry.local_offset == 0 {
             0
         } else {
@@ -2202,7 +2880,7 @@ fn build_candidate(
             limit: limits.max_scratch_bytes as u64,
         });
     }
-    let mut eocd = source[layout.eocd..].to_vec();
+    let mut eocd = try_vec_copy(&source[layout.eocd..], "repair candidate EOCD")?;
     let new_central = layout
         .central_start
         .checked_sub(usize::from(action.field_bytes))
@@ -2228,12 +2906,16 @@ fn verify_candidate(
     candidate: &[u8],
     layout: &Layout,
     limits: OdfRepairLimits,
+    expected_target: Option<RepairFingerprint>,
 ) -> Result<(), RepairError> {
     if candidate.len() as u64 != layout.output_len {
-        return Err(RepairError::TargetChanged {
-            expected: RepairFingerprint::of(&candidate[..candidate.len().min(1)]),
-            observed: RepairFingerprint::of(candidate),
-        });
+        return match expected_target {
+            Some(expected) => Err(RepairError::TargetChanged {
+                expected,
+                observed: RepairFingerprint::of(candidate),
+            }),
+            None => Err(RepairError::PlanMismatch),
+        };
     }
     let candidate_report = validate_package_with_limits(
         candidate,
@@ -2252,6 +2934,7 @@ fn verify_candidate(
 fn verify_streaming_proof(
     source: &[u8],
     layout: &Layout,
+    validation_issue_id: IssueId,
     limits: OdfRepairLimits,
 ) -> Result<(), RepairError> {
     // Re-run the bounded ODF checks against the source. Its exact fingerprint
@@ -2265,6 +2948,7 @@ fn verify_streaming_proof(
     )?;
     if !report.is_complete()
         || report.issues().len() != 1
+        || report.issues()[0].id() != validation_issue_id
         || report.issues()[0].check().as_str() != DECLARATION_CHECK
         || report.issues()[0].code() != MIMETYPE_LOCAL_EXTRA_ISSUE
         || report.issues()[0].repair().repair_id() != Some(MIMETYPE_LOCAL_EXTRA_REPAIR)
@@ -2440,9 +3124,39 @@ fn verify_member_digests(
     let archive_limits = archive_limits(limits);
     let source_archive = ArchiveReader::new_with_limits(source, archive_limits)?;
     let candidate_archive = ArchiveReader::new_with_limits(candidate, archive_limits)?;
-    let source_names: Vec<&str> = source_archive.file_names().collect();
-    let candidate_names: Vec<&str> = candidate_archive.file_names().collect();
-    if source_names != candidate_names || source_names.len() > limits.max_members {
+    let mut source_names = Vec::new();
+    for name in source_archive.file_names() {
+        if source_names.len() >= limits.max_members {
+            return Err(RepairError::Limit {
+                resource: "member count",
+                observed: (source_names.len() + 1) as u64,
+                limit: limits.max_members as u64,
+            });
+        }
+        source_names
+            .try_reserve(1)
+            .map_err(|_| RepairError::Allocation {
+                resource: "source member names",
+            })?;
+        source_names.push(name);
+    }
+    let mut candidate_names = Vec::new();
+    for name in candidate_archive.file_names() {
+        if candidate_names.len() >= limits.max_members {
+            return Err(RepairError::Limit {
+                resource: "member count",
+                observed: (candidate_names.len() + 1) as u64,
+                limit: limits.max_members as u64,
+            });
+        }
+        candidate_names
+            .try_reserve(1)
+            .map_err(|_| RepairError::Allocation {
+                resource: "candidate member names",
+            })?;
+        candidate_names.push(name);
+    }
+    if source_names != candidate_names {
         return Err(RepairError::MemberMismatch {
             name: "member catalog",
         });
@@ -2502,7 +3216,7 @@ fn emit_output<W: Write>(
         )?;
     }
     for entry in &layout.entries {
-        let mut central = source[entry.central.clone()].to_vec();
+        let mut central = try_vec_copy(&source[entry.central.clone()], "repair central record")?;
         let new_offset = if entry.local_offset == 0 {
             0
         } else {
@@ -2713,6 +3427,42 @@ mod tests {
                 observed,
                 limit
             }) if observed == one_over && limit == exact
+        ));
+    }
+
+    #[test]
+    fn target_length_mismatch_never_invents_an_expected_fingerprint() {
+        let layout = Layout {
+            entries: Vec::new(),
+            local_order: Vec::new(),
+            central_start: 0,
+            eocd: 0,
+            output_len: 1,
+            action: RemoveMimetypeLocalExtra {
+                field_id: 0x5455,
+                field_bytes: 9,
+            },
+            member_count: 0,
+            non_directory_count: 0,
+        };
+        assert!(matches!(
+            verify_candidate(&[], &[], &layout, OdfRepairLimits::default(), None,),
+            Err(RepairError::PlanMismatch)
+        ));
+
+        let expected = RepairFingerprint::of(&[0xa5]);
+        assert!(matches!(
+            verify_candidate(
+                &[],
+                &[],
+                &layout,
+                OdfRepairLimits::default(),
+                Some(expected),
+            ),
+            Err(RepairError::TargetChanged {
+                expected: observed_expected,
+                observed,
+            }) if observed_expected == expected && observed == RepairFingerprint::of(&[])
         ));
     }
 }

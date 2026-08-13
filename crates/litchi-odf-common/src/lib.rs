@@ -28,9 +28,12 @@ pub mod validation;
 
 pub use core::{OwnedPackage, PreparedPackage};
 pub use repair::{
-    MIMETYPE_LOCAL_EXTRA_ISSUE, MIMETYPE_LOCAL_EXTRA_REPAIR, MimetypeRepairPlan, OdfRepairLimits,
-    OutputProgress as RepairOutputProgress, RemoveMimetypeLocalExtra, RepairError,
-    RepairFingerprint, RepairPublication, plan_mimetype_local_extra, plan_mimetype_repair,
+    Destructive, MIMETYPE_LOCAL_EXTRA_ISSUE, MIMETYPE_LOCAL_EXTRA_REPAIR,
+    MIMETYPE_REPAIR_PLAN_SCHEMA, MimetypeRepairPlan, NonDestructive, OdfRepairLimits,
+    OutputProgress as RepairOutputProgress, RemoveMimetypeLocalExtra, RepairChangedRegion,
+    RepairEffects, RepairError, RepairFingerprint, RepairIntent, RepairIntentKind,
+    RepairInversePatch, RepairPatch, RepairPlan, RepairPreview, RepairPublication,
+    plan_mimetype_local_extra, plan_mimetype_repair, plan_odf_repair, plan_repair,
 };
 pub use validation::{
     DEFAULT_ODF_VALIDATION_LIMITS, OdfValidationError, OdfValidationLimits, validate_package,
