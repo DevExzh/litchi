@@ -1706,12 +1706,64 @@ NUMBERS_TABLE_LOCK_ALLOWED_COMMON_REEXPORT = (
 )
 IWA_PAGES_SOURCE_ROOT = Path("crates/litchi-iwa/src/pages")
 IWA_PAGES_EDITOR_SOURCE = IWA_PAGES_SOURCE_ROOT / "editor.rs"
+RETIRED_IWA_PAGES_DOCUMENT_SOURCE = IWA_PAGES_SOURCE_ROOT / "document.rs"
+RETIRED_IWA_PAGES_DOCUMENT_TYPES = (
+    "PagesDocument",
+    "PagesDocumentState",
+    "PagesDocumentStats",
+)
+RETIRED_IWA_PAGES_DOCUMENT_TYPE_SET = frozenset(
+    RETIRED_IWA_PAGES_DOCUMENT_TYPES
+)
+IWA_PAGES_MODULE_SOURCE = IWA_PAGES_SOURCE_ROOT / "mod.rs"
+IWA_PAGES_DOCUMENT_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?(document)\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+IWA_PAGES_DOCUMENT_LOCAL_REEXPORT = re.compile(
+    r"^[ \t]*pub(?:\([^()]*\))?[ \t\r\n]+use[ \t\r\n]+"
+    r"(?:(?:r#)?self[ \t\r\n]*::[ \t\r\n]*|"
+    r"(?:r#)?crate[ \t\r\n]*::[ \t\r\n]*(?:r#)?pages"
+    r"[ \t\r\n]*::[ \t\r\n]*(?:\{[ \t\r\n]*)?)?"
+    r"(?:r#)?(?P<module>document)\b",
+    re.MULTILINE,
+)
+WORKSPACE_CRATES_ROOT = Path("crates")
+IWA_HOST_SOURCE_ROOT = Path("crates/litchi-iwa/src")
+IWA_PAGES_FOCUSED_READER_TYPES = frozenset({"Document", "Package"})
 RETIRED_IWA_PAGES_PAGE_LAYOUT_SOURCE = IWA_PAGES_SOURCE_ROOT / "editor" / "page_layout.rs"
 RETIRED_IWA_PAGES_PAGE_LAYOUT_METHODS = ("page_layout", "set_page_layout")
 RETIRED_IWA_PAGES_PAGE_LAYOUT_METHOD_SET = frozenset(
     RETIRED_IWA_PAGES_PAGE_LAYOUT_METHODS
 )
 PAGES_SOURCE_ROOT = Path("crates/litchi-pages/src")
+PAGES_DOCUMENT_PUBLIC_API_SOURCES = (
+    PAGES_SOURCE_ROOT / "document.rs",
+    PAGES_SOURCE_ROOT / "lib.rs",
+)
+PAGES_DOCUMENT_PUBLIC_MARKERS = frozenset(
+    {
+        "Body",
+        "DEFAULT_MAX_TEXT_BYTES",
+        "Document",
+        "DocumentReadOptions",
+        "DocumentSourceLimitKind",
+        "DocumentSourceLimits",
+        "DocumentSourceLimitsError",
+        "Error",
+        "IoKind",
+        "MAX_BODY_STORAGES",
+        "MAX_SECTIONS",
+        "ReadError",
+        "ReadLimitKind",
+        "Result",
+        "Root",
+        "SemanticLimitKind",
+        "SemanticLimits",
+        "SemanticLimitsError",
+    }
+)
 PAGES_PAGE_LAYOUT_IMPLEMENTATION_SOURCE = (
     PAGES_SOURCE_ROOT / "package" / "page_layout.rs"
 )
@@ -6943,6 +6995,282 @@ def audit_iwa_pages_page_layout_source_topology(root: Path = ROOT) -> list[str]:
     return sorted(set(violations))
 
 
+def audit_iwa_pages_document_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the retired Pages reader and host compatibility surfaces deleted."""
+
+    violations: list[str] = []
+    retired_source = root / RETIRED_IWA_PAGES_DOCUMENT_SOURCE
+    if retired_source.exists():
+        violations.append(
+            "retired litchi-iwa Pages document reader source returned: "
+            + str(RETIRED_IWA_PAGES_DOCUMENT_SOURCE)
+        )
+
+    module_path = root / IWA_PAGES_MODULE_SOURCE
+    if module_path.is_file():
+        module_source = _mask_rust_non_code(
+            module_path.read_text(encoding="utf-8")
+        )
+        for match in IWA_PAGES_DOCUMENT_MODULE.finditer(module_source):
+            line_number = module_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Pages document reader module "
+                f"{match.group(1)}: {IWA_PAGES_MODULE_SOURCE}:{line_number}"
+            )
+        for match in IWA_PAGES_DOCUMENT_LOCAL_REEXPORT.finditer(module_source):
+            line_number = module_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Pages document reader local re-export "
+                f"{match.group('module')}: {IWA_PAGES_MODULE_SOURCE}:{line_number}"
+            )
+
+    workspace_sources = root / WORKSPACE_CRATES_ROOT
+    if workspace_sources.is_dir():
+        for path in sorted(workspace_sources.glob("*/src/**/*.rs")):
+            raw_source = path.read_text(encoding="utf-8")
+            for declaration, line_number in _rust_public_declarations(raw_source):
+                for match in RUST_IDENTIFIER.finditer(declaration):
+                    name = match.group(1)
+                    if name not in RETIRED_IWA_PAGES_DOCUMENT_TYPE_SET:
+                        continue
+                    identifier_line = line_number + declaration.count(
+                        "\n", 0, match.start(1)
+                    )
+                    violations.append(
+                        "retired Pages document reader workspace public name "
+                        f"{name}: {path.relative_to(root)}:{identifier_line}"
+                    )
+            for name, line_number in _rust_doc_identifier_occurrences(
+                raw_source, RETIRED_IWA_PAGES_DOCUMENT_TYPE_SET
+            ):
+                violations.append(
+                    "retired Pages document reader workspace public rustdoc "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    host_source_root = root / IWA_HOST_SOURCE_ROOT
+    if host_source_root.is_dir():
+        for path in sorted(host_source_root.rglob("*.rs")):
+            raw_source = path.read_text(encoding="utf-8")
+            source = _mask_rust_non_code(raw_source)
+            focused_aliases: set[str] = set()
+            focused_modules = {"litchi_pages"}
+            focused_imports = re.finditer(
+                r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+                r"use[ \t\r\n]+(?P<body>[^;]*\blitchi_pages\b[^;]*);",
+                source,
+                re.MULTILINE,
+            )
+            for imported in focused_imports:
+                body = imported.group("body")
+                module_alias = re.search(
+                    r"\blitchi_pages\b[ \t\r\n]+as[ \t\r\n]+"
+                    r"(?:r#)?([A-Za-z_][A-Za-z0-9_]*)",
+                    body,
+                )
+                if module_alias is not None:
+                    focused_modules.add(module_alias.group(1))
+                    if re.match(r"^[ \t]*pub\b", imported.group(0)):
+                        line_number = source.count("\n", 0, imported.start()) + 1
+                        violations.append(
+                            "retired litchi-iwa Pages document reader focused host "
+                            f"facade {module_alias.group(1)}: "
+                            f"{path.relative_to(root)}:{line_number}"
+                        )
+                self_alias = re.search(
+                    r"(?<![A-Za-z0-9_#])(?:r#)?self[ \t\r\n]+as"
+                    r"[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)",
+                    body,
+                )
+                if self_alias is not None:
+                    focused_modules.add(self_alias.group(1))
+                    if re.match(r"^[ \t]*pub\b", imported.group(0)):
+                        line_number = source.count("\n", 0, imported.start()) + 1
+                        violations.append(
+                            "retired litchi-iwa Pages document reader focused host "
+                            f"facade {self_alias.group(1)}: "
+                            f"{path.relative_to(root)}:{line_number}"
+                        )
+                if "*" in body:
+                    focused_aliases.update(IWA_PAGES_FOCUSED_READER_TYPES)
+                    if re.match(r"^[ \t]*pub\b", imported.group(0)):
+                        line_number = source.count("\n", 0, imported.start()) + 1
+                        violations.append(
+                            "retired litchi-iwa Pages document reader focused host "
+                            f"facade glob: {path.relative_to(root)}:{line_number}"
+                        )
+                for name in IWA_PAGES_FOCUSED_READER_TYPES:
+                    named = re.search(
+                        rf"(?<![A-Za-z0-9_#])(?:r#)?{name}\b"
+                        rf"(?:[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
+                        rf"(?P<alias>[A-Za-z_][A-Za-z0-9_]*))?",
+                        body,
+                    )
+                    if named is not None:
+                        focused_aliases.add(named.group("alias") or name)
+
+            type_aliases = tuple(
+                re.finditer(
+                    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?type"
+                    r"[ \t\r\n]+(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)"
+                    r"[^=;]*=[ \t\r\n]*(?P<target>[^;]+);",
+                    source,
+                    re.MULTILINE,
+                )
+            )
+            changed = True
+            while changed:
+                changed = False
+                for alias in type_aliases:
+                    identifiers = {
+                        match.group(1)
+                        for match in RUST_IDENTIFIER.finditer(alias.group("target"))
+                    }
+                    focused_target = bool(identifiers & focused_aliases) or (
+                        bool(identifiers & focused_modules)
+                        and bool(identifiers & IWA_PAGES_FOCUSED_READER_TYPES)
+                    )
+                    if focused_target and alias.group("alias") not in focused_aliases:
+                        focused_aliases.add(alias.group("alias"))
+                        changed = True
+
+            for declaration, line_number in _rust_public_declarations(raw_source):
+                identifiers = {
+                    match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+                }
+                exposed = sorted(identifiers & focused_aliases)
+                if identifiers & focused_modules:
+                    exposed.extend(
+                        sorted(
+                            IWA_PAGES_FOCUSED_READER_TYPES & identifiers
+                            - set(exposed)
+                        )
+                    )
+                for name in exposed:
+                    identifier = next(
+                        match
+                        for match in RUST_IDENTIFIER.finditer(declaration)
+                        if match.group(1) == name
+                    )
+                    identifier_line = line_number + declaration.count(
+                        "\n", 0, identifier.start(1)
+                    )
+                    violations.append(
+                        "retired litchi-iwa Pages document reader focused host "
+                        f"facade {name}: {path.relative_to(root)}:{identifier_line}"
+                    )
+
+    caller_paths: set[Path] = set()
+    for caller_root in (
+        Path("crates/litchi-iwa/src"),
+        Path("crates/litchi-iwa/tests"),
+        Path("crates/litchi-iwa/examples"),
+    ):
+        caller_path = root / caller_root
+        if caller_path.is_dir():
+            caller_paths.update(caller_path.rglob("*.rs"))
+    for path in sorted(caller_paths):
+        raw_source = path.read_text(encoding="utf-8")
+        source = _mask_rust_non_code(raw_source)
+        for match in RUST_IDENTIFIER.finditer(source):
+            name = match.group(1)
+            if name not in RETIRED_IWA_PAGES_DOCUMENT_TYPE_SET:
+                continue
+            line_number = source.count("\n", 0, match.start(1)) + 1
+            violations.append(
+                "retired litchi-iwa Pages document reader type usage "
+                f"{name}: {path.relative_to(root)}:{line_number}"
+            )
+        for name, line_number in _rust_doc_identifier_occurrences(
+            raw_source, RETIRED_IWA_PAGES_DOCUMENT_TYPE_SET
+        ):
+            violations.append(
+                "retired litchi-iwa Pages document reader rustdoc reference "
+                f"{name}: {path.relative_to(root)}:{line_number}"
+            )
+
+    readme_path = root / IWA_PAGES_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for match in RUST_IDENTIFIER.finditer(source):
+            name = match.group(1)
+            if name not in RETIRED_IWA_PAGES_DOCUMENT_TYPE_SET:
+                continue
+            line_number = source.count("\n", 0, match.start(1)) + 1
+            violations.append(
+                "retired litchi-iwa Pages document reader README reference "
+                f"{name}: {IWA_PAGES_README}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_pages_document_public_api(root: Path = ROOT) -> list[str]:
+    """Keep the focused Pages reader public API archive-free and semantic."""
+
+    violations: list[str] = []
+    for relative in PAGES_DOCUMENT_PUBLIC_API_SOURCES:
+        path = root / relative
+        if not path.is_file():
+            continue
+        source = path.read_text(encoding="utf-8")
+        dedicated_source = relative == PAGES_SOURCE_ROOT / "document.rs"
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not dedicated_source and not (
+                identifiers & PAGES_DOCUMENT_PUBLIC_MARKERS
+            ):
+                continue
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                reason = _iwork_public_leak(identifier)
+                if reason is None:
+                    continue
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                violations.append(
+                    "focused litchi-pages document reader public API exposes "
+                    f"{reason} {identifier}: "
+                    f"{path.relative_to(root)}:{identifier_line}"
+                )
+
+        doc_regions = [
+            *re.finditer(r"^[ \t]*//[/!][^\r\n]*", source, re.MULTILINE),
+            *re.finditer(r"/\*(?:\*|!)[\s\S]*?\*/", source),
+            *re.finditer(r"#\s*\[\s*doc\s*=\s*[^\]]*\]", source),
+        ]
+        for region in doc_regions:
+            for match in RUST_IDENTIFIER.finditer(region.group(0)):
+                identifier = match.group(1)
+                if not identifier[:1].isupper():
+                    continue
+                reason = _iwork_public_leak(identifier)
+                if reason is None and identifier[:1].isupper():
+                    words = [
+                        word.lower() for word in CAMEL_CASE_WORD.findall(identifier)
+                    ]
+                    if "native" in words and any(
+                        word in {"id", "identifier", "object"} for word in words
+                    ):
+                        reason = "native object"
+                if reason is None:
+                    continue
+                offset = region.start() + match.start(1)
+                line_number = source.count("\n", 0, offset) + 1
+                violations.append(
+                    "focused litchi-pages document reader rustdoc exposes "
+                    f"{reason} {identifier}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_pages_page_layout_facade_source_topology(root: Path = ROOT) -> list[str]:
     """Reject physical identifiers and implementation types from the layout facade."""
 
@@ -7973,6 +8301,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_table_cell_mutation_source_topology()
         + audit_iwa_numbers_table_lock_source_topology()
         + audit_numbers_table_lock_facade_source_topology()
+        + audit_iwa_pages_document_source_topology()
+        + audit_pages_document_public_api()
         + audit_iwa_pages_page_layout_source_topology()
         + audit_pages_page_layout_facade_source_topology()
         + audit_iwa_pages_document_settings_source_topology()

@@ -860,9 +860,22 @@ fn map_package_error(package_error: PackageError) -> SectionNameError {
     match package_error {
         PackageError::Archive(archive_error) => map_archive_error(archive_error),
         PackageError::SectionNamesTooLarge { observed, limit } => name_limit_error(observed, limit),
-        PackageError::Io(_) | PackageError::InvalidFormat(_) | PackageError::Semantic(_) => {
-            SectionNameError::InvalidSource
+        PackageError::NotPages => SectionNameError::UnsupportedSource,
+        PackageError::PayloadLimit { observed, limit } => SectionNameError::LimitExceeded {
+            kind: SectionNameLimitKind::WireBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
         },
+        PackageError::ObjectLimit { observed, limit } => SectionNameError::LimitExceeded {
+            kind: SectionNameLimitKind::Entries,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
+        },
+        PackageError::Allocation { amount } => SectionNameError::Allocation { amount },
+        PackageError::Io(_)
+        | PackageError::Detection(_)
+        | PackageError::InvalidFormat(_)
+        | PackageError::Semantic(_) => SectionNameError::InvalidSource,
     }
 }
 

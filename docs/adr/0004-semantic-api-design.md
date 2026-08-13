@@ -138,17 +138,18 @@ publication. Protobuf decoding, UTF-16/native boundary conversion, archive
 lookup, and unsupported wire-field preservation stay in the IWA adapter.
 
 Pages document state follows the same raw/semantic split:
-`litchi_pages::document::{Root, Body, Document}` owns an immutable, bounded
-semantic snapshot, while `litchi-iwa` decodes native root and body payloads
-before constructing it. The semantic model exposes borrowed section views and
-exact-name or typed `litchi_core::Position` selection; duplicate names are a
-typed ambiguity instead of an arbitrary first match. Every section can produce
-an unambiguous snapshot-local position selector, while a producer-visible name
-is preferred when one is actually present. The native Pages adapter does not
-synthesize section names from headings when the current schema projection has
-no name, and native object identifiers and protobuf messages do not appear in
-ordinary signatures. Snapshot cloning shares the semantic section allocation
-and never reparses or mutates the source document.
+the public `litchi_pages::{Root, Body, Document}` values form the immutable,
+bounded semantic snapshot. The focused Pages owner admits and projects native
+sources before publishing that state; `litchi-iwa` does not decode, construct,
+or re-export this reader model. The semantic model exposes borrowed section
+views and exact-name or typed `litchi_core::Position` selection; duplicate
+names are a typed ambiguity instead of an arbitrary first match. Every section
+can produce an unambiguous snapshot-local position selector, while a
+producer-visible name is preferred when one is actually present. The focused
+adapter does not synthesize section names from headings when the current schema
+projection has no name, and native object identifiers and protobuf messages do
+not appear in ordinary signatures. Snapshot cloning shares the semantic
+section allocation and never reparses or mutates the source document.
 
 Keynote uses the same selector contract through
 `litchi_keynote::SlideSelector::{Name, Position}`. A slide's developer-facing
@@ -1993,3 +1994,76 @@ scalar fields projected into public metadata.
 This amendment retires only the read facade. `KeynoteEditor`,
 `KeynoteDocumentBuilder`, creation, and mutation surfaces remain in
 `litchi-iwa`.
+
+## 2026-08-13 amendment: canonical Pages reader API
+
+The supported Pages semantic read API is `litchi_pages::Document::{open,
+open_with_options, from_bytes, from_bytes_with_options, from_shared_bytes,
+from_shared_bytes_with_options}`. `DocumentReadOptions`
+combines a checked `DocumentSourceLimits` profile with checked
+`SemanticLimits`; the latter admits nonzero ceilings no greater than 4,096
+sections and 64 MiB of retained section-name and text bytes. The resulting
+`Document` exposes constant-time snapshots, semantic sections and selectors,
+plain text, source metadata and statistics, and allocation-free semantic
+validation. Wrong-family iWork input is the typed `ReadError::NotPages`.
+`ReadError` exposes only closed I/O, wrong-family, limit, invalid-source,
+invalid-format, and allocation categories. Semantic admission failures flatten
+into those public categories, with resource failures reported through
+Pages-owned `ReadLimitKind` values and numeric bounds. Paths, package member
+names, native identifiers, native content, and lower-layer diagnostic strings
+do not cross the archive-free boundary.
+
+The Pages-owned `DocumentSourceLimits` profile names five source resources:
+encoded input bytes, independently addressed source items, decoded bytes from
+one source item, aggregate decoded source bytes, and bytes from one document
+payload component. Their defaults are respectively 1 GiB, 100,000, 512 MiB,
+2 GiB, and 512 MiB; callers may tighten but not relax those hard ceilings.
+Rootless/body fallback retains at most 4,096 semantic storages.
+The semantic text ceiling charges retained section names and storage text;
+render-only section separators are not retained input bytes.
+
+The API split is provenance, not two names for the same owner. `Package`
+accepts exact regular-file and byte artifacts and owns `source_bytes`, package
+metadata/statistics, physical validation, and edits. `Document` is
+archive-free, accepts packaged Pages paths, checked directory sources, borrowed
+package bytes, or shared package bytes, and owns no exact artifact.
+`PagesDocumentStats::application` was always the constant Pages; the focused
+statistics retain only object and native section counts.
+
+Packaged and directory paths are available only where Pages can pin stable
+source identity. Windows path ingress fails closed until it can do so safely,
+while borrowed and shared byte ingress remains available. For packaged-path,
+borrowed-byte, and shared-byte routes, the three exact canonical metadata
+members are checked from physical package headers for supported compression and
+the 64 KiB declared-size ceiling before package entries are materialized. This
+selection compares exact raw logical-name bytes after stripping only the
+selected legacy outer-package prefix; raw near-names do not match. The
+selected-member preflight does not prevent unrelated supported members from
+being expanded under the broader source limits before semantic projection
+discards them.
+
+Capability parity includes deliberate semantic corrections already accepted
+for the focused Pages model. An empty native root has zero sections rather
+than a synthetic unnamed body section. Rootless bodies use the bounded native
+storage fallback: the same 14 message types trigger an object, all registry
+storage messages in that object are fully raw-validated and Buffa-projected,
+and all fragments are newline-joined in source order under the aggregate text
+budget. Rooted bodies honor the native initial-section/table graph, UTF-16 boundaries,
+section-break removal, exact name presence, and typed duplicate-name
+ambiguity. The checked-in native fixture therefore has one Body section named
+`Blank`, not the legacy unnamed synthetic section. These are format-owned
+semantics, not object-for-object compatibility with the retired reader.
+
+Source diagnostics bind only the three exact canonical authorities
+`Metadata/Properties.plist`, `Metadata/BuildVersionHistory.plist`, and
+`Metadata/DocumentIdentifier`; no more than 64 KiB from any one selected
+authority is retained in the semantic handoff. Hostile basename matches and
+unrelated sidecars are inert. Revision falls back to the latest admitted
+build-history entry, and application defaults
+to Pages when the properties file omits it. All present selected diagnostics
+must decode before any source-backed `Document` is published.
+
+The public API and behavior gates are frozen: 15/15 document-reader tests and
+153/153 total focused Pages tests pass. Supporting archive and detector suites
+pass 93/93 and 32/32, the host generated-roundtrip passes 1/1, and the boundary
+suite passes 227/227 with zero live retirement or focused-public-API findings.

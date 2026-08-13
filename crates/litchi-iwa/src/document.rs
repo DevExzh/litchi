@@ -8,7 +8,7 @@
 //! iWork formats. For application-specific features, use the specialized
 //! modules:
 //!
-//! - `crate::pages::PagesDocument` for Pages-specific features
+//! - `litchi_pages::Document` for Pages-specific read features
 //! - `crate::numbers::NumbersDocument` for Numbers-specific features
 //! - `litchi_keynote::Package` for Keynote-specific features
 
@@ -329,7 +329,7 @@ impl DocumentStats {
 }
 
 // Note: Application-specific document types have been moved to dedicated modules:
-// - crate::pages::PagesDocument
+// - litchi_pages::Document
 // - crate::numbers::NumbersDocument
 // - litchi_keynote::Package
 //

@@ -1008,9 +1008,22 @@ fn map_package_error(error: PackageError) -> Error {
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::Io(_) | PackageError::InvalidFormat(_) | PackageError::Semantic(_) => {
-            Error::InvalidSource
+        PackageError::NotPages => Error::UnsupportedSource,
+        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+            kind: LimitKind::PayloadBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
         },
+        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+            kind: LimitKind::PayloadObjects,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
+        },
+        PackageError::Allocation { amount } => Error::Allocation { amount },
+        PackageError::Io(_)
+        | PackageError::Detection(_)
+        | PackageError::InvalidFormat(_)
+        | PackageError::Semantic(_) => Error::InvalidSource,
     }
 }
 

@@ -58,14 +58,19 @@ pub mod section;
 pub mod selector;
 
 pub use document::{
-    Body, DEFAULT_MAX_TEXT_BYTES, Document, Error, MAX_BODY_STORAGES, MAX_SECTIONS, Result, Root,
+    Body, DEFAULT_MAX_TEXT_BYTES, Document, DocumentReadOptions, DocumentSourceLimitKind,
+    DocumentSourceLimits, DocumentSourceLimitsError, Error, IoKind, MAX_BODY_STORAGES,
+    MAX_SECTIONS, ReadError, ReadLimitKind, Result, Root, SemanticLimitKind, SemanticLimits,
+    SemanticLimitsError,
 };
 pub use litchi_core::Position;
+/// Maximum bytes retained for each canonical Pages metadata sidecar.
+pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
 pub use litchi_iwa_text::{TextPosition, TextSpan};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::__semantic_document_from_prepared_source;
-pub use package::{Limits, Package, PackageError, PackageResult, Stats};
+pub use package::{Limits, MAX_OBJECTS, Package, PackageError, PackageResult, Stats};
 pub use package::{
     PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError, PageLayoutLimitKind,
     PageLayoutPatch,

@@ -1220,9 +1220,22 @@ fn map_package_error(package_error: PackageError) -> SectionTextError {
         PackageError::Semantic(crate::Error::TextTooLarge { observed, limit }) => {
             text_limit_error(observed, limit)
         },
-        PackageError::Io(_) | PackageError::InvalidFormat(_) | PackageError::Semantic(_) => {
-            SectionTextError::InvalidSource
+        PackageError::NotPages => SectionTextError::UnsupportedSource,
+        PackageError::PayloadLimit { observed, limit } => SectionTextError::LimitExceeded {
+            kind: SectionTextLimitKind::WireBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
         },
+        PackageError::ObjectLimit { observed, limit } => SectionTextError::LimitExceeded {
+            kind: SectionTextLimitKind::Entries,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
+        },
+        PackageError::Allocation { amount } => SectionTextError::Allocation { amount },
+        PackageError::Io(_)
+        | PackageError::Detection(_)
+        | PackageError::InvalidFormat(_)
+        | PackageError::Semantic(_) => SectionTextError::InvalidSource,
     }
 }
 

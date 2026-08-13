@@ -16,7 +16,7 @@ use litchi_keynote::slide::Slide;
 use litchi_keynote::transition::Effect;
 use litchi_numbers::Table;
 use litchi_numbers::cell::Value;
-use litchi_pages::{Document as PagesDocument, Section};
+use litchi_pages::{Document as FocusedPagesDocument, Section};
 
 /// Maximum number of tables retained by one structured snapshot.
 pub const MAX_TABLES: usize = litchi_numbers::MAX_TABLES;
@@ -372,7 +372,7 @@ impl Default for Slides {
 #[derive(Debug)]
 enum Sections {
     Owned(Vec<Section>),
-    Pages(PagesDocument),
+    Pages(FocusedPagesDocument),
 }
 
 impl Sections {
@@ -499,7 +499,7 @@ impl StructuredData {
     ///
     /// Returns a typed error when section positions or default aggregate bounds
     /// are invalid.
-    pub fn from_pages_document(document: PagesDocument) -> Result<Self> {
+    pub fn from_pages_document(document: FocusedPagesDocument) -> Result<Self> {
         Self::from_pages_document_with_limits(document, Limits::default())
     }
 
@@ -510,7 +510,7 @@ impl StructuredData {
     /// Returns a typed error when section positions or selected aggregate
     /// bounds are invalid.
     pub fn from_pages_document_with_limits(
-        document: PagesDocument,
+        document: FocusedPagesDocument,
         limits: Limits,
     ) -> Result<Self> {
         validate_parts(&[], &[], document.sections(), None, limits)?;
@@ -1110,7 +1110,7 @@ mod tests {
 
     #[test]
     fn document_backed_pages_budget_counts_all_section_text() {
-        fn document() -> PagesDocument {
+        fn document() -> FocusedPagesDocument {
             let mut section = Section::builder(0, litchi_pages::SectionType::Body);
             section
                 .set_name(Some("Section"))
@@ -1118,7 +1118,7 @@ mod tests {
             section.set_heading(Some("Heading".to_owned()));
             section.push_paragraph("Paragraph".to_owned());
             section.push_text_storage(Storage::from_text("Storage".to_owned()));
-            PagesDocument::from_sections(vec![section.build()])
+            FocusedPagesDocument::from_sections(vec![section.build()])
                 .unwrap_or_else(|error| panic!("Pages document should be valid: {error}"))
         }
 
@@ -1427,7 +1427,7 @@ mod tests {
 
         let mut section = Section::builder(0, litchi_pages::SectionType::Body);
         section.set_heading(Some("Shared section".to_owned()));
-        let pages = PagesDocument::from_sections(vec![section.build()])
+        let pages = FocusedPagesDocument::from_sections(vec![section.build()])
             .unwrap_or_else(|error| panic!("Pages document should be valid: {error}"));
         let section_ptr = pages.sections().as_ptr();
 

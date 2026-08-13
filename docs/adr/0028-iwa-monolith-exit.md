@@ -2684,3 +2684,77 @@ disposable copy, so no claim is made that native open is byte-inert.
 The monolith exit remains incomplete. `KeynoteEditor` and
 `KeynoteDocumentBuilder` still live in `litchi-iwa`, so the manifest edge and
 ordered debt 014 remain unchanged.
+
+## 2026-08-13 amendment: Pages reader host exit
+
+The Pages read-facade cell exits the monolith. The complete 478-line
+`pages/document.rs`, `pages::document` module, `PagesDocument` re-export, and
+`PagesDocument`/`PagesDocumentStats` types are removed together with their
+duplicate Bundle, object index, root/body decoder, and package snapshot. No
+compatibility alias preserves the retired reader.
+
+Its capabilities move to the focused crate with an explicit provenance split.
+`litchi_pages::Document` owns semantic ZIP and checked-directory path reads on
+supported path-ingress platforms, borrowed/shared ZIP byte reads on every
+supported platform, eager archive-free snapshots, text and sections,
+source-derived metadata/statistics, and semantic validation.
+`litchi_pages::Package` owns exact regular-file and byte ingress, source bytes,
+package metadata/statistics, physical validation, edits, and the
+existing archive-byte alias. It refuses directories. A package-derived or
+semantically constructed `Document` has no source diagnostics, and a
+directory semantic read makes no preservation promise for unselected
+metadata, `Data/`, previews, media, unknown sidecars, or complete bytes.
+
+This supersedes the earlier directory statement that all `Metadata/` was
+outside the frozen adapter. Pages semantic ingress now captures exactly
+`Metadata/Properties.plist`, `Metadata/BuildVersionHistory.plist`, and
+`Metadata/DocumentIdentifier`, retaining at most 64 KiB from each, from the same
+captured authority as the components. It still excludes every other
+sidecar and cannot enter preserve-mode editing. Packaged and directory
+semantic reads therefore share metadata semantics without conflating either
+with exact-artifact ownership.
+
+Deletion gate 3 advances for the retired read behavior with deliberate
+correction: the focused owner uses native empty-root, section-table,
+exact-name, rich-run, and UTF-16-boundary semantics rather than the retired
+synthetic one-section view. Rootless fallback reproduces the retired 14-type
+object trigger and registry-message aggregation, including source-order
+newlines and empty fragments, after strict raw/Buffa validation and before
+aggregate text publication. The public duplicate eager-Prost reader is gone.
+Focused Pages is nevertheless not Prost-free or wholly lazy:
+one bounded rooted StorageArchive decode remains behind strict raw/Buffa
+qualification, while fallback candidates receive full known-field raw storage
+validation before the Buffa text projection.
+
+The native read-only gate is frozen in ADR 0008. Its isolated copy opened
+without repair or conversion and retained the expected one-section semantics,
+but Pages silently normalized that disposable artifact, so native open is not
+claimed byte-inert. The tracked source remained unopened and exact.
+
+This reader exit does not close the remaining source-boundary gates. Packaged
+semantic ingress can still materialize irrelevant supported ZIP entries under
+the generic source limits before dropping them. The three selected canonical
+metadata authorities are nevertheless declared-size and
+unsupported-compression preflighted before any package entry payload is
+materialized for path, borrowed-byte, and shared-byte ZIP ingress. They match
+exact raw logical-name bytes after stripping only the selected legacy
+outer-package prefix, exclude raw near-names, and require local/central ZIP
+names and methods to agree. The focused
+semantic opener exposes the content-free `ReadError` taxonomy rather than
+lower-layer diagnostics. Windows Pages file and directory path ingress fails
+closed until descriptor-relative, reparse-safe stable identity is available;
+borrowed/shared byte ingress remains supported. The unrelated-member
+materialization debt and deliberate Windows path capability gap prevent a
+claim of complete Pages ingress or completion of the whole Pages portion of
+deletion gate 3.
+
+The final focused Pages gate passes 153/153, with supporting archive and
+detector suites at 93/93 and 32/32 and the host generated-roundtrip at 1/1.
+The boundary ratchet passes 227/227; the live retired-reader and focused
+public-API audits both report zero findings.
+
+The monolith exit remains incomplete. `PagesEditor`,
+`PagesDocumentBuilder`, creation, and extensive chart/table/media/formatting
+examples and tests still live in `litchi-iwa`; production host code still uses
+focused Pages types. Ordered debt 017 and the `litchi-iwa -> litchi-pages`
+manifest edge remain unchanged.
