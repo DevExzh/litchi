@@ -813,7 +813,38 @@ pub fn validate_source_with_limits(
     // than materializing clear-looking ciphertext into the record parser.
     let mut document_data = None;
     let current_is_unencrypted = matches!(current, Some(ref value) if !value.is_encrypted());
-    if current_is_unencrypted
+    let current_edit_in_bounds = if current_is_unencrypted && statuses[2].is_complete() {
+        let current_offset = current
+            .as_ref()
+            .map(|value| value.current_edit_offset())
+            .expect("the unencrypted Current User state was established");
+        if u64::from(current_offset) < document_size {
+            true
+        } else {
+            push_issue(
+                &mut issues,
+                simple_issue(
+                    CURRENT_USER,
+                    "ppt.current_user.edit_offset_out_of_bounds",
+                    IssueSeverity::Error,
+                    "Current User points outside the declared PowerPoint Document stream.",
+                    Some(CURRENT_USER_NAME),
+                    limits.report,
+                )?,
+            )?;
+            statuses[3] = CheckStatus::blocked(
+                "Current User points outside the declared PowerPoint Document stream",
+                limits.report,
+            )?;
+            if statuses[4].is_complete() {
+                statuses[4] = CheckStatus::stopped_by(check_id(CURRENT_USER, limits.report)?);
+            }
+            false
+        }
+    } else {
+        false
+    };
+    if current_edit_in_bounds
         && stream_budget_ok
         && statuses[2].is_complete()
         && let Some(path) = inventory.document_path
