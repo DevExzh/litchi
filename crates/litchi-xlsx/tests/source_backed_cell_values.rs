@@ -7,7 +7,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, TargetMode};
-use litchi_xlsx::cell_values::{CellValueEdit, MAX_BATCH_EDITS, SourceBackedEditor};
+use litchi_xlsx::cell_values::{
+    CellValueEdit, MAX_BATCH_EDITS, SheetCellValueEdit, SourceBackedEditor,
+};
 use litchi_xlsx::{Address, Error, ErrorValue, Number, Value};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -119,6 +121,62 @@ fn three_cells() -> Vec<u8> {
         ),
         false,
     )
+}
+
+fn two_sheets() -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(&three_cells()).unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/worksheets/sheet2.xml").unwrap(),
+            ct::SML_WORKSHEET.to_owned(),
+            format!(
+                r#"<worksheet xmlns="{SML}"><dimension ref="A1:C3"/><sheetData><row r="1"><c r="A1"><v>20</v></c></row><row r="2"><c r="B2" t="b"><v>1</v></c></row><row r="3"><c r="C3" t="inlineStr"><is><t>second</t></is></c></row></sheetData></worksheet>"#
+            )
+            .into_bytes(),
+        )))
+        .unwrap();
+    package
+        .get_part_mut(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .set_blob(
+            format!(
+                r#"<workbook xmlns="{SML}" xmlns:r="{REL}"><bookViews><workbookView/></bookViews><sheets><sheet name="Sheet1" sheetId="1" r:id="rIdSheet"/><sheet name="Sheet2" sheetId="2" r:id="rIdSheet2"/></sheets></workbook>"#
+            )
+            .into_bytes(),
+        );
+    package
+        .get_part_mut(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            rt::WORKSHEET.to_owned(),
+            "worksheets/sheet2.xml".to_owned(),
+            "rIdSheet2".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
+fn signed_two_sheets() -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(&two_sheets()).unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+            ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            b"<origin/>".to_vec(),
+        )))
+        .unwrap();
+    package
+        .rels_mut()
+        .try_add_relationship(
+            rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            "_xmlsignatures/origin.sigs".to_owned(),
+            "rIdSignature".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    PackageWriter::to_bytes(&package).unwrap()
 }
 
 fn with_two_cell_styles(bytes: &[u8]) -> (Vec<u8>, PackURI, Vec<u8>) {
@@ -421,6 +479,288 @@ fn exact_batch_limit_accepts_n_and_rejects_n_plus_one_atomically() {
     assert_eq!(edit.len(), MAX_BATCH_EDITS);
     assert!(edit.remove(address("A257")).is_err());
     assert_eq!(edit.len(), MAX_BATCH_EDITS);
+}
+
+#[test]
+fn bounded_multi_sheet_transaction_publishes_one_overlay_and_inverts() {
+    let source_bytes = two_sheets();
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
+            .unwrap();
+    assert!(editor.snapshot("Sheet1").is_err());
+
+    let commit = editor
+        .edit_many([
+            SheetCellValueEdit::set("Sheet1", address("A1"), 10u32),
+            SheetCellValueEdit::clear("Sheet2", address("B2")),
+            SheetCellValueEdit::remove("Sheet2", address("C3")),
+        ])
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(commit.changed());
+    assert_eq!(commit.diagnostics().changed_cells(), 3);
+    assert_eq!(commit.diagnostics().touched_worksheets(), 2);
+    assert_eq!(commit.snapshot().len(), 2);
+    assert_eq!(
+        commit.snapshot().value(0, address("A1")),
+        Some(&Value::Number(Number::new("10").unwrap()))
+    );
+    assert_eq!(commit.snapshot().value(1, address("B2")), None);
+    assert!(!commit.snapshot().contains_cell(1, address("C3")));
+
+    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    commit.patch().apply(&mut replay).unwrap();
+    assert_eq!(
+        litchi_xlsx::cell_values::Snapshot::load_multi(&replay, "Sheet2")
+            .unwrap()
+            .value(address("B2")),
+        None
+    );
+    commit.patch().inverse().apply(&mut replay).unwrap();
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob(),
+        OpcPackage::from_bytes(&source_bytes)
+            .unwrap()
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob(),
+    );
+
+    let mut output = Vec::new();
+    editor
+        .publish_multi_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let published = OpcPackage::from_bytes(&output).unwrap();
+    assert_eq!(
+        published
+            .get_part(&PackURI::new(UNUSED).unwrap())
+            .unwrap()
+            .blob(),
+        OpcPackage::from_bytes(&source_bytes)
+            .unwrap()
+            .get_part(&PackURI::new(UNUSED).unwrap())
+            .unwrap()
+            .blob(),
+    );
+    assert_eq!(
+        litchi_xlsx::cell_values::Snapshot::load_multi(&published, "Sheet1")
+            .unwrap()
+            .value(address("A1")),
+        Some(&Value::Number(Number::new("10").unwrap()))
+    );
+}
+
+#[test]
+fn multi_sheet_duplicate_and_late_failure_are_atomic() {
+    let bytes = two_sheets();
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor
+        .edit_sheets(["Sheet1".into(), "Sheet2".into()])
+        .unwrap();
+    assert!(
+        edit.apply_batch([
+            SheetCellValueEdit::set("Sheet1", address("A1"), 4u32),
+            SheetCellValueEdit::set("Sheet1", address("A1"), 5u32),
+        ])
+        .is_err()
+    );
+    assert!(edit.is_empty());
+    assert!(
+        edit.apply_batch([
+            SheetCellValueEdit::set("Sheet1", address("A1"), 4u32),
+            SheetCellValueEdit::set("Sheet2", address("Z99"), 5u32),
+        ])
+        .is_err()
+    );
+    assert!(edit.is_empty());
+}
+
+#[test]
+fn multi_sheet_commit_rejects_foreign_source_lineage() {
+    let bytes = two_sheets();
+    let first =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let commit = first
+        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 4u32)])
+        .unwrap()
+        .commit()
+        .unwrap();
+    let second = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut output = Vec::new();
+    assert!(matches!(
+        second.publish_multi_commit_to_stream(&mut output, &commit),
+        Err(Error::PatchConflict { .. })
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn multi_sheet_exact_noop_publishes_source_byte_for_byte() {
+    let bytes = two_sheets();
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let commit = editor
+        .edit_sheets(["Sheet1".into(), "Sheet2".into()])
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(!commit.changed());
+    assert!(commit.patch().is_empty());
+    let mut output = Vec::new();
+    editor
+        .publish_multi_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, bytes);
+}
+
+#[test]
+fn multi_sheet_patch_rejects_unselected_graph_tampering() {
+    let bytes = two_sheets();
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let commit = editor
+        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 4u32)])
+        .unwrap()
+        .commit()
+        .unwrap();
+
+    let sheet2 = PackURI::new("/xl/worksheets/sheet2.xml").unwrap();
+    let mut wrong_type = OpcPackage::from_bytes(&bytes).unwrap();
+    wrong_type
+        .get_part_mut(&sheet2)
+        .unwrap()
+        .set_content_type("application/octet-stream".to_owned())
+        .unwrap();
+    assert!(matches!(
+        commit.patch().apply(&mut wrong_type),
+        Err(Error::PatchConflict { .. })
+    ));
+
+    let mut wrong_relationship = OpcPackage::from_bytes(&bytes).unwrap();
+    wrong_relationship
+        .get_part_mut(&sheet2)
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            rt::IMAGE.to_owned(),
+            "../media/unused.bin".to_owned(),
+            "rIdInjected".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    assert!(matches!(
+        commit.patch().apply(&mut wrong_relationship),
+        Err(Error::PatchConflict { .. })
+    ));
+
+    let mut wrong_owner = OpcPackage::from_bytes(&bytes).unwrap();
+    wrong_owner
+        .rels_mut()
+        .try_add_relationship(
+            rt::OFFICE_DOCUMENT.to_owned(),
+            "xl/worksheets/sheet2.xml".to_owned(),
+            "rIdSecondOwner".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    assert!(matches!(
+        commit.patch().apply(&mut wrong_owner),
+        Err(Error::PatchConflict { .. })
+    ));
+}
+
+#[test]
+fn multi_sheet_patch_composes_with_unselected_payload_edits_and_inverse() {
+    let bytes = two_sheets();
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let commit = editor
+        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 42u32)])
+        .unwrap()
+        .commit()
+        .unwrap();
+
+    let sheet2 = PackURI::new("/xl/worksheets/sheet2.xml").unwrap();
+    let independent_sheet2 = format!(
+        r#"<worksheet xmlns="{SML}"><dimension ref="A1:C3"/><sheetData><row r="1"><c r="A1"><v>20</v></c></row><row r="2"><c r="B2" t="b"><v>0</v></c></row><row r="3"><c r="C3" t="inlineStr"><is><t>independent</t></is></c></row></sheetData></worksheet>"#
+    )
+    .into_bytes();
+    let mut composed = OpcPackage::from_bytes(&bytes).unwrap();
+    composed
+        .get_part_mut(&sheet2)
+        .unwrap()
+        .set_blob(independent_sheet2.clone());
+    commit.patch().apply(&mut composed).unwrap();
+    assert_eq!(
+        composed.get_part(&sheet2).unwrap().blob(),
+        independent_sheet2.as_slice()
+    );
+    assert_eq!(
+        litchi_xlsx::cell_values::Snapshot::load_multi(&composed, "Sheet1")
+            .unwrap()
+            .value(address("A1")),
+        Some(&Value::Number(Number::new("42").unwrap()))
+    );
+
+    commit.patch().inverse().apply(&mut composed).unwrap();
+    assert_eq!(
+        composed.get_part(&sheet2).unwrap().blob(),
+        independent_sheet2.as_slice()
+    );
+    assert_eq!(
+        litchi_xlsx::cell_values::Snapshot::load_multi(&composed, "Sheet1")
+            .unwrap()
+            .value(address("A1")),
+        Some(&Value::Number(Number::new("1").unwrap()))
+    );
+}
+
+#[test]
+fn multi_sheet_selector_bounds_and_semantic_duplicates_are_atomic() {
+    let bytes = two_sheets();
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut selectors = Vec::new();
+    selectors.extend(std::iter::repeat_n(0usize.into(), 65));
+    assert!(editor.edit_sheets(selectors).is_err());
+    assert!(
+        editor
+            .edit_sheets(vec!["Sheet1".into(), 0usize.into()])
+            .is_err()
+    );
+}
+
+#[test]
+fn signed_multi_sheet_noop_is_exact_and_changed_publication_refuses() {
+    let bytes = signed_two_sheets();
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let noop = editor
+        .edit_sheets(["Sheet1".into(), "Sheet2".into()])
+        .unwrap()
+        .commit()
+        .unwrap();
+    let mut output = Vec::new();
+    editor
+        .publish_multi_commit_to_stream(&mut output, &noop)
+        .unwrap();
+    assert_eq!(output, bytes);
+
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let changed = editor
+        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 42u32)])
+        .unwrap()
+        .commit()
+        .unwrap();
+    let mut output = Vec::new();
+    assert!(matches!(
+        editor.publish_multi_commit_to_stream(&mut output, &changed),
+        Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
+    assert!(output.is_empty());
 }
 
 #[test]
