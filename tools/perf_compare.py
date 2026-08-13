@@ -1,0 +1,732 @@
+#!/usr/bin/env python3
+"""Fail-closed comparison of two litchi performance JSON reports.
+
+The comparator intentionally uses only the Python standard library.  A policy
+pins the accepted report shape, identity fields, sample floor, and regression
+thresholds.  Exit status is 0 for a passing comparison, 1 for measured
+regressions, and 2 for invalid or incomparable input.
+"""
+
+from __future__ import annotations
+
+import argparse
+import fnmatch
+import hashlib
+import json
+import math
+import statistics
+import sys
+from pathlib import Path
+from typing import Any, Iterable
+
+
+COMPARATOR_NAME = "litchi-perf-compare"
+COMPARATOR_VERSION = "1.0.0"
+SUPPORTED_POLICY_SCHEMA = 1
+SUPPORTED_REPORT_SCHEMA = 1
+
+
+class ComparisonInputError(ValueError):
+    """Raised when inputs cannot be compared safely."""
+
+
+def _reject_nonstandard_constant(value: str) -> None:
+    raise ComparisonInputError(f"non-finite JSON number {value!r}")
+
+
+def load_json(path: Path) -> Any:
+    try:
+        with path.open(encoding="utf-8") as handle:
+            return json.load(handle, parse_constant=_reject_nonstandard_constant)
+    except (OSError, json.JSONDecodeError) as error:
+        raise ComparisonInputError(f"cannot read {path}: {error}") from error
+
+
+def _require_object(value: Any, location: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ComparisonInputError(f"{location} must be an object")
+    return value
+
+
+def _finite_number(value: Any, location: str, *, positive: bool = False) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ComparisonInputError(f"{location} must be a finite number")
+    try:
+        number = float(value)
+    except OverflowError as error:
+        raise ComparisonInputError(f"{location} is outside the finite range") from error
+    if not math.isfinite(number):
+        raise ComparisonInputError(f"{location} must be a finite number")
+    if positive and number <= 0:
+        raise ComparisonInputError(f"{location} must be greater than zero")
+    if not positive and number < 0:
+        raise ComparisonInputError(f"{location} must be non-negative")
+    return number
+
+
+def _reject_nonfinite_tree(value: Any, location: str) -> None:
+    if isinstance(value, bool) or value is None or isinstance(value, str):
+        return
+    if isinstance(value, (int, float)):
+        try:
+            finite = math.isfinite(float(value))
+        except OverflowError as error:
+            raise ComparisonInputError(
+                f"{location} contains a number outside the finite range"
+            ) from error
+        if not finite:
+            raise ComparisonInputError(f"{location} contains a non-finite number")
+        return
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _reject_nonfinite_tree(item, f"{location}[{index}]")
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            _reject_nonfinite_tree(item, f"{location}.{key}")
+
+
+def validate_policy(raw: Any) -> dict[str, Any]:
+    policy = _require_object(raw, "policy")
+    required = {
+        "schema_version",
+        "policy_id",
+        "minimum_samples",
+        "expected_result_count",
+        "expected_result_keys_sha256",
+        "required_cases",
+        "require_clean_worktree",
+        "require_distinct_revisions",
+        "tool_identity",
+        "build_identity_fields",
+        "nullable_build_identity_fields",
+        "expected_configuration",
+        "latency_thresholds_percent",
+        "metric_classes",
+    }
+    missing = sorted(required - policy.keys())
+    unknown = sorted(policy.keys() - required)
+    if missing or unknown:
+        raise ComparisonInputError(
+            f"policy keys mismatch: missing={missing}, unknown={unknown}"
+        )
+    if policy["schema_version"] != SUPPORTED_POLICY_SCHEMA:
+        raise ComparisonInputError(
+            f"unsupported policy schema {policy['schema_version']!r}; "
+            f"expected {SUPPORTED_POLICY_SCHEMA}"
+        )
+    if not isinstance(policy["policy_id"], str) or not policy["policy_id"]:
+        raise ComparisonInputError("policy.policy_id must be a non-empty string")
+    minimum_samples = policy["minimum_samples"]
+    if isinstance(minimum_samples, bool) or not isinstance(minimum_samples, int):
+        raise ComparisonInputError("policy.minimum_samples must be an integer")
+    if minimum_samples < 3:
+        raise ComparisonInputError("policy.minimum_samples must be at least 3")
+    expected_count = policy["expected_result_count"]
+    if isinstance(expected_count, bool) or not isinstance(expected_count, int):
+        raise ComparisonInputError("policy.expected_result_count must be an integer")
+    if expected_count < 1:
+        raise ComparisonInputError("policy.expected_result_count must be positive")
+    expected_keys_sha256 = policy["expected_result_keys_sha256"]
+    if expected_keys_sha256 is not None and (
+        not isinstance(expected_keys_sha256, str)
+        or len(expected_keys_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in expected_keys_sha256)
+    ):
+        raise ComparisonInputError(
+            "policy.expected_result_keys_sha256 must be null or 64 lowercase hex digits"
+        )
+    required_cases = policy["required_cases"]
+    if (
+        not isinstance(required_cases, list)
+        or not required_cases
+        or any(not isinstance(case, str) or not case for case in required_cases)
+        or len(set(required_cases)) != len(required_cases)
+    ):
+        raise ComparisonInputError(
+            "policy.required_cases must contain unique non-empty strings"
+        )
+    if not isinstance(policy["require_clean_worktree"], bool):
+        raise ComparisonInputError("policy.require_clean_worktree must be boolean")
+    if not isinstance(policy["require_distinct_revisions"], bool):
+        raise ComparisonInputError("policy.require_distinct_revisions must be boolean")
+    tool = _require_object(policy["tool_identity"], "policy.tool_identity")
+    for field in ("name", "version", "profile", "target_os", "target_arch"):
+        if not isinstance(tool.get(field), str) or not tool[field]:
+            raise ComparisonInputError(
+                f"policy.tool_identity.{field} must be a non-empty string"
+            )
+    identity_fields = policy["build_identity_fields"]
+    if (
+        not isinstance(identity_fields, list)
+        or not identity_fields
+        or any(not isinstance(field, str) or not field for field in identity_fields)
+        or len(set(identity_fields)) != len(identity_fields)
+    ):
+        raise ComparisonInputError(
+            "policy.build_identity_fields must contain unique non-empty strings"
+        )
+    nullable_identity_fields = policy["nullable_build_identity_fields"]
+    if (
+        not isinstance(nullable_identity_fields, list)
+        or any(
+            not isinstance(field, str) or not field
+            for field in nullable_identity_fields
+        )
+        or len(set(nullable_identity_fields)) != len(nullable_identity_fields)
+        or not set(nullable_identity_fields) <= set(identity_fields)
+    ):
+        raise ComparisonInputError(
+            "policy.nullable_build_identity_fields must be a unique subset of "
+            "build_identity_fields"
+        )
+    expected_configuration = _require_object(
+        policy["expected_configuration"], "policy.expected_configuration"
+    )
+    if not expected_configuration:
+        raise ComparisonInputError("policy.expected_configuration must not be empty")
+    _reject_nonfinite_tree(expected_configuration, "policy.expected_configuration")
+    latency = _require_object(
+        policy["latency_thresholds_percent"],
+        "policy.latency_thresholds_percent",
+    )
+    if set(latency) != {"p50", "p95"}:
+        raise ComparisonInputError(
+            "policy.latency_thresholds_percent must contain exactly p50 and p95"
+        )
+    for name, value in latency.items():
+        _finite_number(value, f"policy.latency_thresholds_percent.{name}")
+    classes = policy["metric_classes"]
+    if not isinstance(classes, list) or not classes:
+        raise ComparisonInputError("policy.metric_classes must be a non-empty list")
+    class_names: set[str] = set()
+    for index, item in enumerate(classes):
+        metric_class = _require_object(item, f"policy.metric_classes[{index}]")
+        if set(metric_class) != {"name", "max_regression_percent", "path_globs"}:
+            raise ComparisonInputError(
+                f"policy.metric_classes[{index}] has invalid keys"
+            )
+        name = metric_class["name"]
+        if not isinstance(name, str) or not name or name in class_names:
+            raise ComparisonInputError("metric class names must be unique strings")
+        class_names.add(name)
+        _finite_number(
+            metric_class["max_regression_percent"],
+            f"policy.metric_classes[{index}].max_regression_percent",
+        )
+        globs = metric_class["path_globs"]
+        if (
+            not isinstance(globs, list)
+            or not globs
+            or any(not isinstance(pattern, str) or not pattern for pattern in globs)
+        ):
+            raise ComparisonInputError(
+                f"policy.metric_classes[{index}].path_globs must be non-empty strings"
+            )
+    return policy
+
+
+def _result_key(result: dict[str, Any], location: str) -> tuple[str, str]:
+    case = result.get("case")
+    corpus = result.get("corpus")
+    if not isinstance(case, str) or not case:
+        raise ComparisonInputError(f"{location}.case must be a non-empty string")
+    if not isinstance(corpus, dict) or not corpus:
+        raise ComparisonInputError(f"{location}.corpus must be a non-empty object")
+    try:
+        corpus_identity = json.dumps(
+            corpus, sort_keys=True, separators=(",", ":"), allow_nan=False
+        )
+    except (TypeError, ValueError) as error:
+        raise ComparisonInputError(f"{location}.corpus is not canonical JSON: {error}")
+    return case, corpus_identity
+
+
+def _index_results(
+    report: dict[str, Any], label: str, expected_count: int
+) -> dict[tuple[str, str], dict[str, Any]]:
+    results = report.get("results")
+    if not isinstance(results, list):
+        raise ComparisonInputError(f"{label}.results must be a list")
+    if len(results) != expected_count:
+        raise ComparisonInputError(
+            f"{label}.results has {len(results)} entries; expected {expected_count}"
+        )
+    indexed: dict[tuple[str, str], dict[str, Any]] = {}
+    for index, raw_result in enumerate(results):
+        result = _require_object(raw_result, f"{label}.results[{index}]")
+        if "elapsed_ns" not in result:
+            raise ComparisonInputError(f"{label}.results[{index}] lacks elapsed_ns")
+        key = _result_key(result, f"{label}.results[{index}]")
+        if key in indexed:
+            raise ComparisonInputError(
+                f"{label} contains duplicate case/corpus key for {key[0]!r}"
+            )
+        indexed[key] = result
+    return indexed
+
+
+def result_key_manifest_sha256(keys: Iterable[tuple[str, str]]) -> str:
+    digest = hashlib.sha256()
+    for case, corpus_identity in sorted(keys):
+        digest.update(case.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(corpus_identity.encode("utf-8"))
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def report_result_key_manifest_sha256(report: Any, expected_count: int) -> str:
+    report_object = _require_object(report, "report")
+    indexed = _index_results(report_object, "report", expected_count)
+    return result_key_manifest_sha256(indexed)
+
+
+def _validate_report_identity(
+    baseline: dict[str, Any], current: dict[str, Any], policy: dict[str, Any]
+) -> None:
+    for label, report in (("baseline", baseline), ("current", current)):
+        _reject_nonfinite_tree(report, label)
+        if report.get("schema_version") != SUPPORTED_REPORT_SCHEMA:
+            raise ComparisonInputError(
+                f"{label}.schema_version must be {SUPPORTED_REPORT_SCHEMA}"
+            )
+        if report.get("tool") != policy["tool_identity"]:
+            raise ComparisonInputError(
+                f"{label}.tool does not match the policy tool identity"
+            )
+        _require_object(report.get("environment"), f"{label}.environment")
+        configuration = _require_object(
+            report.get("configuration"), f"{label}.configuration"
+        )
+        for field, expected in policy["expected_configuration"].items():
+            if configuration.get(field) != expected:
+                raise ComparisonInputError(
+                    f"{label}.configuration.{field} does not match policy: "
+                    f"{configuration.get(field)!r} != {expected!r}"
+                )
+        if configuration.get("cases") != policy["required_cases"]:
+            raise ComparisonInputError(
+                f"{label}.configuration.cases does not match the exact policy case list"
+            )
+        if policy["require_clean_worktree"]:
+            dirty = report["environment"].get("git_worktree_dirty")
+            if dirty is not False:
+                raise ComparisonInputError(
+                    f"{label}.environment.git_worktree_dirty must be false"
+                )
+    if baseline["tool"] != current["tool"]:
+        raise ComparisonInputError("tool identity mismatch between reports")
+    if baseline["configuration"] != current["configuration"]:
+        raise ComparisonInputError("benchmark configuration mismatch between reports")
+    revisions = []
+    for label, report in (("baseline", baseline), ("current", current)):
+        revision = report["environment"].get("git_revision")
+        if not isinstance(revision, str) or not revision:
+            raise ComparisonInputError(
+                f"{label}.environment.git_revision must be a non-empty string"
+            )
+        revisions.append(revision)
+    if policy["require_distinct_revisions"] and revisions[0] == revisions[1]:
+        raise ComparisonInputError("reference and current git revisions must differ")
+    for field in policy["build_identity_fields"]:
+        if field not in baseline["environment"] or field not in current["environment"]:
+            raise ComparisonInputError(f"missing build identity field {field!r}")
+        before = baseline["environment"][field]
+        after = current["environment"][field]
+        nullable = field in policy["nullable_build_identity_fields"]
+        integer_fields = {
+            "logical_cpus_available",
+            "total_memory_bytes",
+            "page_size_bytes",
+        }
+        for label, value in (("baseline", before), ("current", after)):
+            if value is None:
+                if not nullable:
+                    raise ComparisonInputError(
+                        f"{label} build identity {field!r} must not be null"
+                    )
+            elif field in integer_fields and (
+                isinstance(value, bool) or not isinstance(value, int) or value <= 0
+            ):
+                raise ComparisonInputError(
+                    f"{label} build identity {field!r} must be a positive integer"
+                )
+            elif field not in integer_fields and (
+                not isinstance(value, str) or not value
+            ):
+                raise ComparisonInputError(
+                    f"{label} build identity {field!r} must be a non-empty string"
+                )
+        if before != after:
+            raise ComparisonInputError(
+                f"build identity mismatch for {field!r}: {before!r} != {after!r}"
+            )
+    logical_cpus = baseline["environment"]["logical_cpus_available"]
+    expected_workers = sorted(
+        {min(requested, logical_cpus) for requested in (1, 2, 4, 8, logical_cpus)}
+    )
+    for label, report in (("baseline", baseline), ("current", current)):
+        workers = report["configuration"].get("execution_workers")
+        if workers != expected_workers:
+            raise ComparisonInputError(
+                f"{label}.configuration.execution_workers does not match the "
+                f"derived default {expected_workers!r}"
+            )
+
+
+def _percentile(samples: list[float], percentile: int) -> float:
+    ordered = sorted(samples)
+    if percentile == 50:
+        return float(statistics.median(ordered))
+    rank = max(1, math.ceil((percentile / 100.0) * len(ordered)))
+    return ordered[rank - 1]
+
+
+def _latencies(
+    result: dict[str, Any], location: str, minimum_samples: int
+) -> dict[str, float]:
+    elapsed = _require_object(result.get("elapsed_ns"), f"{location}.elapsed_ns")
+    if elapsed.get("unit") != "ns":
+        raise ComparisonInputError(f"{location}.elapsed_ns.unit must be 'ns'")
+    samples_raw = elapsed.get("samples")
+    if not isinstance(samples_raw, list):
+        raise ComparisonInputError(f"{location}.elapsed_ns.samples must be a list")
+    if len(samples_raw) < minimum_samples:
+        raise ComparisonInputError(
+            f"{location} has {len(samples_raw)} latency samples; "
+            f"minimum is {minimum_samples}"
+        )
+    samples = [
+        _finite_number(value, f"{location}.elapsed_ns.samples[{index}]", positive=True)
+        for index, value in enumerate(samples_raw)
+    ]
+    values = {"p50": _percentile(samples, 50), "p95": _percentile(samples, 95)}
+    for name, computed in values.items():
+        reported = _finite_number(elapsed.get(name), f"{location}.elapsed_ns.{name}")
+        if abs(reported - computed) > 0.5:
+            raise ComparisonInputError(
+                f"{location}.elapsed_ns.{name}={reported} disagrees with "
+                f"samples ({computed})"
+            )
+    return values
+
+
+def _metric_class_for_path(
+    path: str, policy: dict[str, Any]
+) -> dict[str, Any] | None:
+    component_path = path.replace(".", "/")
+    matching = [
+        metric_class
+        for metric_class in policy["metric_classes"]
+        if any(
+            fnmatch.fnmatchcase(component_path, pattern)
+            for pattern in metric_class["path_globs"]
+        )
+    ]
+    if len(matching) > 1:
+        names = [item["name"] for item in matching]
+        raise ComparisonInputError(
+            f"optional metric {path!r} matches multiple classes: {names}"
+        )
+    return matching[0] if matching else None
+
+
+def _walk_optional_metrics(
+    value: Any,
+    path: str,
+    policy: dict[str, Any],
+    selected: dict[str, tuple[str, float, float]],
+) -> None:
+    metric_class = _metric_class_for_path(path, policy)
+    if metric_class is not None:
+        if isinstance(value, list):
+            if len(value) < policy["minimum_samples"]:
+                raise ComparisonInputError(
+                    f"optional metric {path} has {len(value)} samples; "
+                    f"minimum is {policy['minimum_samples']}"
+                )
+            samples = [
+                _finite_number(item, f"{path}[{index}]")
+                for index, item in enumerate(value)
+            ]
+            metric_value = _percentile(samples, 50)
+        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            metric_value = _finite_number(value, path)
+        else:
+            raise ComparisonInputError(
+                f"optional metric {path} must be a numeric scalar or sample vector"
+            )
+        selected[path] = (
+            metric_class["name"],
+            metric_value,
+            float(metric_class["max_regression_percent"]),
+        )
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            child = f"{path}.{key}" if path else key
+            _walk_optional_metrics(item, child, policy, selected)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            _walk_optional_metrics(item, f"{path}[{index}]", policy, selected)
+
+
+def _optional_metrics(
+    result: dict[str, Any], policy: dict[str, Any]
+) -> dict[str, tuple[str, float, float]]:
+    selected: dict[str, tuple[str, float, float]] = {}
+    for root, value in result.items():
+        if root in {"case", "corpus", "elapsed_ns", "output_sha256"}:
+            continue
+        _walk_optional_metrics(value, root, policy, selected)
+    return selected
+
+
+def _delta_percent(baseline: float, current: float) -> float:
+    if baseline == 0:
+        return 0.0 if current == 0 else math.inf
+    return ((current / baseline) - 1.0) * 100.0
+
+
+def _comparison_record(
+    *,
+    case: str,
+    corpus: dict[str, Any],
+    metric: str,
+    metric_class: str,
+    baseline: float,
+    current: float,
+    threshold: float,
+) -> dict[str, Any]:
+    delta = _delta_percent(baseline, current)
+    regression = delta > threshold
+    return {
+        "case": case,
+        "corpus": {
+            key: corpus[key]
+            for key in (
+                "name",
+                "generator",
+                "shape",
+                "payload_kind",
+                "archive_sha256",
+                "target_entry",
+            )
+            if key in corpus
+        },
+        "metric": metric,
+        "metric_class": metric_class,
+        "baseline": baseline,
+        "current": current,
+        "delta_percent": delta if math.isfinite(delta) else None,
+        "delta_is_infinite": math.isinf(delta),
+        "max_regression_percent": threshold,
+        "regression": regression,
+    }
+
+
+def compare_reports(
+    baseline_raw: Any, current_raw: Any, policy_raw: Any
+) -> dict[str, Any]:
+    policy = validate_policy(policy_raw)
+    baseline = _require_object(baseline_raw, "baseline")
+    current = _require_object(current_raw, "current")
+    _validate_report_identity(baseline, current, policy)
+    expected_count = policy["expected_result_count"]
+    baseline_results = _index_results(baseline, "baseline", expected_count)
+    current_results = _index_results(current, "current", expected_count)
+    baseline_keys = set(baseline_results)
+    current_keys = set(current_results)
+    if baseline_keys != current_keys:
+        missing = sorted(key[0] for key in baseline_keys - current_keys)
+        extra = sorted(key[0] for key in current_keys - baseline_keys)
+        raise ComparisonInputError(
+            f"case/corpus key mismatch: missing_current={missing}, extra_current={extra}"
+        )
+    observed_cases = {key[0] for key in baseline_keys}
+    expected_cases = set(policy["required_cases"])
+    if observed_cases != expected_cases:
+        missing = sorted(expected_cases - observed_cases)
+        extra = sorted(observed_cases - expected_cases)
+        raise ComparisonInputError(
+            f"case set does not match policy: missing={missing}, extra={extra}"
+        )
+    expected_keys_sha256 = policy["expected_result_keys_sha256"]
+    if expected_keys_sha256 is None:
+        raise ComparisonInputError(
+            "policy has no approved case/corpus manifest digest"
+        )
+    actual_keys_sha256 = result_key_manifest_sha256(baseline_keys)
+    if actual_keys_sha256 != expected_keys_sha256:
+        raise ComparisonInputError(
+            "case/corpus manifest digest does not match policy: "
+            f"{actual_keys_sha256} != {expected_keys_sha256}"
+        )
+
+    comparisons: list[dict[str, Any]] = []
+    minimum_samples = policy["minimum_samples"]
+    latency_thresholds = policy["latency_thresholds_percent"]
+    for key in sorted(baseline_keys):
+        case = key[0]
+        before_result = baseline_results[key]
+        after_result = current_results[key]
+        before_latency = _latencies(before_result, f"baseline.{case}", minimum_samples)
+        after_latency = _latencies(after_result, f"current.{case}", minimum_samples)
+        corpus = before_result["corpus"]
+        for percentile in ("p50", "p95"):
+            comparisons.append(
+                _comparison_record(
+                    case=case,
+                    corpus=corpus,
+                    metric=f"elapsed_ns.{percentile}",
+                    metric_class="latency",
+                    baseline=before_latency[percentile],
+                    current=after_latency[percentile],
+                    threshold=float(latency_thresholds[percentile]),
+                )
+            )
+        before_optional = _optional_metrics(before_result, policy)
+        after_optional = _optional_metrics(after_result, policy)
+        if set(before_optional) != set(after_optional):
+            missing = sorted(set(before_optional) - set(after_optional))
+            extra = sorted(set(after_optional) - set(before_optional))
+            raise ComparisonInputError(
+                f"optional metric mismatch for {case!r}: "
+                f"missing_current={missing}, extra_current={extra}"
+            )
+        for path in sorted(before_optional):
+            before_class, before_value, before_threshold = before_optional[path]
+            after_class, after_value, after_threshold = after_optional[path]
+            if (before_class, before_threshold) != (after_class, after_threshold):
+                raise ComparisonInputError(f"metric policy mismatch for {case}.{path}")
+            comparisons.append(
+                _comparison_record(
+                    case=case,
+                    corpus=corpus,
+                    metric=path,
+                    metric_class=before_class,
+                    baseline=before_value,
+                    current=after_value,
+                    threshold=before_threshold,
+                )
+            )
+
+    regressions = [item for item in comparisons if item["regression"]]
+    return {
+        "schema_version": 1,
+        "tool": {"name": COMPARATOR_NAME, "version": COMPARATOR_VERSION},
+        "policy": {
+            "schema_version": policy["schema_version"],
+            "policy_id": policy["policy_id"],
+            "minimum_samples": minimum_samples,
+        },
+        "status": "regression" if regressions else "pass",
+        "summary": {
+            "matched_results": len(baseline_keys),
+            "compared_metrics": len(comparisons),
+            "regressions": len(regressions),
+        },
+        "baseline_revision": baseline["environment"].get("git_revision"),
+        "current_revision": current["environment"].get("git_revision"),
+        "comparisons": comparisons,
+        "regressions": regressions,
+        "errors": [],
+    }
+
+
+def invalid_report(error: Exception) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "tool": {"name": COMPARATOR_NAME, "version": COMPARATOR_VERSION},
+        "status": "invalid",
+        "summary": {"matched_results": 0, "compared_metrics": 0, "regressions": 0},
+        "comparisons": [],
+        "regressions": [],
+        "errors": [str(error)],
+    }
+
+
+def human_summary(report: dict[str, Any]) -> str:
+    status = report["status"].upper()
+    summary = report["summary"]
+    lines = [
+        f"{status}: {summary['matched_results']} matched results, "
+        f"{summary['compared_metrics']} metrics, {summary['regressions']} regressions"
+    ]
+    if report["status"] == "invalid":
+        lines.extend(f"ERROR: {error}" for error in report["errors"])
+        return "\n".join(lines) + "\n"
+    if report["status"] == "regression":
+        for item in report["regressions"]:
+            delta = "infinite" if item["delta_is_infinite"] else f"{item['delta_percent']:+.2f}%"
+            shape = item["corpus"].get("shape", item["corpus"].get("name", "unknown"))
+            lines.append(
+                f"REGRESSION {item['case']}[{shape}] {item['metric']}: "
+                f"{item['baseline']:.6g} -> {item['current']:.6g} ({delta}; "
+                f"limit +{item['max_regression_percent']:.2f}%)"
+            )
+    else:
+        latency = [
+            item
+            for item in report["comparisons"]
+            if item["metric_class"] == "latency"
+        ]
+        if latency:
+            worst = max(
+                latency,
+                key=lambda item: math.inf
+                if item["delta_is_infinite"]
+                else item["delta_percent"],
+            )
+            delta = "infinite" if worst["delta_is_infinite"] else f"{worst['delta_percent']:+.2f}%"
+            lines.append(
+                f"Worst latency movement: {worst['case']} {worst['metric']} {delta} "
+                f"(limit +{worst['max_regression_percent']:.2f}%)"
+            )
+    return "\n".join(lines) + "\n"
+
+
+def _write_text(path: Path, contents: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(contents, encoding="utf-8")
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--policy", type=Path, required=True)
+    parser.add_argument("--baseline", type=Path, required=True)
+    parser.add_argument("--current", type=Path, required=True)
+    parser.add_argument("--json-out", type=Path, required=True)
+    parser.add_argument("--summary-out", type=Path)
+    return parser
+
+
+def main(argv: Iterable[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    try:
+        policy = load_json(args.policy)
+        baseline = load_json(args.baseline)
+        current = load_json(args.current)
+        report = compare_reports(baseline, current, policy)
+    except (ComparisonInputError, OverflowError, TypeError, ValueError) as error:
+        report = invalid_report(error)
+    machine = json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    human = human_summary(report)
+    try:
+        _write_text(args.json_out, machine)
+        if args.summary_out is not None:
+            _write_text(args.summary_out, human)
+    except OSError as error:
+        print(f"INVALID: cannot write comparator output: {error}", file=sys.stderr)
+        return 2
+    print(human, end="")
+    if report["status"] == "pass":
+        return 0
+    if report["status"] == "regression":
+        return 1
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
