@@ -42,10 +42,11 @@ two matched XLSX conditional-formatting publication cases,
 two XLSX merge/unmerge commit-plus-save cases,
 two bounded XLSX/RTF streaming-creation cases,
 four matched native XLS existing-comment publication cases,
+four matched native XLS worksheet-visibility publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, 15 RTF semantic cases (13 transport/read/edit
 cases plus two logical-tail publication cases), and 36 ODF semantic cases are
-opt-in. The current `Case` matrix exposes 180 selectable case names in total:
+opt-in. The current `Case` matrix exposes 184 selectable case names in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -457,6 +458,34 @@ outside timing. Output hashes are deterministic per case, but eager rendering
 and source-backed overlay are not required to have identical physical CFB
 bytes. These cases add selectable evidence only and make no performance claim
 without a frozen release-build, CPU-pinned ABBA run.
+
+Measure the matched native XLS worksheet-visibility publication controls:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 \
+  --case xls_visibility_eager_edit_save,xls_visibility_source_backed_edit_save,\
+xls_visibility_eager_batch_edit_save,xls_visibility_source_backed_batch_edit_save \
+  --json target/perf/xls-visibility-edit.json
+```
+
+All four cases use one deterministic BIFF8 workbook with 66 worksheet owners,
+eight exact 256 KiB incompressible opaque streams, and opaque metadata. The
+one-edit cases change worksheet position 1's `BoundSheet8.hsState` byte; the
+batch cases change exactly the supported 64-owner limit by hiding positions
+1 through 64, leaving positions 0 and 65 visible. Each sample separately
+records semantic staging/commit and sequential publication time through a
+bounded 64 KiB sink; total `elapsed_ns`
+is their sum. Source-backed reports additionally retain changed-owner/stream,
+physical-span, equal Workbook-length, and exact source/target CFB fingerprint
+evidence. Generic source counters cover only explicit owned-source ingress;
+sink counters cover complete bounded publication. Complete worksheet/catalog
+reopen, opaque-stream preservation, exact offset checks, eager patch
+replay/inverse, no-op identity, cap-plus-one refusal, and protected-source
+refusal stay outside timing. The source-backed API retains its complete
+candidate snapshot, so these cases make no allocation, peak-memory, I/O,
+materialization, or speedup claim without a frozen release-build, CPU-pinned
+ABBA run.
 
 For just the end-to-end legacy writer packaging runs:
 
@@ -1387,6 +1416,14 @@ sink window, and boolean exact-no-op, in-memory patch, durable patch, reopen,
 and source-conflict gates. `retained_output_bytes: 0` describes only the timed
 sink; the append API intentionally retains its validated candidate snapshot,
 so the window is not a process-RSS or transaction-memory claim.
+
+Native XLS worksheet-visibility cases emit `output_sha256` and a
+`source.xls_visibility` object with the explicit owned-source counter scope,
+source-backed flag, update count, separate semantic/publication distributions,
+changed worksheet/stream counts, source and Workbook lengths, and (for
+source-backed cases) changed physical spans and exact source/target
+fingerprints. These diagnostics are content-free and do not imply a bounded
+candidate allocation or a performance advantage.
 
 `docx_source_backed_one_edit_save` also emits `output_sha256`, source/sink
 distributions, and `ordinary_payload_materializations`. Its value is exactly

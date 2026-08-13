@@ -114,6 +114,11 @@ const XLS_COMMENTS_SOURCE_COUNT: usize = 256;
 const XLS_COMMENTS_BATCH_COUNT: usize = 256;
 const XLS_COMMENTS_OPAQUE_STREAM_COUNT: usize = 8;
 const XLS_COMMENTS_OPAQUE_STREAM_BYTES: usize = 2 * 1024 * 1024;
+const XLS_VISIBILITY_CORPUS_GENERATOR: &str = "litchi-xls-visibility-opaque-v1";
+const XLS_VISIBILITY_SHEET_COUNT: usize = litchi_xls::sheet_visibility::MAX_VISIBILITY_CHANGES + 2;
+const XLS_VISIBILITY_BATCH_COUNT: usize = litchi_xls::sheet_visibility::MAX_VISIBILITY_CHANGES;
+const XLS_VISIBILITY_OPAQUE_STREAM_COUNT: usize = 8;
+const XLS_VISIBILITY_OPAQUE_STREAM_BYTES: usize = 256 * 1024;
 const ODS_MEDIA_ENTRY_COUNT: usize = 8;
 const ODS_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const DOCX_SOURCE_MEDIA_ENTRY_COUNT: usize = 8;
@@ -484,6 +489,10 @@ enum Case {
     XlsCommentsSourceBackedEditSave,
     XlsCommentsEagerBatchEditSave,
     XlsCommentsSourceBackedBatchEditSave,
+    XlsVisibilityEagerEditSave,
+    XlsVisibilitySourceBackedEditSave,
+    XlsVisibilityEagerBatchEditSave,
+    XlsVisibilitySourceBackedBatchEditSave,
     PptSemanticOpen,
     PptSemanticListSlides,
     PptSemanticOneShapeText,
@@ -728,6 +737,12 @@ impl Case {
             Self::XlsCommentsSourceBackedBatchEditSave => {
                 "xls_comments_source_backed_batch_edit_save"
             },
+            Self::XlsVisibilityEagerEditSave => "xls_visibility_eager_edit_save",
+            Self::XlsVisibilitySourceBackedEditSave => "xls_visibility_source_backed_edit_save",
+            Self::XlsVisibilityEagerBatchEditSave => "xls_visibility_eager_batch_edit_save",
+            Self::XlsVisibilitySourceBackedBatchEditSave => {
+                "xls_visibility_source_backed_batch_edit_save"
+            },
             Self::PptSemanticOpen => "ppt_semantic_open",
             Self::PptSemanticListSlides => "ppt_semantic_list_slides",
             Self::PptSemanticOneShapeText => "ppt_semantic_one_shape_text",
@@ -913,6 +928,16 @@ impl Case {
                 | Self::XlsCommentsSourceBackedEditSave
                 | Self::XlsCommentsEagerBatchEditSave
                 | Self::XlsCommentsSourceBackedBatchEditSave
+        )
+    }
+
+    const fn is_xls_visibility_edit_save(self) -> bool {
+        matches!(
+            self,
+            Self::XlsVisibilityEagerEditSave
+                | Self::XlsVisibilitySourceBackedEditSave
+                | Self::XlsVisibilityEagerBatchEditSave
+                | Self::XlsVisibilitySourceBackedBatchEditSave
         )
     }
 
@@ -1448,6 +1473,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     xls_comments: Option<XlsCommentsSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    xls_visibility: Option<XlsVisibilitySourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     simulation: Option<RangeSimulationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     opc_cache: Option<OpcCacheEvidenceSummary>,
@@ -1545,6 +1572,42 @@ struct XlsCommentsIterationEvidence {
     semantic_staging_plan_ns: u64,
     publication_ns: u64,
     changed_comments: usize,
+    touched_streams: usize,
+    source_bytes: u64,
+    source_workbook_bytes: u64,
+    target_workbook_bytes: u64,
+    changed_spans: Option<usize>,
+    source_fingerprint: Option<String>,
+    target_fingerprint: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+struct XlsVisibilitySourceSummary {
+    source_counter_scope: &'static str,
+    source_backed: bool,
+    update_count: usize,
+    semantic_staging_plan_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    changed_worksheets: Vec<usize>,
+    touched_streams: Vec<usize>,
+    source_bytes: Vec<u64>,
+    source_workbook_bytes: Vec<u64>,
+    target_workbook_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    changed_spans: Option<Vec<usize>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_fingerprints: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target_fingerprints: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug)]
+struct XlsVisibilityIterationEvidence {
+    source_backed: bool,
+    update_count: usize,
+    semantic_staging_plan_ns: u64,
+    publication_ns: u64,
+    changed_worksheets: usize,
     touched_streams: usize,
     source_bytes: u64,
     source_workbook_bytes: u64,
@@ -2390,6 +2453,59 @@ impl SourceSummary {
         Ok(())
     }
 
+    fn record_xls_visibility(
+        &mut self,
+        snapshot: SourceSnapshot,
+        evidence: XlsVisibilityIterationEvidence,
+    ) -> Result<(), Box<dyn Error>> {
+        self.record(snapshot);
+        let summary = self
+            .xls_visibility
+            .get_or_insert_with(|| XlsVisibilitySourceSummary {
+                source_counter_scope: "owned-source-ingress-only",
+                source_backed: evidence.source_backed,
+                update_count: evidence.update_count,
+                ..XlsVisibilitySourceSummary::default()
+            });
+        if summary.source_backed != evidence.source_backed
+            || summary.update_count != evidence.update_count
+        {
+            return Err("XLS visibility source evidence mixed incompatible cases".into());
+        }
+        summary
+            .semantic_staging_plan_ns
+            .push(evidence.semantic_staging_plan_ns);
+        summary.publication_ns.push(evidence.publication_ns);
+        summary.changed_worksheets.push(evidence.changed_worksheets);
+        summary.touched_streams.push(evidence.touched_streams);
+        summary.source_bytes.push(evidence.source_bytes);
+        summary
+            .source_workbook_bytes
+            .push(evidence.source_workbook_bytes);
+        summary
+            .target_workbook_bytes
+            .push(evidence.target_workbook_bytes);
+        if let Some(changed_spans) = evidence.changed_spans {
+            summary
+                .changed_spans
+                .get_or_insert_with(Vec::new)
+                .push(changed_spans);
+        }
+        if let Some(fingerprint) = evidence.source_fingerprint {
+            summary
+                .source_fingerprints
+                .get_or_insert_with(Vec::new)
+                .push(fingerprint);
+        }
+        if let Some(fingerprint) = evidence.target_fingerprint {
+            summary
+                .target_fingerprints
+                .get_or_insert_with(Vec::new)
+                .push(fingerprint);
+        }
+        Ok(())
+    }
+
     fn record_simulation(&mut self, snapshot: RangeSimulationSnapshot) {
         let summary = self
             .simulation
@@ -2528,6 +2644,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_conditional_formatting_edit_save()
                     && !case.is_xlsx_merge_edit_save()
                     && !case.is_xls_comments_edit_save()
+                    && !case.is_xls_visibility_edit_save()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
                     cfb_corpus
@@ -2586,6 +2703,26 @@ fn main() -> Result<(), Box<dyn Error>> {
             .filter(|case| case.is_xls_comments_edit_save())
         {
             results.push(run_xls_comments_edit_save(
+                *case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_xls_visibility_edit_save())
+    {
+        let corpus = build_xls_visibility_edit_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .filter(|case| case.is_xls_visibility_edit_save())
+        {
+            results.push(run_xls_visibility_edit_save(
                 *case,
                 &corpus,
                 options.warmup_iterations,
@@ -3523,6 +3660,12 @@ fn parse_case(value: &str) -> Option<Case> {
         "xls_comments_source_backed_batch_edit_save" => {
             Some(Case::XlsCommentsSourceBackedBatchEditSave)
         },
+        "xls_visibility_eager_edit_save" => Some(Case::XlsVisibilityEagerEditSave),
+        "xls_visibility_source_backed_edit_save" => Some(Case::XlsVisibilitySourceBackedEditSave),
+        "xls_visibility_eager_batch_edit_save" => Some(Case::XlsVisibilityEagerBatchEditSave),
+        "xls_visibility_source_backed_batch_edit_save" => {
+            Some(Case::XlsVisibilitySourceBackedBatchEditSave)
+        },
         "ppt_semantic_open" => Some(Case::PptSemanticOpen),
         "ppt_semantic_list_slides" => Some(Case::PptSemanticListSlides),
         "ppt_semantic_one_shape_text" => Some(Case::PptSemanticOneShapeText),
@@ -3756,6 +3899,10 @@ fn print_usage() {
                                        xls_comments_source_backed_edit_save,\n\
                                        xls_comments_eager_batch_edit_save,\n\
                                        xls_comments_source_backed_batch_edit_save,\n\
+                                       xls_visibility_eager_edit_save,\n\
+                                       xls_visibility_source_backed_edit_save,\n\
+                                       xls_visibility_eager_batch_edit_save,\n\
+                                       xls_visibility_source_backed_batch_edit_save,\n\
                                        ppt_semantic_open,ppt_semantic_list_slides,\n\
                                        ppt_semantic_one_shape_text,ppt_semantic_full_text,\n\
                                        ppt_slide_order_snapshot_open,\n\
@@ -6402,6 +6549,12 @@ fn run_case_with_config(
         | Case::XlsCommentsSourceBackedBatchEditSave => {
             run_xls_comments_edit_save(case, corpus, warmup_iterations, samples)
         },
+        Case::XlsVisibilityEagerEditSave
+        | Case::XlsVisibilitySourceBackedEditSave
+        | Case::XlsVisibilityEagerBatchEditSave
+        | Case::XlsVisibilitySourceBackedBatchEditSave => {
+            run_xls_visibility_edit_save(case, corpus, warmup_iterations, samples)
+        },
         Case::PptSemanticOpen
         | Case::PptSemanticListSlides
         | Case::PptSemanticOneShapeText
@@ -8083,6 +8236,575 @@ fn build_xls_comments_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
         target_name: "Workbook".to_string(),
         target_payload,
         xlsx: None,
+    })
+}
+
+fn xls_visibility_opaque_stream_name(index: usize) -> String {
+    format!("Payload{index:03}")
+}
+
+fn build_xls_visibility_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let mut workbook_writer = litchi_xls::writer::Writer::new();
+    for index in 0..XLS_VISIBILITY_SHEET_COUNT {
+        let worksheet = workbook_writer.add_worksheet(&format!("Visibility{index:02}"))?;
+        workbook_writer.write_number(worksheet, 0, 0, index as f64)?;
+    }
+    let mut workbook_package = Cursor::new(Vec::new());
+    workbook_writer.write_to(&mut workbook_package)?;
+    let mut parsed = OleFile::open(Cursor::new(workbook_package.into_inner()))?;
+    let workbook_stream = parsed.open_stream(&["Workbook"])?;
+
+    let mut writer = OleWriter::new();
+    writer.create_stream_owned(&["Workbook"], workbook_stream)?;
+    writer.create_storage(&["OpaquePayloads"])?;
+    for index in 0..XLS_VISIBILITY_OPAQUE_STREAM_COUNT {
+        let name = xls_visibility_opaque_stream_name(index);
+        writer.create_stream_owned(
+            &["OpaquePayloads", name.as_str()],
+            payload_bytes(
+                PayloadKind::Incompressible,
+                20_000 + index,
+                XLS_VISIBILITY_OPAQUE_STREAM_BYTES,
+            ),
+        )?;
+    }
+    writer.create_stream(
+        &["OpaqueMetadata"],
+        b"litchi-xls-visibility-opaque-metadata-v1",
+    )?;
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output)?;
+    let archive = output.into_inner();
+
+    verify_xls_visibility_static_guards(&archive)?;
+    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let archive_member_count = parsed.list_streams().len();
+    let target_payload = parsed.open_stream(&["Workbook"])?;
+    let opaque_bytes = XLS_VISIBILITY_OPAQUE_STREAM_COUNT
+        .checked_mul(XLS_VISIBILITY_OPAQUE_STREAM_BYTES)
+        .and_then(|bytes| bytes.checked_add(b"litchi-xls-visibility-opaque-metadata-v1".len()))
+        .ok_or("XLS visibility opaque payload size overflow")?;
+    let uncompressed_payload_bytes = target_payload
+        .len()
+        .checked_add(opaque_bytes)
+        .ok_or("XLS visibility corpus payload size overflow")?;
+    if archive_member_count != XLS_VISIBILITY_OPAQUE_STREAM_COUNT + 2 {
+        return Err("XLS visibility corpus stream inventory differs from specification".into());
+    }
+
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: "xls-visibility-opaque".to_owned(),
+            generator: XLS_VISIBILITY_CORPUS_GENERATOR,
+            package_format: "XLS/CFB",
+            shape: "66-worksheets-opaque-heavy",
+            payload_kind: PayloadKind::Incompressible.name(),
+            compression: "none",
+            entry_count: XLS_VISIBILITY_SHEET_COUNT,
+            archive_member_count,
+            entry_bytes: XLS_VISIBILITY_OPAQUE_STREAM_BYTES,
+            uncompressed_payload_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "Workbook".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "Workbook".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn xls_visibility_case_parameters(case: Case) -> Result<(bool, usize), Box<dyn Error>> {
+    match case {
+        Case::XlsVisibilityEagerEditSave => Ok((false, 1)),
+        Case::XlsVisibilitySourceBackedEditSave => Ok((true, 1)),
+        Case::XlsVisibilityEagerBatchEditSave => Ok((false, XLS_VISIBILITY_BATCH_COUNT)),
+        Case::XlsVisibilitySourceBackedBatchEditSave => Ok((true, XLS_VISIBILITY_BATCH_COUNT)),
+        _ => Err("non-XLS-visibility case passed to XLS visibility runner".into()),
+    }
+}
+
+fn stage_xls_visibility_updates(
+    transaction: &mut litchi_xls::sheet_visibility::Transaction,
+    update_count: usize,
+) -> Result<(), Box<dyn Error>> {
+    if update_count == 1 {
+        transaction.hide(1usize.into())?;
+        return Ok(());
+    }
+    if update_count != XLS_VISIBILITY_BATCH_COUNT {
+        return Err("XLS visibility benchmark update count is outside its fixed closure".into());
+    }
+    for position in 1..=XLS_VISIBILITY_BATCH_COUNT {
+        transaction.hide(position.into())?;
+    }
+    Ok(())
+}
+
+enum XlsVisibilityPublication {
+    Eager {
+        commit: litchi_xls::sheet_visibility::Commit,
+        source_bytes: u64,
+        source_workbook_bytes: u64,
+    },
+    SourceBacked(litchi_xls::sheet_visibility::SourceBackedCommit),
+}
+
+impl XlsVisibilityPublication {
+    fn write_to<W: Write>(
+        &self,
+        writer: &mut W,
+    ) -> Result<Option<litchi_cfb::PublishReport>, Box<dyn Error>> {
+        match self {
+            Self::Eager { commit, .. } => {
+                for chunk in commit.snapshot().bytes().chunks(64 * 1024) {
+                    writer.write_all(chunk)?;
+                }
+                writer.flush()?;
+                Ok(None)
+            },
+            Self::SourceBacked(commit) => Ok(Some(commit.write_to(writer)?)),
+        }
+    }
+
+    fn evidence(
+        &self,
+        source_backed: bool,
+        update_count: usize,
+        semantic_staging_plan: Duration,
+        publication: Duration,
+    ) -> Result<XlsVisibilityIterationEvidence, Box<dyn Error>> {
+        match self {
+            Self::Eager {
+                commit,
+                source_bytes,
+                source_workbook_bytes,
+            } => {
+                let diagnostics = commit.diagnostics();
+                Ok(XlsVisibilityIterationEvidence {
+                    source_backed,
+                    update_count,
+                    semantic_staging_plan_ns: elapsed_ns(semantic_staging_plan)?,
+                    publication_ns: elapsed_ns(publication)?,
+                    changed_worksheets: diagnostics.changed_worksheets(),
+                    touched_streams: diagnostics.touched_streams(),
+                    source_bytes: *source_bytes,
+                    source_workbook_bytes: *source_workbook_bytes,
+                    target_workbook_bytes: u64::try_from(
+                        commit.snapshot().workbook_stream().len(),
+                    )?,
+                    changed_spans: None,
+                    source_fingerprint: None,
+                    target_fingerprint: None,
+                })
+            },
+            Self::SourceBacked(commit) => {
+                let diagnostics = commit.diagnostics();
+                Ok(XlsVisibilityIterationEvidence {
+                    source_backed,
+                    update_count,
+                    semantic_staging_plan_ns: elapsed_ns(semantic_staging_plan)?,
+                    publication_ns: elapsed_ns(publication)?,
+                    changed_worksheets: diagnostics.changed_worksheets(),
+                    touched_streams: diagnostics.touched_streams(),
+                    source_bytes: diagnostics.source_bytes(),
+                    source_workbook_bytes: diagnostics.source_workbook_bytes(),
+                    target_workbook_bytes: diagnostics.target_workbook_bytes(),
+                    changed_spans: Some(diagnostics.changed_spans()),
+                    source_fingerprint: Some(fingerprint_hex(
+                        diagnostics.source_fingerprint().as_bytes(),
+                    )),
+                    target_fingerprint: Some(fingerprint_hex(
+                        diagnostics.target_fingerprint().as_bytes(),
+                    )),
+                })
+            },
+        }
+    }
+}
+
+fn prepare_xls_visibility_publication(
+    source: litchi_xls::sheet_visibility::Snapshot,
+    source_backed: bool,
+    update_count: usize,
+) -> Result<XlsVisibilityPublication, Box<dyn Error>> {
+    let source_bytes = u64::try_from(source.bytes().len())?;
+    let source_workbook_bytes = u64::try_from(source.workbook_stream().len())?;
+    let mut transaction = source.transaction();
+    stage_xls_visibility_updates(&mut transaction, update_count)?;
+    if source_backed {
+        Ok(XlsVisibilityPublication::SourceBacked(
+            transaction.commit_source_backed()?,
+        ))
+    } else {
+        Ok(XlsVisibilityPublication::Eager {
+            commit: transaction.commit()?,
+            source_bytes,
+            source_workbook_bytes,
+        })
+    }
+}
+
+fn read_xls_visibility_source(
+    source: &InstrumentedSource,
+    output: &mut [u8],
+) -> Result<(), Box<dyn Error>> {
+    let mut offset = 0_u64;
+    for chunk in output.chunks_mut(64 * 1024) {
+        source.read_exact_at(offset, chunk)?;
+        offset = offset
+            .checked_add(u64::try_from(chunk.len())?)
+            .ok_or("XLS visibility source offset overflow")?;
+    }
+    Ok(())
+}
+
+fn xls_visibility_expected_updates(update_count: usize, position: usize) -> bool {
+    (update_count == XLS_VISIBILITY_BATCH_COUNT
+        && (1..=XLS_VISIBILITY_BATCH_COUNT).contains(&position))
+        || (update_count == 1 && position == 1)
+}
+
+fn xls_visibility_bound_sheet_offsets(workbook: &[u8]) -> Result<Vec<usize>, Box<dyn Error>> {
+    let mut offsets = Vec::new();
+    let mut offset = 0_usize;
+    while offset < workbook.len() {
+        let header_end = offset
+            .checked_add(4)
+            .ok_or("XLS visibility BIFF header offset overflow")?;
+        let header = workbook
+            .get(offset..header_end)
+            .ok_or("XLS visibility BIFF record has a truncated header")?;
+        let kind = u16::from_le_bytes([header[0], header[1]]);
+        let payload_len = usize::from(u16::from_le_bytes([header[2], header[3]]));
+        let end = header_end
+            .checked_add(payload_len)
+            .ok_or("XLS visibility BIFF record length overflow")?;
+        if workbook.get(header_end..end).is_none() {
+            return Err("XLS visibility BIFF record has a truncated payload".into());
+        }
+        if kind == 0x0085 {
+            let state_offset = offset
+                .checked_add(8)
+                .ok_or("XLS visibility hsState offset overflow")?;
+            if state_offset >= end {
+                return Err("XLS visibility BoundSheet8 has no hsState field".into());
+            }
+            offsets.push(state_offset);
+        }
+        offset = end;
+    }
+    Ok(offsets)
+}
+
+fn verify_xls_visibility_output(
+    corpus: &Corpus,
+    output: &[u8],
+    update_count: usize,
+) -> Result<(), Box<dyn Error>> {
+    use litchi_xls::SheetVisibility;
+
+    if sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256 {
+        return Err("XLS visibility source digest differs from its manifest".into());
+    }
+    verify_xls_untouched_streams(&corpus.archive, output, true)?;
+    let snapshot = litchi_xls::sheet_visibility::Snapshot::from_bytes(output.to_vec())?;
+    if snapshot.worksheet_count() != XLS_VISIBILITY_SHEET_COUNT {
+        return Err("XLS visibility worksheet inventory differs from source".into());
+    }
+    for position in 0..XLS_VISIBILITY_SHEET_COUNT {
+        let worksheet = snapshot
+            .worksheet(position.into())?
+            .ok_or("XLS visibility worksheet owner disappeared")?;
+        let expected = if xls_visibility_expected_updates(update_count, position) {
+            SheetVisibility::Hidden
+        } else {
+            SheetVisibility::Visible
+        };
+        if worksheet.visibility() != expected {
+            return Err(format!(
+                "XLS visibility semantic readback differs at position {position}: observed {:?}, expected {:?}",
+                worksheet.visibility(),
+                expected,
+            )
+            .into());
+        }
+    }
+    let source_workbook =
+        litchi_xls::sheet_visibility::Snapshot::from_bytes(corpus.archive.clone())?
+            .workbook_stream()
+            .to_vec();
+    let source_offsets = xls_visibility_bound_sheet_offsets(&source_workbook)?;
+    let target_offsets = xls_visibility_bound_sheet_offsets(snapshot.workbook_stream())?;
+    if source_offsets != target_offsets || source_offsets.len() != XLS_VISIBILITY_SHEET_COUNT {
+        return Err("XLS visibility BoundSheet8 offset inventory differs from source".into());
+    }
+    let changed_offsets = source_workbook
+        .iter()
+        .zip(snapshot.workbook_stream())
+        .enumerate()
+        .filter_map(|(offset, (before, after))| (before != after).then_some(offset))
+        .collect::<Vec<_>>();
+    let expected_offsets = source_offsets
+        .iter()
+        .enumerate()
+        .filter_map(|(position, offset)| {
+            xls_visibility_expected_updates(update_count, position).then_some(*offset)
+        })
+        .collect::<Vec<_>>();
+    if changed_offsets != expected_offsets {
+        return Err(format!(
+            "XLS visibility changed offsets differ: observed {changed_offsets:?}, expected {expected_offsets:?}"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>> {
+    use litchi_xls::SheetVisibility;
+
+    let snapshot = litchi_xls::sheet_visibility::Snapshot::from_bytes(source.to_vec())?;
+    if snapshot.worksheet_count() != XLS_VISIBILITY_SHEET_COUNT {
+        return Err("XLS visibility source worksheet count differs from specification".into());
+    }
+    let noop = snapshot.transaction().commit_source_backed()?;
+    if !noop.is_noop() || noop.diagnostics().changed_worksheets() != 0 {
+        return Err("XLS visibility source-backed no-op was not exact".into());
+    }
+    let mut noop_bytes = Vec::new();
+    noop.write_to(&mut noop_bytes)?;
+    if noop_bytes != source {
+        return Err("XLS visibility source-backed no-op changed source bytes".into());
+    }
+
+    let mut capped = snapshot.transaction();
+    stage_xls_visibility_updates(&mut capped, XLS_VISIBILITY_BATCH_COUNT)?;
+    let capped = capped.commit_source_backed()?;
+    if capped.diagnostics().changed_worksheets() != XLS_VISIBILITY_BATCH_COUNT
+        || capped.diagnostics().touched_streams() != 1
+    {
+        return Err("XLS visibility exact-cap plan has unexpected diagnostics".into());
+    }
+    let mut capped_bytes = Vec::new();
+    capped.write_to(&mut capped_bytes)?;
+    verify_xls_visibility_output(
+        &Corpus {
+            manifest: CorpusManifest {
+                name: "guard".to_owned(),
+                generator: XLS_VISIBILITY_CORPUS_GENERATOR,
+                package_format: "XLS/CFB",
+                shape: "guard",
+                payload_kind: "guard",
+                compression: "none",
+                entry_count: XLS_VISIBILITY_SHEET_COUNT,
+                archive_member_count: 0,
+                entry_bytes: 0,
+                uncompressed_payload_bytes: 0,
+                archive_bytes: source.len(),
+                archive_sha256: sha256_hex(source),
+                target_entry: "Workbook".to_owned(),
+                target_payload_bytes: 0,
+                target_payload_sha256: String::new(),
+                rtf_variant: None,
+                xlsx: None,
+            },
+            archive: source.to_vec(),
+            target_name: "Workbook".to_owned(),
+            target_payload: Vec::new(),
+            xlsx: None,
+        },
+        &capped_bytes,
+        XLS_VISIBILITY_BATCH_COUNT,
+    )?;
+
+    let mut over_cap = snapshot.transaction();
+    if over_cap
+        .set_visibility_batch(
+            (1..=XLS_VISIBILITY_BATCH_COUNT + 1)
+                .map(|position| (position.into(), SheetVisibility::Hidden)),
+        )
+        .is_ok()
+    {
+        return Err("XLS visibility cap-plus-one staging unexpectedly succeeded".into());
+    }
+    if !over_cap.commit_source_backed()?.is_noop() {
+        return Err("XLS visibility cap-plus-one refusal mutated its source".into());
+    }
+
+    let mut protected_writer = litchi_xls::writer::Writer::new();
+    let sheet = protected_writer.add_worksheet("Protected")?;
+    protected_writer.write_number(sheet, 0, 0, 1.0)?;
+    protected_writer.protect_sheet(sheet, Some("password"), true, false)?;
+    let mut protected_bytes = Cursor::new(Vec::new());
+    protected_writer.write_to(&mut protected_bytes)?;
+    if litchi_xls::sheet_visibility::Snapshot::from_bytes(protected_bytes.into_inner()).is_ok() {
+        return Err("XLS visibility protected source was accepted".into());
+    }
+    Ok(())
+}
+
+fn verify_xls_visibility_prepared(
+    source: &litchi_xls::sheet_visibility::Snapshot,
+    prepared: &XlsVisibilityPublication,
+    output: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    match prepared {
+        XlsVisibilityPublication::Eager { commit, .. } => {
+            let applied = commit.patch().apply(source)?;
+            if applied.bytes() != commit.snapshot().bytes()
+                || commit.patch().apply(commit.snapshot()).is_ok()
+            {
+                return Err("XLS visibility eager patch did not enforce exact source".into());
+            }
+            let restored = commit.patch().inverse().apply(&applied)?;
+            if restored.bytes() != source.bytes() {
+                return Err("XLS visibility eager inverse did not restore exact source".into());
+            }
+        },
+        XlsVisibilityPublication::SourceBacked(commit) => {
+            let diagnostics = commit.diagnostics();
+            let source_digest: [u8; 32] = Sha256::digest(source.bytes()).into();
+            let target_digest: [u8; 32] = Sha256::digest(output).into();
+            if diagnostics.source_fingerprint().as_bytes() != &source_digest
+                || diagnostics.target_fingerprint().as_bytes() != &target_digest
+            {
+                return Err(
+                    "XLS visibility overlay fingerprints differ from exact artifacts".into(),
+                );
+            }
+        },
+    }
+    Ok(())
+}
+
+fn run_xls_visibility_edit_save(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let (source_backed, update_count) = xls_visibility_case_parameters(case)?;
+    if corpus.manifest.generator != XLS_VISIBILITY_CORPUS_GENERATOR {
+        return Err("XLS visibility edit case requires its fixed opaque corpus".into());
+    }
+
+    let expected_source =
+        litchi_xls::sheet_visibility::Snapshot::from_bytes(corpus.archive.clone())?;
+    let expected_prepared =
+        prepare_xls_visibility_publication(expected_source.clone(), source_backed, update_count)?;
+    let mut expected = Vec::new();
+    let expected_report = expected_prepared.write_to(&mut expected)?;
+    if expected == corpus.archive {
+        return Err("XLS visibility expected publication did not change source bytes".into());
+    }
+    verify_xls_visibility_output(corpus, &expected, update_count)?;
+    verify_xls_visibility_prepared(&expected_source, &expected_prepared, &expected)?;
+    if let Some(report) = expected_report
+        && (report.bytes() != u64::try_from(expected.len())? || report.changed_spans() == 0)
+    {
+        return Err("XLS visibility expected overlay report is incomplete".into());
+    }
+    let expected_digest = sha256_hex(&expected);
+    let maximum = u64::try_from(expected.len())?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut measured_digests = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = InstrumentedSource::new(corpus.archive.clone(), Vec::new());
+        let mut source_bytes = vec![0_u8; corpus.archive.len()];
+        let mut sink = CountingSink::bounded(maximum, 64 * 1024);
+        sink.reserve_budget()?;
+
+        read_xls_visibility_source(&source, &mut source_bytes)?;
+        let snapshot = litchi_xls::sheet_visibility::Snapshot::from_bytes(source_bytes)?;
+        let plan_started = Instant::now();
+        let prepared = prepare_xls_visibility_publication(snapshot, source_backed, update_count)?;
+        let semantic_staging_plan = plan_started.elapsed();
+
+        let publication_started = Instant::now();
+        let report = prepared.write_to(&mut sink)?;
+        let publication = publication_started.elapsed();
+        let duration = semantic_staging_plan
+            .checked_add(publication)
+            .ok_or("XLS visibility total duration overflow")?;
+        let metrics = source.snapshot();
+        let evidence = prepared.evidence(
+            source_backed,
+            update_count,
+            semantic_staging_plan,
+            publication,
+        )?;
+
+        if metrics.read_calls == 0
+            || metrics.read_bytes != u64::try_from(corpus.archive.len())?
+            || evidence.changed_worksheets != update_count
+            || evidence.touched_streams != 1
+            || evidence.source_workbook_bytes != evidence.target_workbook_bytes
+            || sink.bytes != expected
+        {
+            return Err(
+                "XLS visibility iteration has unexpected source/publication evidence".into(),
+            );
+        }
+        if source_backed {
+            let report = report.ok_or("XLS visibility source-backed publication has no report")?;
+            if evidence.changed_spans != Some(report.changed_spans())
+                || report.bytes() != sink.summary().accepted_bytes
+                || evidence.source_fingerprint
+                    != Some(fingerprint_hex(report.source_fingerprint().as_bytes()))
+                || evidence.target_fingerprint
+                    != Some(fingerprint_hex(report.target_fingerprint().as_bytes()))
+            {
+                return Err("XLS visibility overlay diagnostics disagree with publication".into());
+            }
+        } else if report.is_some() || evidence.changed_spans.is_some() {
+            return Err("XLS eager visibility publication reported overlay-only evidence".into());
+        }
+        verify_xls_visibility_output(corpus, &sink.bytes, update_count)?;
+        verify_xls_visibility_prepared(
+            &litchi_xls::sheet_visibility::Snapshot::from_bytes(corpus.archive.clone())?,
+            &prepared,
+            &sink.bytes,
+        )?;
+        let digest = sha256_hex(&sink.bytes);
+        if digest != expected_digest {
+            return Err("XLS visibility output digest differs from expected output".into());
+        }
+        if iteration >= warmup_iterations {
+            source_summary.record_xls_visibility(metrics, evidence)?;
+            sink_summaries.push(sink.summary());
+            measured_digests.push(digest);
+        }
+        std::hint::black_box(&sink.bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("XLS visibility measured output hashes are unstable".into());
+    }
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(deterministic_sink_summary(
+            &sink_summaries,
+            "XLS visibility publication",
+        )?),
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: Some(expected_digest),
     })
 }
 
@@ -18136,20 +18858,20 @@ mod tests {
         build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_semantic_docx_corpus,
         build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
         build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
-        build_writer_corpus, build_xls_comments_edit_corpus, build_xlsx_auto_filter_edit_corpus,
-        build_xlsx_calculation_metadata_edit_corpus, build_xlsx_conditional_formatting_edit_corpus,
-        build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
-        build_xlsx_defined_names_edit_corpus, build_xlsx_merge_edit_corpus,
-        build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
-        build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
-        build_xlsx_sheet_protection_edit_corpus, expected_opc_overlay_output,
-        ole_common_changed_output, opc_overlay_replacement_payload, payload_bytes,
-        resolve_execution_workers, run_case, run_case_with_config,
+        build_writer_corpus, build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
+        build_xlsx_auto_filter_edit_corpus, build_xlsx_calculation_metadata_edit_corpus,
+        build_xlsx_conditional_formatting_edit_corpus, build_xlsx_corpus,
+        build_xlsx_data_validation_edit_corpus, build_xlsx_defined_names_edit_corpus,
+        build_xlsx_merge_edit_corpus, build_xlsx_page_break_edit_corpus,
+        build_xlsx_page_margin_edit_corpus, build_xlsx_page_setup_edit_corpus,
+        build_xlsx_print_options_edit_corpus, build_xlsx_sheet_protection_edit_corpus,
+        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
+        payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
         run_docx_source_backed_one_edit_save, run_opc_source_cache_budget_boundary,
         run_opc_source_cache_contention, run_opc_source_overlay_one_part_save,
         run_pptx_batch_edit_save, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_one_edit_save, run_scaling_case, run_streaming_creation,
-        run_xls_comments_edit_save, run_xlsx_auto_filter_edit_save,
+        run_xls_comments_edit_save, run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
         run_xlsx_data_validation_edit_save, run_xlsx_defined_names_edit_save,
         run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
@@ -18286,6 +19008,65 @@ mod tests {
                 assert!(comments.changed_spans.is_none());
                 assert!(comments.source_fingerprints.is_none());
                 assert!(comments.target_fingerprints.is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn xls_visibility_controls_are_deterministic_bounded_and_source_evidenced() {
+        let corpus = build_xls_visibility_edit_corpus().unwrap();
+        let again = build_xls_visibility_edit_corpus().unwrap();
+        assert_eq!(corpus.archive, again.archive);
+        assert_eq!(corpus.manifest.generator, "litchi-xls-visibility-opaque-v1");
+        assert_eq!(corpus.manifest.entry_count, 66);
+        assert_eq!(corpus.manifest.archive_member_count, 10);
+
+        for (case, updates, source_backed) in [
+            (Case::XlsVisibilityEagerEditSave, 1, false),
+            (Case::XlsVisibilitySourceBackedEditSave, 1, true),
+            (
+                Case::XlsVisibilityEagerBatchEditSave,
+                litchi_xls::sheet_visibility::MAX_VISIBILITY_CHANGES,
+                false,
+            ),
+            (
+                Case::XlsVisibilitySourceBackedBatchEditSave,
+                litchi_xls::sheet_visibility::MAX_VISIBILITY_CHANGES,
+                true,
+            ),
+        ] {
+            let measured = run_xls_visibility_edit_save(case, &corpus, 0, 1).unwrap();
+            assert_eq!(measured.case, case.name());
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            assert!(measured.output_sha256.is_some());
+            let sink = measured.sink.unwrap();
+            assert_eq!(sink.accepted_bytes, corpus.manifest.archive_bytes as u64);
+            assert!(sink.write_calls > 0);
+            assert!(sink.largest_write <= 64 * 1024);
+
+            let source = measured.source.unwrap();
+            assert_eq!(source.read_calls.len(), 1);
+            assert_eq!(source.read_bytes, vec![corpus.archive.len() as u64]);
+            let visibility = source.xls_visibility.unwrap();
+            assert_eq!(visibility.source_counter_scope, "owned-source-ingress-only");
+            assert_eq!(visibility.source_backed, source_backed);
+            assert_eq!(visibility.update_count, updates);
+            assert_eq!(visibility.changed_worksheets, vec![updates]);
+            assert_eq!(visibility.touched_streams, vec![1]);
+            assert_eq!(visibility.semantic_staging_plan_ns.len(), 1);
+            assert_eq!(visibility.publication_ns.len(), 1);
+            assert_eq!(
+                visibility.source_workbook_bytes,
+                visibility.target_workbook_bytes
+            );
+            if source_backed {
+                assert_eq!(visibility.changed_spans.unwrap(), vec![1]);
+                assert_eq!(visibility.source_fingerprints.unwrap().len(), 1);
+                assert_eq!(visibility.target_fingerprints.unwrap().len(), 1);
+            } else {
+                assert!(visibility.changed_spans.is_none());
+                assert!(visibility.source_fingerprints.is_none());
+                assert!(visibility.target_fingerprints.is_none());
             }
         }
     }
