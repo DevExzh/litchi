@@ -29,6 +29,9 @@ use litchi_opc::{
     BlobPart, Part, PartData, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
     SourceCacheDiagnostics, SourceCacheLimits,
 };
+use quick_xml::events::{BytesRef, BytesStart, Event};
+use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
+use quick_xml::reader::NsReader;
 use sha2::{Digest as _, Sha256};
 use smallvec::SmallVec;
 use std::io::Write;
@@ -271,6 +274,7 @@ impl Package {
         validate_document_main_content_type(main.content_type())?;
         let source_version = self.package.source_version()?;
         let raw = main.data()?;
+        ensure_source_section_inventory_xml(raw.as_bytes(), limits)?;
         let snapshot =
             crate::section::Snapshot::from_source_xml(raw.as_bytes(), source_version, limits)?;
         // Detect hostile adapters that mutate immediately after the payload
@@ -942,20 +946,446 @@ fn transaction_error_to_document(error: crate::document::TransactionError) -> Er
 /// Managed source-backed document reads must not run the MCE processor: its
 /// owned `Cow` output would be an unbudgeted duplicate of the retained
 /// `PartData` payload. The existing source-backed edit boundary already
-/// refuses any MCE projection, so conservatively reject every package that
-/// declares the MCE namespace before a materialization can occur.
+/// refuses any MCE projection, so reject actual MCE elements, attributes, or
+/// namespace bindings before a materialization can occur.
+// These ceilings mirror the default OPC per-part/event/depth policy. The
+// payload read has already enforced the caller's selected part-byte limit;
+// the explicit byte ceiling also keeps a caller-selected looser policy from
+// turning this namespace-only pass into an unbounded operation.
+const SOURCE_DOCUMENT_SCAN_MAX_BYTES: usize = 512 * 1024 * 1024;
+const SOURCE_DOCUMENT_SCAN_MAX_EVENTS: usize = 1_000_000;
+const SOURCE_DOCUMENT_SCAN_MAX_DEPTH: usize = 256;
+const SOURCE_DOCUMENT_SCAN_MAX_NAME_BYTES: usize = 64 * 1024;
+
 fn ensure_source_document_xml(xml: &[u8]) -> Result<()> {
-    if xml
-        .windows(litchi_ooxml_common::mce::NAMESPACE.len())
-        .any(|window| window == litchi_ooxml_common::mce::NAMESPACE.as_bytes())
-    {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "source-backed document read",
-            reason: "markup-compatibility preprocessing would require an unbudgeted owned payload",
-        });
+    if xml.len() > SOURCE_DOCUMENT_SCAN_MAX_BYTES {
+        return Err(Error::InvalidFormat(
+            "source-backed document XML exceeds the bounded MCE scan byte limit".into(),
+        ));
+    }
+
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    // Namespace resolution is all this pass needs. Disable quick-xml's own
+    // end-name comparison path; the fixed-capacity name stack below performs
+    // exact topology validation while the scalar depth counter bounds
+    // resolver scope growth.
+    reader.config_mut().check_end_names = false;
+    let mut open_names = Vec::new();
+    open_names
+        .try_reserve_exact(SOURCE_DOCUMENT_SCAN_MAX_DEPTH)
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed document XML topology stack",
+            source,
+        })?;
+    let mut open_name_bytes = 0usize;
+    let mut events = 0usize;
+    let mut depth = 0usize;
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("document XML event counter overflow".into()))?;
+        if events > SOURCE_DOCUMENT_SCAN_MAX_EVENTS {
+            return Err(Error::InvalidFormat(
+                "source-backed document XML exceeds the bounded MCE scan event limit".into(),
+            ));
+        }
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormat("document XML depth overflow".into()))?;
+                if depth > SOURCE_DOCUMENT_SCAN_MAX_DEPTH {
+                    return Err(Error::InvalidFormat(
+                        "source-backed document XML exceeds the bounded MCE scan depth limit"
+                            .into(),
+                    ));
+                }
+                retain_source_document_name(
+                    &mut open_names,
+                    &mut open_name_bytes,
+                    element.name().as_ref(),
+                )?;
+                ensure_source_mce_element(&resolver, decoder, &namespace, &element, "document")?;
+            },
+            Event::Empty(element) => {
+                let element_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormat("document XML depth overflow".into()))?;
+                if element_depth > SOURCE_DOCUMENT_SCAN_MAX_DEPTH {
+                    return Err(Error::InvalidFormat(
+                        "source-backed document XML exceeds the bounded MCE scan depth limit"
+                            .into(),
+                    ));
+                }
+                ensure_source_document_name_length(element.name().as_ref())?;
+                ensure_source_mce_element(&resolver, decoder, &namespace, &element, "document")?;
+            },
+            Event::End(element) => {
+                let expected = open_names
+                    .pop()
+                    .ok_or_else(|| Error::InvalidFormat("document XML depth underflow".into()))?;
+                open_name_bytes = open_name_bytes.checked_sub(expected.len()).ok_or_else(|| {
+                    Error::InvalidFormat("document XML name-byte counter underflow".into())
+                })?;
+                if expected.as_slice() != element.name().as_ref() {
+                    return Err(Error::InvalidFormat(
+                        "mismatched source-backed document XML end tag".into(),
+                    ));
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("document XML depth underflow".into()))?;
+            },
+            Event::Eof => {
+                if !open_names.is_empty() || depth != 0 {
+                    return Err(Error::InvalidFormat(
+                        "unclosed source-backed document XML element".into(),
+                    ));
+                }
+                break;
+            },
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
+        }
     }
     Ok(())
+}
+
+fn retain_source_document_name(
+    open_names: &mut Vec<Vec<u8>>,
+    open_name_bytes: &mut usize,
+    name: &[u8],
+) -> Result<()> {
+    ensure_source_document_name_length(name)?;
+    let next_name_bytes = open_name_bytes
+        .checked_add(name.len())
+        .ok_or_else(|| Error::InvalidFormat("document XML name-byte counter overflow".into()))?;
+    if next_name_bytes > SOURCE_DOCUMENT_SCAN_MAX_NAME_BYTES {
+        return Err(Error::InvalidFormat(
+            "source-backed document XML exceeds the bounded aggregate name-byte limit".into(),
+        ));
+    }
+    let mut owned = Vec::new();
+    owned
+        .try_reserve_exact(name.len())
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed document XML element name",
+            source,
+        })?;
+    owned.extend_from_slice(name);
+    open_names.push(owned);
+    *open_name_bytes = next_name_bytes;
+    Ok(())
+}
+
+fn ensure_source_document_name_length(name: &[u8]) -> Result<()> {
+    if name.len() > SOURCE_DOCUMENT_SCAN_MAX_NAME_BYTES {
+        return Err(Error::InvalidFormat(
+            "source-backed document XML exceeds the bounded name-byte limit".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Keep the source-backed section facade on the exact retained PartData
+/// representation. The general in-memory section parser intentionally
+/// supports MCE branch selection and ignores DTD/entity events because it is
+/// used by compatibility callers. A source-bound inventory cannot publish a
+/// descriptor whose semantics came from an unbudgeted MCE projection or from
+/// entity expansion, so reject those constructs before that parser runs.
+fn ensure_source_section_inventory_xml(xml: &[u8], limits: &crate::section::Limits) -> Result<()> {
+    if xml.len() > limits.max_input_bytes {
+        return Err(Error::SectionInventoryLimit {
+            resource: "input bytes",
+            maximum: limits.max_input_bytes,
+            actual: xml.len(),
+        });
+    }
+
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    let mut events = 0usize;
+    let mut depth = 0usize;
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("section XML event counter overflow".into()))?;
+        if events > limits.max_events {
+            return Err(Error::SectionInventoryLimit {
+                resource: "XML events",
+                maximum: limits.max_events,
+                actual: events,
+            });
+        }
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormat("section XML depth overflow".into()))?;
+                if depth > limits.max_depth {
+                    return Err(Error::SectionInventoryLimit {
+                        resource: "XML depth",
+                        maximum: limits.max_depth,
+                        actual: depth,
+                    });
+                }
+                validate_source_section_element(&resolver, decoder, &namespace, &element)?;
+            },
+            Event::Empty(element) => {
+                let element_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormat("section XML depth overflow".into()))?;
+                if element_depth > limits.max_depth {
+                    return Err(Error::SectionInventoryLimit {
+                        resource: "XML depth",
+                        maximum: limits.max_depth,
+                        actual: element_depth,
+                    });
+                }
+                validate_source_section_element(&resolver, decoder, &namespace, &element)?;
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("section XML depth underflow".into()))?;
+            },
+            Event::DocType(_) => {
+                return Err(Error::UnsafeEdit {
+                    format: "DOCX",
+                    operation: "source-backed section inventory",
+                    reason: "DTD declarations are not accepted in a source-bound inventory",
+                });
+            },
+            Event::GeneralRef(reference) => {
+                if reference.is_char_ref() {
+                    let value = reference
+                        .resolve_char_ref()
+                        .map_err(|error| Error::Xml(error.to_string()))?
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "numeric XML character reference did not resolve".into(),
+                            )
+                        })?;
+                    if !is_legal_xml_character(value) {
+                        return Err(Error::InvalidFormat(
+                            "numeric XML character reference is not a legal XML character".into(),
+                        ));
+                    }
+                } else {
+                    let name = reference
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    if !matches!(name.as_ref(), "amp" | "apos" | "gt" | "lt" | "quot") {
+                        return Err(Error::UnsafeEdit {
+                            format: "DOCX",
+                            operation: "source-backed section inventory",
+                            reason: "non-predefined entity references are not accepted in a source-bound inventory",
+                        });
+                    }
+                }
+            },
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_) => {},
+        }
+    }
+    Ok(())
+}
+
+fn validate_source_section_element(
+    resolver: &NamespaceResolver,
+    decoder: quick_xml::encoding::Decoder,
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+) -> Result<()> {
+    ensure_source_mce_element(resolver, decoder, namespace, element, "section inventory")?;
+
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        validate_source_section_attribute_value(attribute.value.as_ref())?;
+    }
+    Ok(())
+}
+
+fn ensure_source_mce_element(
+    resolver: &NamespaceResolver,
+    decoder: quick_xml::encoding::Decoder,
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    operation: &'static str,
+) -> Result<()> {
+    let reason = if operation == "document" {
+        "markup-compatibility preprocessing would require an unbudgeted owned payload"
+    } else {
+        "markup-compatibility elements are not accepted in a source-bound inventory"
+    };
+    if is_mce_namespace(namespace) {
+        return Err(Error::UnsafeEdit {
+            format: "DOCX",
+            operation: if operation == "document" {
+                "source-backed document read"
+            } else {
+                "source-backed section inventory"
+            },
+            reason,
+        });
+    }
+
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let (attribute_namespace, _) = resolver.resolve_attribute(attribute.key);
+        if is_mce_namespace(&attribute_namespace)
+            || is_namespace_declaration(attribute.key)
+                && source_namespace_binding_is_mce(attribute.value.as_ref(), decoder)?
+        {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: if operation == "document" {
+                    "source-backed document read"
+                } else {
+                    "source-backed section inventory"
+                },
+                reason: if operation == "document" {
+                    "markup-compatibility preprocessing would require an unbudgeted owned payload"
+                } else {
+                    "markup-compatibility namespace bindings are not accepted in a source-bound inventory"
+                },
+            });
+        }
+    }
+    Ok(())
+}
+
+fn is_namespace_declaration(key: quick_xml::name::QName<'_>) -> bool {
+    (key.prefix().is_none() && key.local_name().as_ref() == b"xmlns")
+        || key
+            .prefix()
+            .as_ref()
+            .is_some_and(|prefix| prefix.as_ref() == b"xmlns")
+}
+
+fn source_namespace_binding_is_mce(
+    value: &[u8],
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<bool> {
+    let decoded = decoder
+        .decode(value)
+        .map_err(|error| Error::Xml(error.to_string()))?;
+    if !decoded.as_bytes().contains(&b'&') {
+        return Ok(decoded.as_ref() == litchi_ooxml_common::mce::NAMESPACE);
+    }
+
+    let source = decoded.as_ref();
+    let mut output = String::new();
+    let mut start = 0usize;
+    while let Some(relative) = source[start..].find('&') {
+        let ampersand = start + relative;
+        output.push_str(&source[start..ampersand]);
+        let Some(relative_end) = source[ampersand + 1..].find(';') else {
+            output.push_str(&source[ampersand..]);
+            return Ok(output == litchi_ooxml_common::mce::NAMESPACE);
+        };
+        let end = ampersand + 1 + relative_end;
+        let name = &source[ampersand + 1..end];
+        if let Some(entity) = predefined_xml_entity(name) {
+            output.push_str(entity);
+        } else if name.starts_with('#') {
+            let reference = BytesRef::new(name);
+            if let Ok(Some(character)) = reference.resolve_char_ref() {
+                output.push(character);
+            } else {
+                output.push_str(&source[ampersand..=end]);
+            }
+        } else {
+            output.push_str(&source[ampersand..=end]);
+        }
+        start = end + 1;
+    }
+    output.push_str(&source[start..]);
+    Ok(output == litchi_ooxml_common::mce::NAMESPACE)
+}
+
+fn predefined_xml_entity(name: &str) -> Option<&'static str> {
+    match name {
+        "amp" => Some("&"),
+        "apos" => Some("'"),
+        "gt" => Some(">"),
+        "lt" => Some("<"),
+        "quot" => Some("\""),
+        _ => None,
+    }
+}
+
+fn validate_source_section_attribute_value(value: &[u8]) -> Result<()> {
+    let mut start = 0usize;
+    while let Some(relative) = value[start..].iter().position(|byte| *byte == b'&') {
+        let ampersand = start + relative;
+        let end = value
+            .get(ampersand + 1..)
+            .and_then(|tail| tail.iter().position(|byte| *byte == b';'))
+            .map(|relative| ampersand + 1 + relative)
+            .ok_or_else(|| Error::InvalidFormat("unterminated XML attribute reference".into()))?;
+        let name = std::str::from_utf8(&value[ampersand + 1..end])
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let reference = BytesRef::new(name);
+        if reference.is_char_ref() {
+            let value = reference
+                .resolve_char_ref()
+                .map_err(|error| Error::Xml(error.to_string()))?
+                .ok_or_else(|| {
+                    Error::InvalidFormat("numeric XML attribute reference did not resolve".into())
+                })?;
+            if !is_legal_xml_character(value) {
+                return Err(Error::InvalidFormat(
+                    "numeric XML attribute reference is not a legal XML character".into(),
+                ));
+            }
+        } else if !matches!(name, "amp" | "apos" | "gt" | "lt" | "quot") {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "source-backed section inventory",
+                reason: "non-predefined entity references are not accepted in a source-bound attribute",
+            });
+        }
+        start = end + 1;
+    }
+    Ok(())
+}
+
+fn is_mce_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == litchi_ooxml_common::mce::NAMESPACE.as_bytes()
+    )
+}
+
+fn is_legal_xml_character(value: char) -> bool {
+    matches!(
+        value as u32,
+        0x0009 | 0x000a | 0x000d | 0x0020..=0xd7ff | 0xe000..=0xfffd | 0x10000..=0x10ffff
+    )
 }
 
 #[derive(Clone)]
@@ -1099,7 +1529,10 @@ impl Document {
         limits: &crate::section::Limits,
     ) -> Result<crate::section::Inventory> {
         self.check_execution()?;
-        crate::section::Inventory::parse_with_limits(self.xml.as_bytes(), limits)
+        ensure_source_section_inventory_xml(self.xml.as_bytes(), limits)?;
+        let inventory = crate::section::Inventory::parse_with_limits(self.xml.as_bytes(), limits)?;
+        self.check_execution()?;
+        Ok(inventory)
     }
 
     /// Capture a cheaply cloneable inventory bound to the exact opened source.
@@ -1113,6 +1546,13 @@ impl Document {
         limits: &crate::section::Limits,
     ) -> Result<crate::section::Snapshot> {
         self.check_execution()?;
-        crate::section::Snapshot::from_source_xml(self.xml.as_bytes(), self.source_version, limits)
+        ensure_source_section_inventory_xml(self.xml.as_bytes(), limits)?;
+        let snapshot = crate::section::Snapshot::from_source_xml(
+            self.xml.as_bytes(),
+            self.source_version,
+            limits,
+        )?;
+        self.check_execution()?;
+        Ok(snapshot)
     }
 }

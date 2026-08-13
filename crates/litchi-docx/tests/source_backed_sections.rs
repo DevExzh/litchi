@@ -1,12 +1,17 @@
 use std::io;
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits,
+    OwnedSource, ReadAt, Resource, SourceVersion,
+};
 use litchi_docx::section::{Limits, Ownership, Property, PropertyValue};
 use litchi_docx::{Error, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
+use soapberry_zip::office::StreamingArchiveWriter;
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const MAIN: &str = "word/document.xml";
@@ -41,6 +46,50 @@ fn fixture(document: &[u8]) -> Vec<u8> {
         .unwrap();
     package.relate_to(MAIN, rt::OFFICE_DOCUMENT);
     PackageWriter::to_bytes(&package).unwrap()
+}
+
+fn malformed_fixture(document: &[u8]) -> Vec<u8> {
+    let content_types = format!(
+        r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/{MAIN}" ContentType="{}"/></Types>"#,
+        ct::WML_DOCUMENT_MAIN
+    );
+    let relationships = format!(
+        r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="{}" Target="{MAIN}"/></Relationships>"#,
+        rt::OFFICE_DOCUMENT
+    );
+    let mut writer = StreamingArchiveWriter::new();
+    writer
+        .write_stored("[Content_Types].xml", content_types.as_bytes())
+        .unwrap();
+    writer
+        .write_stored("_rels/.rels", relationships.as_bytes())
+        .unwrap();
+    writer.write_stored(MAIN, document).unwrap();
+    writer.finish_to_bytes().unwrap()
+}
+
+fn managed_document_fixture(document: &[u8]) -> (Budget, source_backed::Package) {
+    let bytes = malformed_fixture(document);
+    let memory = 16 * 1024 * 1024;
+    let budget = Budget::root(
+        "docx-managed-section-test",
+        CoreLimits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (_cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        NonZeroUsize::MIN,
+        NonZeroUsize::MIN,
+        NonZeroU64::new(memory).unwrap(),
+        0,
+    )
+    .unwrap();
+    let package = source_backed::Package::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(bytes)),
+        litchi_opc::ReadLimits::default(),
+        ExecutionContext::new(budget.clone(), cancellation, execution_limits),
+    )
+    .unwrap();
+    (budget, package)
 }
 
 struct ObservedSource {
@@ -169,6 +218,241 @@ fn source_snapshot_applies_limits_and_rejects_a_changed_read_at() {
     assert!(matches!(
         package.section_inventory_snapshot(),
         Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+    ));
+
+    let event_limited = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(fixture(
+        document.as_bytes(),
+    ))))
+    .unwrap();
+    let limits = Limits {
+        max_events: 1,
+        ..Limits::default()
+    };
+    assert!(matches!(
+        event_limited.section_inventory_snapshot_with_limits(&limits),
+        Err(Error::SectionInventoryLimit {
+            resource: "XML events",
+            ..
+        })
+    ));
+
+    let deep_document = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>deep</w:t></w:r></w:p></w:body></w:document>"#
+    );
+    let depth_limited = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        malformed_fixture(deep_document.as_bytes()),
+    )))
+    .unwrap();
+    let limits = Limits {
+        max_depth: 2,
+        ..Limits::default()
+    };
+    assert!(matches!(
+        depth_limited.section_inventory_snapshot_with_limits(&limits),
+        Err(Error::SectionInventoryLimit {
+            resource: "XML depth",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn source_snapshot_refuses_mce_dtd_and_entity_syntax() {
+    let documents = [
+        format!(
+            r#"<w:document xmlns:w="{W}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><w:body><mc:AlternateContent><mc:Fallback><w:sectPr/></mc:Fallback></mc:AlternateContent></w:body></w:document>"#
+        ),
+        format!(
+            r#"<!DOCTYPE w:document [<!ELEMENT document ANY>]><w:document xmlns:w="{W}"><w:body><w:sectPr/></w:body></w:document>"#
+        ),
+        format!(
+            r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>&custom;</w:t></w:r></w:p></w:body></w:document>"#
+        ),
+        format!(
+            r#"<w:document xmlns:w="{W}" xmlns:mc="http:&#x2f;&#x2f;schemas.openxmlformats.org&#x2f;markup-compatibility&#x2f;2006"><w:body><w:p/></w:body></w:document>"#
+        ),
+    ];
+
+    for document in documents {
+        let package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+            malformed_fixture(document.as_bytes()),
+        )))
+        .unwrap();
+        assert!(matches!(
+            package.section_inventory_snapshot(),
+            Err(Error::UnsafeEdit { .. })
+        ));
+    }
+
+    let predefined = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>ok &amp; &#x41;</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"#
+    );
+    let package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        malformed_fixture(predefined.as_bytes()),
+    )))
+    .unwrap();
+    assert!(package.section_inventory_snapshot().is_ok());
+
+    let uri = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+    let harmless_uri = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:x="urn:test"><w:body><w:p x:note="{uri}"><w:r><w:t>{uri}</w:t></w:r></w:p><!-- {uri} --><w:sectPr/></w:body></w:document>"#
+    );
+    let package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        malformed_fixture(harmless_uri.as_bytes()),
+    )))
+    .unwrap();
+    assert!(package.section_inventory_snapshot().is_ok());
+
+    let strict = r#"<s:document xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:body><s:p/><s:sectPr/></s:body></s:document>"#;
+    let package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        malformed_fixture(strict.as_bytes()),
+    )))
+    .unwrap();
+    assert_eq!(
+        package
+            .section_inventory_snapshot()
+            .unwrap()
+            .inventory()
+            .sections()
+            .len(),
+        1
+    );
+
+    let valid_references = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:x="urn:test"><w:body><w:p x:value="&amp; &apos; &gt; &lt; &quot; &#65; &#x1F600;"><w:r><w:t>&amp; &apos; &gt; &lt; &quot; &#65; &#x1F600;</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"#
+    );
+    let package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        malformed_fixture(valid_references.as_bytes()),
+    )))
+    .unwrap();
+    assert!(package.section_inventory_snapshot().is_ok());
+
+    for (index, invalid) in [
+        format!(
+            r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>&#x1;</w:t></w:r></w:p></w:body></w:document>"#
+        ),
+        format!(
+            r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>&#xZZ;</w:t></w:r></w:p></w:body></w:document>"#
+        ),
+        format!(
+            r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>&#;</w:t></w:r></w:p></w:body></w:document>"#
+        ),
+        format!(
+            r#"<w:document xmlns:w="{W}" xmlns:x="urn:test"><w:body><w:p x:value="&custom;"/></w:body></w:document>"#
+        ),
+        format!(
+            r#"<w:document xmlns:w="{W}" xmlns:x="urn:test"><w:body><w:p x:value="&#xZZ;"/></w:body></w:document>"#
+        ),
+        format!(
+            r#"<w:document xmlns:w="{W}" xmlns:x="urn:test"><w:body><w:p x:value="&#1;"/></w:body></w:document>"#
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+            malformed_fixture(invalid.as_bytes()),
+        )))
+        .unwrap();
+        assert!(
+            package.section_inventory_snapshot().is_err(),
+            "invalid reference fixture {index} was accepted"
+        );
+    }
+}
+
+#[test]
+fn managed_document_refuses_only_actual_mce_and_retains_part_data() {
+    let uri = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+    let harmless = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:x="urn:test"><w:body><w:p x:note="{uri}"><w:r><w:t>{uri}</w:t></w:r></w:p><!-- {uri} --><w:sectPr/></w:body></w:document>"#
+    );
+    let (budget, package) = managed_document_fixture(harmless.as_bytes());
+    let document = package.document().unwrap();
+    assert_eq!(document.extract_text().unwrap(), uri);
+    assert_eq!(document.section_inventory().unwrap().sections().len(), 1);
+    assert!(budget.used(Resource::Memory) > 0);
+    drop(document);
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    let encoded_mce = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:mc="http:&#x2f;&#x2f;schemas.openxmlformats.org&#x2f;markup-compatibility&#x2f;2006"><w:body><w:p/></w:body></w:document>"#
+    );
+    let (_budget, package) = managed_document_fixture(encoded_mce.as_bytes());
+    assert!(matches!(
+        package.document(),
+        Err(Error::UnsafeEdit {
+            operation: "source-backed document read",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn managed_document_bounds_namespace_scan_depth_and_events() {
+    let mut exact_depth = format!(r#"<w:document xmlns:w="{W}"><w:body>"#);
+    for _ in 0..254 {
+        exact_depth.push_str("<w:sdt>");
+    }
+    for _ in 0..254 {
+        exact_depth.push_str("</w:sdt>");
+    }
+    exact_depth.push_str("</w:body></w:document>");
+    let (_budget, package) = managed_document_fixture(exact_depth.as_bytes());
+    assert!(
+        package.document().is_ok(),
+        "the finite depth boundary is inclusive"
+    );
+
+    let mut deep = format!(r#"<w:document xmlns:w="{W}"><w:body>"#);
+    for _ in 0..255 {
+        deep.push_str("<w:sdt>");
+    }
+    for _ in 0..255 {
+        deep.push_str("</w:sdt>");
+    }
+    deep.push_str("</w:body></w:document>");
+    let (_budget, package) = managed_document_fixture(deep.as_bytes());
+    assert!(matches!(
+        package.document(),
+        Err(Error::InvalidFormat(reason)) if reason.contains("depth limit")
+    ));
+
+    let mut events = format!(r#"<w:document xmlns:w="{W}"><w:body>"#);
+    for _ in 0..1_000_001 {
+        events.push_str("<w:p/>");
+    }
+    events.push_str("</w:body></w:document>");
+    let (_budget, package) = managed_document_fixture(events.as_bytes());
+    assert!(matches!(
+        package.document(),
+        Err(Error::InvalidFormat(reason)) if reason.contains("event limit")
+    ));
+
+    let mismatched =
+        format!(r#"<w:document xmlns:w="{W}"><w:body><w:p></w:r></w:body></w:document>"#);
+    let (_budget, package) = managed_document_fixture(mismatched.as_bytes());
+    assert!(matches!(
+        package.document(),
+        Err(Error::InvalidFormat(reason)) if reason.contains("mismatched")
+    ));
+
+    let unclosed = format!(r#"<w:document xmlns:w="{W}"><w:body><w:p/>"#);
+    let (_budget, package) = managed_document_fixture(unclosed.as_bytes());
+    assert!(matches!(
+        package.document(),
+        Err(Error::InvalidFormat(reason)) if reason.contains("unclosed")
+    ));
+
+    let mut long_name = format!(r#"<w:document xmlns:w="{W}"><w:body><"#);
+    long_name.extend(std::iter::repeat_n('x', 64 * 1024 + 1));
+    long_name.push_str("/></w:body></w:document>");
+    let (_budget, package) = managed_document_fixture(long_name.as_bytes());
+    let result = package.document();
+    assert!(matches!(
+        result,
+        Err(Error::InvalidFormat(reason)) if reason.contains("name-byte limit")
     ));
 }
 
