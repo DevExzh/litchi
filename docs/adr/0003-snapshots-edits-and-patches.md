@@ -1496,3 +1496,58 @@ the complete focused Pages suite passes 153/153. Supporting archive and
 detector suites pass 93/93 and 32/32, the host generated-roundtrip passes 1/1,
 and the 227/227 boundary suite reports zero live retirement or focused-public-
 API findings.
+
+## 2026-08-13 amendment: canonical Numbers read snapshots
+
+`litchi_numbers::Document` now has one shared immutable state containing the
+rooted semantic sheets, validated plain-text length, and optional source
+diagnostics. `snapshot()` is a constant-time clone of that state, and
+`shared_sheets()` shares the same semantic allocation. Source-backed path,
+borrowed-byte, and shared-byte construction eagerly complete bounded capture
+and semantic projection before publication, then release the physical source.
+The resulting snapshot contains no archive, package member, native identifier,
+protobuf/Buffa value, preview, or media payload.
+
+Source diagnostics follow the snapshot's provenance. A source-backed document
+may retain canonical projected metadata and content-free `DocumentStats`; a
+document constructed from semantic sheets or returned by
+`Package::document()`/`document_snapshot()` returns `None` for both. Rooted
+`plain_text()` is available for every document because it is derived from
+retained workbook semantics, not retained source diagnostics. It uses the
+validated exact output length and reports a content-free allocation error
+rather than publishing partial text. Empty rendered Text/Formula values do not
+contribute a line or separator.
+
+`litchi_numbers::Package::snapshot` remains a different capability: it shares
+the complete immutable regular-file/byte artifact, parsed components, exact
+write source, and transaction provenance. Its package-derived `Document`
+shares semantic values but does not acquire source metadata or statistics.
+Directory semantic capture cannot be upgraded into exact-artifact ownership
+and makes no preservation promise for unselected metadata, `Data/`, previews,
+media, or unknown sidecars.
+
+Unix path-backed snapshots use pinned, no-follow capture. Other non-Windows
+targets use version-checked path capture; Windows path-backed snapshots fail
+closed until reparse-safe pinned acquisition exists. Byte-backed snapshots
+remain portable.
+
+Deleting the duplicate host reader creates no edit, patch, commit,
+publication, or filesystem-save operation. Existing Numbers transactions
+remain bound to exact package snapshots, including their locality, conflict,
+inverse, and native verification rules. The reader retirement establishes no
+latency, RSS, allocator-event, zero-copy, or end-to-end Buffa-laziness claim;
+its supported memory statement is structural sharing plus release of package
+state after eager semantic projection.
+
+Frozen verification passes 16/16 focused reader cases, with a seventeenth
+Windows-configured case; 240 Numbers library cases pass and four are ignored;
+compatibility and name gates pass 5/5 and 10/10. Archive coverage passes 127
+cases (125 unit plus two integration), detector coverage passes 40/40, and the
+host library passes 1,397/1,397, while generated-roundtrip and doctest gates
+pass 1/1 and nine passed with three ignored. Host all-target check and no-run,
+strict scoped host Clippy, focused
+all-target Clippy, strict focused rustdoc, formatting, and diff checks pass. The
+boundary units pass 237/237 and both live retirement/API audits report zero
+findings. Broad host all-target Clippy remains blocked by unrelated existing
+lints; the global boundary policy still reports 14 unrelated
+`soapberry-zip`/`xml-minifier` debt findings.

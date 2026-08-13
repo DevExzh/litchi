@@ -529,6 +529,10 @@ pub enum SourceProvenance {
     ExactZip,
     /// Logical entries were normalized from a nested legacy `Index.zip`.
     LegacyZip,
+    /// A modern ZIP was projected to a fixed semantic member set.
+    SemanticZip,
+    /// A legacy ZIP was projected to a fixed semantic member set.
+    LegacySemanticZip,
 }
 
 /// A fixed logical-member admission profile applied before ZIP payload decode.
@@ -545,27 +549,41 @@ pub struct LogicalEntryLimits {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum LogicalEntryLimitProfile {
-    PagesMetadata,
+    SemanticComponents,
+    SemanticMetadata,
 }
 
 impl LogicalEntryLimits {
-    /// Pages' three canonical metadata authorities, each capped at 64 KiB and
-    /// required to use a supported ZIP compression method.
-    pub const PAGES_METADATA: Self = Self {
-        profile: LogicalEntryLimitProfile::PagesMetadata,
+    /// Select only IWA components and materialize no package sidecars.
+    pub const SEMANTIC_COMPONENTS: Self = Self {
+        profile: LogicalEntryLimitProfile::SemanticComponents,
     };
 
-    const MAX_PAGES_METADATA_BYTES: u64 = 64 * 1024;
+    /// iWork's three canonical semantic metadata authorities, each capped at
+    /// 64 KiB and required to use a supported ZIP compression method.
+    pub const SEMANTIC_METADATA: Self = Self {
+        profile: LogicalEntryLimitProfile::SemanticMetadata,
+    };
+
+    /// Compatibility alias for the original Pages-specific spelling.
+    pub const PAGES_METADATA: Self = Self::SEMANTIC_METADATA;
+
+    const MAX_SEMANTIC_METADATA_BYTES: u64 = 64 * 1024;
 
     const fn maximum_for(self, logical_name: &[u8]) -> Option<u64> {
         match self.profile {
-            LogicalEntryLimitProfile::PagesMetadata => match logical_name {
+            LogicalEntryLimitProfile::SemanticComponents => None,
+            LogicalEntryLimitProfile::SemanticMetadata => match logical_name {
                 b"Metadata/Properties.plist"
                 | b"Metadata/BuildVersionHistory.plist"
-                | b"Metadata/DocumentIdentifier" => Some(Self::MAX_PAGES_METADATA_BYTES),
+                | b"Metadata/DocumentIdentifier" => Some(Self::MAX_SEMANTIC_METADATA_BYTES),
                 _ => None,
             },
         }
+    }
+
+    const fn includes_metadata(self) -> bool {
+        matches!(self.profile, LogicalEntryLimitProfile::SemanticMetadata)
     }
 }
 
@@ -575,10 +593,11 @@ pub struct Catalog {
     entries: Vec<Entry>,
     source: Arc<[u8]>,
     source_is_exact: bool,
+    semantic_profile: Option<LogicalEntryLimitProfile>,
     legacy_outer_prefix: Option<Box<[u8]>>,
 }
 
-/// One exact canonical Pages metadata member selected from raw ZIP
+/// One exact canonical iWork metadata member selected from raw ZIP
 /// provenance.
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy)]
@@ -601,7 +620,7 @@ impl<'a> PackageMetadataEntry<'a> {
     }
 }
 
-/// The fixed three-member Pages metadata projection selected from exact raw
+/// The fixed three-member iWork metadata projection selected from exact raw
 /// ZIP authority names.
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy, Default)]
@@ -632,20 +651,22 @@ impl<'a> PackageMetadataSidecars<'a> {
 }
 
 impl Catalog {
-    /// Select Pages' exact raw metadata authorities from the retained package.
+    /// Select iWork's exact raw metadata authorities from the retained package.
     ///
     /// Flat packages require byte-for-byte central names. Legacy packages may
     /// remove only the one explicit raw outer prefix that led to `Index.zip`.
     #[doc(hidden)]
-    pub fn __pages_metadata_sidecars(&self) -> Result<PackageMetadataSidecars<'_>> {
+    pub fn __semantic_metadata_sidecars(&self) -> Result<PackageMetadataSidecars<'_>> {
         let mut selected = PackageMetadataSidecars::default();
         for entry in &self.entries {
             let raw_name = entry.raw_name();
-            let logical_name = self
-                .legacy_outer_prefix
-                .as_deref()
-                .and_then(|prefix| raw_name.strip_prefix(prefix))
-                .unwrap_or(raw_name);
+            let logical_name = match self.legacy_outer_prefix.as_deref() {
+                Some(prefix) => raw_name.strip_prefix(prefix),
+                None => Some(raw_name),
+            };
+            let Some(logical_name) = logical_name else {
+                continue;
+            };
             let authority = match logical_name {
                 b"Metadata/Properties.plist" => Some("Metadata/Properties.plist"),
                 b"Metadata/BuildVersionHistory.plist" => Some("Metadata/BuildVersionHistory.plist"),
@@ -681,6 +702,16 @@ impl Catalog {
             }
         }
         Ok(selected)
+    }
+
+    /// Compatibility alias for the original Pages-specific spelling.
+    #[doc(hidden)]
+    pub fn __pages_metadata_sidecars(&self) -> Result<PackageMetadataSidecars<'_>> {
+        self.__semantic_metadata_sidecars()
+    }
+
+    pub(crate) const fn has_semantic_profile(&self) -> bool {
+        self.semantic_profile.is_some()
     }
 
     /// Parse a package with the default physical limits.
@@ -858,8 +889,21 @@ impl Catalog {
             return Err(Error::Encrypted);
         }
 
-        let has_direct_iwa = archive.file_names().any(crate::zip::is_iwa_name);
-        let nested_name = crate::zip::nested_index_name(&archive)?;
+        let semantic_profile = logical_entry_limits.map(|limits| limits.profile);
+        if semantic_profile.is_some() {
+            reject_semantic_aliases(&archive)?;
+        }
+        let (has_direct_iwa, nested_name) = if semantic_profile.is_some() {
+            let has_direct = archive
+                .physical_entries()
+                .any(|entry| semantic_iwa_name(entry).is_some());
+            (has_direct, semantic_nested_index_name(&archive)?)
+        } else {
+            (
+                archive.file_names().any(crate::zip::is_iwa_name),
+                crate::zip::nested_index_name(&archive)?,
+            )
+        };
         if has_direct_iwa && nested_name.is_some() {
             return Err(Error::InvalidBundle(
                 "iWork package mixes direct IWA members with a legacy Index.zip".to_owned(),
@@ -872,22 +916,43 @@ impl Catalog {
                 preflight_flat_logical_entries(&archive, logical_entry_limits)?;
             }
         }
+        let include_semantic_metadata =
+            logical_entry_limits.is_some_and(LogicalEntryLimits::includes_metadata);
         let (entries, source_is_exact, legacy_outer_prefix) = if has_direct_iwa {
-            (collect_flat(&archive, &source)?, true, None)
+            let entries = if semantic_profile.is_some() {
+                collect_semantic_flat(&archive, &source, include_semantic_metadata)?
+            } else {
+                collect_flat(&archive, &source)?
+            };
+            (entries, semantic_profile.is_none(), None)
         } else if let Some(index_name) = nested_name {
             let prefix: Box<[u8]> = legacy_raw_outer_prefix(&archive, &index_name)?.into();
-            (
-                collect_legacy(&archive, &index_name, checked_limits, &source)?,
-                false,
-                Some(prefix),
-            )
+            let entries = if semantic_profile.is_some() {
+                collect_semantic_legacy(
+                    &archive,
+                    &index_name,
+                    checked_limits,
+                    &source,
+                    &prefix,
+                    include_semantic_metadata,
+                )?
+            } else {
+                collect_legacy(&archive, &index_name, checked_limits, &source)?
+            };
+            (entries, false, Some(prefix))
         } else {
-            (collect_flat(&archive, &source)?, true, None)
+            let entries = if semantic_profile.is_some() {
+                collect_semantic_flat(&archive, &source, include_semantic_metadata)?
+            } else {
+                collect_flat(&archive, &source)?
+            };
+            (entries, semantic_profile.is_none(), None)
         };
         Ok(Catalog {
             entries,
             source,
             source_is_exact,
+            semantic_profile,
             legacy_outer_prefix,
         })
     }
@@ -934,7 +999,11 @@ impl Catalog {
     /// Return the physical origin of this logical package snapshot.
     #[must_use]
     pub const fn source_provenance(&self) -> SourceProvenance {
-        if self.source_is_exact {
+        if self.semantic_profile.is_some() && self.legacy_outer_prefix.is_some() {
+            SourceProvenance::LegacySemanticZip
+        } else if self.semantic_profile.is_some() {
+            SourceProvenance::SemanticZip
+        } else if self.source_is_exact {
             SourceProvenance::ExactZip
         } else {
             SourceProvenance::LegacyZip
@@ -1044,9 +1113,12 @@ impl Catalog {
             return self.to_bytes();
         }
         if !self.source_is_exact {
-            return Err(Error::Reassembly(
-                "legacy nested Index.zip catalogs have normalized logical entries".to_owned(),
-            ));
+            let reason = if self.semantic_profile.is_some() {
+                "semantic catalogs have a projected logical entry set"
+            } else {
+                "legacy nested Index.zip catalogs have normalized logical entries"
+            };
+            return Err(Error::Reassembly(reason.to_owned()));
         }
 
         let archive = ZipArchive::new_with_limits(self.source.as_ref(), checked_limits)?;
@@ -2032,6 +2104,258 @@ fn preflight_flat_logical_entries(
     Ok(())
 }
 
+pub(crate) fn semantic_nested_index_name(archive: &ZipArchive<'_>) -> Result<Option<String>> {
+    Ok(semantic_nested_index_entry(archive)?.map(|entry| entry.name().to_owned()))
+}
+
+pub(crate) fn semantic_nested_index_entry<'archive, 'data>(
+    archive: &'archive ZipArchive<'data>,
+) -> Result<Option<&'archive PhysicalEntry>> {
+    let mut selected: Option<&PhysicalEntry> = None;
+    for entry in archive
+        .physical_entries()
+        .filter(|entry| !entry.is_directory())
+    {
+        let central_exact = is_exact_semantic_nested_index(entry.raw_name());
+        let local_exact = is_exact_semantic_nested_index(&entry.local_header().name);
+        let central_alias = !central_exact
+            && (entry.name().rsplit('/').next() == Some("Index.zip")
+                || raw_has_index_basename(entry.raw_name()));
+        let local_collision =
+            !central_exact && (local_exact || raw_has_index_basename(&entry.local_header().name));
+        if central_alias || local_collision {
+            return Err(Error::InvalidBundle(format!(
+                "semantic package contains a non-canonical raw Index.zip authority: {:?}",
+                String::from_utf8_lossy(entry.raw_name())
+            )));
+        }
+        if !central_exact {
+            continue;
+        }
+        if let Some(first) = selected {
+            return Err(Error::InvalidBundle(format!(
+                "iWork package contains ambiguous exact nested indexes: {} and {}",
+                first.name(),
+                entry.name()
+            )));
+        }
+        selected = Some(entry);
+    }
+    Ok(selected)
+}
+
+fn raw_has_index_basename(raw_name: &[u8]) -> bool {
+    raw_name
+        .split(|byte| matches!(*byte, b'/' | b'\\'))
+        .next_back()
+        == Some(b"Index.zip".as_slice())
+}
+
+fn is_exact_semantic_nested_index(raw_name: &[u8]) -> bool {
+    is_exact_portable_raw_name(raw_name)
+        && (raw_name == b"Index.zip" || raw_name.ends_with(b"/Index.zip"))
+}
+
+pub(crate) fn semantic_detection_root_entry<'archive, 'data>(
+    archive: &'archive ZipArchive<'data>,
+    nested: bool,
+) -> Result<Option<&'archive PhysicalEntry>> {
+    let authority = if nested {
+        b"Document.iwa".as_slice()
+    } else {
+        b"Index/Document.iwa".as_slice()
+    };
+    let normalized_authority = if nested {
+        "Document.iwa"
+    } else {
+        "Index/Document.iwa"
+    };
+    let mut selected: Option<&PhysicalEntry> = None;
+    for entry in archive
+        .physical_entries()
+        .filter(|entry| !entry.is_directory())
+    {
+        let central_exact = entry.raw_name() == authority;
+        let local_exact = entry.local_header().name.as_ref() == authority;
+        let central_alias = entry.raw_name() != authority
+            && (entry.name() == normalized_authority
+                || raw_path_normalizes_to(entry.raw_name(), authority));
+        let local_collision = !central_exact
+            && (local_exact || raw_path_normalizes_to(&entry.local_header().name, authority));
+        if central_alias || local_collision {
+            return Err(Error::InvalidBundle(format!(
+                "semantic package contains a non-canonical raw Document.iwa authority: {:?}",
+                String::from_utf8_lossy(entry.raw_name())
+            )));
+        }
+        if !central_exact {
+            continue;
+        }
+        if selected.is_some() {
+            return Err(Error::InvalidBundle(
+                "iWork package contains multiple exact Document.iwa components".to_owned(),
+            ));
+        }
+        selected = Some(entry);
+    }
+    Ok(selected)
+}
+
+pub(crate) fn raw_path_normalizes_to(raw_name: &[u8], authority: &[u8]) -> bool {
+    let mut expected = authority.split(|byte| *byte == b'/');
+    let first = expected.next();
+    let second = expected.next();
+    let expected_depth = usize::from(first.is_some()) + usize::from(second.is_some());
+    if expected.next().is_some() {
+        return false;
+    }
+
+    let mut retained = [None, None];
+    let mut depth = 0_usize;
+    for component in raw_name.split(|byte| matches!(*byte, b'/' | b'\\')) {
+        if component.is_empty() || component == b"." {
+            continue;
+        }
+        if component == b".." {
+            if depth != 0 {
+                depth -= 1;
+                if depth < retained.len() {
+                    retained[depth] = None;
+                }
+            }
+            continue;
+        }
+        if depth < retained.len() {
+            retained[depth] = Some(component);
+        }
+        depth = depth.saturating_add(1);
+    }
+    depth == expected_depth && retained[0] == first && retained[1] == second
+}
+
+pub(crate) fn reject_semantic_aliases(archive: &ZipArchive<'_>) -> Result<()> {
+    for entry in archive
+        .physical_entries()
+        .filter(|entry| !entry.is_directory())
+    {
+        let normalized_iwa = crate::zip::is_iwa_name(entry.name())
+            && (entry.name().starts_with("Index/") || !entry.name().contains('/'));
+        let normalized_index = entry.name().rsplit('/').next() == Some("Index.zip");
+        if (normalized_iwa && semantic_iwa_name(entry).is_none())
+            || (normalized_index
+                && !(is_exact_portable_raw_name(entry.raw_name())
+                    && (entry.raw_name() == b"Index.zip"
+                        || entry.raw_name().ends_with(b"/Index.zip"))))
+        {
+            return Err(Error::InvalidBundle(format!(
+                "semantic package contains a non-canonical raw authority: {:?}",
+                String::from_utf8_lossy(entry.raw_name())
+            )));
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn semantic_iwa_name(physical: &PhysicalEntry) -> Option<&str> {
+    semantic_iwa_name_in(physical, false)
+}
+
+pub(crate) fn semantic_nested_iwa_name(physical: &PhysicalEntry) -> Option<&str> {
+    semantic_iwa_name_in(physical, true)
+}
+
+fn semantic_iwa_name_in(physical: &PhysicalEntry, allow_root: bool) -> Option<&str> {
+    let raw_name = physical.raw_name();
+    if !is_exact_portable_raw_name(raw_name)
+        || !(raw_name.starts_with(b"Index/") || allow_root && !raw_name.contains(&b'/'))
+        || !raw_name.ends_with(b".iwa")
+    {
+        return None;
+    }
+    std::str::from_utf8(raw_name).ok()
+}
+
+fn is_exact_portable_raw_name(raw_name: &[u8]) -> bool {
+    let Ok(name) = std::str::from_utf8(raw_name) else {
+        return false;
+    };
+    !name.is_empty()
+        && !name.starts_with('/')
+        && !name.ends_with('/')
+        && !name.contains(['\0', '\\'])
+        && !name.chars().any(char::is_control)
+        && !name.split('/').any(|component| {
+            component.is_empty() || matches!(component, "." | "..") || component.contains(':')
+        })
+}
+
+pub(crate) fn preflight_semantic_iwa(physical: &PhysicalEntry, name: &str) -> Result<()> {
+    preflight_semantic_supported_entry(physical, "canonical IWA entry", name)
+}
+
+pub(crate) fn preflight_semantic_container(physical: &PhysicalEntry, name: &str) -> Result<()> {
+    preflight_semantic_supported_entry(physical, "canonical container", name)
+}
+
+pub(crate) fn preflight_semantic_iwa_entries(archive: &ZipArchive<'_>, nested: bool) -> Result<()> {
+    let mut seen = HashSet::new();
+    for entry in archive
+        .physical_entries()
+        .filter(|entry| !entry.is_directory())
+    {
+        let name = if nested {
+            semantic_nested_iwa_name(entry)
+        } else {
+            semantic_iwa_name(entry)
+        };
+        let Some(name) = name else {
+            if nested && !is_semantic_irrelevant_payload(entry.raw_name()) {
+                return Err(Error::InvalidBundle(format!(
+                    "legacy package index contains a non-canonical IWA member: {}",
+                    entry.name()
+                )));
+            }
+            continue;
+        };
+        preflight_semantic_iwa(entry, name)?;
+        seen.try_reserve(1).map_err(|_error| Error::Allocation {
+            resource: "semantic IWA authority names",
+            amount: 1,
+        })?;
+        if !seen.insert(name) {
+            return Err(Error::InvalidBundle(format!(
+                "duplicate semantic IWA authority is ambiguous: {name}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn preflight_semantic_supported_entry(
+    physical: &PhysicalEntry,
+    label: &str,
+    name: &str,
+) -> Result<()> {
+    let local = physical.local_header();
+    let central = physical.central_header();
+    if local.name.as_ref() != central.name.as_ref() {
+        return Err(Error::InvalidBundle(format!(
+            "{label} {name} has mismatched local and central names"
+        )));
+    }
+    if local.compression_method != central.compression_method {
+        return Err(Error::InvalidBundle(format!(
+            "{label} {name} has mismatched local and central compression methods"
+        )));
+    }
+    if !matches!(central.compression_method, 0 | 8) {
+        return Err(Error::InvalidBundle(format!(
+            "{label} {name} uses unsupported ZIP compression"
+        )));
+    }
+    Ok(())
+}
+
 fn preflight_legacy_outer_logical_entries(
     archive: &ZipArchive<'_>,
     index_name: &str,
@@ -2043,8 +2367,9 @@ fn preflight_legacy_outer_logical_entries(
         .filter(|entry| !entry.is_directory() && entry.name() != index_name)
     {
         let raw_name = physical.raw_name();
-        let logical_name = raw_name.strip_prefix(raw_prefix).unwrap_or(raw_name);
-        preflight_logical_entry(physical, logical_name, limits)?;
+        if let Some(logical_name) = raw_name.strip_prefix(raw_prefix) {
+            preflight_logical_entry(physical, logical_name, limits)?;
+        }
     }
     Ok(())
 }
@@ -2117,6 +2442,43 @@ fn collect_flat(archive: &ZipArchive<'_>, source: &Arc<[u8]>) -> Result<Vec<Entr
             source.clone(),
             entry,
             entry.name(),
+            &mut entries,
+            &mut seen,
+        )?;
+    }
+    Ok(entries)
+}
+
+fn collect_semantic_flat(
+    archive: &ZipArchive<'_>,
+    source: &Arc<[u8]>,
+    include_metadata: bool,
+) -> Result<Vec<Entry>> {
+    preflight_semantic_iwa_entries(archive, false)?;
+    let mut entries = Vec::new();
+    let mut seen = HashSet::new();
+    for entry in archive
+        .physical_entries()
+        .filter(|entry| !entry.is_directory())
+    {
+        let semantic_iwa = semantic_iwa_name(entry);
+        if semantic_iwa.is_none()
+            && !(include_metadata && is_semantic_metadata_authority(entry.raw_name()))
+        {
+            continue;
+        }
+        let normalized_name = if let Some(name) = semantic_iwa {
+            name
+        } else {
+            std::str::from_utf8(entry.raw_name()).map_err(|_error| {
+                Error::InvalidBundle("semantic metadata authority is not UTF-8".to_owned())
+            })?
+        };
+        push_entry(
+            archive,
+            source.clone(),
+            entry,
+            normalized_name,
             &mut entries,
             &mut seen,
         )?;
@@ -2206,6 +2568,109 @@ fn collect_legacy(
     Ok(entries)
 }
 
+fn collect_semantic_legacy(
+    archive: &ZipArchive<'_>,
+    index_name: &str,
+    limits: Limits,
+    source: &Arc<[u8]>,
+    raw_prefix: &[u8],
+    include_metadata: bool,
+) -> Result<Vec<Entry>> {
+    let index_entry = archive
+        .physical_entries()
+        .find(|entry| entry.name() == index_name)
+        .ok_or_else(|| {
+            Error::InvalidBundle(format!(
+                "legacy package index has no physical member: {index_name}"
+            ))
+        })?;
+    preflight_semantic_container(index_entry, index_name)?;
+    let declared_index_size = index_entry.uncompressed_size();
+    limits.check_input_size(declared_index_size, "legacy iWork Index.zip")?;
+    let index_data = archive.read_entry(index_entry)?;
+    let index_size = u64::try_from(index_data.len()).map_err(|error| {
+        Error::InvalidBundle(format!(
+            "legacy iWork Index.zip length does not fit u64: {error}"
+        ))
+    })?;
+    limits.check_input_size(index_size, "legacy iWork Index.zip")?;
+    let index_source: Arc<[u8]> = index_data.into();
+    let index = ZipArchive::new_with_limits(index_source.as_ref(), limits).map_err(|error| {
+        if matches!(&error, Error::Limit { .. }) {
+            error
+        } else {
+            Error::InvalidBundle(format!("legacy package index: {error}"))
+        }
+    })?;
+
+    preflight_semantic_iwa_entries(&index, true)?;
+
+    let mut entries = Vec::new();
+    let mut seen = HashSet::new();
+    for entry in index
+        .physical_entries()
+        .filter(|entry| !entry.is_directory())
+    {
+        let Some(name) = semantic_nested_iwa_name(entry) else {
+            continue;
+        };
+        push_entry(
+            &index,
+            index_source.clone(),
+            entry,
+            name,
+            &mut entries,
+            &mut seen,
+        )?;
+    }
+    if entries.is_empty() {
+        return Err(Error::InvalidBundle(format!(
+            "legacy package index {index_name} contains no IWA components"
+        )));
+    }
+
+    for entry in archive
+        .physical_entries()
+        .filter(|entry| !entry.is_directory() && entry.name() != index_name)
+    {
+        if !include_metadata {
+            continue;
+        }
+        let Some(logical_raw_name) = entry.raw_name().strip_prefix(raw_prefix) else {
+            continue;
+        };
+        if !is_semantic_metadata_authority(logical_raw_name) {
+            continue;
+        }
+        let normalized_name = std::str::from_utf8(logical_raw_name).map_err(|_error| {
+            Error::InvalidBundle("semantic metadata authority is not UTF-8".to_owned())
+        })?;
+        push_entry(
+            archive,
+            source.clone(),
+            entry,
+            normalized_name,
+            &mut entries,
+            &mut seen,
+        )?;
+    }
+    Ok(entries)
+}
+
+const fn is_semantic_metadata_authority(raw_name: &[u8]) -> bool {
+    matches!(
+        raw_name,
+        b"Metadata/Properties.plist"
+            | b"Metadata/BuildVersionHistory.plist"
+            | b"Metadata/DocumentIdentifier"
+    )
+}
+
+fn is_semantic_irrelevant_payload(raw_name: &[u8]) -> bool {
+    is_exact_portable_raw_name(raw_name)
+        && (raw_name.starts_with(b"Data/") || raw_name.starts_with(b"Preview/"))
+}
+
 fn push_entry(
     archive: &ZipArchive<'_>,
     source: Arc<[u8]>,
@@ -2251,6 +2716,7 @@ mod tests {
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
     use litchi_core::SourceVersion;
+    use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
     use soapberry_zip::office::StreamingArchiveWriter;
 
     use super::*;
@@ -2311,6 +2777,19 @@ mod tests {
             writer.write_stored(name, data)?;
         }
         Ok(writer.finish_to_bytes()?)
+    }
+
+    fn semantic_iwa(identifier: u64) -> Result<Vec<u8>> {
+        let archive = Archive {
+            objects: vec![ArchiveObject::new(
+                identifier,
+                vec![RawMessage {
+                    type_: 6_000,
+                    data: vec![1, 2, 3],
+                }],
+            )?],
+        };
+        Ok(SnappyStream::compress(&archive.to_bytes()?)?)
     }
 
     fn push_u16(bytes: &mut Vec<u8>, value: u16) {
@@ -2444,6 +2923,64 @@ mod tests {
         push_u16(&mut bytes, 0);
         push_u16(&mut bytes, 1);
         push_u16(&mut bytes, 1);
+        push_u32(&mut bytes, checked_u32(central_size));
+        push_u32(&mut bytes, checked_u32(central_offset));
+        push_u16(&mut bytes, 0);
+        bytes
+    }
+
+    fn raw_named_entries(entries: &[(&[u8], &[u8], u16, u16, &[u8])]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        let mut offsets = Vec::new();
+        for &(local_name, _central_name, local_method, _central_method, data) in entries {
+            offsets.push(bytes.len());
+            let crc32 = soapberry_zip::crc32(data);
+            push_u32(&mut bytes, 0x0403_4b50);
+            push_u16(&mut bytes, 20);
+            push_u16(&mut bytes, 0x0800);
+            push_u16(&mut bytes, local_method);
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0);
+            push_u32(&mut bytes, crc32);
+            push_u32(&mut bytes, checked_u32(data.len()));
+            push_u32(&mut bytes, checked_u32(data.len()));
+            push_u16(&mut bytes, checked_u16(local_name.len()));
+            push_u16(&mut bytes, 0);
+            bytes.extend_from_slice(local_name);
+            bytes.extend_from_slice(data);
+        }
+
+        let central_offset = bytes.len();
+        for (index, &(_local_name, central_name, _local_method, central_method, data)) in
+            entries.iter().enumerate()
+        {
+            let crc32 = soapberry_zip::crc32(data);
+            push_u32(&mut bytes, 0x0201_4b50);
+            push_u16(&mut bytes, 20);
+            push_u16(&mut bytes, 20);
+            push_u16(&mut bytes, 0x0800);
+            push_u16(&mut bytes, central_method);
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0);
+            push_u32(&mut bytes, crc32);
+            push_u32(&mut bytes, checked_u32(data.len()));
+            push_u32(&mut bytes, checked_u32(data.len()));
+            push_u16(&mut bytes, checked_u16(central_name.len()));
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0);
+            push_u32(&mut bytes, 0);
+            push_u32(&mut bytes, checked_u32(offsets[index]));
+            bytes.extend_from_slice(central_name);
+        }
+
+        let central_size = bytes.len() - central_offset;
+        push_u32(&mut bytes, 0x0605_4b50);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, checked_u16(entries.len()));
+        push_u16(&mut bytes, checked_u16(entries.len()));
         push_u32(&mut bytes, checked_u32(central_size));
         push_u32(&mut bytes, checked_u32(central_offset));
         push_u16(&mut bytes, 0);
@@ -2603,7 +3140,7 @@ mod tests {
             "Metadata/BuildVersionHistory.plist",
             "Metadata/DocumentIdentifier",
         ] {
-            let exact = vec![b'x'; LogicalEntryLimits::MAX_PAGES_METADATA_BYTES as usize];
+            let exact = vec![b'x'; LogicalEntryLimits::MAX_SEMANTIC_METADATA_BYTES as usize];
             let accepted = zip(&[(authority, &exact)])?;
             crate::zip::reset_test_entry_read_count();
             let catalog = Catalog::__from_bytes_with_logical_entry_limits(
@@ -2631,7 +3168,7 @@ mod tests {
                     observed,
                     maximum,
                 }) if observed == one_over.len() as u64
-                    && maximum == LogicalEntryLimits::MAX_PAGES_METADATA_BYTES
+                    && maximum == LogicalEntryLimits::MAX_SEMANTIC_METADATA_BYTES
             ));
             assert_eq!(
                 crate::zip::test_entry_read_count(),
@@ -2699,6 +3236,367 @@ mod tests {
                 if message.contains("mismatched local and central compression methods")
         ));
         assert_eq!(crate::zip::test_entry_read_count(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn semantic_profile_reads_only_exact_iwa_and_three_sidecars_in_modern_zip() -> Result<()> {
+        let document = semantic_iwa(1)?;
+        let metadata = semantic_iwa(2)?;
+        let entries: [(&str, &[u8]); 8] = [
+            ("Index/Document.iwa", &document),
+            ("Index/Metadata.iwa", &metadata),
+            ("Metadata/Properties.plist", b"properties"),
+            ("Metadata/BuildVersionHistory.plist", b"history"),
+            ("Metadata/DocumentIdentifier", b"identifier"),
+            ("Data/asset.bin", b"asset"),
+            ("Data/not-a-component.iwa", &metadata),
+            ("Preview/preview.jpg", b"preview"),
+        ];
+        let bytes = zip(&entries)?;
+
+        crate::zip::reset_test_entry_read_count();
+        let semantic = Catalog::__from_bytes_with_logical_entry_limits(
+            &bytes,
+            Limits::default(),
+            LogicalEntryLimits::SEMANTIC_METADATA,
+        )?;
+        assert_eq!(crate::zip::test_entry_read_count(), 5);
+        assert_eq!(
+            semantic.iter().map(Entry::name).collect::<Vec<_>>(),
+            [
+                "Index/Document.iwa",
+                "Index/Metadata.iwa",
+                "Metadata/Properties.plist",
+                "Metadata/BuildVersionHistory.plist",
+                "Metadata/DocumentIdentifier",
+            ]
+        );
+        assert!(!semantic.source_is_exact());
+        assert_eq!(semantic.source_provenance(), SourceProvenance::SemanticZip);
+
+        crate::zip::reset_test_entry_read_count();
+        let generic = Catalog::from_bytes(&bytes)?;
+        assert_eq!(crate::zip::test_entry_read_count(), 8);
+        assert_eq!(generic.len(), 8);
+        assert!(generic.source_is_exact());
+        Ok(())
+    }
+
+    #[test]
+    fn semantic_components_profile_reads_no_sidecars() -> Result<()> {
+        let document = semantic_iwa(1)?;
+        let entries: [(&str, &[u8]); 5] = [
+            ("Index/Document.iwa", &document),
+            ("Metadata/Properties.plist", b"properties"),
+            ("Metadata/BuildVersionHistory.plist", b"history"),
+            ("Metadata/DocumentIdentifier", b"identifier"),
+            ("Data/asset.bin", b"asset"),
+        ];
+        let bytes = zip(&entries)?;
+
+        crate::zip::reset_test_entry_read_count();
+        let catalog = Catalog::__from_bytes_with_logical_entry_limits(
+            &bytes,
+            Limits::default(),
+            LogicalEntryLimits::SEMANTIC_COMPONENTS,
+        )?;
+        assert_eq!(crate::zip::test_entry_read_count(), 1);
+        assert_eq!(
+            catalog.iter().map(Entry::name).collect::<Vec<_>>(),
+            ["Index/Document.iwa"]
+        );
+        assert!(
+            catalog
+                .__semantic_metadata_sidecars()?
+                .properties_plist()
+                .is_none()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn semantic_profile_reads_only_nested_iwa_and_prefixed_sidecars_in_legacy_zip() -> Result<()> {
+        let document = semantic_iwa(1)?;
+        let metadata = semantic_iwa(2)?;
+        let index = zip(&[
+            ("Index/Document.iwa", document.as_slice()),
+            ("Index/Metadata.iwa", metadata.as_slice()),
+            ("Data/not-a-component.iwa", metadata.as_slice()),
+        ])?;
+        let outer_entries: [(&str, &[u8]); 6] = [
+            ("legacy.pages/Index.zip", &index),
+            ("legacy.pages/Metadata/Properties.plist", b"properties"),
+            (
+                "legacy.pages/Metadata/BuildVersionHistory.plist",
+                b"history",
+            ),
+            ("legacy.pages/Metadata/DocumentIdentifier", b"identifier"),
+            ("legacy.pages/Data/asset.bin", b"asset"),
+            ("legacy.pages/Preview/preview.jpg", b"preview"),
+        ];
+        let bytes = zip(&outer_entries)?;
+
+        crate::zip::reset_test_entry_read_count();
+        let semantic = Catalog::__from_bytes_with_logical_entry_limits(
+            &bytes,
+            Limits::default(),
+            LogicalEntryLimits::SEMANTIC_METADATA,
+        )?;
+        assert_eq!(crate::zip::test_entry_read_count(), 6);
+        assert_eq!(semantic.len(), 5);
+        assert!(!semantic.source_is_exact());
+        assert_eq!(
+            semantic.source_provenance(),
+            SourceProvenance::LegacySemanticZip
+        );
+
+        crate::zip::reset_test_entry_read_count();
+        let generic = Catalog::from_bytes(&bytes)?;
+        assert_eq!(crate::zip::test_entry_read_count(), 8);
+        assert_eq!(generic.len(), 8);
+        assert_eq!(generic.source_provenance(), SourceProvenance::LegacyZip);
+        Ok(())
+    }
+
+    #[test]
+    fn semantic_profile_skips_irrelevant_opaque_and_refuses_selected_opaque_before_read()
+    -> Result<()> {
+        for name in [b"Data/opaque.bin".as_slice(), b"Preview/opaque.jpg"] {
+            let irrelevant = raw_named_zip(name, name, 99, 99, b"opaque");
+            crate::zip::reset_test_entry_read_count();
+            let catalog = Catalog::__from_bytes_with_logical_entry_limits(
+                &irrelevant,
+                Limits::default(),
+                LogicalEntryLimits::SEMANTIC_METADATA,
+            )?;
+            assert!(catalog.is_empty());
+            assert_eq!(crate::zip::test_entry_read_count(), 0);
+        }
+
+        let selected = raw_named_zip(
+            b"Index/Document.iwa",
+            b"Index/Document.iwa",
+            99,
+            99,
+            b"opaque",
+        );
+        crate::zip::reset_test_entry_read_count();
+        assert!(matches!(
+            Catalog::__from_bytes_with_logical_entry_limits(
+                &selected,
+                Limits::default(),
+                LogicalEntryLimits::SEMANTIC_COMPONENTS,
+            ),
+            Err(Error::InvalidBundle(message)) if message.contains("unsupported ZIP compression")
+        ));
+        assert_eq!(crate::zip::test_entry_read_count(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn semantic_profile_batch_preflights_late_iwa_before_any_component_read() -> Result<()> {
+        let inner = raw_named_entries(&[
+            (
+                b"Index/Document.iwa",
+                b"Index/Document.iwa",
+                0,
+                0,
+                b"document",
+            ),
+            (
+                b"Index/Metadata.iwa",
+                b"Index/Metadata.iwa",
+                99,
+                99,
+                b"metadata",
+            ),
+        ]);
+
+        crate::zip::reset_test_entry_read_count();
+        assert!(matches!(
+            Catalog::__from_bytes_with_logical_entry_limits(
+                &inner,
+                Limits::default(),
+                LogicalEntryLimits::SEMANTIC_COMPONENTS,
+            ),
+            Err(Error::InvalidBundle(message)) if message.contains("unsupported ZIP compression")
+        ));
+        assert_eq!(crate::zip::test_entry_read_count(), 0);
+
+        let outer = zip(&[("legacy.pages/Index.zip", inner.as_slice())])?;
+        crate::zip::reset_test_entry_read_count();
+        assert!(matches!(
+            Catalog::__from_bytes_with_logical_entry_limits(
+                &outer,
+                Limits::default(),
+                LogicalEntryLimits::SEMANTIC_COMPONENTS,
+            ),
+            Err(Error::InvalidBundle(message)) if message.contains("unsupported ZIP compression")
+        ));
+        assert_eq!(
+            crate::zip::test_entry_read_count(),
+            1,
+            "legacy detection must read only the selected Index.zip container"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn semantic_detection_reads_only_the_exact_modern_root() -> Result<()> {
+        let document = semantic_iwa(1)?;
+        let bytes = raw_named_entries(&[
+            (
+                b"Index/Document.iwa",
+                b"Index/Document.iwa",
+                0,
+                0,
+                document.as_slice(),
+            ),
+            (
+                b"Index/Foreign-local.iwa",
+                b"Index/Foreign.iwa",
+                99,
+                0,
+                b"corrupt foreign payload",
+            ),
+            (
+                b"Index/Opaque.iwa",
+                b"Index/Opaque.iwa",
+                99,
+                99,
+                b"opaque foreign payload",
+            ),
+            (
+                b"Index/nested/Slide.iwa",
+                b"Index/nested/Slide.iwa",
+                0,
+                0,
+                b"corrupt nested basename decoy",
+            ),
+        ]);
+
+        crate::zip::reset_test_entry_read_count();
+        let root = crate::inspect_semantic_detection_root(&bytes, Limits::default())?;
+        assert!(root.has_iwa_components());
+        assert!(!root.has_keynote_components());
+        assert!(root.document().is_some());
+        assert_eq!(crate::zip::test_entry_read_count(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn semantic_detection_reads_only_the_legacy_container_and_root() -> Result<()> {
+        let document = semantic_iwa(1)?;
+        let index = raw_named_entries(&[
+            (b"Document.iwa", b"Document.iwa", 0, 0, document.as_slice()),
+            (
+                b"Foreign-local.iwa",
+                b"Foreign.iwa",
+                99,
+                0,
+                b"corrupt foreign payload",
+            ),
+            (
+                b"Opaque.iwa",
+                b"Opaque.iwa",
+                99,
+                99,
+                b"opaque foreign payload",
+            ),
+            (
+                b"nested/TemplateSlide.iwa",
+                b"nested/TemplateSlide.iwa",
+                0,
+                0,
+                b"corrupt nested basename decoy",
+            ),
+        ]);
+        let bytes = zip(&[("legacy.pages/Index.zip", index.as_slice())])?;
+
+        crate::zip::reset_test_entry_read_count();
+        let root = crate::inspect_semantic_detection_root(&bytes, Limits::default())?;
+        assert!(root.has_iwa_components());
+        assert!(!root.has_keynote_components());
+        assert!(root.document().is_some());
+        assert_eq!(crate::zip::test_entry_read_count(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn semantic_detection_does_not_gather_high_count_non_root_names() -> Result<()> {
+        let document = semantic_iwa(1)?;
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("Index/Document.iwa", &document)?;
+        for index in 0..1_024 {
+            writer.write_stored(&format!("Index/Foreign-{index}.iwa"), b"corrupt")?;
+        }
+        let bytes = writer.finish_to_bytes()?;
+
+        crate::zip::reset_test_entry_read_count();
+        let root = crate::inspect_semantic_detection_root(&bytes, Limits::default())?;
+        assert!(root.document().is_some());
+        assert_eq!(crate::zip::test_entry_read_count(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn semantic_detection_refuses_root_and_nested_index_raw_aliases() -> Result<()> {
+        let document = semantic_iwa(1)?;
+        for alias in [
+            b"Index//Document.iwa".as_slice(),
+            b"Index/./Document.iwa",
+            b"Index\\Document.iwa",
+        ] {
+            let bytes = raw_named_zip(alias, alias, 0, 0, &document);
+            assert!(matches!(
+                crate::inspect_semantic_detection_root(&bytes, Limits::default()),
+                Err(Error::InvalidBundle(message))
+                    if message.contains("non-canonical raw Document.iwa authority")
+            ));
+        }
+
+        let index = zip(&[("Document.iwa", document.as_slice())])?;
+        for alias in [
+            b"legacy.pages/./Index.zip".as_slice(),
+            b"legacy.pages\\Index.zip",
+        ] {
+            let bytes = raw_named_zip(alias, alias, 0, 0, &index);
+            assert!(matches!(
+                crate::inspect_semantic_detection_root(&bytes, Limits::default()),
+                Err(Error::InvalidBundle(message))
+                    if message.contains("non-canonical raw Index.zip authority")
+            ));
+        }
+
+        let duplicate_root = raw_named_entries(&[
+            (
+                b"Index/Document.iwa",
+                b"Index/Document.iwa",
+                0,
+                0,
+                document.as_slice(),
+            ),
+            (
+                b"Index/Document.iwa",
+                b"Index/Document.iwa",
+                0,
+                0,
+                document.as_slice(),
+            ),
+        ]);
+        let duplicate_result =
+            crate::inspect_semantic_detection_root(&duplicate_root, Limits::default());
+        assert!(duplicate_result.is_err());
+
+        let mixed = zip(&[
+            ("Index/Document.iwa", document.as_slice()),
+            ("legacy.pages/Index.zip", index.as_slice()),
+        ])?;
+        assert!(matches!(
+            crate::inspect_semantic_detection_root(&mixed, Limits::default()),
+            Err(Error::InvalidBundle(message)) if message.contains("mixes direct IWA")
+        ));
         Ok(())
     }
 

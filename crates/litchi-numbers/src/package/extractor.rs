@@ -19,6 +19,7 @@
 //! this decoder is intentionally not part of the public API.
 
 use super::Components;
+use super::names;
 use super::table::Table;
 use super::{
     Error, Result, SemanticLimitKind, SemanticLimits, SemanticPath, TABLE_MODEL_MESSAGE_TYPE,
@@ -34,11 +35,12 @@ use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_protos::group_node_category_codec::{self, CategoryValueView, GroupNodeView};
 use litchi_iwa_protos::table_info_codec;
-use litchi_iwa_protos::{tn, tsce, tsd, tst};
+use litchi_iwa_protos::{numbers_table_cell_storage_codec, tsce, tsd, tst};
 use prost::Message;
 use std::borrow::Cow;
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write as _;
 use std::sync::Arc;
 
 type CompactTable<T> = Box<[(u32, T)]>;
@@ -48,6 +50,8 @@ type FormulaErrorTable = CompactTable<String>;
 type CommentTable = CompactTable<Comment>;
 type FormulaOwnerKey = [u32; 4];
 type FormulaCategoryKey = [u64; 2];
+const RICH_TEXT_PAYLOAD_MESSAGE_TYPE: u32 = 6_218;
+const STORAGE_MESSAGE_TYPE: u32 = 2_001;
 
 const TILE_MESSAGE_TYPE: u32 = 6_002;
 const MAX_TABLE_ROWS: usize = 1 << 20;
@@ -57,6 +61,71 @@ const MAX_TABLE_MATERIALIZED_CELLS: usize = 1 << 20;
 const MAX_FORMULA_CATEGORY_DEPTH: usize = 64;
 const MAX_FORMULA_WORK: usize = crate::MAX_REFERENCES;
 const MAX_FORMULA_WIRE_BYTES: usize = DEFAULT_MAX_TEXT_BYTES;
+const MAX_PAYLOAD_WORK: usize = DEFAULT_MAX_TEXT_BYTES;
+
+fn table_cell_decode_options(
+    source: &[u8],
+    max_references: usize,
+    max_text_bytes: usize,
+    max_fields: usize,
+    max_work: usize,
+) -> numbers_table_cell_storage_codec::DecodeOptions {
+    numbers_table_cell_storage_codec::DecodeOptions::new(
+        source.len().max(1),
+        max_fields,
+        max_work,
+        16,
+        max_references,
+        max_text_bytes,
+    )
+}
+
+fn map_table_cell_codec_error(error: numbers_table_cell_storage_codec::DecodeError) -> Error {
+    map_table_cell_codec_error_with_reference_offset(error, 0)
+}
+
+fn map_table_cell_codec_error_with_reference_offset(
+    error: numbers_table_cell_storage_codec::DecodeError,
+    reference_offset: usize,
+) -> Error {
+    use numbers_table_cell_storage_codec::DecodeLimit;
+    let Some(limit) = error.resource_limit() else {
+        return Error::InvalidFormat("Numbers table storage projection is invalid".to_owned());
+    };
+    let (kind, observed, maximum) = match limit {
+        DecodeLimit::Bytes { observed, maximum } => {
+            (SemanticLimitKind::FormulaWireBytes, observed, maximum)
+        },
+        DecodeLimit::References { observed, maximum } => (
+            SemanticLimitKind::References,
+            observed.saturating_add(reference_offset),
+            maximum.saturating_add(reference_offset),
+        ),
+        DecodeLimit::Text { observed, maximum } => {
+            (SemanticLimitKind::FormulaWireBytes, observed, maximum)
+        },
+        DecodeLimit::Fields { observed, maximum } => {
+            (SemanticLimitKind::Objects, observed, maximum)
+        },
+        DecodeLimit::Work { observed, maximum } => {
+            (SemanticLimitKind::FormulaWork, observed, maximum)
+        },
+        DecodeLimit::Nesting { observed, maximum } => (
+            SemanticLimitKind::FormulaDepth,
+            observed as usize,
+            maximum as usize,
+        ),
+        _ => {
+            return Error::InvalidFormat("Numbers table storage projection is invalid".to_owned());
+        },
+    };
+    Error::SemanticLimit {
+        kind,
+        observed,
+        maximum,
+        path: SemanticPath::Package,
+    }
+}
 
 struct CellTables<'a> {
     strings: &'a StringTable,
@@ -70,6 +139,62 @@ struct CellTables<'a> {
 struct ParsedCell {
     value: CellValue,
     comment_identifier: Option<u32>,
+}
+
+#[derive(Default)]
+struct ListPreflight {
+    entries: usize,
+    segments: usize,
+    strings: usize,
+    formulas: usize,
+    rich_texts: usize,
+    comments: usize,
+}
+
+impl numbers_table_cell_storage_codec::StorageVisitor for ListPreflight {
+    fn visit_list_entry(
+        &mut self,
+        entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+    ) -> std::result::Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        self.entries = self.entries.saturating_add(1);
+        if entry.string_value().is_some() {
+            self.strings = self.strings.saturating_add(1);
+        } else if entry.formula().is_some() {
+            self.formulas = self.formulas.saturating_add(1);
+        } else if entry.rich_text_payload().is_some() {
+            self.rich_texts = self.rich_texts.saturating_add(1);
+        } else if entry.comment_storage().is_some() {
+            self.comments = self.comments.saturating_add(1);
+        }
+        Ok(())
+    }
+
+    fn visit_list_segment(
+        &mut self,
+        _reference: numbers_table_cell_storage_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        self.segments = self.segments.saturating_add(1);
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct TilePreflight {
+    cells: usize,
+    rows: usize,
+}
+
+impl numbers_table_cell_storage_codec::StorageVisitor for TilePreflight {
+    fn visit_tile_row(
+        &mut self,
+        row: numbers_table_cell_storage_codec::TileRowInfoSnapshot<'_>,
+    ) -> std::result::Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        self.rows = self.rows.saturating_add(1);
+        self.cells = self
+            .cells
+            .saturating_add(usize::try_from(row.cell_count()).unwrap_or(usize::MAX));
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -106,6 +231,10 @@ impl CellBudget {
 
 #[derive(Debug, Clone, Copy)]
 struct ProjectionBudget {
+    references: usize,
+    payload_fields: usize,
+    payload_work: usize,
+    staging_text_bytes: usize,
     materialized_cells: usize,
     output_text_bytes: usize,
     formula_render_work: usize,
@@ -113,11 +242,16 @@ struct ProjectionBudget {
     max_output_text_bytes: usize,
     max_formula_render_work: usize,
     max_formula_render_depth: usize,
+    max_references: usize,
 }
 
 impl ProjectionBudget {
     const fn new(limits: SemanticLimits) -> Self {
         Self {
+            references: 0,
+            payload_fields: 0,
+            payload_work: 0,
+            staging_text_bytes: 0,
             materialized_cells: 0,
             output_text_bytes: 0,
             formula_render_work: 0,
@@ -125,6 +259,7 @@ impl ProjectionBudget {
             max_output_text_bytes: limits.max_output_text_bytes(),
             max_formula_render_work: limits.max_formula_render_work(),
             max_formula_render_depth: limits.max_formula_render_depth(),
+            max_references: limits.max_references(),
         }
     }
 
@@ -134,6 +269,110 @@ impl ProjectionBudget {
             amount,
             self.max_materialized_cells,
             SemanticLimitKind::MaterializedCells,
+        )?;
+        Ok(())
+    }
+
+    const fn remaining_materialized_cells(&self) -> usize {
+        self.max_materialized_cells
+            .saturating_sub(self.materialized_cells)
+    }
+
+    const fn remaining_output_text_bytes(&self) -> usize {
+        self.max_output_text_bytes
+            .saturating_sub(self.output_text_bytes)
+    }
+
+    const fn remaining_references(&self) -> usize {
+        self.max_references.saturating_sub(self.references)
+    }
+
+    fn charge_references(&mut self, amount: usize) -> Result<()> {
+        self.references = projection_charge(
+            self.references,
+            amount,
+            self.max_references,
+            SemanticLimitKind::References,
+        )?;
+        Ok(())
+    }
+
+    const fn remaining_payload_fields(&self) -> usize {
+        crate::MAX_REFERENCES.saturating_sub(self.payload_fields)
+    }
+
+    const fn remaining_payload_work(&self) -> usize {
+        MAX_PAYLOAD_WORK.saturating_sub(self.payload_work)
+    }
+
+    const fn remaining_staging_text_bytes(&self) -> usize {
+        DEFAULT_MAX_TEXT_BYTES.saturating_sub(self.staging_text_bytes)
+    }
+
+    fn charge_staging_text(&mut self, amount: usize) -> Result<()> {
+        self.staging_text_bytes = projection_charge(
+            self.staging_text_bytes,
+            amount,
+            DEFAULT_MAX_TEXT_BYTES,
+            SemanticLimitKind::TextBytes,
+        )?;
+        Ok(())
+    }
+
+    fn charge_wire_preflight(
+        &mut self,
+        report: litchi_iwa_common::wire::WirePreflight,
+    ) -> Result<()> {
+        self.payload_fields = projection_charge(
+            self.payload_fields,
+            report.fields(),
+            crate::MAX_REFERENCES,
+            SemanticLimitKind::Objects,
+        )?;
+        self.payload_work = projection_charge(
+            self.payload_work,
+            report.scanned_bytes(),
+            MAX_PAYLOAD_WORK,
+            SemanticLimitKind::FormulaWork,
+        )?;
+        Ok(())
+    }
+
+    fn charge_decode_report(
+        &mut self,
+        report: numbers_table_cell_storage_codec::DecodeReport,
+    ) -> Result<()> {
+        self.charge_references(report.references())?;
+        self.payload_fields = projection_charge(
+            self.payload_fields,
+            report.fields(),
+            crate::MAX_REFERENCES,
+            SemanticLimitKind::Objects,
+        )?;
+        self.payload_work = projection_charge(
+            self.payload_work,
+            report.work_bytes(),
+            MAX_PAYLOAD_WORK,
+            SemanticLimitKind::FormulaWork,
+        )?;
+        Ok(())
+    }
+
+    fn charge_decode_work(
+        &mut self,
+        report: numbers_table_cell_storage_codec::DecodeReport,
+    ) -> Result<()> {
+        self.payload_fields = projection_charge(
+            self.payload_fields,
+            report.fields(),
+            crate::MAX_REFERENCES,
+            SemanticLimitKind::Objects,
+        )?;
+        self.payload_work = projection_charge(
+            self.payload_work,
+            report.work_bytes(),
+            MAX_PAYLOAD_WORK,
+            SemanticLimitKind::FormulaWork,
         )?;
         Ok(())
     }
@@ -184,6 +423,7 @@ impl ProjectionBudget {
         } else {
             // Retained cells and text are transactional, but CPU work is a
             // package-wide admission cost even when the candidate is rejected.
+            self.payload_work = self.payload_work.max(candidate.payload_work);
             self.formula_render_work = self.formula_render_work.max(candidate.formula_render_work);
         }
     }
@@ -455,8 +695,8 @@ fn validate_table_data_list_segment(
 
 #[derive(Debug, Clone)]
 struct FormulaReferenceName {
-    sheet: Arc<str>,
-    table: Arc<str>,
+    sheet: Arc<String>,
+    table: Arc<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -469,9 +709,9 @@ struct FormulaReferenceMaps {
 pub(super) struct TableDataExtractor<'a> {
     bundle: &'a Components,
     object_index: &'a Index,
-    formula_references: RefCell<Option<FormulaReferenceMaps>>,
     projection_budget: RefCell<ProjectionBudget>,
-    max_formula_references: usize,
+    retain_comments: bool,
+    document_projection: bool,
 }
 
 impl<'a> TableDataExtractor<'a> {
@@ -499,24 +739,16 @@ impl<'a> TableDataExtractor<'a> {
         Self {
             bundle,
             object_index,
-            formula_references: RefCell::new(None),
             projection_budget: RefCell::new(ProjectionBudget::new(limits)),
-            max_formula_references: limits.max_references(),
+            retain_comments: true,
+            document_projection: false,
         }
     }
 
-    fn formula_references(&self) -> Result<Ref<'_, FormulaReferenceMaps>> {
-        if self.formula_references.borrow().is_none() {
-            let references = build_formula_reference_maps(
-                self.bundle,
-                self.object_index,
-                self.max_formula_references,
-            )?;
-            *self.formula_references.borrow_mut() = Some(references);
-        }
-        Ref::filter_map(self.formula_references.borrow(), Option::as_ref).map_err(|_references| {
-            Error::InvalidFormat("Numbers formula-reference cache was not initialized".to_owned())
-        })
+    pub(super) fn without_comments(mut self) -> Self {
+        self.retain_comments = false;
+        self.document_projection = true;
+        self
     }
 
     /// Charge semantic text retained outside table projection, such as rooted
@@ -525,6 +757,13 @@ impl<'a> TableDataExtractor<'a> {
         self.projection_budget
             .borrow_mut()
             .charge_output_text(amount)
+    }
+
+    /// Merge a rooted reference admission into the table-sidecar budget.
+    pub(super) fn charge_references(&self, amount: usize) -> Result<()> {
+        self.projection_budget
+            .borrow_mut()
+            .charge_references(amount)
     }
 
     /// Extract all tables from the document
@@ -635,7 +874,7 @@ impl<'a> TableDataExtractor<'a> {
                     message.type_
                 ))
             })?;
-            return self.parse_table_model(table_model).map(Some);
+            return self.parse_table_model(table_model, false, None).map(Some);
         }
 
         // Protobuf is permissive, and legacy fixtures used 6000 for a model.
@@ -662,15 +901,15 @@ impl<'a> TableDataExtractor<'a> {
             ));
         }
         decode_legacy_table_candidate(&message.data, |table_model| {
-            self.parse_table_model(table_model)
+            self.parse_table_model(table_model, false, None)
         })
     }
 
     /// Extract a table model reached through a schema-proven `TableInfo` edge.
     ///
-    /// Rooted ownership is stricter than the global compatibility scan: one
-    /// canonical type-6001 payload is preferred, the legacy type-6000 payload
-    /// is accepted only when 6001 is absent, and duplicate candidates fail.
+    /// Rooted ownership is stricter than the global compatibility scan:
+    /// canonical and legacy payloads are mutually exclusive and duplicates
+    /// fail independently of message order.
     pub(super) fn extract_reachable_table_from_object(
         &self,
         object: &Resolved<'_>,
@@ -680,87 +919,190 @@ impl<'a> TableDataExtractor<'a> {
             .messages
             .iter()
             .filter(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE);
-        if let Some(message) = typed.next() {
-            if typed.next().is_some() {
+        let canonical = typed.next();
+        if canonical.is_some() && typed.next().is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers {path} table model contains duplicate canonical payloads"
+            )));
+        }
+        let mut legacy = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == 6_000);
+        let legacy_first = legacy.next();
+        let legacy_duplicate = legacy.next().is_some();
+        if legacy_duplicate && (self.document_projection || canonical.is_none()) {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers {path} table model contains duplicate legacy payloads"
+            )));
+        }
+        let message = match (canonical, legacy_first) {
+            (Some(message), Some(_)) if !self.document_projection => message,
+            (Some(_), Some(_)) => {
                 return Err(Error::InvalidFormat(format!(
-                    "Numbers {path} table model contains duplicate canonical payloads"
+                    "Numbers {path} table model has ambiguous payload ownership"
                 )));
-            }
+            },
+            (Some(message), None) | (None, Some(message)) => message,
+            (None, None) => {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers {path} table model has no recognized payload"
+                )));
+            },
+        };
+        if !self.document_projection {
             let table_model =
                 tst::TableModelArchive::decode(message.data.as_slice()).map_err(|error| {
                     Error::InvalidFormat(format!(
                         "Numbers {path} table-model payload is malformed: {error}"
                     ))
                 })?;
-            return self.parse_table_model(table_model);
+            return self.parse_table_model(table_model, false, None);
         }
-
-        let mut legacy = object
-            .messages
-            .iter()
-            .filter(|message| message.type_ == 6_000);
-        let Some(message) = legacy.next() else {
-            return Err(Error::InvalidFormat(format!(
-                "Numbers {path} table model has no recognized payload"
-            )));
+        let projected_name = names::preflight_table_name(message.data.as_slice())
+            .map_err(|error| super::map_sheet_preflight_error(error, path, 0))?;
+        let mut candidate_budget = *self.projection_budget.borrow();
+        candidate_budget.charge_output_text(projected_name.len())?;
+        let projected_model = if self.document_projection {
+            let options = table_cell_decode_options(
+                &message.data,
+                candidate_budget.remaining_references(),
+                MAX_FORMULA_WIRE_BYTES,
+                candidate_budget.remaining_payload_fields(),
+                candidate_budget.remaining_payload_work(),
+            );
+            let (projected, report) =
+                numbers_table_cell_storage_codec::decode_table_model_with_report(
+                    &message.data,
+                    options,
+                )
+                .map_err(|error| {
+                    map_table_cell_codec_error_with_reference_offset(
+                        error,
+                        candidate_budget.references,
+                    )
+                })?;
+            if let Err(error) = candidate_budget.charge_decode_report(report) {
+                self.projection_budget
+                    .borrow_mut()
+                    .commit_attempt(candidate_budget, false);
+                return Err(error);
+            }
+            Some(projected)
+        } else {
+            None
         };
-        if legacy.next().is_some() {
-            return Err(Error::InvalidFormat(format!(
-                "Numbers {path} table model contains duplicate legacy payloads"
-            )));
+        let table_model = match tst::TableModelArchive::decode(message.data.as_slice()) {
+            Ok(table_model) => table_model,
+            Err(error) => {
+                self.projection_budget
+                    .borrow_mut()
+                    .commit_attempt(candidate_budget, false);
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers {path} table-model payload is malformed: {error}"
+                )));
+            },
+        };
+        if table_model.table_name != projected_name {
+            self.projection_budget
+                .borrow_mut()
+                .commit_attempt(candidate_budget, false);
+            return Err(Error::MalformedPayload { path });
         }
-        let table_model =
-            tst::TableModelArchive::decode(message.data.as_slice()).map_err(|error| {
-                Error::InvalidFormat(format!(
-                    "Numbers {path} legacy table-model payload is malformed: {error}"
-                ))
-            })?;
-        self.parse_table_model(table_model)
+        if let Some(projected_model) = projected_model
+            && (table_model.number_of_rows != projected_model.number_of_rows()
+                || table_model.number_of_columns != projected_model.number_of_columns()
+                || table_model.table_id != projected_model.table_id())
+        {
+            self.projection_budget
+                .borrow_mut()
+                .commit_attempt(candidate_budget, false);
+            return Err(Error::MalformedPayload { path });
+        }
+        self.parse_table_model(table_model, true, Some(candidate_budget))
     }
 
     /// Parse a TableModelArchive protobuf message
-    fn parse_table_model(&self, table_model: tst::TableModelArchive) -> Result<Table> {
+    fn parse_table_model(
+        &self,
+        table_model: tst::TableModelArchive,
+        name_precharged: bool,
+        initial_budget: Option<ProjectionBudget>,
+    ) -> Result<Table> {
         // Projection is transactional at the table boundary. A rejected legacy
         // candidate must not consume retained-cell or retained-text capacity
         // that belongs to a later schema-proven table. Formula work remains a
         // monotonic package-wide cost across successful and rejected attempts.
-        let mut projection_budget = *self.projection_budget.borrow();
+        let mut projection_budget =
+            initial_budget.unwrap_or_else(|| *self.projection_budget.borrow());
         let result = (|| {
             let (row_count, column_count) = checked_table_dimensions(
                 table_model.number_of_rows,
                 table_model.number_of_columns,
             )?;
-            projection_budget.charge_output_text(table_model.table_name.len())?;
+            if !name_precharged {
+                projection_budget.charge_output_text(table_model.table_name.len())?;
+            }
             let mut table =
                 Table::with_dimensions(table_model.table_name, row_count, column_count)?;
 
             // Extract string table for cell text values
             // string_table is a required field, not Optional
-            let string_table =
-                self.load_string_table(table_model.base_data_store.string_table.identifier)?;
+            let string_table = self.load_string_table(
+                table_model.base_data_store.string_table.identifier,
+                &mut projection_budget,
+            )?;
 
             // Extract formula table for formula cells
             // formula_table is a required field, not Optional
-            let formula_table =
-                self.load_formula_table(table_model.base_data_store.formula_table.identifier)?;
+            let formula_table = self.load_formula_table(
+                table_model.base_data_store.formula_table.identifier,
+                &mut projection_budget,
+            )?;
             let formula_references = if formula_table.is_empty() {
                 None
             } else {
-                Some(self.formula_references()?)
+                let (references, cost) = build_formula_reference_maps(
+                    self.bundle,
+                    self.object_index,
+                    projection_budget.remaining_references(),
+                    projection_budget.remaining_payload_work(),
+                    MAX_FORMULA_WIRE_BYTES.saturating_sub(projection_budget.payload_work),
+                    projection_budget.remaining_staging_text_bytes(),
+                )?;
+                projection_budget.charge_references(cost.retained_entries)?;
+                projection_budget.charge_staging_text(cost.text_bytes)?;
+                projection_budget.payload_work = projection_charge(
+                    projection_budget.payload_work,
+                    cost.work_items,
+                    MAX_PAYLOAD_WORK,
+                    SemanticLimitKind::FormulaWork,
+                )?;
+                Some(references)
             };
             let empty_formula_references = FormulaReferenceMaps::default();
             let formula_error_table = match table_model.base_data_store.formula_error_table {
-                Some(reference) => self.load_formula_error_table(reference.identifier)?,
+                Some(reference) => {
+                    self.load_formula_error_table(reference.identifier, &mut projection_budget)?
+                },
                 None => Box::default(),
             };
 
             let rich_text_table = match table_model.base_data_store.rich_text_table {
-                Some(reference) => self.load_rich_text_table(reference.identifier)?,
+                Some(reference) => {
+                    self.load_rich_text_table(reference.identifier, &mut projection_budget)?
+                },
                 None => Box::default(),
             };
-            let comment_table = match table_model.base_data_store.comment_storage_table {
-                Some(reference) => self.load_comment_table(reference.identifier)?,
-                None => Box::default(),
+            let comment_table = if self.retain_comments {
+                match table_model.base_data_store.comment_storage_table {
+                    Some(reference) => {
+                        self.load_comment_table(reference.identifier, &mut projection_budget)?
+                    },
+                    None => Box::default(),
+                }
+            } else {
+                Box::default()
             };
 
             // Parse tiles to extract cell data
@@ -771,7 +1113,7 @@ impl<'a> TableDataExtractor<'a> {
                 rich_text: &rich_text_table,
                 comments: &comment_table,
                 formula_references: formula_references
-                    .as_deref()
+                    .as_ref()
                     .unwrap_or(&empty_formula_references),
             };
             self.parse_tiles(
@@ -791,73 +1133,125 @@ impl<'a> TableDataExtractor<'a> {
     }
 
     /// Load a TableDataList from an object reference
-    fn load_string_table(&self, object_id: u64) -> Result<StringTable> {
-        compact_table(
-            self.load_table_data_list_entries(object_id, tst::table_data_list::ListType::String)?
-                .into_iter()
-                .filter_map(|entry| entry.string.map(|value| (entry.key, value))),
-        )
-    }
-
-    fn load_formula_table(&self, object_id: u64) -> Result<FormulaTable> {
-        compact_table(
-            self.load_table_data_list_entries(object_id, tst::table_data_list::ListType::Formula)?
-                .into_iter()
-                .filter_map(|entry| entry.formula.map(|value| (entry.key, value))),
-        )
-    }
-
-    fn load_formula_error_table(&self, object_id: u64) -> Result<FormulaErrorTable> {
+    fn load_string_table(
+        &self,
+        object_id: u64,
+        budget: &mut ProjectionBudget,
+    ) -> Result<StringTable> {
         compact_table(
             self.load_table_data_list_entries(
                 object_id,
-                tst::table_data_list::ListType::FormulaError,
+                tst::table_data_list::ListType::String,
+                budget,
             )?
             .into_iter()
             .filter_map(|entry| entry.string.map(|value| (entry.key, value))),
         )
     }
 
-    fn load_rich_text_table(&self, object_id: u64) -> Result<StringTable> {
+    fn load_formula_table(
+        &self,
+        object_id: u64,
+        budget: &mut ProjectionBudget,
+    ) -> Result<FormulaTable> {
+        compact_table(
+            self.load_table_data_list_entries(
+                object_id,
+                tst::table_data_list::ListType::Formula,
+                budget,
+            )?
+            .into_iter()
+            .filter_map(|entry| entry.formula.map(|value| (entry.key, value))),
+        )
+    }
+
+    fn load_formula_error_table(
+        &self,
+        object_id: u64,
+        budget: &mut ProjectionBudget,
+    ) -> Result<FormulaErrorTable> {
+        compact_table(
+            self.load_table_data_list_entries(
+                object_id,
+                tst::table_data_list::ListType::FormulaError,
+                budget,
+            )?
+            .into_iter()
+            .filter_map(|entry| entry.string.map(|value| (entry.key, value))),
+        )
+    }
+
+    fn load_rich_text_table(
+        &self,
+        object_id: u64,
+        budget: &mut ProjectionBudget,
+    ) -> Result<StringTable> {
         let mut result = Vec::new();
 
         for entry in self.load_table_data_list_entries(
             object_id,
             tst::table_data_list::ListType::RichTextPayload,
+            budget,
         )? {
-            let Some(payload_reference) = entry.rich_text_payload else {
-                continue;
-            };
-            let Some(payload_object) = self
+            let payload_reference = entry.rich_text_payload.ok_or_else(|| {
+                Error::InvalidFormat("Numbers rich-text entry has no payload reference".to_owned())
+            })?;
+            if payload_reference.identifier == 0 {
+                return Err(Error::InvalidFormat(
+                    "Numbers rich-text entry has a null payload reference".to_owned(),
+                ));
+            }
+            let payload_object = self
                 .object_index
                 .resolve_ref_id(self.bundle, payload_reference.identifier)?
-            else {
-                continue;
-            };
-            for payload_message in payload_object.messages {
-                let Ok(payload) =
-                    tst::RichTextPayloadArchive::decode(payload_message.data.as_slice())
-                else {
-                    continue;
-                };
-                if let Some(text) = self.extract_rich_text(payload.storage.identifier)? {
-                    result.try_reserve(1).map_err(|_| {
-                        allocation_error("Numbers rich-text sidecar", result.len() + 1)
-                    })?;
-                    result.push((entry.key, text));
-                    break;
-                }
+                .ok_or_else(|| {
+                    Error::InvalidFormat("Numbers rich-text payload is missing".to_owned())
+                })?;
+            let mut messages = payload_object
+                .messages
+                .iter()
+                .filter(|message| message.type_ == RICH_TEXT_PAYLOAD_MESSAGE_TYPE);
+            let payload_message = messages.next().ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Numbers rich-text payload has no canonical message".to_owned(),
+                )
+            })?;
+            if messages.next().is_some() {
+                return Err(Error::InvalidFormat(
+                    "Numbers rich-text payload has duplicate canonical messages".to_owned(),
+                ));
             }
+            let (projected_storage, payload_report) =
+                preflight_rich_text_payload(&payload_message.data)?;
+            budget.charge_wire_preflight(payload_report)?;
+            budget.charge_references(1)?;
+            let payload = tst::RichTextPayloadArchive::decode(payload_message.data.as_slice())
+                .map_err(Error::protobuf)?;
+            if payload.storage.identifier != projected_storage {
+                return Err(Error::InvalidFormat(
+                    "Numbers rich-text payload failed strict reference parity".to_owned(),
+                ));
+            }
+            let text = self.extract_rich_text(payload.storage.identifier, budget)?;
+            result
+                .try_reserve(1)
+                .map_err(|_| allocation_error("Numbers rich-text sidecar", result.len() + 1))?;
+            result.push((entry.key, text));
         }
 
         compact_table_vec(result)
     }
 
-    fn load_comment_table(&self, object_id: u64) -> Result<CommentTable> {
+    fn load_comment_table(
+        &self,
+        object_id: u64,
+        budget: &mut ProjectionBudget,
+    ) -> Result<CommentTable> {
         let mut result = Vec::new();
         for entry in self.load_table_data_list_entries(
             object_id,
             tst::table_data_list::ListType::CommentStorage,
+            budget,
         )? {
             if entry.refcount == 0 {
                 return Err(Error::InvalidFormat(format!(
@@ -940,6 +1334,7 @@ impl<'a> TableDataExtractor<'a> {
         &self,
         object_id: u64,
         list_type: tst::table_data_list::ListType,
+        budget: &mut ProjectionBudget,
     ) -> Result<Vec<tst::table_data_list::ListEntry>> {
         let resolved = self
             .object_index
@@ -949,38 +1344,98 @@ impl<'a> TableDataExtractor<'a> {
                     "Numbers table-data-list object {object_id} is missing"
                 ))
             })?;
-        let lists = resolved
+        let mut selected = None;
+        let mut selected_preflight = None;
+        for message in resolved
             .messages
             .iter()
             .filter(|message| message.type_ == 6005 || message.type_ == 6201)
-            .map(|message| tst::TableDataList::decode(message.data.as_slice()))
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(Error::protobuf)?;
-        let mut matching = lists
-            .into_iter()
-            .filter(|list| list.list_type == list_type as i32);
-        let list = matching.next().ok_or_else(|| {
+        {
+            if !self.document_projection {
+                let decoded =
+                    tst::TableDataList::decode(message.data.as_slice()).map_err(Error::protobuf)?;
+                if decoded.list_type != list_type as i32 {
+                    continue;
+                }
+                if selected.replace(decoded).is_some() {
+                    return Err(Error::InvalidFormat(format!(
+                        "Object {object_id} has multiple Numbers {list_type:?} TableDataList payloads"
+                    )));
+                }
+                continue;
+            }
+            let mut preflight = ListPreflight::default();
+            let options = table_cell_decode_options(
+                &message.data,
+                crate::MAX_REFERENCES,
+                MAX_FORMULA_WIRE_BYTES,
+                budget.remaining_payload_fields(),
+                budget.remaining_payload_work(),
+            );
+            let (snapshot, report) =
+                numbers_table_cell_storage_codec::decode_table_data_list_with_visitor(
+                    &message.data,
+                    options,
+                    &mut preflight,
+                )
+                .map_err(|error| {
+                    map_table_cell_codec_error_with_reference_offset(error, budget.references)
+                })?;
+            if snapshot.list_type() != list_type as i32 {
+                budget.charge_decode_work(report)?;
+                continue;
+            }
+            budget.charge_decode_report(report)?;
+            if selected.is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "Object {object_id} has multiple Numbers {list_type:?} TableDataList payloads"
+                )));
+            }
+            selected =
+                Some(tst::TableDataList::decode(message.data.as_slice()).map_err(Error::protobuf)?);
+            selected_preflight = Some(preflight);
+        }
+        let list = selected.ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "Object {object_id} has no Numbers {list_type:?} TableDataList payload"
             ))
         })?;
-        if matching.next().is_some() {
+        if let Some(list_preflight) = selected_preflight
+            && (list.entries.len() != list_preflight.entries
+                || list.segments.len() != list_preflight.segments)
+        {
             return Err(Error::InvalidFormat(format!(
-                "Object {object_id} has multiple Numbers {list_type:?} TableDataList payloads"
+                "Numbers {list_type:?} table {object_id} failed strict list parity"
+            )));
+        }
+        if self.document_projection
+            && list
+                .entries
+                .iter()
+                .any(|entry| !entry_matches_list_type(entry, list_type))
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers {list_type:?} table {object_id} has an entry without its selected payload"
             )));
         }
 
         let mut entries = list.entries;
-        let mut keys = entries
-            .iter()
-            .map(|entry| entry.key)
-            .collect::<HashSet<_>>();
+        let mut keys = HashSet::new();
+        keys.try_reserve(entries.len()).map_err(|_allocation| {
+            allocation_error("Numbers table-list entry keys", entries.len())
+        })?;
+        keys.extend(entries.iter().map(|entry| entry.key));
         if keys.len() != entries.len() {
             return Err(Error::InvalidFormat(format!(
                 "Numbers {list_type:?} table {object_id} contains duplicate root entry keys"
             )));
         }
         let mut segment_ids = HashSet::new();
+        segment_ids
+            .try_reserve(list.segments.len())
+            .map_err(|_allocation| {
+                allocation_error("Numbers table-list segment identities", list.segments.len())
+            })?;
         for reference in list.segments {
             if !segment_ids.insert(reference.identifier) {
                 return Err(Error::InvalidFormat(format!(
@@ -997,26 +1452,68 @@ impl<'a> TableDataExtractor<'a> {
                         reference.identifier
                     ))
                 })?;
-            let segment_messages = segment_object
+            let mut segment_messages = segment_object
                 .messages
                 .iter()
-                .filter(|message| message.type_ == 6011)
-                .collect::<Vec<_>>();
-            let segment_message = segment_messages.first().ok_or_else(|| {
+                .filter(|message| message.type_ == 6011);
+            let segment_message = segment_messages.next().ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Object {} has no Numbers TableDataListSegment payload",
                     reference.identifier
                 ))
             })?;
-            if segment_messages.len() != 1 {
+            if segment_messages.next().is_some() {
                 return Err(Error::InvalidFormat(format!(
                     "Object {} has multiple Numbers TableDataListSegment payloads",
                     reference.identifier
                 )));
             }
+            let projected_segment = if self.document_projection {
+                let mut segment_preflight = ListPreflight::default();
+                let options = table_cell_decode_options(
+                    &segment_message.data,
+                    budget.remaining_references(),
+                    MAX_FORMULA_WIRE_BYTES,
+                    budget.remaining_payload_fields(),
+                    budget.remaining_payload_work(),
+                );
+                let (snapshot, report) =
+                    numbers_table_cell_storage_codec::decode_table_data_list_segment_with_visitor(
+                        &segment_message.data,
+                        options,
+                        &mut segment_preflight,
+                    )
+                    .map_err(|error| {
+                        map_table_cell_codec_error_with_reference_offset(error, budget.references)
+                    })?;
+                budget.charge_decode_report(report)?;
+                Some((snapshot, segment_preflight))
+            } else {
+                None
+            };
             let segment = tst::TableDataListSegment::decode(segment_message.data.as_slice())
                 .map_err(Error::protobuf)?;
+            if let Some((segment_snapshot, segment_preflight)) = projected_segment
+                && (segment_snapshot.list_type() != segment.list_type
+                    || segment.entries.len() != segment_preflight.entries)
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers table-data-list segment {} failed strict parity",
+                    reference.identifier
+                )));
+            }
             validate_table_data_list_segment(reference.identifier, list_type, &segment)?;
+            if self.document_projection
+                && segment
+                    .entries
+                    .iter()
+                    .any(|entry| !entry_matches_list_type(entry, list_type))
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers table-data-list segment {} has a conflicting entry payload",
+                    reference.identifier
+                )));
+            }
             for entry in segment.entries {
                 if !keys.insert(entry.key) {
                     return Err(Error::InvalidFormat(format!(
@@ -1024,6 +1521,12 @@ impl<'a> TableDataExtractor<'a> {
                         entry.key
                     )));
                 }
+                entries.try_reserve(1).map_err(|_allocation| {
+                    allocation_error(
+                        "Numbers table-list entries",
+                        entries.len().saturating_add(1),
+                    )
+                })?;
                 entries.push(entry);
             }
         }
@@ -1124,11 +1627,42 @@ impl<'a> TableDataExtractor<'a> {
                     "Numbers tile object {tile_id} contains multiple tile payloads"
                 )));
             }
+            let options = table_cell_decode_options(
+                &msg.data,
+                projection_budget.remaining_references(),
+                projection_budget.remaining_output_text_bytes(),
+                projection_budget.remaining_payload_fields(),
+                projection_budget.remaining_payload_work(),
+            );
+            let mut projected_rows = TilePreflight::default();
+            let (projected, report) = numbers_table_cell_storage_codec::decode_tile_with_visitor(
+                &msg.data,
+                options,
+                &mut projected_rows,
+            )
+            .map_err(|error| {
+                map_table_cell_codec_error_with_reference_offset(
+                    error,
+                    projection_budget.references,
+                )
+            })?;
+            projection_budget.charge_decode_report(report)?;
+            projection_budget.charge_materialized_cells(projected_rows.cells)?;
             let tile = tst::Tile::decode(&*msg.data).map_err(|error| {
                 Error::InvalidFormat(format!(
                     "Numbers tile object {tile_id} has a malformed tile payload: {error}"
                 ))
             })?;
+            if tile.num_cells != projected.num_cells()
+                || tile.numrows != projected.num_rows()
+                || tile.row_infos.len() != projected_rows.rows
+                || tile.max_column != projected.max_column()
+                || tile.max_row != projected.max_row()
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers tile object {tile_id} failed strict projection parity"
+                )));
+            }
             self.parse_tile_rows(
                 &tile,
                 row_origin,
@@ -1227,7 +1761,8 @@ impl<'a> TableDataExtractor<'a> {
             Error::InvalidFormat("Numbers cell count does not fit the host usize".to_owned())
         })?;
         budget.check(expected_cells)?;
-        projection_budget.charge_materialized_cells(expected_cells)?;
+        // The strict tile projection admitted the aggregate declared cell
+        // count before generated tile decoding.
         let cells = Self::parse_cell_offsets(
             cell_offsets,
             cell_storage.len(),
@@ -1975,21 +2510,233 @@ impl<'a> TableDataExtractor<'a> {
     }
 
     /// Extract rich text from a storage reference
-    fn extract_rich_text(&self, storage_id: u64) -> Result<Option<String>> {
-        if let Some(resolved) = self.object_index.resolve_ref_id(self.bundle, storage_id)? {
-            // Look for TSWP.StorageArchive messages
-            for msg in resolved.messages {
-                if msg.type_ >= 2001
-                    && msg.type_ <= 2022
-                    && let Ok(storage) = litchi_iwa_protos::tswp::StorageArchive::decode(&*msg.data)
-                    && !storage.text.is_empty()
-                {
-                    return Ok(Some(storage.text.join("\n")));
-                }
-            }
+    fn extract_rich_text(&self, storage_id: u64, budget: &mut ProjectionBudget) -> Result<String> {
+        if storage_id == 0 {
+            return Err(Error::InvalidFormat(
+                "Numbers rich-text storage has a null reference".to_owned(),
+            ));
         }
+        let resolved = self
+            .object_index
+            .resolve_ref_id(self.bundle, storage_id)?
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers rich-text storage is missing".to_owned())
+            })?;
+        let mut messages = resolved
+            .messages
+            .iter()
+            .filter(|message| message.type_ == STORAGE_MESSAGE_TYPE);
+        let message = messages.next().ok_or_else(|| {
+            Error::InvalidFormat("Numbers rich-text storage has no canonical message".to_owned())
+        })?;
+        if messages.next().is_some() {
+            return Err(Error::InvalidFormat(
+                "Numbers rich-text storage has duplicate canonical messages".to_owned(),
+            ));
+        }
+        let remaining = if self.document_projection {
+            budget.remaining_staging_text_bytes()
+        } else {
+            budget.remaining_output_text_bytes()
+        };
+        if remaining == 0 {
+            return Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::OutputTextBytes,
+                observed: 1,
+                maximum: 0,
+                path: SemanticPath::Package,
+            });
+        }
+        let limits = litchi_iwa_text_wire::Limits::new(
+            message.data.len().max(1),
+            message.data.len().max(1),
+            message.data.len().max(1),
+            remaining,
+        )
+        .map_err(|_error| {
+            Error::InvalidFormat("Numbers rich-text limits are invalid".to_owned())
+        })?;
+        let validated_text_len = if self.document_projection {
+            let rewrite_limits = litchi_iwa_text_wire::RewriteLimits::new(
+                message.data.len().max(1),
+                budget.remaining_payload_fields().max(1),
+                8,
+                crate::MAX_REFERENCES,
+                remaining,
+                crate::MAX_REFERENCES,
+                budget.remaining_references().max(1),
+                message.data.len().max(1),
+                budget.remaining_payload_work().max(1),
+            )
+            .map_err(|_error| {
+                Error::InvalidFormat("Numbers rich-text limits are invalid".to_owned())
+            })?;
+            let validation =
+                litchi_iwa_text_wire::validate_storage_with_limits(&message.data, rewrite_limits)
+                    .map_err(map_rich_text_rewrite_error)?;
+            budget.payload_fields = projection_charge(
+                budget.payload_fields,
+                validation.fields(),
+                crate::MAX_REFERENCES,
+                SemanticLimitKind::Objects,
+            )?;
+            budget.charge_references(validation.reference_occurrences())?;
+            let second_pass_work = message
+                .data
+                .len()
+                .checked_mul(2)
+                .and_then(|work| work.checked_add(validation.utf8_len().saturating_mul(2)))
+                .ok_or_else(|| {
+                    formula_semantic_limit(
+                        SemanticLimitKind::FormulaWork,
+                        usize::MAX,
+                        MAX_PAYLOAD_WORK,
+                    )
+                })?;
+            budget.payload_work = projection_charge(
+                budget.payload_work,
+                validation
+                    .validation_work()
+                    .saturating_add(second_pass_work),
+                MAX_PAYLOAD_WORK,
+                SemanticLimitKind::FormulaWork,
+            )?;
+            Some(validation.utf8_len())
+        } else {
+            None
+        };
+        let storage = litchi_iwa_text_wire::from_bytes_with_limits(&message.data, limits)
+            .map_err(map_rich_text_error)?;
+        if self.document_projection {
+            if validated_text_len != Some(storage.len()) {
+                return Err(Error::InvalidFormat(
+                    "Numbers rich-text storage failed strict text parity".to_owned(),
+                ));
+            }
+            budget.charge_staging_text(storage.len())?;
+        } else {
+            budget.charge_output_text(storage.len())?;
+        }
+        Ok(storage.into_text())
+    }
+}
 
-        Ok(None)
+fn preflight_rich_text_payload(
+    source: &[u8],
+) -> Result<(u64, litchi_iwa_common::wire::WirePreflight)> {
+    let limits = WireLimits::default()
+        .with_input_bytes(source.len().clamp(1, WireLimits::MAX_INPUT_BYTES))?
+        .with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS))?
+        .with_nesting(1)?;
+    let mut storage = None;
+    let mut cell = false;
+    let report = preflight_wire_tree_with_limits(source, limits, |visit| {
+        match visit.field().number() {
+            1 => {
+                if storage.is_some() || visit.field().wire_type() != 2 {
+                    return Err(litchi_iwa_common::Error::InvalidFormat(
+                        "invalid rich-text storage reference".to_owned(),
+                    ));
+                }
+                storage = Some(names::preflight_local_reference(visit.field().payload())?);
+            },
+            3 => {
+                if cell || visit.field().wire_type() != 2 {
+                    return Err(litchi_iwa_common::Error::InvalidFormat(
+                        "invalid rich-text cell owner".to_owned(),
+                    ));
+                }
+                cell = true;
+            },
+            _ => {},
+        }
+        Ok(WireDescent::Skip)
+    })?;
+    if !cell {
+        return Err(Error::InvalidFormat(
+            "Numbers rich-text payload has no cell owner".to_owned(),
+        ));
+    }
+    let storage = storage.ok_or_else(|| {
+        Error::InvalidFormat("Numbers rich-text payload has no storage reference".to_owned())
+    })?;
+    Ok((storage, report))
+}
+
+fn entry_matches_list_type(
+    entry: &tst::table_data_list::ListEntry,
+    list_type: tst::table_data_list::ListType,
+) -> bool {
+    let present = [
+        entry.string.is_some(),
+        entry.reference.is_some(),
+        entry.formula.is_some(),
+        entry.format.is_some(),
+        entry.custom_format.is_some(),
+        entry.rich_text_payload.is_some(),
+        entry.comment_storage.is_some(),
+        entry.import_warning_set.is_some(),
+        entry.cell_spec.is_some(),
+    ];
+    if present.into_iter().filter(|value| *value).count() != 1 {
+        return false;
+    }
+    match list_type {
+        tst::table_data_list::ListType::String | tst::table_data_list::ListType::FormulaError => {
+            entry.string.is_some()
+        },
+        tst::table_data_list::ListType::Formula => entry.formula.is_some(),
+        tst::table_data_list::ListType::RichTextPayload => entry.rich_text_payload.is_some(),
+        tst::table_data_list::ListType::CommentStorage => entry.comment_storage.is_some(),
+        _ => true,
+    }
+}
+
+fn map_rich_text_error(error: litchi_iwa_text_wire::Error) -> Error {
+    match error {
+        litchi_iwa_text_wire::Error::TooManyTextBytes { actual, limit } => Error::SemanticLimit {
+            kind: SemanticLimitKind::OutputTextBytes,
+            observed: actual,
+            maximum: limit,
+            path: SemanticPath::Package,
+        },
+        litchi_iwa_text_wire::Error::TooManyFragments { actual, limit } => Error::SemanticLimit {
+            kind: SemanticLimitKind::Objects,
+            observed: actual,
+            maximum: limit,
+            path: SemanticPath::Package,
+        },
+        litchi_iwa_text_wire::Error::Common(error) => Error::Common(error),
+        _ => Error::InvalidFormat("Numbers rich-text storage is invalid".to_owned()),
+    }
+}
+
+fn map_rich_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
+    match error {
+        litchi_iwa_text_wire::RewriteError::LimitExceeded {
+            resource,
+            observed,
+            limit,
+        } => Error::SemanticLimit {
+            kind: if resource.contains("reference") {
+                SemanticLimitKind::References
+            } else if resource.contains("field") || resource.contains("entry") {
+                SemanticLimitKind::Objects
+            } else if resource.contains("text") {
+                SemanticLimitKind::TextBytes
+            } else if resource.contains("work") {
+                SemanticLimitKind::FormulaWork
+            } else {
+                SemanticLimitKind::FormulaWireBytes
+            },
+            observed,
+            maximum: limit,
+            path: SemanticPath::Package,
+        },
+        litchi_iwa_text_wire::RewriteError::Allocation { amount, .. } => {
+            allocation_error("Numbers rich-text storage validation", amount)
+        },
+        _ => Error::InvalidFormat("Numbers rich-text storage is invalid".to_owned()),
     }
 }
 
@@ -2004,16 +2751,27 @@ struct FormulaReferenceBudget {
     work_items: usize,
     wire_bytes: usize,
     text_bytes: usize,
+    maximum_work: usize,
+    maximum_wire_bytes: usize,
+    maximum_text_bytes: usize,
 }
 
 impl FormulaReferenceBudget {
-    const fn new(maximum_retained_entries: usize) -> Self {
+    const fn new(
+        maximum_retained_entries: usize,
+        maximum_work: usize,
+        maximum_wire_bytes: usize,
+        maximum_text_bytes: usize,
+    ) -> Self {
         Self {
             retained_entries: 0,
             maximum_retained_entries,
             work_items: 0,
             wire_bytes: 0,
             text_bytes: 0,
+            maximum_work,
+            maximum_wire_bytes,
+            maximum_text_bytes,
         }
     }
 
@@ -2043,31 +2801,36 @@ impl FormulaReferenceBudget {
 
     fn ensure_work_capacity(&self, additional: usize) -> Result<()> {
         let observed = self.work_items.checked_add(additional).ok_or_else(|| {
-            formula_semantic_limit(SemanticLimitKind::FormulaWork, usize::MAX, MAX_FORMULA_WORK)
+            formula_semantic_limit(
+                SemanticLimitKind::FormulaWork,
+                usize::MAX,
+                self.maximum_work,
+            )
         })?;
-        if observed > MAX_FORMULA_WORK {
+        if observed > self.maximum_work {
             return Err(formula_semantic_limit(
                 SemanticLimitKind::FormulaWork,
                 observed,
-                MAX_FORMULA_WORK,
+                self.maximum_work,
             ));
         }
         Ok(())
     }
 
     fn charge_wire_bytes(&mut self, bytes: usize) -> Result<()> {
+        self.charge_work(bytes)?;
         self.wire_bytes = self.wire_bytes.checked_add(bytes).ok_or_else(|| {
             formula_semantic_limit(
                 SemanticLimitKind::FormulaWireBytes,
                 usize::MAX,
-                MAX_FORMULA_WIRE_BYTES,
+                self.maximum_wire_bytes,
             )
         })?;
-        if self.wire_bytes > MAX_FORMULA_WIRE_BYTES {
+        if self.wire_bytes > self.maximum_wire_bytes {
             return Err(formula_semantic_limit(
                 SemanticLimitKind::FormulaWireBytes,
                 self.wire_bytes,
-                MAX_FORMULA_WIRE_BYTES,
+                self.maximum_wire_bytes,
             ));
         }
         Ok(())
@@ -2078,14 +2841,14 @@ impl FormulaReferenceBudget {
             formula_semantic_limit(
                 SemanticLimitKind::TextBytes,
                 usize::MAX,
-                DEFAULT_MAX_TEXT_BYTES,
+                self.maximum_text_bytes,
             )
         })?;
-        if self.text_bytes > DEFAULT_MAX_TEXT_BYTES {
+        if self.text_bytes > self.maximum_text_bytes {
             return Err(formula_semantic_limit(
                 SemanticLimitKind::TextBytes,
                 self.text_bytes,
-                DEFAULT_MAX_TEXT_BYTES,
+                self.maximum_text_bytes,
             ));
         }
         Ok(())
@@ -2105,55 +2868,77 @@ fn build_formula_reference_maps(
     bundle: &Components,
     object_index: &Index,
     max_formula_references: usize,
-) -> Result<FormulaReferenceMaps> {
-    let mut budget = FormulaReferenceBudget::new(max_formula_references);
+    max_work: usize,
+    max_wire_bytes: usize,
+    max_text_bytes: usize,
+) -> Result<(FormulaReferenceMaps, FormulaReferenceBudget)> {
+    let mut budget = FormulaReferenceBudget::new(
+        max_formula_references,
+        max_work,
+        max_wire_bytes,
+        max_text_bytes,
+    );
     let mut result = FormulaReferenceMaps::default();
     result
         .categories
         .try_reserve(1)
         .map_err(|_error| allocation_error("Numbers formula categories", 1))?;
-    result.categories.insert([1, 0], "Grand Total".to_owned());
+    let mut grand_total = String::new();
+    grand_total
+        .try_reserve_exact("Grand Total".len())
+        .map_err(|_error| allocation_error("Numbers formula categories", "Grand Total".len()))?;
+    grand_total.push_str("Grand Total");
+    result.categories.insert([1, 0], grand_total);
     let mut table_info_names = HashMap::<u64, FormulaReferenceName>::new();
-    let root_archive = bundle
+    let root_message = bundle
         .get_archive("Index/Document.iwa")
         .and_then(|archive| archive.object(1))
-        .and_then(|object| {
-            object
-                .messages
-                .iter()
-                .filter(|message| message.type_ == 1)
-                .find_map(|message| tn::DocumentArchive::decode(message.data.as_slice()).ok())
-        });
+        .and_then(|object| object.messages.iter().find(|message| message.type_ == 1));
 
-    if let Some(root) = root_archive {
-        for sheet_reference in root.sheets {
+    if let Some(root) = root_message {
+        budget.charge_wire_bytes(root.data.len())?;
+        budget.charge_work(root.data.len().saturating_mul(7))?;
+        let options = litchi_iwa_protos::numbers_sheet_order_codec::DecodeOptions::new(
+            root.data.len().max(1),
+            root.data.len().saturating_mul(2).max(1),
+            budget.maximum_work.max(1),
+            2,
+            budget.maximum_retained_entries.saturating_add(1).max(1),
+        );
+        let sheet_order =
+            litchi_iwa_protos::numbers_sheet_order_codec::decode_document_sheet_order(
+                &root.data, options,
+            )
+            .map_err(|_error| Error::MalformedPayload {
+                path: SemanticPath::Document,
+            })?;
+        for sheet_reference in sheet_order.sheet_references() {
             budget.charge_work(1)?;
             let Some(sheet_object) =
-                object_index.resolve_ref_id(bundle, sheet_reference.identifier)?
+                object_index.resolve_ref_id(bundle, sheet_reference.identifier())?
             else {
                 continue;
             };
-            let Some(sheet) =
-                sheet_object
-                    .messages
-                    .iter()
-                    .find_map(|message| match message.type_ {
-                        2 => tn::SheetArchive::decode(message.data.as_slice()).ok(),
-                        3 => tn::FormBasedSheetArchive::decode(message.data.as_slice())
-                            .ok()
-                            .map(|form| form.super_),
-                        _ => None,
-                    })
-            else {
+            let Some(sheet_message) = sheet_object.messages.iter().find(|message| {
+                message.type_ == super::SHEET_MESSAGE_TYPE
+                    || message.type_ == super::FORM_BASED_SHEET_MESSAGE_TYPE
+            }) else {
                 continue;
             };
-            let sheet_name = sheet.name;
-            let mut cached_sheet_name = None::<Arc<str>>;
-            for drawable in sheet.drawable_infos {
+            budget.charge_wire_bytes(sheet_message.data.len())?;
+            budget.charge_work(sheet_message.data.len().saturating_mul(7))?;
+            let (sheet_name, drawables) = names::preflight_sheet_payload(
+                sheet_message.type_,
+                &sheet_message.data,
+                budget.maximum_retained_entries,
+            )
+            .map_err(|_error| Error::MalformedPayload {
+                path: SemanticPath::StructuredTables,
+            })?;
+            let mut cached_sheet_name = None::<Arc<String>>;
+            for drawable in drawables {
                 budget.charge_work(1)?;
-                let Some(drawable_object) =
-                    object_index.resolve_ref_id(bundle, drawable.identifier)?
-                else {
+                let Some(drawable_object) = object_index.resolve_ref_id(bundle, drawable)? else {
                     continue;
                 };
                 let table_name = formula_table_name(
@@ -2163,7 +2948,7 @@ fn build_formula_reference_maps(
                     &mut budget,
                 )?;
                 if let Some(table) = table_name {
-                    let is_new = !table_info_names.contains_key(&drawable.identifier);
+                    let is_new = !table_info_names.contains_key(&drawable);
                     if is_new {
                         budget.charge_retained_entry()?;
                     }
@@ -2180,15 +2965,20 @@ fn build_formula_reference_maps(
                         Arc::clone(name)
                     } else {
                         budget.charge_text(sheet_name.len())?;
-                        let name = Arc::<str>::from(sheet_name.as_str());
+                        let mut name = String::new();
+                        name.try_reserve_exact(sheet_name.len()).map_err(|_error| {
+                            allocation_error("Numbers formula sheet name", sheet_name.len())
+                        })?;
+                        name.push_str(sheet_name);
+                        let name = Arc::new(name);
                         cached_sheet_name = Some(Arc::clone(&name));
                         name
                     };
                     table_info_names.insert(
-                        drawable.identifier,
+                        drawable,
                         FormulaReferenceName {
                             sheet: retained_sheet_name,
-                            table: Arc::from(table),
+                            table: Arc::new(table),
                         },
                     );
                 }
@@ -2210,19 +3000,15 @@ fn build_formula_reference_maps(
                 if message.type_ != 4008 {
                     continue;
                 }
-                budget.charge_work(1)?;
-                let Ok(owner) =
-                    tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())
-                else {
+                budget.charge_wire_bytes(message.data.len())?;
+                let (key, table_identifier, report) = match preflight_formula_owner(&message.data) {
+                    Ok(projection) => projection,
+                    Err(_) => continue,
+                };
+                budget.charge_work(report.scanned_bytes().saturating_add(report.fields()))?;
+                let Some(name) = table_info_names.get(&table_identifier) else {
                     continue;
                 };
-                let Some(table_info) = owner.formula_owner.as_ref() else {
-                    continue;
-                };
-                let Some(name) = table_info_names.get(&table_info.identifier) else {
-                    continue;
-                };
-                let key = formula_owner_key(&owner.formula_owner_uid);
                 if !result.owners.contains_key(&key) {
                     budget.charge_retained_entry()?;
                     result.owners.try_reserve(1).map_err(|_error| {
@@ -2233,7 +3019,7 @@ fn build_formula_reference_maps(
             }
         }
     }
-    Ok(result)
+    Ok((result, budget))
 }
 
 fn formula_table_name(
@@ -2282,11 +3068,21 @@ fn formula_table_name(
             }
             message
         };
-        if let Some(name) = model_message
-            .and_then(|message| tst::TableModelArchive::decode(message.data.as_slice()).ok())
-            .map(|model| model.table_name)
-        {
-            return Ok(Some(name));
+        if let Some(message) = model_message {
+            budget.charge_wire_bytes(message.data.len())?;
+            budget.charge_work(message.data.len().saturating_mul(7))?;
+            let name = names::preflight_table_name(&message.data).map_err(|_error| {
+                Error::MalformedPayload {
+                    path: SemanticPath::StructuredTables,
+                }
+            })?;
+            budget.charge_text(name.len())?;
+            let mut retained = String::new();
+            retained
+                .try_reserve_exact(name.len())
+                .map_err(|_error| allocation_error("Numbers formula table name", name.len()))?;
+            retained.push_str(name);
+            return Ok(Some(retained));
         }
     }
     Ok(None)
@@ -2399,7 +3195,7 @@ fn preflight_formula_category_payload(
     // Charge source bytes before inspecting their framing so a package cannot
     // multiply malformed-candidate scan work without consuming a hard budget.
     budget.charge_wire_bytes(source.len())?;
-    let remaining_work = MAX_FORMULA_WORK.saturating_sub(budget.work_items);
+    let remaining_work = budget.maximum_work.saturating_sub(budget.work_items);
     if remaining_work == 0 {
         return Err(formula_semantic_limit(
             SemanticLimitKind::FormulaWork,
@@ -2587,7 +3383,18 @@ fn retain_formula_category_name(
             .map_err(|_error| allocation_error("Numbers formula categories", names.len() + 1))?;
     }
     budget.charge_text(label.len())?;
-    names.insert(key, label.into_owned());
+    let label = match label {
+        Cow::Owned(label) => label,
+        Cow::Borrowed(label) => {
+            let mut retained = String::new();
+            retained.try_reserve_exact(label.len()).map_err(|_error| {
+                allocation_error("Numbers formula category label", label.len())
+            })?;
+            retained.push_str(label);
+            retained
+        },
+    };
+    names.insert(key, label);
     Ok(())
 }
 
@@ -2653,6 +3460,114 @@ fn formula_owner_key(owner: &litchi_iwa_protos::tsp::Uuid) -> FormulaOwnerKey {
         owner.upper as u32,
         (owner.upper >> 32) as u32,
     ]
+}
+
+fn preflight_formula_owner(
+    source: &[u8],
+) -> Result<(FormulaOwnerKey, u64, litchi_iwa_common::wire::WirePreflight)> {
+    let limits = WireLimits::default()
+        .with_input_bytes(source.len().clamp(1, WireLimits::MAX_INPUT_BYTES))?
+        .with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS))?
+        .with_nesting(2)?;
+    let mut owner_key = None;
+    let mut table = None;
+    let report = preflight_wire_tree_with_limits(source, limits, |visit| {
+        if visit.path().is_empty() && visit.field().number() == 1 {
+            if owner_key.is_some() || visit.field().wire_type() != 2 {
+                return Err(litchi_iwa_common::Error::InvalidFormat(
+                    "invalid formula owner".into(),
+                ));
+            }
+            let mut lower = None;
+            let mut upper = None;
+            let nested = preflight_wire_tree_with_limits(
+                visit.field().payload(),
+                WireLimits::default()
+                    .with_input_bytes(
+                        visit
+                            .field()
+                            .payload()
+                            .len()
+                            .clamp(1, WireLimits::MAX_INPUT_BYTES),
+                    )?
+                    .with_fields(8)?
+                    .with_nesting(1)?,
+                |uuid| {
+                    if !uuid.path().is_empty() || uuid.field().wire_type() != 0 {
+                        return Err(litchi_iwa_common::Error::InvalidFormat(
+                            "invalid formula owner UUID".into(),
+                        ));
+                    }
+                    let (value, length) =
+                        litchi_iwa_common::varint::decode_varint_from_bytes(uuid.field().payload())
+                            .map_err(|_error| {
+                                litchi_iwa_common::Error::InvalidFormat(
+                                    "invalid formula owner UUID".into(),
+                                )
+                            })?;
+                    if length != uuid.field().payload().len() {
+                        return Err(litchi_iwa_common::Error::InvalidFormat(
+                            "invalid formula owner UUID".into(),
+                        ));
+                    }
+                    let canonical_length = if value == 0 {
+                        1
+                    } else {
+                        usize::try_from((64 - value.leading_zeros()).div_ceil(7)).map_err(
+                            |_error| {
+                                litchi_iwa_common::Error::InvalidFormat(
+                                    "invalid formula owner UUID".into(),
+                                )
+                            },
+                        )?
+                    };
+                    if length != canonical_length {
+                        return Err(litchi_iwa_common::Error::InvalidFormat(
+                            "invalid formula owner UUID".into(),
+                        ));
+                    }
+                    match uuid.field().number() {
+                        1 if lower.replace(value).is_none() => {},
+                        2 if upper.replace(value).is_none() => {},
+                        _ => {
+                            return Err(litchi_iwa_common::Error::InvalidFormat(
+                                "invalid formula owner UUID".into(),
+                            ));
+                        },
+                    }
+                    Ok(WireDescent::Skip)
+                },
+            )?;
+            let _ = nested;
+            let lower = lower.ok_or_else(|| {
+                litchi_iwa_common::Error::InvalidFormat("missing formula owner UUID".into())
+            })?;
+            let upper = upper.ok_or_else(|| {
+                litchi_iwa_common::Error::InvalidFormat("missing formula owner UUID".into())
+            })?;
+            owner_key = Some([
+                lower as u32,
+                (lower >> 32) as u32,
+                upper as u32,
+                (upper >> 32) as u32,
+            ]);
+        } else if visit.path().is_empty() && visit.field().number() == 11 {
+            if table.is_some() || visit.field().wire_type() != 2 {
+                return Err(litchi_iwa_common::Error::InvalidFormat(
+                    "invalid formula owner table".into(),
+                ));
+            }
+            table = Some(names::preflight_local_reference(visit.field().payload())?);
+        }
+        Ok(WireDescent::Skip)
+    })?;
+    Ok((
+        owner_key
+            .ok_or_else(|| Error::InvalidFormat("Numbers formula owner has no UUID".to_owned()))?,
+        table
+            .ok_or_else(|| Error::InvalidFormat("Numbers formula owner has no table".to_owned()))?,
+        report,
+    ))
 }
 
 fn formula_category_key(category: &litchi_iwa_protos::tsp::Uuid) -> FormulaCategoryKey {
@@ -3114,7 +4029,10 @@ fn render_formula_ast_array(
             )?),
             AstNodeType::NumberNode => node
                 .ast_number_node_number
-                .map(|number| renderer.owned_expr(number.to_string(), budget))
+                .map(|number| {
+                    let value = fallible_formula_display(number, renderer, budget)?;
+                    renderer.owned_expr(value, budget)
+                })
                 .transpose()?,
             AstNodeType::StringNode => node
                 .ast_string_node_string
@@ -3134,16 +4052,30 @@ fn render_formula_ast_array(
             AstNodeType::DateNode => node
                 .ast_date_node_date_num
                 .map(|seconds| {
-                    renderer.owned_expr(format!("(DATE(2001,1,1)+{})", seconds / 86_400.0), budget)
+                    let days = seconds / 86_400.0;
+                    let value = fallible_formula_format(renderer, budget, |output| {
+                        write!(output, "(DATE(2001,1,1)+{days})")
+                    })?;
+                    renderer.owned_expr(value, budget)
                 })
                 .transpose()?,
             AstNodeType::DurationNode => node
                 .ast_duration_node_unit_num
-                .map(|value| renderer.owned_expr(value.to_string(), budget))
+                .map(|value| {
+                    let value = fallible_formula_display(value, renderer, budget)?;
+                    renderer.owned_expr(value, budget)
+                })
                 .transpose()?,
             AstNodeType::EmptyArgumentNode => Some(renderer.static_expr("", budget)?),
             AstNodeType::CellReferenceNode => Some(renderer.owned_expr(
-                render_cell_reference(node, host_row, host_column, formula_references)?,
+                render_cell_reference_checked(
+                    node,
+                    host_row,
+                    host_column,
+                    formula_references,
+                    renderer,
+                    budget,
+                )?,
                 budget,
             )?),
             AstNodeType::LocalCellReferenceNode => Some(
@@ -3151,15 +4083,15 @@ fn render_formula_ast_array(
                     node.ast_local_cell_reference_node_reference
                         .as_ref()
                         .map_or_else(
-                            || "#REF!".to_owned(),
+                            || fallible_formula_owned("#REF!", renderer, budget),
                             |cell| {
-                                format!(
-                                    "{}{}",
-                                    TableDataExtractor::column_index_to_letter(cell.column_handle),
-                                    cell.row_handle + 1
-                                )
+                                let column = FormulaColumn(cell.column_handle);
+                                let row = cell.row_handle + 1;
+                                fallible_formula_format(renderer, budget, |output| {
+                                    write!(output, "{column}{row}")
+                                })
                             },
-                        ),
+                        )?,
                     budget,
                 )?,
             ),
@@ -3168,16 +4100,20 @@ fn render_formula_ast_array(
                     node.ast_cross_table_cell_reference_node_reference
                         .as_ref()
                         .map_or_else(
-                            || "#REF!".to_owned(),
+                            || fallible_formula_owned("#REF!", renderer, budget),
                             |cell| {
-                                format!(
-                                    "{}{}{}",
-                                    formula_reference_prefix(&cell.table_id, formula_references),
-                                    TableDataExtractor::column_index_to_letter(cell.column_handle),
-                                    cell.row_handle + 1
-                                )
+                                let prefix = formula_reference_prefix_parts(
+                                    &cell.table_id,
+                                    formula_references,
+                                );
+                                let column = FormulaColumn(cell.column_handle);
+                                let row = cell.row_handle + 1;
+                                fallible_formula_format(renderer, budget, |output| {
+                                    write_formula_reference_prefix(output, prefix)?;
+                                    write!(output, "{column}{row}")
+                                })
                             },
-                        ),
+                        )?,
                     budget,
                 )?,
             ),
@@ -3189,7 +4125,7 @@ fn render_formula_ast_array(
                         "function",
                     )?;
                     Some(renderer.comma_joined(
-                        Some(TableDataExtractor::get_function_name(index)),
+                        Some(fallible_function_name(index, renderer, budget)?),
                         arguments,
                         "(",
                         ")",
@@ -3274,15 +4210,23 @@ fn render_formula_ast_array(
                 &mut stack, renderer, ":", "range", false, budget,
             )?),
             AstNodeType::ColonTractNode => Some(renderer.owned_expr(
-                render_colon_tract(node, host_row, host_column, formula_references)?,
+                render_colon_tract_checked(
+                    node,
+                    host_row,
+                    host_column,
+                    formula_references,
+                    renderer,
+                    budget,
+                )?,
                 budget,
             )?),
             AstNodeType::ReferenceErrorNode | AstNodeType::ReferenceErrorWithUids => {
                 Some(renderer.static_expr("#REF!", budget)?)
             },
-            AstNodeType::CategoryRefNode => Some(
-                renderer.owned_expr(render_category_reference(node, formula_references), budget)?,
-            ),
+            AstNodeType::CategoryRefNode => Some(renderer.owned_expr(
+                render_category_reference_checked(node, formula_references, renderer, budget)?,
+                budget,
+            )?),
             AstNodeType::UnknownFunctionNode => {
                 let arguments = pop_formula_arguments(
                     &mut stack,
@@ -3291,11 +4235,13 @@ fn render_formula_ast_array(
                 )?;
                 Some(
                     renderer.comma_joined(
-                        Some(
+                        Some(fallible_formula_owned(
                             node.ast_unknown_function_node_string
-                                .clone()
-                                .unwrap_or_else(|| "UNKNOWN".to_owned()),
-                        ),
+                                .as_deref()
+                                .unwrap_or("UNKNOWN"),
+                            renderer,
+                            budget,
+                        )?),
                         arguments,
                         "(",
                         ")",
@@ -3327,6 +4273,174 @@ fn render_formula_ast_array(
         }
     }
     Ok(stack.pop())
+}
+
+fn fallible_formula_owned(
+    value: &str,
+    renderer: &FormulaRenderer,
+    budget: &ProjectionBudget,
+) -> Result<String> {
+    renderer.check_additional_owned(value.len(), budget)?;
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(value.len())
+        .map_err(|_error| allocation_error("Numbers formula owned text", value.len()))?;
+    owned.push_str(value);
+    Ok(owned)
+}
+
+fn fallible_formula_display(
+    value: impl std::fmt::Display,
+    renderer: &FormulaRenderer,
+    budget: &ProjectionBudget,
+) -> Result<String> {
+    #[derive(Default)]
+    struct Counter {
+        bytes: usize,
+    }
+    impl std::fmt::Write for Counter {
+        fn write_str(&mut self, value: &str) -> std::fmt::Result {
+            self.bytes = self.bytes.checked_add(value.len()).ok_or(std::fmt::Error)?;
+            Ok(())
+        }
+    }
+    let mut counter = Counter::default();
+    write!(&mut counter, "{value}")
+        .map_err(|_error| formula_output_limit_error(usize::MAX, budget))?;
+    renderer.check_additional_owned(counter.bytes, budget)?;
+    let mut output = String::new();
+    output
+        .try_reserve_exact(counter.bytes)
+        .map_err(|_error| allocation_error("Numbers formula owned text", counter.bytes))?;
+    write!(&mut output, "{value}")
+        .map_err(|_error| Error::InvalidFormat("Numbers formula formatting failed".to_owned()))?;
+    Ok(output)
+}
+
+fn fallible_formula_format(
+    renderer: &FormulaRenderer,
+    budget: &ProjectionBudget,
+    write_value: impl Fn(&mut dyn std::fmt::Write) -> std::fmt::Result,
+) -> Result<String> {
+    #[derive(Default)]
+    struct Counter(usize);
+    impl std::fmt::Write for Counter {
+        fn write_str(&mut self, value: &str) -> std::fmt::Result {
+            self.0 = self.0.checked_add(value.len()).ok_or(std::fmt::Error)?;
+            Ok(())
+        }
+    }
+    let mut counter = Counter::default();
+    write_value(&mut counter).map_err(|_error| formula_output_limit_error(usize::MAX, budget))?;
+    renderer.check_additional_owned(counter.0, budget)?;
+    let mut output = String::new();
+    output
+        .try_reserve_exact(counter.0)
+        .map_err(|_error| allocation_error("Numbers formula owned text", counter.0))?;
+    write_value(&mut output)
+        .map_err(|_error| Error::InvalidFormat("Numbers formula formatting failed".to_owned()))?;
+    Ok(output)
+}
+
+#[derive(Clone, Copy)]
+struct FormulaColumn(u32);
+
+impl std::fmt::Display for FormulaColumn {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut bytes = [0_u8; 7];
+        let mut cursor = bytes.len();
+        let mut value = self.0;
+        loop {
+            cursor -= 1;
+            bytes[cursor] = b'A' + u8::try_from(value % 26).map_err(|_error| std::fmt::Error)?;
+            if value < 26 {
+                break;
+            }
+            value = value / 26 - 1;
+        }
+        formatter
+            .write_str(std::str::from_utf8(&bytes[cursor..]).map_err(|_error| std::fmt::Error)?)
+    }
+}
+
+fn fallible_function_name(
+    index: u32,
+    renderer: &FormulaRenderer,
+    budget: &ProjectionBudget,
+) -> Result<String> {
+    if let Some(name) = super::function_map::function_name(index) {
+        fallible_formula_owned(name, renderer, budget)
+    } else {
+        fallible_formula_format(renderer, budget, |output| write!(output, "FUNC{index}"))
+    }
+}
+
+type FormulaPrefix<'a> = Option<&'a FormulaReferenceName>;
+
+fn formula_reference_prefix_parts<'a>(
+    owner: &litchi_iwa_protos::tsp::CfuuidArchive,
+    references: &'a FormulaReferenceMaps,
+) -> FormulaPrefix<'a> {
+    cfuuid_key(owner).and_then(|key| references.owners.get(&key))
+}
+
+fn write_formula_reference_prefix(
+    output: &mut dyn std::fmt::Write,
+    prefix: FormulaPrefix<'_>,
+) -> std::fmt::Result {
+    if let Some(name) = prefix {
+        write!(output, "{}::{}::", name.sheet, name.table)
+    } else {
+        output.write_str("Table::")
+    }
+}
+
+fn render_category_reference_checked(
+    node: &tsce::ast_node_array_archive::AstNodeArchive,
+    references: &FormulaReferenceMaps,
+    renderer: &FormulaRenderer,
+    budget: &ProjectionBudget,
+) -> Result<String> {
+    let category_uid = node
+        .ast_category_ref
+        .as_ref()
+        .map(|ast| &ast.category_ref)
+        .and_then(|category| {
+            category
+                .absolute_group_uid
+                .as_ref()
+                .or(category.relative_group_uid.as_ref())
+                .or_else(|| category.group_uids.as_ref()?.uid.last())
+        });
+    let Some(label) =
+        category_uid.and_then(|uid| references.categories.get(&formula_category_key(uid)))
+    else {
+        return fallible_formula_owned("#CATEGORY!", renderer, budget);
+    };
+    let escaped_extra = label
+        .bytes()
+        .filter(|byte| *byte == b'\\' || *byte == b']')
+        .count();
+    let required = "#CATEGORY!["
+        .len()
+        .checked_add(label.len())
+        .and_then(|length| length.checked_add(escaped_extra))
+        .and_then(|length| length.checked_add(1))
+        .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
+    renderer.check_additional_owned(required, budget)?;
+    let mut output = String::new();
+    output
+        .try_reserve_exact(required)
+        .map_err(|_error| allocation_error("Numbers formula category text", required))?;
+    output.push_str("#CATEGORY![");
+    for character in label.chars() {
+        if character == '\\' || character == ']' {
+            output.push('\\');
+        }
+        output.push(character);
+    }
+    output.push(']');
+    Ok(output)
 }
 
 fn render_binary(
@@ -3426,6 +4540,75 @@ fn render_cell_reference(
         ));
     }
     Ok("#REF!".to_owned())
+}
+
+fn render_cell_reference_checked(
+    node: &tsce::ast_node_array_archive::AstNodeArchive,
+    host_row: usize,
+    host_column: usize,
+    formula_references: &FormulaReferenceMaps,
+    renderer: &FormulaRenderer,
+    budget: &ProjectionBudget,
+) -> Result<String> {
+    if let (Some(ast_column), Some(ast_row)) = (&node.ast_column, &node.ast_row) {
+        let column = FormulaColumn(resolve_formula_coordinate(
+            host_column,
+            ast_column.column,
+            ast_column.absolute.unwrap_or(false),
+            "column",
+        )?);
+        let row = resolve_formula_coordinate(
+            host_row,
+            ast_row.row,
+            ast_row.absolute.unwrap_or(false),
+            "row",
+        )? + 1;
+        let prefix = node
+            .ast_cross_table_reference_extra_info
+            .as_ref()
+            .and_then(|extra| formula_reference_prefix_parts(&extra.table_id, formula_references));
+        return fallible_formula_format(renderer, budget, |output| {
+            if node.ast_cross_table_reference_extra_info.is_some() {
+                write_formula_reference_prefix(output, prefix)?;
+            }
+            write!(
+                output,
+                "{}{column}{}{row}",
+                if ast_column.absolute.unwrap_or(false) {
+                    "$"
+                } else {
+                    ""
+                },
+                if ast_row.absolute.unwrap_or(false) {
+                    "$"
+                } else {
+                    ""
+                }
+            )
+        });
+    }
+    if let Some(cell) = &node.ast_local_cell_reference_node_reference {
+        let column = FormulaColumn(cell.column_handle);
+        let row = cell.row_handle + 1;
+        return fallible_formula_format(renderer, budget, |output| {
+            write!(
+                output,
+                "{}{column}{}{row}",
+                if cell.column_is_sticky != 0 { "$" } else { "" },
+                if cell.row_is_sticky != 0 { "$" } else { "" }
+            )
+        });
+    }
+    if let Some(cell) = &node.ast_cross_table_cell_reference_node_reference {
+        let prefix = formula_reference_prefix_parts(&cell.table_id, formula_references);
+        let column = FormulaColumn(cell.column_handle);
+        let row = cell.row_handle + 1;
+        return fallible_formula_format(renderer, budget, |output| {
+            write_formula_reference_prefix(output, prefix)?;
+            write!(output, "{column}{row}")
+        });
+    }
+    fallible_formula_owned("#REF!", renderer, budget)
 }
 
 fn resolve_formula_coordinate(host: usize, stored: i32, absolute: bool, axis: &str) -> Result<u32> {
@@ -3571,6 +4754,101 @@ fn render_colon_tract(
     }
 }
 
+fn render_colon_tract_checked(
+    node: &tsce::ast_node_array_archive::AstNodeArchive,
+    host_row: usize,
+    host_column: usize,
+    formula_references: &FormulaReferenceMaps,
+    renderer: &FormulaRenderer,
+    budget: &ProjectionBudget,
+) -> Result<String> {
+    let tract = node.ast_colon_tract.as_ref().ok_or_else(|| {
+        Error::ParseError("Numbers formula colon tract is missing its coordinates".to_owned())
+    })?;
+    let sticky = node.ast_sticky_bits.as_ref().ok_or_else(|| {
+        Error::ParseError("Numbers formula colon tract is missing its sticky bits".to_owned())
+    })?;
+    let prefix = node
+        .ast_cross_table_reference_extra_info
+        .as_ref()
+        .and_then(|extra| formula_reference_prefix_parts(&extra.table_id, formula_references));
+    let has_prefix = node.ast_cross_table_reference_extra_info.is_some();
+    let whole_rows = tract.relative_column.is_empty()
+        && tract.absolute_column.len() == 1
+        && tract.absolute_column[0].range_begin == i16::MAX as u32
+        && tract.absolute_column[0].range_end.is_none();
+    let whole_columns = tract.relative_row.is_empty()
+        && tract.absolute_row.len() == 1
+        && tract.absolute_row[0].range_begin == i32::MAX as u32
+        && tract.absolute_row[0].range_end.is_none();
+    let has_columns =
+        !whole_rows && (!tract.relative_column.is_empty() || !tract.absolute_column.is_empty());
+    let has_rows =
+        !whole_columns && (!tract.relative_row.is_empty() || !tract.absolute_row.is_empty());
+    let (begin_column, end_column) = if has_columns {
+        let (begin, end) = resolve_colon_axis(
+            &tract.relative_column,
+            &tract.absolute_column,
+            sticky.begin_column_is_absolute,
+            sticky.end_column_is_absolute,
+            host_column,
+            "column",
+        )?;
+        (Some(FormulaColumn(begin)), Some(FormulaColumn(end)))
+    } else {
+        (None, None)
+    };
+    let (begin_row, end_row) = if has_rows {
+        let (begin, end) = resolve_colon_axis(
+            &tract.relative_row,
+            &tract.absolute_row,
+            sticky.begin_row_is_absolute,
+            sticky.end_row_is_absolute,
+            host_row,
+            "row",
+        )?;
+        (Some(u64::from(begin) + 1), Some(u64::from(end) + 1))
+    } else {
+        (None, None)
+    };
+    if !has_columns && !has_rows {
+        return Err(Error::ParseError(
+            "Numbers formula colon tract has no row or column coordinates".to_owned(),
+        ));
+    }
+    fallible_formula_format(renderer, budget, |output| {
+        if has_prefix {
+            write_formula_reference_prefix(output, prefix)?;
+        }
+        if let Some(column) = begin_column {
+            if sticky.begin_column_is_absolute {
+                output.write_char('$')?;
+            }
+            write!(output, "{column}")?;
+        }
+        if let Some(row) = begin_row {
+            if sticky.begin_row_is_absolute {
+                output.write_char('$')?;
+            }
+            write!(output, "{row}")?;
+        }
+        output.write_char(':')?;
+        if let Some(column) = end_column {
+            if sticky.end_column_is_absolute {
+                output.write_char('$')?;
+            }
+            write!(output, "{column}")?;
+        }
+        if let Some(row) = end_row {
+            if sticky.end_row_is_absolute {
+                output.write_char('$')?;
+            }
+            write!(output, "{row}")?;
+        }
+        Ok(())
+    })
+}
+
 fn resolve_colon_axis(
     relative: &[tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractRelativeRangeArchive],
     absolute: &[tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractAbsoluteRangeArchive],
@@ -3686,8 +4964,12 @@ mod tests {
     };
     use crate::cell::Value as CellValue;
     use crate::cell::wire::{BncCell, decimal128_le};
-    use crate::package::{ReadOptions, SemanticPath, compatibility_tables_from_bytes_with_options};
-    use crate::{PackageSemanticLimits as SemanticLimits, SemanticLimitKind};
+    use crate::package::{
+        Components, Index, ReadOptions, SemanticPath, compatibility_tables_from_bytes_with_options,
+    };
+    use crate::{
+        DEFAULT_MAX_TEXT_BYTES, Package, PackageSemanticLimits as SemanticLimits, SemanticLimitKind,
+    };
     use litchi_iwa_archive::Limits;
     use litchi_iwa_common::comment::Comment;
     use litchi_iwa_common::wire::append_length_delimited_field;
@@ -3696,6 +4978,7 @@ mod tests {
     use litchi_iwa_protos::{tn, tsce, tsp, tst};
     use prost::Message as _;
     use std::collections::HashMap;
+    use std::path::PathBuf;
 
     const TEST_DECIMAL_FLAG: u32 = 0x0000_0001;
 
@@ -3755,6 +5038,23 @@ mod tests {
                 ..Default::default()
             },
             ..Default::default()
+        }
+    }
+
+    fn native_fixture() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers/basic.numbers")
+    }
+
+    fn empty_list(list_type: tst::table_data_list::ListType) -> RawMessage {
+        RawMessage {
+            type_: 6_005,
+            data: tst::TableDataList {
+                list_type: list_type as i32,
+                next_list_id: 1,
+                ..Default::default()
+            }
+            .encode_to_vec(),
         }
     }
 
@@ -4142,6 +5442,129 @@ mod tests {
     }
 
     #[test]
+    fn rooted_table_call_graph_enforces_one_cumulative_reference_budget() -> super::Result<()> {
+        fn extract(max_references: usize) -> super::Result<usize> {
+            let package = Package::open(native_fixture())?;
+            let limits = SemanticLimits::new(
+                SemanticLimits::MAX_OBJECTS,
+                SemanticLimits::MAX_SHEETS,
+                SemanticLimits::MAX_TABLES,
+                max_references,
+            )
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+            let extractor =
+                TableDataExtractor::new(&package.state.components, &package.state.index, limits)
+                    .without_comments();
+
+            // The fixture has one rooted sheet, drawable, and TableInfo edge.
+            // Production charges these before entering the table-model and
+            // sidecar call graph; mirror that exact prefix here.
+            extractor.charge_references(3)?;
+            let entry = package
+                .state
+                .index
+                .iter_entries_by_type(super::TABLE_MODEL_MESSAGE_TYPE)
+                .next()
+                .ok_or_else(|| Error::InvalidFormat("native table model is missing".to_owned()))?;
+            let object = package
+                .state
+                .index
+                .resolve_ref(&package.state.components, entry.id())?
+                .ok_or_else(|| Error::InvalidFormat("native table model is missing".to_owned()))?;
+            extractor.extract_reachable_table_from_object(
+                &object,
+                SemanticPath::Drawable { sheet: 0, index: 0 },
+            )?;
+            Ok(extractor.projection_budget.borrow().references)
+        }
+
+        let exact = extract(SemanticLimits::MAX_REFERENCES)?;
+        assert!(
+            exact > 3,
+            "table/list/rich/tile projection must charge references"
+        );
+        assert_eq!(extract(exact)?, exact);
+        let tight = extract(exact - 1);
+        assert!(
+            matches!(
+                tight,
+                Err(Error::SemanticLimit {
+                    kind: SemanticLimitKind::References,
+                    observed,
+                    maximum,
+                    ..
+                }) if observed == exact && maximum == exact - 1
+            ),
+            "unexpected tight cumulative result: {tight:?}; exact={exact}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn wrong_list_candidate_rolls_back_retention_but_keeps_decode_work() -> super::Result<()> {
+        let bytes = compatibility_package(vec![
+            archive_object(
+                90,
+                vec![empty_list(tst::table_data_list::ListType::Formula)],
+            )?,
+            archive_object(
+                91,
+                vec![empty_list(tst::table_data_list::ListType::Formula)],
+            )?,
+            archive_object(
+                92,
+                vec![
+                    empty_list(tst::table_data_list::ListType::String),
+                    empty_list(tst::table_data_list::ListType::Formula),
+                ],
+            )?,
+        ])?;
+        let components = Components::from_bytes(&bytes, Limits::default())?;
+        let index = Index::from_components(&components, SemanticLimits::MAX_OBJECTS)?;
+        let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default())
+            .without_comments();
+
+        let invalid = tst::TableModelArchive {
+            table_name: "rejected".to_owned(),
+            number_of_rows: 1,
+            number_of_columns: 1,
+            base_data_store: tst::DataStore {
+                string_table: reference(90),
+                formula_table: reference(91),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(matches!(
+            extractor.parse_table_model(invalid, false, None),
+            Err(Error::InvalidFormat(_))
+        ));
+        let rejected = *extractor.projection_budget.borrow();
+        assert_eq!(rejected.references, 0);
+        assert_eq!(rejected.materialized_cells, 0);
+        assert_eq!(rejected.output_text_bytes, 0);
+        assert!(rejected.payload_work > 0);
+
+        let valid = tst::TableModelArchive {
+            table_name: "accepted".to_owned(),
+            number_of_rows: 1,
+            number_of_columns: 1,
+            base_data_store: tst::DataStore {
+                string_table: reference(92),
+                formula_table: reference(92),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let table = extractor.parse_table_model(valid, false, None)?;
+        assert_eq!(table.name(), "accepted");
+        let published = *extractor.projection_budget.borrow();
+        assert!(published.payload_work > rejected.payload_work);
+        assert_eq!(published.output_text_bytes, "accepted".len());
+        Ok(())
+    }
+
+    #[test]
     fn rejected_attempt_rolls_back_retained_values_but_not_formula_work() -> super::Result<()> {
         let limits = SemanticLimits::default()
             .with_projection_limits(3, 5)
@@ -4186,7 +5609,12 @@ mod tests {
             deep_wire = parent;
         }
         let mut depth_names = HashMap::new();
-        let mut depth_budget = FormulaReferenceBudget::new(crate::MAX_REFERENCES);
+        let mut depth_budget = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            MAX_FORMULA_WORK,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
         let depth_result =
             collect_formula_category_payload(&deep_wire, &mut depth_names, &mut depth_budget);
         assert!(
@@ -4216,7 +5644,12 @@ mod tests {
         };
         let shallow = category(1, "root", vec![category(2, "child", Vec::new())]);
         let mut tight_names = HashMap::new();
-        let mut tight_budget = FormulaReferenceBudget::new(1);
+        let mut tight_budget = FormulaReferenceBudget::new(
+            1,
+            MAX_FORMULA_WORK,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
         assert!(matches!(
             collect_formula_category_payload(
                 &shallow.encode_to_vec(),
@@ -4236,7 +5669,12 @@ mod tests {
             ..Default::default()
         };
         let mut fanout_names = HashMap::new();
-        let mut false_positive_budget = FormulaReferenceBudget::new(1);
+        let mut false_positive_budget = FormulaReferenceBudget::new(
+            1,
+            MAX_FORMULA_WORK,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
         collect_formula_category_payload(
             &empty_fanout.encode_to_vec(),
             &mut fanout_names,
@@ -4249,7 +5687,12 @@ mod tests {
             ..Default::default()
         };
         let mut work_names = HashMap::new();
-        let mut full_work_budget = FormulaReferenceBudget::new(crate::MAX_REFERENCES);
+        let mut full_work_budget = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            MAX_FORMULA_WORK,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
         full_work_budget.work_items = MAX_FORMULA_WORK - 1;
         assert!(matches!(
             collect_formula_category_payload(
@@ -4271,7 +5714,12 @@ mod tests {
         let mut nested_projection = Vec::new();
         append_length_delimited_field(&mut nested_projection, 7, &cell_value)?;
         let mut nested_names = HashMap::new();
-        let mut nested_work_budget = FormulaReferenceBudget::new(crate::MAX_REFERENCES);
+        let mut nested_work_budget = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            MAX_FORMULA_WORK,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
         nested_work_budget.work_items = MAX_FORMULA_WORK - 5;
         assert!(matches!(
             collect_formula_category_payload(
@@ -4295,7 +5743,12 @@ mod tests {
         let mut malformed_projection = Vec::new();
         append_length_delimited_field(&mut malformed_projection, 7, &malformed_cell)?;
         let mut malformed_names = HashMap::new();
-        let mut malformed_budget = FormulaReferenceBudget::new(crate::MAX_REFERENCES);
+        let mut malformed_budget = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            MAX_FORMULA_WORK,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
         collect_formula_category_payload(
             &malformed_projection,
             &mut malformed_names,
@@ -4323,7 +5776,12 @@ mod tests {
 
         let duplicate = category(1, "first", vec![category(1, "second", Vec::new())]);
         let mut duplicate_names = HashMap::new();
-        let mut duplicate_budget = FormulaReferenceBudget::new(1);
+        let mut duplicate_budget = FormulaReferenceBudget::new(
+            1,
+            MAX_FORMULA_WORK,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
         collect_formula_category_payload(
             &duplicate.encode_to_vec(),
             &mut duplicate_names,
@@ -4353,7 +5811,12 @@ mod tests {
     #[test]
     fn formula_category_wire_bytes_are_aggregate_and_inclusive() {
         let mut names = HashMap::new();
-        let mut budget = FormulaReferenceBudget::new(crate::MAX_REFERENCES);
+        let mut budget = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            MAX_FORMULA_WORK,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
         budget.wire_bytes = MAX_FORMULA_WIRE_BYTES;
 
         assert!(matches!(

@@ -2067,3 +2067,103 @@ The public API and behavior gates are frozen: 15/15 document-reader tests and
 153/153 total focused Pages tests pass. Supporting archive and detector suites
 pass 93/93 and 32/32, the host generated-roundtrip passes 1/1, and the boundary
 suite passes 227/227 with zero live retirement or focused-public-API findings.
+
+## 2026-08-13 amendment: canonical Numbers reader API
+
+The supported archive-free Numbers read entry points are
+`litchi_numbers::Document::{open, open_with_options, from_bytes,
+from_bytes_with_options, from_shared_bytes,
+from_shared_bytes_with_options}`. `DocumentReadOptions` combines a checked
+`DocumentSourceLimits` profile with checked semantic `DocumentLimits`.
+`DocumentLimits::new` returns `Result<DocumentLimits, DocumentLimitsError>`,
+preserves zero as an exact tightening, and rejects values above the hard
+semantic maxima. `DocumentLimitKind` identifies the rejected resource;
+`DocumentReadOptions::new` remains infallible once both profiles exist.
+Construction is eager and failure-atomic: a document is published only after
+format ownership, graph structure, sheet/table/cell counts, semantic text,
+source metadata, and source statistics have been accepted. Selected
+projections use physical preflight where stated below; not every limit is
+claimed to precede every decode or intermediate allocation. Focused `Document`
+projection borrows packaged source bytes and releases them before publication;
+selected components, sidecars, and semantic values are owned. Attacker-scaled
+`Vec`, `String`, and collection growth is explicitly reserved fallibly where
+the focused adapters own it. The standard library provides no fallible `Arc`
+allocation, so bounded reference-count control blocks and final immutable
+publication allocations retain an allocator-abort caveat. These guarantees
+apply to focused `Document` constructors, not the preserve/edit `Package` path.
+
+The returned API is selector-first and archive-free: `sheets`, `sheet`,
+`sheet_count`, `snapshot`, `shared_sheets`, `plain_text`, `text_len`,
+`metadata`, `stats`, and `validate`. None exposes a bundle, object index,
+component name, member name, native identifier, protobuf/Buffa value, or exact
+package bytes. Public source opens use a content-free `DocumentReadError`
+taxonomy; its display, debug, and error-source chain retain only stable
+categories and numeric bounds, never caller paths, authored content,
+member/component names, native identifiers, or lower-layer diagnostic strings.
+
+Rooted `plain_text` is a deliberate semantic correction, not compatibility
+flattening. It visits sheets and their tables in source order and materialized
+cells in row-major order. Each non-empty sheet name, table name, and non-empty
+cell display value occupies one newline-separated line; missing cells, headers,
+and empty rendered Text/Formula strings are not independently emitted.
+Non-empty Text/Formula displays retain their strings, finite
+number/date/duration displays use shortest round-trippable decimal text,
+Booleans use `true`/`false`, and error displays use the `ERROR: ` prefix. This
+rooted projection intentionally differs from storage-oriented text. The legacy
+public `NumbersDocument::text` was unreachable on the native fixture because
+legacy document construction failed first; the independently recovered private
+storage projection matched `Package::text` on the basic and formula-rich
+fixtures only. `Package::text` therefore remains the separate physical/storage
+diagnostic, without an unqualified legacy-parity claim.
+
+Source diagnostics are optional by construction. A source-backed document
+retains content-free
+`DocumentStats { source_record_count, sheet_count, table_count }`
+and narrowly projected metadata from the three canonical Numbers authorities.
+Semantic constructors and package-derived documents expose neither metadata
+nor stats. This distinction prevents a package's semantic view from claiming
+the acquisition provenance of a source-backed document. `application` is not
+stored because the concrete type already proves Numbers format identity.
+Each canonical metadata authority has a fixed 64 KiB physical ceiling before
+ZIP payload materialization or directory-sidecar allocation. The private
+`plist::stream` event projector additionally admits at most 1,024 events,
+nesting depth 16, 128 build-history entries, 16 KiB per selected scalar, and
+64 KiB of retained selected properties; it does not deserialize a general
+scalar DTO or plist value tree. A build-history dictionary rejects duplicate
+exact `Version` or `Build` keys; when distinct values are both present,
+`Version` is authoritative. These diagnostic ceilings are fixed rather than
+caller-extensible.
+
+Exact complete artifacts remain on `litchi_numbers::Package`, including
+regular-file and byte ingress, write/edit provenance, package text and object
+diagnostics, and transactions. `Package::open` rejects directories. The
+retired `from_archive_bytes` and limit variants were redundant byte aliases;
+callers choose semantic `Document::from_bytes` or exact `Package::from_bytes`
+instead of retaining a second name.
+
+The focused reader is not Prost-free or wholly Buffa-lazy. Selective strict
+raw/Buffa projections qualify root sheet order, sheet references and names,
+TableInfo ownership, and table model/list/segment/tile/rich-text boundaries;
+the focused `Document` projection skips comments. Generated Prost remains in
+the wider admitted table and formula-owner graph. Deleting the second public
+reader neither hardens every `Package` path nor authorizes a whole-graph codec
+rewrite.
+
+On Unix, file and directory path ingress uses pinned, no-follow capture. Other
+non-Windows targets use version-checked path capture rather than descriptor
+pinning. Windows path ingress is deliberately unavailable until stable,
+reparse-safe handle traversal can freeze the source. Borrowed and shared byte
+constructors are portable.
+
+The public contract is frozen by 16/16 focused reader cases, with a seventeenth
+Windows-configured case; 240 Numbers library cases pass and four are ignored;
+compatibility and name gates pass 5/5 and 10/10. Archive coverage passes 127
+cases (125 unit plus two integration), detector coverage passes 40/40, and the
+host library passes 1,397/1,397, while generated-roundtrip and doctest gates
+pass 1/1 and nine passed with three ignored. Host all-target check and no-run,
+strict scoped host Clippy, focused
+all-target Clippy, strict focused rustdoc, formatting, and diff checks pass. The
+boundary units pass 237/237 and both live retirement/API audits report zero
+findings. Broad host all-target Clippy remains blocked by unrelated existing
+lints; the global boundary policy still reports 14 unrelated
+`soapberry-zip`/`xml-minifier` debt findings.

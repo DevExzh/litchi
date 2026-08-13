@@ -92,7 +92,7 @@ impl Sheet {
         for table in &tables {
             if !names.insert(table.name()) {
                 return Err(Error::DuplicateTableName {
-                    name: table.name().to_owned(),
+                    name: fallible_name_copy(table.name())?,
                 });
             }
         }
@@ -243,8 +243,9 @@ impl Builder {
             .any(|stored| stored.name() == table.name())
         {
             return Err(InsertError::new(
-                Error::DuplicateTableName {
-                    name: table.name().to_owned(),
+                match fallible_name_copy(table.name()) {
+                    Ok(name) => Error::DuplicateTableName { name },
+                    Err(error) => error,
                 },
                 table,
             ));
@@ -271,6 +272,18 @@ impl Builder {
             tables: self.tables.into_boxed_slice(),
         }
     }
+}
+
+fn fallible_name_copy(name: &str) -> std::result::Result<String, Error> {
+    let mut retained = String::new();
+    retained
+        .try_reserve_exact(name.len())
+        .map_err(|_allocation| Error::Allocation {
+            resource: "duplicate table name diagnostic",
+            amount: name.len(),
+        })?;
+    retained.push_str(name);
+    Ok(retained)
 }
 
 #[cfg(test)]

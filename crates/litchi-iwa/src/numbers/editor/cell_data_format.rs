@@ -1443,7 +1443,8 @@ fn number_format_from_native(native: &FormatStructArchive) -> Result<Number> {
 mod tests {
     use super::*;
     use crate::numbers::cell::CellValue;
-    use crate::numbers::{NumbersDocument, NumbersDocumentBuilder, NumbersEditor};
+    use crate::numbers::editor::compatibility_document_from_bytes;
+    use crate::numbers::{NumbersDocumentBuilder, NumbersEditor, SemanticTableCellAssertions};
     use litchi_numbers::cell::data_format::control::Range;
     use litchi_numbers::cell::data_format::custom::{
         Condition, ConditionValue, Custom, DateTime as CustomDateTime, DateTimePattern, Name,
@@ -1708,9 +1709,9 @@ mod tests {
             reopened.table_cell_checkbox_format(table_id, 1, 1).unwrap(),
             Some(Checkbox)
         );
-        let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 2),
             Some(&CellValue::Boolean(false))
         );
         assert!(
@@ -1800,9 +1801,9 @@ mod tests {
                 .unwrap(),
             Some(StarRating)
         );
-        let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 2),
             Some(&CellValue::number(0.0).expect("finite test number"))
         );
         assert!(
@@ -1899,9 +1900,9 @@ mod tests {
             reopened.table_cell_slider_format(table_id, 1, 1).unwrap(),
             Some(number_slider.clone())
         );
-        let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 2),
             Some(&CellValue::number(10.0).expect("finite test number"))
         );
 
@@ -2005,9 +2006,9 @@ mod tests {
             reopened.table_cell_stepper_format(table_id, 1, 1).unwrap(),
             Some(number_stepper.clone())
         );
-        let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 2),
             Some(&CellValue::number(-10.0).expect("finite test number"))
         );
 
@@ -2081,13 +2082,13 @@ mod tests {
             reopened.table_cell_text_format(table_id, 1, 2).unwrap(),
             Some(Text)
         );
-        let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 1),
             Some(&CellValue::Text("00123".to_owned()))
         );
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 2),
             Some(&CellValue::Empty)
         );
 
@@ -2293,9 +2294,9 @@ mod tests {
                 .unwrap(),
             Some(priority.clone())
         );
-        let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 2),
             Some(&CellValue::Text("Low".to_owned()))
         );
         crate::numbers::editor::set_cell_fixture(
@@ -2414,9 +2415,9 @@ mod tests {
             reopened.table_cell_duration_format(table_id, 1, 1).unwrap(),
             Some(duration)
         );
-        let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+        let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
+            document.sheets()[0].tables().next().unwrap().get_cell(1, 2),
             Some(&CellValue::duration(129_600.0).expect("finite test duration"))
         );
         assert!(

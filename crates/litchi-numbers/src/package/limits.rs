@@ -116,6 +116,35 @@ pub struct SemanticLimits {
 }
 
 impl SemanticLimits {
+    pub(crate) const fn for_document(limits: crate::DocumentLimits) -> Self {
+        Self {
+            objects: MAX_OBJECTS,
+            sheets: if limits.max_sheets() < HARD_MAX_SHEETS {
+                limits.max_sheets()
+            } else {
+                HARD_MAX_SHEETS
+            },
+            tables: if limits.max_tables() < HARD_MAX_TABLES {
+                limits.max_tables()
+            } else {
+                HARD_MAX_TABLES
+            },
+            references: MAX_REFERENCES,
+            materialized_cells: if limits.max_materialized_cells() < MAX_PROJECTED_CELLS {
+                limits.max_materialized_cells()
+            } else {
+                MAX_PROJECTED_CELLS
+            },
+            output_text_bytes: if limits.max_text_bytes() < MAX_OUTPUT_TEXT_BYTES {
+                limits.max_text_bytes()
+            } else {
+                MAX_OUTPUT_TEXT_BYTES
+            },
+            formula_render_work: MAX_FORMULA_RENDER_WORK,
+            formula_render_depth: MAX_FORMULA_RENDER_DEPTH,
+        }
+    }
+
     /// Hard ceiling for indexed native objects.
     pub const MAX_OBJECTS: usize = MAX_OBJECTS;
     /// Hard ceiling for rooted semantic sheets.

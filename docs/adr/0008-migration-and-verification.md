@@ -10390,3 +10390,108 @@ while retaining a valid 13-member ZIP and the same focused semantics.
 `PagesEditor`, `PagesDocumentBuilder`, creation, and the broader host examples
 and tests remain. Debt 017 and the `litchi-iwa -> litchi-pages` manifest edge
 therefore remain open.
+
+## 2026-08-13 amendment: Numbers reader retirement verification
+
+The migration host's duplicate Numbers reader is deleted together with its
+module/export/state/statistics types and reader-only sheet adapter. Host
+callers and examples now use `litchi_numbers::Document` for archive-free
+semantic reads or `litchi_numbers::Package` when exact artifact, package text,
+write, or edit provenance is required. Permanent boundary audits reject the
+retired names, module shapes, aliases, public host facades over focused reader
+types, raw/native vocabulary in focused reader signatures, and reintroduction
+of a second reader source.
+
+The final permanent document-reader gate must cover ZIP and app-authored
+directory semantic-workbook parity, borrowed and shared bytes, shared-source
+release after projection, snapshot and shared-sheet identity, `Send + Sync`,
+canonical three-sidecar metadata projection, source diagnostics versus
+diagnostic-free semantic and package-derived documents, rooted plain-text
+ordering,
+exact/max-minus-one source and semantic budgets, foreign iWork refusal,
+malformed graph refusal, directory lifetime after capture, and content-free
+error redaction. It must prove that generic/foreign source preparation remains
+index-only until Numbers ownership is established, so hostile metadata cannot
+change another format's classification. Directory coverage must also prove
+that only the exact root `Index.zip` authority participates and root or nested
+decoys are inert. Windows-specific regressions must freeze file and directory
+path ingress as a typed fail-closed result while retaining borrowed/shared byte
+ingress. Unix path tests must cover pinned, no-follow capture; other
+non-Windows targets are qualified as version-checked path capture rather than
+descriptor pinning.
+Semantic-workbook parity is not metadata identity: the checked ZIP and
+directory fixtures carry different canonical document identifiers and
+revisions, which remain source-provenance diagnostics rather than values to
+normalize across representations.
+The plain-text oracle fixes the order as non-empty sheet name, then each
+non-empty table name and non-empty materialized cell display in row-major
+order, with exactly one newline between emitted values. Empty rendered
+Text/Formula values are excluded rather than producing blank lines.
+The checked-in native fixture also freezes a deliberate correction: legacy
+`NumbersDocument` construction rejects that valid workbook before its public
+`text()` can run. Independently recovered private legacy storage output equals
+`Package::text` on this fixture and the formula-rich fixture, but that narrow
+observation is not promoted into general parity.
+The focused native semantic oracle is exactly
+`Sheet 1\nTable 1\nLitchi native Numbers fixture\n42`; `text_len()` equals
+that output's UTF-8 length. The source-backed statistics are exactly 622 source
+records, one sheet, and one table.
+The final metadata-hostile gate must fix 64 KiB per-authority physical
+admission and the `plist::stream` event projector's exact/max-minus-one event,
+depth, history-entry, selected-scalar, and retained-property budgets. The
+projector must remain narrow rather than deserializing a general scalar DTO or
+plist value tree.
+The admission claim is publication-scoped: selected projections preflight
+where implemented and all remaining schema decodes stay within physical,
+component, and semantic ceilings, but not every ceiling is claimed to precede
+every decode or intermediate allocation. These gates qualify focused
+`Document` construction, not the preserve/edit `Package` path.
+Caller-selected semantic zeroes remain exact zero ceilings rather than being
+widened to one, and over-hard requests fail through `DocumentLimitsError`.
+Owned attacker-scaled payload and collection growth is fallibly reserved where
+the focused adapters control it. Standard-library `Arc` control blocks and
+final immutable publication allocations remain an explicit allocator-abort
+caveat; this is not an all-allocations-fallible claim.
+
+The frozen verification record is explicit rather than inferred from one
+monolithic run. Focused reader coverage passes 16/16, with a seventeenth
+Windows-configured case. The Numbers library passes 240 cases with four
+ignored; compatibility passes 5/5 and names pass 10/10. Archive coverage passes
+127 cases (125 unit plus two integration), and detector coverage passes 40/40.
+The host library passes 1,397/1,397, generated-roundtrip passes 1/1, and host
+doctests pass nine with three ignored. Host all-target check and all-target
+no-run pass, as do strict scoped
+host Clippy (`--lib --test generated_roundtrip -D warnings`), focused all-target
+Clippy, strict focused rustdoc, formatting, and diff checks. Boundary units pass
+237/237; the live retirement and focused-public-API audits each report zero
+findings. The host-scoped cut touches 15 files with 329 insertions and 888
+deletions, net -559, including the 602 reader-owned source lines. Broad host
+all-target Clippy remains blocked by unrelated existing lints, and the global
+boundary policy continues to report 14 unrelated
+`soapberry-zip`/`xml-minifier` debt findings.
+
+Native evidence is read-only and isolated. The tracked
+`test-data/iwork/numbers/basic.numbers` source was never opened and remains
+136,357 bytes, a valid 43-entry ZIP, with SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`.
+Apple Numbers 14.4 build 7043.0.93 opened only the disposable copy in
+`/tmp/litchi-numbers-native.DfdNPz` without repair, recovery, or conversion UI.
+The UI showed exactly `Sheet 1` / `Table 1`, 22 rows by 7 columns, one header
+row and column, no footer rows, title enabled, caption disabled, the visible
+`Litchi native Numbers fixture` marker, and numeric `42`. Focused reread agreed:
+one rooted sheet, one 22-by-7 table, two materialized cells, and one
+compatibility table.
+
+Escape followed by Command-W produced no save prompt, but Numbers silently
+normalized the disposable copy to 136,374 bytes and SHA-256
+`b2388ce97cc30dbb1fadb02eece6f92fbeeeecb3e1a258aa79ece7511dfb31d6`.
+It remained a valid 43-entry ZIP. This is application acceptance and semantic
+agreement, not evidence that native open is byte-inert, and the normalized
+copy is not a package-locality or preservation oracle.
+
+The cut makes no performance or complete Buffa claim. Focused document
+construction is still eager and substantially Prost-backed. Verified gains
+are the deletion of duplicate parsing, constant-time shared snapshots, bounded
+sparse semantic retention, and release of source/package state after semantic
+projection. The Numbers editor, builder, host table adapters, examples, tests,
+manifest edge, and ordered debt 015 remain.

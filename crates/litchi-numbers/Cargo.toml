@@ -19,9 +19,12 @@ litchi-iwa-core    = { workspace = true }
 litchi-iwa-detect  = { workspace = true }
 litchi-iwa-protos  = { workspace = true }
 litchi-iwa-text-wire = { workspace = true }
+litchi-core        = { workspace = true }
 litchi-numbers-wire = { workspace = true }
 phf                = { workspace = true }
+plist              = { workspace = true, features = ["enable_unstable_features_that_may_break_with_minor_version_bumps"] }
 prost              = { workspace = true }
+ryu                = { workspace = true }
 thiserror          = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

@@ -202,8 +202,11 @@ pub mod sheet;
 pub mod table;
 
 pub use document::{
-    DEFAULT_MAX_TEXT_BYTES, Document, Error as DocumentError, Limits as DocumentLimits,
-    MAX_MATERIALIZED_CELLS, MAX_SHEETS, MAX_TABLES, Result as DocumentResult,
+    DEFAULT_MAX_TEXT_BYTES, Document, DocumentReadOptions, DocumentSourceLimitKind,
+    DocumentSourceLimits, DocumentSourceLimitsError, Error as DocumentError, IoKind,
+    LimitKind as DocumentLimitKind, Limits as DocumentLimits, LimitsError as DocumentLimitsError,
+    MAX_MATERIALIZED_CELLS, MAX_SHEETS, MAX_TABLES, ReadError as DocumentReadError,
+    ReadLimitKind as DocumentReadLimitKind, Result as DocumentResult, Stats as DocumentStats,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
@@ -211,7 +214,9 @@ pub use formula::{
 };
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
-pub use package::__compatibility_tables_from_prepared_source;
+pub use package::{
+    __compatibility_tables_from_prepared_source, __semantic_document_from_prepared_source,
+};
 pub use package::{
     Error as PackageError, Limits as PackageLimits, MAX_OBJECTS, MAX_REFERENCES, Package,
     PayloadLimitKind as PackagePayloadLimitKind, ReadOptions as PackageReadOptions,

@@ -209,6 +209,7 @@ pub struct StorageValidation {
     fields: usize,
     table_entries: usize,
     reference_occurrences: usize,
+    validation_work: usize,
     has_unknown_wire_fields: bool,
 }
 
@@ -247,6 +248,12 @@ impl StorageValidation {
     #[must_use]
     pub const fn reference_occurrences(self) -> usize {
         self.reference_occurrences
+    }
+
+    /// Conservative aggregate work charged by strict validation.
+    #[must_use]
+    pub const fn validation_work(self) -> usize {
+        self.validation_work
     }
 
     /// Whether any traversed message contained an unrecognized field.
@@ -2179,7 +2186,8 @@ pub fn validate_storage_with_limits(
 ) -> RewriteResult<StorageValidation> {
     let text_preflight = preflight_root_text(source, limits)?;
     let counters = validate_full_storage_tree(source, text_preflight.utf16_len, limits)?;
-    preflight_validation_work(source.len(), text_preflight, &counters, limits)?;
+    let validation_work =
+        preflight_validation_work(source.len(), text_preflight, &counters, limits)?;
     let empty_range = Range { start: 0, end: 0 };
     let text = decode_text_plan(source, &empty_range, "", text_preflight, limits)?;
     Ok(StorageValidation {
@@ -2189,6 +2197,7 @@ pub fn validate_storage_with_limits(
         fields: counters.fields,
         table_entries: counters.table_entries,
         reference_occurrences: counters.references,
+        validation_work,
         has_unknown_wire_fields: counters.unknown_fields != 0,
     })
 }
@@ -2229,12 +2238,13 @@ fn preflight_validation_work(
     text: TextPreflight,
     counters: &Counters,
     limits: RewriteLimits,
-) -> RewriteResult<()> {
+) -> RewriteResult<usize> {
     let root_and_projection = checked_mul(source_len, 2, "validation root and Buffa work")?;
     let text_work = checked_mul(text.text_bytes, 6, "validation text work")?;
     let structural_work = checked_add(root_and_projection, counters.tree_bytes, "validation work")?;
     let aggregate_work = checked_add(structural_work, text_work, "validation work")?;
-    enforce_limit("rewrite work", aggregate_work, limits.max_rewrite_work())
+    enforce_limit("rewrite work", aggregate_work, limits.max_rewrite_work())?;
+    Ok(aggregate_work)
 }
 
 fn preflight_rewrite_work(

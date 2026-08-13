@@ -1,7 +1,7 @@
 use std::env;
 
-use litchi_iwa::numbers::{NumbersDocument, NumbersEditor};
-use litchi_numbers::SheetSelector;
+use litchi_iwa::numbers::NumbersEditor;
+use litchi_numbers::{Document, SheetSelector};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments = env::args().skip(1).collect::<Vec<_>>();
@@ -20,8 +20,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let created = editor.duplicate_sheet(SheetSelector::index(sheet_index))?;
     editor.save(&arguments[1])?;
 
-    let document = NumbersDocument::open(&arguments[1])?;
-    let sheets = document.sheets()?;
+    let document = Document::open(&arguments[1])?;
+    let sheets = document.sheets();
     let copied = sheets
         .get(created.index)
         .filter(|sheet| sheet.name() == created.name)
@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "duplicated sheet {:?} as {:?} with {} tables",
         source.name,
         copied.name(),
-        copied.tables().len()
+        copied.table_count()
     );
     Ok(())
 }

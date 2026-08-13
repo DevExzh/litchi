@@ -14,9 +14,10 @@ use litchi_iwa::Document;
 use litchi_iwa::application::Application;
 use litchi_iwa::detect::{self, Format};
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{NumbersDocument, NumbersDocumentBuilder, NumbersEditor};
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::PagesEditor;
 use litchi_keynote::Package as KeynotePackage;
+use litchi_numbers::Document as NumbersSemanticDocument;
 use litchi_pages::Document as PagesSemanticDocument;
 use tempfile::tempdir;
 
@@ -69,7 +70,7 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     assert_send_sync::<litchi_iwa::raw::bundle::Bundle>();
     assert_send_sync::<litchi_iwa::Document>();
     assert_send_sync::<PagesSemanticDocument>();
-    assert_send_sync::<NumbersDocument>();
+    assert_send_sync::<NumbersSemanticDocument>();
     assert_send_sync::<KeynotePackage>();
     assert_eq!(document.application(), application);
     let document_stats = document.stats()?;
@@ -130,16 +131,20 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
         },
         Format::Numbers => {
             NumbersEditor::open(path)?;
-            let specialized = NumbersDocument::open(path)?;
+            let specialized = NumbersSemanticDocument::open(path)?;
             let snapshot = specialized.snapshot();
-            let specialized_stats = specialized.stats()?;
-            let snapshot_stats = snapshot.stats()?;
+            let specialized_stats = specialized
+                .stats()
+                .expect("a source-backed Numbers document has ingress statistics");
+            let snapshot_stats = snapshot
+                .stats()
+                .expect("a Numbers snapshot retains ingress statistics");
             assert_eq!(
-                snapshot_stats.total_objects,
-                specialized_stats.total_objects
+                snapshot_stats.source_record_count,
+                specialized_stats.source_record_count
             );
-            let semantic_sheets = specialized.semantic_sheets();
-            let snapshot_sheets = snapshot.semantic_sheets();
+            let semantic_sheets = specialized.shared_sheets();
+            let snapshot_sheets = snapshot.shared_sheets();
             assert!(Arc::ptr_eq(&semantic_sheets, &snapshot_sheets));
             assert_eq!(semantic_sheets.len(), specialized_stats.sheet_count);
             assert_eq!(
@@ -148,6 +153,24 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
                     .map(litchi_numbers::Sheet::table_count)
                     .sum::<usize>(),
                 specialized_stats.table_count
+            );
+            specialized.validate()?;
+            assert_eq!(specialized.text_len(), specialized.plain_text()?.len());
+
+            let borrowed = NumbersSemanticDocument::from_bytes(&bytes)?;
+            let shared = NumbersSemanticDocument::from_shared_bytes(Arc::from(bytes.clone()))?;
+            assert_eq!(borrowed.plain_text()?, specialized.plain_text()?);
+            assert_eq!(shared.plain_text()?, specialized.plain_text()?);
+
+            let directory_path = path.with_file_name("generated-directory.numbers");
+            fs::create_dir(&directory_path)?;
+            fs::copy(path, directory_path.join("Index.zip"))?;
+            let directory_document = NumbersSemanticDocument::open(&directory_path)?;
+            assert_eq!(directory_document.plain_text()?, specialized.plain_text()?);
+            assert_eq!(directory_document.stats(), specialized.stats());
+            assert_eq!(
+                directory_document.metadata().is_some(),
+                specialized.metadata().is_some()
             );
         },
         Format::Keynote => {
