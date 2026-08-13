@@ -39,9 +39,11 @@ two matched XLSX data-validation publication cases,
 two matched XLSX auto-filter/sort-state publication cases,
 two matched XLSX conditional-formatting publication cases,
 two XLSX merge/unmerge commit-plus-save cases,
+two bounded XLSX/RTF streaming-creation cases,
+four matched native XLS existing-comment publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, 13 RTF semantic cases, and 36 ODF semantic cases
-are opt-in, for 169 selectable cases in total:
+are opt-in, for 175 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -389,6 +391,34 @@ stale-source refusal are verified outside timing. These cases add selectable
 correctness evidence only and make no latency claim without controlled ABBA
 evidence.
 
+Measure the matched native XLS existing-comment publication controls:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 \
+  --case xls_comments_eager_edit_save,xls_comments_source_backed_edit_save,\
+xls_comments_eager_batch_edit_save,xls_comments_source_backed_batch_edit_save \
+  --json target/perf/xls-comments-edit.json
+```
+
+All four cases use one deterministic BIFF8 workbook with 256 existing comments,
+an untouched worksheet/comment, eight exact 2 MiB incompressible opaque streams,
+and one opaque metadata stream. The one-edit cases replace the middle owner; the
+batch cases replace exactly the supported 256-owner limit. Author/text lengths
+and compressed encoding width stay unchanged. Each sample separately records
+semantic staging/plan and publication time while total `elapsed_ns` is their
+sum. The source-backed reports additionally retain changed comments, logical
+streams, physical spans, equal Workbook lengths, and exact source/target CFB
+fingerprints. Generic source counters cover only the explicit owned-source
+ingress because the public XLS comments API owns its source bytes internally;
+sink counters cover complete bounded publication. Complete reopen, all 256
+semantic values, worksheet/comment inventory, every untouched stream, explicit
+eager fallback for a length-changing edit, and protected/refusal behavior stay
+outside timing. Output hashes are deterministic per case, but eager rendering
+and source-backed overlay are not required to have identical physical CFB
+bytes. These cases add selectable evidence only and make no performance claim
+without a frozen release-build, CPU-pinned ABBA run.
+
 For just the end-to-end legacy writer packaging runs:
 
 ```sh
@@ -610,6 +640,41 @@ complete logical cell order and rounds up to one cell where necessary.
 Its narrow range is `B1:B256`, which returns 256 cells while making the
 worksheet store examine the 65,536 stored cells in those rows. This preserves a
 high-contrast public end-to-end case without relying on internal APIs.
+
+## Opt-in bounded streaming creation
+
+`xlsx_streaming_create` and `rtf_streaming_create` exercise the public
+forward-only creation APIs. They use `--semantic-shape` only as a common shape
+selector and are not part of the default matrix.
+
+| Shape | XLSX rows / cells | RTF paragraphs / runs | Retained writer window |
+|---|---:|---:|---:|
+| `tiny` | 64 / 256 | 64 / 64 | XLSX 4 KiB row buffer; RTF 37 B encoder state |
+| `medium` | 8,192 / 32,768 | 8,192 / 8,192 | Same |
+| `large` | 131,072 / 524,288 | 131,072 / 131,072 | Same |
+
+The XLSX case writes one numeric, inline-text, boolean, and explicit blank cell
+per row. The RTF case writes one bounded UTF-8 run per paragraph. Text is
+deterministic and includes non-ASCII and format-significant characters.
+
+Timed publication uses a non-seek SHA-256 discard sink. It retains no output
+bytes: only hash state, accepted bytes, write calls, and the largest write. A
+complete artifact is generated separately before timing, reopened through the
+ordinary `Workbook` or `Document` facade, and exhaustively checked against the
+shape. That artifact is dropped before samples run. Every timed digest must
+equal the reopened artifact digest.
+
+The `sink` record additionally reports exact rows/cells or paragraphs/runs,
+input bytes, authored worksheet/RTF bytes, `retained_output_bytes: 0`, and the
+production writer's explicit `retained_authoring_window_bytes`. Increasing total output
+therefore cannot be mistaken for an increasing retained authoring window.
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 5 --semantic-shape tiny,large \
+  --case xlsx_streaming_create,rtf_streaming_create \
+  --json target/perf/streaming-create.json
+```
 
 ## Opt-in DOCX/PPTX semantic corpus matrix
 
@@ -1222,6 +1287,11 @@ identifying the deterministic changed archive without changing schema v1. For
 `ordinary_payload_materializations` value is exactly one per sample: the
 selected original Part is validated, while every unselected member is copied
 physically without semantic materialization.
+
+Streaming-creation cases also emit `output_sha256`. Their `sink` extensions are
+content-free scalar evidence; `retained_output_bytes` is always zero and
+`retained_authoring_window_bytes` is the row/text encoder bound, not process RSS or a
+claim about allocator internals.
 
 `docx_source_backed_one_edit_save` also emits `output_sha256`, source/sink
 distributions, and `ordinary_payload_materializations`. Its value is exactly
