@@ -65,7 +65,8 @@
       "litchi-ooxml-common",
       "litchi-opc",
       "litchi-sign",
-      "litchi-vba"
+      "litchi-vba",
+      "soapberry-zip"
     ],
     "litchi-drawingml": [
       "litchi-core",
@@ -343,6 +344,10 @@
     "xml-minifier-macros": []
   },
   "dev_only_edges": [
+    {
+      "dependent": "litchi-docx",
+      "dependency": "soapberry-zip"
+    },
     {
       "dependent": "litchi-iwa-detect",
       "dependency": "litchi-iwa-protos"
