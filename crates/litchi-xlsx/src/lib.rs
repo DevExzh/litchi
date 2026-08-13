@@ -123,6 +123,8 @@ pub mod slicer;
 mod slicer_cache;
 pub mod smart_tags;
 pub mod sort;
+/// Bounded, sequential creation of one-sheet XLSX workbooks.
+pub mod streaming;
 pub mod style;
 pub mod survey;
 pub mod tab_state;
@@ -233,6 +235,10 @@ pub use phonetic_properties::{
     PhoneticAlignment, PhoneticProperties, PhoneticType, parse_phonetic_properties,
 };
 pub use print_options::{PrintOptions, parse_print_options};
+pub use streaming::{
+    StreamingCell, StreamingCellValue, StreamingValue, StreamingWorkbookLimits,
+    StreamingWorkbookWriter,
+};
 // Query-table semantic types remain under the contextual `query_table` owner;
 // package operations are also available at this convenience facade.
 pub use data_validation::{
