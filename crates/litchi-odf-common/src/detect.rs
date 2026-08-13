@@ -137,12 +137,25 @@ pub fn bytes(value: &[u8]) -> Option<Format> {
 /// without a second central-directory scan.
 #[must_use]
 pub fn prepared(value: Vec<u8>) -> Option<PreparedPackage> {
-    let format = mime(packaged_mime(&value)?)?;
-    let package = OwnedPackage::from_prepared_bytes(value).ok()?;
-    if !package.is_stored(MIMETYPE_PATH).ok()? {
-        return None;
+    prepared_or_original(value).ok()
+}
+
+/// Detect a packaged ODF document while preserving ownership on rejection.
+///
+/// A successful result retains the one validated ZIP index built by the
+/// detector. A rejected candidate returns the caller's original `Vec`
+/// allocation so a lower-precedence package detector can inspect it without a
+/// full-input clone.
+#[must_use]
+pub fn prepared_or_original(value: Vec<u8>) -> Result<PreparedPackage, Vec<u8>> {
+    let Some(format) = packaged_mime(&value).and_then(mime) else {
+        return Err(value);
+    };
+    let package = OwnedPackage::from_prepared_bytes_or_recover(value)?;
+    if !package.is_stored(MIMETYPE_PATH).unwrap_or(false) {
+        return Err(package.into_inner());
     }
-    Some(PreparedPackage::new(package, format))
+    Ok(PreparedPackage::new(package, format))
 }
 
 /// Compatibility spelling for callers that prefer the full detector name.
@@ -507,5 +520,29 @@ mod tests {
             ("../content.xml", b"junk"),
         ]);
         assert!(prepared(traversal).is_none());
+    }
+
+    #[test]
+    fn rejected_prepared_detection_returns_the_original_allocation() {
+        let mut writer = crate::core::PackageWriter::new();
+        writer
+            .set_mimetype(constants::ODF_TEXT)
+            .expect("test package mimetype must be accepted");
+        let mut invalid = writer
+            .finish_to_bytes()
+            .expect("test package must be writable");
+        let central = central_record(&invalid, MIMETYPE_NAME);
+        invalid[central] = 0;
+        invalid.reserve(64);
+        let pointer = invalid.as_ptr();
+        let capacity = invalid.capacity();
+
+        let recovered = match prepared_or_original(invalid) {
+            Err(recovered) => recovered,
+            Ok(_) => panic!("malformed ODF index must return its source"),
+        };
+
+        assert_eq!(recovered.as_ptr(), pointer);
+        assert_eq!(recovered.capacity(), capacity);
     }
 }

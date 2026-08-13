@@ -1,9 +1,9 @@
 //! Smart format detection with reusable owned results.
 //!
 //! This module provides the `DetectedFormat` enum and the `detect_format_smart`
-//! function. OOXML and OLE results retain their parsed owners; packaged ODF
-//! results retain a validated archive index, while iWork and RTF results retain
-//! the caller's moved byte buffer for subsequent parsing.
+//! function. OOXML and OLE results retain their parsed owners; packaged ODT
+//! results retain a validated archive index; ODS, ODP, iWork, and RTF results
+//! retain the caller's moved byte buffer for subsequent parsing.
 
 /// Detected format with reusable parsed owners or moved source bytes.
 ///
@@ -11,13 +11,14 @@
 /// includes the most reusable representation available at this layer:
 /// - OOXML formats (DOCX, PPTX, XLSX, XLSB): include parsed OPC package
 /// - OLE2 formats (DOC, PPT, XLS): include parsed OleFile
-/// - ODF formats: include an owned, validated package index after detection
+/// - ODT: includes an owned, validated package index after detection
+/// - ODS and ODP: include owned bytes after package detection
 /// - iWork formats: include owned bytes after leaf detection
 /// - RTF: includes owned bytes
 ///
 /// iWork leaf detectors may scan a container before a later document parser
-/// reads the retained bytes again. ODF packaged detection retains its bounded
-/// index and makes the handoff parsing-once at the archive-structure layer.
+/// reads the retained bytes again. Packaged ODT detection retains its bounded
+/// index and makes that handoff parsing-once at the archive-structure layer.
 pub enum DetectedFormat {
     // OOXML formats with parsed OPC package
     #[cfg(feature = "docx")]
@@ -45,7 +46,7 @@ pub enum DetectedFormat {
     #[cfg(feature = "numbers")]
     Numbers(Vec<u8>),
 
-    // ODF formats with a validated, reusable ZIP archive index
+    // ODT retains its validated ZIP index; ODS and ODP retain moved bytes.
     #[cfg(feature = "odt")]
     Odt(litchi_odf_common::PreparedPackage),
     #[cfg(feature = "odp")]
@@ -107,7 +108,8 @@ impl std::fmt::Debug for DetectedFormat {
 /// The result retains a reusable representation for immediate follow-up work:
 /// - OOXML files: parse OPC package once and return it
 /// - OLE2 files: parse OLE file once and return it
-/// - ODF files: retain one validated archive index for semantic opening
+/// - ODT files: retain one validated archive index for semantic opening
+/// - ODS and ODP files: return the moved bytes after package detection
 /// - iWork and RTF files: return the moved bytes after detection
 ///
 /// # Arguments
@@ -170,22 +172,25 @@ fn detect_format_smart_without_ooxml(bytes: Vec<u8>) -> Option<DetectedFormat> {
 
     if mask.is_zip() {
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
-        if let Some(prepared) = litchi_odf_common::detect::prepared(bytes) {
-            let format = prepared.format();
-            return match format {
-                #[cfg(feature = "odt")]
-                litchi_core::detection::FileFormat::Odt => Some(DetectedFormat::Odt(prepared)),
-                #[cfg(feature = "odp")]
-                litchi_core::detection::FileFormat::Odp => {
-                    Some(DetectedFormat::Odp(prepared.into_package().into_inner()))
-                },
-                #[cfg(feature = "ods")]
-                litchi_core::detection::FileFormat::Ods => {
-                    Some(DetectedFormat::Ods(prepared.into_package().into_inner()))
-                },
-                _ => None,
-            };
-        }
+        let bytes = match litchi_odf_common::detect::prepared_or_original(bytes) {
+            Ok(prepared) => {
+                let format = prepared.format();
+                return match format {
+                    #[cfg(feature = "odt")]
+                    litchi_core::detection::FileFormat::Odt => Some(DetectedFormat::Odt(prepared)),
+                    #[cfg(feature = "odp")]
+                    litchi_core::detection::FileFormat::Odp => {
+                        Some(DetectedFormat::Odp(prepared.into_package().into_inner()))
+                    },
+                    #[cfg(feature = "ods")]
+                    litchi_core::detection::FileFormat::Ods => {
+                        Some(DetectedFormat::Ods(prepared.into_package().into_inner()))
+                    },
+                    _ => None,
+                };
+            },
+            Err(bytes) => bytes,
+        };
 
         #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
         if let Ok(Some(format)) = litchi_iwa_detect::bytes(&bytes) {
@@ -204,6 +209,9 @@ fn detect_format_smart_without_ooxml(bytes: Vec<u8>) -> Option<DetectedFormat> {
             };
             return Some(detected);
         }
+
+        #[cfg(not(any(feature = "pages", feature = "keynote", feature = "numbers")))]
+        drop(bytes);
     }
 
     None
@@ -296,18 +304,25 @@ pub fn detect_format_smart_with_limits(
         }
 
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
-        if let Some(prepared) = litchi_odf_common::detect::prepared(bytes) {
-            let format = prepared.format();
-            return match format {
-                #[cfg(feature = "odt")]
-                FileFormat::Odt => Some(DetectedFormat::Odt(prepared)),
-                #[cfg(feature = "odp")]
-                FileFormat::Odp => Some(DetectedFormat::Odp(prepared.into_package().into_inner())),
-                #[cfg(feature = "ods")]
-                FileFormat::Ods => Some(DetectedFormat::Ods(prepared.into_package().into_inner())),
-                _ => None,
-            };
-        }
+        let bytes = match litchi_odf_common::detect::prepared_or_original(bytes) {
+            Ok(prepared) => {
+                let format = prepared.format();
+                return match format {
+                    #[cfg(feature = "odt")]
+                    FileFormat::Odt => Some(DetectedFormat::Odt(prepared)),
+                    #[cfg(feature = "odp")]
+                    FileFormat::Odp => {
+                        Some(DetectedFormat::Odp(prepared.into_package().into_inner()))
+                    },
+                    #[cfg(feature = "ods")]
+                    FileFormat::Ods => {
+                        Some(DetectedFormat::Ods(prepared.into_package().into_inner()))
+                    },
+                    _ => None,
+                };
+            },
+            Err(bytes) => bytes,
+        };
 
         #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
         if let Ok(Some(format)) = litchi_iwa_detect::bytes(&bytes) {
@@ -326,6 +341,9 @@ pub fn detect_format_smart_with_limits(
             };
             return Some(detected);
         }
+
+        #[cfg(not(any(feature = "pages", feature = "keynote", feature = "numbers")))]
+        drop(bytes);
     }
 
     None
@@ -472,5 +490,21 @@ mod short_signature_tests {
 
         assert_eq!(debug, "DetectedFormat(\"Pages\")");
         assert!(!debug.contains("private document marker"));
+    }
+
+    #[cfg(all(feature = "odt", feature = "pages"))]
+    #[test]
+    fn rejected_odf_probe_preserves_the_pages_source_for_lower_precedence_detection() {
+        let bytes = include_bytes!("../../../../test-data/iwork/pages/basic.pages").to_vec();
+        let pointer = bytes.as_ptr();
+        let capacity = bytes.capacity();
+
+        let detected = detect_format_smart(bytes).expect("Pages fixture should be detected");
+        let super::DetectedFormat::Pages(retained) = detected else {
+            panic!("ODF rejection must continue to Pages detection");
+        };
+
+        assert_eq!(retained.as_ptr(), pointer);
+        assert_eq!(retained.capacity(), capacity);
     }
 }

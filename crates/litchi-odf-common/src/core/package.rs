@@ -71,11 +71,22 @@ impl OwnedPackage {
         )
     }
 
-    pub(crate) fn from_prepared_bytes(data: Vec<u8>) -> Result<Self> {
-        Self::from_shared_bytes_with_policy(
-            Arc::new(data),
+    pub(crate) fn from_prepared_bytes_or_recover(
+        data: Vec<u8>,
+    ) -> std::result::Result<Self, Vec<u8>> {
+        let data = Arc::new(data);
+        match Self::from_shared_bytes_with_policy(
+            Arc::clone(&data),
             soapberry_zip::office::ArchiveValidationPolicy::StrictPackage,
-        )
+        ) {
+            Ok(package) => Ok(package),
+            Err(_error) => {
+                let Some(data) = Arc::into_inner(data) else {
+                    unreachable!("failed ODF preparation must release its temporary source handle")
+                };
+                Err(data)
+            },
+        }
     }
 
     fn from_shared_bytes_with_policy(
