@@ -21,5 +21,6 @@ pub use source::{
     MAX_SOURCE_BACKED_SLIDE_BATCH, SourceBackedPresentation, SourceBackedPresentationEditor,
     SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit, SourceBackedSlideBatchPatch,
     SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit, SourceBackedSlideEdit,
-    SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceSlide,
+    SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImage, SourceImageDescriptor,
+    SourceImageTarget, SourceSlide,
 };
