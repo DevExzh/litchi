@@ -158,7 +158,9 @@ pub struct SourceCacheDiagnostics {
     /// Whether this cache charges retained and in-flight payloads to a caller
     /// supplied hierarchical memory budget.
     pub budget_managed: bool,
-    /// Managed payload reservations rejected by the hierarchical budget.
+    /// Managed budget reservations rejected by the hierarchical budget. A
+    /// final `InputBytes` refusal is counted; a temporary oversized read
+    /// window that is shrunk to the remaining capacity is not.
     pub budget_reservation_failures: u64,
     /// Current memory usage observed on the managed context's local budget.
     /// This is content-free and may include sibling operations sharing the
@@ -171,6 +173,34 @@ pub struct SourceCacheDiagnostics {
     /// Local memory limit observed on the managed context's budget. `None`
     /// means that the compatibility, unmanaged cache path is active.
     pub budget_memory_limit: Option<u64>,
+    /// Cumulative physical bytes accepted from positional reads charged to
+    /// this context. Shared contexts may include sibling operations. This is
+    /// never released when a package, cache entry, or payload handle is
+    /// dropped.
+    pub budget_input_bytes_used: u64,
+    /// Local cumulative input-byte limit, or `None` for an unmanaged cache.
+    pub budget_input_bytes_limit: Option<u64>,
+    /// Cumulative declared cold-load work charged before payload I/O. A
+    /// successful ZIP read proves that the declared uncompressed size is also
+    /// the actual materialized size; hits and waiters add no work. Shared
+    /// contexts may include sibling operations.
+    pub budget_work_used: u64,
+    /// Local cumulative work limit, or `None` for an unmanaged cache.
+    pub budget_work_limit: Option<u64>,
+    /// Current retained object usage observed on the managed context's local
+    /// budget. Shared contexts may include sibling operations. Unlike input
+    /// bytes and work, this usage is released when the package catalog or a
+    /// payload object is dropped.
+    pub budget_objects_used: u64,
+    /// Local retained-object limit, or `None` for an unmanaged cache.
+    pub budget_objects_limit: Option<u64>,
+    /// Object units retained by the package catalog itself.
+    pub budget_catalog_reserved_objects: u64,
+    /// Object units retained by cache entries and active flights. Returned
+    /// handles that outlive eviction are reflected in `budget_objects_used`
+    /// but deliberately excluded here, matching the retained-byte diagnostic.
+    /// Shared reservations are counted once.
+    pub budget_cache_reserved_objects: u64,
 }
 
 #[derive(Debug, Default)]
@@ -194,10 +224,28 @@ struct SourceReader {
 
 impl ZipReaderAt for SourceReader {
     fn read_at(&self, output: &mut [u8], offset: u64) -> std::io::Result<usize> {
-        self.snapshot.ensure_current_io_if_monitored()?;
-        let read = self.snapshot.source.read_at(offset, output)?;
-        self.snapshot.ensure_current_io_if_monitored()?;
-        Ok(read)
+        let result = read_source_at_with_context(
+            &self.snapshot,
+            self.snapshot.context.as_ref(),
+            offset,
+            output,
+            "archive",
+        );
+        result.map_err(|error| {
+            let execution = match &error {
+                OpcError::Cancelled => Some(ExecutionError::Cancelled),
+                OpcError::Execution(execution) => Some(execution.clone()),
+                _ => None,
+            };
+            if let Some(execution) = execution {
+                record_source_execution_failure(&self.snapshot, execution);
+            }
+            match error {
+                OpcError::IoError(error) => error,
+                OpcError::Execution(error) => execution_io_error(error),
+                error => std::io::Error::other(error.to_string()),
+            }
+        })
     }
 }
 
@@ -208,6 +256,9 @@ struct SourceSnapshot {
     length: u64,
     monitor_reads: Arc<std::sync::atomic::AtomicBool>,
     lineage: SourceLineage,
+    context: Option<ExecutionContext>,
+    execution_failure: Option<Arc<Mutex<Option<ExecutionError>>>>,
+    input_reservation_failures: Option<Arc<AtomicU64>>,
 }
 
 /// Process-local identity for one opened source-backed package lineage.
@@ -262,11 +313,13 @@ impl SourceArtifact {
             let remaining =
                 usize::try_from((self.snapshot.length - offset).min(buffer.len() as u64))
                     .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
-            let read = self
-                .snapshot
-                .source
-                .read_at(offset, &mut buffer[..remaining])?;
-            validate_source_read_count(read, remaining, "fingerprinting")?;
+            let read = read_source_at_with_context(
+                &self.snapshot,
+                self.snapshot.context.as_ref(),
+                offset,
+                &mut buffer[..remaining],
+                "fingerprinting",
+            )?;
             if read == 0 {
                 return Err(OpcError::IoError(std::io::Error::new(
                     std::io::ErrorKind::UnexpectedEof,
@@ -285,7 +338,7 @@ impl SourceArtifact {
 
     /// Copy the retained source artifact exactly to a sequential sink.
     pub fn write_to_stream<W: Write>(&self, writer: W) -> Result<()> {
-        write_exact_snapshot(&self.snapshot, writer, None)
+        write_exact_snapshot(&self.snapshot, writer, self.snapshot.context.as_ref())
     }
 }
 
@@ -522,11 +575,18 @@ impl PartData {
 struct CachedPayload {
     bytes: Arc<Vec<u8>>,
     reservation: Option<Arc<Reservation>>,
+    object_reservation: Option<Arc<Reservation>>,
 }
 
 impl CachedPayload {
     fn reserved_bytes(&self) -> u64 {
         self.reservation
+            .as_ref()
+            .map_or(0, |reservation| reservation.amount())
+    }
+
+    fn reserved_objects(&self) -> u64 {
+        self.object_reservation
             .as_ref()
             .map_or(0, |reservation| reservation.amount())
     }
@@ -557,19 +617,31 @@ struct LoadFlight {
     state: Mutex<FlightState>,
     completed: Condvar,
     reservation: Option<Arc<Reservation>>,
+    flight_object_reservation: Option<Arc<Reservation>>,
+    payload_object_reservation: Option<Arc<Reservation>>,
 }
 
 impl LoadFlight {
-    fn new(reservation: Option<Arc<Reservation>>) -> Self {
+    fn new(
+        reservation: Option<Arc<Reservation>>,
+        flight_object_reservation: Option<Arc<Reservation>>,
+        payload_object_reservation: Option<Arc<Reservation>>,
+    ) -> Self {
         Self {
             state: Mutex::new(FlightState::default()),
             completed: Condvar::new(),
             reservation,
+            flight_object_reservation,
+            payload_object_reservation,
         }
     }
 
     fn reservation(&self) -> Option<Arc<Reservation>> {
         self.reservation.as_ref().map(Arc::clone)
+    }
+
+    fn payload_object_reservation(&self) -> Option<Arc<Reservation>> {
+        self.payload_object_reservation.as_ref().map(Arc::clone)
     }
 
     fn wait(
@@ -622,7 +694,12 @@ enum CacheAccess {
     Hit(CachedPayload),
     Loader(Arc<LoadFlight>),
     Waiter(Arc<LoadFlight>),
-    Bypass(Option<Arc<Reservation>>),
+    Bypass(LoadResources),
+}
+
+struct LoadResources {
+    reservation: Option<Arc<Reservation>>,
+    payload_object_reservation: Option<Arc<Reservation>>,
 }
 
 #[derive(Debug)]
@@ -631,6 +708,7 @@ struct PartCache {
     state: Mutex<CacheState>,
     counters: CacheCounters,
     budget: Option<ExecutionContext>,
+    input_reservation_failures: Option<Arc<AtomicU64>>,
 }
 
 impl PartCache {
@@ -640,15 +718,21 @@ impl PartCache {
             state: Mutex::new(CacheState::default()),
             counters: CacheCounters::default(),
             budget: None,
+            input_reservation_failures: None,
         }
     }
 
-    fn new_managed(limits: SourceCacheLimits, context: ExecutionContext) -> Self {
+    fn new_managed(
+        limits: SourceCacheLimits,
+        context: ExecutionContext,
+        input_reservation_failures: Arc<AtomicU64>,
+    ) -> Self {
         Self {
             limits,
             state: Mutex::new(CacheState::default()),
             counters: CacheCounters::default(),
             budget: Some(context),
+            input_reservation_failures: Some(input_reservation_failures),
         }
     }
 
@@ -690,17 +774,58 @@ impl PartCache {
         }
 
         let reservation = self.reserve_for_load(&mut state, declared_bytes)?;
+        let payload_object_reservation = self.reserve_object_for_load()?;
         if state.flights.try_reserve(1).is_err() {
+            self.charge_cold_work(declared_bytes)?;
             self.counters.cold_loads.fetch_add(1, Ordering::Relaxed);
             self.counters
                 .allocation_bypasses
                 .fetch_add(1, Ordering::Relaxed);
-            return Ok(CacheAccess::Bypass(reservation));
+            return Ok(CacheAccess::Bypass(LoadResources {
+                reservation,
+                payload_object_reservation,
+            }));
         }
-        let flight = Arc::new(LoadFlight::new(reservation));
+        let flight_object_reservation = self.reserve_object_for_load()?;
+        self.charge_cold_work(declared_bytes)?;
+        let flight = Arc::new(LoadFlight::new(
+            reservation,
+            flight_object_reservation,
+            payload_object_reservation,
+        ));
         state.flights.insert(entry_id, Arc::clone(&flight));
         self.counters.cold_loads.fetch_add(1, Ordering::Relaxed);
         Ok(CacheAccess::Loader(flight))
+    }
+
+    fn reserve_object_for_load(
+        &self,
+    ) -> std::result::Result<Option<Arc<Reservation>>, ExecutionError> {
+        let Some(context) = self.budget.as_ref() else {
+            return Ok(None);
+        };
+        match context.reserve(Resource::Objects, 1) {
+            Ok(reservation) => Ok(Some(Arc::new(reservation))),
+            Err(error) => {
+                if matches!(error, ExecutionError::ResourceLimit(_)) {
+                    self.counters
+                        .budget_reservation_failures
+                        .fetch_add(1, Ordering::Relaxed);
+                }
+                Err(error)
+            },
+        }
+    }
+
+    fn charge_cold_work(&self, declared_bytes: u64) -> std::result::Result<(), ExecutionError> {
+        let Some(context) = self.budget.as_ref() else {
+            return Ok(());
+        };
+        // Work is cumulative. Charge the declared decompression output before
+        // the archive reader starts; `load_part` later requires the actual
+        // verified output length to equal this declaration, so no guessed or
+        // second work charge is needed.
+        context.consume(Resource::Work, declared_bytes)
     }
 
     fn reserve_for_load(
@@ -921,22 +1046,73 @@ impl PartCache {
             .values()
             .map(|entry| entry.payload.reserved_bytes())
             .sum::<u64>();
+        let mut budget_cache_reserved_objects = state
+            .entries
+            .values()
+            .map(|entry| entry.payload.reserved_objects())
+            .sum::<u64>();
         for flight in state.flights.values() {
-            let Some(reservation) = flight.reservation.as_ref() else {
-                continue;
-            };
-            let already_counted = state.entries.values().any(|entry| {
-                entry
-                    .payload
-                    .reservation
-                    .as_ref()
-                    .is_some_and(|existing| Arc::ptr_eq(existing, reservation))
-            });
-            if !already_counted {
-                budget_cache_reserved_bytes =
-                    budget_cache_reserved_bytes.saturating_add(reservation.amount());
+            if let Some(reservation) = flight.reservation.as_ref() {
+                let already_counted = state.entries.values().any(|entry| {
+                    entry
+                        .payload
+                        .reservation
+                        .as_ref()
+                        .is_some_and(|existing| Arc::ptr_eq(existing, reservation))
+                });
+                if !already_counted {
+                    budget_cache_reserved_bytes =
+                        budget_cache_reserved_bytes.saturating_add(reservation.amount());
+                }
+            }
+            if let Some(object_reservation) = flight.payload_object_reservation.as_ref() {
+                let already_counted = state.entries.values().any(|entry| {
+                    entry
+                        .payload
+                        .object_reservation
+                        .as_ref()
+                        .is_some_and(|existing| Arc::ptr_eq(existing, object_reservation))
+                });
+                if !already_counted {
+                    budget_cache_reserved_objects =
+                        budget_cache_reserved_objects.saturating_add(object_reservation.amount());
+                }
+            }
+            if let Some(object_reservation) = flight.flight_object_reservation.as_ref() {
+                budget_cache_reserved_objects =
+                    budget_cache_reserved_objects.saturating_add(object_reservation.amount());
             }
         }
+        let (budget_input_bytes_used, budget_input_bytes_limit) =
+            self.budget.as_ref().map_or((0, None), |context| {
+                (
+                    context.budget().used(Resource::InputBytes),
+                    Some(context.budget().limit(Resource::InputBytes)),
+                )
+            });
+        let (budget_work_used, budget_work_limit) =
+            self.budget.as_ref().map_or((0, None), |context| {
+                (
+                    context.budget().used(Resource::Work),
+                    Some(context.budget().limit(Resource::Work)),
+                )
+            });
+        let (budget_objects_used, budget_objects_limit) =
+            self.budget.as_ref().map_or((0, None), |context| {
+                (
+                    context.budget().used(Resource::Objects),
+                    Some(context.budget().limit(Resource::Objects)),
+                )
+            });
+        let budget_reservation_failures = self
+            .counters
+            .budget_reservation_failures
+            .load(Ordering::Relaxed)
+            .saturating_add(
+                self.input_reservation_failures
+                    .as_ref()
+                    .map_or(0, |counter| counter.load(Ordering::Relaxed)),
+            );
         SourceCacheDiagnostics {
             hits: self.counters.hits.load(Ordering::Relaxed),
             cold_loads: self.counters.cold_loads.load(Ordering::Relaxed),
@@ -951,10 +1127,7 @@ impl PartCache {
             retained_bytes: state.total_bytes,
             in_flight_loads: state.flights.len(),
             budget_managed: self.budget.is_some(),
-            budget_reservation_failures: self
-                .counters
-                .budget_reservation_failures
-                .load(Ordering::Relaxed),
+            budget_reservation_failures,
             budget_memory_used: self
                 .budget
                 .as_ref()
@@ -964,6 +1137,14 @@ impl PartCache {
                 .budget
                 .as_ref()
                 .map(|context| context.budget().limit(Resource::Memory)),
+            budget_input_bytes_used,
+            budget_input_bytes_limit,
+            budget_work_used,
+            budget_work_limit,
+            budget_objects_used,
+            budget_objects_limit,
+            budget_catalog_reserved_objects: 0,
+            budget_cache_reserved_objects,
         }
     }
 }
@@ -1014,6 +1195,7 @@ pub struct SourceBackedPackage {
     parts_by_name: HashMap<PackURI, usize>,
     non_part_members: Vec<NonPartMember>,
     cache: PartCache,
+    catalog_object_reservation: Option<Arc<Reservation>>,
 }
 
 /// Validation-only open failure with exact ingress phase provenance.
@@ -1047,6 +1229,9 @@ impl SourceBackedPackage {
             length,
             monitor_reads: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             lineage: SourceLineage(Arc::new(())),
+            context: None,
+            execution_failure: None,
+            input_reservation_failures: None,
         };
         snapshot
             .ensure_current()
@@ -1120,6 +1305,7 @@ impl SourceBackedPackage {
             parts_by_name,
             non_part_members,
             cache: PartCache::new(SourceCacheLimits::default()),
+            catalog_object_reservation: None,
         })
     }
 
@@ -1208,6 +1394,10 @@ impl SourceBackedPackage {
         if let Some(context) = context.as_ref() {
             context.check().map_err(map_execution_error)?;
         }
+        let execution_failure = context
+            .as_ref()
+            .map(|_| Arc::new(Mutex::new(None::<ExecutionError>)));
+        let input_reservation_failures = context.as_ref().map(|_| Arc::new(AtomicU64::new(0)));
         let version = source.version()?;
         let length = source.len()?;
         limits.check(ReadResource::InputBytes, length, limits.max_input_bytes())?;
@@ -1220,27 +1410,67 @@ impl SourceBackedPackage {
             length,
             monitor_reads: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             lineage: SourceLineage(Arc::new(())),
+            context: context.clone(),
+            execution_failure: execution_failure.clone(),
+            input_reservation_failures: input_reservation_failures.clone(),
         };
         snapshot.ensure_current()?;
         if let Some(context) = context.as_ref() {
             context.check().map_err(map_execution_error)?;
         }
-        let archive = IndexedArchive::from_reader_with_limits(
+        let archive = match IndexedArchive::from_reader_with_limits(
             SourceReader {
                 snapshot: snapshot.clone(),
             },
             length,
             limits.zip_limits(),
-        )?;
+        ) {
+            Ok(archive) => archive,
+            Err(error) => {
+                if let Some(execution) = take_source_execution_failure(&snapshot) {
+                    return Err(map_execution_error(execution));
+                }
+                return Err(error.into());
+            },
+        };
         snapshot.ensure_current()?;
         if let Some(context) = context.as_ref() {
             context.check().map_err(map_execution_error)?;
         }
+        // The indexed archive and its source catalog remain owned by the
+        // package for its whole lifetime. Reserve one object for the package
+        // catalog owner and one for every physical member before parsing the
+        // source catalog and projecting deferred part vectors; this is a
+        // bounded retained charge, not a cumulative event. Payloads and
+        // load flights use separate units.
+        let catalog_object_reservation = if let Some(context) = context.as_ref() {
+            let member_objects = u64::try_from(archive.len()).map_err(|_| {
+                overlay_unavailable("source-backed OPC catalog member count overflows u64")
+            })?;
+            let object_count = member_objects.checked_add(1).ok_or_else(|| {
+                overlay_unavailable("source-backed OPC catalog object count overflows u64")
+            })?;
+            Some(Arc::new(
+                context
+                    .reserve(Resource::Objects, object_count)
+                    .map_err(map_execution_error)?,
+            ))
+        } else {
+            None
+        };
         let SourceCatalog {
             pkg_srels,
             parts,
             non_part_members,
-        } = PackageReader::source_catalog(&archive, limits)?;
+        } = match PackageReader::source_catalog(&archive, limits) {
+            Ok(catalog) => catalog,
+            Err(error) => {
+                if let Some(execution) = take_source_execution_failure(&snapshot) {
+                    return Err(map_execution_error(execution));
+                }
+                return Err(error);
+            },
+        };
         snapshot.ensure_current()?;
         if let Some(context) = context.as_ref() {
             context.check().map_err(map_execution_error)?;
@@ -1289,10 +1519,14 @@ impl SourceBackedPackage {
             context.check().map_err(map_execution_error)?;
         }
 
-        let cache = context.map_or_else(
-            || PartCache::new(cache_limits),
-            |context| PartCache::new_managed(cache_limits, context),
-        );
+        let cache = if let Some(context) = context {
+            let input_reservation_failures = input_reservation_failures.ok_or_else(|| {
+                overlay_unavailable("managed source input reservation counter is unavailable")
+            })?;
+            PartCache::new_managed(cache_limits, context, input_reservation_failures)
+        } else {
+            PartCache::new(cache_limits)
+        };
         Ok(Self {
             source: snapshot,
             archive,
@@ -1302,6 +1536,7 @@ impl SourceBackedPackage {
             parts_by_name,
             non_part_members,
             cache,
+            catalog_object_reservation,
         })
     }
 
@@ -1370,7 +1605,12 @@ impl SourceBackedPackage {
     /// operation does not read part payloads or expose member identifiers.
     #[must_use]
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
-        self.cache.diagnostics()
+        let mut diagnostics = self.cache.diagnostics();
+        diagnostics.budget_catalog_reserved_objects = self
+            .catalog_object_reservation
+            .as_ref()
+            .map_or(0, |reservation| reservation.amount());
+        diagnostics
     }
 
     /// Check the caller-supplied execution policy for a source-backed
@@ -1541,7 +1781,15 @@ impl SourceBackedPackage {
             relationship_xml.len(),
         )?;
         let original_part = self.read_part(target)?;
-        let original_relationships = self.archive.read_entry(relationship_entry)?;
+        let original_relationships = match self.archive.read_entry(relationship_entry) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                if let Some(execution) = take_source_execution_failure(&self.source) {
+                    return Err(map_execution_error(execution));
+                }
+                return Err(error.into());
+            },
+        };
         self.source.ensure_current()?;
         if self.has_signature_infrastructure() {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
@@ -1874,6 +2122,9 @@ impl SourceBackedPackage {
         let index = match self.archive.preservation_index(&mut scratch) {
             Ok(index) => index,
             Err(error) => {
+                if let Some(execution) = take_source_execution_failure(&self.source) {
+                    return Err(map_execution_error(execution));
+                }
                 self.source.ensure_current()?;
                 return Err(overlay_unavailable(error.to_string()));
             },
@@ -1957,6 +2208,8 @@ impl SourceBackedPackage {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take()
             .map_or(result, |error| Err(map_execution_error(error)));
+        let result = take_source_execution_failure(&self.source)
+            .map_or(result, |error| Err(map_execution_error(error)));
         finish_source_publication(result, &self.source, written)
     }
 
@@ -2007,7 +2260,13 @@ impl SourceBackedPackage {
                     return self.load_part(index, entry_id, declared_bytes, Some(flight), None);
                 },
                 CacheAccess::Bypass(reservation) => {
-                    return self.load_part(index, entry_id, declared_bytes, None, reservation);
+                    return self.load_part(
+                        index,
+                        entry_id,
+                        declared_bytes,
+                        None,
+                        Some(reservation),
+                    );
                 },
             }
         }
@@ -2019,14 +2278,22 @@ impl SourceBackedPackage {
         entry_id: EntryId,
         declared_bytes: Option<u64>,
         flight: Option<Arc<LoadFlight>>,
-        bypass_reservation: Option<Arc<Reservation>>,
+        bypass_resources: Option<LoadResources>,
     ) -> Result<PartData> {
         let result = (|| {
             let part = self
                 .parts
                 .get(index)
                 .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
-            let bytes = self.archive.read_entry(part.entry_id)?;
+            let bytes = match self.archive.read_entry(part.entry_id) {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    if let Some(execution) = take_source_execution_failure(&self.source) {
+                        return Err(map_execution_error(execution));
+                    }
+                    return Err(error.into());
+                },
+            };
             // The decompressor has finished and no payload has been
             // published yet. Cancellation here discards the cold result.
             self.cache.check_context().map_err(map_execution_error)?;
@@ -2053,10 +2320,29 @@ impl SourceBackedPackage {
         let reservation = flight
             .as_ref()
             .and_then(|flight| flight.reservation())
-            .or(bypass_reservation);
+            .or_else(|| {
+                bypass_resources
+                    .as_ref()
+                    .and_then(|resources| resources.reservation.as_ref().map(Arc::clone))
+            });
+        let object_reservation = flight
+            .as_ref()
+            .and_then(|flight| flight.payload_object_reservation())
+            .or_else(|| {
+                bypass_resources.as_ref().and_then(|resources| {
+                    resources
+                        .payload_object_reservation
+                        .as_ref()
+                        .map(Arc::clone)
+                })
+            });
         match (flight, result) {
             (Some(flight), Ok(bytes)) => {
-                let payload = CachedPayload { bytes, reservation };
+                let payload = CachedPayload {
+                    bytes,
+                    reservation,
+                    object_reservation,
+                };
                 if let Err(error) = self
                     .cache
                     .complete_success(entry_id, &flight, payload.clone())
@@ -2071,7 +2357,11 @@ impl SourceBackedPackage {
                 Err(error)
             },
             (None, Ok(bytes)) => {
-                let payload = CachedPayload { bytes, reservation };
+                let payload = CachedPayload {
+                    bytes,
+                    reservation,
+                    object_reservation,
+                };
                 if let Err(error) = self
                     .cache
                     .complete_bypass_success(entry_id, payload.clone())
@@ -2313,6 +2603,40 @@ fn map_execution_error(error: ExecutionError) -> OpcError {
     }
 }
 
+fn execution_io_error(error: ExecutionError) -> std::io::Error {
+    std::io::Error::other(error.to_string())
+}
+
+fn record_execution_failure(failure: &Arc<Mutex<Option<ExecutionError>>>, error: ExecutionError) {
+    let mut slot = failure
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if slot.is_none() {
+        *slot = Some(error);
+    }
+}
+
+fn record_source_execution_failure(snapshot: &SourceSnapshot, error: ExecutionError) {
+    if let Some(failure) = snapshot.execution_failure.as_ref() {
+        record_execution_failure(failure, error);
+    }
+}
+
+fn record_input_reservation_failure(snapshot: &SourceSnapshot) {
+    if let Some(counter) = snapshot.input_reservation_failures.as_ref() {
+        counter.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+fn take_source_execution_failure(snapshot: &SourceSnapshot) -> Option<ExecutionError> {
+    snapshot.execution_failure.as_ref().and_then(|failure| {
+        failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+    })
+}
+
 fn finish_source_publication(
     result: Result<()>,
     source: &SourceSnapshot,
@@ -2370,8 +2694,13 @@ fn write_exact_snapshot<W: Write>(
                 }
                 let remaining = usize::try_from((source.length - offset).min(buffer.len() as u64))
                     .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
-                let read = source.source.read_at(offset, &mut buffer[..remaining])?;
-                validate_source_read_count(read, remaining, "publication")?;
+                let read = read_source_at_with_context(
+                    source,
+                    context,
+                    offset,
+                    &mut buffer[..remaining],
+                    "publication",
+                )?;
                 if read == 0 {
                     return Err(OpcError::IoError(std::io::Error::new(
                         std::io::ErrorKind::UnexpectedEof,
@@ -2395,6 +2724,83 @@ fn write_exact_snapshot<W: Write>(
         })()
     };
     finish_source_publication(result, source, written)
+}
+
+/// Reserve a bounded positional-read window, perform exactly one source read,
+/// and commit only the bytes actually accepted. The retry loop is important
+/// for short-read adapters: a caller with one input byte remaining must still
+/// be allowed to read one byte even when the adapter initially receives a
+/// larger output buffer. A reservation is held only across the physical read,
+/// so cumulative [`Resource::InputBytes`] usage is exact under retries and
+/// never leaks on an I/O failure.
+fn read_source_at_with_context(
+    snapshot: &SourceSnapshot,
+    context: Option<&ExecutionContext>,
+    offset: u64,
+    output: &mut [u8],
+    operation: &str,
+) -> Result<usize> {
+    if let Some(context) = context {
+        context.check().map_err(map_execution_error)?;
+    }
+    snapshot.ensure_current_io_if_monitored()?;
+    let requested = output.len();
+    let (read_output, reservation) = if let Some(context) = context {
+        let mut attempt = u64::try_from(requested)
+            .map_err(|_| overlay_unavailable("source read length overflows u64"))?;
+        loop {
+            match context.reserve(Resource::InputBytes, attempt) {
+                Ok(reservation) => {
+                    let length = usize::try_from(attempt)
+                        .map_err(|_| overlay_unavailable("source read length overflows usize"))?;
+                    break (&mut output[..length], Some(reservation));
+                },
+                Err(error) => {
+                    let Some(limit) = (match &error {
+                        ExecutionError::ResourceLimit(limit) => Some(limit),
+                        ExecutionError::Cancelled
+                        | ExecutionError::WorkersExceedInFlightTasks { .. }
+                        | ExecutionError::ParallelThresholdExceedsInFlightBytes { .. } => None,
+                        _ => None,
+                    }) else {
+                        return Err(map_execution_error(error));
+                    };
+                    let previous = limit.observed.saturating_sub(attempt);
+                    let available = limit.limit.saturating_sub(previous);
+                    let next = available.min(attempt.saturating_sub(1));
+                    if next == 0 {
+                        record_input_reservation_failure(snapshot);
+                        return Err(map_execution_error(error));
+                    }
+                    attempt = next;
+                },
+            }
+        }
+    } else {
+        (output, None)
+    };
+    let read = match snapshot.source.read_at(offset, read_output) {
+        Ok(read) => read,
+        Err(error) => return Err(OpcError::IoError(error)),
+    };
+    validate_source_read_count(read, read_output.len(), operation)?;
+    if let Some(reservation) = reservation {
+        if !reservation.commit(read as u64) {
+            return Err(overlay_unavailable(
+                "source-backed OPC input reservation underflow",
+            ));
+        }
+    }
+    if let Some(context) = context {
+        context.check().map_err(|error| {
+            record_source_execution_failure(snapshot, error.clone());
+            map_execution_error(error)
+        })?;
+    }
+    snapshot
+        .ensure_current_io_if_monitored()
+        .map_err(OpcError::IoError)?;
+    Ok(read)
 }
 
 fn validate_source_read_count(read: usize, requested: usize, operation: &str) -> Result<()> {
@@ -2457,6 +2863,8 @@ mod tests {
         bytes: Vec<u8>,
         revision: AtomicU64,
         reads: AtomicUsize,
+        read_bytes: AtomicU64,
+        max_read: usize,
     }
 
     impl CountingSource {
@@ -2465,7 +2873,15 @@ mod tests {
                 bytes,
                 revision: AtomicU64::new(0),
                 reads: AtomicUsize::new(0),
+                read_bytes: AtomicU64::new(0),
+                max_read: usize::MAX,
             }
+        }
+
+        fn chunked(bytes: Vec<u8>, max_read: usize) -> Self {
+            let mut source = Self::new(bytes);
+            source.max_read = max_read.max(1);
+            source
         }
 
         fn changed(&self) {
@@ -2487,7 +2903,9 @@ mod tests {
                 return Ok(0);
             }
             let count = output.len().min(self.bytes.len() - offset);
+            let count = count.min(self.max_read);
             output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            self.read_bytes.fetch_add(count as u64, Ordering::SeqCst);
             Ok(count)
         }
 
@@ -2791,9 +3209,20 @@ mod tests {
     fn managed_context_with_cancellation(
         memory: u64,
     ) -> (Budget, CancellationSource, ExecutionContext) {
+        let (budget, cancellation_source, context) =
+            managed_context_with_resources(memory, u64::MAX, u64::MAX, u64::MAX);
+        (budget, cancellation_source, context)
+    }
+
+    fn managed_context_with_resources(
+        memory: u64,
+        input_bytes: u64,
+        objects: u64,
+        work: u64,
+    ) -> (Budget, CancellationSource, ExecutionContext) {
         let budget = Budget::root(
             "opc-source-cache-test",
-            Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+            Limits::new(memory, input_bytes, u64::MAX, objects, u64::MAX, work),
         );
         let (cancellation_source, cancellation) = CancellationSource::pair();
         let execution_limits = ExecutionLimits::new(
@@ -3147,6 +3576,261 @@ mod tests {
     }
 
     #[test]
+    fn managed_input_bytes_are_exact_for_chunked_reads_and_cache_hits_are_free() {
+        const DOCUMENT: &[u8] = b"short-read physical input accounting";
+        let source = Arc::new(CountingSource::chunked(
+            archive_bytes(root_relationships(), DOCUMENT, false),
+            3,
+        ));
+        let (budget, _cancellation_source, context) =
+            managed_context_with_resources(4096, u64::MAX, u64::MAX, u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        assert_eq!(
+            budget.used(Resource::InputBytes),
+            source.read_bytes.load(Ordering::SeqCst)
+        );
+        let first = package.main_document_part().unwrap().data().unwrap();
+        let after_cold = source.read_bytes.load(Ordering::SeqCst);
+        assert_eq!(budget.used(Resource::InputBytes), after_cold);
+        let second = package.main_document_part().unwrap().data().unwrap();
+        assert!(first.shares_allocation_with(&second));
+        assert_eq!(source.read_bytes.load(Ordering::SeqCst), after_cold);
+        assert_eq!(
+            package.cache_diagnostics().budget_input_bytes_used,
+            after_cold
+        );
+        drop(second);
+        drop(first);
+        drop(package);
+        // InputBytes and Work are cumulative; only retained resources release
+        // when the package and its handles are dropped.
+        assert_eq!(budget.used(Resource::InputBytes), after_cold);
+    }
+
+    #[test]
+    fn managed_input_budget_refusal_counts_only_the_terminal_read_reservation() {
+        const DOCUMENT: &[u8] = b"input reservation refusal accounting";
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            DOCUMENT,
+            false,
+        )));
+        let (budget, _cancellation_source, context) =
+            managed_context_with_resources(4096, u64::MAX, u64::MAX, u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context.clone(),
+        )
+        .unwrap();
+        let input_before = budget.used(Resource::InputBytes);
+        context
+            .consume(Resource::InputBytes, u64::MAX - input_before)
+            .unwrap();
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        let error = package.main_document_part().unwrap().data().unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                if limit.resource == Resource::InputBytes
+        ));
+        assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
+        assert_eq!(budget.used(Resource::InputBytes), u64::MAX);
+        assert_eq!(budget.used(Resource::Work), DOCUMENT.len() as u64);
+        assert_eq!(package.cache_diagnostics().budget_reservation_failures, 1);
+        assert_eq!(package.cache_diagnostics().retained_entries, 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        drop(package);
+        assert_eq!(budget.used(Resource::Objects), 0);
+    }
+
+    #[test]
+    fn managed_work_one_under_refuses_payload_before_physical_io() {
+        const DOCUMENT: &[u8] = b"work preflight one under";
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            DOCUMENT,
+            false,
+        )));
+        let (budget, _cancellation_source, context) =
+            managed_context_with_resources(4096, u64::MAX, u64::MAX, (DOCUMENT.len() - 1) as u64);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        let error = package.main_document_part().unwrap().data().unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                if limit.resource == Resource::Work
+        ));
+        assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
+        assert_eq!(budget.used(Resource::Work), 0);
+        assert_eq!(package.cache_diagnostics().retained_entries, 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_object_one_under_refuses_payload_before_physical_io() {
+        const DOCUMENT: &[u8] = b"object preflight one under";
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            DOCUMENT,
+            false,
+        )));
+        // archive_bytes(false) contains four non-directory members and one
+        // package-level catalog owner is retained by SourceBackedPackage.
+        let (budget, _cancellation_source, context) =
+            managed_context_with_resources(4096, u64::MAX, 5, u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        let error = package.main_document_part().unwrap().data().unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                if limit.resource == Resource::Objects
+        ));
+        // The catalog reservation is retained by the package; the one-under
+        // payload-object preflight happens before any ordinary payload read.
+        assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
+        assert_eq!(budget.used(Resource::Objects), 5);
+        drop(package);
+        assert_eq!(budget.used(Resource::Objects), 0);
+    }
+
+    #[test]
+    fn managed_failed_cold_load_consumes_work_and_input_but_releases_retained_objects() {
+        const DOCUMENT: &[u8] = b"managed failed cold-load accounting";
+        let mut bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let position = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        bytes[position] ^= 0xff;
+        let source = Arc::new(CountingSource::new(bytes));
+        let (budget, _cancellation_source, context) =
+            managed_context_with_resources(4096, u64::MAX, u64::MAX, u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let reads_before = source.read_bytes.load(Ordering::SeqCst);
+        assert!(matches!(
+            package.main_document_part().unwrap().data(),
+            Err(OpcError::ZipError(_))
+        ));
+        let reads_after = source.read_bytes.load(Ordering::SeqCst);
+        assert!(reads_after > reads_before);
+        assert_eq!(budget.used(Resource::InputBytes), reads_after);
+        assert_eq!(budget.used(Resource::Work), DOCUMENT.len() as u64);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(package.cache_diagnostics().retained_entries, 0);
+        assert_eq!(package.cache_diagnostics().budget_cache_reserved_objects, 0);
+        drop(package);
+        assert_eq!(budget.used(Resource::Objects), 0);
+    }
+
+    #[test]
+    fn managed_cancellation_between_cache_admission_and_source_read_is_typed() {
+        const DOCUMENT: &[u8] = b"cancel before managed source read";
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            DOCUMENT,
+            false,
+        )));
+        let (budget, cancellation_source, context) = managed_context_with_cancellation(4096);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let part = package.main_document_part().unwrap();
+        let index = part.index;
+        let entry_id = package.parts[index].entry_id;
+        let declared = package
+            .archive
+            .metadata_for(entry_id)
+            .unwrap()
+            .uncompressed_size();
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        let flight = match package.cache.enter(entry_id, declared).unwrap() {
+            CacheAccess::Loader(flight) => flight,
+            CacheAccess::Hit(_) | CacheAccess::Waiter(_) | CacheAccess::Bypass(_) => {
+                panic!("fresh managed Part must become the loader")
+            },
+        };
+        // The loader has charged its bounded cold-load resources, but has not
+        // entered SourceReader yet. This is the exact race boundary where a
+        // cancellation must survive ZIP's std::io::Error conversion.
+        cancellation_source.cancel();
+        let error = package
+            .load_part(index, entry_id, Some(declared), Some(flight), None)
+            .unwrap_err();
+        assert!(matches!(error, OpcError::Cancelled));
+        assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
+        assert_eq!(budget.used(Resource::Work), DOCUMENT.len() as u64);
+        assert_eq!(package.cache_diagnostics().in_flight_loads, 0);
+        assert_eq!(package.cache_diagnostics().retained_entries, 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(package.cache_diagnostics().budget_cache_reserved_objects, 0);
+        drop(package);
+        assert_eq!(budget.used(Resource::Objects), 0);
+    }
+
+    #[test]
+    fn managed_cancellation_before_preservation_source_read_is_typed() {
+        const DOCUMENT: &[u8] = b"<before/>";
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let source = Arc::new(CancelOnHitVersionSource::new(
+            archive_bytes(root_relationships(), DOCUMENT, false),
+            cancellation_source,
+        ));
+        let budget = Budget::root(
+            "opc-source-cache-preservation-cancel-test",
+            Limits::new(4096, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(4096).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let target = package.main_document_part().unwrap().partname().clone();
+        source.arm_after_cache_enter();
+        let mut output = Vec::new();
+        let error = package
+            .write_part_overlay_to_stream(&mut output, &target, b"<after/>".to_vec())
+            .unwrap_err();
+        assert!(matches!(error, OpcError::Cancelled));
+        assert!(output.is_empty());
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
     fn managed_constructor_honors_pre_cancellation_without_source_reads() {
         let source = Arc::new(CountingSource::new(archive_bytes(
             root_relationships(),
@@ -3305,6 +3989,8 @@ mod tests {
             budget.used(Resource::Memory),
             (b"document".len() + b"<orphan/>".len()) as u64
         );
+        assert_eq!(budget.used(Resource::Objects), 7);
+        assert_eq!(diagnostics.budget_cache_reserved_objects, 1);
         assert!(
             package
                 .cache
@@ -3319,6 +4005,7 @@ mod tests {
         drop(first);
         drop(package);
         assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
     }
 
     #[test]
@@ -3521,6 +4208,8 @@ mod tests {
                 diagnostics.budget_cache_reserved_bytes,
                 DOCUMENT.len() as u64
             );
+            assert_eq!(diagnostics.budget_cache_reserved_objects, 2);
+            assert_eq!(budget.used(Resource::Objects), 7);
             (first_task.join().unwrap(), second_task.join().unwrap())
         });
         assert_eq!(source.payload_reads.load(Ordering::SeqCst), 1);
@@ -3534,6 +4223,7 @@ mod tests {
             diagnostics.budget_cache_reserved_bytes,
             DOCUMENT.len() as u64
         );
+        assert_eq!(diagnostics.budget_cache_reserved_objects, 1);
         drop(first);
         drop(second);
         drop(package);
@@ -3585,6 +4275,9 @@ mod tests {
         assert_eq!(diagnostics.retained_entries, 0);
         assert_eq!(diagnostics.failed_loads, 1);
         assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Work), DOCUMENT.len() as u64);
+        assert!(budget.used(Resource::InputBytes) > 0);
+        assert_eq!(diagnostics.budget_cache_reserved_objects, 0);
         drop(package);
         assert_eq!(budget.used(Resource::Memory), 0);
     }
@@ -3616,6 +4309,9 @@ mod tests {
         assert_eq!(diagnostics.failed_loads, 1);
         assert_eq!(diagnostics.retained_entries, 0);
         assert_eq!(diagnostics.budget_cache_reserved_bytes, 0);
+        assert_eq!(budget.used(Resource::Work), DOCUMENT.len() as u64);
+        assert!(budget.used(Resource::InputBytes) > 0);
+        assert_eq!(diagnostics.budget_cache_reserved_objects, 0);
     }
 
     #[test]
@@ -3735,6 +4431,7 @@ mod tests {
                 CachedPayload {
                     bytes: Arc::clone(&first),
                     reservation: None,
+                    object_reservation: None,
                 },
             )
             .unwrap();
@@ -3749,6 +4446,7 @@ mod tests {
                 CachedPayload {
                     bytes: Arc::new(vec![3, 4]),
                     reservation: None,
+                    object_reservation: None,
                 },
             )
             .unwrap();
@@ -3762,6 +4460,7 @@ mod tests {
                 CachedPayload {
                     bytes: Arc::new(vec![1, 2]),
                     reservation: None,
+                    object_reservation: None,
                 },
             )
             .unwrap();
@@ -3771,6 +4470,7 @@ mod tests {
                 CachedPayload {
                     bytes: Arc::new(vec![3, 4]),
                     reservation: None,
+                    object_reservation: None,
                 },
             )
             .unwrap();
@@ -3797,6 +4497,7 @@ mod tests {
                 CachedPayload {
                     bytes: Arc::new(vec![0, 0, 0, 0]),
                     reservation: None,
+                    object_reservation: None,
                 },
             )
             .unwrap();
