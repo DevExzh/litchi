@@ -22,7 +22,11 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
     )]
     let control = match word {
         // Document
-        "rtf" => ControlWord::Rtf(param_value),
+        "rtf" => ControlWord::Rtf(param.ok_or_else(|| {
+            RtfError::MalformedDocument(
+                "RTF \\rtf control requires a version parameter".to_string(),
+            )
+        })?),
         "ansi" => ControlWord::Ansi,
         "ansicpg" => ControlWord::AnsiCodePage(param_value),
         "mac" => ControlWord::Mac,

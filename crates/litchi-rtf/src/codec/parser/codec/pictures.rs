@@ -4,8 +4,8 @@
     reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
 )]
 use super::{
-    ControlWord, Cow, Destination, MAX_PICTURE_DATA_BYTES, ParsedBodyStoryEvent, Parser, RtfError,
-    RtfResult, Token, control_symbol_text,
+    ControlWord, Cow, Destination, MAX_GROUP_NESTING_DEPTH, MAX_PICTURE_DATA_BYTES,
+    ParsedBodyStoryEvent, Parser, RtfError, RtfResult, Token, control_symbol_text,
 };
 
 impl<'a> Parser<'a> {
@@ -107,6 +107,11 @@ impl<'a> Parser<'a> {
         reason = "remaining variants share the same fallback by design"
     )]
     pub(super) fn parse_picture(&mut self) -> RtfResult<()> {
+        if self.pictures.len() >= crate::picture::MAX_PICTURES {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture count exceeds the safety limit".to_string(),
+            ));
+        }
         let shape_properties = self.scan_picture_shape_properties()?;
         self.pos += 1; // Skip \pict
 
@@ -289,11 +294,17 @@ impl<'a> Parser<'a> {
                                 "RTF blipuid destination must be starred and grouped".to_string(),
                             ));
                         },
-                        _ => {},
+                        _ => self.mark_unknown_syntax()?,
                     }
                 },
                 Token::Text(text) => {
                     data_started |= text.bytes().any(|byte| !byte.is_ascii_whitespace());
+                    let hex_digits = text
+                        .bytes()
+                        .filter(|byte| !byte.is_ascii_whitespace())
+                        .count();
+                    let decoded_bytes = (usize::from(high_nibble.is_some()) + hex_digits) / 2;
+                    Self::reserve_picture_payload(&mut data, decoded_bytes)?;
                     for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
                         let nibble = Self::hex_nibble(byte).ok_or_else(|| {
                             RtfError::MalformedDocument(
@@ -306,11 +317,6 @@ impl<'a> Parser<'a> {
                             high_nibble = Some(nibble);
                         }
                     }
-                    if data.len() > MAX_PICTURE_DATA_BYTES {
-                        return Err(RtfError::MalformedDocument(
-                            "RTF picture data exceeds the safety limit".to_string(),
-                        ));
-                    }
                     self.pos += 1;
                 },
                 Token::Binary(bytes) => {
@@ -320,12 +326,8 @@ impl<'a> Parser<'a> {
                             "RTF picture binary payload splits a hexadecimal byte".to_string(),
                         ));
                     }
+                    Self::reserve_picture_payload(&mut data, bytes.len())?;
                     data.extend_from_slice(bytes);
-                    if data.len() > MAX_PICTURE_DATA_BYTES {
-                        return Err(RtfError::MalformedDocument(
-                            "RTF picture data exceeds the safety limit".to_string(),
-                        ));
-                    }
                     self.pos += 1;
                 },
                 Token::OpenBrace => {
@@ -353,6 +355,7 @@ impl<'a> Parser<'a> {
                             "RTF blipuid destination must be starred".to_string(),
                         ));
                     } else {
+                        self.mark_unknown_syntax()?;
                         self.skip_group()?;
                     }
                 },
@@ -365,7 +368,11 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        if !data.is_empty() {
+        if data.is_empty() {
+            // Keep an explicit content-free marker instead of silently
+            // dropping an empty picture destination from the model.
+            self.mark_unknown_syntax()?;
+        } else {
             // If type not specified, try to detect from data
             if image_type == super::super::super::picture::ImageType::Unknown {
                 image_type = super::super::super::picture::detect_image_type(&data);
@@ -399,6 +406,35 @@ impl<'a> Parser<'a> {
             self.pictures.push(picture);
         }
 
+        Ok(())
+    }
+
+    fn reserve_picture_payload(data: &mut Vec<u8>, additional: usize) -> RtfResult<()> {
+        Self::reserve_picture_payload_with_limit(
+            data,
+            additional,
+            MAX_PICTURE_DATA_BYTES,
+            "RTF picture data",
+            "RTF picture data exceeds the safety limit",
+        )
+    }
+
+    fn reserve_picture_payload_with_limit(
+        data: &mut Vec<u8>,
+        additional: usize,
+        limit: usize,
+        resource: &'static str,
+        message: &'static str,
+    ) -> RtfResult<()> {
+        let remaining = limit.saturating_sub(data.len());
+        if additional > remaining {
+            return Err(RtfError::MalformedDocument(message.to_string()));
+        }
+        data.try_reserve_exact(additional)
+            .map_err(|_err| RtfError::AllocationFailed {
+                resource,
+                requested: data.len().saturating_add(additional),
+            })?;
         Ok(())
     }
 
@@ -482,6 +518,11 @@ impl<'a> Parser<'a> {
                     index += 1;
                 },
                 Some(Token::OpenBrace) => {
+                    if depth >= MAX_GROUP_NESTING_DEPTH {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF picture nesting depth exceeds the safety limit".to_string(),
+                        ));
+                    }
                     depth += 1;
                     index += 1;
                 },
@@ -894,5 +935,23 @@ impl<'a> Parser<'a> {
                 None => return Err(RtfError::UnexpectedEof),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Parser;
+
+    #[test]
+    fn picture_payload_capacity_rejects_one_over_before_reserving() {
+        let mut data = vec![0_u8, 1_u8];
+        assert!(
+            Parser::reserve_picture_payload_with_limit(&mut data, 0, 2, "picture", "picture",)
+                .is_ok()
+        );
+        assert!(
+            Parser::reserve_picture_payload_with_limit(&mut data, 1, 2, "picture", "picture",)
+                .is_err()
+        );
     }
 }

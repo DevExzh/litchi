@@ -141,6 +141,12 @@ pub struct RtfDocument<'a> {
     opaque_nodes: Vec<crate::opaque::Node>,
     /// Original transport for byte-exact writes of immutable snapshots containing opaque syntax.
     preserved_source: Option<Vec<u8>>,
+    /// Finite profile used for the parse that produced this model.
+    parse_limits: ParseLimits,
+    /// Parser provenance for the complete root/header/document token stream.
+    parse_provenance: crate::validation::ParseProvenance,
+    /// Content-free markers retained by focused parsers for dropped syntax.
+    unknown_syntax_markers: usize,
     /// Packed proven body range in an uncompressed ASCII source; zero means unavailable.
     ordinary_body_source_span: u64,
     /// Extracted tables
@@ -151,6 +157,8 @@ pub struct RtfDocument<'a> {
     picture_compatibility_records: Vec<crate::PictureCompatibilityRecord>,
     /// Extracted fields
     fields: Vec<super::super::field::Field<'a>>,
+    /// Parser-derived field safety classifications aligned with `fields`.
+    field_safety: Vec<crate::validation::FieldSafety>,
     /// Ordered positional legacy form fields.
     form_fields: Vec<super::super::form_field::FormField<'a>>,
     /// Inert producer provenance from the generator destination.
@@ -553,11 +561,15 @@ impl<'a> RtfDocument<'a> {
             body_paragraph_count: parsed.body_paragraph_count,
             opaque_nodes: parsed.opaque_nodes,
             preserved_source: None,
+            parse_limits: limits,
+            parse_provenance: parsed.parse_provenance,
+            unknown_syntax_markers: parsed.unknown_syntax_markers,
             ordinary_body_source_span,
             tables: owned_tables,
             pictures: owned_pictures,
             picture_compatibility_records: parsed.picture_compatibility_records,
             fields: owned_fields,
+            field_safety: parsed.field_safety,
             form_fields: parsed
                 .form_fields
                 .into_iter()
@@ -1026,6 +1038,22 @@ impl<'a> RtfDocument<'a> {
 
     pub(crate) fn preserved_source(&self) -> Option<&[u8]> {
         self.preserved_source.as_deref()
+    }
+
+    pub(crate) const fn parse_limits(&self) -> ParseLimits {
+        self.parse_limits
+    }
+
+    pub(crate) const fn parse_provenance(&self) -> crate::validation::ParseProvenance {
+        self.parse_provenance
+    }
+
+    pub(crate) const fn unknown_syntax_markers(&self) -> usize {
+        self.unknown_syntax_markers
+    }
+
+    pub(crate) fn field_safety(&self) -> &[crate::validation::FieldSafety] {
+        &self.field_safety
     }
 
     pub(crate) fn ordinary_body_source_span(&self) -> Option<Range<usize>> {
@@ -2290,6 +2318,7 @@ impl<'a> RtfDocument<'a> {
             ));
         }
         field.validate()?;
+        let field_safety = crate::validation::classify_field(&field);
         let body = self.text();
         if body.get(field.position..field.position).is_none() {
             return Err(RtfError::MalformedDocument(
@@ -2306,6 +2335,7 @@ impl<'a> RtfDocument<'a> {
         }
         let index = self.fields.len();
         self.fields.push(field);
+        self.field_safety.push(field_safety);
         self.insert_body_story_event(crate::BodyStoryEvent::Field(index))?;
         Ok(())
     }
@@ -2328,13 +2358,16 @@ impl<'a> RtfDocument<'a> {
             ));
         }
         field.validate()?;
+        let field_safety = crate::validation::classify_field(&field);
         let index = self.fields.len();
         self.fields.push(field);
+        self.field_safety.push(field_safety);
         Ok(index)
     }
 
     pub fn clear_fields(&mut self) {
         self.fields.clear();
+        self.field_safety.clear();
         self.body_story_events
             .retain(|event| !matches!(event, crate::BodyStoryEvent::Field(_)));
     }
@@ -3445,6 +3478,13 @@ impl<'a> RtfDocument<'a> {
     #[must_use]
     pub fn objects(&self) -> &[super::super::object::EmbeddedObject<'_>] {
         &self.objects
+    }
+
+    /// Produce a bounded, content-free semantic and security inventory without
+    /// mutating or reparsing this retained model.
+    #[must_use]
+    pub fn validation_report(&self) -> crate::ValidationReport {
+        crate::ValidationReport::from_raw(self)
     }
 
     /// Resolve one object result-picture reference without cloning picture bytes.

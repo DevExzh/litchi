@@ -28,8 +28,14 @@ impl<'a> Parser<'a> {
             token_spans,
             source,
             limits,
+            parse_provenance: crate::validation::ParseProvenance {
+                syntax_valid: false,
+                root_valid: false,
+                document_valid: false,
+            },
             opaque_nodes: Vec::new(),
             opaque_bytes: 0,
+            unknown_syntax_markers: 0,
             pos: 0,
             states: vec![State::default()],
             font_table: RefCell::new(FontTable::new()),
@@ -52,6 +58,8 @@ impl<'a> Parser<'a> {
             pictures: Vec::new(),
             picture_compatibility_records: Vec::new(),
             fields: Vec::new(),
+            field_safety: Vec::new(),
+            field_nesting_depth: 0,
             field_drawing_captures: Vec::new(),
             form_fields: Vec::new(),
             form_field_text_bytes: 0,
@@ -259,6 +267,22 @@ impl<'a> Parser<'a> {
                 "Empty token stream".to_string(),
             ));
         }
+        // A parser can only produce a report after proving that this is one
+        // complete RTF root.  In particular, a leading brace alone is not
+        // enough: reject fragments, unsupported RTF versions, and multiple
+        // roots before semantic dispatch can retain partial state.
+        if !matches!(self.tokens.first(), Some(Token::OpenBrace))
+            || !matches!(
+                self.tokens.get(1),
+                Some(Token::Control(ControlWord::Rtf(1)))
+            )
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF document must begin with the supported \\rtf1 root header".to_string(),
+            ));
+        }
+        self.parse_provenance.syntax_valid = true;
+        self.parse_provenance.root_valid = true;
         let mut contexts: Vec<NoteGuardContext> = Vec::new();
         let mut ordinary_body_start = None;
         let mut ordinary_body_end = None;
@@ -489,13 +513,6 @@ impl<'a> Parser<'a> {
             None
         };
 
-        // Expect opening brace
-        if !matches!(self.tokens.first(), Some(Token::OpenBrace)) {
-            return Err(RtfError::MalformedDocument(
-                "Document must start with {".to_string(),
-            ));
-        }
-
         if body_block_reservation_eligible {
             self.body_block_capacity_hint = initial_body_block_capacity(
                 self.source.map(str::len),
@@ -506,7 +523,16 @@ impl<'a> Parser<'a> {
 
         // Parse document content
         self.parse_group()?;
-
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
+                Token::Text(text) if text.chars().all(char::is_whitespace) => self.pos += 1,
+                _ => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF document contains trailing non-whitespace tokens".to_string(),
+                    ));
+                },
+            }
+        }
         // Finalize any remaining table
         self.finalize_table()?;
         self.finalize_bookmarks()?;
@@ -557,6 +583,7 @@ impl<'a> Parser<'a> {
         for section in &self.sections {
             section.properties.columns.validate()?;
         }
+        self.parse_provenance.document_valid = true;
 
         Ok(ParsedDocument {
             ordinary_body_source_span,
@@ -565,10 +592,13 @@ impl<'a> Parser<'a> {
             color_table: self.color_table.into_inner(),
             blocks: self.blocks,
             opaque_nodes: self.opaque_nodes,
+            unknown_syntax_markers: self.unknown_syntax_markers,
             tables: self.tables,
             pictures: self.pictures,
             picture_compatibility_records: self.picture_compatibility_records,
             fields: self.fields,
+            field_safety: self.field_safety,
+            parse_provenance: self.parse_provenance,
             form_fields: self.form_fields,
             generator: self.generator,
             revision_save,

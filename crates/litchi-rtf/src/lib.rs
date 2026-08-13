@@ -77,6 +77,7 @@ mod resource;
 pub mod review;
 pub mod streaming;
 pub mod text;
+pub mod validation;
 
 pub use content::{field, math, section, table};
 pub use drawing::{picture, shape};
@@ -183,6 +184,10 @@ pub mod style {
 
 pub use api::Document;
 pub use codec::error::{RtfError as Error, RtfResult as Result};
+pub use validation::{
+    ValidationCheck, ValidationCounts, ValidationDependency, ValidationLimits, ValidationReport,
+    ValidationStatus,
+};
 
 // Canonical native RTF vocabulary used by the retained model and writer. The
 // ordinary facade selects a smaller contextual subset from this module.
@@ -382,8 +387,8 @@ mod native {
     };
     pub use paragraph_group::{ParagraphGroupProperty, ParagraphGroupPropertyTable};
     pub use picture::{
-        ImageType, MAX_PICTURE_SHAPE_PROPERTIES, MAX_PICTURE_SHAPE_PROPERTY_BYTES, Picture,
-        PictureBitmapMetadata, PictureCrop, PictureIdentity, PictureShapeProperties,
+        ImageType, MAX_PICTURE_SHAPE_PROPERTIES, MAX_PICTURE_SHAPE_PROPERTY_BYTES, MAX_PICTURES,
+        Picture, PictureBitmapMetadata, PictureCrop, PictureIdentity, PictureShapeProperties,
         detect_image_type,
     };
     pub use picture_compatibility::{

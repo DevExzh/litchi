@@ -11,11 +11,12 @@ impl<'a> Lexer<'a> {
         let size = usize::try_from(declared_size).map_err(|_err| {
             RtfError::MalformedDocument("RTF binary length cannot be negative".to_string())
         })?;
-        if size > self.limits.max_binary_bytes() {
+        let binary_limit = self.binary_destination_limit();
+        if size > binary_limit {
             return Err(RtfError::LimitExceeded {
                 resource: "binary payload bytes",
                 observed: size,
-                limit: self.limits.max_binary_bytes(),
+                limit: binary_limit,
             });
         }
         let total_binary_bytes =

@@ -3,9 +3,9 @@
     reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
 )]
 use super::{
-    ControlWord, Cow, Destination, DrawingStoryCapture, FormFieldBuilder, ParsedBodyStoryEvent,
-    Parser, RtfError, RtfResult, SmallVec, Token, control_symbol_text, parser_classification_error,
-    require_parameterless,
+    ControlWord, Cow, Destination, DrawingStoryCapture, FormFieldBuilder, MAX_GROUP_NESTING_DEPTH,
+    ParsedBodyStoryEvent, Parser, RtfError, RtfResult, SmallVec, Token, control_symbol_text,
+    parser_classification_error, require_parameterless,
 };
 
 impl Parser<'_> {
@@ -18,6 +18,12 @@ impl Parser<'_> {
         reason = "remaining variants share the same fallback by design"
     )]
     pub(super) fn parse_field(&mut self) -> RtfResult<()> {
+        if self.field_nesting_depth >= MAX_GROUP_NESTING_DEPTH {
+            return Err(RtfError::MalformedDocument(
+                "RTF nested field depth exceeds the safety limit".to_string(),
+            ));
+        }
+        self.field_nesting_depth += 1;
         let state = self.current_state()?;
         let enclosing_destination = state.destination;
         let field_in_table = state.in_table;
@@ -411,6 +417,7 @@ impl Parser<'_> {
             field.position = field_position;
             field.range_end = field_position;
             field.validate()?;
+            let field_safety = crate::validation::classify_field(&field);
 
             if self.fields.len() >= crate::field::MAX_GENERIC_FIELDS {
                 return Err(RtfError::MalformedDocument(
@@ -419,6 +426,7 @@ impl Parser<'_> {
             }
             let field_index = self.fields.len();
             self.fields.push(field);
+            self.field_safety.push(field_safety);
             let story_field = crate::StoryField {
                 field_index,
                 position: field_position,
@@ -548,6 +556,7 @@ impl Parser<'_> {
             // are intentionally not exposed as executable/external content.
         }
 
+        self.field_nesting_depth -= 1;
         Ok(())
     }
 

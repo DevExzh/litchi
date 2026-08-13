@@ -13,6 +13,8 @@ use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_PICTURE_WRITE_BYTES: usize = 64 * 1_048_576;
+/// Maximum number of retained picture destinations in one parsed document.
+pub const MAX_PICTURES: usize = 65_536;
 /// Maximum number of scalar `OfficeArt` properties on one inline picture.
 pub const MAX_PICTURE_SHAPE_PROPERTIES: usize = 4_096;
 /// Maximum aggregate name/value bytes on one inline picture.
