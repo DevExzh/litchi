@@ -21,11 +21,17 @@
 use crate::records::{BoundSheetRecord, Encoding, SheetType, SheetVisible};
 use crate::{Error, Result, SheetKind, SheetVisibility, Workbook};
 use litchi_biff::Records;
-use litchi_cfb::OleFile;
+use litchi_cfb::{
+    ArtifactFingerprint, ComposedOverlaySource, OleFile, OverlayError, OverlayLimits,
+    PublishReport, SameLengthStreamOverlay, ValidatedOverlayPlan,
+};
 use litchi_core::binary;
+use litchi_core::{ReadAt, SourceVersion};
 use litchi_ole_common::object::{Editor as PackageEditor, Limits, Targets};
+use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::fmt;
-use std::io::Cursor;
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
+use std::path::Path;
 use std::sync::Arc;
 
 const BOF: u16 = 0x0809;
@@ -412,6 +418,91 @@ impl Transaction {
             },
         })
     }
+
+    /// Plans a protected, source-backed same-length visibility publication.
+    ///
+    /// The complete `Workbook`/`Book` stream is staged first and then submitted
+    /// as one [`SameLengthStreamOverlay`]. The common CFB publisher retains the
+    /// source topology and all unselected streams, while the composed target is
+    /// reopened through the complete XLS reader before the plan is returned.
+    /// This method never falls back to [`Self::commit`]; callers that need a
+    /// length-changing or topology-changing edit must explicitly choose that
+    /// eager path.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for a protected/signed/encrypted source, stale
+    /// `BoundSheet8` state, an invalid final-visible-sheet outcome, a changed
+    /// stream length, failed complete semantic readback, or a bounded CFB
+    /// overlay failure.
+    pub fn commit_source_backed(self) -> Result<SourceBackedCommit> {
+        let effective: Vec<_> = self
+            .changes
+            .iter()
+            .filter(|change| change.before != change.after)
+            .collect();
+
+        if !effective.is_empty() {
+            require_final_visible_worksheet(&self.source, &self.changes)?;
+        }
+
+        let mut workbook = Vec::new();
+        workbook
+            .try_reserve_exact(self.source.inner.workbook_stream.len())
+            .map_err(|_error| Error::Allocation("staging source-backed Workbook stream"))?;
+        workbook.extend_from_slice(&self.source.inner.workbook_stream);
+        for change in &effective {
+            let entry = self.source.inner.sheets.get(change.sheet).ok_or_else(|| {
+                Error::UnsafeEdit("source-backed worksheet visibility owner is stale".into())
+            })?;
+            let field = workbook.get_mut(entry.visibility_offset).ok_or_else(|| {
+                Error::InvalidData("BoundSheet8 visibility field is outside Workbook".into())
+            })?;
+            if *field != encode_visibility(change.before) {
+                return Err(Error::UnsafeEdit(
+                    "BoundSheet8 visibility precondition is stale".into(),
+                ));
+            }
+            *field = encode_visibility(change.after);
+        }
+        if workbook.len() != self.source.inner.workbook_stream.len() {
+            return Err(Error::UnsafeEdit(
+                "source-backed visibility publication changed Workbook stream length".into(),
+            ));
+        }
+
+        let source: Arc<dyn ReadAt> =
+            Arc::new(SnapshotSource::new(Arc::clone(&self.source.inner.bytes)));
+        let publisher = SourceBackedOverlayPublisher::open(source).map_err(overlay_to_error)?;
+        let replacement = SameLengthStreamOverlay::new(
+            self.source.inner.workbook_path.clone(),
+            Arc::from(workbook),
+        );
+        let plan = publisher
+            .plan(vec![replacement], OverlayLimits::default())
+            .map_err(overlay_to_error)?;
+        verify_source_backed_readback(&plan, &self.source, &effective)?;
+
+        let source_workbook_bytes = u64::try_from(self.source.inner.workbook_stream.len())
+            .map_err(|_error| Error::InvalidData("Workbook stream length exceeds u64".into()))?;
+        let source_bytes = u64::try_from(self.source.inner.bytes.len())
+            .map_err(|_error| Error::InvalidData("source CFB length exceeds u64".into()))?;
+        let diagnostics = SourceBackedDiagnostics {
+            changed_worksheets: effective.len(),
+            touched_streams: usize::from(!plan.is_noop()),
+            changed_spans: plan.changed_spans(),
+            source_bytes,
+            source_workbook_bytes,
+            target_workbook_bytes: source_workbook_bytes,
+            source_fingerprint: plan.source_fingerprint(),
+            target_fingerprint: plan.target_fingerprint(),
+        };
+        Ok(SourceBackedCommit {
+            source: self.source,
+            plan,
+            diagnostics,
+        })
+    }
 }
 
 impl fmt::Debug for Transaction {
@@ -485,6 +576,140 @@ impl fmt::Debug for Commit {
             .debug_struct("Commit")
             .field("snapshot", &self.snapshot)
             .field("patch", &self.patch)
+            .field("diagnostics", &self.diagnostics)
+            .finish()
+    }
+}
+
+/// Content-free evidence for a same-length source-backed visibility
+/// publication.
+///
+/// The diagnostics retain only bounded counts, lengths, and opaque CFB
+/// fingerprints. Workbook payload bytes and worksheet names are not copied
+/// into this value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceBackedDiagnostics {
+    changed_worksheets: usize,
+    touched_streams: usize,
+    changed_spans: usize,
+    source_bytes: u64,
+    source_workbook_bytes: u64,
+    target_workbook_bytes: u64,
+    source_fingerprint: ArtifactFingerprint,
+    target_fingerprint: ArtifactFingerprint,
+}
+
+impl SourceBackedDiagnostics {
+    /// Number of distinct worksheet owners changed by the transaction.
+    #[must_use]
+    pub const fn changed_worksheets(self) -> usize {
+        self.changed_worksheets
+    }
+
+    /// Number of logical CFB streams selected for the overlay.
+    #[must_use]
+    pub const fn touched_streams(self) -> usize {
+        self.touched_streams
+    }
+
+    /// Number of physical CFB spans retained by the overlay plan.
+    #[must_use]
+    pub const fn changed_spans(self) -> usize {
+        self.changed_spans
+    }
+
+    /// Complete source CFB length.
+    #[must_use]
+    pub const fn source_bytes(self) -> u64 {
+        self.source_bytes
+    }
+
+    /// Source `Workbook`/`Book` stream length.
+    #[must_use]
+    pub const fn source_workbook_bytes(self) -> u64 {
+        self.source_workbook_bytes
+    }
+
+    /// Candidate `Workbook`/`Book` stream length.
+    #[must_use]
+    pub const fn target_workbook_bytes(self) -> u64 {
+        self.target_workbook_bytes
+    }
+
+    /// Exact source CFB fingerprint checked by the overlay plan.
+    #[must_use]
+    pub const fn source_fingerprint(self) -> ArtifactFingerprint {
+        self.source_fingerprint
+    }
+
+    /// Exact composed target CFB fingerprint checked by the overlay plan.
+    #[must_use]
+    pub const fn target_fingerprint(self) -> ArtifactFingerprint {
+        self.target_fingerprint
+    }
+}
+
+/// A checked source-bound same-length XLS visibility publication plan.
+pub struct SourceBackedCommit {
+    source: Snapshot,
+    plan: ValidatedOverlayPlan,
+    diagnostics: SourceBackedDiagnostics,
+}
+
+impl SourceBackedCommit {
+    /// Exact immutable source snapshot used by this plan.
+    #[must_use]
+    pub const fn source(&self) -> &Snapshot {
+        &self.source
+    }
+
+    /// Underlying checked common CFB overlay plan.
+    #[must_use]
+    pub const fn plan(&self) -> &ValidatedOverlayPlan {
+        &self.plan
+    }
+
+    /// Content-free publication evidence.
+    #[must_use]
+    pub const fn diagnostics(&self) -> SourceBackedDiagnostics {
+        self.diagnostics
+    }
+
+    /// Whether this publication is an exact source identity no-op.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.plan.is_noop()
+    }
+
+    /// Streams the complete source-backed candidate to a sequential sink.
+    ///
+    /// A sink failure may leave a typed prefix in the sink; inspect the
+    /// returned [`OverlayError`] before deciding whether to retry.
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
+        self.plan.write_to(writer)
+    }
+
+    /// Alias for [`Self::write_to`] emphasizing sequential publication.
+    pub fn publish_to_stream<W: Write>(
+        &self,
+        writer: &mut W,
+    ) -> Result<PublishReport, OverlayError> {
+        self.write_to(writer)
+    }
+
+    /// Publishes through the common synced sibling-file and atomic-rename
+    /// path.
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<PublishReport, OverlayError> {
+        self.plan.save(path)
+    }
+}
+
+impl fmt::Debug for SourceBackedCommit {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SourceBackedCommit")
+            .field("source", &self.source)
+            .field("plan", &self.plan)
             .field("diagnostics", &self.diagnostics)
             .finish()
     }
@@ -756,7 +981,7 @@ fn require_bof(payload: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn require_unprotected(workbook: &Workbook<Cursor<&[u8]>>) -> Result<()> {
+fn require_unprotected<R: Read + Seek>(workbook: &Workbook<R>) -> Result<()> {
     let protection = workbook.protection();
     if protection.structure_protected()
         || protection.windows_protected()
@@ -788,8 +1013,8 @@ fn require_unprotected(workbook: &Workbook<Cursor<&[u8]>>) -> Result<()> {
     Ok(())
 }
 
-fn require_public_readback(
-    workbook: &Workbook<Cursor<&[u8]>>,
+fn require_public_readback<R: Read + Seek>(
+    workbook: &Workbook<R>,
     sheets: &[SheetEntry],
 ) -> Result<()> {
     if workbook.sheets().len() != sheets.len() {
@@ -960,6 +1185,132 @@ fn compare_other_streams(before: &Snapshot, after: &Snapshot) -> Result<()> {
     Ok(())
 }
 
+#[derive(Clone)]
+struct SnapshotSource {
+    bytes: Arc<[u8]>,
+    version: SourceVersion,
+}
+
+impl SnapshotSource {
+    fn new(bytes: Arc<[u8]>) -> Self {
+        let identity = bytes.as_ptr() as usize as u64;
+        let length = bytes.len() as u64;
+        Self {
+            bytes,
+            version: SourceVersion::new(identity, length),
+        }
+    }
+}
+
+impl ReadAt for SnapshotSource {
+    fn len(&self) -> std::io::Result<u64> {
+        u64::try_from(self.bytes.len())
+            .map_err(|_error| std::io::Error::other("source length exceeds u64"))
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+        if output.is_empty() || offset >= self.bytes.len() as u64 {
+            return Ok(0);
+        }
+        let start = usize::try_from(offset)
+            .map_err(|_error| std::io::Error::other("source offset exceeds usize"))?;
+        let count = output.len().min(self.bytes.len() - start);
+        output[..count].copy_from_slice(&self.bytes[start..start + count]);
+        Ok(count)
+    }
+
+    fn version(&self) -> std::io::Result<SourceVersion> {
+        Ok(self.version)
+    }
+}
+
+struct PositionalReader {
+    source: ComposedOverlaySource,
+    position: u64,
+}
+
+impl PositionalReader {
+    fn new(source: ComposedOverlaySource) -> Self {
+        Self {
+            source,
+            position: 0,
+        }
+    }
+}
+
+impl Read for PositionalReader {
+    fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+        let count = self.source.read_at(self.position, output)?;
+        self.position = self
+            .position
+            .checked_add(count as u64)
+            .ok_or_else(|| std::io::Error::other("positional reader offset overflow"))?;
+        Ok(count)
+    }
+}
+
+impl Seek for PositionalReader {
+    fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+        let length = self.source.len()?;
+        let target = match position {
+            SeekFrom::Start(offset) => i128::from(offset),
+            SeekFrom::Current(offset) => i128::from(self.position) + i128::from(offset),
+            SeekFrom::End(offset) => i128::from(length) + i128::from(offset),
+        };
+        if target < 0 || target > i128::from(u64::MAX) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "positional reader seek is outside the source",
+            ));
+        }
+        self.position = target as u64;
+        Ok(self.position)
+    }
+}
+
+fn overlay_to_error(error: OverlayError) -> Error {
+    match error {
+        OverlayError::Ole(error) => Error::Cfb(error),
+        OverlayError::Io(error) => Error::Io(error),
+        other => Error::UnsafeEdit(format!("source-backed visibility overlay refused: {other}")),
+    }
+}
+
+fn verify_source_backed_readback(
+    plan: &ValidatedOverlayPlan,
+    source: &Snapshot,
+    changes: &[&Change],
+) -> Result<()> {
+    let candidate = plan.composed_source().map_err(overlay_to_error)?;
+    let workbook = Workbook::new(PositionalReader::new(candidate))?;
+    require_unprotected(&workbook)?;
+
+    let mut sheets = Vec::new();
+    sheets
+        .try_reserve_exact(source.inner.sheets.len())
+        .map_err(|_error| Error::Allocation("retaining source-backed sheet readback"))?;
+    sheets.extend(source.inner.sheets.iter().cloned());
+    for change in changes {
+        let sheet = sheets.get_mut(change.sheet).ok_or_else(|| {
+            Error::UnsafeEdit("source-backed worksheet disappeared during readback".into())
+        })?;
+        sheet.visibility = change.after;
+    }
+    require_public_readback(&workbook, &sheets)?;
+    for change in changes {
+        let metadata = workbook.sheets().get(change.sheet).ok_or_else(|| {
+            Error::UnsafeEdit("source-backed worksheet disappeared during readback".into())
+        })?;
+        if metadata.visibility() != change.after {
+            return Err(Error::UnsafeEdit(
+                "source-backed worksheet visibility readback disagreed with the staged state"
+                    .into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn root_identity(ole: &OleFile<Cursor<&[u8]>>) -> Option<(String, u8, String)> {
     ole.root_entry()
         .map(|entry| (entry.name.clone(), entry.entry_type, entry.clsid.clone()))
@@ -1036,6 +1387,7 @@ fn read_patch_len(bytes: &[u8], offset: usize) -> Result<usize> {
 mod tests {
     use super::*;
     use litchi_cfb::{OleFile, OleWriter};
+    use std::io;
 
     fn package(sheet_count: usize) -> Vec<u8> {
         let mut writer = crate::Writer::new();
@@ -1146,6 +1498,167 @@ mod tests {
                 .visibility(),
             SheetVisibility::Visible
         );
+    }
+
+    #[test]
+    fn source_backed_visibility_publishes_one_and_bounded_batches() {
+        let source = Snapshot::from_bytes(package(3)).unwrap();
+        let source_directory = {
+            let ole = OleFile::open(Cursor::new(source.bytes())).unwrap();
+            directory_catalog(&ole).unwrap()
+        };
+        let mut edit = source.transaction();
+        edit.hide(1usize.into()).unwrap();
+        let commit = edit.commit_source_backed().unwrap();
+        assert_eq!(commit.diagnostics().changed_worksheets(), 1);
+        assert_eq!(commit.diagnostics().touched_streams(), 1);
+        assert!(commit.diagnostics().changed_spans() > 0);
+        assert_ne!(
+            commit.diagnostics().source_fingerprint(),
+            commit.diagnostics().target_fingerprint()
+        );
+
+        let mut output = Vec::new();
+        let report = commit.write_to(&mut output).unwrap();
+        assert_eq!(report.changed_spans(), commit.diagnostics().changed_spans());
+        let reopened = Snapshot::from_bytes(output.clone()).unwrap();
+        assert_eq!(
+            reopened
+                .worksheet(1usize.into())
+                .unwrap()
+                .unwrap()
+                .visibility(),
+            SheetVisibility::Hidden
+        );
+        assert_eq!(stream(&output, &["Opaque"]), b"untouched");
+        let target_directory = {
+            let ole = OleFile::open(Cursor::new(output.as_slice())).unwrap();
+            directory_catalog(&ole).unwrap()
+        };
+        assert_eq!(source_directory, target_directory);
+
+        let changed_offsets = source
+            .workbook_stream()
+            .iter()
+            .zip(reopened.workbook_stream())
+            .enumerate()
+            .filter_map(|(offset, (before, after))| (before != after).then_some(offset))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            changed_offsets,
+            vec![source.inner.sheets[1].visibility_offset]
+        );
+
+        let source = Snapshot::from_bytes(package(MAX_VISIBILITY_CHANGES + 2)).unwrap();
+        let mut bounded = source.transaction();
+        bounded
+            .set_visibility_batch(
+                (1..=MAX_VISIBILITY_CHANGES)
+                    .map(|position| (Selector::Position(position), SheetVisibility::Hidden)),
+            )
+            .unwrap();
+        let bounded = bounded.commit_source_backed().unwrap();
+        assert_eq!(
+            bounded.diagnostics().changed_worksheets(),
+            MAX_VISIBILITY_CHANGES
+        );
+        let mut output = Vec::new();
+        bounded.write_to(&mut output).unwrap();
+        let reopened = Snapshot::from_bytes(output).unwrap();
+        assert_eq!(
+            reopened
+                .worksheets()
+                .filter(|sheet| sheet.visibility() == SheetVisibility::Visible)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn source_backed_visibility_noop_and_cap_plus_one_are_atomic() {
+        let source = Snapshot::from_bytes(package(2)).unwrap();
+        let noop = source.transaction().commit_source_backed().unwrap();
+        assert!(noop.is_noop());
+        assert_eq!(noop.diagnostics().changed_worksheets(), 0);
+        assert_eq!(noop.diagnostics().touched_streams(), 0);
+        assert_eq!(
+            noop.diagnostics().source_fingerprint(),
+            noop.diagnostics().target_fingerprint()
+        );
+        let mut output = Vec::new();
+        noop.write_to(&mut output).unwrap();
+        assert_eq!(output, source.bytes());
+
+        let source = Snapshot::from_bytes(package(MAX_VISIBILITY_CHANGES + 2)).unwrap();
+        let mut refused = source.transaction();
+        assert!(
+            refused
+                .set_visibility_batch(
+                    (0..=MAX_VISIBILITY_CHANGES).map(|position| {
+                        (Selector::Position(position), SheetVisibility::Hidden)
+                    })
+                )
+                .is_err()
+        );
+        let noop = refused.commit_source_backed().unwrap();
+        assert!(noop.is_noop());
+        assert_eq!(noop.source().bytes(), source.bytes());
+    }
+
+    struct PartialSink {
+        accepted: usize,
+        limit: usize,
+    }
+
+    impl Write for PartialSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if self.accepted >= self.limit {
+                return Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "test sink stopped",
+                ));
+            }
+            let count = bytes.len().min(self.limit - self.accepted);
+            self.accepted += count;
+            Ok(count)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn source_backed_visibility_reports_partial_sink_and_save_failures() {
+        let source = Snapshot::from_bytes(package(2)).unwrap();
+        let mut edit = source.transaction();
+        edit.hide(1usize.into()).unwrap();
+        let commit = edit.commit_source_backed().unwrap();
+        let mut sink = PartialSink {
+            accepted: 0,
+            limit: 23,
+        };
+        let error = commit.write_to(&mut sink).unwrap_err();
+        assert!(matches!(
+            error,
+            OverlayError::IncompleteOutput {
+                progress: litchi_cfb::OutputProgress::Prefix { .. },
+                ..
+            }
+        ));
+
+        let path = std::env::temp_dir().join(format!(
+            "litchi-xls-visibility-missing-parent-{}",
+            std::process::id()
+        ));
+        let missing = path.join("child").join("output.xls");
+        let error = commit.save(&missing).unwrap_err();
+        assert!(matches!(
+            error,
+            OverlayError::Ole(litchi_cfb::OleError::Io(_))
+                | OverlayError::Io(_)
+                | OverlayError::Unavailable { .. }
+        ));
     }
 
     #[test]
