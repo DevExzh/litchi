@@ -1,7 +1,7 @@
 //! ODT package lifecycle, mutation, and lossless byte access.
 
 use super::model::Document;
-use crate::core::{Content, Meta, OwnedPackage, Styles};
+use crate::core::{Content, Meta, OwnedPackage, PreparedPackage, Styles};
 use crate::elements::style::{StyleElements, StyleRegistry};
 use litchi_core::{Error, Result};
 use std::{path::Path, sync::Arc};
@@ -129,6 +129,33 @@ impl Document {
         Self::from_owned_package(OwnedPackage::from_bytes_with_password(bytes, password)?)
     }
 
+    /// Open a prepared packaged ODF result produced by smart detection.
+    ///
+    /// The retained ZIP index is transferred into this semantic owner. The
+    /// concrete ODT MIME and content contracts are still checked here before
+    /// the document model is constructed.
+    pub fn from_prepared_package(prepared: PreparedPackage) -> Result<Self> {
+        if prepared.format() != litchi_core::detection::FileFormat::Odt {
+            return Err(Error::InvalidFormat(
+                "prepared ODF package is not an ODT family document".to_string(),
+            ));
+        }
+        Self::from_owned_package(prepared.into_package())
+    }
+
+    /// Alias for [`Self::from_prepared_package`].
+    #[inline]
+    pub fn from_prepared(prepared: PreparedPackage) -> Result<Self> {
+        Self::from_prepared_package(prepared)
+    }
+
+    /// Return the identity of the archive index retained by this document.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn prepared_index_identity(&self) -> usize {
+        self.package.prepared_index_identity()
+    }
+
     pub(crate) fn from_owned_package(owned_package: OwnedPackage) -> Result<Self> {
         let package = owned_package.package()?;
 
@@ -137,6 +164,14 @@ impl Document {
 
         // Parse core components
         let content_bytes = package.get_file("content.xml")?;
+        let content_xml = std::str::from_utf8(&content_bytes).map_err(|error| {
+            Error::InvalidFormat(format!("ODT content.xml is not UTF-8: {error}"))
+        })?;
+        litchi_odf_common::core::validate_content_document_part(
+            content_xml,
+            "<office:text",
+            "ODT",
+        )?;
         let content = Content::from_bytes(&content_bytes)?;
 
         let styles = if package.has_file("styles.xml") {

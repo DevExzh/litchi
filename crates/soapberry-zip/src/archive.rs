@@ -631,6 +631,14 @@ impl<'archive, R> ZipEntry<'archive, R>
 where
     R: ReaderAt,
 {
+    pub(crate) fn local_header_fixed(&self) -> Result<ZipLocalFileHeaderFixed, Error> {
+        let mut buffer = [0u8; ZipLocalFileHeaderFixed::SIZE];
+        self.archive
+            .get_ref()
+            .read_exact_at(&mut buffer, self.entry.local_header_offset)?;
+        ZipLocalFileHeaderFixed::parse(&buffer)
+    }
+
     /// Returns a [`ZipReader`] for reading the compressed data of this entry.
     pub fn reader(&self) -> ZipReader<&'archive R> {
         ZipReader {
@@ -1498,6 +1506,12 @@ impl<'a> ZipFileHeaderRecord<'a> {
         self.flags & 0x08 != 0
     }
 
+    /// Returns the central-directory general-purpose bit flags.
+    #[inline]
+    pub(crate) fn flags(&self) -> u16 {
+        self.flags
+    }
+
     /// Describes where the file's data is located within the archive.
     #[inline]
     pub fn wayfinder(&self) -> ZipArchiveEntryWayfinder {
@@ -1720,6 +1734,12 @@ impl ZipArchiveEntryWayfinder {
     #[inline]
     pub fn compressed_size_hint(&self) -> u64 {
         self.compressed_size
+    }
+
+    /// Returns the local-header offset retained by this wayfinder.
+    #[inline]
+    pub(crate) fn local_header_offset(&self) -> u64 {
+        self.local_header_offset
     }
 }
 

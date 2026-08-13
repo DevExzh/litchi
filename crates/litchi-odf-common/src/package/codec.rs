@@ -1,6 +1,6 @@
 //! Archive access and neutral `manifest.xml` codecs.
 
-use super::model::{Archive, Entry, Manifest};
+use super::model::{Archive, ArchiveNames, ArchiveReaderKind, Entry, Manifest, PreparedArchive};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -19,9 +19,21 @@ impl<'data> Archive<'data> {
     ///
     /// Returns an error when `data` is not a readable ZIP archive.
     pub fn new(data: &'data [u8]) -> Result<Self> {
+        #[cfg(test)]
+        super::model::note_index_build();
         let reader = ArchiveReader::new(data)
             .map_err(|error| Error::InvalidFormat(format!("Invalid ZIP archive: {error}")))?;
-        Ok(Self { reader })
+        Ok(Self {
+            reader: ArchiveReaderKind::Borrowed(reader),
+        })
+    }
+
+    /// Adopt an already indexed owned archive without rescanning its central
+    /// directory.
+    pub(crate) fn from_prepared(index: PreparedArchive) -> Self {
+        Self {
+            reader: ArchiveReaderKind::Prepared(index),
+        }
     }
 
     /// Read and decode one archive member.
@@ -30,9 +42,11 @@ impl<'data> Archive<'data> {
     ///
     /// Returns an error when `path` is absent or its content cannot be read.
     pub fn read(&self, path: &str) -> Result<Vec<u8>> {
-        self.reader
-            .read(path)
-            .map_err(|error| Error::InvalidFormat(error.to_string()))
+        let result = match &self.reader {
+            ArchiveReaderKind::Borrowed(reader) => reader.read(path),
+            ArchiveReaderKind::Prepared(reader) => reader.read(path),
+        };
+        result.map_err(|error| Error::InvalidFormat(error.to_string()))
     }
 
     /// Read one UTF-8 archive member.
@@ -66,12 +80,18 @@ impl<'data> Archive<'data> {
     /// Check whether an archive member exists.
     #[must_use]
     pub fn contains(&self, path: &str) -> bool {
-        self.reader.contains(path)
+        match &self.reader {
+            ArchiveReaderKind::Borrowed(reader) => reader.contains(path),
+            ArchiveReaderKind::Prepared(reader) => reader.contains(path),
+        }
     }
 
     /// Iterate over archive members in physical order.
-    pub fn file_names(&self) -> impl Iterator<Item = &str> {
-        self.reader.file_names()
+    pub fn file_names(&self) -> ArchiveNames<'_> {
+        match &self.reader {
+            ArchiveReaderKind::Borrowed(reader) => ArchiveNames::Borrowed(reader.file_names()),
+            ArchiveReaderKind::Prepared(reader) => ArchiveNames::Prepared(reader.file_names()),
+        }
     }
 
     /// Check whether an archive member uses ZIP Store.
@@ -80,9 +100,11 @@ impl<'data> Archive<'data> {
     ///
     /// Returns an error when `path` cannot be inspected in the ZIP archive.
     pub fn is_stored(&self, path: &str) -> Result<bool> {
-        self.reader
-            .is_stored(path)
-            .map_err(|error| Error::InvalidFormat(error.to_string()))
+        let result = match &self.reader {
+            ArchiveReaderKind::Borrowed(reader) => reader.is_stored(path),
+            ArchiveReaderKind::Prepared(reader) => reader.is_stored(path),
+        };
+        result.map_err(|error| Error::InvalidFormat(error.to_string()))
     }
 }
 

@@ -51,6 +51,17 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 pub use crate::LimitResource;
 
+/// Validation policy for an indexed Office archive.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ArchiveValidationPolicy {
+    /// Preserve the compatibility path normalization behavior.
+    #[default]
+    Normalized,
+    /// Reject unsafe/raw path spellings and cross-check the offset-zero
+    /// `mimetype` local header against its central-directory record.
+    StrictPackage,
+}
+
 /// Resource limits applied while indexing an Office ZIP package.
 ///
 /// The defaults accommodate large embedded media while rejecting implausible
@@ -457,6 +468,25 @@ pub struct ArchiveReader<'data> {
     order: Vec<String>,
 }
 
+/// Zero-allocation iterator over an [`ArchiveReader`] file-name order.
+pub struct ArchiveReaderNames<'a> {
+    names: std::slice::Iter<'a, String>,
+}
+
+impl<'a> Iterator for ArchiveReaderNames<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.names.next().map(String::as_str)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.names.size_hint()
+    }
+}
+
+impl ExactSizeIterator for ArchiveReaderNames<'_> {}
+
 /// Information about an archive entry for fast lookup
 #[derive(Debug, Clone)]
 struct EntryInfo {
@@ -490,6 +520,28 @@ pub struct IndexedArchive<R> {
     directories: HashMap<String, Metadata>,
     order: Vec<EntryId>,
 }
+
+/// Zero-allocation iterator over an [`IndexedArchive`] file-name order.
+pub struct IndexedArchiveNames<'a, R> {
+    archive: &'a IndexedArchive<R>,
+    order: std::slice::Iter<'a, EntryId>,
+}
+
+impl<'a, R> Iterator for IndexedArchiveNames<'a, R> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.order
+            .next()
+            .map(|id| self.archive.entries[id.0].name.as_str())
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.order.size_hint()
+    }
+}
+
+impl<R> ExactSizeIterator for IndexedArchiveNames<'_, R> {}
 
 #[derive(Debug, Clone)]
 struct IndexedEntry {
@@ -723,8 +775,10 @@ impl<'data> ArchiveReader<'data> {
     }
 
     /// Get an iterator over all file names in the archive.
-    pub fn file_names(&self) -> impl Iterator<Item = &str> {
-        self.order.iter().map(String::as_str)
+    pub fn file_names(&self) -> ArchiveReaderNames<'_> {
+        ArchiveReaderNames {
+            names: self.order.iter(),
+        }
     }
 
     /// Whether an archive entry uses the ZIP Store method.
@@ -921,11 +975,27 @@ where
         end_offset: u64,
         limits: ArchiveLimits,
     ) -> Result<Self, Error> {
+        Self::from_reader_with_limits_and_policy(
+            reader,
+            end_offset,
+            limits,
+            ArchiveValidationPolicy::Normalized,
+        )
+    }
+
+    /// Locate and index a positional ZIP source with explicit limits and
+    /// validation policy.
+    pub fn from_reader_with_limits_and_policy(
+        reader: R,
+        end_offset: u64,
+        limits: ArchiveLimits,
+        policy: ArchiveValidationPolicy,
+    ) -> Result<Self, Error> {
         let mut buffer = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
         let archive = ZipLocator::new()
             .locate_in_reader(reader, &mut buffer, end_offset)
             .map_err(|(_reader, error)| error)?;
-        Self::from_zip_archive_with_limits(archive, limits)
+        Self::from_zip_archive_with_limits_and_policy(archive, limits, policy)
     }
 
     /// Build an index from an already located ZIP archive using default limits.
@@ -945,12 +1015,27 @@ where
         archive: ZipArchive<R>,
         limits: ArchiveLimits,
     ) -> Result<Self, Error> {
+        Self::from_zip_archive_with_limits_and_policy(
+            archive,
+            limits,
+            ArchiveValidationPolicy::Normalized,
+        )
+    }
+
+    /// Build an index from an already located ZIP archive with explicit limits
+    /// and validation policy.
+    pub fn from_zip_archive_with_limits_and_policy(
+        archive: ZipArchive<R>,
+        limits: ArchiveLimits,
+        policy: ArchiveValidationPolicy,
+    ) -> Result<Self, Error> {
         let mut index = HashMap::new();
         let mut entries = Vec::new();
         let mut directories = HashMap::new();
         let mut ordered_entries = Vec::new();
         let mut total_metadata_bytes = 0_u64;
         let mut total_uncompressed_size = 0_u64;
+        let mut strict_mimetype = None;
         let mut buffer = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
 
         {
@@ -985,7 +1070,10 @@ where
 
                 let compressed_size = entry.compressed_size_hint();
                 let uncompressed_size = entry.uncompressed_size_hint();
-                let name = normalized_member_name(path);
+                let name = match policy {
+                    ArchiveValidationPolicy::Normalized => normalized_member_name(path),
+                    ArchiveValidationPolicy::StrictPackage => strict_member_name(path)?,
+                };
 
                 if entry.is_dir() {
                     directories.entry(name).or_insert(Metadata {
@@ -994,6 +1082,19 @@ where
                         directory: true,
                     });
                     continue;
+                }
+
+                if matches!(policy, ArchiveValidationPolicy::StrictPackage)
+                    && path.as_ref() == b"mimetype"
+                {
+                    strict_mimetype = Some((
+                        entry.wayfinder(),
+                        entry.flags(),
+                        entry.compression_method().as_id().as_u16(),
+                        entry.crc32(),
+                        compressed_size,
+                        uncompressed_size,
+                    ));
                 }
 
                 if entries.len() >= limits.max_files {
@@ -1054,6 +1155,10 @@ where
                     },
                 });
             }
+        }
+
+        if matches!(policy, ArchiveValidationPolicy::StrictPackage) {
+            validate_strict_mimetype(&archive, strict_mimetype)?;
         }
 
         ordered_entries.sort_unstable_by_key(|(offset, _)| *offset);
@@ -1118,8 +1223,11 @@ where
     }
 
     /// Iterate normalized non-directory names in physical local-header order.
-    pub fn file_names(&self) -> impl Iterator<Item = &str> {
-        self.order.iter().map(|id| self.entries[id.0].name.as_str())
+    pub fn file_names(&self) -> IndexedArchiveNames<'_, R> {
+        IndexedArchiveNames {
+            archive: self,
+            order: self.order.iter(),
+        }
     }
 
     /// Whether an indexed file uses ZIP Store compression.
@@ -1267,6 +1375,78 @@ fn normalized_member_name(path: ZipFilePath<RawPath<'_>>) -> String {
         Ok(normalized) => normalized.as_ref().to_string(),
         Err(_) => String::from_utf8_lossy(path.as_ref()).to_string(),
     }
+}
+
+fn strict_member_name(path: ZipFilePath<RawPath<'_>>) -> Result<String, Error> {
+    let raw = path.as_ref();
+    if raw.is_empty() || raw.iter().any(|byte| *byte < 0x20) {
+        return Err(ErrorKind::InvalidInput {
+            msg: "strict package archive contains an empty or control-character member name"
+                .to_string(),
+        }
+        .into());
+    }
+    let normalized = path.try_normalize().map_err(|_| ErrorKind::InvalidInput {
+        msg: "strict package archive contains a non-UTF-8 member name".to_string(),
+    })?;
+    let normalized_name = normalized.as_str();
+    if normalized_name.is_empty() {
+        return Err(ErrorKind::InvalidInput {
+            msg: "strict package archive contains a member that normalizes to an empty name"
+                .to_string(),
+        }
+        .into());
+    }
+    let canonical = raw == normalized_name.as_bytes()
+        || (path.is_dir()
+            && raw.len() == normalized_name.len() + 1
+            && &raw[..normalized_name.len()] == normalized_name.as_bytes()
+            && raw[normalized_name.len()] == b'/');
+    if !canonical {
+        return Err(ErrorKind::InvalidInput {
+            msg: "strict package archive contains an unsafe or non-canonical member name"
+                .to_string(),
+        }
+        .into());
+    }
+    Ok(normalized_name.to_string())
+}
+
+fn validate_strict_mimetype<R: ReaderAt>(
+    archive: &ZipArchive<R>,
+    central: Option<(crate::ZipArchiveEntryWayfinder, u16, u16, u32, u64, u64)>,
+) -> Result<(), Error> {
+    let Some((wayfinder, flags, method, crc, compressed_size, uncompressed_size)) = central else {
+        return Err(ErrorKind::InvalidInput {
+            msg: "strict package archive has no central mimetype member".to_string(),
+        }
+        .into());
+    };
+    if wayfinder.local_header_offset() != 0 {
+        return Err(ErrorKind::InvalidInput {
+            msg: "central mimetype member does not point to offset-zero local header".to_string(),
+        }
+        .into());
+    }
+
+    let entry = archive.get_entry(wayfinder)?;
+    let local = entry.local_header_fixed()?;
+    let mut variable =
+        vec![0_u8; usize::from(local.file_name_len) + usize::from(local.extra_field_len)];
+    let local_header = entry.local_header(&mut variable)?;
+    if local_header.file_path().as_bytes() != b"mimetype"
+        || local.flags != flags
+        || local.compression_method.as_u16() != method
+        || local.crc32 != crc
+        || u64::from(local.compressed_size) != compressed_size
+        || u64::from(local.uncompressed_size) != uncompressed_size
+    {
+        return Err(ErrorKind::InvalidInput {
+            msg: "central mimetype metadata does not match offset-zero local header".to_string(),
+        }
+        .into());
+    }
+    Ok(())
 }
 
 #[inline]

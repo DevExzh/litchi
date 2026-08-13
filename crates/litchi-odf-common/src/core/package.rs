@@ -5,7 +5,7 @@
 //!
 //! Uses soapberry-zip for high-performance zero-copy ZIP parsing.
 
-use crate::package::{self, Archive};
+use crate::package::{self, Archive, PreparedArchive};
 use litchi_core::{Error, Result};
 use std::io::Read;
 use std::sync::Arc;
@@ -33,6 +33,7 @@ pub struct Package<'data> {
 )]
 pub struct OwnedPackage {
     data: Arc<Vec<u8>>,
+    index: PreparedArchive,
     password: Option<Zeroizing<String>>,
 }
 
@@ -55,13 +56,7 @@ impl OwnedPackage {
     ///
     /// Returns an error when the bytes do not form a valid ZIP archive.
     pub fn from_bytes(data: Vec<u8>) -> Result<Self> {
-        // Validate the archive can be parsed
-        let _ = Archive::new(&data)?;
-
-        Ok(Self {
-            data: Arc::new(data),
-            password: None,
-        })
+        Self::from_shared_bytes(Arc::new(data))
     }
 
     /// Adopt shared ODF package bytes without copying the archive buffer.
@@ -70,9 +65,39 @@ impl OwnedPackage {
     ///
     /// Returns an error when the bytes do not form a valid ZIP archive.
     pub fn from_shared_bytes(data: Arc<Vec<u8>>) -> Result<Self> {
-        let _ = Archive::new(data.as_slice())?;
+        Self::from_shared_bytes_with_policy(
+            data,
+            soapberry_zip::office::ArchiveValidationPolicy::Normalized,
+        )
+    }
+
+    pub(crate) fn from_prepared_bytes(data: Vec<u8>) -> Result<Self> {
+        Self::from_shared_bytes_with_policy(
+            Arc::new(data),
+            soapberry_zip::office::ArchiveValidationPolicy::StrictPackage,
+        )
+    }
+
+    fn from_shared_bytes_with_policy(
+        data: Arc<Vec<u8>>,
+        policy: soapberry_zip::office::ArchiveValidationPolicy,
+    ) -> Result<Self> {
+        #[cfg(test)]
+        package::note_index_build();
+        let index = Arc::new(
+            soapberry_zip::office::IndexedArchive::from_reader_with_limits_and_policy(
+                Arc::clone(&data),
+                u64::try_from(data.len()).map_err(|_| {
+                    Error::InvalidFormat("ODF package length exceeds ZIP reader limits".to_string())
+                })?,
+                soapberry_zip::office::ArchiveLimits::default(),
+                policy,
+            )
+            .map_err(|error| Error::InvalidFormat(format!("Invalid ZIP archive: {error}")))?,
+        );
         Ok(Self {
             data,
+            index,
             password: None,
         })
     }
@@ -98,11 +123,9 @@ impl OwnedPackage {
     ///
     /// Returns an error when the bytes do not form a valid ZIP archive.
     pub fn from_bytes_with_password(data: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        let _ = Archive::new(&data)?;
-        Ok(Self {
-            data: Arc::new(data),
-            password: Some(Zeroizing::new(password.into())),
-        })
+        let mut package = Self::from_shared_bytes(Arc::new(data))?;
+        package.password = Some(Zeroizing::new(password.into()));
+        Ok(package)
     }
 
     /// Get a borrowed [`Package`] for accessing archive contents.
@@ -112,8 +135,8 @@ impl OwnedPackage {
     /// Returns an error when the archive MIME type or manifest cannot be
     /// decoded.
     pub fn package(&self) -> Result<Package<'_>> {
-        Package::new_with_password(
-            &self.data,
+        Package::new_with_prepared(
+            Arc::clone(&self.index),
             self.password.as_ref().map(|password| password.as_str()),
         )
     }
@@ -121,7 +144,24 @@ impl OwnedPackage {
     /// Get the underlying data.
     #[must_use]
     pub fn into_inner(self) -> Vec<u8> {
-        Arc::try_unwrap(self.data).unwrap_or_else(|data| (*data).clone())
+        let Self {
+            data,
+            index,
+            password: _,
+        } = self;
+        match Arc::try_unwrap(index) {
+            Ok(index) => {
+                drop(data);
+                match Arc::try_unwrap(index.into_zip_archive().into_inner()) {
+                    Ok(data) => data,
+                    Err(data) => (*data).clone(),
+                }
+            },
+            Err(index) => {
+                drop(index);
+                Arc::try_unwrap(data).unwrap_or_else(|data| (*data).clone())
+            },
+        }
     }
 
     /// Get a reference to the underlying data.
@@ -134,6 +174,13 @@ impl OwnedPackage {
     #[must_use]
     pub fn shared_bytes(&self) -> Arc<Vec<u8>> {
         Arc::clone(&self.data)
+    }
+
+    /// Return a stable identity for the retained archive index.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn prepared_index_identity(&self) -> usize {
+        Arc::as_ptr(&self.index) as usize
     }
 
     // Convenience methods that delegate to Package
@@ -167,6 +214,13 @@ impl OwnedPackage {
     pub fn has_file(&self, path: &str) -> Result<bool> {
         let package = self.package()?;
         Ok(package.has_file(path))
+    }
+
+    /// Check whether a package member uses ZIP Store compression.
+    pub fn is_stored(&self, path: &str) -> Result<bool> {
+        self.index
+            .is_stored(path)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))
     }
 
     /// List all files in the package.
@@ -228,6 +282,16 @@ impl<'data> Package<'data> {
     fn new_with_password(data: &'data [u8], password: Option<&'data str>) -> Result<Self> {
         let archive = Archive::new(data)?;
 
+        Self::from_archive(archive, password)
+    }
+
+    fn new_with_prepared(index: PreparedArchive, password: Option<&'data str>) -> Result<Self> {
+        let archive = Archive::from_prepared(index);
+
+        Self::from_archive(archive, password)
+    }
+
+    fn from_archive(archive: Archive<'data>, password: Option<&'data str>) -> Result<Self> {
         // Read MIME type from mimetype file
         let mimetype = archive
             .read_string("mimetype")
@@ -297,6 +361,11 @@ impl<'data> Package<'data> {
     #[must_use]
     pub fn has_file(&self, path: &str) -> bool {
         self.archive.contains(path)
+    }
+
+    /// Check whether a package member uses ZIP Store compression.
+    pub fn is_stored(&self, path: &str) -> Result<bool> {
+        self.archive.is_stored(path)
     }
 
     /// Get the manifest.
