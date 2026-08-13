@@ -10282,3 +10282,111 @@ evidence rather than byte-preservation evidence for native open.
 
 `KeynoteEditor` and `KeynoteDocumentBuilder` remain. Debt 014 and the
 `litchi-iwa -> litchi-keynote` manifest edge therefore remain open.
+
+## 2026-08-13 amendment: legacy Pages reader retirement gate
+
+The retirement deletes the 478-line
+`crates/litchi-iwa/src/pages/document.rs`, its module declaration and local
+re-export, and the `PagesDocument`, private `PagesDocumentState`, and
+`PagesDocumentStats` types. The sole real host caller migrates to the focused
+owner; stale host documentation points semantic readers to `litchi_pages`.
+The permanent boundary audit rejects resurrection of the exact source, module,
+re-export, types, callers, examples, and documentation while allowing
+`PagesDocumentBuilder`, `PagesEditor`, and focused `Document`/`Package` use.
+The live retirement audit reports zero findings.
+
+Public capability mapping is provenance-specific. Semantic reads use
+`litchi_pages::Document` for a ZIP path or checked app-authored directory on
+supported path-ingress platforms, or borrowed ZIP bytes or shared ZIP bytes on
+every supported platform, and obtain eager archive-free sections, text,
+source-derived metadata/statistics, snapshots, and semantic validation. Exact
+regular-file or byte reads use `litchi_pages::Package`; that owner retains
+bytes, package metadata/statistics, physical validation, and editing,
+and refuses directories. Package-derived and constructed semantic documents
+return no source diagnostics. The retired archive-byte name maps to
+`Document::from_bytes` for semantic reads or `Package::from_archive_bytes` when
+exact artifact provenance is required.
+
+Parity is asserted at supported behavior, with the focused Pages contract
+authoritative for structure. Empty roots have zero sections. Rootless fallback
+uses the retired 14-type object trigger, fully validates and projects every
+registry storage message in that object, and newline-joins fragments in source
+order, including empty fragments, before enforcing the aggregate retained-text
+ceiling. Rooted bodies preserve rich storage runs and project the native section table, exact name
+presence, and UTF-16 boundaries. Metadata parity uses only the exact canonical
+Properties, BuildVersionHistory, and DocumentIdentifier paths, retaining at
+most 64 KiB from each in the semantic handoff. Near-name sidecars do not
+participate. ZIP and directory semantic reads agree, while only a complete ZIP
+package carries exact-artifact provenance.
+
+This cut removes the duplicate host's eager Prost root/body reader, not all
+Prost use in focused Pages. Strict raw-wire preflight and private forced Buffa
+lazy views select the root references and section boundaries. The rooted body
+is then materialized by one bounded `TSWP.StorageArchive` Prost decode;
+rootless fallback candidates instead pass full known-field raw storage
+validation before the bounded Buffa text projection and object-level
+coalescing. Raw records remain the preservation authority for mutations. The focused
+reader is eager rather than lazy or single-flight, and no latency, RSS,
+allocation, read-scaling, or complete Buffa-laziness claim follows.
+
+The default read envelope is 1 GiB input, 100,000 entries, 512 MiB for one
+expanded entry, 2 GiB aggregate expanded bytes, 512 MiB for one decoded IWA
+component, 4,096 semantic sections or fallback storages, and 64 MiB retained
+section-name plus text bytes. Caller options may tighten these ceilings. The
+archive-free snapshot retains at most 64 KiB from each selected authority.
+Directory capture enforces that ceiling before allocating a sidecar and charges
+it to the source budgets. Packaged ZIP path, borrowed-byte, and shared-byte
+capture first checks each exact raw logical authority's declared uncompressed
+size and compression method from the physical ZIP headers, rejecting more than
+64 KiB or unsupported compression before any package entry payload is
+materialized. Only the selected legacy outer-package prefix is stripped before
+that raw-byte comparison; near-names remain unrelated. Local and central ZIP
+names and methods must also agree.
+
+The permanent focused reader integration gate passes 15/15. It covers
+ZIP/directory/borrowed-byte/shared-`Arc<[u8]>` parity, release of a caller's
+shared source allocation after projection, `Send + Sync`, source-diagnostic
+presence versus diagnostic-free package semantic documents, shared-section
+snapshot identity, typed package-directory refusal, and typed Keynote-as-Pages
+refusal for ZIP and directory inputs. It also covers all three canonical
+metadata authorities with hostile near-names; survival after the captured
+directory is deleted; exact and max-minus-one source and semantic budgets; the
+64 KiB properties boundary; multi-fragment, co-located-message, empty-fragment,
+and bogus-trigger fallback cases; atomic malformed-root refusal; content-free
+path, member, and control-character error redaction; and checked semantic-limit
+construction. The full `litchi-pages` all-feature gate passes 153/153: 77
+library tests, 15 document-reader tests, 59 other integration tests, and two
+doctests. Supporting archive tests pass 93/93, detector tests pass 32/32, and
+the host generated-roundtrip gate passes 1/1. The boundary suite passes
+227/227; its live retirement and focused-public-API audits each report zero
+findings. All-target check, strict all-target Clippy, strict no-dependency
+rustdoc, global formatting, and diff checks pass.
+
+One materialization limitation and one platform capability caveat remain
+explicit. Semantic ZIP ingress still builds the bounded package catalog and
+may expand unrelated supported entries under the generic source limits before
+discarding them; the selected metadata preflight is not a general ZIP member
+filter. Windows Pages file and directory path ingress deliberately fails
+closed because stable, reparse-safe source identity is not yet available;
+borrowed and shared byte ingress remains supported there. Public archive-free
+opens now return `ReadError`, whose display, debug, and source chain expose only
+closed categories and numeric bounds rather than paths, member/component names,
+native identifiers, content, or lower-layer diagnostic strings.
+
+The read-only native oracle keeps the tracked
+`test-data/iwork/pages/basic.pages` unopened and exact at 96,417 bytes and
+SHA-256
+`21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42`.
+Apple Pages 14.4 build 7043.0.93 opened only an isolated copy without repair,
+recovery, or conversion UI and showed exactly one page with
+`Litchi native Pages fixture`, `Buffa lazy-view migration verification`, and
+`2026-08-07`. Focused reread reports 570 objects, one Body section named
+`Blank`, exact text, and Pages 14.4.1 metadata. This is compatibility evidence,
+not byte-inert-open evidence: Pages silently normalized the disposable copy to
+96,432 bytes and SHA-256
+`665e4f6f26713d14a2346b129b0e19ea6cc83ffefe1d8244866b51fe6a79e127`,
+while retaining a valid 13-member ZIP and the same focused semantics.
+
+`PagesEditor`, `PagesDocumentBuilder`, creation, and the broader host examples
+and tests remain. Debt 017 and the `litchi-iwa -> litchi-pages` manifest edge
+therefore remain open.

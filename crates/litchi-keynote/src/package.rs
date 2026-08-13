@@ -336,7 +336,7 @@ struct State {
 
 #[derive(Debug)]
 enum PhysicalSource {
-    Package(SourceCatalog),
+    Package(Box<SourceCatalog>),
     Semantic(Arc<ComponentCatalog>),
 }
 
@@ -526,7 +526,7 @@ impl Package {
 
         let package = Self {
             state: Arc::new(State {
-                source: PhysicalSource::Package(source_catalog),
+                source: PhysicalSource::Package(Box::new(source_catalog)),
                 options,
                 object_index,
                 total_objects,

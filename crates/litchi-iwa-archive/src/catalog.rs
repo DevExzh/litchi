@@ -3,12 +3,13 @@ use std::sync::Arc;
 use litchi_core::ReadAt;
 use litchi_iwa_core::{Archive, SnappyStream};
 
-use crate::package::{Catalog, SourceProvenance};
+use crate::package::{Catalog, LogicalEntryLimits, SourceProvenance};
 use crate::zip::{ZipArchive, is_iwa_name, parse_directory_index_components, parse_iwa_components};
 use crate::{Limits, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DirectoryIndexReport {
+    pub(crate) input_bytes: u64,
     pub(crate) entries: usize,
     pub(crate) metadata_bytes: u64,
     pub(crate) expanded_bytes: u64,
@@ -263,6 +264,25 @@ impl SourceCatalog {
         Self::from_package(package, limits)
     }
 
+    /// Parse borrowed package bytes while applying a fixed logical-member
+    /// admission profile before any ZIP payload is decoded.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_bytes_with_limits`], plus a
+    /// refusal for a selected physical member whose declared shape violates
+    /// the logical-entry profile.
+    #[doc(hidden)]
+    pub fn __from_bytes_with_logical_entry_limits(
+        bytes: &[u8],
+        limits: Limits,
+        logical_entry_limits: LogicalEntryLimits,
+    ) -> Result<Self> {
+        let package =
+            Catalog::__from_bytes_with_logical_entry_limits(bytes, limits, logical_entry_limits)?;
+        Self::from_package(package, limits)
+    }
+
     /// Parse an already-owned immutable package source without copying it.
     ///
     /// # Errors
@@ -284,6 +304,28 @@ impl SourceCatalog {
     /// encrypted, ambiguous, or over budget.
     pub fn from_shared_bytes_with_limits(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
         let package = Catalog::from_shared_bytes_with_limits(source, limits)?;
+        Self::from_package(package, limits)
+    }
+
+    /// Parse shared package bytes while applying a fixed logical-member
+    /// admission profile before any ZIP payload is decoded.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_shared_bytes_with_limits`],
+    /// plus a refusal for a selected physical member whose declared shape
+    /// violates the logical-entry profile.
+    #[doc(hidden)]
+    pub fn __from_shared_bytes_with_logical_entry_limits(
+        source: Arc<[u8]>,
+        limits: Limits,
+        logical_entry_limits: LogicalEntryLimits,
+    ) -> Result<Self> {
+        let package = Catalog::__from_shared_bytes_with_logical_entry_limits(
+            source,
+            limits,
+            logical_entry_limits,
+        )?;
         Self::from_package(package, limits)
     }
 

@@ -329,22 +329,22 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 enum Components {
-    Physical(SourceCatalog),
+    Physical(Box<SourceCatalog>),
     #[cfg(feature = "internal-iwork-source")]
     Semantic(Arc<ComponentCatalog>),
 }
 
 impl Components {
     fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
-        Ok(Self::Physical(SourceCatalog::from_bytes_with_limits(
-            bytes, limits,
-        )?))
+        Ok(Self::Physical(Box::new(
+            SourceCatalog::from_bytes_with_limits(bytes, limits)?,
+        )))
     }
 
     fn from_shared_bytes(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
-        Ok(Self::Physical(
+        Ok(Self::Physical(Box::new(
             SourceCatalog::from_shared_bytes_with_limits(source, limits)?,
-        ))
+        )))
     }
 
     #[cfg(feature = "internal-iwork-source")]

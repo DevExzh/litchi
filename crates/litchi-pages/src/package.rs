@@ -13,7 +13,6 @@ pub(crate) mod section_settings;
 mod section_text;
 mod section_transaction;
 
-use std::collections::BTreeSet;
 use std::fmt;
 use std::fs::{Metadata as FileMetadata, OpenOptions};
 use std::io::Read;
@@ -27,7 +26,6 @@ use litchi_iwa_common::{
     WireLimits,
     wire::{WireFieldView, WireView},
 };
-#[cfg(feature = "internal-iwork-source")]
 use litchi_iwa_detect::{Format, PreparedSource};
 use litchi_iwa_protos::{
     pages_body_codec::{self, DecodeOptions as PagesBodyDecodeOptions},
@@ -61,6 +59,8 @@ pub use section_text::{
 };
 
 const SECTION_MESSAGE_TYPE: u32 = 10_011;
+/// Hard package-wide ceiling for native objects inspected by Pages ingress.
+pub const MAX_OBJECTS: usize = 1_000_000;
 
 /// Bounded physical ingress limits for a Pages package.
 ///
@@ -79,6 +79,12 @@ pub enum PackageError {
     /// The shared physical ZIP/IWA ingress boundary rejected the package.
     #[error(transparent)]
     Archive(#[from] litchi_iwa_archive::Error),
+    /// Focused iWork source capture or classification rejected the input.
+    #[error(transparent)]
+    Detection(#[from] litchi_iwa_detect::Error),
+    /// The input is valid iWork data but belongs to another application.
+    #[error("iWork package is not a Pages document")]
+    NotPages,
     /// The parsed package cannot form a valid Pages-native document.
     #[error("invalid Pages package: {0}")]
     InvalidFormat(String),
@@ -94,6 +100,15 @@ pub enum PackageError {
         /// Aggregate retained UTF-8 budget.
         limit: usize,
     },
+    /// A bounded semantic payload operation exceeded its finite profile.
+    #[error("Pages payload limit exceeded: observed {observed}, maximum {limit}")]
+    PayloadLimit { observed: usize, limit: usize },
+    /// The package-wide native object inventory exceeded its finite profile.
+    #[error("Pages object limit exceeded: observed {observed}, maximum {limit}")]
+    ObjectLimit { observed: usize, limit: usize },
+    /// A bounded semantic allocation failed before publication.
+    #[error("Pages semantic allocation failed for {amount} units")]
+    Allocation { amount: usize },
 }
 
 /// Result type returned by [`Package`] operations.
@@ -107,7 +122,7 @@ pub struct Stats {
 }
 
 impl Stats {
-    /// Return the number of native IWA objects retained by the package.
+    /// Return the number of native IWA objects observed during source capture.
     #[must_use]
     pub const fn total_objects(self) -> usize {
         self.total_objects
@@ -388,32 +403,7 @@ impl Package {
     /// Project native Pages metadata into the format-neutral core model.
     #[must_use]
     pub fn metadata(&self) -> litchi_core::Metadata {
-        let metadata = &self.state.metadata;
-        let revision = metadata
-            .revision
-            .clone()
-            .or_else(|| metadata.build_version.clone());
-        let content_status = metadata
-            .format_version
-            .as_deref()
-            .map(|version| format!("Pages Format Version {version}"));
-
-        litchi_core::Metadata {
-            title: metadata.title.clone(),
-            author: metadata.author.clone(),
-            keywords: metadata.keywords.clone(),
-            description: metadata.description.clone(),
-            application: Some(
-                metadata
-                    .application
-                    .clone()
-                    .unwrap_or_else(|| "Pages".to_owned()),
-            ),
-            revision,
-            content_status,
-            identifier: metadata.identifier.clone(),
-            ..Default::default()
-        }
+        self.state.metadata.to_core()
     }
 
     /// Revalidate the retained native object inventory and semantic snapshot.
@@ -453,21 +443,65 @@ impl Metadata {
             metadata.build_version = parse_build_version(data)?;
         }
         if let Some(data) = metadata_entry(catalog, "Metadata/DocumentIdentifier")? {
-            let identifier_text = std::str::from_utf8(data).map_err(|error| {
-                PackageError::InvalidFormat(format!(
-                    "Pages DocumentIdentifier is not valid UTF-8: {error}"
-                ))
-            })?;
-            let identifier = identifier_text.trim();
-            if identifier.is_empty() {
-                return Err(PackageError::InvalidFormat(
-                    "Pages DocumentIdentifier must not be empty".to_owned(),
-                ));
-            }
-            metadata.identifier = Some(identifier.to_owned());
+            metadata.apply_document_identifier(data)?;
         }
 
         Ok(metadata)
+    }
+
+    fn from_prepared_sidecars(
+        sidecars: &litchi_iwa_detect::PreparedMetadataSidecars,
+    ) -> PackageResult<Self> {
+        let mut metadata = Self::default();
+        if let Some(data) = sidecars.properties_plist() {
+            metadata.apply_properties(data)?;
+        }
+        if let Some(data) = sidecars.build_version_history_plist() {
+            metadata.build_version = parse_build_version(data)?;
+        }
+        if let Some(data) = sidecars.document_identifier() {
+            metadata.apply_document_identifier(data)?;
+        }
+        Ok(metadata)
+    }
+
+    fn apply_document_identifier(&mut self, data: &[u8]) -> PackageResult<()> {
+        let identifier_text = std::str::from_utf8(data).map_err(|error| {
+            PackageError::InvalidFormat(format!(
+                "Pages DocumentIdentifier is not valid UTF-8: {error}"
+            ))
+        })?;
+        let identifier = identifier_text.trim();
+        if identifier.is_empty() {
+            return Err(PackageError::InvalidFormat(
+                "Pages DocumentIdentifier must not be empty".to_owned(),
+            ));
+        }
+        self.identifier = Some(identifier.to_owned());
+        Ok(())
+    }
+
+    fn to_core(&self) -> litchi_core::Metadata {
+        let revision = self.revision.clone().or_else(|| self.build_version.clone());
+        let content_status = self
+            .format_version
+            .as_deref()
+            .map(|version| format!("Pages Format Version {version}"));
+        litchi_core::Metadata {
+            title: self.title.clone(),
+            author: self.author.clone(),
+            keywords: self.keywords.clone(),
+            description: self.description.clone(),
+            application: Some(
+                self.application
+                    .clone()
+                    .unwrap_or_else(|| "Pages".to_owned()),
+            ),
+            revision,
+            content_status,
+            identifier: self.identifier.clone(),
+            ..Default::default()
+        }
     }
 
     fn apply_properties(&mut self, data: &[u8]) -> PackageResult<()> {
@@ -561,49 +595,41 @@ pub fn __semantic_document_from_prepared_source(
     max_sections: usize,
     max_text_bytes: usize,
 ) -> PackageResult<Document> {
-    let (components, limits) = semantic_components_from_prepared_source(source)?;
-    decode_semantic_components(
-        &components,
-        max_sections.min(MAX_SECTIONS),
-        max_text_bytes.min(effective_text_limit(limits)),
-        limits,
-    )
+    let semantic = crate::SemanticLimits::new(max_sections, max_text_bytes)
+        .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+    semantic_document_from_prepared_source(source, semantic)
 }
 
-#[cfg(feature = "internal-iwork-source")]
+pub(crate) fn semantic_document_from_prepared_source(
+    source: PreparedSource,
+    semantic: crate::SemanticLimits,
+) -> PackageResult<Document> {
+    validate_prepared_format(&source)?;
+    let (components, limits, sidecars) = source.__into_pages_semantic_source()?.__into_parts();
+    // Parse every present canonical diagnostic before publishing any source
+    // metadata. Failure therefore yields no partially populated Document.
+    let metadata = Metadata::from_prepared_sidecars(&sidecars)?.to_core();
+    let object_count = validate_components(&components)?;
+    let root_references = root_references_with_limits(&components, limits)?;
+    let document = decode_document(
+        &components,
+        root_references,
+        semantic.max_sections(),
+        semantic.max_text_bytes().min(effective_text_limit(limits)),
+        limits,
+    )?;
+    let stats = Stats {
+        total_objects: object_count,
+        section_count: document.section_count(),
+    };
+    Ok(Document::from_source(document, metadata, stats))
+}
+
 fn validate_prepared_format(source: &PreparedSource) -> PackageResult<()> {
     if source.format() != Format::Pages {
-        return Err(PackageError::InvalidFormat(
-            "prepared iWork source is not a Pages document".to_owned(),
-        ));
+        return Err(PackageError::NotPages);
     }
     Ok(())
-}
-
-#[cfg(feature = "internal-iwork-source")]
-fn semantic_components_from_prepared_source(
-    source: PreparedSource,
-) -> PackageResult<(Arc<ComponentCatalog>, Limits)> {
-    validate_prepared_format(&source)?;
-    Ok(source.__into_components())
-}
-
-#[cfg(feature = "internal-iwork-source")]
-fn decode_semantic_components(
-    components: &ComponentCatalog,
-    max_sections: usize,
-    max_text_bytes: usize,
-    limits: Limits,
-) -> PackageResult<Document> {
-    validate_components(components)?;
-    let root_references = root_references_with_limits(components, limits)?;
-    decode_document(
-        components,
-        root_references,
-        max_sections,
-        max_text_bytes,
-        limits,
-    )
 }
 
 #[cfg(any(unix, windows))]
@@ -845,8 +871,22 @@ fn validate_components(components: &ComponentCatalog) -> PackageResult<usize> {
         ));
     }
 
-    let mut object_ids = BTreeSet::new();
-    let mut object_count = 0usize;
+    let object_count = checked_object_count(
+        components
+            .iter()
+            .map(|component| component.archive().objects.len()),
+    )?;
+    if object_count == 0 {
+        return Err(PackageError::InvalidFormat(
+            "Pages package contains no IWA objects".to_owned(),
+        ));
+    }
+    let mut object_ids = Vec::new();
+    object_ids
+        .try_reserve_exact(object_count)
+        .map_err(|_error| PackageError::Allocation {
+            amount: object_count,
+        })?;
     for component in components.iter() {
         for object in &component.archive().objects {
             let identifier = object.archive_info.identifier.ok_or_else(|| {
@@ -861,21 +901,34 @@ fn validate_components(components: &ComponentCatalog) -> PackageResult<usize> {
                     component.name()
                 )));
             }
-            if !object_ids.insert(identifier) {
-                return Err(PackageError::InvalidFormat(format!(
-                    "Pages package contains duplicate object identifier {identifier}"
-                )));
-            }
-            object_count = object_count.checked_add(1).ok_or_else(|| {
-                PackageError::InvalidFormat("Pages package object count overflows usize".to_owned())
-            })?;
+            object_ids.push(identifier);
         }
     }
-
-    if object_count == 0 {
+    object_ids.sort_unstable();
+    if object_ids.windows(2).any(|pair| pair[0] == pair[1]) {
         return Err(PackageError::InvalidFormat(
-            "Pages package contains no IWA objects".to_owned(),
+            "Pages package contains a duplicate object identifier".to_owned(),
         ));
+    }
+    Ok(object_count)
+}
+
+fn checked_object_count(counts: impl IntoIterator<Item = usize>) -> PackageResult<usize> {
+    let object_count = counts
+        .into_iter()
+        .try_fold(0usize, |count, component_count| {
+            count
+                .checked_add(component_count)
+                .ok_or(PackageError::ObjectLimit {
+                    observed: usize::MAX,
+                    limit: MAX_OBJECTS,
+                })
+        })?;
+    if object_count > MAX_OBJECTS {
+        return Err(PackageError::ObjectLimit {
+            observed: object_count,
+            limit: MAX_OBJECTS,
+        });
     }
     Ok(object_count)
 }
@@ -978,7 +1031,7 @@ fn decode_document(
     }
 
     let body = {
-        let storages = extract_storages(components, max_sections, max_text_bytes)?;
+        let storages = extract_storages(components, max_sections, max_text_bytes, limits)?;
         (!storages.is_empty())
             .then(|| Body::with_max_text_bytes(storages, max_text_bytes))
             .transpose()?
@@ -1735,55 +1788,289 @@ fn extract_storages(
     components: &ComponentCatalog,
     max_sections: usize,
     max_text_bytes: usize,
+    limits: Limits,
 ) -> PackageResult<Vec<Storage>> {
     let mut storages = Vec::new();
     let mut text_bytes = 0usize;
+    let validation_limits =
+        storage_rewrite_limits(limits).map_err(|limit_error| match limit_error {
+            StorageWireLimitsError::Physical(physical_error) => {
+                PackageError::Archive(physical_error)
+            },
+            StorageWireLimitsError::Wire(wire_error) => PackageError::InvalidFormat(format!(
+                "Pages fallback text validation limits are invalid: {wire_error}"
+            )),
+        })?;
 
     for component in components.iter() {
         for object in &component.archive().objects {
+            if !object
+                .messages
+                .iter()
+                .any(|message| is_fallback_trigger_type(message.type_))
+            {
+                continue;
+            }
+            let Some(identifier) = object.archive_info.identifier.and_then(NonZeroU64::new) else {
+                continue;
+            };
+            let mut object_storages = Vec::new();
+            let mut object_text_bytes = 0usize;
+            let mut object_fragments = 0usize;
             for message in &object.messages {
                 if !is_storage_message_type(message.type_) {
                     continue;
                 }
-                let Ok(native) = tswp::StorageArchive::decode(message.data.as_slice()) else {
-                    continue;
+                let validation_result = litchi_iwa_text_wire::validate_storage_with_limits(
+                    message.data.as_slice(),
+                    validation_limits,
+                );
+                let validation = match validation_result {
+                    Ok(validation) => validation,
+                    Err(error) => {
+                        skip_or_reject_fallback_validation(error)?;
+                        continue;
+                    },
                 };
-                let Some(identifier) = object.archive_info.identifier.and_then(NonZeroU64::new)
-                else {
-                    continue;
-                };
-                ensure_text_size(&native, text_bytes, max_text_bytes, identifier)?;
-                let Ok(storage) = litchi_iwa_text_wire::from_archive(native) else {
-                    continue;
-                };
-                if storage.is_empty() {
-                    continue;
-                }
-                if max_sections == 0 {
-                    return Err(SemanticError::TooManySections {
-                        actual: 1,
-                        limit: max_sections,
-                    }
-                    .into());
-                }
-                if storages.len() == MAX_BODY_STORAGES {
-                    return Err(SemanticError::TooManyBodyStorages {
-                        actual: storages.len().saturating_add(1),
-                        limit: MAX_BODY_STORAGES,
-                    }
-                    .into());
-                }
-                text_bytes = text_bytes.checked_add(storage.len()).ok_or({
+                let next_fragments = object_fragments.checked_add(validation.fragments()).ok_or(
                     PackageError::Semantic(SemanticError::TextTooLarge {
                         observed: usize::MAX,
                         limit: max_text_bytes,
-                    })
+                    }),
+                )?;
+                let separator_bytes = next_fragments.saturating_sub(1);
+                let next_object_text = object_text_bytes.checked_add(validation.utf8_len()).ok_or(
+                    PackageError::Semantic(SemanticError::TextTooLarge {
+                        observed: usize::MAX,
+                        limit: max_text_bytes,
+                    }),
+                )?;
+                let charged_object_text =
+                    next_object_text
+                        .checked_add(separator_bytes)
+                        .ok_or(PackageError::Semantic(SemanticError::TextTooLarge {
+                            observed: usize::MAX,
+                            limit: max_text_bytes,
+                        }))?;
+                let charged_total =
+                    text_bytes
+                        .checked_add(charged_object_text)
+                        .ok_or(PackageError::Semantic(SemanticError::TextTooLarge {
+                            observed: usize::MAX,
+                            limit: max_text_bytes,
+                        }))?;
+                if charged_total > max_text_bytes {
+                    return Err(PackageError::Semantic(SemanticError::TextTooLarge {
+                        observed: charged_total,
+                        limit: max_text_bytes,
+                    }));
+                }
+                let remaining_text = max_text_bytes
+                    .saturating_sub(text_bytes)
+                    .saturating_sub(object_text_bytes)
+                    .max(1);
+                let text_limits = litchi_iwa_text_wire::Limits::new(
+                    message.data.len().max(1),
+                    litchi_iwa_text_wire::DEFAULT_MAX_FIELDS,
+                    litchi_iwa_text_wire::DEFAULT_MAX_WIRE_FRAGMENTS,
+                    remaining_text,
+                )
+                .map_err(|error| {
+                    PackageError::InvalidFormat(format!(
+                        "Pages fallback text limits are invalid: {error}"
+                    ))
                 })?;
-                storages.push(storage);
+                // Fallback discovery is deliberately speculative, matching
+                // the legacy archive-wide projection: a recognized type whose
+                // payload is not a strict TSWP storage is not promoted into
+                // semantic state. Valid candidates pass raw-wire preflight and
+                // the bounded Buffa projection before any text is published.
+                let storage_result = litchi_iwa_text_wire::from_bytes_with_limits(
+                    message.data.as_slice(),
+                    text_limits,
+                );
+                let storage = match storage_result {
+                    Ok(storage) => storage,
+                    Err(error) => {
+                        skip_or_reject_fallback_materialization(error, text_bytes, max_text_bytes)?;
+                        continue;
+                    },
+                };
+                object_storages
+                    .try_reserve(1)
+                    .map_err(|_error| PackageError::Allocation { amount: 1 })?;
+                object_storages.push(storage);
+                object_text_bytes = next_object_text;
+                object_fragments = next_fragments;
             }
+            let storage = legacy_fallback_object_storage(
+                &object_storages,
+                identifier,
+                max_text_bytes.saturating_sub(text_bytes),
+            )?;
+            if storage.is_empty() {
+                continue;
+            }
+            if max_sections == 0 {
+                return Err(SemanticError::TooManySections {
+                    actual: 1,
+                    limit: max_sections,
+                }
+                .into());
+            }
+            if storages.len() == MAX_BODY_STORAGES {
+                return Err(SemanticError::TooManyBodyStorages {
+                    actual: storages.len().saturating_add(1),
+                    limit: MAX_BODY_STORAGES,
+                }
+                .into());
+            }
+            let next_text_bytes = text_bytes.checked_add(storage.len()).ok_or({
+                PackageError::Semantic(SemanticError::TextTooLarge {
+                    observed: usize::MAX,
+                    limit: max_text_bytes,
+                })
+            })?;
+            if next_text_bytes > max_text_bytes {
+                return Err(PackageError::Semantic(SemanticError::TextTooLarge {
+                    observed: next_text_bytes,
+                    limit: max_text_bytes,
+                }));
+            }
+            text_bytes = next_text_bytes;
+            storages.push(storage);
         }
     }
     Ok(storages)
+}
+
+fn skip_or_reject_fallback_validation(
+    error: litchi_iwa_text_wire::RewriteError,
+) -> PackageResult<()> {
+    match error {
+        litchi_iwa_text_wire::RewriteError::InvalidFormat(_) => Ok(()),
+        litchi_iwa_text_wire::RewriteError::Allocation { amount, .. } => {
+            Err(PackageError::Allocation { amount })
+        },
+        litchi_iwa_text_wire::RewriteError::LimitExceeded {
+            observed, limit, ..
+        } => Err(PackageError::PayloadLimit { observed, limit }),
+        litchi_iwa_text_wire::RewriteError::Projection(_) => Err(PackageError::InvalidFormat(
+            "Pages fallback text projection disagreed with validated input".to_owned(),
+        )),
+        _ => Err(PackageError::InvalidFormat(
+            "Pages fallback text validation could not complete".to_owned(),
+        )),
+    }
+}
+
+fn skip_or_reject_fallback_materialization(
+    error: litchi_iwa_text_wire::Error,
+    retained_text_bytes: usize,
+    max_text_bytes: usize,
+) -> PackageResult<()> {
+    match error {
+        litchi_iwa_text_wire::Error::InvalidUtf8 { .. }
+        | litchi_iwa_text_wire::Error::WrongTextWireType { .. }
+        | litchi_iwa_text_wire::Error::Storage(_) => Ok(()),
+        litchi_iwa_text_wire::Error::TooManyTextBytes { actual, .. } => {
+            Err(PackageError::Semantic(SemanticError::TextTooLarge {
+                observed: retained_text_bytes.saturating_add(actual),
+                limit: max_text_bytes,
+            }))
+        },
+        litchi_iwa_text_wire::Error::TextLengthOverflow => {
+            Err(PackageError::Semantic(SemanticError::TextTooLarge {
+                observed: usize::MAX,
+                limit: max_text_bytes,
+            }))
+        },
+        litchi_iwa_text_wire::Error::TooManyFragments { actual, limit } => {
+            Err(PackageError::PayloadLimit {
+                observed: actual,
+                limit,
+            })
+        },
+        litchi_iwa_text_wire::Error::Common(litchi_iwa_common::Error::Allocation {
+            amount,
+            ..
+        }) => Err(PackageError::Allocation { amount }),
+        litchi_iwa_text_wire::Error::Common(litchi_iwa_common::Error::LimitExceeded {
+            observed,
+            limit,
+            ..
+        }) => Err(PackageError::PayloadLimit { observed, limit }),
+        litchi_iwa_text_wire::Error::ProjectionDecode { .. }
+        | litchi_iwa_text_wire::Error::ProjectionMismatch { .. }
+        | litchi_iwa_text_wire::Error::ProjectionTextLengthMismatch { .. } => {
+            Err(PackageError::InvalidFormat(
+                "Pages fallback text projection disagreed with validated input".to_owned(),
+            ))
+        },
+        _ => Err(PackageError::InvalidFormat(
+            "Pages fallback text materialization could not complete".to_owned(),
+        )),
+    }
+}
+
+fn legacy_fallback_object_storage(
+    storages: &[Storage],
+    identifier: NonZeroU64,
+    max_text_bytes: usize,
+) -> PackageResult<Storage> {
+    let fragment_count = storages
+        .iter()
+        .try_fold(0usize, |count, storage| {
+            count.checked_add(storage.runs().len())
+        })
+        .ok_or(PackageError::Semantic(SemanticError::TextTooLarge {
+            observed: usize::MAX,
+            limit: max_text_bytes,
+        }))?;
+    if fragment_count == 0 {
+        return Ok(Storage::new());
+    }
+    let joined_len = storages
+        .iter()
+        .try_fold(fragment_count - 1, |length, storage| {
+            length.checked_add(storage.len())
+        })
+        .ok_or(PackageError::Semantic(SemanticError::TextTooLarge {
+            observed: usize::MAX,
+            limit: max_text_bytes,
+        }))?;
+    if joined_len > max_text_bytes {
+        return Err(PackageError::Semantic(SemanticError::TextTooLarge {
+            observed: joined_len,
+            limit: max_text_bytes,
+        }));
+    }
+
+    let mut joined = String::new();
+    joined
+        .try_reserve_exact(joined_len)
+        .map_err(|_error| PackageError::Allocation { amount: joined_len })?;
+    let mut fragment_index = 0usize;
+    for storage in storages {
+        for run in storage.runs().iter().copied() {
+            if fragment_index != 0 {
+                joined.push('\n');
+            }
+            fragment_index += 1;
+            let end = run.end().ok_or_else(|| {
+                PackageError::InvalidFormat(format!(
+                    "Pages fallback storage object {identifier} contains an overflowing text range"
+                ))
+            })?;
+            let fragment = storage.text().get(run.start()..end).ok_or_else(|| {
+                PackageError::InvalidFormat(format!(
+                    "Pages fallback storage object {identifier} contains an invalid text range"
+                ))
+            })?;
+            joined.push_str(fragment);
+        }
+    }
+    Ok(Storage::from_text(joined))
 }
 
 fn unique_message_payload<'a>(
@@ -1886,6 +2173,13 @@ const fn is_body_text_message_type(type_id: u32) -> bool {
 
 const fn is_storage_message_type(type_id: u32) -> bool {
     matches!(type_id, 2001..=2014 | 2022)
+}
+
+const fn is_fallback_trigger_type(type_id: u32) -> bool {
+    matches!(
+        type_id,
+        200 | 201 | 202 | 203 | 204 | 205 | 2001 | 2002 | 2003 | 2004 | 2005 | 2011 | 2012 | 2022
+    )
 }
 
 #[cfg(test)]
@@ -2518,31 +2812,6 @@ mod tests {
 
     #[cfg(feature = "internal-iwork-source")]
     #[test]
-    fn semantic_component_boundary_has_no_physical_source_to_parse_again() -> PackageResult<()> {
-        let source: Arc<[u8]> = package_bytes(Some("Single parse"), true, false)?.into();
-        let weak_source = Arc::downgrade(&source);
-        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&source))
-            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
-            .ok_or_else(|| {
-                PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
-            })?;
-        drop(source);
-
-        let (components, limits) = semantic_components_from_prepared_source(prepared)?;
-        assert!(weak_source.upgrade().is_none());
-
-        let document = decode_semantic_components(
-            &components,
-            MAX_SECTIONS,
-            effective_text_limit(limits),
-            limits,
-        )?;
-        assert_eq!(document.plain_text(), "Single parse");
-        Ok(())
-    }
-
-    #[cfg(feature = "internal-iwork-source")]
-    #[test]
     fn semantic_prepared_source_rejects_malformed_pages_graph() -> PackageResult<()> {
         let root = tp::DocumentArchive {
             body_storage: Some(Reference {
@@ -2860,5 +3129,135 @@ mod tests {
             .err()
             .unwrap_or_else(|| panic!("oversized input should fail"));
         assert!(error.to_string().contains("limit"));
+    }
+
+    #[test]
+    fn aggregate_object_count_accepts_exact_cap_and_refuses_one_over() {
+        assert_eq!(
+            checked_object_count([MAX_OBJECTS])
+                .unwrap_or_else(|error| panic!("exact object cap must pass: {error}")),
+            MAX_OBJECTS
+        );
+        assert!(matches!(
+            checked_object_count([MAX_OBJECTS - 1, 2]),
+            Err(PackageError::ObjectLimit {
+                observed,
+                limit: MAX_OBJECTS,
+            }) if observed == MAX_OBJECTS + 1
+        ));
+        assert!(matches!(
+            checked_object_count([usize::MAX, 1]),
+            Err(PackageError::ObjectLimit {
+                observed: usize::MAX,
+                limit: MAX_OBJECTS,
+            })
+        ));
+    }
+
+    #[test]
+    fn object_inventory_rejects_duplicate_identifiers_across_components() -> PackageResult<()> {
+        let root = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 10_000,
+                        data: tp::DocumentArchive::default().encode_to_vec(),
+                    }],
+                )
+                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+            ],
+        };
+        let other = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 999,
+                        data: Vec::new(),
+                    }],
+                )
+                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+            ],
+        };
+        let root_stream = SnappyStream::compress(
+            &root
+                .to_bytes()
+                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+        )
+        .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        let other_stream = SnappyStream::compress(
+            &other
+                .to_bytes()
+                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+        )
+        .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        let bytes = litchi_iwa_archive::package::to_bytes(
+            [
+                ("Index/Document.iwa", root_stream.as_slice()),
+                ("Index/Other.iwa", other_stream.as_slice()),
+            ],
+            Limits::default(),
+        )?;
+
+        let error = Package::from_bytes(&bytes)
+            .err()
+            .unwrap_or_else(|| panic!("duplicate cross-component identifiers must fail"));
+        assert!(matches!(error, PackageError::InvalidFormat(_)));
+        Ok(())
+    }
+
+    #[test]
+    fn fallback_speculation_skips_only_content_invalid_payloads() {
+        assert!(
+            skip_or_reject_fallback_validation(litchi_iwa_text_wire::RewriteError::InvalidFormat(
+                "speculative".to_owned()
+            ))
+            .is_ok()
+        );
+        assert!(matches!(
+            skip_or_reject_fallback_validation(litchi_iwa_text_wire::RewriteError::Allocation {
+                resource: "test",
+                amount: 7,
+            }),
+            Err(PackageError::Allocation { amount: 7 })
+        ));
+        assert!(matches!(
+            skip_or_reject_fallback_validation(litchi_iwa_text_wire::RewriteError::Projection(
+                "parity".to_owned()
+            )),
+            Err(PackageError::InvalidFormat(_))
+        ));
+
+        assert!(
+            skip_or_reject_fallback_materialization(
+                litchi_iwa_text_wire::Error::WrongTextWireType { actual: 0 },
+                0,
+                16,
+            )
+            .is_ok()
+        );
+        assert!(matches!(
+            skip_or_reject_fallback_materialization(
+                litchi_iwa_text_wire::Error::Common(litchi_iwa_common::Error::Allocation {
+                    resource: "test",
+                    amount: 11,
+                }),
+                0,
+                16,
+            ),
+            Err(PackageError::Allocation { amount: 11 })
+        ));
+        assert!(matches!(
+            skip_or_reject_fallback_materialization(
+                litchi_iwa_text_wire::Error::ProjectionMismatch {
+                    preflight: 1,
+                    decoded: 0,
+                },
+                0,
+                16,
+            ),
+            Err(PackageError::InvalidFormat(_))
+        ));
     }
 }

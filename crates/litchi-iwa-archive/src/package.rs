@@ -531,15 +531,158 @@ pub enum SourceProvenance {
     LegacyZip,
 }
 
+/// A fixed logical-member admission profile applied before ZIP payload decode.
+///
+/// This unstable integration type lets a format owner select a narrow set of
+/// exact normalized logical names whose declared physical shape must be
+/// checked before any package entries are materialized. It is intentionally
+/// not a caller-extensible path filter.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct LogicalEntryLimits {
+    profile: LogicalEntryLimitProfile,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum LogicalEntryLimitProfile {
+    PagesMetadata,
+}
+
+impl LogicalEntryLimits {
+    /// Pages' three canonical metadata authorities, each capped at 64 KiB and
+    /// required to use a supported ZIP compression method.
+    pub const PAGES_METADATA: Self = Self {
+        profile: LogicalEntryLimitProfile::PagesMetadata,
+    };
+
+    const MAX_PAGES_METADATA_BYTES: u64 = 64 * 1024;
+
+    const fn maximum_for(self, logical_name: &[u8]) -> Option<u64> {
+        match self.profile {
+            LogicalEntryLimitProfile::PagesMetadata => match logical_name {
+                b"Metadata/Properties.plist"
+                | b"Metadata/BuildVersionHistory.plist"
+                | b"Metadata/DocumentIdentifier" => Some(Self::MAX_PAGES_METADATA_BYTES),
+                _ => None,
+            },
+        }
+    }
+}
+
 /// Ordered raw entries extracted from one physical iWork ZIP input.
 #[derive(Debug)]
 pub struct Catalog {
     entries: Vec<Entry>,
     source: Arc<[u8]>,
     source_is_exact: bool,
+    legacy_outer_prefix: Option<Box<[u8]>>,
+}
+
+/// One exact canonical Pages metadata member selected from raw ZIP
+/// provenance.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy)]
+pub struct PackageMetadataEntry<'a> {
+    data: &'a [u8],
+    opaque: bool,
+}
+
+impl<'a> PackageMetadataEntry<'a> {
+    /// Borrow the selected member payload.
+    #[must_use]
+    pub const fn data(self) -> &'a [u8] {
+        self.data
+    }
+
+    /// Whether the selected authority uses unsupported compression.
+    #[must_use]
+    pub const fn is_opaque(self) -> bool {
+        self.opaque
+    }
+}
+
+/// The fixed three-member Pages metadata projection selected from exact raw
+/// ZIP authority names.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PackageMetadataSidecars<'a> {
+    properties: Option<PackageMetadataEntry<'a>>,
+    build_version_history: Option<PackageMetadataEntry<'a>>,
+    document_identifier: Option<PackageMetadataEntry<'a>>,
+}
+
+impl<'a> PackageMetadataSidecars<'a> {
+    /// Borrow exact `Metadata/Properties.plist`, if present.
+    #[must_use]
+    pub const fn properties_plist(self) -> Option<PackageMetadataEntry<'a>> {
+        self.properties
+    }
+
+    /// Borrow exact `Metadata/BuildVersionHistory.plist`, if present.
+    #[must_use]
+    pub const fn build_version_history_plist(self) -> Option<PackageMetadataEntry<'a>> {
+        self.build_version_history
+    }
+
+    /// Borrow exact `Metadata/DocumentIdentifier`, if present.
+    #[must_use]
+    pub const fn document_identifier(self) -> Option<PackageMetadataEntry<'a>> {
+        self.document_identifier
+    }
 }
 
 impl Catalog {
+    /// Select Pages' exact raw metadata authorities from the retained package.
+    ///
+    /// Flat packages require byte-for-byte central names. Legacy packages may
+    /// remove only the one explicit raw outer prefix that led to `Index.zip`.
+    #[doc(hidden)]
+    pub fn __pages_metadata_sidecars(&self) -> Result<PackageMetadataSidecars<'_>> {
+        let mut selected = PackageMetadataSidecars::default();
+        for entry in &self.entries {
+            let raw_name = entry.raw_name();
+            let logical_name = self
+                .legacy_outer_prefix
+                .as_deref()
+                .and_then(|prefix| raw_name.strip_prefix(prefix))
+                .unwrap_or(raw_name);
+            let authority = match logical_name {
+                b"Metadata/Properties.plist" => Some("Metadata/Properties.plist"),
+                b"Metadata/BuildVersionHistory.plist" => Some("Metadata/BuildVersionHistory.plist"),
+                b"Metadata/DocumentIdentifier" => Some("Metadata/DocumentIdentifier"),
+                _ => None,
+            };
+            let Some(authority) = authority else {
+                continue;
+            };
+            if entry.metadata().local().name() != entry.metadata().central().name() {
+                return Err(Error::InvalidBundle(format!(
+                    "canonical logical entry {authority} has mismatched local and central names"
+                )));
+            }
+            if entry.metadata().local().compression_method()
+                != entry.metadata().central().compression_method()
+            {
+                return Err(Error::InvalidBundle(format!(
+                    "canonical logical entry {authority} has mismatched local and central compression methods"
+                )));
+            }
+            let value = PackageMetadataEntry {
+                data: entry.data(),
+                opaque: entry.is_opaque(),
+            };
+            match logical_name {
+                b"Metadata/Properties.plist" => selected.properties = Some(value),
+                b"Metadata/BuildVersionHistory.plist" => {
+                    selected.build_version_history = Some(value);
+                },
+                b"Metadata/DocumentIdentifier" => selected.document_identifier = Some(value),
+                _ => {},
+            }
+        }
+        Ok(selected)
+    }
+
     /// Parse a package with the default physical limits.
     ///
     /// # Errors
@@ -578,6 +721,35 @@ impl Catalog {
     /// Returns an error when the ZIP envelope, nested index, duplicate entry,
     /// or configured physical limit is invalid.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
+        Self::from_bytes_with_optional_logical_entry_limits(bytes, limits, None)
+    }
+
+    /// Parse borrowed package bytes while applying a fixed logical-member
+    /// profile before any ZIP payload is decoded.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_bytes_with_limits`], plus a
+    /// refusal when a selected logical authority has unsupported compression
+    /// or exceeds its declared uncompressed-size ceiling.
+    #[doc(hidden)]
+    pub fn __from_bytes_with_logical_entry_limits(
+        bytes: &[u8],
+        limits: Limits,
+        logical_entry_limits: LogicalEntryLimits,
+    ) -> Result<Self> {
+        Self::from_bytes_with_optional_logical_entry_limits(
+            bytes,
+            limits,
+            Some(logical_entry_limits),
+        )
+    }
+
+    fn from_bytes_with_optional_logical_entry_limits(
+        bytes: &[u8],
+        limits: Limits,
+        logical_entry_limits: Option<LogicalEntryLimits>,
+    ) -> Result<Self> {
         let checked_limits = limits.validate()?;
         let input_size = u64::try_from(bytes.len()).map_err(|_error| {
             Error::InvalidBundle("borrowed ZIP input length does not fit u64".to_owned())
@@ -592,7 +764,7 @@ impl Catalog {
             })?;
         source_bytes.extend_from_slice(bytes);
         let shared_source: Arc<[u8]> = source_bytes.into();
-        Self::from_source_with_checked_limits(shared_source, checked_limits)
+        Self::from_source_with_checked_limits(shared_source, checked_limits, logical_entry_limits)
     }
 
     /// Parse a package from an immutable positional source under the default
@@ -626,8 +798,37 @@ impl Catalog {
     /// Returns an error when the ZIP envelope, nested index, duplicate entry,
     /// or configured physical limit is invalid.
     pub fn from_shared_bytes_with_limits(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
+        Self::from_shared_bytes_with_optional_logical_entry_limits(source, limits, None)
+    }
+
+    /// Parse shared package bytes while applying a fixed logical-member
+    /// profile before any ZIP payload is decoded.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_shared_bytes_with_limits`],
+    /// plus a refusal when a selected logical authority has unsupported
+    /// compression or exceeds its declared uncompressed-size ceiling.
+    #[doc(hidden)]
+    pub fn __from_shared_bytes_with_logical_entry_limits(
+        source: Arc<[u8]>,
+        limits: Limits,
+        logical_entry_limits: LogicalEntryLimits,
+    ) -> Result<Self> {
+        Self::from_shared_bytes_with_optional_logical_entry_limits(
+            source,
+            limits,
+            Some(logical_entry_limits),
+        )
+    }
+
+    fn from_shared_bytes_with_optional_logical_entry_limits(
+        source: Arc<[u8]>,
+        limits: Limits,
+        logical_entry_limits: Option<LogicalEntryLimits>,
+    ) -> Result<Self> {
         let checked_limits = limits.validate()?;
-        Self::from_source_with_checked_limits(source, checked_limits)
+        Self::from_source_with_checked_limits(source, checked_limits, logical_entry_limits)
     }
 
     /// Parse a package from an immutable positional source under caller-
@@ -644,10 +845,14 @@ impl Catalog {
     pub fn from_read_at_with_limits(source: &dyn ReadAt, limits: Limits) -> Result<Self> {
         let checked_limits = limits.validate()?;
         let source_bytes = read_source(source, checked_limits)?;
-        Self::from_source_with_checked_limits(source_bytes, checked_limits)
+        Self::from_source_with_checked_limits(source_bytes, checked_limits, None)
     }
 
-    fn from_source_with_checked_limits(source: Arc<[u8]>, checked_limits: Limits) -> Result<Self> {
+    fn from_source_with_checked_limits(
+        source: Arc<[u8]>,
+        checked_limits: Limits,
+        logical_entry_limits: Option<LogicalEntryLimits>,
+    ) -> Result<Self> {
         let archive = ZipArchive::new_with_limits(source.as_ref(), checked_limits)?;
         if crate::zip::is_encrypted(&archive) {
             return Err(Error::Encrypted);
@@ -660,20 +865,30 @@ impl Catalog {
                 "iWork package mixes direct IWA members with a legacy Index.zip".to_owned(),
             ));
         }
-        let (entries, source_is_exact) = if has_direct_iwa {
-            (collect_flat(&archive, &source)?, true)
+        if let Some(logical_entry_limits) = logical_entry_limits {
+            if let Some(index_name) = nested_name.as_deref() {
+                preflight_legacy_outer_logical_entries(&archive, index_name, logical_entry_limits)?;
+            } else {
+                preflight_flat_logical_entries(&archive, logical_entry_limits)?;
+            }
+        }
+        let (entries, source_is_exact, legacy_outer_prefix) = if has_direct_iwa {
+            (collect_flat(&archive, &source)?, true, None)
         } else if let Some(index_name) = nested_name {
+            let prefix: Box<[u8]> = legacy_raw_outer_prefix(&archive, &index_name)?.into();
             (
                 collect_legacy(&archive, &index_name, checked_limits, &source)?,
                 false,
+                Some(prefix),
             )
         } else {
-            (collect_flat(&archive, &source)?, true)
+            (collect_flat(&archive, &source)?, true, None)
         };
         Ok(Catalog {
             entries,
             source,
             source_is_exact,
+            legacy_outer_prefix,
         })
     }
 
@@ -1804,6 +2019,92 @@ fn diagnostic_fingerprint(bytes: &[u8]) -> u64 {
     })
 }
 
+fn preflight_flat_logical_entries(
+    archive: &ZipArchive<'_>,
+    limits: LogicalEntryLimits,
+) -> Result<()> {
+    for physical in archive
+        .physical_entries()
+        .filter(|entry| !entry.is_directory())
+    {
+        preflight_logical_entry(physical, physical.raw_name(), limits)?;
+    }
+    Ok(())
+}
+
+fn preflight_legacy_outer_logical_entries(
+    archive: &ZipArchive<'_>,
+    index_name: &str,
+    limits: LogicalEntryLimits,
+) -> Result<()> {
+    let raw_prefix = legacy_raw_outer_prefix(archive, index_name)?;
+    for physical in archive
+        .physical_entries()
+        .filter(|entry| !entry.is_directory() && entry.name() != index_name)
+    {
+        let raw_name = physical.raw_name();
+        let logical_name = raw_name.strip_prefix(raw_prefix).unwrap_or(raw_name);
+        preflight_logical_entry(physical, logical_name, limits)?;
+    }
+    Ok(())
+}
+
+fn legacy_raw_outer_prefix<'a>(archive: &'a ZipArchive<'_>, index_name: &str) -> Result<&'a [u8]> {
+    let raw_name = archive
+        .physical_entries()
+        .find(|entry| entry.name() == index_name)
+        .ok_or_else(|| {
+            Error::InvalidBundle(format!(
+                "legacy package index has no physical member: {index_name}"
+            ))
+        })?
+        .raw_name();
+    std::str::from_utf8(raw_name).map_err(|_error| {
+        Error::InvalidBundle("legacy package index raw name is not UTF-8".to_owned())
+    })?;
+    raw_name.strip_suffix(b"Index.zip").ok_or_else(|| {
+        Error::InvalidBundle("legacy package index raw name has an invalid suffix".to_owned())
+    })
+}
+
+fn preflight_logical_entry(
+    physical: &PhysicalEntry,
+    logical_name: &[u8],
+    limits: LogicalEntryLimits,
+) -> Result<()> {
+    let Some(maximum) = limits.maximum_for(logical_name) else {
+        return Ok(());
+    };
+    let local = physical.local_header();
+    let central = physical.central_header();
+    if local.name.as_ref() != central.name.as_ref() {
+        return Err(Error::InvalidBundle(format!(
+            "canonical logical entry {} has mismatched local and central names",
+            String::from_utf8_lossy(logical_name)
+        )));
+    }
+    if local.compression_method != central.compression_method {
+        return Err(Error::InvalidBundle(format!(
+            "canonical logical entry {} has mismatched local and central compression methods",
+            String::from_utf8_lossy(logical_name)
+        )));
+    }
+    if !matches!(central.compression_method, 0 | 8) {
+        return Err(Error::InvalidBundle(format!(
+            "canonical logical entry {} uses unsupported ZIP compression",
+            String::from_utf8_lossy(logical_name)
+        )));
+    }
+    if physical.uncompressed_size() > maximum {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::EntryBytes,
+            observed: physical.uncompressed_size(),
+            maximum,
+        });
+    }
+    Ok(())
+}
+
 fn collect_flat(archive: &ZipArchive<'_>, source: &Arc<[u8]>) -> Result<Vec<Entry>> {
     let mut entries = Vec::new();
     let mut seen = HashSet::new();
@@ -2094,6 +2395,61 @@ mod tests {
         (bytes, central_offset, central_end)
     }
 
+    fn raw_named_zip(
+        local_name: &[u8],
+        central_name: &[u8],
+        local_method: u16,
+        central_method: u16,
+        data: &[u8],
+    ) -> Vec<u8> {
+        let crc32 = soapberry_zip::crc32(data);
+        let mut bytes = Vec::new();
+        push_u32(&mut bytes, 0x0403_4b50);
+        push_u16(&mut bytes, 20);
+        push_u16(&mut bytes, 0x0800);
+        push_u16(&mut bytes, local_method);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u32(&mut bytes, crc32);
+        push_u32(&mut bytes, checked_u32(data.len()));
+        push_u32(&mut bytes, checked_u32(data.len()));
+        push_u16(&mut bytes, checked_u16(local_name.len()));
+        push_u16(&mut bytes, 0);
+        bytes.extend_from_slice(local_name);
+        bytes.extend_from_slice(data);
+
+        let central_offset = bytes.len();
+        push_u32(&mut bytes, 0x0201_4b50);
+        push_u16(&mut bytes, 20);
+        push_u16(&mut bytes, 20);
+        push_u16(&mut bytes, 0x0800);
+        push_u16(&mut bytes, central_method);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u32(&mut bytes, crc32);
+        push_u32(&mut bytes, checked_u32(data.len()));
+        push_u32(&mut bytes, checked_u32(data.len()));
+        push_u16(&mut bytes, checked_u16(central_name.len()));
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u32(&mut bytes, 0);
+        push_u32(&mut bytes, 0);
+        bytes.extend_from_slice(central_name);
+
+        let central_size = bytes.len() - central_offset;
+        push_u32(&mut bytes, 0x0605_4b50);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 1);
+        push_u16(&mut bytes, 1);
+        push_u32(&mut bytes, checked_u32(central_size));
+        push_u32(&mut bytes, checked_u32(central_offset));
+        push_u16(&mut bytes, 0);
+        bytes
+    }
+
     fn physical_two_entry_zip() -> Vec<u8> {
         let entries = [
             (
@@ -2237,6 +2593,112 @@ mod tests {
             ["Metadata/a", "Index/Document.iwa"]
         );
         assert_eq!(catalog.iter().next().map(Entry::data), Some(&b"a"[..]));
+        Ok(())
+    }
+
+    #[test]
+    fn logical_entry_profile_checks_declared_sizes_before_entry_read() -> Result<()> {
+        for authority in [
+            "Metadata/Properties.plist",
+            "Metadata/BuildVersionHistory.plist",
+            "Metadata/DocumentIdentifier",
+        ] {
+            let exact = vec![b'x'; LogicalEntryLimits::MAX_PAGES_METADATA_BYTES as usize];
+            let accepted = zip(&[(authority, &exact)])?;
+            crate::zip::reset_test_entry_read_count();
+            let catalog = Catalog::__from_bytes_with_logical_entry_limits(
+                &accepted,
+                Limits::default(),
+                LogicalEntryLimits::PAGES_METADATA,
+            )?;
+            assert_eq!(
+                catalog.iter().next().map(Entry::data),
+                Some(exact.as_slice())
+            );
+            assert_eq!(crate::zip::test_entry_read_count(), 1);
+
+            let one_over = vec![b'x'; exact.len() + 1];
+            let rejected = zip(&[(authority, &one_over)])?;
+            crate::zip::reset_test_entry_read_count();
+            assert!(matches!(
+                Catalog::__from_bytes_with_logical_entry_limits(
+                    &rejected,
+                    Limits::default(),
+                    LogicalEntryLimits::PAGES_METADATA,
+                ),
+                Err(Error::Limit {
+                    kind: crate::LimitKind::EntryBytes,
+                    observed,
+                    maximum,
+                }) if observed == one_over.len() as u64
+                    && maximum == LogicalEntryLimits::MAX_PAGES_METADATA_BYTES
+            ));
+            assert_eq!(
+                crate::zip::test_entry_read_count(),
+                0,
+                "oversized {authority} must fail from PhysicalEntry before read_entry"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn pages_metadata_profile_does_not_promote_raw_normalization_near_names() -> Result<()> {
+        for raw_name in [
+            b"Metadata\\Properties.plist".as_slice(),
+            b"/Metadata/Properties.plist",
+            b"Metadata//Properties.plist",
+            b"Metadata/./Properties.plist",
+            b"Metadata/x/../Properties.plist",
+        ] {
+            let bytes = raw_named_zip(raw_name, raw_name, 0, 0, b"decoy");
+            let archive = ZipArchive::new_with_limits(&bytes, Limits::default())?;
+            preflight_flat_logical_entries(&archive, LogicalEntryLimits::PAGES_METADATA)?;
+            crate::zip::reset_test_entry_read_count();
+            let catalog = Catalog::__from_bytes_with_logical_entry_limits(
+                &bytes,
+                Limits::default(),
+                LogicalEntryLimits::PAGES_METADATA,
+            )?;
+            assert!(
+                catalog
+                    .__pages_metadata_sidecars()?
+                    .properties_plist()
+                    .is_none()
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn pages_metadata_profile_refuses_selected_header_mismatches_before_read() -> Result<()> {
+        let authority = b"Metadata/Properties.plist";
+        let local_near_name = b"Metadata/Properties.plisX";
+        let name_mismatch = raw_named_zip(local_near_name, authority, 0, 0, b"properties");
+        crate::zip::reset_test_entry_read_count();
+        assert!(matches!(
+            Catalog::__from_bytes_with_logical_entry_limits(
+                &name_mismatch,
+                Limits::default(),
+                LogicalEntryLimits::PAGES_METADATA,
+            ),
+            Err(Error::InvalidBundle(message))
+                if message.contains("mismatched local and central names")
+        ));
+        assert_eq!(crate::zip::test_entry_read_count(), 0);
+
+        let method_mismatch = raw_named_zip(authority, authority, 99, 0, b"properties");
+        crate::zip::reset_test_entry_read_count();
+        assert!(matches!(
+            Catalog::__from_bytes_with_logical_entry_limits(
+                &method_mismatch,
+                Limits::default(),
+                LogicalEntryLimits::PAGES_METADATA,
+            ),
+            Err(Error::InvalidBundle(message))
+                if message.contains("mismatched local and central compression methods")
+        ));
+        assert_eq!(crate::zip::test_entry_read_count(), 0);
         Ok(())
     }
 

@@ -15,8 +15,9 @@ use litchi_iwa::application::Application;
 use litchi_iwa::detect::{self, Format};
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocument, NumbersDocumentBuilder, NumbersEditor};
-use litchi_iwa::pages::{PagesDocument, PagesEditor};
+use litchi_iwa::pages::PagesEditor;
 use litchi_keynote::Package as KeynotePackage;
+use litchi_pages::Document as PagesSemanticDocument;
 use tempfile::tempdir;
 
 fn assert_send_sync<T: Send + Sync>() {}
@@ -67,7 +68,7 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     let document = Document::open(path)?;
     assert_send_sync::<litchi_iwa::raw::bundle::Bundle>();
     assert_send_sync::<litchi_iwa::Document>();
-    assert_send_sync::<PagesDocument>();
+    assert_send_sync::<PagesSemanticDocument>();
     assert_send_sync::<NumbersDocument>();
     assert_send_sync::<KeynotePackage>();
     assert_eq!(document.application(), application);
@@ -91,13 +92,40 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     match expected {
         Format::Pages => {
             PagesEditor::open(path)?;
-            let specialized = PagesDocument::open(path)?;
+            let specialized = PagesSemanticDocument::open(path)?;
             let snapshot = specialized.snapshot();
-            let specialized_stats = specialized.stats()?;
-            let snapshot_stats = snapshot.stats()?;
+            let specialized_stats = specialized
+                .stats()
+                .expect("a source-backed Pages document has ingress statistics");
+            let snapshot_stats = snapshot
+                .stats()
+                .expect("a Pages snapshot retains ingress statistics");
             assert_eq!(
-                snapshot_stats.total_objects,
-                specialized_stats.total_objects
+                snapshot_stats.total_objects(),
+                specialized_stats.total_objects()
+            );
+            specialized.validate()?;
+            assert_eq!(
+                snapshot.plain_text(),
+                specialized.plain_text(),
+                "a Pages snapshot retains semantic text"
+            );
+
+            let directory_path = path.with_file_name("generated-directory.pages");
+            fs::create_dir(&directory_path)?;
+            fs::copy(path, directory_path.join("Index.zip"))?;
+            let directory_document = PagesSemanticDocument::open(&directory_path)?;
+            assert_eq!(
+                directory_document.plain_text(),
+                specialized.plain_text(),
+                "the focused Pages reader preserves directory-path semantics"
+            );
+            assert_eq!(
+                directory_document
+                    .stats()
+                    .expect("a directory-backed Pages document has ingress statistics")
+                    .total_objects(),
+                specialized_stats.total_objects()
             );
         },
         Format::Numbers => {

@@ -1,23 +1,20 @@
 //! Pages Document Support
 //!
-//! This module provides comprehensive support for parsing Apple Pages documents,
-//! including text extraction, section management, and document structure analysis.
+//! This module provides comprehensive support for creating and editing Apple
+//! Pages documents. Read-only semantic parsing lives in [`litchi_pages`].
 //!
 //! ## Features
 //!
-//! - Document metadata extraction
-//! - Section and paragraph parsing
-//! - Text style information
 //! - Floating drawables (images, shapes)
 //! - Header and footer extraction
 //!
 //! ## Example
 //!
 //! ```rust,no_run
-//! use litchi_iwa::pages::PagesDocument;
+//! use litchi_pages::Document;
 //!
-//! let doc = PagesDocument::open("document.pages")?;
-//! let text = doc.text()?;
+//! let doc = Document::open("document.pages")?;
+//! let text = doc.plain_text();
 //! let sections = doc.sections();
 //!
 //! for section in sections {
@@ -30,11 +27,9 @@
 //! ```
 
 mod creation;
-pub mod document;
 pub mod editor;
 
 pub use creation::PagesDocumentBuilder;
-pub use document::PagesDocument;
 pub use editor::{
     PagesAudioInfo, PagesBodyChartInfo, PagesBodyShapeInfo, PagesCellValue, PagesDrawableTextInfo,
     PagesEditor, PagesHeaderFooterInfo, PagesImageInfo, PagesMovieInfo, PagesSectionInfo,

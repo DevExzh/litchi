@@ -1453,3 +1453,46 @@ scalar diagnostics. Their independent hard admission ceiling is 64 KiB.
 No edit, patch, publication, or native mutation is introduced by deleting the
 duplicate reader. Existing `Package` transactions continue to bind their
 patches to exact immutable source snapshots.
+
+## 2026-08-13 amendment: canonical Pages read snapshots
+
+`litchi_pages::Document` captures a complete ZIP path or app-authored package
+directory where stable path ingress is supported, or borrowed ZIP bytes or
+caller-owned shared ZIP bytes on every supported platform, then eagerly
+completes the bounded Pages projection, drops the physical components and
+unselected sidecars, and
+publishes one archive-free `Arc`-backed state. `snapshot()` is a constant-time
+clone of that state. Its source-derived `metadata()` and `stats()` are present;
+documents built from semantic values return `None` for both. Semantic
+`validate()` walks the retained values without reconstructing a package or
+allocating another document.
+
+Windows Pages path capture deliberately fails closed because stable,
+reparse-safe identity is not yet pinned there; borrowed and shared byte ingress
+remain available. Source-open failures cross the public archive-free boundary
+as content-free `ReadError` categories and numeric bounds. The three canonical
+Pages metadata members in a ZIP are declared-size and compression preflighted
+before package entries are materialized. Selection compares exact raw logical
+name bytes after stripping only the selected legacy outer-package prefix, so
+raw near-names remain excluded. Unrelated supported members can still be
+expanded under the generic source limits before projection drops them.
+
+`litchi_pages::Package::snapshot` has a different contract: it shares the
+immutable complete ZIP artifact and remains the authority for exact bytes,
+physical validation, and transaction provenance. Its borrowed
+`semantic_document()` shares archive-free semantics but intentionally has no
+source diagnostics; callers use `Package::{metadata, stats}` for artifact
+diagnostics. Directory-backed semantic values cannot be used to edit or claim
+preservation of metadata beyond the selected authorities, `Data/`,
+previews, media, unknown sidecars, or complete package bytes.
+
+Deleting the duplicate host reader adds no edit, patch, commit, publication,
+or save operation. Existing focused Pages edits remain bound to exact
+regular-file or byte-backed package snapshots, and their patch limitations are
+unchanged.
+
+Snapshot and ingress behavior is covered by the 15/15 document-reader gate;
+the complete focused Pages suite passes 153/153. Supporting archive and
+detector suites pass 93/93 and 32/32, the host generated-roundtrip passes 1/1,
+and the 227/227 boundary suite reports zero live retirement or focused-public-
+API findings.

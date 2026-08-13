@@ -970,9 +970,22 @@ fn map_package_error(package_error: PackageError) -> SectionPaginationError {
                 maximum: usize_to_u64(limit),
             }
         },
-        PackageError::Io(_) | PackageError::InvalidFormat(_) | PackageError::Semantic(_) => {
-            SectionPaginationError::InvalidSource
+        PackageError::NotPages => SectionPaginationError::UnsupportedSource,
+        PackageError::PayloadLimit { observed, limit } => SectionPaginationError::LimitExceeded {
+            kind: SectionPaginationLimitKind::WireBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
         },
+        PackageError::ObjectLimit { observed, limit } => SectionPaginationError::LimitExceeded {
+            kind: SectionPaginationLimitKind::Entries,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
+        },
+        PackageError::Allocation { amount } => SectionPaginationError::Allocation { amount },
+        PackageError::Io(_)
+        | PackageError::Detection(_)
+        | PackageError::InvalidFormat(_)
+        | PackageError::Semantic(_) => SectionPaginationError::InvalidSource,
     }
 }
 

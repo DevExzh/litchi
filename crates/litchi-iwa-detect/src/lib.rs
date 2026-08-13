@@ -10,8 +10,8 @@
 )]
 
 use litchi_iwa_archive::{
-    self, ComponentCatalog, DetectionRoot, DirectoryMarkers, FrozenDirectoryBundle,
-    LogicalSourceCatalog, SourceCatalog,
+    self, ComponentCatalog, DetectionRoot, DirectoryMarkers, DirectoryMetadataSidecars,
+    FrozenDirectoryBundle, LogicalEntryLimits, LogicalSourceCatalog, SourceCatalog,
 };
 use litchi_iwa_common::wire::{WireField, parse_wire_fields};
 use litchi_iwa_core::{Archive, SnappyLimits, SnappyStream};
@@ -221,13 +221,139 @@ pub struct PreparedSource {
     limits: Limits,
 }
 
+/// Canonical metadata diagnostics retained for a format-owned semantic reader.
+///
+/// This explicitly unstable DTO exposes only the three fixed authorities used
+/// by the Pages reader. It deliberately carries neither physical package
+/// entries nor caller-selected paths.
+#[doc(hidden)]
+#[derive(Clone, Default)]
+pub struct PreparedMetadataSidecars {
+    properties_plist: Option<Arc<[u8]>>,
+    build_version_history_plist: Option<Arc<[u8]>>,
+    document_identifier: Option<Arc<[u8]>>,
+}
+
+impl fmt::Debug for PreparedMetadataSidecars {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PreparedMetadataSidecars")
+            .field(
+                "properties_plist_bytes",
+                &self.properties_plist.as_deref().map(<[u8]>::len),
+            )
+            .field(
+                "build_version_history_plist_bytes",
+                &self.build_version_history_plist.as_deref().map(<[u8]>::len),
+            )
+            .field(
+                "document_identifier_bytes",
+                &self.document_identifier.as_deref().map(<[u8]>::len),
+            )
+            .finish()
+    }
+}
+
+impl PreparedMetadataSidecars {
+    /// Borrow canonical `Metadata/Properties.plist`, when present.
+    #[must_use]
+    pub fn properties_plist(&self) -> Option<&[u8]> {
+        self.properties_plist.as_deref()
+    }
+
+    /// Borrow canonical `Metadata/BuildVersionHistory.plist`, when present.
+    #[must_use]
+    pub fn build_version_history_plist(&self) -> Option<&[u8]> {
+        self.build_version_history_plist.as_deref()
+    }
+
+    /// Borrow canonical `Metadata/DocumentIdentifier`, when present.
+    #[must_use]
+    pub fn document_identifier(&self) -> Option<&[u8]> {
+        self.document_identifier.as_deref()
+    }
+}
+
+impl From<DirectoryMetadataSidecars> for PreparedMetadataSidecars {
+    fn from(sidecars: DirectoryMetadataSidecars) -> Self {
+        let (properties_plist, build_version_history_plist, document_identifier) =
+            sidecars.__into_parts();
+        Self {
+            properties_plist,
+            build_version_history_plist,
+            document_identifier,
+        }
+    }
+}
+
+/// Archive-free semantic state consumed by one format owner.
+///
+/// This DTO preserves the checked archive profile and immutable component
+/// snapshot without exposing exact-package authority.
+#[doc(hidden)]
+pub struct PreparedSemanticSource {
+    components: Arc<ComponentCatalog>,
+    limits: litchi_iwa_archive::Limits,
+    sidecars: PreparedMetadataSidecars,
+}
+
+impl fmt::Debug for PreparedSemanticSource {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PreparedSemanticSource")
+            .field("components", &self.components.len())
+            .field("limits", &self.limits)
+            .field("sidecars", &self.sidecars)
+            .finish()
+    }
+}
+
+impl PreparedSemanticSource {
+    /// Borrow the immutable semantic component catalog.
+    #[must_use]
+    pub fn components(&self) -> &ComponentCatalog {
+        &self.components
+    }
+
+    /// Return the physical profile that authorized the component snapshot.
+    #[must_use]
+    pub const fn archive_limits(&self) -> litchi_iwa_archive::Limits {
+        self.limits
+    }
+
+    /// Borrow the fixed canonical metadata diagnostics.
+    #[must_use]
+    pub const fn sidecars(&self) -> &PreparedMetadataSidecars {
+        &self.sidecars
+    }
+
+    /// Consume this DTO into the format-owned semantic parts.
+    #[must_use]
+    pub fn __into_parts(
+        self,
+    ) -> (
+        Arc<ComponentCatalog>,
+        litchi_iwa_archive::Limits,
+        PreparedMetadataSidecars,
+    ) {
+        (self.components, self.limits, self.sidecars)
+    }
+}
+
 enum PreparedBacking {
     Package(SourceCatalog),
     Semantic {
         components: Arc<ComponentCatalog>,
         limits: litchi_iwa_archive::Limits,
-        properties: Option<Arc<[u8]>>,
+        sidecars: PreparedMetadataSidecars,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PathProfile {
+    IndexOnly,
+    Properties,
+    PagesMetadata,
 }
 
 impl fmt::Debug for PreparedSource {
@@ -269,6 +395,37 @@ impl PreparedSource {
         Self::from_catalog(catalog, limits)
     }
 
+    /// Prepare borrowed package bytes with Pages' fixed metadata authorities
+    /// checked from physical ZIP headers before package payload decode.
+    ///
+    /// Ordinary detection and other format owners remain on the generic ZIP
+    /// profile. This unstable opt-in caps each exact normalized Pages metadata
+    /// member at 64 KiB and rejects unsupported compression.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_bytes_with_limits`], plus a
+    /// refusal when a selected Pages metadata authority violates its physical
+    /// profile.
+    #[doc(hidden)]
+    pub fn __from_bytes_with_pages_metadata(value: &[u8], limits: Limits) -> Result<Option<Self>> {
+        if !check_prepared_candidate(value, limits)? {
+            return Ok(None);
+        }
+        let archive_limits = archive_limits(limits)?;
+        let catalog = if bytes_with_limits(value, limits)? == Some(Format::Pages) {
+            SourceCatalog::__from_bytes_with_logical_entry_limits(
+                value,
+                archive_limits,
+                LogicalEntryLimits::PAGES_METADATA,
+            )
+        } else {
+            SourceCatalog::from_bytes_with_limits(value, archive_limits)
+        }
+        .map_err(map_archive_error)?;
+        Self::from_catalog(catalog, limits)
+    }
+
     /// Prepare already-owned immutable package bytes without copying them.
     ///
     /// # Errors
@@ -297,6 +454,36 @@ impl PreparedSource {
         }
         let catalog = SourceCatalog::from_shared_bytes_with_limits(value, archive_limits(limits)?)
             .map_err(map_archive_error)?;
+        Self::from_catalog(catalog, limits)
+    }
+
+    /// Prepare shared package bytes with Pages' fixed metadata authorities
+    /// checked from physical ZIP headers before package payload decode.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_shared_bytes_with_limits`],
+    /// plus a refusal when a selected Pages metadata authority violates its
+    /// physical profile.
+    #[doc(hidden)]
+    pub fn __from_shared_bytes_with_pages_metadata(
+        value: Arc<[u8]>,
+        limits: Limits,
+    ) -> Result<Option<Self>> {
+        if !check_prepared_candidate(&value, limits)? {
+            return Ok(None);
+        }
+        let archive_limits = archive_limits(limits)?;
+        let catalog = if bytes_with_limits(&value, limits)? == Some(Format::Pages) {
+            SourceCatalog::__from_shared_bytes_with_logical_entry_limits(
+                value,
+                archive_limits,
+                LogicalEntryLimits::PAGES_METADATA,
+            )
+        } else {
+            SourceCatalog::from_shared_bytes_with_limits(value, archive_limits)
+        }
+        .map_err(map_archive_error)?;
         Self::from_catalog(catalog, limits)
     }
 
@@ -344,7 +531,7 @@ impl PreparedSource {
             backing: PreparedBacking::Semantic {
                 components,
                 limits: archive_limits,
-                properties: None,
+                sidecars: PreparedMetadataSidecars::default(),
             },
             format,
             limits,
@@ -376,7 +563,7 @@ impl PreparedSource {
     ///
     /// Returns the same errors as [`Self::from_path`].
     pub fn from_path_with_limits(value: impl AsRef<Path>, limits: Limits) -> Result<Option<Self>> {
-        Self::from_path_with_profile(value.as_ref(), limits, false)
+        Self::from_path_with_profile(value.as_ref(), limits, PathProfile::IndexOnly)
     }
 
     /// Prepare a path while retaining the canonical properties diagnostic for
@@ -389,25 +576,76 @@ impl PreparedSource {
         value: impl AsRef<Path>,
         limits: Limits,
     ) -> Result<Option<Self>> {
-        Self::from_path_with_profile(value.as_ref(), limits, true)
+        Self::from_path_with_profile(value.as_ref(), limits, PathProfile::Properties)
+    }
+
+    /// Prepare a path while retaining exactly Pages' three canonical metadata
+    /// diagnostics for its archive-free semantic reader.
+    ///
+    /// Ordinary detection remains index-only, and the Keynote properties
+    /// profile remains properties-only. This opt-in freezes
+    /// `Metadata/Properties.plist`, `Metadata/BuildVersionHistory.plist`, and
+    /// `Metadata/DocumentIdentifier` from one pinned directory authority.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_path_with_limits`], plus a
+    /// refusal when a selected canonical metadata authority is unsafe.
+    #[doc(hidden)]
+    pub fn __from_path_with_pages_metadata(
+        value: impl AsRef<Path>,
+        limits: Limits,
+    ) -> Result<Option<Self>> {
+        Self::from_path_with_profile(value.as_ref(), limits, PathProfile::PagesMetadata)
     }
 
     fn from_path_with_profile(
         path: &Path,
         limits: Limits,
-        capture_properties: bool,
+        profile: PathProfile,
     ) -> Result<Option<Self>> {
         match kind(path)? {
             Kind::File => {
+                // Focused Pages path ingress promises a stable, no-follow
+                // physical snapshot. The current Windows adapter cannot pin
+                // that identity across reparse-point resolution, so keep the
+                // byte/shared-byte APIs available there and fail closed for
+                // this path-owned profile.
+                #[cfg(windows)]
+                if profile == PathProfile::PagesMetadata {
+                    return Err(Error::InvalidFormat(
+                        "Pages package path ingress is unsupported on Windows".to_owned(),
+                    ));
+                }
                 let source = read_stable_package_file(path, limits)?;
-                Self::from_shared_bytes_with_limits(source, limits)
+                if profile == PathProfile::PagesMetadata {
+                    Self::__from_shared_bytes_with_pages_metadata(source, limits)
+                } else {
+                    Self::from_shared_bytes_with_limits(source, limits)
+                }
             },
             Kind::Dir => {
                 let archive = archive_limits(limits)?;
-                let directory = if capture_properties {
-                    FrozenDirectoryBundle::open_with_properties(path, archive)
-                } else {
-                    FrozenDirectoryBundle::open_with_limits(path, archive)
+                let directory = match profile {
+                    PathProfile::IndexOnly => {
+                        FrozenDirectoryBundle::open_with_limits(path, archive)
+                    },
+                    PathProfile::Properties => {
+                        FrozenDirectoryBundle::open_with_properties(path, archive)
+                    },
+                    PathProfile::PagesMetadata => {
+                        FrozenDirectoryBundle::open_with_pages_metadata_when(
+                            path,
+                            archive,
+                            |components, markers| {
+                                matches!(component_catalog(components), Ok(Some(Format::Pages)))
+                                    && matches!(
+                                        marker_outcome(markers),
+                                        Outcome::None | Outcome::Found(Format::Pages)
+                                    )
+                            },
+                        )
+                    },
                 }
                 .map_err(map_archive_error)?;
                 Self::from_directory(directory, limits)
@@ -455,12 +693,12 @@ impl PreparedSource {
             },
         }
         let archive_limits = directory.limits();
-        let (components, properties) = directory.into_semantic_parts();
+        let (components, sidecars) = directory.into_pages_semantic_parts();
         Ok(Some(Self {
             backing: PreparedBacking::Semantic {
                 limits: archive_limits,
                 components,
-                properties,
+                sidecars: sidecars.into(),
             },
             format,
             limits,
@@ -562,10 +800,120 @@ impl PreparedSource {
             PreparedBacking::Semantic {
                 components,
                 limits,
-                properties,
-            } => Ok((components, limits, properties)),
+                sidecars,
+            } => Ok((components, limits, sidecars.properties_plist)),
         }
     }
+
+    /// Consume a Pages-prepared source into one typed archive-free semantic
+    /// handoff.
+    ///
+    /// For a packaged source, this copies only Pages' three exact canonical
+    /// metadata authorities before dropping the physical catalog. Selected
+    /// entries using an unsupported compression method are rejected rather
+    /// than treated as decoded metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation error if a selected packaged diagnostic cannot be
+    /// copied into immutable ownership, or a format error for an opaque
+    /// selected authority.
+    #[doc(hidden)]
+    pub fn __into_pages_semantic_source(self) -> Result<PreparedSemanticSource> {
+        if self.format != Format::Pages {
+            return Err(Error::InvalidFormat(
+                "prepared iWork source is not a Pages document".to_owned(),
+            ));
+        }
+        match self.backing {
+            PreparedBacking::Package(catalog) => {
+                let limits = catalog.limits();
+                let sidecars = copy_pages_metadata_sidecars(catalog.package())?;
+                Ok(PreparedSemanticSource {
+                    components: Arc::new(catalog.into_components()),
+                    limits,
+                    sidecars,
+                })
+            },
+            PreparedBacking::Semantic {
+                components,
+                limits,
+                sidecars,
+            } => Ok(PreparedSemanticSource {
+                components,
+                limits,
+                sidecars,
+            }),
+        }
+    }
+}
+
+const PAGES_METADATA_AUTHORITIES: [(&str, PagesSidecar); 3] = [
+    ("Metadata/Properties.plist", PagesSidecar::Properties),
+    (
+        "Metadata/BuildVersionHistory.plist",
+        PagesSidecar::BuildVersionHistory,
+    ),
+    (
+        "Metadata/DocumentIdentifier",
+        PagesSidecar::DocumentIdentifier,
+    ),
+];
+
+#[derive(Clone, Copy)]
+enum PagesSidecar {
+    Properties,
+    BuildVersionHistory,
+    DocumentIdentifier,
+}
+
+fn copy_pages_metadata_sidecars(
+    package: &litchi_iwa_archive::package::Catalog,
+) -> Result<PreparedMetadataSidecars> {
+    let mut sidecars = PreparedMetadataSidecars::default();
+    let selected = package
+        .__pages_metadata_sidecars()
+        .map_err(map_archive_error)?;
+    for (authority, sidecar, entry) in [
+        (
+            PAGES_METADATA_AUTHORITIES[0].0,
+            PagesSidecar::Properties,
+            selected.properties_plist(),
+        ),
+        (
+            PAGES_METADATA_AUTHORITIES[1].0,
+            PagesSidecar::BuildVersionHistory,
+            selected.build_version_history_plist(),
+        ),
+        (
+            PAGES_METADATA_AUTHORITIES[2].0,
+            PagesSidecar::DocumentIdentifier,
+            selected.document_identifier(),
+        ),
+    ] {
+        let Some(entry) = entry else {
+            continue;
+        };
+        if entry.is_opaque() {
+            return Err(Error::InvalidFormat(format!(
+                "canonical Pages metadata authority {authority} uses unsupported compression"
+            )));
+        }
+        if entry.data().len() > MAX_PROPERTIES_BYTES {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::EntryBytes,
+                observed: u64::try_from(entry.data().len()).unwrap_or(u64::MAX),
+                maximum: MAX_PROPERTIES_BYTES as u64,
+            });
+        }
+        let data = Some(copy_semantic_sidecar(entry.data())?);
+        match sidecar {
+            PagesSidecar::Properties => sidecars.properties_plist = data,
+            PagesSidecar::BuildVersionHistory => sidecars.build_version_history_plist = data,
+            PagesSidecar::DocumentIdentifier => sidecars.document_identifier = data,
+        }
+    }
+    Ok(sidecars)
 }
 
 fn copy_semantic_sidecar(source: &[u8]) -> Result<Arc<[u8]>> {
@@ -1541,6 +1889,99 @@ mod tests {
         package(&files)
     }
 
+    fn document_package_with_members(format: Format, members: &[(&str, &[u8])]) -> Vec<u8> {
+        let root = document(format);
+        let mut files = vec![("Index/Document.iwa", root.as_slice())];
+        files.extend_from_slice(members);
+        package(&files)
+    }
+
+    fn legacy_pages_package_with_outer_members(members: &[(&str, &[u8])]) -> Vec<u8> {
+        let root = document(Format::Pages);
+        let index = package(&[("Document.iwa", root.as_slice())]);
+        let physical_names = members
+            .iter()
+            .map(|(logical_name, _data)| format!("legacy.pages/{logical_name}"))
+            .collect::<Vec<_>>();
+        let mut entries = vec![("legacy.pages/Index.zip", index.as_slice())];
+        entries.extend(
+            physical_names
+                .iter()
+                .zip(members)
+                .map(|(physical_name, (_logical_name, data))| (physical_name.as_str(), *data)),
+        );
+        package(&entries)
+    }
+
+    fn patch_zip_member_compression_to_opaque(bytes: &mut [u8], name: &str) {
+        const LOCAL_HEADER_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x03, 0x04];
+        const CENTRAL_HEADER_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x01, 0x02];
+        const UNSUPPORTED_METHOD: [u8; 2] = 99_u16.to_le_bytes();
+
+        let name = name.as_bytes();
+        let mut cursor = 0;
+        let mut changed = 0;
+        while let Some(relative) = bytes[cursor..]
+            .windows(name.len())
+            .position(|candidate| candidate == name)
+        {
+            let position = cursor + relative;
+            if position >= 30 && bytes[position - 30..position - 26] == LOCAL_HEADER_SIGNATURE {
+                bytes[position - 22..position - 20].copy_from_slice(&UNSUPPORTED_METHOD);
+                changed += 1;
+            } else if position >= 46
+                && bytes[position - 46..position - 42] == CENTRAL_HEADER_SIGNATURE
+            {
+                bytes[position - 36..position - 34].copy_from_slice(&UNSUPPORTED_METHOD);
+                changed += 1;
+            }
+            cursor = position.saturating_add(name.len());
+        }
+        assert_eq!(
+            changed, 2,
+            "{name:?} must have one local and one central ZIP record"
+        );
+    }
+
+    fn patch_zip_member_local_name(bytes: &mut [u8], name: &str, replacement: &str) {
+        assert_eq!(name.len(), replacement.len());
+        const LOCAL_HEADER_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x03, 0x04];
+        let position = bytes
+            .windows(name.len())
+            .position(|candidate| candidate == name.as_bytes())
+            .expect("test ZIP contains requested local member");
+        assert!(position >= 30);
+        assert_eq!(bytes[position - 30..position - 26], LOCAL_HEADER_SIGNATURE);
+        bytes[position..position + name.len()].copy_from_slice(replacement.as_bytes());
+    }
+
+    fn patch_zip_member_raw_names(bytes: &mut [u8], name: &str, replacement: &str) {
+        assert_eq!(name.len(), replacement.len());
+        let mut cursor = 0;
+        let mut changed = 0;
+        while let Some(relative) = bytes[cursor..]
+            .windows(name.len())
+            .position(|candidate| candidate == name.as_bytes())
+        {
+            let position = cursor + relative;
+            bytes[position..position + name.len()].copy_from_slice(replacement.as_bytes());
+            changed += 1;
+            cursor = position + name.len();
+        }
+        assert_eq!(changed, 2, "test member must have local and central names");
+    }
+
+    fn patch_zip_member_local_compression(bytes: &mut [u8], name: &str, method: u16) {
+        const LOCAL_HEADER_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x03, 0x04];
+        let position = bytes
+            .windows(name.len())
+            .position(|candidate| candidate == name.as_bytes())
+            .expect("test ZIP contains requested local member");
+        assert!(position >= 30);
+        assert_eq!(bytes[position - 30..position - 26], LOCAL_HEADER_SIGNATURE);
+        bytes[position - 22..position - 20].copy_from_slice(&method.to_le_bytes());
+    }
+
     fn frozen_package(bytes: &[u8]) -> FrozenEntryStore {
         let catalog = litchi_iwa_archive::package::Catalog::from_bytes(bytes)
             .expect("parse logical test package");
@@ -1858,6 +2299,472 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+    }
+
+    #[test]
+    fn pages_semantic_handoff_copies_only_the_three_canonical_sidecars() {
+        let properties = b"canonical-pages-properties";
+        let history = b"canonical-pages-history";
+        let identifier = b"canonical-pages-identifier";
+        let bytes: Arc<[u8]> = document_package_with_members(
+            Format::Pages,
+            &[
+                ("Metadata/Properties.plist", properties),
+                ("Metadata/BuildVersionHistory.plist", history),
+                ("Metadata/DocumentIdentifier", identifier),
+                ("Metadata/Properties.plist.bak", b"properties-decoy"),
+                ("Metadata/BuildVersionHistory.plist~", b"history-decoy"),
+                ("Metadata/DocumentIdentifier.txt", b"identifier-decoy"),
+                ("Decoy/Properties.plist", b"basename-decoy"),
+            ],
+        )
+        .into();
+
+        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&bytes))
+            .unwrap()
+            .expect("fixture has a Pages root");
+        let semantic = prepared
+            .__into_pages_semantic_source()
+            .expect("canonical Pages sidecars are copied");
+        assert_eq!(
+            Arc::strong_count(&bytes),
+            1,
+            "the archive-free Pages consumer must not retain exact-package bytes"
+        );
+        let sidecars = semantic.sidecars();
+        assert_eq!(sidecars.properties_plist(), Some(properties.as_slice()));
+        assert_eq!(
+            sidecars.build_version_history_plist(),
+            Some(history.as_slice())
+        );
+        assert_eq!(sidecars.document_identifier(), Some(identifier.as_slice()));
+    }
+
+    #[test]
+    fn pages_zip_profile_enforces_modern_canonical_boundaries_before_handoff() {
+        for authority in PAGES_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
+            let exact = vec![b'x'; MAX_PROPERTIES_BYTES];
+            let accepted = document_package_with_members(Format::Pages, &[(authority, &exact)]);
+            let prepared =
+                PreparedSource::__from_bytes_with_pages_metadata(&accepted, Limits::default())
+                    .unwrap()
+                    .expect("fixture has a Pages root");
+            let sidecars = prepared
+                .__into_pages_semantic_source()
+                .expect("exactly 64 KiB physical authority is admitted")
+                .__into_parts()
+                .2;
+            let captured = match authority {
+                "Metadata/Properties.plist" => sidecars.properties_plist(),
+                "Metadata/BuildVersionHistory.plist" => sidecars.build_version_history_plist(),
+                "Metadata/DocumentIdentifier" => sidecars.document_identifier(),
+                _ => unreachable!("test iterates fixed Pages metadata authorities"),
+            };
+            assert_eq!(captured, Some(exact.as_slice()));
+
+            let one_over = vec![b'x'; MAX_PROPERTIES_BYTES + 1];
+            let rejected = document_package_with_members(Format::Pages, &[(authority, &one_over)]);
+            assert!(matches!(
+                PreparedSource::__from_bytes_with_pages_metadata(
+                    &rejected,
+                    Limits::default(),
+                ),
+                Err(Error::LimitExceeded {
+                    kind: LimitKind::EntryBytes,
+                    observed,
+                    maximum,
+                }) if observed == one_over.len() as u64
+                    && maximum == MAX_PROPERTIES_BYTES as u64
+            ));
+        }
+    }
+
+    #[test]
+    fn pages_zip_profile_normalizes_legacy_outer_canonical_boundaries() {
+        for authority in PAGES_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
+            let exact = vec![b'x'; MAX_PROPERTIES_BYTES];
+            let accepted = legacy_pages_package_with_outer_members(&[(authority, &exact)]);
+            PreparedSource::__from_bytes_with_pages_metadata(&accepted, Limits::default())
+                .unwrap()
+                .expect("legacy fixture has a Pages root")
+                .__into_pages_semantic_source()
+                .expect("exact legacy outer authority is admitted");
+
+            let one_over = vec![b'x'; MAX_PROPERTIES_BYTES + 1];
+            let rejected = legacy_pages_package_with_outer_members(&[(authority, &one_over)]);
+            assert!(matches!(
+                PreparedSource::__from_bytes_with_pages_metadata(
+                    &rejected,
+                    Limits::default(),
+                ),
+                Err(Error::LimitExceeded {
+                    kind: LimitKind::EntryBytes,
+                    observed,
+                    maximum,
+                }) if observed == one_over.len() as u64
+                    && maximum == MAX_PROPERTIES_BYTES as u64
+            ));
+        }
+    }
+
+    #[test]
+    fn pages_zip_profile_ignores_near_names_and_rejects_duplicate_authorities() {
+        let oversized = vec![b'x'; MAX_PROPERTIES_BYTES + 1];
+        let near_names = document_package_with_members(
+            Format::Pages,
+            &[
+                ("Metadata/Properties.plist.bak", &oversized),
+                ("Metadata/BuildVersionHistory.plist~", &oversized),
+                ("Metadata/DocumentIdentifier.txt", &oversized),
+                ("Decoy/Properties.plist", &oversized),
+            ],
+        );
+        let sidecars =
+            PreparedSource::__from_bytes_with_pages_metadata(&near_names, Limits::default())
+                .unwrap()
+                .expect("near names do not affect Pages classification")
+                .__into_pages_semantic_source()
+                .unwrap()
+                .__into_parts()
+                .2;
+        assert!(sidecars.properties_plist().is_none());
+        assert!(sidecars.build_version_history_plist().is_none());
+        assert!(sidecars.document_identifier().is_none());
+
+        let root = document(Format::Pages);
+        let index = package(&[("Document.iwa", root.as_slice())]);
+        let duplicate = package(&[
+            ("legacy.pages/Index.zip", index.as_slice()),
+            (
+                "legacy.pages/Metadata/DocumentIdentifier",
+                b"first".as_slice(),
+            ),
+            ("Metadata/DocumentIdentifier", &oversized),
+        ]);
+        let duplicate_error =
+            PreparedSource::__from_bytes_with_pages_metadata(&duplicate, Limits::default())
+                .expect_err("a duplicate normalized authority must fail before payload decode");
+        assert!(
+            matches!(
+                &duplicate_error,
+                Error::LimitExceeded {
+                    kind: LimitKind::EntryBytes,
+                    observed,
+                    maximum,
+                } if *observed == oversized.len() as u64
+                    && *maximum == MAX_PROPERTIES_BYTES as u64
+            ),
+            "unexpected duplicate preflight result: {duplicate_error:?}"
+        );
+    }
+
+    #[test]
+    fn pages_zip_profile_requires_exact_raw_authority_names() {
+        let authority = "Metadata/Properties.plist";
+        let near_name = r"Metadata\Properties.plist";
+        let mut bytes =
+            document_package_with_members(Format::Pages, &[(authority, b"properties-decoy")]);
+        // The test writer normalizes paths, so construct hostile raw headers
+        // after serialization instead of trusting its input spelling.
+        patch_zip_member_raw_names(&mut bytes, authority, near_name);
+        let sidecars = PreparedSource::__from_bytes_with_pages_metadata(&bytes, Limits::default())
+            .expect("raw near-name is outside the Pages metadata profile")
+            .expect("fixture has a Pages root")
+            .__into_pages_semantic_source()
+            .expect("raw near-name is ignored at handoff")
+            .__into_parts()
+            .2;
+        assert_eq!(sidecars.properties_plist(), None);
+    }
+
+    #[test]
+    fn pages_zip_profile_refuses_selected_local_central_mismatches() {
+        let authority = "Metadata/Properties.plist";
+        let replacement = "Metadata/Properties.plisX";
+        let mut name_mismatch =
+            document_package_with_members(Format::Pages, &[(authority, b"properties")]);
+        patch_zip_member_local_name(&mut name_mismatch, authority, replacement);
+        assert!(matches!(
+            PreparedSource::__from_bytes_with_pages_metadata(
+                &name_mismatch,
+                Limits::default(),
+            ),
+            Err(Error::Archive(message))
+                if message.contains("mismatched local and central names")
+        ));
+
+        let mut method_mismatch =
+            document_package_with_members(Format::Pages, &[(authority, b"properties")]);
+        patch_zip_member_local_compression(&mut method_mismatch, authority, 99);
+        assert!(matches!(
+            PreparedSource::__from_bytes_with_pages_metadata(
+                &method_mismatch,
+                Limits::default(),
+            ),
+            Err(Error::Archive(message))
+                if message.contains("mismatched local and central compression methods")
+        ));
+    }
+
+    #[test]
+    fn pages_zip_profile_refuses_opaque_canonical_authorities_during_preparation() {
+        for authority in PAGES_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
+            let mut bytes = document_package_with_members(
+                Format::Pages,
+                &[(authority, b"canonical-pages-sidecar")],
+            );
+            patch_zip_member_compression_to_opaque(&mut bytes, authority);
+
+            assert!(matches!(
+                PreparedSource::__from_bytes_with_pages_metadata(&bytes, Limits::default()),
+                Err(Error::Archive(message))
+                    if message.contains(authority)
+                        && message.contains("unsupported ZIP compression")
+            ));
+        }
+    }
+
+    #[test]
+    fn pages_zip_profile_applies_metadata_policy_only_after_pages_classification() {
+        let oversized = vec![b'x'; MAX_PROPERTIES_BYTES + 1];
+        let mut keynote = document_package_with_members(
+            Format::Keynote,
+            &[("Metadata/BuildVersionHistory.plist", &oversized)],
+        );
+        patch_zip_member_compression_to_opaque(&mut keynote, "Metadata/BuildVersionHistory.plist");
+
+        let prepared =
+            PreparedSource::__from_bytes_with_pages_metadata(&keynote, Limits::default())
+                .expect("non-Pages metadata remains outside the Pages ZIP profile")
+                .expect("fixture has a Keynote root");
+        assert_eq!(prepared.format(), Format::Keynote);
+    }
+
+    #[test]
+    fn pages_shared_and_regular_file_profiles_use_the_same_zip_preflight() -> std::io::Result<()> {
+        let one_over = vec![b'x'; MAX_PROPERTIES_BYTES + 1];
+        let bytes: Arc<[u8]> = document_package_with_members(
+            Format::Pages,
+            &[("Metadata/Properties.plist", &one_over)],
+        )
+        .into();
+        assert!(matches!(
+            PreparedSource::__from_shared_bytes_with_pages_metadata(
+                Arc::clone(&bytes),
+                Limits::default(),
+            ),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::EntryBytes,
+                ..
+            })
+        ));
+
+        let temp = Temp::new()?;
+        let path = temp.0.join("oversized.pages");
+        fs::write(&path, &bytes)?;
+        assert!(matches!(
+            PreparedSource::__from_path_with_pages_metadata(&path, Limits::default()),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::EntryBytes,
+                ..
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn keynote_semantic_handoff_remains_properties_only() {
+        let properties = b"canonical-keynote-properties";
+        let history = b"opaque-history-must-not-affect-keynote";
+        let identifier = b"opaque-identifier-must-not-affect-keynote";
+        let mut bytes = document_package_with_members(
+            Format::Keynote,
+            &[
+                ("Metadata/Properties.plist", properties),
+                ("Metadata/BuildVersionHistory.plist", history),
+                ("Metadata/DocumentIdentifier", identifier),
+            ],
+        );
+        patch_zip_member_compression_to_opaque(&mut bytes, "Metadata/BuildVersionHistory.plist");
+        patch_zip_member_compression_to_opaque(&mut bytes, "Metadata/DocumentIdentifier");
+
+        let prepared = PreparedSource::from_bytes(&bytes)
+            .unwrap()
+            .expect("fixture has a Keynote root");
+        let (_components, _limits, captured) = prepared
+            .__into_semantic_parts()
+            .expect("Keynote must ignore non-properties Pages sidecars");
+        assert_eq!(captured.as_deref(), Some(properties.as_slice()));
+    }
+
+    #[test]
+    fn pages_semantic_handoff_rejects_opaque_canonical_sidecars() {
+        for authority in PAGES_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
+            let mut bytes = document_package_with_members(
+                Format::Pages,
+                &[(authority, b"canonical-pages-sidecar")],
+            );
+            patch_zip_member_compression_to_opaque(&mut bytes, authority);
+
+            let prepared = PreparedSource::from_bytes(&bytes)
+                .unwrap()
+                .expect("fixture has a Pages root");
+            let error = prepared
+                .__into_pages_semantic_source()
+                .expect_err("opaque canonical Pages metadata must fail closed");
+            assert!(matches!(
+                error,
+                Error::InvalidFormat(message)
+                    if message.contains(authority) && message.contains("unsupported compression")
+            ));
+        }
+    }
+
+    #[test]
+    fn pages_semantic_handoff_enforces_the_exact_per_sidecar_ceiling() {
+        for authority in PAGES_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
+            let exact = vec![b'x'; MAX_PROPERTIES_BYTES];
+            let accepted = document_package_with_members(Format::Pages, &[(authority, &exact)]);
+            let prepared = PreparedSource::from_bytes(&accepted)
+                .unwrap()
+                .expect("fixture has a Pages root");
+            let sidecars = prepared
+                .__into_pages_semantic_source()
+                .expect("exactly 64 KiB sidecar must be accepted")
+                .__into_parts()
+                .2;
+            let captured = match authority {
+                "Metadata/Properties.plist" => sidecars.properties_plist(),
+                "Metadata/BuildVersionHistory.plist" => sidecars.build_version_history_plist(),
+                "Metadata/DocumentIdentifier" => sidecars.document_identifier(),
+                _ => unreachable!("test iterates fixed Pages metadata authorities"),
+            };
+            assert_eq!(captured, Some(exact.as_slice()));
+
+            let oversized = vec![b'x'; MAX_PROPERTIES_BYTES + 1];
+            let rejected = document_package_with_members(Format::Pages, &[(authority, &oversized)]);
+            let prepared = PreparedSource::from_bytes(&rejected)
+                .unwrap()
+                .expect("fixture has a Pages root");
+            assert!(matches!(
+                prepared.__into_pages_semantic_source(),
+                Err(Error::LimitExceeded {
+                    kind: LimitKind::EntryBytes,
+                    observed,
+                    maximum,
+                }) if observed == oversized.len() as u64
+                    && maximum == MAX_PROPERTIES_BYTES as u64
+            ));
+        }
+    }
+
+    #[test]
+    fn directory_pages_metadata_profile_is_opt_in_and_exact() -> std::io::Result<()> {
+        let temp = Temp::new()?;
+        let bundle = temp.0.join("profile.pages");
+        let properties = b"directory-properties";
+        let history = b"directory-history";
+        let identifier = b"directory-identifier";
+        fs::create_dir(&bundle)?;
+        fs::write(
+            bundle.join("Index.zip"),
+            document_package(Format::Pages, &[]),
+        )?;
+        fs::create_dir(bundle.join("Metadata"))?;
+        fs::write(bundle.join("Metadata/Properties.plist"), properties)?;
+        fs::write(bundle.join("Metadata/BuildVersionHistory.plist"), history)?;
+        fs::write(bundle.join("Metadata/DocumentIdentifier"), identifier)?;
+        fs::write(bundle.join("Metadata/Properties.plist.bak"), b"decoy")?;
+
+        let generic = PreparedSource::from_path(&bundle)
+            .unwrap()
+            .expect("fixture has a Pages root")
+            .__into_pages_semantic_source()
+            .unwrap();
+        assert_eq!(generic.sidecars().properties_plist(), None);
+        assert_eq!(generic.sidecars().build_version_history_plist(), None);
+        assert_eq!(generic.sidecars().document_identifier(), None);
+
+        let properties_only =
+            PreparedSource::__from_path_with_properties(&bundle, Limits::default())
+                .unwrap()
+                .expect("fixture has a Pages root");
+        let (_components, _limits, captured) = properties_only.__into_semantic_parts().unwrap();
+        assert_eq!(captured.as_deref(), Some(properties.as_slice()));
+
+        let pages = PreparedSource::__from_path_with_pages_metadata(&bundle, Limits::default())
+            .unwrap()
+            .expect("fixture has a Pages root")
+            .__into_pages_semantic_source()
+            .unwrap();
+        assert_eq!(
+            pages.sidecars().properties_plist(),
+            Some(properties.as_slice())
+        );
+        assert_eq!(
+            pages.sidecars().build_version_history_plist(),
+            Some(history.as_slice())
+        );
+        assert_eq!(
+            pages.sidecars().document_identifier(),
+            Some(identifier.as_slice())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn directory_pages_profile_applies_sidecar_policy_only_after_pages_classification() -> Result<()>
+    {
+        let temp = Temp::new()?;
+        let keynote = temp.0.join("profile-isolation.key");
+        fs::create_dir(&keynote)?;
+        fs::write(
+            keynote.join("Index.zip"),
+            document_package(Format::Keynote, &[]),
+        )?;
+        fs::create_dir_all(keynote.join("Metadata/BuildVersionHistory.plist"))?;
+
+        let prepared = PreparedSource::__from_path_with_pages_metadata(&keynote, Limits::default())
+            .expect("non-Pages sidecars must be outside the Pages profile")
+            .expect("fixture has a Keynote root");
+        assert_eq!(prepared.format(), Format::Keynote);
+
+        let pages = temp.0.join("profile-strict.pages");
+        fs::create_dir(&pages)?;
+        fs::write(
+            pages.join("Index.zip"),
+            document_package(Format::Pages, &[]),
+        )?;
+        fs::create_dir_all(pages.join("Metadata/BuildVersionHistory.plist"))?;
+        assert!(matches!(
+            PreparedSource::__from_path_with_pages_metadata(&pages, Limits::default()),
+            Err(Error::Archive(message))
+                if message.contains("BuildVersionHistory.plist")
+                    && message.contains("not a regular file")
+        ));
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn pages_metadata_path_profile_fails_closed_without_pinned_windows_identity()
+    -> std::io::Result<()> {
+        let temp = Temp::new()?;
+        let package = temp.0.join("document.pages");
+        fs::write(&package, document_package(Format::Pages, &[]))?;
+        assert!(matches!(
+            PreparedSource::__from_path_with_pages_metadata(&package, Limits::default()),
+            Err(Error::InvalidFormat(message))
+                if message == "Pages package path ingress is unsupported on Windows"
+        ));
+
+        let bytes = document_package(Format::Pages, &[]);
+        assert!(
+            PreparedSource::__from_bytes_with_pages_metadata(&bytes, Limits::default())
+                .unwrap()
+                .is_some()
+        );
+        Ok(())
     }
 
     #[test]

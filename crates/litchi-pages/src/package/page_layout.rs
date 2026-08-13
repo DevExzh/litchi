@@ -1430,9 +1430,22 @@ fn map_package_error(error: PackageError) -> PageLayoutError {
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::Io(_) | PackageError::InvalidFormat(_) | PackageError::Semantic(_) => {
-            PageLayoutError::InvalidSource
+        PackageError::NotPages => PageLayoutError::UnsupportedSource,
+        PackageError::PayloadLimit { observed, limit } => PageLayoutError::LimitExceeded {
+            kind: PageLayoutLimitKind::PayloadBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
         },
+        PackageError::ObjectLimit { observed, limit } => PageLayoutError::LimitExceeded {
+            kind: PageLayoutLimitKind::PayloadObjects,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
+        },
+        PackageError::Allocation { amount } => PageLayoutError::Allocation { amount },
+        PackageError::Io(_)
+        | PackageError::Detection(_)
+        | PackageError::InvalidFormat(_)
+        | PackageError::Semantic(_) => PageLayoutError::InvalidSource,
     }
 }
 

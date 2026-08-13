@@ -10,6 +10,7 @@ use crate::{Error, Limits, Result};
 #[cfg(test)]
 std::thread_local! {
     static TEST_PARSE_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static TEST_ENTRY_READ_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 #[cfg(test)]
@@ -20,6 +21,16 @@ pub(crate) fn reset_test_parse_count() {
 #[cfg(test)]
 pub(crate) fn test_parse_count() -> usize {
     TEST_PARSE_COUNT.with(std::cell::Cell::get)
+}
+
+#[cfg(test)]
+pub(crate) fn reset_test_entry_read_count() {
+    TEST_ENTRY_READ_COUNT.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+pub(crate) fn test_entry_read_count() -> usize {
+    TEST_ENTRY_READ_COUNT.with(std::cell::Cell::get)
 }
 
 /// Opaque ZIP reader used by the physical component catalog.
@@ -177,6 +188,8 @@ impl<'data> ZipArchive<'data> {
     }
 
     pub(crate) fn read_entry(&self, entry: &PhysicalEntry) -> Result<Vec<u8>> {
+        #[cfg(test)]
+        TEST_ENTRY_READ_COUNT.with(|count| count.set(count.get().saturating_add(1)));
         self.read(entry.name())
     }
 
@@ -252,6 +265,9 @@ impl<'data> ZipArchive<'data> {
             }
         }
         Ok(DirectoryIndexReport {
+            input_bytes: u64::try_from(self.data.len()).map_err(|_error| {
+                Error::InvalidBundle("directory index input length does not fit u64".to_owned())
+            })?,
             entries,
             metadata_bytes,
             expanded_bytes,

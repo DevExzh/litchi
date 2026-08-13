@@ -7,6 +7,7 @@ use crate::{Error, LimitKind, Result};
 pub struct Limits {
     max_input_bytes: u64,
     max_entries: usize,
+    max_metadata_bytes: u64,
     max_entry_bytes: u64,
     max_total_bytes: u64,
     max_iwa_stream_bytes: usize,
@@ -50,6 +51,7 @@ impl Limits {
         Self {
             max_input_bytes,
             max_entries,
+            max_metadata_bytes: max_input_bytes.min(Self::MAX_METADATA_BYTES),
             max_entry_bytes,
             max_total_bytes,
             max_iwa_stream_bytes,
@@ -68,6 +70,25 @@ impl Limits {
     #[must_use]
     pub const fn max_entries(self) -> usize {
         self.max_entries
+    }
+
+    /// Maximum aggregate logical or ZIP-header metadata bytes.
+    pub(crate) const fn max_metadata_bytes(self) -> u64 {
+        self.max_metadata_bytes
+    }
+
+    /// Set a derived subordinate metadata ceiling without weakening the outer
+    /// checked profile.
+    pub(crate) fn with_derived_metadata_bytes(mut self, maximum: u64) -> Result<Self> {
+        if maximum > self.max_input_bytes.min(Self::MAX_METADATA_BYTES) {
+            return Err(Error::Limit {
+                kind: LimitKind::MetadataBytes,
+                observed: maximum,
+                maximum: self.max_input_bytes.min(Self::MAX_METADATA_BYTES),
+            });
+        }
+        self.max_metadata_bytes = maximum;
+        Ok(self)
     }
 
     /// Maximum declared uncompressed size of one ZIP member.
@@ -213,6 +234,13 @@ impl Limits {
                 maximum: Self::MAX_ENTRIES as u64,
             });
         }
+        if self.max_metadata_bytes > self.max_input_bytes.min(Self::MAX_METADATA_BYTES) {
+            return Err(Error::Limit {
+                kind: LimitKind::MetadataBytes,
+                observed: self.max_metadata_bytes,
+                maximum: self.max_input_bytes.min(Self::MAX_METADATA_BYTES),
+            });
+        }
         if self.max_entry_bytes > Self::MAX_ENTRY_BYTES {
             return Err(Error::Limit {
                 kind: LimitKind::EntryBytes,
@@ -253,11 +281,7 @@ impl Limits {
             } else {
                 Self::MAX_MEMBER_NAME_BYTES
             },
-            max_metadata_bytes: if self.max_input_bytes < Self::MAX_METADATA_BYTES {
-                self.max_input_bytes
-            } else {
-                Self::MAX_METADATA_BYTES
-            },
+            max_metadata_bytes: self.max_metadata_bytes,
             max_compressed_size: if self.max_input_bytes < Self::MAX_COMPRESSED_ENTRY_BYTES {
                 self.max_input_bytes
             } else {
@@ -274,6 +298,7 @@ impl Default for Limits {
         Self {
             max_input_bytes: Self::MAX_INPUT_BYTES,
             max_entries: Self::MAX_ENTRIES,
+            max_metadata_bytes: Self::MAX_METADATA_BYTES,
             max_entry_bytes: Self::MAX_ENTRY_BYTES,
             max_total_bytes: Self::MAX_TOTAL_BYTES,
             max_iwa_stream_bytes: Self::MAX_IWA_STREAM_BYTES,

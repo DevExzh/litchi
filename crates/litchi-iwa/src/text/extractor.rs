@@ -77,11 +77,6 @@ impl TextExtractor {
         }
         text
     }
-
-    /// Get all text storages
-    pub fn storages(&self) -> &[Storage] {
-        &self.storages
-    }
 }
 
 impl Default for TextExtractor {

@@ -3219,3 +3219,52 @@ passes 7/7, and the metadata scalar/64 KiB-cap unit gate passes 1/1.
 `KeynoteEditor` and `KeynoteDocumentBuilder` remain host owners. Consequently
 the `litchi-iwa -> litchi-keynote` manifest edge and ordered debt 014 remain;
 this retirement removes no dependency declaration.
+
+## 2026-08-13 amendment: Pages reader ownership and provenance
+
+Pages now has two focused read layers with different provenance. The
+archive-free `litchi_pages::Document` owns semantic path ingress for complete
+ZIP files and checked app-authored package directories on supported
+path-ingress platforms, plus borrowed ZIP bytes and caller-owned shared ZIP
+bytes on every supported platform. Windows Pages path ingress fails closed
+until stable, reparse-safe source identity can be pinned; byte/shared-byte
+ingress remains available there. `Document` consumes one
+`PreparedSource`, completes bounded projection eagerly, and retains only shared
+semantic sections, rendered-text length, and optional source diagnostics.
+`litchi_pages::Package` remains the exact complete-artifact owner for regular
+files and byte ingress, `source_bytes`, physical validation, and editing. It
+continues to reject directories rather than treating an
+`Index.zip` or loose `Index/` tree as a complete writable artifact.
+
+The package-contained semantic `Document` is deliberately diagnostic-free:
+its `metadata()` and `stats()` are `None`, while `Package` itself retains
+owned metadata and infallible package statistics. A path-opened `Document`
+instead retains source-derived metadata and statistics as `Some`; documents
+constructed from `Root` or semantic sections also have no source diagnostics.
+Exact byte callers use `Package::{from_bytes, from_archive_bytes}`; semantic
+byte callers use `Document::{from_bytes, from_shared_bytes}`. No archive,
+component, native identifier, protobuf/Buffa value, media, preview, or exact
+package byte enters the public semantic document.
+
+The semantic boundary publishes the content-free `ReadError` taxonomy rather
+than transparent archive, detector, or package diagnostics. For packaged
+sources, the three exact Pages metadata authorities are checked from ZIP
+headers for the 64 KiB declared-size ceiling and supported compression before
+package entries are materialized. Matching uses exact raw logical-name bytes,
+after stripping only the selected legacy outer-package prefix; raw near-names
+remain unrelated. Other supported entries can still be
+expanded under the generic source limits before the archive-free projection
+drops them.
+
+The `litchi-iwa` migration host's 478-line `pages/document.rs`, its
+`pages::document` module, and its `PagesDocument` and `PagesDocumentStats`
+exports are deleted. This removes the duplicate host `Bundle`, `ObjectIndex`,
+and public eager-Prost reader. It does not remove the host's Pages editor or
+builder, creation paths, examples, or their focused semantic dependencies.
+The direct `litchi-iwa -> litchi-pages` edge and ordered debt 017 therefore
+remain.
+
+The focused Pages suite passes 153/153, with supporting archive and detector
+suites at 93/93 and 32/32 and the host generated-roundtrip at 1/1. The boundary
+suite passes 227/227; its live retirement and focused-public-API audits both
+report zero findings.

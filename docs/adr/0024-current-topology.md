@@ -2096,3 +2096,63 @@ checked-in source remained exact.
 
 The host still owns `KeynoteEditor` and `KeynoteDocumentBuilder`; debt 014 and
 the manifest edge remain. This status closes only the duplicate reader cell.
+
+## 2026-08-13 current-status amendment: Pages reader cutover
+
+`litchi_pages::Document` is now the canonical archive-free Pages reader.
+It captures complete ZIP files and checked app-authored package directories on
+supported path-ingress platforms, or borrowed ZIP bytes and shared ZIP bytes
+on every supported platform, through one prepared source. It eagerly validates
+the semantic projection and retains cheap shared sections plus
+optional source metadata and statistics. Semantic
+constructors and a package's borrowed `semantic_document()` retain no source
+diagnostics. `litchi_pages::Package` remains the exact regular-file/byte owner
+for source bytes, package diagnostics, physical validation, and
+editing; direct package open continues to reject directories.
+
+The focused structural projection supersedes the retired reader's narrower
+model: empty root means zero sections; rooted section names and UTF-16
+boundaries are authoritative; and duplicate exact names remain a typed
+selector ambiguity. The source-backed metadata
+handoff freezes only the exact Properties, BuildVersionHistory, and
+DocumentIdentifier authorities, retaining at most 64 KiB from each. It does not
+retain arbitrary directory metadata, `Data/`, previews, media, or unknown
+sidecars.
+
+The legacy Pages reader source/module/export and its three reader/state/stats
+types are gone. Its public eager-Prost path is not replaced by a second focused
+reader. The focused path remains eager and not Prost-free: strict raw and
+private Buffa projections qualify root and section-boundary reads. Fallback
+candidates pass full known-field raw storage validation before their Buffa text
+projection, while one bounded rooted StorageArchive decode remains
+Prost-backed.
+Rootless fallback now reproduces the retired object-level trigger and
+aggregation contract under strict raw/Buffa validation and the semantic text
+budget.
+
+Directory capture enforces the 64 KiB ceiling before allocating each selected
+sidecar. Packaged ZIP path, borrowed-byte, and shared-byte capture preflights
+the three exact raw logical authorities' declared sizes and compression methods
+before any package entry payload is materialized. Selection strips only the
+chosen legacy outer-package prefix before raw-byte comparison, excludes raw
+near-names, and requires local/central ZIP names and methods to agree. Public
+semantic open maps lower layers into content-free `ReadError` categories and
+numeric bounds.
+Semantic ZIP ingress can still expand unrelated supported entries under the
+generic source limits before discarding them; selected-sidecar preflight does
+not make it a filtered catalog. Windows Pages file and directory path ingress
+fails closed until stable, reparse-safe identity can be pinned, while borrowed
+and shared byte ingress remains available there. Those are retained scope and
+platform qualifications, not capabilities supplied by deleting the host
+facade.
+
+Final verification passes 153/153 focused Pages tests, 93/93 archive tests,
+32/32 detector tests, and the 1/1 host generated-roundtrip gate. The boundary
+suite passes 227/227; both the live retirement audit and the focused public-API
+audit report zero findings.
+
+The host still owns `PagesEditor`, `PagesDocumentBuilder`, creation, and broad
+chart, table, media, and formatting workflows. Its direct focused dependency
+is still used by production code, so ordered debt 017 and the manifest edge do
+not close. The native read oracle and its silent-normalization caveat are
+frozen in ADR 0008.

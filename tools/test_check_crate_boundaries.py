@@ -7982,6 +7982,398 @@ class BoundaryPolicyTests(unittest.TestCase):
                         ],
                     )
 
+    def test_retired_iwa_pages_document_reader_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_DOCUMENT_SOURCE,
+            Path("crates/litchi-iwa/src/pages/document.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_DOCUMENT_TYPES,
+            ("PagesDocument", "PagesDocumentState", "PagesDocumentStats"),
+        )
+        self.assertEqual(
+            boundaries.IWA_PAGES_MODULE_SOURCE,
+            Path("crates/litchi-iwa/src/pages/mod.rs"),
+        )
+        self.assertEqual(boundaries.WORKSPACE_CRATES_ROOT, Path("crates"))
+        self.assertEqual(
+            boundaries.IWA_PAGES_FOCUSED_READER_TYPES,
+            frozenset({"Document", "Package"}),
+        )
+
+    def test_retired_iwa_pages_document_reader_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            retired = root / boundaries.RETIRED_IWA_PAGES_DOCUMENT_SOURCE
+            retired.parent.mkdir(parents=True)
+            retired.write_text("// retired reader returned\n", encoding="utf-8")
+            module = root / boundaries.IWA_PAGES_MODULE_SOURCE
+            module.write_text(
+                "pub mod r#document;\n"
+                "pub use self::r#document::*;\n",
+                encoding="utf-8",
+            )
+            source_caller = root / "crates/litchi-iwa/src/legacy_pages.rs"
+            source_caller.parent.mkdir(parents=True, exist_ok=True)
+            source_caller.write_text(
+                "pub fn open() -> PagesDocument { todo!() }\n"
+                "pub type State = PagesDocumentState;\n"
+                "/// Do not restore `PagesDocumentStats`.\n",
+                encoding="utf-8",
+            )
+            test_caller = root / "crates/litchi-iwa/tests/pages_reader.rs"
+            test_caller.parent.mkdir(parents=True)
+            test_caller.write_text(
+                "fn assert_stats(_: PagesDocumentStats) {}\n",
+                encoding="utf-8",
+            )
+            example_caller = root / "crates/litchi-iwa/examples/read_pages.rs"
+            example_caller.parent.mkdir(parents=True)
+            example_caller.write_text(
+                "use litchi_iwa::pages::PagesDocument;\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_PAGES_README
+            readme.write_text(
+                "Open with `PagesDocumentState` and inspect "
+                "`PagesDocumentStats`.\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_pages_document_source_topology(root)
+            expected = {
+                        "retired litchi-iwa Pages document reader local re-export "
+                        "document: crates/litchi-iwa/src/pages/mod.rs:2",
+                        "retired litchi-iwa Pages document reader module document: "
+                        "crates/litchi-iwa/src/pages/mod.rs:1",
+                        "retired litchi-iwa Pages document reader README reference "
+                        "PagesDocumentState: crates/litchi-iwa/README.md:1",
+                        "retired litchi-iwa Pages document reader README reference "
+                        "PagesDocumentStats: crates/litchi-iwa/README.md:1",
+                        "retired litchi-iwa Pages document reader source returned: "
+                        "crates/litchi-iwa/src/pages/document.rs",
+                        "retired litchi-iwa Pages document reader rustdoc reference "
+                        "PagesDocumentStats: crates/litchi-iwa/src/legacy_pages.rs:3",
+                        "retired litchi-iwa Pages document reader type usage "
+                        "PagesDocument: crates/litchi-iwa/examples/read_pages.rs:1",
+                        "retired litchi-iwa Pages document reader type usage "
+                        "PagesDocument: crates/litchi-iwa/src/legacy_pages.rs:1",
+                        "retired litchi-iwa Pages document reader type usage "
+                        "PagesDocumentState: crates/litchi-iwa/src/legacy_pages.rs:2",
+                        "retired litchi-iwa Pages document reader type usage "
+                        "PagesDocumentStats: crates/litchi-iwa/tests/pages_reader.rs:1",
+            }
+            self.assertTrue(expected <= set(violations), violations)
+            self.assertTrue(
+                any(
+                    "workspace public name PagesDocument" in violation
+                    for violation in violations
+                ),
+                violations,
+            )
+
+    def test_retired_iwa_pages_document_rustdoc_references_cannot_return(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / boundaries.IWA_PAGES_MODULE_SOURCE
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "//! Use `PagesDocument`.\n"
+                "/// State was `PagesDocumentState`.\n"
+                "/** Stats were `PagesDocumentStats`. */\n"
+                '#[doc = "Do not restore PagesDocument"]\n'
+                "pub struct Reader;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_pages_document_source_topology(root)
+            expected = {
+                    "retired litchi-iwa Pages document reader rustdoc reference "
+                    "PagesDocument: crates/litchi-iwa/src/pages/mod.rs:1",
+                    "retired litchi-iwa Pages document reader rustdoc reference "
+                    "PagesDocument: crates/litchi-iwa/src/pages/mod.rs:4",
+                    "retired litchi-iwa Pages document reader rustdoc reference "
+                    "PagesDocumentState: crates/litchi-iwa/src/pages/mod.rs:2",
+                    "retired litchi-iwa Pages document reader rustdoc reference "
+                    "PagesDocumentStats: crates/litchi-iwa/src/pages/mod.rs:3",
+            }
+            self.assertTrue(expected <= set(violations), violations)
+            self.assertEqual(
+                sum("workspace public rustdoc" in item for item in violations),
+                4,
+            )
+
+    def test_retired_iwa_pages_document_module_and_reexport_variants(
+        self,
+    ) -> None:
+        declarations = (
+            ("mod document;", "module document"),
+            ("pub(crate) mod r#document;", "module document"),
+            ("pub\nmod\ndocument\n{}", "module document"),
+            ("pub use document::*;", "local re-export document"),
+            ("pub(crate) use self::r#document as legacy;", "local re-export document"),
+            (
+                "pub\nuse\ncrate::r#pages::document\n    as LegacyReader;",
+                "local re-export document",
+            ),
+            (
+                "pub use crate::pages::{r#document as LegacyReader};",
+                "local re-export document",
+            ),
+        )
+        for declaration, fragment in declarations:
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    module = root / boundaries.IWA_PAGES_MODULE_SOURCE
+                    module.parent.mkdir(parents=True)
+                    module.write_text(declaration + "\n", encoding="utf-8")
+
+                    violations = (
+                        boundaries.audit_iwa_pages_document_source_topology(root)
+                    )
+                    self.assertTrue(violations)
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        violations,
+                    )
+
+    def test_retired_iwa_pages_document_multiline_type_aliases_cannot_return(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            caller = root / "crates/litchi-iwa/src/legacy_pages_aliases.rs"
+            caller.parent.mkdir(parents=True)
+            caller.write_text(
+                "use litchi_iwa\n"
+                "    ::pages\n"
+                "    ::PagesDocument\n"
+                "    as LegacyReader;\n"
+                "pub type LegacyState =\n"
+                "    PagesDocumentState;\n"
+                "fn stats() -> crate::pages\n"
+                "    ::PagesDocumentStats { todo!() }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_pages_document_source_topology(root)
+            expected = {
+                    "retired litchi-iwa Pages document reader type usage "
+                    "PagesDocument: "
+                    "crates/litchi-iwa/src/legacy_pages_aliases.rs:3",
+                    "retired litchi-iwa Pages document reader type usage "
+                    "PagesDocumentState: "
+                    "crates/litchi-iwa/src/legacy_pages_aliases.rs:6",
+                    "retired litchi-iwa Pages document reader type usage "
+                    "PagesDocumentStats: "
+                    "crates/litchi-iwa/src/legacy_pages_aliases.rs:8",
+            }
+            self.assertTrue(expected <= set(violations), violations)
+            self.assertTrue(
+                any(
+                    "workspace public name PagesDocumentState" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_iwa_pages_document_reader_policy_allows_builder_editor_and_direct_focused_use(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            module = root / boundaries.IWA_PAGES_MODULE_SOURCE
+            module.parent.mkdir(parents=True)
+            module.write_text(
+                "pub use creation::PagesDocumentBuilder;\n"
+                "pub use editor::PagesEditor;\n"
+                "use litchi_pages::{Document as FocusedDocument, "
+                "Package as FocusedPackage};\n"
+                "fn read(_: FocusedDocument, _: FocusedPackage) {}\n",
+                encoding="utf-8",
+            )
+            for relative in (
+                Path("crates/litchi-iwa/src/pages/creation.rs"),
+                Path("crates/litchi-iwa/tests/generated_roundtrip.rs"),
+                Path("crates/litchi-iwa/examples/create_pages.rs"),
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};\n"
+                    "use litchi_pages::{Document, Package};\n"
+                    "pub struct PagesDocuments;\n"
+                    "pub struct LegacyPagesDocumentStats;\n"
+                    "// PagesDocument and PagesDocumentState are retired.\n",
+                    encoding="utf-8",
+                )
+            readme = root / boundaries.IWA_PAGES_README
+            readme.write_text(
+                "Use `PagesDocumentBuilder`, `PagesEditor`, "
+                "`litchi_pages::Document`, or `litchi_pages::Package`.\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_document_source_topology(root), []
+            )
+
+    def test_iwa_pages_document_reader_policy_rejects_host_focused_facades(
+        self,
+    ) -> None:
+        declarations = (
+            ("pub use litchi_pages::Document;", "facade Document"),
+            ("pub use litchi_pages::Package as PagesReader;", "facade PagesReader"),
+            (
+                "use litchi_pages::Document as FocusedDocument;\n"
+                "pub type Reader = FocusedDocument;",
+                "facade FocusedDocument",
+            ),
+            (
+                "pub fn open() -> litchi_pages::Document { todo!() }",
+                "facade Document",
+            ),
+            (
+                "use litchi_pages as focused;\n"
+                "pub type Reader = focused::Document;",
+                "facade Document",
+            ),
+            (
+                "use litchi_pages::Document as Focused;\n"
+                "type Inner = Focused;\n"
+                "pub fn read() -> Inner { todo!() }",
+                "facade Inner",
+            ),
+            (
+                "pub use litchi_pages as focused_pages;",
+                "facade focused_pages",
+            ),
+            (
+                "pub use litchi_pages::{self as focused_pages};",
+                "facade focused_pages",
+            ),
+            ("pub use litchi_pages::*;", "facade glob"),
+        )
+        for declaration, fragment in declarations:
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    host = root / boundaries.IWA_PAGES_MODULE_SOURCE
+                    host.parent.mkdir(parents=True)
+                    host.write_text(declaration + "\n", encoding="utf-8")
+
+                    violations = (
+                        boundaries.audit_iwa_pages_document_source_topology(root)
+                    )
+                    self.assertTrue(violations)
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        violations,
+                    )
+
+    def test_retired_pages_document_public_names_are_workspace_wide(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            aliases = root / "crates/consumer/src/lib.rs"
+            aliases.parent.mkdir(parents=True)
+            aliases.write_text(
+                "pub use litchi_pages::Document as PagesDocument;\n"
+                "pub type PagesDocumentStats = crate::Stats;\n"
+                "pub fn reopen(document: PagesDocument) {}\n"
+                "/// The old PagesDocumentState must stay gone.\n"
+                "pub struct Reader;\n",
+                encoding="utf-8",
+            )
+            private_use = root / "crates/other/src/lib.rs"
+            private_use.parent.mkdir(parents=True)
+            private_use.write_text(
+                "use litchi_pages::Document as PagesDocument;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_document_source_topology(root),
+                [
+                    "retired Pages document reader workspace public name "
+                    "PagesDocument: crates/consumer/src/lib.rs:1",
+                    "retired Pages document reader workspace public name "
+                    "PagesDocument: crates/consumer/src/lib.rs:3",
+                    "retired Pages document reader workspace public name "
+                    "PagesDocumentStats: crates/consumer/src/lib.rs:2",
+                    "retired Pages document reader workspace public rustdoc "
+                    "PagesDocumentState: crates/consumer/src/lib.rs:4",
+                ],
+            )
+
+    def test_focused_pages_document_reader_public_api_rejects_native_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.PAGES_DOCUMENT_PUBLIC_API_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "/// Returns `NativeObjectId` and `DocumentArchive`.\n"
+                "pub fn inspect(object_id: u64) -> DocumentArchive { todo!() }\n"
+                "pub type SourceBytes = Vec<u8>;\n",
+                encoding="utf-8",
+            )
+            export = root / boundaries.PAGES_DOCUMENT_PUBLIC_API_SOURCES[1]
+            export.write_text(
+                "pub type DocumentReadOptions = litchi_iwa_core::RawObject;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_document_public_api(root)
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                any("raw identifier object_id" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("archive/IWA type DocumentArchive" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("raw source bytes SourceBytes" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("archive/IWA type litchi_iwa_core" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("native object RawObject" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("rustdoc exposes raw identifier NativeObjectId" in violation for violation in violations)
+            )
+
+    def test_focused_pages_document_reader_public_api_allows_checked_limits(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.PAGES_DOCUMENT_PUBLIC_API_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "/// Checked, content-free source limits.\n"
+                "pub struct DocumentSourceLimits { max_input_bytes: u64 }\n"
+                "pub struct DocumentReadOptions;\n"
+                "pub enum ReadError { InvalidSource }\n"
+                "pub struct Document;\n",
+                encoding="utf-8",
+            )
+            export = root / boundaries.PAGES_DOCUMENT_PUBLIC_API_SOURCES[1]
+            export.write_text(
+                "pub use document::{Document, DocumentReadOptions, "
+                "DocumentSourceLimits, ReadError};\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(boundaries.audit_pages_document_public_api(root), [])
+
     def test_retired_iwa_pages_page_layout_method_inventory_is_exact(self) -> None:
         self.assertEqual(
             boundaries.RETIRED_IWA_PAGES_PAGE_LAYOUT_METHODS,
