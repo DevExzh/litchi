@@ -4,7 +4,8 @@ Date: 2026-08-13
 
 Production revision: `d488ed128`
 
-Status: opt-in harness implemented; release ABBA and performance evidence pending
+Status: opt-in harness and release ABBA structural/distribution evidence complete;
+no performance improvement accepted
 
 ## Scope
 
@@ -44,8 +45,8 @@ invariants hold:
 - same-Part waves expose one flight, `workers - 1` waiters, one cold read and
   one shared allocation;
 - disjoint-Part waves expose one initial flight and one simultaneous fixed
-  source delay per worker (`worker_count` of each), then load every Part in the
-  fixed working set once;
+  source delay per worker (`worker_count` flights and delays), then load every
+  Part in the fixed working set once;
 - `1/2x`, `1x`, and `2x` cells report their exact eviction, bypass, retained
   entry and retained byte counts while all returned handles remain pinned;
 - compatibility diagnostics remain unmanaged, while managed diagnostics and
@@ -77,6 +78,28 @@ peak heap and RSS evidence, copied/decompressed-byte and CPU-utilization
 counters, contention profiles/flame graphs, and disclosure of variance and all
 out-of-model Amdahl cells. The production cache implementation is unchanged by
 this tranche.
+
+## Release evidence
+
+The follow-up release capture is retained under
+[`results/opc-source-cache-release-abba-0100/`](../results/opc-source-cache-release-abba-0100/).
+It was built with `--release --locked` from a clean archive of committed
+revision `a1b692297b2493a3f523aa064e6be366271c4f52`, pinned to CPUs `0-11`,
+and ran the balanced order `control-A`, `managed-A`, `managed-B`, `control-B`.
+Each of the 30 cells per leg used 3 warmups and 30 measured samples at resolved
+widths `1,2,4,8,12`. The exact-budget and one-byte-under boundary records also
+passed, including zero payload I/O for the refused one-byte-under case.
+
+Independent recomputation matched the retained hashes, percentiles, means,
+Student-t intervals, all 60 directional Welch intervals, and every cache,
+source-I/O, flight, waiter, pin and Budget invariant. Zero cells passed both
+directional confidence gates, so no managed-versus-control speedup is accepted.
+The 10 ms source delay remains a deterministic coordination instrument rather
+than production latency. Per-sample allocation counts, peak RSS and attributable
+hardware counters were not captured and remain explicit evidence gaps. The
+reviewed 34 MiB executable and temporary build tree are intentionally excluded
+from version control; their provenance hashes remain in
+`results/raw-manifest.json`.
 
 This tranche also does not close ADR 0005's broader execution-context adoption
 work. Compatibility source-backed constructors remain deliberately unmanaged,
