@@ -7,6 +7,13 @@ use crate::package::{Catalog, SourceProvenance};
 use crate::zip::{ZipArchive, is_iwa_name, parse_directory_index_components, parse_iwa_components};
 use crate::{Limits, Result};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DirectoryIndexReport {
+    pub(crate) entries: usize,
+    pub(crate) metadata_bytes: u64,
+    pub(crate) expanded_bytes: u64,
+}
+
 /// One parsed `.iwa` component in deterministic member-name order.
 #[derive(Debug)]
 pub struct Component {
@@ -75,18 +82,24 @@ impl ComponentCatalog {
         Ok(Self { components })
     }
 
-    pub(crate) fn from_directory_index_zip(bytes: &[u8], limits: Limits) -> Result<Self> {
-        let validated_limits = limits.validate()?;
+    pub(crate) fn from_directory_index_zip_with_report(
+        bytes: &[u8],
+        index_limits: Limits,
+        component_limits: Limits,
+    ) -> Result<(Self, DirectoryIndexReport)> {
+        let validated_index_limits = index_limits.validate()?;
+        let validated_component_limits = component_limits.validate()?;
         let input_size = u64::try_from(bytes.len()).map_err(|_error| {
             crate::Error::InvalidBundle(
                 "directory bundle Index.zip length does not fit u64".to_owned(),
             )
         })?;
-        validated_limits.check_input_size(input_size, "directory bundle Index.zip")?;
-        let archive = ZipArchive::new_with_limits(bytes, validated_limits)?;
-        let components =
-            parse_directory_index_components(&archive, validated_limits)?.into_boxed_slice();
-        Ok(Self { components })
+        validated_index_limits.check_input_size(input_size, "directory bundle Index.zip")?;
+        let archive = ZipArchive::new_with_limits(bytes, validated_index_limits)?;
+        let report = archive.directory_index_report()?;
+        let components = parse_directory_index_components(&archive, validated_component_limits)?
+            .into_boxed_slice();
+        Ok((Self { components }, report))
     }
 
     pub(crate) fn from_logical_entries<'a>(

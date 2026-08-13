@@ -26,6 +26,8 @@ use std::{
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024 * 1024;
+/// Maximum canonical properties diagnostic retained for a semantic owner.
+pub const MAX_PROPERTIES_BYTES: usize = litchi_iwa_archive::MAX_DIRECTORY_PROPERTIES_BYTES as usize;
 
 /// Errors returned by a bounded iWork detection attempt.
 #[derive(Debug)]
@@ -224,6 +226,7 @@ enum PreparedBacking {
     Semantic {
         components: Arc<ComponentCatalog>,
         limits: litchi_iwa_archive::Limits,
+        properties: Option<Arc<[u8]>>,
     },
 }
 
@@ -341,6 +344,7 @@ impl PreparedSource {
             backing: PreparedBacking::Semantic {
                 components,
                 limits: archive_limits,
+                properties: None,
             },
             format,
             limits,
@@ -372,16 +376,40 @@ impl PreparedSource {
     ///
     /// Returns the same errors as [`Self::from_path`].
     pub fn from_path_with_limits(value: impl AsRef<Path>, limits: Limits) -> Result<Option<Self>> {
-        let path = value.as_ref();
+        Self::from_path_with_profile(value.as_ref(), limits, false)
+    }
+
+    /// Prepare a path while retaining the canonical properties diagnostic for
+    /// archive-free format-owned semantic readers.
+    ///
+    /// Ordinary format detection remains index-only. This unstable opt-in is
+    /// used only when the selected semantic owner exposes metadata.
+    #[doc(hidden)]
+    pub fn __from_path_with_properties(
+        value: impl AsRef<Path>,
+        limits: Limits,
+    ) -> Result<Option<Self>> {
+        Self::from_path_with_profile(value.as_ref(), limits, true)
+    }
+
+    fn from_path_with_profile(
+        path: &Path,
+        limits: Limits,
+        capture_properties: bool,
+    ) -> Result<Option<Self>> {
         match kind(path)? {
             Kind::File => {
                 let source = read_stable_package_file(path, limits)?;
                 Self::from_shared_bytes_with_limits(source, limits)
             },
             Kind::Dir => {
-                let directory =
-                    FrozenDirectoryBundle::open_with_limits(path, archive_limits(limits)?)
-                        .map_err(map_archive_error)?;
+                let archive = archive_limits(limits)?;
+                let directory = if capture_properties {
+                    FrozenDirectoryBundle::open_with_properties(path, archive)
+                } else {
+                    FrozenDirectoryBundle::open_with_limits(path, archive)
+                }
+                .map_err(map_archive_error)?;
                 Self::from_directory(directory, limits)
             },
             Kind::Missing => Err(Error::Io(std::io::Error::new(
@@ -426,10 +454,13 @@ impl PreparedSource {
                 ));
             },
         }
+        let archive_limits = directory.limits();
+        let (components, properties) = directory.into_semantic_parts();
         Ok(Some(Self {
             backing: PreparedBacking::Semantic {
-                limits: directory.limits(),
-                components: directory.into_components(),
+                limits: archive_limits,
+                components,
+                properties,
             },
             format,
             limits,
@@ -476,9 +507,75 @@ impl PreparedSource {
                 let limits = catalog.limits();
                 (Arc::new(catalog.into_components()), limits)
             },
-            PreparedBacking::Semantic { components, limits } => (components, limits),
+            PreparedBacking::Semantic {
+                components, limits, ..
+            } => (components, limits),
         }
     }
+
+    /// Consume a prepared source into semantic components and the optional
+    /// frozen canonical `Metadata/Properties.plist` diagnostic.
+    ///
+    /// This unstable handoff never yields exact package provenance. The
+    /// returned sidecar is the only non-IWA directory member captured by the
+    /// semantic directory adapter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation error if the canonical packaged sidecar cannot
+    /// be copied into immutable ownership before the package catalog is
+    /// released.
+    #[doc(hidden)]
+    pub fn __into_semantic_parts(
+        self,
+    ) -> Result<(
+        Arc<ComponentCatalog>,
+        litchi_iwa_archive::Limits,
+        Option<Arc<[u8]>>,
+    )> {
+        match self.backing {
+            PreparedBacking::Package(catalog) => {
+                let limits = catalog.limits();
+                let properties = catalog
+                    .package()
+                    .iter()
+                    .find(|entry| entry.name() == "Metadata/Properties.plist")
+                    .map(|entry| {
+                        if entry.is_opaque() {
+                            return Err(Error::InvalidFormat(
+                                "canonical Keynote properties use unsupported compression"
+                                    .to_owned(),
+                            ));
+                        }
+                        if entry.data().len() > MAX_PROPERTIES_BYTES {
+                            return Err(Error::LimitExceeded {
+                                kind: LimitKind::EntryBytes,
+                                observed: u64::try_from(entry.data().len()).unwrap_or(u64::MAX),
+                                maximum: MAX_PROPERTIES_BYTES as u64,
+                            });
+                        }
+                        copy_semantic_sidecar(entry.data())
+                    })
+                    .transpose()?;
+                Ok((Arc::new(catalog.into_components()), limits, properties))
+            },
+            PreparedBacking::Semantic {
+                components,
+                limits,
+                properties,
+            } => Ok((components, limits, properties)),
+        }
+    }
+}
+
+fn copy_semantic_sidecar(source: &[u8]) -> Result<Arc<[u8]>> {
+    let mut copy = Vec::new();
+    copy.try_reserve_exact(source.len())
+        .map_err(|_error| Error::Allocation {
+            amount: source.len(),
+        })?;
+    copy.extend_from_slice(source);
+    Ok(Arc::from(copy.into_boxed_slice()))
 }
 
 fn marker_outcome(markers: DirectoryMarkers) -> Outcome {

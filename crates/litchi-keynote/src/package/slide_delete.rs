@@ -1279,8 +1279,7 @@ fn publish_selection(
     let catalog = match &source.state.source {
         PhysicalSource::Package(catalog) if catalog.source_is_exact() => catalog,
         PhysicalSource::Package(_) => return Err(Error::UnsupportedSource),
-        #[cfg(feature = "internal-iwork-source")]
-        _ => return Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => return Err(Error::UnsupportedSource),
     };
     let limits = catalog
         .limits()
@@ -1614,18 +1613,9 @@ fn count_changed_components(before: &Package, after: &Package) -> usize {
 }
 
 fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
-    #[cfg(feature = "internal-iwork-source")]
     match &package.state.source {
         PhysicalSource::Package(source) if source.source_is_exact() => Ok(source.shared_source()),
         PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
-    }
-    #[cfg(not(feature = "internal-iwork-source"))]
-    {
-        let PhysicalSource::Package(source) = &package.state.source;
-        if !source.source_is_exact() {
-            return Err(Error::UnsupportedSource);
-        }
-        Ok(source.shared_source())
     }
 }
 

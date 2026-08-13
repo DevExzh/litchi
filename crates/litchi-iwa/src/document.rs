@@ -10,7 +10,7 @@
 //!
 //! - `crate::pages::PagesDocument` for Pages-specific features
 //! - `crate::numbers::NumbersDocument` for Numbers-specific features
-//! - `crate::keynote::KeynoteDocument` for Keynote-specific features
+//! - `litchi_keynote::Package` for Keynote-specific features
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -331,7 +331,7 @@ impl DocumentStats {
 // Note: Application-specific document types have been moved to dedicated modules:
 // - crate::pages::PagesDocument
 // - crate::numbers::NumbersDocument
-// - crate::keynote::KeynoteDocument
+// - litchi_keynote::Package
 //
 // The unified Document type above works with all formats and provides
 // common functionality. For application-specific features, use the

@@ -25,6 +25,7 @@ mod zip;
 pub use catalog::{Component, ComponentCatalog, SourceCatalog};
 pub use directory::{
     DirectoryMarkers, DirectoryProvenance, FrozenDirectoryBundle, FrozenDirectoryEntry,
+    MAX_DIRECTORY_PROPERTIES_BYTES,
 };
 pub use error::{Error, LimitKind, Result};
 pub use limits::Limits;

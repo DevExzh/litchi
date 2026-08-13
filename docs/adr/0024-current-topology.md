@@ -2034,3 +2034,65 @@ accepted, saved, closed, and exact-path reopened both candidates without repair
 or conversion, retaining dark-red `Color Fill` and `No Fill` respectively.
 The Pages-resaved ZIPs pass integrity, but their independent rewriting is not
 used as a locality, allocation, scratch, or byte-preservation measurement.
+
+## 2026-08-13 current-status amendment: Keynote reader cutover
+
+The previous status entries that left `KeynoteDocument::show` and its eager
+Prost graph as open debt are superseded. `litchi_keynote::Document::{open,
+open_with_options}` is now the canonical semantic Keynote reader for complete
+ZIPs and frozen app-authored package directories. It captures `PreparedSource`,
+eagerly completes bounded decoding, and returns an archive-free full `Show`,
+rooted text, source-derived metadata, and source statistics. Source-backed
+metadata combines semantic Show values with narrowly decoded canonical
+properties scalars when that diagnostic is present; `Some` does not prove
+sidecar presence. `litchi_keynote::Package` remains the exact complete
+regular-file artifact owner; the cross-format coordinator can delegate semantic
+reads to the focused owner. The host
+`keynote/document.rs` file, module, reader type, stats type, and re-export are
+gone, removing 933 lines and the duplicate
+`Bundle`/`ObjectIndex`/semantic-cache pipeline.
+
+The focused reader is bounded, not Prost-free. Six generated-message decodes
+remain behind strict wire preflight during semantic traversal; they are not a
+second public reader.
+
+The focused surfaces retain the complete supported read capability set.
+`Document` owns semantic path ingress, cheap snapshots, rooted text, slides,
+metadata, show, validation, and source statistics; `Package` owns exact ZIP
+path/byte ingress, semantic projection, cheap shared `semantic_snapshot`,
+writing, and editing. That package-derived semantic snapshot is intentionally
+diagnostic-free: `metadata()` and `stats()` are `None`.
+The old archive-bytes constructor was only an alias for byte ingress, and its
+stats application field was a constant rather than semantic state. Direct
+`Package::open` refuses directories so an `Index.zip` fragment cannot
+masquerade as a complete artifact with write/edit provenance. Archive-free
+semantic reads do not promise preservation of other sidecars, `Data/`,
+previews, or exact package bytes.
+
+Focused semantics intentionally differ where the duplicate reader was too
+broad or lossy: unreachable theme/template storage is excluded from text,
+rich storage fragments are retained, and metadata/validation are stricter.
+Metadata lookup accepts only canonical logical `Metadata/Properties.plist` and
+ignores unrelated basename matches. Its centralized 64 KiB hard admission
+ceiling is independent of broader entry limits, and decoding is restricted to
+the scalar fields projected into public metadata.
+The generated roundtrip, host compile/lint/doctest, focused path, native
+fixture, and boundary gates cover the retired surface and replacement paths.
+The unchanged
+500,058-byte native read fixture has SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+The live retired-reader audit is clean, and the full checker continues to
+distinguish its dependency-policy baseline findings. Permanent path regressions
+prove packaged/directory Keynote semantic parity through both focused
+`Document` and the coordinator, plus directory/focused-ZIP snapshot parity.
+Frozen ingress and semantic gates pass archive-directory 16/16, detection
+18/18, focused Keynote native 7/7, coordinator `iwork_path` 7/7, and metadata
+scalar/64 KiB-cap unit coverage 1/1.
+Keynote 14.4 opened an isolated fixture copy without repair/recovery/conversion
+and showed the one expected slide and its three visible text sentinels. The
+separate non-UI focused fixture gate reports one slide/959 objects. Native
+autosave normalization changed only the disposable copy; the
+checked-in source remained exact.
+
+The host still owns `KeynoteEditor` and `KeynoteDocumentBuilder`; debt 014 and
+the manifest edge remain. This status closes only the duplicate reader cell.

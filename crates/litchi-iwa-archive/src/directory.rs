@@ -24,9 +24,14 @@ use rustix::{
     fs::{self as unix_fs, AtFlags, Dir, FileType, Mode, OFlags, Stat},
 };
 
+use crate::catalog::DirectoryIndexReport;
 use crate::{ComponentCatalog, Error, LimitKind, Limits, Result};
 
 const READ_CHUNK_BYTES: usize = 16 * 1024;
+const PROPERTIES_LOGICAL_NAME: &str = "Metadata/Properties.plist";
+/// Maximum canonical Keynote properties diagnostic retained during a bounded
+/// semantic directory capture.
+pub const MAX_DIRECTORY_PROPERTIES_BYTES: u64 = 64 * 1024;
 
 /// Physical representation captured from a legacy directory bundle.
 ///
@@ -110,10 +115,11 @@ impl fmt::Debug for FrozenDirectoryEntry {
 ///
 /// Opening copies every in-scope source byte before publishing the value. The
 /// snapshot therefore performs no ambient filesystem I/O during later
-/// component traversal and is cheaply cloneable through shared state.
-/// `Metadata/` and `Data/` are deliberately outside this index adapter; a
-/// caller must not infer that they were preserved merely because this value
-/// exists.
+/// component traversal and is cheaply cloneable through shared state. The
+/// ordinary constructors remain index-only. A format-owned semantic reader
+/// may opt into capturing canonical `Metadata/Properties.plist` with the same
+/// pinned root; every other `Metadata/` member and all `Data/` members remain
+/// outside this adapter.
 #[derive(Clone)]
 pub struct FrozenDirectoryBundle {
     state: Arc<State>,
@@ -124,6 +130,8 @@ struct State {
     markers: DirectoryMarkers,
     limits: Limits,
     components: Arc<ComponentCatalog>,
+    properties: Option<Arc<[u8]>>,
+    index_report: DirectoryIndexReport,
     storage: Storage,
 }
 
@@ -140,6 +148,10 @@ impl fmt::Debug for FrozenDirectoryBundle {
             .field("markers", &self.state.markers)
             .field("limits", &self.state.limits)
             .field("components", &self.state.components.len())
+            .field(
+                "properties_bytes",
+                &self.state.properties.as_deref().map(<[u8]>::len),
+            )
             .field("logical_entries", &self.loose_entries().len())
             .field("index_zip_bytes", &self.index_zip_bytes().map(<[u8]>::len))
             .finish()
@@ -174,12 +186,30 @@ impl FrozenDirectoryBundle {
     ///
     /// Returns the same errors as [`Self::open`].
     pub fn open_with_limits(path: impl AsRef<Path>, limits: Limits) -> Result<Self> {
+        Self::open_with_profile(path.as_ref(), limits, false)
+    }
+
+    /// Snapshot a directory index plus its canonical properties diagnostic.
+    ///
+    /// This semantic-only profile is intentionally opt-in so ordinary
+    /// directory detection and Pages/Numbers projection retain their existing
+    /// index-only resource contract.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::open_with_limits`] and charges the
+    /// optional diagnostic as one logical entry before allocating its bytes.
+    #[doc(hidden)]
+    pub fn open_with_properties(path: impl AsRef<Path>, limits: Limits) -> Result<Self> {
+        Self::open_with_profile(path.as_ref(), limits, true)
+    }
+
+    fn open_with_profile(root: &Path, limits: Limits, capture_properties: bool) -> Result<Self> {
         let checked_limits = limits.validate()?;
-        let root = path.as_ref();
 
         #[cfg(unix)]
         {
-            Self::open_unix(root, checked_limits)
+            Self::open_unix(root, checked_limits, capture_properties)
         }
 
         #[cfg(not(unix))]
@@ -187,6 +217,12 @@ impl FrozenDirectoryBundle {
             let root_before = require_directory(root, "directory bundle root")?;
             reject_path_encryption_markers(root)?;
             let markers_before = snapshot_markers(root)?;
+            let mut properties = if capture_properties {
+                inspect_properties(root)?
+            } else {
+                PropertiesCapture::default()
+            };
+            let index_limits = limits_without_properties(checked_limits, &properties)?;
             let index_zip_path = root.join("Index.zip");
             let index_path = root.join("Index");
             let index_zip = inspect_node(&index_zip_path, "directory bundle Index.zip")?;
@@ -197,14 +233,18 @@ impl FrozenDirectoryBundle {
                     &index_zip_path,
                     version,
                     markers_before.markers,
+                    index_limits,
                     checked_limits,
-                )?,
+                )
+                .map_err(|error| remap_reserved_limit(error, checked_limits, &properties))?,
                 (Node::Missing, Node::Directory(version)) => Self::from_loose_index(
                     &index_path,
                     version,
                     markers_before.markers,
+                    index_limits,
                     checked_limits,
-                )?,
+                )
+                .map_err(|error| remap_reserved_limit(error, checked_limits, &properties))?,
                 (Node::File(_), Node::Directory(_)) => {
                     return Err(Error::InvalidBundle(
                         "directory bundle contains both Index.zip and Index/ representations"
@@ -227,6 +267,11 @@ impl FrozenDirectoryBundle {
             if markers_after != markers_before {
                 return Err(changed("verifying directory bundle application markers"));
             }
+            validate_properties_budget(snapshot.state.index_report, checked_limits, &properties)?;
+            if capture_properties {
+                read_properties(root, &mut properties, checked_limits)?;
+                verify_properties(root, &properties)?;
+            }
             ensure_path_version(root, &root_before, "verifying directory bundle root")?;
             match snapshot.state.provenance {
                 DirectoryProvenance::IndexZip => {
@@ -245,12 +290,12 @@ impl FrozenDirectoryBundle {
                 },
             }
             reject_path_encryption_markers(root)?;
-            Ok(snapshot)
+            snapshot.with_properties(properties.data)
         }
     }
 
     #[cfg(unix)]
-    fn open_unix(root: &Path, limits: Limits) -> Result<Self> {
+    fn open_unix(root: &Path, limits: Limits, capture_properties: bool) -> Result<Self> {
         let root_fd = unix_fs::open(
             root,
             OFlags::RDONLY
@@ -271,15 +316,21 @@ impl FrozenDirectoryBundle {
                 unix_error(error)
             }
         })?;
-        Self::open_unix_root(&root_fd, limits)
+        Self::open_unix_root(&root_fd, limits, capture_properties)
     }
 
     #[cfg(unix)]
-    fn open_unix_root(root_fd: &OwnedFd, limits: Limits) -> Result<Self> {
+    fn open_unix_root(root_fd: &OwnedFd, limits: Limits, capture_properties: bool) -> Result<Self> {
         let root_before = unix_file_version(&unix_fs::fstat(root_fd).map_err(unix_error)?)?;
         unix_require_kind(root_fd, FileType::Directory, "directory bundle root")?;
         unix_reject_encryption_markers(root_fd)?;
         let markers_before = unix_snapshot_markers(root_fd)?;
+        let mut properties = if capture_properties {
+            unix_inspect_properties(root_fd)?
+        } else {
+            PropertiesCapture::default()
+        };
+        let index_limits = limits_without_properties(limits, &properties)?;
         let index_zip = unix_inspect_node(root_fd, c"Index.zip", "directory bundle Index.zip")?;
         let index = unix_inspect_node(root_fd, c"Index", "directory bundle Index")?;
 
@@ -289,11 +340,17 @@ impl FrozenDirectoryBundle {
                     root_fd,
                     c"Index.zip",
                     &version,
-                    limits,
+                    index_limits,
                     FileRole::IndexZip,
-                )?;
-                let snapshot =
-                    Self::from_captured_index_zip(bytes, markers_before.markers, limits)?;
+                )
+                .map_err(|error| remap_reserved_limit(error, limits, &properties))?;
+                let snapshot = Self::from_captured_index_zip(
+                    bytes,
+                    markers_before.markers,
+                    index_limits,
+                    limits,
+                )
+                .map_err(|error| remap_reserved_limit(error, limits, &properties))?;
                 unix_ensure_node_version(
                     root_fd,
                     c"Index.zip",
@@ -312,16 +369,20 @@ impl FrozenDirectoryBundle {
             },
             (Node::Missing, Node::Directory(version)) => {
                 let index_fd = unix_open_directory_at(root_fd, c"Index", &version)?;
-                let manifest = unix_scan_manifest(&index_fd, limits)?;
+                let manifest = unix_scan_manifest(&index_fd, index_limits)
+                    .map_err(|error| remap_reserved_limit(error, limits, &properties))?;
                 if manifest.is_empty() {
                     return Err(Error::InvalidBundle(
                         "directory bundle Index/ contains no entries".to_owned(),
                     ));
                 }
-                let entries = unix_read_manifest(&index_fd, &manifest, limits)?;
-                let snapshot = Self::from_captured_loose(entries, markers_before.markers, limits)?;
+                let entries = unix_read_manifest(&index_fd, &manifest, index_limits)
+                    .map_err(|error| remap_reserved_limit(error, limits, &properties))?;
+                let snapshot = Self::from_captured_loose(entries, markers_before.markers, limits)
+                    .map_err(|error| remap_reserved_limit(error, limits, &properties))?;
 
-                let observed = unix_scan_manifest(&index_fd, limits)?;
+                let observed = unix_scan_manifest(&index_fd, index_limits)
+                    .map_err(|error| remap_reserved_limit(error, limits, &properties))?;
                 if observed != manifest {
                     return Err(changed(
                         "verifying directory bundle Index/ manifest after component parsing",
@@ -370,11 +431,16 @@ impl FrozenDirectoryBundle {
         if unix_snapshot_markers(root_fd)? != markers_before {
             return Err(changed("verifying directory bundle application markers"));
         }
+        validate_properties_budget(snapshot.state.index_report, limits, &properties)?;
+        if capture_properties {
+            unix_read_properties(root_fd, &mut properties, limits)?;
+            unix_verify_properties(root_fd, &properties)?;
+        }
         let root_after = unix_file_version(&unix_fs::fstat(root_fd).map_err(unix_error)?)?;
         if root_after != root_before {
             return Err(changed("verifying pinned directory bundle root"));
         }
-        Ok(snapshot)
+        snapshot.with_properties(properties.data)
     }
 
     #[cfg(not(unix))]
@@ -382,10 +448,12 @@ impl FrozenDirectoryBundle {
         path: &Path,
         expected: FileVersion,
         markers: DirectoryMarkers,
-        limits: Limits,
+        index_limits: Limits,
+        retained_limits: Limits,
     ) -> Result<Self> {
-        let bytes = read_stable_file(path, &expected, limits, FileRole::IndexZip)?;
-        let snapshot = Self::from_captured_index_zip(bytes, markers, limits)?;
+        let bytes = read_stable_file(path, &expected, index_limits, FileRole::IndexZip)?;
+        let snapshot =
+            Self::from_captured_index_zip(bytes, markers, index_limits, retained_limits)?;
         ensure_path_version(
             path,
             &expected,
@@ -397,9 +465,14 @@ impl FrozenDirectoryBundle {
     fn from_captured_index_zip(
         bytes: Box<[u8]>,
         markers: DirectoryMarkers,
-        limits: Limits,
+        index_limits: Limits,
+        retained_limits: Limits,
     ) -> Result<Self> {
-        let components = ComponentCatalog::from_directory_index_zip(&bytes, limits)?;
+        let (components, index_report) = ComponentCatalog::from_directory_index_zip_with_report(
+            &bytes,
+            index_limits,
+            retained_limits,
+        )?;
         if components.is_empty() {
             return Err(Error::InvalidBundle(
                 "directory bundle Index.zip contains no decodable IWA components".to_owned(),
@@ -409,8 +482,10 @@ impl FrozenDirectoryBundle {
             state: Arc::new(State {
                 provenance: DirectoryProvenance::IndexZip,
                 markers,
-                limits,
+                limits: retained_limits,
                 components: Arc::new(components),
+                properties: None,
+                index_report,
                 storage: Storage::IndexZip(bytes),
             }),
         })
@@ -421,9 +496,10 @@ impl FrozenDirectoryBundle {
         path: &Path,
         expected: FileVersion,
         markers: DirectoryMarkers,
-        limits: Limits,
+        index_limits: Limits,
+        retained_limits: Limits,
     ) -> Result<Self> {
-        let manifest = scan_manifest(path, limits)?;
+        let manifest = scan_manifest(path, index_limits)?;
         if manifest.is_empty() {
             return Err(Error::InvalidBundle(
                 "directory bundle Index/ contains no entries".to_owned(),
@@ -437,15 +513,20 @@ impl FrozenDirectoryBundle {
                 amount: manifest.len(),
             })?;
         for item in &manifest {
-            let data = read_stable_file(&item.path, &item.version, limits, FileRole::LooseEntry)?;
+            let data = read_stable_file(
+                &item.path,
+                &item.version,
+                index_limits,
+                FileRole::LooseEntry,
+            )?;
             entries.push(FrozenDirectoryEntry {
                 name: item.logical_name.clone(),
                 data,
             });
         }
 
-        let snapshot = Self::from_captured_loose(entries, markers, limits)?;
-        let observed = scan_manifest(path, limits)?;
+        let snapshot = Self::from_captured_loose(entries, markers, retained_limits)?;
+        let observed = scan_manifest(path, index_limits)?;
         if manifest != observed {
             return Err(changed(
                 "verifying directory bundle Index/ manifest after component parsing",
@@ -462,23 +543,56 @@ impl FrozenDirectoryBundle {
     fn from_captured_loose(
         entries: Vec<FrozenDirectoryEntry>,
         markers: DirectoryMarkers,
-        limits: Limits,
+        retained_limits: Limits,
     ) -> Result<Self> {
         let components = ComponentCatalog::from_logical_entries(
             entries.iter().map(|entry| (entry.name(), entry.data())),
-            limits,
+            retained_limits,
         )?;
         if components.is_empty() {
             return Err(Error::InvalidBundle(
                 "directory bundle Index/ contains no decodable IWA components".to_owned(),
             ));
         }
+        let index_report = entries.iter().try_fold(
+            DirectoryIndexReport {
+                entries: 0,
+                metadata_bytes: 0,
+                expanded_bytes: 0,
+            },
+            |mut report, entry| {
+                report.entries = report.entries.checked_add(1).ok_or_else(|| {
+                    Error::InvalidBundle("directory entry count overflowed usize".to_owned())
+                })?;
+                report.metadata_bytes = report
+                    .metadata_bytes
+                    .checked_add(u64::try_from(entry.name.len()).map_err(|_error| {
+                        Error::InvalidBundle(
+                            "directory entry name length does not fit u64".to_owned(),
+                        )
+                    })?)
+                    .ok_or_else(|| {
+                        Error::InvalidBundle("directory metadata length overflowed u64".to_owned())
+                    })?;
+                report.expanded_bytes = report
+                    .expanded_bytes
+                    .checked_add(u64::try_from(entry.data.len()).map_err(|_error| {
+                        Error::InvalidBundle("directory entry length does not fit u64".to_owned())
+                    })?)
+                    .ok_or_else(|| {
+                        Error::InvalidBundle("directory byte length overflowed u64".to_owned())
+                    })?;
+                Ok::<DirectoryIndexReport, Error>(report)
+            },
+        )?;
         Ok(Self {
             state: Arc::new(State {
                 provenance: DirectoryProvenance::LooseIndex,
                 markers,
-                limits,
+                limits: retained_limits,
                 components: Arc::new(components),
+                properties: None,
+                index_report,
                 storage: Storage::LooseIndex(entries.into_boxed_slice()),
             }),
         })
@@ -508,6 +622,30 @@ impl FrozenDirectoryBundle {
         &self.state.components
     }
 
+    /// Borrow the frozen canonical `Metadata/Properties.plist` diagnostic.
+    ///
+    /// The bytes are retained only for archive-free semantic metadata. Their
+    /// presence does not turn this directory snapshot into an exact package
+    /// artifact and does not imply that any other sidecar was captured.
+    #[must_use]
+    pub fn properties_plist(&self) -> Option<&[u8]> {
+        self.state.properties.as_deref()
+    }
+
+    /// Consume the snapshot into semantic components and the optional frozen
+    /// canonical properties diagnostic.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn into_semantic_parts(self) -> (Arc<ComponentCatalog>, Option<Arc<[u8]>>) {
+        match Arc::try_unwrap(self.state) {
+            Ok(state) => (state.components, state.properties),
+            Err(state) => (
+                Arc::clone(&state.components),
+                state.properties.as_ref().map(Arc::clone),
+            ),
+        }
+    }
+
     /// Consume this snapshot into a shared immutable component catalog.
     ///
     /// This is the semantic-only handoff for directory-backed documents. It
@@ -516,10 +654,7 @@ impl FrozenDirectoryBundle {
     /// artifact.
     #[must_use]
     pub fn into_components(self) -> Arc<ComponentCatalog> {
-        match Arc::try_unwrap(self.state) {
-            Ok(state) => state.components,
-            Err(state) => Arc::clone(&state.components),
-        }
+        self.into_semantic_parts().0
     }
 
     /// Borrow the exact `Index.zip` subartifact, if that representation was
@@ -545,6 +680,188 @@ impl FrozenDirectoryBundle {
             Storage::LooseIndex(entries) => entries,
         }
     }
+
+    fn with_properties(mut self, properties: Option<Box<[u8]>>) -> Result<Self> {
+        let Some(properties) = properties else {
+            return Ok(self);
+        };
+        Arc::get_mut(&mut self.state)
+            .expect("new directory snapshot has exclusive state")
+            .properties = Some(Arc::from(properties));
+        Ok(self)
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct PropertiesCapture {
+    directory: Option<FileVersion>,
+    file: Option<FileVersion>,
+    data: Option<Box<[u8]>>,
+}
+
+fn limits_without_properties(limits: Limits, properties: &PropertiesCapture) -> Result<Limits> {
+    let Some(file) = properties.file else {
+        return Ok(limits);
+    };
+    if file.len > MAX_DIRECTORY_PROPERTIES_BYTES {
+        return Err(Error::Limit {
+            kind: LimitKind::EntryBytes,
+            observed: file.len,
+            maximum: MAX_DIRECTORY_PROPERTIES_BYTES,
+        });
+    }
+    if file.len >= limits.max_input_bytes() {
+        return Err(Error::Limit {
+            kind: LimitKind::InputBytes,
+            observed: if file.len == limits.max_input_bytes() {
+                file.len.saturating_add(1)
+            } else {
+                file.len
+            },
+            maximum: limits.max_input_bytes(),
+        });
+    }
+    if limits.max_entries() <= 1 {
+        return Err(Error::Limit {
+            kind: LimitKind::Entries,
+            observed: 2,
+            maximum: limits.max_entries() as u64,
+        });
+    }
+    if file.len >= limits.max_total_bytes() {
+        return Err(Error::Limit {
+            kind: LimitKind::TotalBytes,
+            observed: if file.len == limits.max_total_bytes() {
+                file.len.saturating_add(1)
+            } else {
+                file.len
+            },
+            maximum: limits.max_total_bytes(),
+        });
+    }
+    let input = limits
+        .max_input_bytes()
+        .checked_sub(file.len)
+        .ok_or_else(|| Error::Limit {
+            kind: LimitKind::InputBytes,
+            observed: file.len,
+            maximum: limits.max_input_bytes(),
+        })?;
+    let entries = limits.max_entries().checked_sub(1).ok_or(Error::Limit {
+        kind: LimitKind::Entries,
+        observed: 1,
+        maximum: limits.max_entries() as u64,
+    })?;
+    let total = limits
+        .max_total_bytes()
+        .checked_sub(file.len)
+        .ok_or(Error::Limit {
+            kind: LimitKind::TotalBytes,
+            observed: file.len,
+            maximum: limits.max_total_bytes(),
+        })?;
+    let maximum_name = u64::try_from(PROPERTIES_LOGICAL_NAME.len()).unwrap_or(u64::MAX);
+    if maximum_name > limits.max_input_bytes().min(Limits::MAX_MEMBER_NAME_BYTES) {
+        return Err(Error::Limit {
+            kind: LimitKind::MemberNameBytes,
+            observed: maximum_name,
+            maximum: limits.max_input_bytes().min(Limits::MAX_MEMBER_NAME_BYTES),
+        });
+    }
+    if maximum_name > limits.max_input_bytes().min(Limits::MAX_METADATA_BYTES) {
+        return Err(Error::Limit {
+            kind: LimitKind::MetadataBytes,
+            observed: maximum_name,
+            maximum: limits.max_input_bytes().min(Limits::MAX_METADATA_BYTES),
+        });
+    }
+    Limits::new(
+        input,
+        entries,
+        limits.max_entry_bytes(),
+        total,
+        limits.max_iwa_stream_bytes(),
+    )?
+    .with_archive_limits(limits.archive_limits())
+}
+
+fn remap_reserved_limit(error: Error, limits: Limits, properties: &PropertiesCapture) -> Error {
+    let Some(file) = properties.file else {
+        return error;
+    };
+    match error {
+        Error::Limit {
+            kind: LimitKind::InputBytes,
+            observed,
+            ..
+        } => Error::Limit {
+            kind: LimitKind::InputBytes,
+            observed: observed.saturating_add(file.len),
+            maximum: limits.max_input_bytes(),
+        },
+        Error::Limit {
+            kind: LimitKind::Entries,
+            observed,
+            ..
+        } => Error::Limit {
+            kind: LimitKind::Entries,
+            observed: observed.saturating_add(1),
+            maximum: limits.max_entries() as u64,
+        },
+        Error::Limit {
+            kind: LimitKind::TotalBytes,
+            observed,
+            ..
+        } => Error::Limit {
+            kind: LimitKind::TotalBytes,
+            observed: observed.saturating_add(file.len),
+            maximum: limits.max_total_bytes(),
+        },
+        other => other,
+    }
+}
+
+fn validate_properties_budget(
+    index: DirectoryIndexReport,
+    limits: Limits,
+    properties: &PropertiesCapture,
+) -> Result<()> {
+    let Some(file) = properties.file else {
+        return Ok(());
+    };
+    if file.len > limits.max_entry_bytes() {
+        return Err(Error::Limit {
+            kind: LimitKind::EntryBytes,
+            observed: file.len,
+            maximum: limits.max_entry_bytes(),
+        });
+    }
+    if file.len > MAX_DIRECTORY_PROPERTIES_BYTES {
+        return Err(Error::Limit {
+            kind: LimitKind::EntryBytes,
+            observed: file.len,
+            maximum: MAX_DIRECTORY_PROPERTIES_BYTES,
+        });
+    }
+    let entries = index
+        .entries
+        .checked_add(1)
+        .ok_or_else(|| Error::InvalidBundle("directory entry count overflowed usize".to_owned()))?;
+    check_entry_count(entries, limits)?;
+    let name_bytes = u64::try_from(PROPERTIES_LOGICAL_NAME.len()).unwrap_or(u64::MAX);
+    check_member_name(name_bytes, limits)?;
+    let metadata_bytes = index
+        .metadata_bytes
+        .checked_add(name_bytes)
+        .ok_or_else(|| {
+            Error::InvalidBundle("directory metadata length overflowed u64".to_owned())
+        })?;
+    check_metadata_bytes(metadata_bytes, limits)?;
+    let expanded = index.expanded_bytes.checked_add(file.len).ok_or_else(|| {
+        Error::InvalidBundle("directory expanded length overflowed u64".to_owned())
+    })?;
+    check_total_bytes(expanded, limits)?;
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -606,6 +923,106 @@ fn unix_reject_encryption_markers(root_fd: &OwnedFd) -> Result<()> {
             "directory bundle Metadata is not a directory".to_owned(),
         )),
     }
+}
+
+#[cfg(unix)]
+fn unix_inspect_properties(root_fd: &OwnedFd) -> Result<PropertiesCapture> {
+    match unix_inspect_node(root_fd, c"Metadata", "directory bundle Metadata")? {
+        Node::Missing => Ok(PropertiesCapture::default()),
+        Node::File(_) => Err(Error::InvalidBundle(
+            "directory bundle Metadata is not a directory".to_owned(),
+        )),
+        Node::Directory(directory) => {
+            let metadata_fd = unix_open_directory_at(root_fd, c"Metadata", &directory)?;
+            match unix_inspect_node(
+                &metadata_fd,
+                c"Properties.plist",
+                "directory bundle Metadata/Properties.plist",
+            )? {
+                Node::Missing => Ok(PropertiesCapture {
+                    directory: Some(directory),
+                    file: None,
+                    data: None,
+                }),
+                Node::Directory(_) => Err(Error::InvalidBundle(
+                    "directory bundle Metadata/Properties.plist is not a regular file".to_owned(),
+                )),
+                Node::File(file) => Ok(PropertiesCapture {
+                    directory: Some(directory),
+                    file: Some(file),
+                    data: None,
+                }),
+            }
+        },
+    }
+}
+
+#[cfg(unix)]
+fn unix_read_properties(
+    root_fd: &OwnedFd,
+    capture: &mut PropertiesCapture,
+    limits: Limits,
+) -> Result<()> {
+    let (Some(directory), Some(file)) = (capture.directory, capture.file) else {
+        return Ok(());
+    };
+    let metadata_fd = unix_open_directory_at(root_fd, c"Metadata", &directory)?;
+    capture.data = Some(unix_read_stable_file_at(
+        &metadata_fd,
+        c"Properties.plist",
+        &file,
+        limits,
+        FileRole::Sidecar,
+    )?);
+    let observed = unix_file_version(&unix_fs::fstat(&metadata_fd).map_err(unix_error)?)?;
+    if observed != directory {
+        return Err(changed("reading directory bundle Metadata"));
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn unix_verify_properties(root_fd: &OwnedFd, capture: &PropertiesCapture) -> Result<()> {
+    match capture.directory {
+        None => {
+            if !matches!(
+                unix_inspect_node(root_fd, c"Metadata", "directory bundle Metadata")?,
+                Node::Missing
+            ) {
+                return Err(changed("verifying directory bundle Metadata"));
+            }
+        },
+        Some(directory) => {
+            let metadata_fd = unix_open_directory_at(root_fd, c"Metadata", &directory)?;
+            match capture.file {
+                None => {
+                    if !matches!(
+                        unix_inspect_node(
+                            &metadata_fd,
+                            c"Properties.plist",
+                            "directory bundle Metadata/Properties.plist",
+                        )?,
+                        Node::Missing
+                    ) {
+                        return Err(changed(
+                            "verifying directory bundle Metadata/Properties.plist",
+                        ));
+                    }
+                },
+                Some(file) => unix_ensure_node_version(
+                    &metadata_fd,
+                    c"Properties.plist",
+                    &file,
+                    "verifying directory bundle Metadata/Properties.plist",
+                )?,
+            }
+            let observed = unix_file_version(&unix_fs::fstat(&metadata_fd).map_err(unix_error)?)?;
+            if observed != directory {
+                return Err(changed("verifying directory bundle Metadata"));
+            }
+        },
+    }
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -982,6 +1399,7 @@ fn utf8_name(name: OsString) -> Result<String> {
 enum FileRole {
     IndexZip,
     LooseEntry,
+    Sidecar,
 }
 
 #[cfg(not(unix))]
@@ -1072,7 +1490,7 @@ fn check_file_size(observed: u64, limits: Limits, role: FileRole) -> Result<()> 
             maximum: limits.max_input_bytes(),
         });
     }
-    if matches!(role, FileRole::LooseEntry) && observed > limits.max_entry_bytes() {
+    if !matches!(role, FileRole::IndexZip) && observed > limits.max_entry_bytes() {
         return Err(Error::Limit {
             kind: LimitKind::EntryBytes,
             observed,
@@ -1171,6 +1589,100 @@ fn reject_path_encryption_markers(root: &Path) -> Result<()> {
             "directory bundle Metadata is not a directory".to_owned(),
         )),
     }
+}
+
+#[cfg(not(unix))]
+fn inspect_properties(root: &Path) -> Result<PropertiesCapture> {
+    let metadata_path = root.join("Metadata");
+    match inspect_node(&metadata_path, "directory bundle Metadata")? {
+        Node::Missing => Ok(PropertiesCapture {
+            directory: None,
+            file: None,
+            data: None,
+        }),
+        Node::File(_) => Err(Error::InvalidBundle(
+            "directory bundle Metadata is not a directory".to_owned(),
+        )),
+        Node::Directory(directory) => {
+            let properties_path = metadata_path.join("Properties.plist");
+            match inspect_node(
+                &properties_path,
+                "directory bundle Metadata/Properties.plist",
+            )? {
+                Node::Missing => Ok(PropertiesCapture {
+                    directory: Some(directory),
+                    file: None,
+                    data: None,
+                }),
+                Node::Directory(_) => Err(Error::InvalidBundle(
+                    "directory bundle Metadata/Properties.plist is not a regular file".to_owned(),
+                )),
+                Node::File(file) => Ok(PropertiesCapture {
+                    directory: Some(directory),
+                    file: Some(file),
+                    data: None,
+                }),
+            }
+        },
+    }
+}
+
+#[cfg(not(unix))]
+fn read_properties(root: &Path, capture: &mut PropertiesCapture, limits: Limits) -> Result<()> {
+    let Some(file) = capture.file.as_ref() else {
+        return Ok(());
+    };
+    capture.data = Some(read_stable_file(
+        &root.join("Metadata/Properties.plist"),
+        file,
+        limits,
+        FileRole::Sidecar,
+    )?);
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn verify_properties(root: &Path, capture: &PropertiesCapture) -> Result<()> {
+    let metadata_path = root.join("Metadata");
+    match &capture.directory {
+        None => {
+            if !matches!(
+                inspect_node(&metadata_path, "directory bundle Metadata")?,
+                Node::Missing
+            ) {
+                return Err(changed("verifying directory bundle Metadata"));
+            }
+        },
+        Some(directory) => {
+            ensure_path_version(
+                &metadata_path,
+                directory,
+                "verifying directory bundle Metadata",
+            )?;
+            let properties_path = metadata_path.join("Properties.plist");
+            match &capture.file {
+                None => {
+                    if !matches!(
+                        inspect_node(
+                            &properties_path,
+                            "directory bundle Metadata/Properties.plist",
+                        )?,
+                        Node::Missing
+                    ) {
+                        return Err(changed(
+                            "verifying directory bundle Metadata/Properties.plist",
+                        ));
+                    }
+                },
+                Some(file) => ensure_path_version(
+                    &properties_path,
+                    file,
+                    "verifying directory bundle Metadata/Properties.plist",
+                )?,
+            }
+        },
+    }
+    Ok(())
 }
 
 fn is_encryption_marker(name: &str) -> bool {
@@ -1372,6 +1884,133 @@ mod tests {
         let components = frozen.into_components();
         assert!(state_lifetime.upgrade().is_none());
         assert_eq!(components.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn freezes_only_the_canonical_properties_diagnostic_under_aggregate_limits() -> Result<()> {
+        let temp = Temp::new()?;
+        let index = index_zip(&[("Index/Document.iwa", iwa(1, 10_000)?)])?;
+        let properties = b"canonical-properties";
+        fs::write(temp.path().join("Index.zip"), &index)?;
+        fs::create_dir(temp.path().join("Metadata"))?;
+        fs::write(temp.path().join("Metadata/Properties.plist"), properties)?;
+        fs::write(
+            temp.path().join("Metadata/BuildVersionHistory.plist"),
+            b"ignored",
+        )?;
+        fs::create_dir(temp.path().join("Data"))?;
+        fs::write(temp.path().join("Data/media.bin"), b"ignored")?;
+
+        let exact_input = u64::try_from(index.len() + properties.len()).map_err(|_error| {
+            Error::InvalidBundle("test aggregate length does not fit u64".to_owned())
+        })?;
+        let limits = Limits::new(
+            exact_input,
+            Limits::MAX_ENTRIES,
+            Limits::MAX_ENTRY_BYTES,
+            Limits::MAX_TOTAL_BYTES,
+            Limits::MAX_IWA_STREAM_BYTES,
+        )?;
+        let index_only = FrozenDirectoryBundle::open_with_limits(temp.path(), limits)?;
+        assert_eq!(index_only.properties_plist(), None);
+        let frozen = FrozenDirectoryBundle::open_with_properties(temp.path(), limits)?;
+        assert_eq!(frozen.properties_plist(), Some(properties.as_slice()));
+        let (components, captured) = frozen.into_semantic_parts();
+        assert_eq!(components.len(), 1);
+        assert_eq!(captured.as_deref(), Some(properties.as_slice()));
+
+        let too_small = Limits::new(
+            exact_input - 1,
+            Limits::MAX_ENTRIES,
+            Limits::MAX_ENTRY_BYTES,
+            Limits::MAX_TOTAL_BYTES,
+            Limits::MAX_IWA_STREAM_BYTES,
+        )?;
+        assert!(matches!(
+            FrozenDirectoryBundle::open_with_properties(temp.path(), too_small),
+            Err(Error::Limit {
+                kind: LimitKind::InputBytes,
+                observed,
+                maximum,
+            }) if observed == exact_input && maximum == exact_input - 1
+        ));
+
+        let property_bytes = u64::try_from(properties.len()).map_err(|_error| {
+            Error::InvalidBundle("test properties length does not fit u64".to_owned())
+        })?;
+        let no_index_input = Limits::new(
+            property_bytes,
+            Limits::MAX_ENTRIES,
+            Limits::MAX_ENTRY_BYTES,
+            Limits::MAX_TOTAL_BYTES,
+            Limits::MAX_IWA_STREAM_BYTES,
+        )?;
+        assert!(matches!(
+            FrozenDirectoryBundle::open_with_properties(temp.path(), no_index_input),
+            Err(Error::Limit {
+                kind: LimitKind::InputBytes,
+                observed,
+                maximum,
+            }) if observed == property_bytes + 1 && maximum == property_bytes
+        ));
+
+        let no_index_entry = Limits::new(
+            Limits::MAX_INPUT_BYTES,
+            1,
+            Limits::MAX_ENTRY_BYTES,
+            Limits::MAX_TOTAL_BYTES,
+            Limits::MAX_IWA_STREAM_BYTES,
+        )?;
+        assert!(matches!(
+            FrozenDirectoryBundle::open_with_properties(temp.path(), no_index_entry),
+            Err(Error::Limit {
+                kind: LimitKind::Entries,
+                observed: 2,
+                maximum: 1,
+            })
+        ));
+
+        let no_index_total = Limits::new(
+            Limits::MAX_INPUT_BYTES,
+            Limits::MAX_ENTRIES,
+            Limits::MAX_ENTRY_BYTES,
+            property_bytes,
+            Limits::MAX_IWA_STREAM_BYTES,
+        )?;
+        assert!(matches!(
+            FrozenDirectoryBundle::open_with_properties(temp.path(), no_index_total),
+            Err(Error::Limit {
+                kind: LimitKind::TotalBytes,
+                observed,
+                maximum,
+            }) if observed == property_bytes + 1 && maximum == property_bytes
+        ));
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symbolic_properties_diagnostic() -> Result<()> {
+        use std::os::unix::fs::symlink;
+
+        let temp = Temp::new()?;
+        fs::write(
+            temp.path().join("Index.zip"),
+            index_zip(&[("Index/Document.iwa", iwa(1, 10_000)?)])?,
+        )?;
+        fs::create_dir(temp.path().join("Metadata"))?;
+        fs::write(temp.path().join("outside.plist"), b"outside")?;
+        symlink(
+            temp.path().join("outside.plist"),
+            temp.path().join("Metadata/Properties.plist"),
+        )?;
+
+        assert!(matches!(
+            FrozenDirectoryBundle::open_with_properties(temp.path(), Limits::default()),
+            Err(Error::InvalidBundle(message))
+                if message.contains("Metadata/Properties.plist")
+        ));
         Ok(())
     }
 
@@ -1658,6 +2297,7 @@ mod tests {
             captured,
             DirectoryMarkers::default(),
             Limits::default(),
+            Limits::default(),
         )?;
         assert_eq!(snapshot.components().len(), 1);
 
@@ -1696,7 +2336,7 @@ mod tests {
         fs::create_dir(source.join("Index"))?;
         fs::write(source.join("Index/not-a-document.iwa"), b"malicious")?;
 
-        let frozen = FrozenDirectoryBundle::open_unix_root(&root_fd, Limits::default())?;
+        let frozen = FrozenDirectoryBundle::open_unix_root(&root_fd, Limits::default(), false)?;
         assert_eq!(frozen.components().len(), 1);
         assert!(frozen.components().get("Index/Document.iwa").is_some());
         assert!(

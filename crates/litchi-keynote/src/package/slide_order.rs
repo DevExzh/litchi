@@ -495,29 +495,19 @@ impl Package {
         reason = "the internal prepared-source feature adds a semantic-only failure branch"
     )]
     fn physical_shared_source(&self) -> Result<Arc<[u8]>, SlideOrderError> {
-        #[cfg(feature = "internal-iwork-source")]
         match &self.state.source {
             PhysicalSource::Package(source) => Ok(source.shared_source()),
             PhysicalSource::Semantic(_) => Err(SlideOrderError::UnsupportedSource),
-        }
-        #[cfg(not(feature = "internal-iwork-source"))]
-        {
-            let PhysicalSource::Package(source) = &self.state.source;
-            Ok(source.shared_source())
         }
     }
 
     fn editable_source_catalog(
         &self,
     ) -> Result<&litchi_iwa_archive::SourceCatalog, SlideOrderError> {
-        #[cfg(feature = "internal-iwork-source")]
         let source = match &self.state.source {
             PhysicalSource::Package(source) => source,
-            #[cfg(feature = "internal-iwork-source")]
             PhysicalSource::Semantic(_) => return Err(SlideOrderError::UnsupportedSource),
         };
-        #[cfg(not(feature = "internal-iwork-source"))]
-        let PhysicalSource::Package(source) = &self.state.source;
         if !source.source_is_exact() {
             return Err(SlideOrderError::UnsupportedSource);
         }

@@ -13,9 +13,10 @@ use std::sync::Arc;
 use litchi_iwa::Document;
 use litchi_iwa::application::Application;
 use litchi_iwa::detect::{self, Format};
-use litchi_iwa::keynote::{KeynoteDocument, KeynoteDocumentBuilder, KeynoteEditor};
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocument, NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocument, PagesEditor};
+use litchi_keynote::Package as KeynotePackage;
 use tempfile::tempdir;
 
 fn assert_send_sync<T: Send + Sync>() {}
@@ -68,7 +69,7 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     assert_send_sync::<litchi_iwa::Document>();
     assert_send_sync::<PagesDocument>();
     assert_send_sync::<NumbersDocument>();
-    assert_send_sync::<KeynoteDocument>();
+    assert_send_sync::<KeynotePackage>();
     assert_eq!(document.application(), application);
     let document_stats = document.stats()?;
     assert_eq!(document_stats.application, application);
@@ -123,7 +124,7 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
         },
         Format::Keynote => {
             KeynoteEditor::open(path)?;
-            let specialized = KeynoteDocument::open(path)?;
+            let specialized = KeynotePackage::open(path)?;
             let snapshot = specialized.snapshot();
             let specialized_stats = specialized.stats()?;
             let snapshot_stats = snapshot.stats()?;
@@ -131,6 +132,16 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
                 snapshot_stats.total_objects,
                 specialized_stats.total_objects
             );
+            specialized.validate()?;
+            assert_eq!(
+                specialized.show()?.slide_count(),
+                specialized_stats.slide_count
+            );
+            assert_eq!(
+                specialized.semantic_snapshot()?.slides().len(),
+                specialized_stats.slide_count
+            );
+            assert!(!specialized.text()?.is_empty());
         },
     }
 

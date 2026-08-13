@@ -1282,15 +1282,9 @@ fn utf16_len(text: &str) -> Result<u32, SlideNotesError> {
     reason = "the semantic-only source feature adds a typed unsupported-source branch"
 )]
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, SlideNotesError> {
-    #[cfg(feature = "internal-iwork-source")]
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
         PhysicalSource::Semantic(_) => Err(SlideNotesError::UnsupportedSource),
-    }
-    #[cfg(not(feature = "internal-iwork-source"))]
-    {
-        let PhysicalSource::Package(source) = &package.state.source;
-        Ok(source)
     }
 }
 

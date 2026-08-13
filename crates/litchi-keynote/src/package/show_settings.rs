@@ -1607,15 +1607,9 @@ fn allocate_bytes(capacity: usize) -> Result<Vec<u8>, Error> {
     reason = "the internal prepared-source feature adds a semantic-only failure branch"
 )]
 fn physical_source_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
-    #[cfg(feature = "internal-iwork-source")]
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
         PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
-    }
-    #[cfg(not(feature = "internal-iwork-source"))]
-    {
-        let PhysicalSource::Package(source) = &package.state.source;
-        Ok(source)
     }
 }
 
