@@ -24,6 +24,10 @@ on:
       - 'crates/soapberry-zip/**'
       - 'crates/xml-minifier/**'
       - 'tools/perf-baseline/**'
+      - 'tools/perf_compare.py'
+      - 'tools/test_perf_compare.py'
+      - 'docs/performance/perf-regression-policy-v1.json'
+      - 'docs/performance/REGRESSION_COMPARATOR.md'
       - '.github/workflows/perf-baseline.yml'
   pull_request:
     branches:
@@ -48,13 +52,23 @@ on:
       - 'crates/soapberry-zip/**'
       - 'crates/xml-minifier/**'
       - 'tools/perf-baseline/**'
+      - 'tools/perf_compare.py'
+      - 'tools/test_perf_compare.py'
+      - 'docs/performance/perf-regression-policy-v1.json'
+      - 'docs/performance/REGRESSION_COMPARATOR.md'
       - '.github/workflows/perf-baseline.yml'
   workflow_dispatch:
+    inputs:
+      reference_run_id:
+        description: Prior reference run ID; leave empty to record only
+        required: false
+        type: string
   schedule:
     - cron: '17 3 * * 0'
 
 permissions:
   contents: read
+  actions: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -84,6 +98,9 @@ jobs:
           cargo fmt --manifest-path "$PERF_MANIFEST" -- --check
           cargo check --locked --manifest-path "$PERF_MANIFEST"
           cargo test --locked --manifest-path "$PERF_MANIFEST"
+
+      - name: Test fail-closed performance comparator
+        run: python3 -m unittest tools.test_perf_compare
 
       - name: Run deterministic smoke baseline
         run: |
@@ -1841,4 +1858,46 @@ jobs:
             target/perf/odf-semantic-baseline.json
             target/perf/rtf-semantic-baseline.json
           if-no-files-found: error
+          retention-days: 14
+
+  reference-regression:
+    name: reference-gated hosted comparison
+    if: github.event_name == 'workflow_dispatch' && inputs.reference_run_id != ''
+    needs: full
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download current hosted report
+        uses: actions/download-artifact@v4
+        with:
+          name: container-performance-baseline-${{ github.run_id }}
+          path: target/perf/current
+
+      - name: Download explicit reference report
+        uses: actions/download-artifact@v4
+        with:
+          name: container-performance-baseline-${{ inputs.reference_run_id }}
+          path: target/perf/reference
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.reference_run_id }}
+
+      - name: Apply versioned performance regression policy
+        run: |
+          python3 tools/perf_compare.py \
+            --policy docs/performance/perf-regression-policy-v1.json \
+            --baseline target/perf/reference/container-baseline.json \
+            --current target/perf/current/container-baseline.json \
+            --json-out target/perf/comparison/perf-regression.json \
+            --summary-out target/perf/comparison/perf-regression.txt
+
+      - name: Upload comparison summaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-regression-comparison-${{ github.run_id }}
+          path: target/perf/comparison/
+          if-no-files-found: warn
           retention-days: 14

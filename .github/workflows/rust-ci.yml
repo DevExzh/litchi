@@ -178,6 +178,11 @@ jobs:
       - name: Check if code is compilable
         run: cargo check --workspace --all-features --lib --tests
 
+      - name: Reject deprecated API use in every target
+        env:
+          RUSTFLAGS: -D deprecated
+        run: cargo check --workspace --all-targets --all-features
+
       - name: Check minimal font and PPT capability boundaries
         run: |
           for package in litchi-docx litchi-ppt litchi-pptx; do

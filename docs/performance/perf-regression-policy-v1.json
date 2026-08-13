@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "policy_id": "litchi-hosted-default-matrix-v1",
+  "minimum_samples": 15,
+  "expected_result_count": 198,
+  "expected_result_keys_sha256": null,
+  "required_cases": [
+    "zip_index",
+    "zip_read_one",
+    "opc_open",
+    "opc_open_owned",
+    "opc_noop_save",
+    "opc_mutated_save",
+    "opc_source_open",
+    "opc_source_open_main_read",
+    "opc_source_cached_main_read",
+    "opc_source_concurrent_same_part",
+    "cfb_open",
+    "cfb_list_streams",
+    "cfb_read_one",
+    "cfb_create_stream_borrowed",
+    "cfb_create_stream_owned",
+    "cfb_shared_open",
+    "cfb_shared_read_one",
+    "cfb_shared_concurrent_reads",
+    "doc_fresh_write_to",
+    "xls_fresh_write_to",
+    "ppt_fresh_write_to",
+    "xlsx_open_owned",
+    "xlsx_list_sheets",
+    "xlsx_first_cell",
+    "xlsx_full_cell_scan",
+    "xlsx_narrow_column_range_scan",
+    "xlsx_noop_commit",
+    "xlsx_noop_commit_save",
+    "xlsx_one_cell_commit",
+    "xlsx_one_cell_commit_save",
+    "xlsx_one_percent_commit",
+    "xlsx_one_percent_commit_save",
+    "xlsx_source_open",
+    "xlsx_source_list_sheets",
+    "xlsx_source_first_cell",
+    "xlsx_source_narrow_column_range_scan"
+  ],
+  "require_clean_worktree": true,
+  "require_distinct_revisions": true,
+  "tool_identity": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "build_identity_fields": [
+    "rustc_version",
+    "logical_cpus_available",
+    "allocator",
+    "rustflags",
+    "cargo_build_target",
+    "perf_event_paranoid",
+    "os",
+    "kernel",
+    "cpu_model",
+    "total_memory_bytes",
+    "page_size_bytes"
+  ],
+  "nullable_build_identity_fields": [
+    "rustflags",
+    "cargo_build_target"
+  ],
+  "expected_configuration": {
+    "samples_per_case": 15,
+    "warmup_iterations_per_case": 3,
+    "filesystem_cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    }
+  },
+  "latency_thresholds_percent": {
+    "p50": 5.0,
+    "p95": 10.0
+  },
+  "metric_classes": [
+    {
+      "name": "allocation",
+      "max_regression_percent": 5.0,
+      "path_globs": [
+        "**/*allocation_calls",
+        "**/*allocations",
+        "**/*allocated_bytes",
+        "*allocation_calls",
+        "*allocations",
+        "*allocated_bytes"
+      ]
+    },
+    {
+      "name": "rss",
+      "max_regression_percent": 5.0,
+      "path_globs": [
+        "**/*rss*",
+        "**/*resident_set*",
+        "*rss*",
+        "*resident_set*"
+      ]
+    },
+    {
+      "name": "work",
+      "max_regression_percent": 5.0,
+      "path_globs": [
+        "**/*instructions",
+        "**/*cycles",
+        "**/*faults",
+        "source/*read_calls",
+        "source/*read_bytes",
+        "sink/write_calls",
+        "source/*materializations",
+        "**/*copied_bytes",
+        "**/*decompressed_bytes",
+        "**/*recompressed_bytes",
+        "**/*work_units",
+        "source/*max_in_flight*",
+        "source/*maximum_in_flight*",
+        "*instructions",
+        "*cycles",
+        "*faults",
+        "*read_calls",
+        "*read_bytes",
+        "*write_calls",
+        "*materializations",
+        "*copied_bytes",
+        "*decompressed_bytes",
+        "*recompressed_bytes",
+        "*work_units",
+        "*max_in_flight*",
+        "*maximum_in_flight*"
+      ]
+    }
+  ]
+}
