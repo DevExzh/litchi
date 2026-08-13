@@ -14,9 +14,8 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **180 selectable cases**; its preceding committed
-revision had 178. Dirty worktree additions, including the uncommitted XLS
-visibility harness, are not included in this count. The measured 36-default-case,
+HEAD harness contains **184 selectable cases**; its preceding committed
+revision had 180. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
 opt-in simulated-range cases, two opt-in scaling cases, one opt-in XLSX
@@ -81,6 +80,7 @@ is still not broad program or CRUD coverage.
 | Native DOC/XLS/PPT semantic baseline | Large one-edit/save p50: XLS **1.722 ms**, DOC **1.416 ms**, PPT **0.357 ms**; large XLS open **1.383 ms** | Generated writer corpora; accepted XLS and DOC follow-ups are listed below |
 | Native XLS validated-editor reuse | Large one-cell edit/save p50 **-7.72%**, mean **-7.90%** | Final exact owner parse, public Workbook reopen and typed readback remain; peak heap/RSS flat |
 | Native XLS fixed-width numeric inventory carry-forward | Large one-cell edit/save p50 **-7.83%**, mean **-7.37%**, p95 **-7.20%** | Exact byte-range proof plus complete public Workbook validation/readback remain; peak heap -5.54%, RSS flat; all nonnumeric/structural/resource edits retain full parse |
+| XLS worksheet-visibility source-overlay evidence | Four committed opt-in eager/source-backed scalar/batch selectors cover one-owner and bounded 64-owner visibility edits; production source-backed overlay is committed in `bac279116` | Correctness/coverage only: complete worksheet/catalog/opaque-stream readback, exact overlay bytes, patch/inverse, source fingerprints/spans, cap/protection refusals; no release ABBA, speedup, allocation, RSS, peak-memory, or physical-I/O claim |
 | Rejected XLS terminal-render handoff | Tiny changed save p50 **-7.55%**; large changed save **-0.39%** (neutral) | Fully reverted: repeated large exact no-op p50 **+22.00%**, mean **+16.69%** |
 | Common OLE2 publication stages and rejected handoffs | Current open/publication/finish/end-to-end p50: **1.382 / 7.979 / 5.473 / 26.086 ms**; inline recapture prototype end-to-end **-2.61%** p50 | Stages are non-additive; shared-payload, validated-render and inline recapture prototypes are all fully reverted |
 | Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
@@ -234,6 +234,17 @@ large changed-save p50 improved only 0.39%, while four repeated exact-no-op
 cycles regressed 22.00% p50 and 16.69% mean. The profile, equality prototype,
 allocation evidence and rejection gate are in
 [`change 0028`](changes/0028-xls-terminal-render-handoff-rejected.md).
+
+The committed source-backed XLS worksheet-visibility implementation is
+`bac279116`. Change 0091 adds four opt-in eager/source-backed scalar and
+bounded-batch selectors over one-owner and 64-owner visibility edits. They
+verify complete worksheet/catalog/opaque-stream readback, exact overlay bytes,
+patch/inverse, source fingerprints/spans, and cap/protection refusals. This is
+correctness/coverage evidence only: no release ABBA, speedup, allocation, RSS,
+peak-memory, or physical-I/O claim is made. The source-backed path retains its
+complete candidate snapshot; its 64 KiB publication sink bound limits writes,
+and retained output is only for digest and reopen assertions. See
+[`change 0091`](changes/0091-xls-visibility-source-overlay-evidence.md).
 
 The native PPT root-snapshot evidence is retained as four short ABBA cycles
 under `results/abba-ppt-slide-order-root-repeat-*.json`. Reader/edit guards,
@@ -933,10 +944,11 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 180 selectable cases; dirty
-worktree additions, including the uncommitted XLS visibility harness, are
-excluded. Its previously
-measured default matrix remains 198 records across deterministic ZIP/OPC, positional
+The committed HEAD standalone harness provides 184 selectable cases. Change
+0091 adds four committed opt-in XLS visibility selectors; they are
+correctness/coverage evidence only and make no release ABBA, speedup,
+allocation, RSS, peak-memory, or physical-I/O claim. The previously measured
+default matrix remains 198 records across deterministic ZIP/OPC, positional
 CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus

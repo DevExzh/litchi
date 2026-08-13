@@ -222,11 +222,9 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**180 selectable cases**; its preceding committed revision had 178. Dirty
-worktree additions, including the uncommitted XLS visibility harness, are not
-included in this count. The historical 36-default-case/198-default-record
-tranche remains measured as documented below; newer selectable cases do not
-inherit those measurements.
+**184 selectable cases**; its preceding committed revision had 180. The
+historical 36-default-case/198-default-record tranche remains measured as
+documented below; newer selectable cases do not inherit those measurements.
 
 Five filesystem cases now exercise eager/source-backed OPC open, eager/source-
 backed one-Part atomic save, and same-length CFB atomic overlay save. A
@@ -293,6 +291,18 @@ publication, complete reopen, patch/inverse and foreign-source refusal. The
 it does not bound the transaction's validated candidate snapshot. No release
 latency, allocation, RSS, or speedup claim is made. See
 [`0090`](changes/0090-rtf-logical-tail-append-evidence.md).
+
+The source-backed XLS worksheet-visibility overlay landed in committed
+production change `bac279116`. Committed change `0091` adds four opt-in eager
+and source-backed scalar/batch selectors over one-owner and bounded 64-owner
+visibility edits. They verify complete worksheet/catalog/opaque-stream
+readback, exact overlay bytes, patch/inverse, source fingerprints/spans, and
+cap/protection refusals. This is correctness/coverage evidence only: it makes
+no release ABBA, speedup, allocation, RSS, peak-memory, or physical-I/O claim.
+The source-backed path retains its complete candidate snapshot; its 64 KiB
+publication sink bound limits writes, and retained output is only for digest
+and reopen assertions, not a candidate-memory bound. See
+[`0091`](changes/0091-xls-visibility-source-overlay-evidence.md).
 
 The previously measured tranche includes six opt-in simulated-range cases,
 two opt-in execution-scaling cases, one opt-in XLSX
