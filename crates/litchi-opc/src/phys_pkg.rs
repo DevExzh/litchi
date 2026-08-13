@@ -7,7 +7,8 @@
 
 use crate::error::{OpcError, Result};
 use crate::limits::{ReadLimits, ReadResource};
-use crate::packuri::PackURI;
+use crate::packuri::{PackURI, PartNameConflict};
+use soapberry_zip::CompressionMethod;
 use soapberry_zip::office::{LazyArchiveReader, LimitResource};
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};
@@ -913,6 +914,124 @@ impl<'data> PhysPkgReader<'data> {
     }
 }
 
+#[derive(Default)]
+struct PartNameSet {
+    /// Full part names folded with the OPC ASCII-case-equivalence rule.
+    names: HashMap<String, PackURI>,
+    /// For each folded ancestor path, one known descendant full name.
+    ///
+    /// OPC topology validation rejects any ancestor/descendant pair. Keeping
+    /// this index makes validation proportional to path depth rather than the
+    /// number of already-emitted members.
+    descendants: HashMap<String, String>,
+}
+
+struct PreparedPartName {
+    folded: String,
+    /// Each item is `(folded ancestor, folded full candidate name)`.
+    ancestors: Vec<(String, String)>,
+}
+
+impl PartNameSet {
+    fn prepare(candidate: &PackURI) -> Result<PreparedPartName> {
+        let folded = fold_part_name(candidate.as_str())?;
+        let mut ancestors = Vec::new();
+        let slash_count = folded.bytes().filter(|byte| *byte == b'/').count();
+        ancestors
+            .try_reserve(slash_count.saturating_sub(1))
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC physical package name ancestors",
+                source,
+            })?;
+        for (index, byte) in folded.bytes().enumerate() {
+            if byte != b'/' || index == 0 {
+                continue;
+            }
+            let ancestor = try_owned_string(&folded[..index], "OPC physical package ancestor")?;
+            let descendant = try_owned_string(&folded, "OPC physical package descendant")?;
+            ancestors.push((ancestor, descendant));
+        }
+        Ok(PreparedPartName { folded, ancestors })
+    }
+
+    fn validate(&self, candidate: &PackURI, prepared: &PreparedPartName) -> Result<()> {
+        if let Some(existing) = self.names.get(&prepared.folded) {
+            let conflict = if existing.as_str() == candidate.as_str() {
+                PartNameConflict::Duplicate
+            } else {
+                PartNameConflict::Equivalent
+            };
+            return Err(part_name_conflict_error(existing, candidate, conflict));
+        }
+        for (ancestor, _) in &prepared.ancestors {
+            if let Some(existing) = self.names.get(ancestor) {
+                return Err(part_name_conflict_error(
+                    existing,
+                    candidate,
+                    PartNameConflict::Derived,
+                ));
+            }
+        }
+        if let Some(descendant) = self.descendants.get(&prepared.folded) {
+            if let Some(existing) = self.names.get(descendant) {
+                return Err(part_name_conflict_error(
+                    existing,
+                    candidate,
+                    PartNameConflict::Derived,
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn reserve(&mut self, prepared: &PreparedPartName) -> Result<()> {
+        self.names
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC physical package names",
+                source,
+            })?;
+        self.descendants
+            .try_reserve(prepared.ancestors.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC physical package descendant index",
+                source,
+            })?;
+        Ok(())
+    }
+
+    fn insert(&mut self, partname: PackURI, prepared: PreparedPartName) {
+        let PreparedPartName { folded, ancestors } = prepared;
+        self.names.insert(folded, partname);
+        for (ancestor, descendant) in ancestors {
+            self.descendants.entry(ancestor).or_insert(descendant);
+        }
+    }
+}
+
+fn try_owned_string(value: &str, resource: &'static str) -> Result<String> {
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(value.len())
+        .map_err(|source| OpcError::Allocation { resource, source })?;
+    owned.push_str(value);
+    Ok(owned)
+}
+
+fn fold_part_name(value: &str) -> Result<String> {
+    let mut folded = String::new();
+    folded
+        .try_reserve_exact(value.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "OPC physical package folded name",
+            source,
+        })?;
+    for byte in value.bytes() {
+        folded.push(char::from(byte.to_ascii_lowercase()));
+    }
+    Ok(folded)
+}
+
 /// Physical package writer for creating OPC packages.
 ///
 /// Handles the low-level writing of parts to a ZIP archive with optimal compression.
@@ -924,6 +1043,98 @@ impl<'data> PhysPkgReader<'data> {
 pub struct PhysPkgWriter<W: Write = Cursor<Vec<u8>>> {
     /// The underlying ZIP archive writer
     archive: soapberry_zip::office::StreamingArchiveWriter<W>,
+    /// Validated OPC member names already committed to this archive.
+    ///
+    /// Keeping this state at the OPC boundary prevents a streaming caller from
+    /// publishing duplicate, ASCII-equivalent, or derived part names while the
+    /// underlying ZIP transport remains format-neutral.
+    part_names: PartNameSet,
+}
+
+/// An owned, sequential writer for one OPC part.
+///
+/// The physical package writer is moved into this value while the part is
+/// being emitted. The part accepts uncompressed bytes through [`Write`] and
+/// returns the package writer from [`Self::finish`], so callers never need to
+/// hold a borrow into a ZIP archive or see a ZIP entry type. Dropping an
+/// unfinished part abandons the consuming package writer and leaves any
+/// already-published sequential sink bytes incomplete.
+pub struct PartWriter<W: Write> {
+    entry: Option<soapberry_zip::office::StreamingArchiveEntry<W>>,
+    partname: PackURI,
+    part_names: PartNameSet,
+    prepared_name: PreparedPartName,
+}
+
+impl<W: Write> Write for PartWriter<W> {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.entry
+            .as_mut()
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "OPC Part writer has already been finished",
+                )
+            })?
+            .write(buffer)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.entry
+            .as_mut()
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "OPC Part writer has already been finished",
+                )
+            })?
+            .flush()
+    }
+}
+
+impl<W: Write> PartWriter<W> {
+    /// Total package bytes accepted by the output sink so far.
+    ///
+    /// This includes local headers and all earlier Parts, not only the active
+    /// Part payload. It is useful for diagnostics before [`Self::finish`] is
+    /// called. A sink failure after publication begins is reported as
+    /// [`OpcError::IncompleteOutput`] from `finish`.
+    #[must_use]
+    pub fn output_bytes(&self) -> u64 {
+        self.entry
+            .as_ref()
+            .map(|entry| entry.progress().output_bytes())
+            .unwrap_or(0)
+    }
+
+    /// Number of uncompressed bytes accepted by this part.
+    #[must_use]
+    pub fn uncompressed_bytes(&self) -> u64 {
+        self.entry
+            .as_ref()
+            .map(soapberry_zip::office::StreamingArchiveEntry::uncompressed_bytes)
+            .unwrap_or(0)
+    }
+
+    /// Finish this part and recover the physical package writer.
+    ///
+    /// The part name becomes committed only after the ZIP entry is finalized.
+    /// If finalization or the sink fails after bytes were accepted, the error
+    /// carries the exact accepted byte count in [`OpcError::IncompleteOutput`].
+    pub fn finish(mut self) -> Result<PhysPkgWriter<W>> {
+        let entry = self.entry.take().ok_or_else(|| {
+            OpcError::ZipError("OPC Part writer has already been finished".to_string())
+        })?;
+        let (archive, _progress) = entry
+            .finish_with_progress()
+            .map_err(map_streaming_failure)?;
+        let partname = self.partname;
+        self.part_names.insert(partname, self.prepared_name);
+        Ok(PhysPkgWriter {
+            archive,
+            part_names: self.part_names,
+        })
+    }
 }
 
 impl PhysPkgWriter<Cursor<Vec<u8>>> {
@@ -932,6 +1143,7 @@ impl PhysPkgWriter<Cursor<Vec<u8>>> {
     pub fn new() -> Self {
         Self {
             archive: soapberry_zip::office::StreamingArchiveWriter::new(),
+            part_names: PartNameSet::default(),
         }
     }
 
@@ -942,9 +1154,11 @@ impl PhysPkgWriter<Cursor<Vec<u8>>> {
     /// # Errors
     /// Returns an error if the ZIP archive cannot be finalized.
     pub fn finish(self) -> Result<Vec<u8>> {
-        self.archive
-            .finish_to_bytes()
-            .map_err(|error| OpcError::ZipError(error.to_string()))
+        let (writer, _progress) = self
+            .archive
+            .finish_with_progress()
+            .map_err(map_streaming_failure)?;
+        Ok(writer.into_inner())
     }
 }
 
@@ -953,7 +1167,59 @@ impl<W: Write> PhysPkgWriter<W> {
     pub fn with_writer(writer: W) -> Self {
         Self {
             archive: soapberry_zip::office::StreamingArchiveWriter::with_writer(writer),
+            part_names: PartNameSet::default(),
         }
+    }
+
+    /// Start a Deflate-compressed OPC Part without buffering its payload.
+    ///
+    /// The package writer is moved into the returned part writer while the
+    /// payload is emitted. Call [`PartWriter::finish`] to recover it. A
+    /// preflight failure consumes this writer without publishing a new local
+    /// header; dropping a successfully started Part leaves the sequential
+    /// output incomplete.
+    /// `partname` must be a checked, non-root [`PackURI`]. Duplicate,
+    /// ASCII-equivalent, and derived names are rejected before the ZIP local
+    /// header is written.
+    pub fn start_part(self, partname: &PackURI) -> Result<PartWriter<W>> {
+        self.start_part_inner(partname, CompressionMethod::Deflate)
+    }
+
+    /// Start a stored OPC Part without buffering its payload.
+    ///
+    /// This is intended for package members whose format contract requires
+    /// Store compression, such as an ODF `mimetype` member. The same OPC name
+    /// validation and bounded ZIP transport policy as [`Self::start_part`]
+    /// applies.
+    pub fn start_stored_part(self, partname: &PackURI) -> Result<PartWriter<W>> {
+        self.start_part_inner(partname, CompressionMethod::Store)
+    }
+
+    /// Number of bytes accepted by the sequential output sink so far.
+    #[must_use]
+    pub fn output_bytes(&self) -> u64 {
+        self.archive.output_bytes()
+    }
+
+    fn start_part_inner(
+        mut self,
+        partname: &PackURI,
+        compression_method: CompressionMethod,
+    ) -> Result<PartWriter<W>> {
+        let prepared_name = PartNameSet::prepare(partname)?;
+        validate_part_name(&self.part_names, partname, &prepared_name)?;
+        self.part_names.reserve(&prepared_name)?;
+        let owned_partname = clone_pack_uri(partname)?;
+        let entry = self
+            .archive
+            .start_entry(partname.membername(), compression_method)
+            .map_err(map_streaming_failure)?;
+        Ok(PartWriter {
+            entry: Some(entry),
+            partname: owned_partname,
+            part_names: self.part_names,
+            prepared_name,
+        })
     }
 
     /// Write a part to the package with Deflate compression.
@@ -965,9 +1231,15 @@ impl<W: Write> PhysPkgWriter<W> {
     /// # Errors
     /// Returns an error if the part cannot be written to the archive.
     pub fn write(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
+        let prepared_name = PartNameSet::prepare(pack_uri)?;
+        validate_part_name(&self.part_names, pack_uri, &prepared_name)?;
+        self.part_names.reserve(&prepared_name)?;
+        let owned_partname = clone_pack_uri(pack_uri)?;
         self.archive
             .write_deflated(pack_uri.membername(), blob)
-            .map_err(|error| OpcError::ZipError(error.to_string()))
+            .map_err(|error| map_archive_error(&error))?;
+        self.part_names.insert(owned_partname, prepared_name);
+        Ok(())
     }
 
     /// Write a part to the package without compression (stored).
@@ -979,9 +1251,15 @@ impl<W: Write> PhysPkgWriter<W> {
     /// # Errors
     /// Returns an error if the part cannot be written to the archive.
     pub fn write_stored(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
+        let prepared_name = PartNameSet::prepare(pack_uri)?;
+        validate_part_name(&self.part_names, pack_uri, &prepared_name)?;
+        self.part_names.reserve(&prepared_name)?;
+        let owned_partname = clone_pack_uri(pack_uri)?;
         self.archive
             .write_stored(pack_uri.membername(), blob)
-            .map_err(|error| OpcError::ZipError(error.to_string()))
+            .map_err(|error| map_archive_error(&error))?;
+        self.part_names.insert(owned_partname, prepared_name);
+        Ok(())
     }
 
     /// Finalize the archive and recover the sequential sink.
@@ -990,8 +1268,9 @@ impl<W: Write> PhysPkgWriter<W> {
     /// Returns an error if the ZIP archive cannot be finalized.
     pub fn finish_into_inner(self) -> Result<W> {
         self.archive
-            .finish()
-            .map_err(|error| OpcError::ZipError(error.to_string()))
+            .finish_with_progress()
+            .map(|(writer, _progress)| writer)
+            .map_err(map_streaming_failure)
     }
 }
 
@@ -1041,6 +1320,55 @@ fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result<Vec<u8>> {
                 source,
             })?;
         data.extend_from_slice(&buffer[..read]);
+    }
+}
+
+fn map_streaming_failure(failure: soapberry_zip::office::StreamingArchiveFailure) -> OpcError {
+    let written = failure.progress().output_bytes();
+    let source = OpcError::from(failure.into_error());
+    if written == 0 {
+        source
+    } else {
+        OpcError::IncompleteOutput {
+            written,
+            source: Box::new(source),
+        }
+    }
+}
+
+fn validate_part_name(
+    part_names: &PartNameSet,
+    candidate: &PackURI,
+    prepared: &PreparedPartName,
+) -> Result<()> {
+    if candidate.as_str() == "/" {
+        return Err(OpcError::InvalidPackUri(
+            "an OPC Part cannot use the package root URI".to_string(),
+        ));
+    }
+    part_names.validate(candidate, prepared)
+}
+
+fn clone_pack_uri(candidate: &PackURI) -> Result<PackURI> {
+    let owned = try_owned_string(candidate.as_str(), "OPC physical package part name")?;
+    PackURI::new(owned).map_err(OpcError::InvalidPackUri)
+}
+
+fn part_name_conflict_error(
+    existing: &PackURI,
+    candidate: &PackURI,
+    conflict: PartNameConflict,
+) -> OpcError {
+    match conflict {
+        PartNameConflict::Duplicate => OpcError::DuplicatePartName(candidate.to_string()),
+        PartNameConflict::Equivalent => OpcError::EquivalentPartNames {
+            existing: existing.to_string(),
+            candidate: candidate.to_string(),
+        },
+        PartNameConflict::Derived => OpcError::DerivedPartNames {
+            existing: existing.to_string(),
+            candidate: candidate.to_string(),
+        },
     }
 }
 
@@ -1311,6 +1639,142 @@ mod tests {
         assert!(reader.contains(&rels));
         assert!(reader.contains(&document));
         assert_eq!(reader.blob_for(&document).unwrap(), b"<document/>");
+    }
+
+    #[test]
+    fn owned_part_writer_streams_and_recovers_the_physical_writer() {
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let styles = PackURI::new("/word/styles.xml").unwrap();
+        let mut writer = PhysPkgWriter::new();
+
+        let mut document_writer = writer.start_part(&document).unwrap();
+        document_writer
+            .write_all(b"<document>streamed</document>")
+            .unwrap();
+        assert_eq!(document_writer.uncompressed_bytes(), 29);
+        writer = document_writer.finish().unwrap();
+
+        let mut styles_writer = writer.start_stored_part(&styles).unwrap();
+        styles_writer.write_all(b"<styles/>").unwrap();
+        writer = styles_writer.finish().unwrap();
+
+        let bytes = writer.finish().unwrap();
+        let reader = PhysPkgReader::new(&bytes).unwrap();
+        assert_eq!(
+            reader.blob_for(&document).unwrap(),
+            b"<document>streamed</document>"
+        );
+        assert_eq!(reader.blob_for(&styles).unwrap(), b"<styles/>");
+    }
+
+    #[test]
+    fn physical_writer_rejects_duplicate_equivalent_and_derived_names() {
+        let mut writer = PhysPkgWriter::new();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        writer.write(&document, b"document").unwrap();
+
+        assert!(matches!(
+            writer.write(&document, b"duplicate"),
+            Err(OpcError::DuplicatePartName(_))
+        ));
+        assert!(matches!(
+            writer.write(&PackURI::new("/WORD/DOCUMENT.XML").unwrap(), b"equivalent"),
+            Err(OpcError::EquivalentPartNames { .. })
+        ));
+        assert!(matches!(
+            writer.write(
+                &PackURI::new("/word/document.xml/image.bin").unwrap(),
+                b"derived"
+            ),
+            Err(OpcError::DerivedPartNames { .. })
+        ));
+        let root_writer = PhysPkgWriter::new();
+        assert!(matches!(
+            root_writer.start_part(&PackURI::new("/").unwrap()),
+            Err(OpcError::InvalidPackUri(_))
+        ));
+
+        let bytes = writer.finish().unwrap();
+        let reader = PhysPkgReader::new(&bytes).unwrap();
+        assert_eq!(reader.blob_for(&document).unwrap(), b"document");
+
+        let mut child_first = PhysPkgWriter::new();
+        child_first
+            .write(
+                &PackURI::new("/word/document.xml/image.bin").unwrap(),
+                b"child",
+            )
+            .unwrap();
+        assert!(matches!(
+            child_first.write(&document, b"parent"),
+            Err(OpcError::DerivedPartNames { .. })
+        ));
+    }
+
+    #[test]
+    fn owned_part_name_conflict_is_rejected_before_local_header_output() {
+        let mut sink = Vec::new();
+        let parent = PackURI::new("/word/document.xml").unwrap();
+        let child = PackURI::new("/word/document.xml/image.bin").unwrap();
+        let mut writer = PhysPkgWriter::with_writer(&mut sink);
+        let mut part = writer.start_part(&parent).unwrap();
+        part.write_all(b"parent").unwrap();
+        writer = part.finish().unwrap();
+        let bytes_before = writer.output_bytes() as usize;
+
+        let conflict = writer.start_part(&child);
+        assert!(matches!(conflict, Err(OpcError::DerivedPartNames { .. })));
+        drop(conflict);
+        assert_eq!(sink.len(), bytes_before);
+    }
+
+    struct PartialSink {
+        bytes: Vec<u8>,
+        limit: usize,
+    }
+
+    impl Write for PartialSink {
+        fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+            let remaining = self.limit.saturating_sub(self.bytes.len());
+            if remaining == 0 {
+                return Err(std::io::Error::other("partial OPC sink failure"));
+            }
+            let accepted = remaining.min(buffer.len());
+            self.bytes.extend_from_slice(&buffer[..accepted]);
+            if accepted < buffer.len() {
+                return Err(std::io::Error::other("partial OPC sink failure"));
+            }
+            Ok(accepted)
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn owned_part_writer_reports_typed_partial_progress() {
+        let sink = PartialSink {
+            bytes: Vec::new(),
+            limit: 128,
+        };
+        let partname = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+        let mut part = PhysPkgWriter::with_writer(sink)
+            .start_stored_part(&partname)
+            .unwrap();
+        let write_error = part.write_all(&vec![b'x'; 4096]).unwrap_err();
+        assert_eq!(write_error.kind(), std::io::ErrorKind::Other);
+
+        let finish_result = part.finish();
+        match finish_result {
+            Err(OpcError::IncompleteOutput { written, source }) => {
+                assert!(written > 0);
+                assert!(written < 128);
+                assert!(matches!(*source, OpcError::ZipError(_)));
+            },
+            Ok(_) => panic!("partial output unexpectedly finished"),
+            Err(other) => panic!("unexpected partial output error: {other:?}"),
+        }
     }
 
     #[test]
