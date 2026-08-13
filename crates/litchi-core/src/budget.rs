@@ -218,6 +218,27 @@ impl Reservation {
     pub const fn resource(&self) -> Resource {
         self.resource
     }
+
+    /// Commits at most the reserved amount as cumulative usage.
+    ///
+    /// A reservation normally releases all of its charge when dropped.  A
+    /// sequential writer can instead preflight a maximum write, perform the
+    /// sink operation, and commit the exact number of bytes accepted without
+    /// releasing the charge into a race window.  Returns `false` when
+    /// `amount` exceeds the reservation; in that case the reservation is
+    /// released normally and no cumulative usage is retained.
+    #[must_use = "check whether the requested amount was committed"]
+    pub fn commit(mut self, amount: u64) -> bool {
+        if amount > self.amount {
+            return false;
+        }
+        if amount < self.amount {
+            release_nodes(&self.nodes, self.resource, self.amount - amount);
+        }
+        self.nodes.clear();
+        self.amount = 0;
+        true
+    }
 }
 
 impl Drop for Reservation {
@@ -268,6 +289,52 @@ mod tests {
         drop(first);
         assert_eq!(budget.used(Resource::Memory), 0);
         assert!(budget.reserve(Resource::Memory, 10).is_ok());
+    }
+
+    #[test]
+    fn reservations_can_commit_an_exact_short_write() {
+        let budget = Budget::root("document", limits(10));
+        let reservation = budget.reserve(Resource::Memory, 7).expect("reserve");
+        assert!(reservation.commit(3));
+        assert_eq!(budget.used(Resource::Memory), 3);
+        assert!(budget.reserve(Resource::Memory, 7).is_ok());
+    }
+
+    #[test]
+    fn committed_reservation_preserves_hierarchical_charge() {
+        let root = Budget::root("document", limits(100));
+        let child = root.child("worksheet", limits(100));
+        let reservation = child.reserve(Resource::OutputBytes, 7).expect("reserve");
+        assert_eq!(root.used(Resource::OutputBytes), 7);
+        assert_eq!(child.used(Resource::OutputBytes), 7);
+        assert!(reservation.commit(3));
+        assert_eq!(root.used(Resource::OutputBytes), 3);
+        assert_eq!(child.used(Resource::OutputBytes), 3);
+
+        let exact = child
+            .reserve(Resource::OutputBytes, 4)
+            .expect("reserve exact");
+        assert!(exact.commit(4));
+        assert_eq!(root.used(Resource::OutputBytes), 7);
+        assert_eq!(child.used(Resource::OutputBytes), 7);
+
+        let zero = child
+            .reserve(Resource::OutputBytes, 5)
+            .expect("reserve zero");
+        assert!(zero.commit(0));
+        assert_eq!(root.used(Resource::OutputBytes), 7);
+        assert_eq!(child.used(Resource::OutputBytes), 7);
+
+        let over = child
+            .reserve(Resource::OutputBytes, 5)
+            .expect("reserve over");
+        assert!(!over.commit(6));
+        assert_eq!(root.used(Resource::OutputBytes), 7);
+        assert_eq!(child.used(Resource::OutputBytes), 7);
+        let released = child
+            .reserve(Resource::OutputBytes, 93)
+            .expect("over-commit must release its complete reservation");
+        drop(released);
     }
 
     #[test]
