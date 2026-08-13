@@ -3,7 +3,8 @@
 `litchi-perf-baseline` is an isolated, reproducible measurement tool for the
 ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
 public-API XLSX snapshot/edit/save flows, and opt-in DOC/XLS/PPT,
-DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows. It creates every corpus in memory; it also exercises
+DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows, including the opt-in RTF logical-tail
+append transaction. It creates every corpus in memory; it also exercises
 source-backed XLSX catalog, worksheet reads, and guarded calculation-metadata,
 defined-name, page-break/page-margin/page-setup/print-options/sheet-protection/data-validation/auto-filter
 publication over positional I/O. It does not
@@ -42,8 +43,9 @@ two XLSX merge/unmerge commit-plus-save cases,
 two bounded XLSX/RTF streaming-creation cases,
 four matched native XLS existing-comment publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
-DOCX/PPTX semantic cases, 13 RTF semantic cases, and 36 ODF semantic cases
-are opt-in, for 175 selectable cases in total:
+DOCX/PPTX semantic cases, 15 RTF semantic cases (13 transport/read/edit
+cases plus two logical-tail publication cases), and 36 ODF semantic cases are
+opt-in. The current `Case` matrix exposes 180 selectable case names in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -603,6 +605,30 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/semantic-rtf-variants-smoke.json
 ```
 
+Measure logical append to an existing plain RTF separately from streaming
+creation. The command below selects small, medium, and large existing
+documents; the changed case appends 4, 64, or 256 bounded plain paragraphs,
+while the no-op case commits an empty tail transaction. Both cases publish to
+a fixed 16 KiB non-seek sink window. Every sample is checked against an
+untimed output digest, and the preflight gates cover exact no-op identity,
+in-memory patch replay/inverse, durable JSON decode/apply/inverse, complete
+reopen, and foreign-source conflict refusal:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 --semantic-shape tiny,medium,large \
+  --case rtf_logical_tail_append,rtf_logical_tail_noop_save \
+  --json target/perf/rtf-logical-tail-append.json
+```
+
+The timed interval includes append staging, candidate commit validation, and
+sequential publication. Source parsing, expected-output construction, durable
+wire work, reopening, and all correctness gates remain outside timing. The
+`sink.rtf_tail_append` object records source/input/inserted/output bytes,
+paragraph/run counts, the fixed sink window, and boolean gate results. This is
+selectable baseline evidence only; it makes no speedup or latency claim until
+a frozen release-build CPU-pinned ABBA comparison exists.
+
 Exercise deterministic high-latency, range-bounded positional I/O without a
 network. Every upstream logical read is split into physical requests no larger
 than the selected maximum:
@@ -750,7 +776,10 @@ The RTF cases exercise only the ordinary native `litchi_rtf::Document` facade:
 owned-byte open, lazy paragraph enumeration, one middle paragraph, first
 complete-text materialization, bounded semantic-text output to a forward-only
 sink, exact source streaming, exact empty-edit publication, and
-capability-bounded one-paragraph and `ceil(1%)` paragraph edit/save.
+capability-bounded one-paragraph and `ceil(1%)` paragraph edit/save. The two
+`rtf_logical_tail_*` cases are a separate existing-document append tranche;
+they do not reuse the streaming-creation path and are restricted to the
+matched plain lifecycle corpus.
 The two lifecycle cases use a matched default-formatted plain corpus because
 the read/edit corpus's explicit font formatting is outside their changed
 publication closure.
@@ -758,10 +787,10 @@ publication closure.
 
 | Variant | Source | Shapes | Supported cases |
 |---|---|---|---|
-| `plain` | Deterministic direct ASCII RTF | tiny, medium, large | All 13 |
-| `byte1252` | Deterministic raw CP-1252 bytes containing literal `0xe9` | tiny, medium, large | Open/read/text-to-sink/stream/no-op; changed splice is excluded because candidate validation refuses this byte layout |
-| `lzfu` | Deterministic LZFu compression of the plain bytes | tiny, medium, large | Open/read/text-to-sink/stream/no-op; changed transport rewrites are explicitly unsupported |
-| `watermark` | Content-addressed real-producer `test-data/rtf/watermark.rtf` | tiny selector only | Open/read/stream/no-op; semantic body-text output is excluded because its meaningful content is header drawing metadata rather than editable body text |
+| `plain` | Deterministic direct ASCII RTF | tiny, medium, large | All 15, including logical-tail append/no-op |
+| `byte1252` | Deterministic raw CP-1252 bytes containing literal `0xe9` | tiny, medium, large | The original 13 open/read/text-to-sink/stream/no-op cases; changed splice and logical tail are excluded because candidate validation refuses this byte layout |
+| `lzfu` | Deterministic LZFu compression of the plain bytes | tiny, medium, large | The original 13 open/read/text-to-sink/stream/no-op cases; changed transport and logical-tail rewrites are explicitly unsupported |
+| `watermark` | Content-addressed real-producer `test-data/rtf/watermark.rtf` | tiny selector only | The original open/read/stream/no-op cases; semantic body-text output and logical-tail publication are excluded because the meaningful content is header drawing metadata rather than editable body text |
 
 Every save uses the native forward-only `Write` contract and every output is
 reopened and fully verified. The watermark verifier additionally requires the
@@ -781,6 +810,18 @@ plain variant: it stages the middle paragraph through `replace_paragraph_text`,
 commits with source and semantic readback checks, streams the changed snapshot,
 and verifies every paragraph after reopen. Corpus creation, expected-output
 construction, and input cloning remain outside the timed interval.
+
+The logical-tail cases use the matched default-formatted lifecycle corpus,
+which has 24/200/10,000 existing paragraphs for tiny/medium/large. They append
+4/64/256 one-run plain paragraphs under explicit paragraph, run, input,
+inserted-byte, output, and durable-patch limits. The resulting source/input /
+inserted/output byte counters are 1,304/168/273/1,577 for tiny,
+10,808/2,816/4,421/15,229 for medium, and
+540,008/11,008/17,413/557,421 for large. Publication uses a 16 KiB
+windowed non-seek sink that retains zero output bytes; the large case therefore
+reports multiple bounded writes instead of one whole-document write. This
+window is a sink accounting bound, not a claim that the append transaction's
+validated candidate snapshot is memory-bounded.
 
 ## Opt-in ODF semantic corpus matrix
 
@@ -1192,6 +1233,15 @@ remain distinguishable.
   remains exact. Native RTF has no logical-Part materialization counter, so the
   report records honest output hashes and bounded sink counters rather than a
   fabricated Part count.
+- `rtf_logical_tail_append`: stage a bounded batch of borrowed plain paragraphs
+  immediately before the exact root close of an existing lifecycle document,
+  then commit and publish through the windowed non-seek sink. The untimed
+  gates prove complete paragraph/text readback, exact source bytes, in-memory
+  patch/inverse, durable JSON apply/inverse, and foreign-source refusal.
+- `rtf_logical_tail_noop_save`: run the same existing-document tail transaction
+  with an empty batch. It measures exact no-op commit plus sequential
+  publication and reports shared snapshot identity separately from the changed
+  append case.
 
 The two lifecycle intervals include edit construction, the one staging call,
 commit, a constant-size diagnostics assertion, one shared snapshot-handle
@@ -1329,6 +1379,14 @@ Streaming-creation cases also emit `output_sha256`. Their `sink` extensions are
 content-free scalar evidence; `retained_output_bytes` is always zero and
 `retained_authoring_window_bytes` is the row/text encoder bound, not process RSS or a
 claim about allocator internals.
+
+Logical-tail RTF cases also emit `output_sha256`. Their `sink.rtf_tail_append`
+object records the operation (`append` or `exact_noop`), source, caller-input,
+inserted, and published output bytes, appended paragraph/run counts, the 16 KiB
+sink window, and boolean exact-no-op, in-memory patch, durable patch, reopen,
+and source-conflict gates. `retained_output_bytes: 0` describes only the timed
+sink; the append API intentionally retains its validated candidate snapshot,
+so the window is not a process-RSS or transaction-memory claim.
 
 `docx_source_backed_one_edit_save` also emits `output_sha256`, source/sink
 distributions, and `ordinary_payload_materializations`. Its value is exactly
