@@ -54,6 +54,30 @@ impl Spreadsheet {
         Self::from_package(package)
     }
 
+    /// Adopt the indexed package retained by smart ODF detection.
+    ///
+    /// This transfers the detector-owned archive index into the immutable
+    /// spreadsheet package without a second ZIP central-directory scan.
+    pub fn from_prepared_package(
+        prepared: litchi_odf_common::core::PreparedPackage,
+    ) -> Result<Self> {
+        let package = crate::package::Package::from_prepared_package(prepared)?;
+        Self::from_package(package)
+    }
+
+    /// Alias for [`Self::from_prepared_package`].
+    #[inline]
+    pub fn from_prepared(prepared: litchi_odf_common::core::PreparedPackage) -> Result<Self> {
+        Self::from_prepared_package(prepared)
+    }
+
+    /// Return the identity of the archive index retained by smart detection.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn prepared_index_identity(&self) -> usize {
+        self.package.prepared_index_identity()
+    }
+
     /// Open password-encrypted ODS bytes and fully decode the public semantic owners.
     ///
     /// # Errors

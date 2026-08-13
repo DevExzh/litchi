@@ -119,7 +119,7 @@ pub fn flat(value: &[u8]) -> Option<Format> {
 #[must_use]
 pub fn bytes(value: &[u8]) -> Option<Format> {
     if value.starts_with(ZIP_SIGNATURE) {
-        let format = mime(packaged_mime(value)?)?;
+        let format = packaged_mime(value)?;
         let archive = soapberry_zip::office::ArchiveReader::new(value).ok()?;
         if !archive.is_stored(MIMETYPE_PATH).ok()? {
             return None;
@@ -127,6 +127,17 @@ pub fn bytes(value: &[u8]) -> Option<Format> {
         return Some(format);
     }
     flat(value)
+}
+
+/// Classify a packaged ODF candidate from its local `mimetype` entry only.
+///
+/// Unlike [`bytes`], this helper does not inspect the central directory. It is
+/// intended for an owner that will immediately run [`prepared_or_original`]
+/// and build the bounded archive index exactly once. A nonconforming local
+/// header, unknown MIME type, or non-ZIP input returns `None`.
+#[must_use]
+pub fn packaged_mime(value: &[u8]) -> Option<Format> {
+    mime(packaged_mime_bytes(value)?)
 }
 
 /// Detect a packaged ODF document while retaining its validated ZIP index.
@@ -146,9 +157,9 @@ pub fn prepared(value: Vec<u8>) -> Option<PreparedPackage> {
 /// detector. A rejected candidate returns the caller's original `Vec`
 /// allocation so a lower-precedence package detector can inspect it without a
 /// full-input clone.
-#[must_use]
+#[must_use = "inspect the prepared package or recover the original bytes"]
 pub fn prepared_or_original(value: Vec<u8>) -> Result<PreparedPackage, Vec<u8>> {
-    let Some(format) = packaged_mime(&value).and_then(mime) else {
+    let Some(format) = packaged_mime(&value) else {
         return Err(value);
     };
     let package = OwnedPackage::from_prepared_bytes_or_recover(value)?;
@@ -182,7 +193,7 @@ pub fn reader<R: Read + Seek>(value: &mut R) -> Option<Format> {
     detected
 }
 
-fn packaged_mime(value: &[u8]) -> Option<&[u8]> {
+fn packaged_mime_bytes(value: &[u8]) -> Option<&[u8]> {
     if value.get(..4)? != ZIP_SIGNATURE {
         return None;
     }

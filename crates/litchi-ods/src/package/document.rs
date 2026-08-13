@@ -1,6 +1,8 @@
 use litchi_core::{Error, Result};
 use litchi_odf_common::calculation::Settings;
-use litchi_odf_common::core::{OwnedPackage, PackageWriter, XmlSplicePublication, family};
+use litchi_odf_common::core::{
+    OwnedPackage, PackageWriter, PreparedPackage, XmlSplicePublication, family,
+};
 use litchi_odf_common::package::{
     replace_content_xml as replace_package_content_xml, replace_content_xml_spliced,
 };
@@ -44,6 +46,33 @@ impl Package {
         Ok(Self(package))
     }
 
+    /// Adopt the indexed package retained by smart ODF detection.
+    ///
+    /// The prepared value is consumed only after the ODS MIME contract is
+    /// checked, so a mismatched family is reported without exposing or
+    /// rebuilding the underlying archive index.
+    pub fn from_prepared_package(prepared: PreparedPackage) -> Result<Self> {
+        if prepared.format() != litchi_core::detection::FileFormat::Ods {
+            return Err(Error::InvalidFormat(
+                "prepared ODF package is not an ODS family document".to_string(),
+            ));
+        }
+        let package = family::Package::from_owned_package(
+            prepared.into_package(),
+            MIMETYPE,
+            BODY_MARKER,
+            "ODS",
+        )?;
+        crate::authoring::validate_content_xml(package.content_xml())?;
+        Ok(Self(package))
+    }
+
+    /// Alias for [`Self::from_prepared_package`].
+    #[inline]
+    pub fn from_prepared(prepared: PreparedPackage) -> Result<Self> {
+        Self::from_prepared_package(prepared)
+    }
+
     /// Adopt shared ODS bytes for an internal source-bound transaction.
     pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
         let package = family::Package::from_shared_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS")?;
@@ -82,6 +111,13 @@ impl Package {
     #[must_use]
     pub fn package(&self) -> &OwnedPackage {
         self.0.package()
+    }
+
+    /// Return the identity of the archive index retained by smart detection.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn prepared_index_identity(&self) -> usize {
+        self.0.package().prepared_index_identity()
     }
 
     /// Decode the complete ODS metadata snapshot, retaining the bounded

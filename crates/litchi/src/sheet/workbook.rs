@@ -127,6 +127,19 @@ impl Workbook {
     /// - No temporary files created
     /// - Ideal for network data, streams, or in-memory content
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        #[cfg(feature = "ods")]
+        let bytes = match crate::detection_smart::detected::detect_prepared_ods(bytes) {
+            Ok(prepared) => {
+                let ods = litchi_ods::Spreadsheet::from_prepared_package(prepared)
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                return Ok(Self {
+                    inner: WorkbookImpl::Ods(std::cell::RefCell::new(ods)),
+                    cached_metadata: Metadata::default(),
+                });
+            },
+            Err(bytes) => bytes,
+        };
+
         // Detection consumes the input and returns either a parsed owner or the
         // moved source bytes, depending on the format.
         use crate::detection_smart::{DetectedFormat, detect_format_smart};
@@ -524,6 +537,121 @@ mod flat_ods_dispatch_tests {
             Workbook::open(file.path()),
             Err(error) if error.to_string().contains("flat OpenDocument")
         ));
+    }
+}
+
+#[cfg(all(test, feature = "ods", any(feature = "xlsx", feature = "xlsb")))]
+mod ooxml_odf_polyglot_tests {
+    use super::Workbook;
+    use std::io::{Cursor, Write};
+
+    fn dual_marker_xlsx() -> Vec<u8> {
+        let mut output = Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+
+        // Keep the valid ODF local mimetype first, as required by ODF. The
+        // remaining entries form a valid minimal OPC/XLSX package as well.
+        writer.start_file("mimetype", options).unwrap();
+        writer
+            .write_all(b"application/vnd.oasis.opendocument.spreadsheet")
+            .unwrap();
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>"#,
+            )
+            .unwrap();
+        writer.start_file("_rels/.rels", options).unwrap();
+        writer
+            .write_all(
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.start_file("xl/workbook.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>"#,
+            )
+            .unwrap();
+        writer
+            .start_file("xl/_rels/workbook.xml.rels", options)
+            .unwrap();
+        writer
+            .write_all(
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer
+            .start_file("xl/worksheets/sheet1.xml", options)
+            .unwrap();
+        writer
+            .write_all(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>"#,
+            )
+            .unwrap();
+        writer.finish().unwrap();
+        output.into_inner()
+    }
+
+    #[cfg(feature = "xlsx")]
+    #[test]
+    fn ooxml_first_precedence_survives_an_odf_local_mimetype_marker() {
+        let bytes = dual_marker_xlsx();
+        assert!(matches!(
+            crate::detection_smart::detect_format_smart(bytes.clone()),
+            Some(crate::detection_smart::DetectedFormat::Xlsx(_))
+        ));
+        let workbook = Workbook::from_bytes(bytes)
+            .expect("OOXML-first precedence should select the valid XLSX owner");
+        assert_eq!(workbook.worksheet_names().unwrap(), ["Sheet1"]);
+    }
+
+    #[cfg(all(feature = "xlsb", not(feature = "xlsx")))]
+    #[test]
+    fn disabled_xlsx_owner_keeps_smart_precedence() {
+        let bytes = dual_marker_xlsx();
+        assert!(crate::detection_smart::detect_format_smart(bytes.clone()).is_none());
+        assert!(crate::detection_smart::detected::detect_prepared_ods(bytes.clone()).is_err());
+
+        let error = Workbook::from_bytes(bytes)
+            .err()
+            .expect("disabled XLSX owner must not fall through to ODS");
+        assert_eq!(error.to_string(), "Not a valid Office file");
+    }
+
+    #[test]
+    fn invalid_odf_body_still_falls_back_to_typed_ods_validation() {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_SPREADSHEET)
+            .unwrap();
+        writer
+            .add_file("content.xml", b"<not-an-ods-document/>")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let error = Workbook::from_bytes(bytes)
+            .err()
+            .expect("invalid ODS body must not be accepted as XLSX");
+        assert!(error.to_string().contains("ODS"));
+    }
+
+    #[test]
+    fn valid_ods_wins_after_the_ooxml_probe_fails() {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_SPREADSHEET)
+            .unwrap();
+        writer
+            .add_file(
+                "content.xml",
+                br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table table:name="Sheet1"/></office:spreadsheet></office:body></office:document-content>"#,
+            )
+            .unwrap();
+
+        assert!(Workbook::from_bytes(writer.finish_to_bytes().unwrap()).is_ok());
     }
 }
 

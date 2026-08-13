@@ -4,7 +4,7 @@ use crate::codec::Parser;
 use crate::core::{OwnedPackage, family::Package};
 use crate::model::{Reference, Settings, Slide, declaration, page_layout, page_metadata, settings};
 use litchi_core::{Error, Metadata, Result};
-use litchi_odf_common::constants::ODF_PRESENTATION;
+use litchi_odf_common::{constants::ODF_PRESENTATION, core::PreparedPackage};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -101,6 +101,25 @@ impl Presentation {
             .map(|package| Self { package })
     }
 
+    /// Adopt the indexed package retained by smart ODF detection.
+    ///
+    /// The concrete ODP MIME and body contracts remain checked at this
+    /// boundary while the detector-owned ZIP index is transferred unchanged.
+    pub fn from_prepared_package(prepared: PreparedPackage) -> Result<Self> {
+        if prepared.format() != litchi_core::detection::FileFormat::Odp {
+            return Err(Error::InvalidFormat(
+                "prepared ODF package is not an ODP family document".to_string(),
+            ));
+        }
+        Self::from_owned_package(prepared.into_package())
+    }
+
+    /// Alias for [`Self::from_prepared_package`].
+    #[inline]
+    pub fn from_prepared(prepared: PreparedPackage) -> Result<Self> {
+        Self::from_prepared_package(prepared)
+    }
+
     /// Create a presentation while sharing an existing archive allocation.
     pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
         Package::from_shared_bytes(bytes, ODF_PRESENTATION, BODY_MARKER, "ODP")
@@ -111,6 +130,13 @@ impl Presentation {
     pub(crate) fn from_owned_package(package: OwnedPackage) -> Result<Self> {
         Package::from_owned_package(package, ODF_PRESENTATION, BODY_MARKER, "ODP")
             .map(|validated| Self { package: validated })
+    }
+
+    /// Return the identity of the archive index retained by smart detection.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn prepared_index_identity(&self) -> usize {
+        self.package.package().prepared_index_identity()
     }
 
     /// Create a presentation from password-encrypted ODP bytes.
