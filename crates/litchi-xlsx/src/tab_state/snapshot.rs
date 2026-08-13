@@ -71,7 +71,7 @@ impl Snapshot {
     ) -> Result<Self> {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
-        let workbook_bytes = workbook.data()?.into_arc();
+        let workbook_bytes = workbook.data()?.into_arc()?;
         let catalog = raw::parse_catalog(workbook_bytes.as_slice())?;
         let graph = capture_source_graph(package, &workbook, &catalog.sheets)?;
         let (tabs, active) = semantic_tabs(&catalog)?;
@@ -526,7 +526,7 @@ fn capture_source_touched(
     for position in positions {
         let binding = checked_tabular_binding(graph, position)?;
         let part = package.part(&binding.part.uri)?;
-        let bytes = part.data()?.into_arc();
+        let bytes = part.data()?.into_arc()?;
         touched.push(TouchedPart {
             position,
             part: PartState::new(
