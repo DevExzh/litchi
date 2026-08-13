@@ -40,7 +40,7 @@ two matched XLSX auto-filter/sort-state publication cases,
 two matched XLSX conditional-formatting publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, 13 RTF semantic cases, and 36 ODF semantic cases
-are opt-in, for 162 selectable cases in total:
+are opt-in, for 167 selectable cases in total:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -92,6 +92,43 @@ which validates the selected payload, preserves the existing URI, content type,
 relationships and topology, raw-copies every other member, and writes to a
 sequential sink. Payload preparation and complete output verification stay
 outside timing.
+
+Measure the controlled filesystem tranche (five opt-in cases):
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 5 \
+  --case opc_file_eager_open,opc_file_source_open,\
+opc_file_eager_one_part_atomic_save,opc_file_source_one_part_atomic_save,\
+cfb_file_same_length_overlay_atomic_save \
+  --json target/perf/filesystem-crud.json
+```
+
+Use `--filesystem-cache warm` for a warm-only smoke, or
+`--filesystem-cache warm,cold-requested` (the default) for both keyed states.
+Use `--filesystem-root PATH` to place the source, destination, and sibling
+temporary files under a caller-selected filesystem; the report records only
+that a root was selected, not the path itself.
+
+Each sample uses a fresh child process and reports child operation time plus
+parent-observed wall time. A separate child primes the warm path immediately
+before each warm sample; the cold sample requests Linux `posix_fadvise`
+`DONTNEED` immediately before timing and records whether that advisory request
+was accepted. `cold-requested` is a cache-state request, not a claim that the
+kernel or storage device delivered a guaranteed cold cache. The additive
+`filesystem_evidence` JSON section records per-sample `ReadAt` request and
+return byte counts, request sizes, maximum in-flight reads, procfs I/O/fault/
+RSS counters, deterministic output hashes and byte lengths, and semantic
+reopen checks. The OPC corpus and expected one-Part output hashes, plus the
+CFB corpus and exact 36-byte-overlay output hash, are pinned and checked before
+samples; when both OPC save cases are selected, their per-state sample hashes
+must also match. Save cases seed a pre-existing destination before both warm and cold measurements
+and publish through a same-filesystem sibling temporary file plus atomic
+rename; the CFB case uses the checked same-length stream-overlay publisher and
+records its changed-span and published-byte report fields. OPC materialization
+counts are recorded when exposed by the public API. After every prime and
+measured child, the parent re-reads the source and checks its pinned SHA-256
+before proceeding to the next sample.
 
 Measure the media-rich DOCX source-backed semantic-edit control:
 
@@ -1079,9 +1116,13 @@ are unchanged; CFB reports use `compression: "none"`
 and count streams in `archive_member_count`. The report also records the git
 revision and dirty state when available, `rustc` version, build profile and
 target, visible logical CPUs, allocator, relevant Cargo/Rust flags, and Linux
-`perf_event_paranoid` value. Metadata collection is best-effort and is complete
-before timed iterations. The requested JSON parent directory is created
-automatically.
+`perf_event_paranoid` value. Filesystem-enabled reports additionally expose
+best-effort non-path host evidence: OS/kernel, CPU model, total memory, page
+size, filesystem type, current CPU affinity, and whether the measured
+source/destination probe used one device. A storage identifier is deliberately
+serialized as `null`; absolute paths and device identifiers are never emitted.
+Metadata collection is best-effort and is complete before timed iterations.
+The requested JSON parent directory is created automatically.
 
 `configuration.writer_shapes` is an additive schema-v1 field identifying the
 fresh writer shape selection. For writer records, `entry_count` is the logical
@@ -1121,6 +1162,18 @@ Simulated-range records additionally contain `source.simulation`: per-sample
 logical read calls/bytes, physical request count/bytes, sorted physical request
 sizes, and fixed request-size buckets. Request delays are computed only from
 the recorded configuration; no ambient network or clock-derived input is used.
+
+Filesystem records are additive under `filesystem_evidence`. Each evidence
+sample is keyed by case, corpus manifest, sample index, and `cache_state`
+(`warm` or `cold-requested`), and pairs child elapsed time with parent-observed
+wall time. It includes logical `ReadAt` requested/returned bytes, fixed request
+size buckets, maximum concurrent reads, procfs I/O/fault/RSS deltas (with
+post-sample `VmHWM`), output SHA-256 and byte length for saves, and public API
+publication counters where available. `opc_materialized_parts` is explicit
+zero for the raw-copy source overlay path; CFB records changed spans and
+published bytes. The configuration records selected cache states, process
+isolation, fresh-child sampling, and whether a caller-selected filesystem root
+was used.
 
 Positional XLSX records additionally contain `source.xlsx` arrays for physical
 overlap with the workbook, selected worksheet, all unselected worksheets,
