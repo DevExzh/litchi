@@ -1,8 +1,9 @@
 # Performance program phase report
 
-Date: 2026-08-13
+Date: 2026-08-14
 Branch: `feat/office-format-completeness`
-Production base for the latest measured tranche: `6df5d4a1fbe53a8216e63f24cc1392be60b714a8`
+Historical production base for the original measured tranche:
+`6df5d4a1fbe53a8216e63f24cc1392be60b714a8`
 
 This report summarizes the measured implementation tranches to date. It is not a
 claim that the end-to-end performance program or CRUD scenario matrix is
@@ -12,8 +13,10 @@ definitions, commands, and profiler limitations are in
 
 ## Current stable tranche
 
-The original stage-1 results below remain historical evidence. The current
-harness contains **169 selectable cases**. The measured 36-default-case,
+The original stage-1 results below remain historical evidence. The committed
+HEAD harness contains **180 selectable cases**; its preceding committed
+revision had 178. Dirty worktree additions, including the uncommitted XLS
+visibility harness, are not included in this count. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
 opt-in simulated-range cases, two opt-in scaling cases, one opt-in XLSX
@@ -49,8 +52,11 @@ is still not broad program or CRUD coverage.
 | Source-backed XLSX auto-filter publication | Media-rich filter/sort edit-save p50 **-97.75%** (44.40x), mean **-97.75%**; instructions **-73.57%**; materializations **12 -> 3**; byte-identical output | One existing normal worksheet's direct auto-filter and sort state only; cells, tables, formula evaluation, relationships, topology, MCE-selected state and changed signed sources remain outside the capability |
 | Deterministic range simulation | XLSX listing has zero timed requests; selected reads have zero unselected-sheet overlap; full physical size distributions recorded | Synthetic latency model, not a cold filesystem or ambient network |
 | [Filesystem cache-state smoke](changes/0087-filesystem-cache-state-evidence.md) | Schema 1 debug artifact completed 10 warm/cold-requested result records and five evidence records; source OPC open uses 13 logical reads/1,008 B and zero Part materializations versus four eager materializations; eager/source saves share the exact `f4bbe4...` output hash; CFB reports one changed span and `799475...` | One sample, no warm-up, dirty worktree, debug build and merely requested cold state. Counter/output correctness only; no latency, allocation, memory, throughput or warm/cold claim |
-| [Managed OPC source cache](changes/0086-opc-source-cache-budget-management.md) | Retained and active-flight payloads can be charged to hierarchical `Budget`; pinned handles are not evicted and same-Part misses remain single-flight | Focused correctness tests only. No controlled contention, latency, allocation or peak-memory artifact exists |
+| [Filesystem repeated release evidence](changes/0089-filesystem-release-repeated-evidence.md) | Five cases, 30 fresh-child samples in each warm/cold-requested state (300 total), CPU-pinned release tmpfs run; logical/process I/O, materialization, span, hash and descriptive latency distributions retained | Accepted advisory cold request on tmpfs; process `read_bytes == 0` is only a process-I/O observation and gives no physical cold-cache or storage claim. No comparator, allocation, peak-memory, or production-performance acceptance |
+| [Managed OPC source cache](changes/0086-opc-source-cache-budget-management.md) and [release contention](changes/0088-opc-source-cache-contention-evidence.md) | Retained and active-flight payload memory can be charged to hierarchical `Budget`; pinned handles are not evicted, same-Part misses remain single-flight, and release ABBA validates structural/distribution counters | No managed-versus-control speedup accepted. `InputBytes`, `Work`, `Objects`, allocation, peak-memory/RSS, hardware, copied/decompressed-byte and CPU-utilization evidence remain missing |
 | Bounded forward-only XLSX/RTF creation | Production APIs exist at `8245da20d` and `5918be8ec` | Performance and memory evidence pending; no result claim |
+| Bounded semantic validation and ODF repair | DOCX, PPTX, RTF and XLS reports now complement CFB, OPC and ODF reports; ODF exposes one typed non-destructive `mimetype` local-extra repair plan | Correctness-only, finite and fail-closed. No validation latency claim; structural, encrypted, signed, macro and semantic repairs remain unsupported |
+| RTF logical-tail append | Two opt-in existing-document cases cover tiny/medium/large append and exact no-op publication through a fixed 16 KiB non-seek hashing window that caps accepted bytes per write and retains zero output | Correctness/coverage only: candidate snapshot is not window-bounded, and no release ABBA, allocation, RSS, or speedup claim exists; see [change 0090](changes/0090-rtf-logical-tail-append-evidence.md) |
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |
 | Coalesced DOCX paragraph edits | Large 100-edit/save p50 **-94.99% (19.97x)** and mean **-95.02%**; medium two-edit/save p50 **-12.98%**; scalar one-edit guardrail neutral | Direct-body, strictly ordered paragraph text replacement; generated corpus; scalar API remains separate |
 | ODF semantic baselines and ODS snapshot reuse | Medium/large ODS no-op edit-save p50 **-7.45% / -11.78%**; one-cell edit-save **-3.57% / -2.06%** | Generated ODT/ODS/ODP baseline corpora; focused ODP/ODT publication follow-ups are listed below |
@@ -383,6 +389,15 @@ open/list/no-op guards, allocation attribution, counters, RSS, capability
 smoke and artifact hashes are summarized in
 [`change 0048`](changes/0048-rtf-retained-body-source-span.md).
 
+The existing-document RTF logical-tail evidence is a correctness/coverage
+tranche rather than a performance result. Its two selectors cover tiny,
+medium, and large appends plus an exact no-op through a fixed 16 KiB hashing
+sink window that caps accepted bytes per write and retains zero output; complete
+reopen, sequential bytes, in-memory and durable patch/inverse, and foreign-source
+refusal remain untimed gates. The sink window does not bound the transaction's
+validated candidate snapshot. See
+[`change 0090`](changes/0090-rtf-logical-tail-append-evidence.md).
+
 The source-backed PPTX selected-slide publication evidence is
 [`before A`](results/abba-pptx-source-edit-before-a.json),
 [`after A`](results/abba-pptx-source-edit-after-a.json),
@@ -564,10 +579,19 @@ counters, Heaptrack and GNU Time artifacts are indexed in
 Managed source-backed cache bytes are charged to a caller's hierarchical
 `Budget`; compatibility opens remain finite under `SourceCacheLimits`.
 Hierarchy, pinning, eviction, sibling competition, cancellation and release
-are correctness-tested, while controlled contention/latency evidence remains
-pending. Raw ZIP preservation is integrated for owned same-topology OPC
-mutations and the bounded consuming source-backed multi-Part publisher; broad
-source-backed semantic editing remains pending.
+are correctness-tested. The committed release contention ABBA adds structural
+and distribution evidence, but no managed-versus-control speedup is accepted;
+allocation, peak-memory/RSS, hardware, copied/decompressed-byte and CPU-
+utilization evidence remain missing. `InputBytes`, `Work`, and `Objects`
+accounting is also not yet complete. Raw ZIP preservation is integrated for
+owned same-topology OPC mutations and the bounded consuming source-backed
+multi-Part publisher; broad source-backed semantic editing remains pending.
+The release cache capture retains balanced control/managed ABBA distributions
+and invariant recomputation, but its fixed source delay is only a coordination
+instrument; no production speedup, allocation, RSS, hardware, or CPU-utilization
+claim is made. The repeated filesystem release capture retains 300 fresh-child
+tmpfs samples for the five file cases; accepted cold advice and zero process
+`read_bytes` keep it descriptive rather than a cold-storage result.
 See [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
 [`0007`](changes/0007-source-backed-opc-and-facades.md),
@@ -909,8 +933,10 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 169 selectable cases. Its previously measured
-default matrix remains 198 records across deterministic ZIP/OPC, positional
+The committed HEAD standalone harness provides 180 selectable cases; dirty
+worktree additions, including the uncommitted XLS visibility harness, are
+excluded. Its previously
+measured default matrix remains 198 records across deterministic ZIP/OPC, positional
 CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus
@@ -920,8 +946,11 @@ It records
 p50/p95/p99, raw samples, mean, sample deviation, Student's-t 95% mean interval,
 corpus/output hashes, environment, bounded sequential-write behavior,
 deterministic logical/physical range distributions, and exact execution
-tasks/bytes. CI runs a non-gating deterministic smoke check and a
-scheduled/manual release matrix.
+tasks/bytes. The committed release cache artifact retains per-sample counters,
+occupancy, Budget diagnostics, flights and waiters but intentionally does not
+claim speedup; the repeated filesystem release artifact retains 300 fresh-child
+tmpfs samples but does not prove physical cold-cache behavior. CI runs a
+non-gating deterministic smoke check and a scheduled/manual release matrix.
 
 The current local evidence includes consolidated changed-crate tests with
 byte/hash checks, focused changed-crate warning-denied Clippy, formatter and
@@ -1009,9 +1038,11 @@ Lock-wait evidence remains missing.
 
 The largest remaining limitation is the incomplete migration from eager OPC to
 source-backed CRUD: selective open, source versions, a finite pinned-aware
-single-flight cache, optional hierarchical budget charging, and a low-level
-consuming one-Part publisher now exist, but controlled cache contention and
-latency evidence and broad semantic edit/patch coverage are incomplete. Raw
+single-flight cache, hierarchical memory budget charging, and a low-level
+consuming one-Part publisher now exist. Release contention ABBA evidence is
+structural/distribution-only with no accepted speedup; the remaining budget
+dimensions, resource instrumentation and broad semantic edit/patch coverage
+are incomplete. Raw
 ZIP preservation is integrated for
 eager owned same-topology mutation and this narrow source-backed case; format
 facades, topology changes, signatures and real-producer/media matrices remain.
@@ -1019,9 +1050,10 @@ The changed-Part handoff and post-validation local-span copies are removed;
 the required selected-Part/compressor buffer remains to be attributed and
 reduced independently.
 
-Other high-priority gaps are controlled cold-filesystem and real range-source
-matrices beyond the one-sample debug counter smoke, threshold tuning/contention
-work beyond the committed explicit scaling curves, performance and memory
+Other high-priority gaps are physical cold-filesystem and real range-source
+matrices beyond the debug smoke and repeated tmpfs release capture, threshold
+tuning and cache-acceptance work beyond the committed explicit scaling curves,
+performance and memory
 evidence for bounded forward-only XLSX/RTF creation,
 and broad format-semantic CRUD coverage beyond the generated text/grid slices
 (bulk action distinctions, dependency-copy, merge/split, patch timing, repair,
