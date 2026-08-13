@@ -151,7 +151,9 @@ pub mod xml_maps;
 pub use litchi_crypto::ooxml as encryption;
 
 /// OPC resource limits used by XLSX package and workbook ingress.
-pub use litchi_opc::ReadLimits;
+pub use litchi_opc::{
+    ReadLimits, SourceCacheDiagnostics, SourceCacheLimitError, SourceCacheLimits,
+};
 
 pub use active_x::{
     Binary, Control, ControlProperties, ControlSet, Controls, Descriptor, Font, LoadedControl,
