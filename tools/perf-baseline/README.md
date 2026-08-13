@@ -4,7 +4,8 @@
 ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
 public-API XLSX snapshot/edit/save flows, and opt-in DOC/XLS/PPT,
 DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows, including the opt-in RTF logical-tail
-append transaction. It creates every corpus in memory; it also exercises
+append transaction, bounded RTF/XLS/DOCX/PPTX/ODF validation reports, and a
+source-backed DOCX section inventory. It creates every corpus in memory; it also exercises
 source-backed XLSX catalog, worksheet reads, and guarded calculation-metadata,
 defined-name, page-break/page-margin/page-setup/print-options/sheet-protection/data-validation/auto-filter
 publication over positional I/O. It does not
@@ -46,7 +47,9 @@ four matched native XLS worksheet-visibility publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, 15 RTF semantic cases (13 transport/read/edit
 cases plus two logical-tail publication cases), and 36 ODF semantic cases are
-opt-in. The current `Case` matrix exposes 184 selectable case names in total:
+opt-in. The current `Case` matrix exposes 190 selectable case names in total;
+the six validation/section selectors are opt-in and do not alter the default
+36 cases / 198 records:
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
@@ -531,6 +534,36 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --case docx_semantic_open,docx_semantic_list_paragraphs,docx_semantic_one_paragraph,docx_semantic_full_text,docx_semantic_create_small,docx_semantic_noop_edit_save,docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,pptx_semantic_open,pptx_semantic_list_slides,pptx_semantic_one_slide,pptx_semantic_full_text,pptx_semantic_create_small,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save \
   --json target/perf/semantic-office-smoke.json
 ```
+
+Measure the bounded validation reports and source-backed DOCX section inventory
+over deterministic in-memory corpora:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 --semantic-shape tiny,medium,large \
+  --writer-shape tiny,large --rtf-variant plain \
+  --case rtf_validation_report,xls_validation_report,docx_validation_report,\
+docx_section_inventory,pptx_validation_report,odf_validation_report \
+  --json target/perf/validation-sections.json
+```
+
+Corpus generation, source setup, canonical report/inventory summarization,
+hashing, and gates are outside each timed interval. RTF validation and generic
+ODF validation time only their borrowed-byte validator calls. XLS, DOCX, and
+PPTX validation time the public source-backed validator, including its
+positional `ReadAt` requests. The DOCX section case times source-backed package
+open plus the section-inventory snapshot. Each result records deterministic
+report hashes, check IDs/status classes, issue codes and counts, source
+before/after hashes, and source-read counters where available. The section
+record additionally retains every descriptor's ownership, paragraph range,
+page/margin values, start marker, and header/footer relationship IDs. Warmups
+are excluded from recorded source counters. These are selectable correctness
+and baseline measurements only; make no speedup claim without a frozen release,
+CPU-pinned balanced ABBA capture with retained raw samples.
+The RTF validation selector accepts the plain, raw CP-1252, and LZFu variants;
+the producer-watermark fixture is intentionally excluded because its opaque
+drawing surface yields an unknown safety status rather than a complete terminal
+validation report.
 
 Run the complete tiny semantic ODF smoke matrix (24 records):
 

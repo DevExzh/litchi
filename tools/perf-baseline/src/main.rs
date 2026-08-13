@@ -29,8 +29,8 @@ use std::{
 
 use litchi_cfb::{OleFile, OleWriter, SharedOleFile, SharedOleFileLimits};
 use litchi_core::{
-    Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, ReadAt,
-    SourceVersion,
+    Budget, CancellationSource, CheckStatus, ExecutionContext, ExecutionError, ExecutionLimits,
+    Limits, ReadAt, SourceVersion, ValidateReport,
 };
 use litchi_core::{OwnedSource, Position, Resource};
 use litchi_ole_common::object::{
@@ -245,6 +245,10 @@ impl RtfSemanticVariant {
                     | Case::RtfLogicalTailNoopSave
             ) || matches!(self, Self::Plain))
             && (!matches!(case, Case::RtfSemanticTextToSink) || !matches!(self, Self::Watermark))
+    }
+
+    const fn supports_validation(self) -> bool {
+        !matches!(self, Self::Watermark)
     }
 }
 
@@ -485,6 +489,7 @@ enum Case {
     XlsSemanticFullCellScan,
     XlsSemanticNoopEditSave,
     XlsSemanticOneEditSave,
+    XlsValidationReport,
     XlsCommentsEagerEditSave,
     XlsCommentsSourceBackedEditSave,
     XlsCommentsEagerBatchEditSave,
@@ -541,6 +546,7 @@ enum Case {
     RtfSemanticMoveParagraphSave,
     RtfLogicalTailAppend,
     RtfLogicalTailNoopSave,
+    RtfValidationReport,
     RtfStreamingCreate,
     DocxSemanticOpen,
     DocxSemanticListParagraphs,
@@ -550,6 +556,8 @@ enum Case {
     DocxSemanticNoopEditSave,
     DocxSemanticOneEditSave,
     DocxSemanticOnePercentEditSave,
+    DocxValidationReport,
+    DocxSectionInventory,
     PptxSemanticOpen,
     PptxSemanticListSlides,
     PptxSemanticOneSlide,
@@ -558,6 +566,7 @@ enum Case {
     PptxSemanticNoopEditSave,
     PptxSemanticOneEditSave,
     PptxSemanticOnePercentEditSave,
+    PptxValidationReport,
     OdtSemanticOpen,
     OdtSemanticListParagraphs,
     OdtSemanticOneParagraph,
@@ -566,6 +575,7 @@ enum Case {
     OdtSemanticNoopEditSave,
     OdtSemanticOneEditSave,
     OdtSemanticOnePercentEditSave,
+    OdfValidationReport,
     OdtMediaParagraphEditSave,
     OdtMediaLineBreakEditSave,
     OdtMediaAppendRunEditSave,
@@ -731,6 +741,7 @@ impl Case {
             Self::XlsSemanticFullCellScan => "xls_semantic_full_cell_scan",
             Self::XlsSemanticNoopEditSave => "xls_semantic_noop_edit_save",
             Self::XlsSemanticOneEditSave => "xls_semantic_one_edit_save",
+            Self::XlsValidationReport => "xls_validation_report",
             Self::XlsCommentsEagerEditSave => "xls_comments_eager_edit_save",
             Self::XlsCommentsSourceBackedEditSave => "xls_comments_source_backed_edit_save",
             Self::XlsCommentsEagerBatchEditSave => "xls_comments_eager_batch_edit_save",
@@ -793,6 +804,7 @@ impl Case {
             Self::RtfSemanticMoveParagraphSave => "rtf_semantic_move_paragraph_save",
             Self::RtfLogicalTailAppend => "rtf_logical_tail_append",
             Self::RtfLogicalTailNoopSave => "rtf_logical_tail_noop_save",
+            Self::RtfValidationReport => "rtf_validation_report",
             Self::RtfStreamingCreate => "rtf_streaming_create",
             Self::DocxSemanticOpen => "docx_semantic_open",
             Self::DocxSemanticListParagraphs => "docx_semantic_list_paragraphs",
@@ -802,6 +814,8 @@ impl Case {
             Self::DocxSemanticNoopEditSave => "docx_semantic_noop_edit_save",
             Self::DocxSemanticOneEditSave => "docx_semantic_one_edit_save",
             Self::DocxSemanticOnePercentEditSave => "docx_semantic_one_percent_edit_save",
+            Self::DocxValidationReport => "docx_validation_report",
+            Self::DocxSectionInventory => "docx_section_inventory",
             Self::PptxSemanticOpen => "pptx_semantic_open",
             Self::PptxSemanticListSlides => "pptx_semantic_list_slides",
             Self::PptxSemanticOneSlide => "pptx_semantic_one_slide",
@@ -810,6 +824,7 @@ impl Case {
             Self::PptxSemanticNoopEditSave => "pptx_semantic_noop_edit_save",
             Self::PptxSemanticOneEditSave => "pptx_semantic_one_edit_save",
             Self::PptxSemanticOnePercentEditSave => "pptx_semantic_one_percent_edit_save",
+            Self::PptxValidationReport => "pptx_validation_report",
             Self::OdtSemanticOpen => "odt_semantic_open",
             Self::OdtSemanticListParagraphs => "odt_semantic_list_paragraphs",
             Self::OdtSemanticOneParagraph => "odt_semantic_one_paragraph",
@@ -818,6 +833,7 @@ impl Case {
             Self::OdtSemanticNoopEditSave => "odt_semantic_noop_edit_save",
             Self::OdtSemanticOneEditSave => "odt_semantic_one_edit_save",
             Self::OdtSemanticOnePercentEditSave => "odt_semantic_one_percent_edit_save",
+            Self::OdfValidationReport => "odf_validation_report",
             Self::OdtMediaParagraphEditSave => "odt_media_paragraph_edit_save",
             Self::OdtMediaLineBreakEditSave => "odt_media_line_break_edit_save",
             Self::OdtMediaAppendRunEditSave => "odt_media_append_run_edit_save",
@@ -1118,6 +1134,29 @@ impl Case {
             self,
             Self::OdpMediaTextBoxScalarReplaceSave | Self::OdpMediaTextBoxBatchReplaceSave
         )
+    }
+
+    const fn uses_validation_xls(self) -> bool {
+        matches!(self, Self::XlsValidationReport)
+    }
+
+    const fn uses_validation_rtf(self) -> bool {
+        matches!(self, Self::RtfValidationReport)
+    }
+
+    const fn uses_validation_docx(self) -> bool {
+        matches!(
+            self,
+            Self::DocxValidationReport | Self::DocxSectionInventory
+        )
+    }
+
+    const fn uses_validation_pptx(self) -> bool {
+        matches!(self, Self::PptxValidationReport)
+    }
+
+    const fn uses_validation_odf(self) -> bool {
+        matches!(self, Self::OdfValidationReport)
     }
 
     const fn uses_ods_media(self) -> bool {
@@ -1452,6 +1491,55 @@ struct CaseResult {
     output_sha256: Option<String>,
 }
 
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct ValidationSummary {
+    report_sha256: String,
+    check_ids: Vec<String>,
+    check_statuses: Vec<String>,
+    issue_codes: Vec<String>,
+    issue_count: usize,
+    complete: bool,
+    has_errors: bool,
+    counts: BTreeMap<String, u64>,
+    source_sha256_before: String,
+    source_sha256_after: String,
+    source_bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_read_calls: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_read_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    section_inventory: Option<SectionInventorySummary>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct SectionInventorySummary {
+    section_count: usize,
+    paragraph_count: usize,
+    descriptors: Vec<SectionDescriptorSummary>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct SectionDescriptorSummary {
+    position: usize,
+    ownership: String,
+    paragraph_start: usize,
+    paragraph_end: usize,
+    page_width_emu: Option<i64>,
+    page_height_emu: Option<i64>,
+    page_orientation: String,
+    margin_left_emu: Option<i64>,
+    margin_right_emu: Option<i64>,
+    margin_top_emu: Option<i64>,
+    margin_bottom_emu: Option<i64>,
+    margin_header_emu: Option<i64>,
+    margin_footer_emu: Option<i64>,
+    margin_gutter_emu: Option<i64>,
+    start: Option<String>,
+    headers: Vec<String>,
+    footers: Vec<String>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 struct ExecutionSummary {
     worker_count: usize,
@@ -1478,6 +1566,8 @@ struct SourceSummary {
     simulation: Option<RangeSimulationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     opc_cache: Option<OpcCacheEvidenceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    validation: Option<ValidationSummary>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -2527,6 +2617,257 @@ impl SourceSummary {
     }
 }
 
+fn check_status_name(status: &CheckStatus) -> &'static str {
+    match status {
+        CheckStatus::Complete => "complete",
+        CheckStatus::NotApplicable => "not_applicable",
+        CheckStatus::Blocked { .. } => "blocked",
+        CheckStatus::StoppedBy { .. } => "stopped_by",
+        _ => "unknown",
+    }
+}
+
+fn require_complete_validation(
+    case: Case,
+    summary: &ValidationSummary,
+) -> Result<(), Box<dyn Error>> {
+    if summary.check_ids.is_empty() || !summary.complete || summary.has_errors {
+        return Err(format!(
+            "{} produced an incomplete or error validation report",
+            case.name()
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn rtf_status_name(status: litchi_rtf::ValidationStatus) -> &'static str {
+    match status {
+        litchi_rtf::ValidationStatus::Valid => "valid",
+        litchi_rtf::ValidationStatus::Present => "present",
+        litchi_rtf::ValidationStatus::Absent => "absent",
+        litchi_rtf::ValidationStatus::NotApplicable => "not_applicable",
+        litchi_rtf::ValidationStatus::Unsupported => "unsupported",
+        litchi_rtf::ValidationStatus::Unknown => "unknown",
+        _ => "unknown",
+    }
+}
+
+fn generic_validation_summary(
+    report: &ValidateReport,
+    source: &[u8],
+    source_read_calls: Option<u64>,
+    source_read_bytes: Option<u64>,
+) -> Result<ValidationSummary, Box<dyn Error>> {
+    let encoded = serde_json::to_vec(report)?;
+    let check_ids = report
+        .checks()
+        .iter()
+        .map(|check| check.id().as_str().to_owned())
+        .collect::<Vec<_>>();
+    let check_statuses = report
+        .checks()
+        .iter()
+        .map(|check| check_status_name(check.status()).to_owned())
+        .collect::<Vec<_>>();
+    let issue_codes = report
+        .issues()
+        .iter()
+        .map(|issue| issue.code().to_owned())
+        .collect::<Vec<_>>();
+    let mut counts = BTreeMap::new();
+    counts.insert(
+        "checks".to_owned(),
+        u64::try_from(report.checks().len()).map_err(|_| "validation check count overflows u64")?,
+    );
+    counts.insert(
+        "issues".to_owned(),
+        u64::try_from(report.issues().len()).map_err(|_| "validation issue count overflows u64")?,
+    );
+    counts.insert("complete".to_owned(), u64::from(report.is_complete()));
+    counts.insert("has_errors".to_owned(), u64::from(report.has_errors()));
+    Ok(ValidationSummary {
+        report_sha256: sha256_hex(&encoded),
+        check_ids,
+        check_statuses,
+        issue_codes,
+        issue_count: report.issues().len(),
+        complete: report.is_complete(),
+        has_errors: report.has_errors(),
+        counts,
+        source_sha256_before: sha256_hex(source),
+        source_sha256_after: sha256_hex(source),
+        source_bytes: u64::try_from(source.len())
+            .map_err(|_| "validation source length overflows u64")?,
+        source_read_calls,
+        source_read_bytes,
+        section_inventory: None,
+    })
+}
+
+fn rtf_validation_summary(
+    report: &litchi_rtf::ValidationReport,
+    source: &[u8],
+) -> Result<ValidationSummary, Box<dyn Error>> {
+    let checks = [
+        ("syntax", report.syntax()),
+        ("root", report.root()),
+        ("document", report.document()),
+        ("compressed_transport", report.compressed_transport()),
+        ("fields", report.fields()),
+        ("external_links", report.external_links()),
+        ("objects", report.objects()),
+        ("pictures", report.pictures()),
+        ("active_content", report.active_content()),
+        ("unsupported_syntax", report.unsupported_syntax()),
+        ("external_resolution", report.external_resolution()),
+        ("execution", report.execution()),
+        ("repair", report.repair()),
+        ("security", report.security()),
+    ];
+    let check_ids = checks
+        .iter()
+        .map(|(id, _)| (*id).to_owned())
+        .collect::<Vec<_>>();
+    let check_statuses = checks
+        .iter()
+        .map(|(_, check)| rtf_status_name(check.status()).to_owned())
+        .collect::<Vec<_>>();
+    let complete = checks.iter().all(|(_, check)| {
+        matches!(
+            check.status(),
+            litchi_rtf::ValidationStatus::Valid
+                | litchi_rtf::ValidationStatus::Present
+                | litchi_rtf::ValidationStatus::Absent
+                | litchi_rtf::ValidationStatus::NotApplicable
+        )
+    });
+    let counts_value = report.counts();
+    let mut counts = BTreeMap::new();
+    counts.insert(
+        "source_bytes".to_owned(),
+        u64::try_from(counts_value.source_bytes())
+            .map_err(|_| "RTF source byte count overflows u64")?,
+    );
+    counts.insert(
+        "fields".to_owned(),
+        u64::try_from(counts_value.fields()).map_err(|_| "RTF field count overflows u64")?,
+    );
+    counts.insert(
+        "objects".to_owned(),
+        u64::try_from(counts_value.objects()).map_err(|_| "RTF object count overflows u64")?,
+    );
+    counts.insert(
+        "pictures".to_owned(),
+        u64::try_from(counts_value.pictures()).map_err(|_| "RTF picture count overflows u64")?,
+    );
+    counts.insert(
+        "form_fields".to_owned(),
+        u64::try_from(counts_value.form_fields())
+            .map_err(|_| "RTF form-field count overflows u64")?,
+    );
+    counts.insert(
+        "opaque_nodes".to_owned(),
+        u64::try_from(counts_value.opaque_nodes())
+            .map_err(|_| "RTF opaque-node count overflows u64")?,
+    );
+    counts.insert(
+        "opaque_bytes".to_owned(),
+        u64::try_from(counts_value.opaque_bytes())
+            .map_err(|_| "RTF opaque-byte count overflows u64")?,
+    );
+    counts.insert(
+        "unknown_syntax_markers".to_owned(),
+        u64::try_from(counts_value.unknown_syntax_markers())
+            .map_err(|_| "RTF unknown-syntax count overflows u64")?,
+    );
+    let canonical = serde_json::to_vec(&(&check_ids, &check_statuses, &counts))?;
+    Ok(ValidationSummary {
+        report_sha256: sha256_hex(&canonical),
+        check_ids,
+        check_statuses,
+        issue_codes: Vec::new(),
+        issue_count: 0,
+        complete,
+        has_errors: !complete,
+        counts,
+        source_sha256_before: sha256_hex(source),
+        source_sha256_after: sha256_hex(source),
+        source_bytes: u64::try_from(source.len()).map_err(|_| "RTF source length overflows u64")?,
+        source_read_calls: None,
+        source_read_bytes: None,
+        section_inventory: None,
+    })
+}
+
+fn section_inventory_summary(snapshot: &litchi_docx::section::Snapshot) -> SectionInventorySummary {
+    let inventory = snapshot.inventory();
+    let descriptors = inventory
+        .sections()
+        .iter()
+        .map(|section| SectionDescriptorSummary {
+            position: section.position().get(),
+            ownership: match section.ownership() {
+                litchi_docx::section::Ownership::Paragraph(position) => {
+                    format!("paragraph:{}", position.get())
+                },
+                litchi_docx::section::Ownership::BodyFinal => "body_final".to_owned(),
+                litchi_docx::section::Ownership::Implicit => "implicit".to_owned(),
+                _ => "unknown".to_owned(),
+            },
+            paragraph_start: section.paragraphs().start().get(),
+            paragraph_end: section.paragraphs().end().get(),
+            page_width_emu: section
+                .page_size()
+                .and_then(|page| page.width.map(|value| value.0)),
+            page_height_emu: section
+                .page_size()
+                .and_then(|page| page.height.map(|value| value.0)),
+            page_orientation: section.page_size().map_or_else(
+                || "none".to_owned(),
+                |page| format!("{:?}", page.orientation),
+            ),
+            margin_left_emu: section
+                .margins()
+                .and_then(|margins| margins.left.map(|value| value.0)),
+            margin_right_emu: section
+                .margins()
+                .and_then(|margins| margins.right.map(|value| value.0)),
+            margin_top_emu: section
+                .margins()
+                .and_then(|margins| margins.top.map(|value| value.0)),
+            margin_bottom_emu: section
+                .margins()
+                .and_then(|margins| margins.bottom.map(|value| value.0)),
+            margin_header_emu: section
+                .margins()
+                .and_then(|margins| margins.header.map(|value| value.0)),
+            margin_footer_emu: section
+                .margins()
+                .and_then(|margins| margins.footer.map(|value| value.0)),
+            margin_gutter_emu: section
+                .margins()
+                .and_then(|margins| margins.gutter.map(|value| value.0)),
+            start: section.start().map(|value| format!("{:?}", value)),
+            headers: section
+                .headers()
+                .iter()
+                .map(|reference| format!("{:?}:{}", reference.kind, reference.relationship_id))
+                .collect(),
+            footers: section
+                .footers()
+                .iter()
+                .map(|reference| format!("{:?}:{}", reference.kind, reference.relationship_id))
+                .collect(),
+        })
+        .collect::<Vec<_>>();
+    SectionInventorySummary {
+        section_count: descriptors.len(),
+        paragraph_count: inventory.paragraph_count(),
+        descriptors,
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     if filesystem::run_child_if_requested()? {
         return Ok(());
@@ -2645,6 +2986,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_merge_edit_save()
                     && !case.is_xls_comments_edit_save()
                     && !case.is_xls_visibility_edit_save()
+                    && !case.uses_validation_xls()
+                    && !case.uses_validation_rtf()
+                    && !case.uses_validation_docx()
+                    && !case.uses_validation_pptx()
+                    && !case.uses_validation_odf()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
                     cfb_corpus
@@ -3313,6 +3659,126 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options.cases.iter().any(|case| case.uses_validation_xls()) {
+        for shape in options
+            .writer_shapes
+            .iter()
+            .copied()
+            .filter(|shape| *shape != WriterShape::PayloadHeavy)
+        {
+            let corpus = build_writer_corpus(Case::XlsFreshWriteTo, shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_validation_xls())
+            {
+                results.push(run_case_with_config(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_validation_docx()) {
+        for shape in &options.semantic_shapes {
+            let corpus = build_semantic_docx_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_validation_docx())
+            {
+                results.push(run_case_with_config(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_validation_pptx()) {
+        for shape in &options.semantic_shapes {
+            let corpus = build_semantic_pptx_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_validation_pptx())
+            {
+                results.push(run_case_with_config(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_validation_rtf()) {
+        let mut rtf_validation_rows = 0usize;
+        for variant in &options.rtf_variants {
+            for shape in options
+                .semantic_shapes
+                .iter()
+                .filter(|shape| variant.supports_validation() && variant.supports_shape(**shape))
+            {
+                let corpus = build_semantic_rtf_corpus(*shape, *variant)?;
+                for case in options
+                    .cases
+                    .iter()
+                    .copied()
+                    .filter(|case| case.uses_validation_rtf())
+                {
+                    results.push(run_case_with_config(
+                        case,
+                        &corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                        options.range_simulation,
+                    )?);
+                    rtf_validation_rows = rtf_validation_rows
+                        .checked_add(1)
+                        .ok_or("RTF validation result count overflows usize")?;
+                }
+            }
+        }
+        if rtf_validation_rows == 0 {
+            return Err(
+                "selected RTF variants and shapes produce no validation-supported cases".into(),
+            );
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_validation_odf()) {
+        for shape in &options.semantic_shapes {
+            let corpus = build_semantic_odt_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_validation_odf())
+            {
+                results.push(run_case_with_config(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
     let report = Report {
         schema_version: SCHEMA_VERSION,
         tool: Tool {
@@ -3654,6 +4120,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "xls_semantic_full_cell_scan" => Some(Case::XlsSemanticFullCellScan),
         "xls_semantic_noop_edit_save" => Some(Case::XlsSemanticNoopEditSave),
         "xls_semantic_one_edit_save" => Some(Case::XlsSemanticOneEditSave),
+        "xls_validation_report" => Some(Case::XlsValidationReport),
         "xls_comments_eager_edit_save" => Some(Case::XlsCommentsEagerEditSave),
         "xls_comments_source_backed_edit_save" => Some(Case::XlsCommentsSourceBackedEditSave),
         "xls_comments_eager_batch_edit_save" => Some(Case::XlsCommentsEagerBatchEditSave),
@@ -3716,6 +4183,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "rtf_semantic_move_paragraph_save" => Some(Case::RtfSemanticMoveParagraphSave),
         "rtf_logical_tail_append" => Some(Case::RtfLogicalTailAppend),
         "rtf_logical_tail_noop_save" => Some(Case::RtfLogicalTailNoopSave),
+        "rtf_validation_report" => Some(Case::RtfValidationReport),
         "rtf_streaming_create" => Some(Case::RtfStreamingCreate),
         "docx_semantic_open" => Some(Case::DocxSemanticOpen),
         "docx_semantic_list_paragraphs" => Some(Case::DocxSemanticListParagraphs),
@@ -3725,6 +4193,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "docx_semantic_noop_edit_save" => Some(Case::DocxSemanticNoopEditSave),
         "docx_semantic_one_edit_save" => Some(Case::DocxSemanticOneEditSave),
         "docx_semantic_one_percent_edit_save" => Some(Case::DocxSemanticOnePercentEditSave),
+        "docx_validation_report" => Some(Case::DocxValidationReport),
+        "docx_section_inventory" => Some(Case::DocxSectionInventory),
         "pptx_semantic_open" => Some(Case::PptxSemanticOpen),
         "pptx_semantic_list_slides" => Some(Case::PptxSemanticListSlides),
         "pptx_semantic_one_slide" => Some(Case::PptxSemanticOneSlide),
@@ -3733,6 +4203,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_semantic_noop_edit_save" => Some(Case::PptxSemanticNoopEditSave),
         "pptx_semantic_one_edit_save" => Some(Case::PptxSemanticOneEditSave),
         "pptx_semantic_one_percent_edit_save" => Some(Case::PptxSemanticOnePercentEditSave),
+        "pptx_validation_report" => Some(Case::PptxValidationReport),
         "odt_semantic_open" => Some(Case::OdtSemanticOpen),
         "odt_semantic_list_paragraphs" => Some(Case::OdtSemanticListParagraphs),
         "odt_semantic_one_paragraph" => Some(Case::OdtSemanticOneParagraph),
@@ -3741,6 +4212,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_semantic_noop_edit_save" => Some(Case::OdtSemanticNoopEditSave),
         "odt_semantic_one_edit_save" => Some(Case::OdtSemanticOneEditSave),
         "odt_semantic_one_percent_edit_save" => Some(Case::OdtSemanticOnePercentEditSave),
+        "odf_validation_report" => Some(Case::OdfValidationReport),
         "odt_media_paragraph_edit_save" => Some(Case::OdtMediaParagraphEditSave),
         "odt_media_line_break_edit_save" => Some(Case::OdtMediaLineBreakEditSave),
         "odt_media_append_run_edit_save" => Some(Case::OdtMediaAppendRunEditSave),
@@ -6543,6 +7015,7 @@ fn run_case_with_config(
         | Case::XlsSemanticOneEditSave => {
             run_semantic_xls(case, corpus, warmup_iterations, samples)
         },
+        Case::XlsValidationReport => run_xls_validation_report(corpus, warmup_iterations, samples),
         Case::XlsCommentsEagerEditSave
         | Case::XlsCommentsSourceBackedEditSave
         | Case::XlsCommentsEagerBatchEditSave
@@ -6636,6 +7109,7 @@ fn run_case_with_config(
         | Case::RtfSemanticMoveParagraphSave => {
             run_semantic_rtf(case, corpus, warmup_iterations, samples)
         },
+        Case::RtfValidationReport => run_rtf_validation_report(corpus, warmup_iterations, samples),
         Case::RtfLogicalTailAppend | Case::RtfLogicalTailNoopSave => {
             run_rtf_logical_tail_append(case, corpus, warmup_iterations, samples)
         },
@@ -6649,6 +7123,12 @@ fn run_case_with_config(
         | Case::DocxSemanticOnePercentEditSave => {
             run_semantic_docx(case, corpus, warmup_iterations, samples)
         },
+        Case::DocxValidationReport => {
+            run_docx_validation_report(corpus, warmup_iterations, samples)
+        },
+        Case::DocxSectionInventory => {
+            run_docx_section_inventory(corpus, warmup_iterations, samples)
+        },
         Case::PptxSemanticOpen
         | Case::PptxSemanticListSlides
         | Case::PptxSemanticOneSlide
@@ -6658,6 +7138,9 @@ fn run_case_with_config(
         | Case::PptxSemanticOneEditSave
         | Case::PptxSemanticOnePercentEditSave => {
             run_semantic_pptx(case, corpus, warmup_iterations, samples)
+        },
+        Case::PptxValidationReport => {
+            run_pptx_validation_report(corpus, warmup_iterations, samples)
         },
         Case::OdtSemanticOpen
         | Case::OdtSemanticListParagraphs
@@ -6669,6 +7152,7 @@ fn run_case_with_config(
         | Case::OdtSemanticOnePercentEditSave => {
             run_semantic_odt(case, corpus, warmup_iterations, samples)
         },
+        Case::OdfValidationReport => run_odf_validation_report(corpus, warmup_iterations, samples),
         Case::OdtMediaParagraphEditSave => {
             run_odt_media_paragraph_edit_save(corpus, warmup_iterations, samples)
         },
@@ -10178,6 +10662,273 @@ fn run_rtf_logical_tail_append(
         corpus.manifest.archive_sha256.clone()
     });
     Ok(result)
+}
+
+fn run_read_at_validation_report<F>(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    validate: F,
+) -> Result<CaseResult, Box<dyn Error>>
+where
+    F: Fn(Arc<dyn ReadAt>) -> Result<ValidateReport, Box<dyn Error>>,
+{
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut expected_validation = None;
+    let mut measured_validation = None;
+    let source_before = sha256_hex(&corpus.archive);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = Arc::new(InstrumentedSource::new(corpus.archive.clone(), Vec::new()));
+        let source_for_validation: Arc<dyn ReadAt> = source.clone();
+        let started = Instant::now();
+        let report = validate(source_for_validation)?;
+        let duration = started.elapsed();
+        let snapshot = source.snapshot();
+        let mut summary = generic_validation_summary(
+            &report,
+            &corpus.archive,
+            Some(snapshot.read_calls),
+            Some(snapshot.read_bytes),
+        )?;
+        summary.source_sha256_before.clone_from(&source_before);
+        summary.source_sha256_after = sha256_hex(&corpus.archive);
+        if summary.source_sha256_before != summary.source_sha256_after {
+            return Err(format!("{} mutated its source bytes", case.name()).into());
+        }
+        require_complete_validation(case, &summary)?;
+        if let Some(expected) = &expected_validation {
+            if expected != &summary {
+                return Err(
+                    format!("{} validation topology changed across samples", case.name()).into(),
+                );
+            }
+        } else {
+            expected_validation = Some(summary.clone());
+        }
+        if iteration >= warmup_iterations {
+            if measured_validation.is_none() {
+                measured_validation = Some(summary);
+            }
+            source_summary.record(snapshot);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let validation = measured_validation
+        .or(expected_validation)
+        .ok_or("validation case produced no samples")?;
+    if source_summary.read_calls.len() != samples || source_summary.read_bytes.contains(&0) {
+        return Err(format!("{} did not record bounded source reads", case.name()).into());
+    }
+    source_summary.validation = Some(validation);
+    Ok(result_with_source(case, corpus, elapsed, source_summary))
+}
+
+fn run_xls_validation_report(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    run_read_at_validation_report(
+        Case::XlsValidationReport,
+        corpus,
+        warmup_iterations,
+        samples,
+        |source| Ok(litchi_xls::validation::validate_source(source)?),
+    )
+}
+
+fn run_docx_validation_report(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    run_read_at_validation_report(
+        Case::DocxValidationReport,
+        corpus,
+        warmup_iterations,
+        samples,
+        |source| Ok(litchi_docx::validate_read_at(source)?),
+    )
+}
+
+fn run_pptx_validation_report(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    run_read_at_validation_report(
+        Case::PptxValidationReport,
+        corpus,
+        warmup_iterations,
+        samples,
+        |source| Ok(litchi_pptx::validate_source(source)?),
+    )
+}
+
+fn run_borrowed_validation_report<R, F, S>(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    validate: F,
+    summarize: S,
+) -> Result<CaseResult, Box<dyn Error>>
+where
+    F: Fn(&[u8]) -> Result<R, Box<dyn Error>>,
+    S: Fn(&R, &[u8]) -> Result<ValidationSummary, Box<dyn Error>>,
+{
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut expected_validation = None;
+    let mut measured_validation = None;
+    let source_before = sha256_hex(&corpus.archive);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let (report, duration) = {
+            let started = Instant::now();
+            let report = validate(&corpus.archive)?;
+            (report, started.elapsed())
+        };
+        let mut summary = summarize(&report, &corpus.archive)?;
+        summary.source_sha256_before.clone_from(&source_before);
+        summary.source_sha256_after = sha256_hex(&corpus.archive);
+        if summary.source_sha256_before != summary.source_sha256_after {
+            return Err(format!("{} mutated its source bytes", case.name()).into());
+        }
+        require_complete_validation(case, &summary)?;
+        if let Some(expected) = &expected_validation {
+            if expected != &summary {
+                return Err(
+                    format!("{} validation topology changed across samples", case.name()).into(),
+                );
+            }
+        } else {
+            expected_validation = Some(summary.clone());
+        }
+        if iteration >= warmup_iterations && measured_validation.is_none() {
+            measured_validation = Some(summary);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let source = SourceSummary {
+        validation: Some(
+            measured_validation
+                .or(expected_validation)
+                .ok_or("validation case produced no samples")?,
+        ),
+        ..SourceSummary::default()
+    };
+    Ok(result_with_source(case, corpus, elapsed, source))
+}
+
+fn run_rtf_validation_report(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    run_borrowed_validation_report(
+        Case::RtfValidationReport,
+        corpus,
+        warmup_iterations,
+        samples,
+        |bytes| Ok(litchi_rtf::ValidationReport::from_bytes(bytes)?),
+        rtf_validation_summary,
+    )
+}
+
+fn run_odf_validation_report(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    run_borrowed_validation_report(
+        Case::OdfValidationReport,
+        corpus,
+        warmup_iterations,
+        samples,
+        |bytes| Ok(litchi_odf_common::validate_package(bytes)?),
+        |report, bytes| generic_validation_summary(report, bytes, None, None),
+    )
+}
+
+fn run_docx_section_inventory(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut expected_validation = None;
+    let mut measured_validation = None;
+    let source_before = sha256_hex(&corpus.archive);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = Arc::new(InstrumentedSource::new(corpus.archive.clone(), Vec::new()));
+        let source_for_package: Arc<dyn ReadAt> = source.clone();
+        let started = Instant::now();
+        let package = litchi_docx::source_backed::Package::from_read_at(source_for_package)?;
+        let snapshot = package.section_inventory_snapshot()?;
+        let duration = started.elapsed();
+        let inventory = section_inventory_summary(&snapshot);
+        let canonical = serde_json::to_vec(&inventory)?;
+        let source_after = sha256_hex(&corpus.archive);
+        let summary = ValidationSummary {
+            report_sha256: sha256_hex(&canonical),
+            check_ids: vec!["docx.section_inventory".to_owned()],
+            check_statuses: vec!["complete".to_owned()],
+            issue_codes: Vec::new(),
+            issue_count: 0,
+            complete: true,
+            has_errors: false,
+            counts: BTreeMap::from([
+                (
+                    "sections".to_owned(),
+                    u64::try_from(inventory.section_count)
+                        .map_err(|_| "section count overflows u64")?,
+                ),
+                (
+                    "paragraphs".to_owned(),
+                    u64::try_from(inventory.paragraph_count)
+                        .map_err(|_| "paragraph count overflows u64")?,
+                ),
+            ]),
+            source_sha256_before: source_before.clone(),
+            source_sha256_after: source_after,
+            source_bytes: u64::try_from(corpus.archive.len())
+                .map_err(|_| "DOCX source length overflows u64")?,
+            source_read_calls: Some(source.snapshot().read_calls),
+            source_read_bytes: Some(source.snapshot().read_bytes),
+            section_inventory: Some(inventory),
+        };
+        if summary.source_sha256_before != summary.source_sha256_after {
+            return Err("DOCX section inventory mutated its source bytes".into());
+        }
+        require_complete_validation(Case::DocxSectionInventory, &summary)?;
+        if let Some(expected) = &expected_validation {
+            if expected != &summary {
+                return Err("DOCX section inventory topology changed across samples".into());
+            }
+        } else {
+            expected_validation = Some(summary.clone());
+        }
+        if iteration >= warmup_iterations {
+            if measured_validation.is_none() {
+                measured_validation = Some(summary);
+            }
+            source_summary.record(source.snapshot());
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    source_summary.validation = Some(
+        measured_validation
+            .or(expected_validation)
+            .ok_or("section case produced no samples")?,
+    );
+    Ok(result_with_source(
+        Case::DocxSectionInventory,
+        corpus,
+        elapsed,
+        source_summary,
+    ))
 }
 
 fn run_semantic_docx(
@@ -18959,6 +19710,92 @@ mod tests {
         assert!(!Case::DEFAULT.contains(&Case::XlsCommentsSourceBackedBatchEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxStreamingCreate));
         assert!(!Case::DEFAULT.contains(&Case::RtfStreamingCreate));
+        assert!(!Case::DEFAULT.contains(&Case::RtfValidationReport));
+        assert!(!Case::DEFAULT.contains(&Case::XlsValidationReport));
+        assert!(!Case::DEFAULT.contains(&Case::DocxValidationReport));
+        assert!(!Case::DEFAULT.contains(&Case::DocxSectionInventory));
+        assert!(!Case::DEFAULT.contains(&Case::PptxValidationReport));
+        assert!(!Case::DEFAULT.contains(&Case::OdfValidationReport));
+    }
+
+    #[test]
+    fn bounded_validation_cases_exclude_warmups_and_preserve_topology() {
+        let cases = [
+            (
+                Case::RtfValidationReport,
+                build_semantic_rtf_corpus(SemanticShape::Tiny, RtfSemanticVariant::Plain).unwrap(),
+            ),
+            (
+                Case::XlsValidationReport,
+                build_writer_corpus(Case::XlsFreshWriteTo, WriterShape::Tiny).unwrap(),
+            ),
+            (
+                Case::DocxValidationReport,
+                build_semantic_docx_corpus(SemanticShape::Tiny).unwrap(),
+            ),
+            (
+                Case::DocxSectionInventory,
+                build_semantic_docx_corpus(SemanticShape::Tiny).unwrap(),
+            ),
+            (
+                Case::PptxValidationReport,
+                build_semantic_pptx_corpus(SemanticShape::Tiny).unwrap(),
+            ),
+            (
+                Case::OdfValidationReport,
+                build_semantic_odt_corpus(SemanticShape::Tiny).unwrap(),
+            ),
+        ];
+
+        for (case, corpus) in cases {
+            let measured = run_case(case, &corpus, 1, 2).unwrap();
+            assert_eq!(measured.elapsed_ns.samples.len(), 2, "{case:?}");
+            let source = measured.source.as_ref().expect("validation source summary");
+            let validation = source
+                .validation
+                .as_ref()
+                .expect("validation topology summary");
+            assert!(!validation.check_ids.is_empty(), "{case:?}");
+            assert_eq!(
+                validation.source_sha256_before, validation.source_sha256_after,
+                "{case:?} mutated its source"
+            );
+            assert_eq!(
+                validation.source_bytes,
+                u64::try_from(corpus.archive.len()).unwrap(),
+                "{case:?} source byte count"
+            );
+
+            if matches!(case, Case::RtfValidationReport | Case::OdfValidationReport) {
+                assert!(source.read_calls.is_empty(), "{case:?} is borrowed-input");
+                assert!(validation.source_read_calls.is_none(), "{case:?}");
+            } else {
+                assert_eq!(source.read_calls.len(), 2, "{case:?} warmup leaked");
+                assert_eq!(source.read_bytes.len(), 2, "{case:?} warmup leaked");
+                assert_eq!(validation.source_read_calls, Some(source.read_calls[0]));
+                assert_eq!(validation.source_read_bytes, Some(source.read_bytes[0]));
+                assert!(source.read_bytes[0] > 0, "{case:?}");
+            }
+
+            if case == Case::DocxSectionInventory {
+                let inventory = validation
+                    .section_inventory
+                    .as_ref()
+                    .expect("DOCX section inventory");
+                assert_eq!(inventory.section_count, 1);
+                assert_eq!(inventory.paragraph_count, 24);
+                let descriptor = inventory
+                    .descriptors
+                    .first()
+                    .expect("DOCX body-final section");
+                assert_eq!(descriptor.position, 0);
+                assert_eq!(descriptor.ownership, "body_final");
+                assert_eq!(descriptor.paragraph_start, 0);
+                assert_eq!(descriptor.paragraph_end, 24);
+            } else {
+                assert!(validation.section_inventory.is_none(), "{case:?}");
+            }
+        }
     }
 
     #[test]

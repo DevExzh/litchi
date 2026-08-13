@@ -1,8 +1,8 @@
 # Performance CRUD coverage
 
-Date: 2026-08-13
+Date: 2026-08-14
 
-This is a coverage map, not a completion claim. It compares the 184 selectable
+This is a coverage map, not a completion claim. It compares the 190 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -10,8 +10,8 @@ performance claim.
 
 | Required scenario | Current status | Coverage evidence |
 |---|---|---|
-| Open and identify format | Partial | ZIP/OPC/CFB plus owned DOC/XLS/PPT/RTF/XLSX and source-backed XLSX open; RTF now covers plain, raw CP-1252, LZFu and a real-producer watermark input; the public PPT root slide-order snapshot has its own measured validation path; no smart-detection handoff case |
-| List semantic children without payloads | Partial | XLS/XLSX/ODS sheets, DOC/RTF/DOCX/ODT paragraphs and PPT/PPTX/ODP slides; DOCX section listing remains missing |
+| Open and identify format | Partial | ZIP/OPC/CFB plus owned DOC/XLS/PPT/RTF/XLSX and source-backed XLSX open; opt-in bounded RTF/XLS/DOCX/PPTX/generic-ODF reports now exercise format validation, while RTF still covers plain, raw CP-1252, LZFu and a real-producer watermark input; no smart-detection handoff case |
+| List semantic children without payloads | Partial | XLS/XLSX/ODS sheets, DOC/RTF/DOCX/ODT paragraphs and PPT/PPTX/ODP slides; opt-in `docx_section_inventory` now lists the exact source-backed DOCX section descriptors, but broader section/edit matrices remain missing |
 | Query one property or named object | Partial | XLS/XLSX/ODS cells, one DOC/RTF/DOCX paragraph, an indexed fully validated ODT paragraph, one PPT shape and one PPTX/ODP slide; the already-open RTF paragraph query reuses its parser-derived exact story length and cardinality, while explicit sparse `nth` skips discarded-view construction; broader properties/images remain missing |
 | Read one cell/paragraph/slide/image/Part | Partial | XLS/XLSX/ODS cells, DOC/RTF/DOCX paragraphs, indexed ODT paragraphs, PPT/PPTX/ODP text objects and generic OPC Part. Three opt-in OPC source-cache selectors add exact managed-Budget boundary evidence plus finite-control/managed same-Part and fixed-work disjoint-Part contention across `1/2x`, `1x`, and `2x` capacities and capped worker widths; their deterministic source delay is correctness evidence, not a latency claim. Semantic image selection remains missing |
 | Scan all cells/paragraphs/slides | Covered for generated native/OOXML/RTF/ODF text corpora | XLS/XLSX/ODS cell scans, including the isolated ODS public-cell sweep; DOC/RTF/DOCX/ODT paragraph enumeration and PPT/PPTX/ODP slide/text enumeration |
@@ -28,7 +28,7 @@ performance claim.
 | Copy object with dependency closure | Partial (correctness only) | PPTX atomically applies a bounded in-package slide-copy plan for its supported finite owned dependency graph while reusing shared layout dependencies and refusing unsupported/shared ownership; ODP copies only dependency-free blank slides; ODS copies only dependency-free worksheets; DOCX copies only direct plain main-document paragraphs. These APIs have reopen and preservation tests but no selectable timing evidence. General cross-document copy, arbitrary charts/media/themes/notes/formulas/styles, name-collision reconciliation and complete dependency closure remain missing |
 | Merge and split | Partial (selectable correctness evidence) | XLSX now has two opt-in eager commit-plus-bounded-save cases over one deterministic sparse `Sheet1` A1:B2 fixture: merge and unmerge prepare the transaction outside timing and time only commit plus `Workbook::write_to`; untimed checks reopen merge membership, anchor retention, covered/uncovered and unrelated-cell semantics, exact durable patch apply/inverse restoration, and stale-source refusal. These cases make no latency claim without controlled ABBA evidence; broader format merge/split coverage remains missing |
 | Patch encode/apply/invert/merge | Partial | Durable encode/decode/apply/inverse coverage now also includes exact DOCX plain-paragraph copy/removal, ODT plain-paragraph move, PPTX dependency-free slide removal, ODS worksheet move/copy, XLS worksheet visibility, RTF picture-payload/removal edits, and the new logical-tail append's source-checked durable replay/inverse/reopen/foreign-source gates. Source-backed XLSX scalar-cell and row-visibility edits and RTF paragraph-layout edits have source-bound apply/inverse but no durable wire claim. The selectable RTF paragraph remove/move and logical-tail cases keep durable work outside timing. DOCX irreversible hyperlink redaction intentionally has no inverse. Patch merge/join/three-way conflict resolution remains incomplete and unmeasured |
-| Validate without mutation | Partial (correctness only) | Distinct bounded reports now exist for CFB, OPC and generic ODF. CFB reruns canonical container ingress; OPC reports ZIP/catalog/loaded-relationship/signature-presence capabilities with exact failure attribution; ODF indexes bounded ZIP metadata and materializes only `mimetype`, the manifest and `content.xml` to report package declarations, root XML and encryption/signature/macro/external-reference presence. These are API correctness tests, not selectable benchmarks. They do not validate DOC/XLS/PPT or OOXML/ODF family semantics, decrypt content, verify signatures, execute macros, fetch links or offer general repair; ODF exposes only the separately identified narrow `mimetype` local-extra repair target described below |
+| Validate without mutation | Partial (bounded opt-in evidence) | Opt-in `rtf_validation_report`, `xls_validation_report`, `docx_validation_report`, `pptx_validation_report`, and `odf_validation_report` now retain deterministic report hashes, check IDs/statuses, issue codes/counts, source hashes, and bounded source-read counters for ReadAt validators; `docx_section_inventory` additionally retains the exact source-backed section topology. Existing CFB/OPC/generic-ODF reports remain correctness-only APIs. These selectors are not default cases and carry no speedup claim; they do not decrypt content, verify signatures, execute macros, fetch links, or provide general repair, and broader format-semantic/security matrices remain open |
 | Explicit repair plan | Partial (correctness only) | Generic ODF exposes one bounded typed `RepairPlan<NonDestructive>` for an otherwise-valid first/stored `mimetype` with one recognized Extended Timestamp local-header extra. It binds source length and SHA-256 evidence, rejects stale/foreign reports and unsafe ZIP/security/semantic cases before output, previews deterministic changed-member/archive effects without source bytes, removes only that local extra, reopens the candidate, proves member digest equality and raw preservation, and reports sequential-sink progress. Explicit `apply` yields a source-checked reversible patch with an exact inverse; destructive plans and unsupported structural/XML/encryption/signature/macro repairs remain unconstructible. No latency claim is made. |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS rows/members, and exact raw ODT/ODS/ODP auxiliary/media members during neighboring edits; ODT resource replacement retains frame attributes and unknown children while removal retains payload files; ODP model batches retain unselected producer content; the new XLSX closures raw-copy unselected Parts and refuse selected MCE/unknown owners. This is narrow fail-closed preservation, not general extension-aware editing |
 | Replace one or a bounded set of low-level Parts, preserve the rest | Covered for owned OPC, bounded source-backed OPC, guarded DOCX main-document semantics, guarded PPTX selected/multi-slide semantics, and guarded XLSX worksheet/workbook semantics | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; changes 0037/0077 add consuming one-Part/bounded multi-Part publishers; changes 0039, 0044/0063/0077, 0046, 0061, 0067, 0070, 0073, 0076, 0078, 0079 and 0080 integrate accepted measured guarded semantic transactions while refusing unsafe MCE, signatures, stale closure, topology, relationship, style-reference and printer-reference cases before output. Change 0082 adds matched selectable XLSX conditional-formatting publication through one selected worksheet after workbook/relationship/styles validation, with no latency claim before ABBA. Correctness-only guarded closures add direct standard PPTX transition set/replace/clear through one selected slide Part, XLSX tab-state publication through the workbook alone or the workbook plus old/new active worksheets, and DOCX main-document-only hyperlink-wrapper detachment. General XLSX cell/formula/table-filter, printer graph and structural/inherited/extension-transition PPTX editing remain outside the closure |
@@ -49,6 +49,10 @@ while the API's candidate snapshot remains intentionally outside that sink
 window claim. The correctness-only same-length OLE2 overlay substrate also
 accepts a direct sequential sink and an atomic path destination, but no format
 owner consumes it in an adopted end-to-end performance path yet.
+The new validation tranche uses borrowed generated bytes for RTF and generic ODF
+and instrumented positional `ReadAt` for XLS, DOCX, and PPTX; source hashes and
+validation topology are checked outside timing, and DOCX section descriptors are
+checked exactly.
 Borrowed-byte comparisons, filesystem positional cold reads, atomic-save
 timing, broad structural PPTX streaming output, and non-seek semantic
 conversion for other formats remain.
@@ -103,9 +107,11 @@ conversion for other formats remain.
    dependency-free PPTX/ODP slide removals across real-producer charts, media,
    themes, notes and collision-name reconciliation; slide split remains
    missing.
-9. Extend the new bounded CFB/OPC/generic-ODF reports into format-semantic
+9. Extend the new bounded CFB/OPC/generic-ODF reports and the opt-in
+   RTF/XLS/DOCX/PPTX validation selectors into broader format-semantic
    DOC/XLS/PPT, OOXML and ODF-family validation/security matrices, signature
-   verification and explicit repair planning.
+   verification and explicit repair planning; the current reports and DOCX
+   section inventory are correctness/baseline evidence only.
 10. Smart detection versus prepared-source reuse. OOXML smart results retain an
    adoptable parsed OPC package; ODF detection/handoff remains unmeasured.
 11. Broaden ODF beyond generated text/grid/deck and accepted compact ODT/ODS/ODP
