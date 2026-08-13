@@ -616,6 +616,7 @@ impl Edit {
             self.stage_spliced_shared("worksheet.edit", "worksheets", candidate)
         } else {
             self.stage_shared("worksheet.edit", "worksheets", candidate)
+                .map(|_| ())
         }
     }
 
@@ -637,6 +638,7 @@ impl Edit {
             "definitions",
             commit.snapshot().as_bytes().to_vec(),
         )
+        .map(|_| ())
     }
 
     /// Stage cell-annotation CRUD.
@@ -661,6 +663,7 @@ impl Edit {
             self.candidate.clone()
         };
         self.stage("annotation.edit", "annotations", bytes)
+            .map(|_| ())
     }
 
     /// Stage bounded content-validation definition CRUD.
@@ -750,6 +753,7 @@ impl Edit {
             "metadata-graphs",
             commit.snapshot().as_bytes().to_vec(),
         )
+        .map(|_| ())
     }
 
     /// Stage document, sheet, and direct cell-style protection metadata.
@@ -778,6 +782,7 @@ impl Edit {
             self.candidate.clone()
         };
         self.stage("protection.edit", "protection", bytes)
+            .map(|_| ())
     }
 
     /// Stage `DataPilot` table CRUD.
@@ -798,6 +803,7 @@ impl Edit {
             "data-pilot",
             commit.snapshot().as_bytes().to_vec(),
         )
+        .map(|_| ())
     }
 
     /// Stage tracked-change graph CRUD and acceptance metadata.
@@ -822,6 +828,7 @@ impl Edit {
             self.candidate.clone()
         };
         self.stage("tracked-change.edit", "tracked-changes", bytes)
+            .map(|_| ())
     }
 
     /// Stage embedded-chart part replacement.
@@ -849,6 +856,7 @@ impl Edit {
             "charts",
             commit.snapshot().as_bytes().to_vec(),
         )
+        .map(|_| ())
     }
 
     /// Replace one existing non-repeated cell body with checked rich paragraphs and inline runs.
@@ -1773,7 +1781,7 @@ impl Edit {
         }
         refuse_referenced_removal(&package, path)?;
         let bytes = replace_resource(&package, None, path, self.before.limits)?;
-        self.stage("resource.remove", path, bytes)
+        self.stage("resource.remove", path, bytes).map(|_| ())
     }
 
     /// Restore the exact source candidate and discard every staged semantic operation.
@@ -1813,8 +1821,11 @@ impl Edit {
             return Ok(Commit {
                 snapshot: self.before,
                 patch,
+                diagnostics: Diagnostics::unchanged(self.steps.len()),
             });
         }
+        let operation_count = self.steps.len();
+        let content_provenance_spliced = self.spliced_parts.contains("content.xml");
         enforce_security_policy(&self.before, policy)?;
         validate_package_size(self.candidate.len(), self.before.limits)?;
         validate_authored_parts(&self.before.source, &self.candidate, &self.spliced_parts)?;
@@ -1825,18 +1836,25 @@ impl Edit {
             self.steps,
             snapshot.limits,
         )?;
-        Ok(Commit { snapshot, patch })
+        Ok(Commit {
+            snapshot,
+            patch,
+            diagnostics: Diagnostics::for_changed_commit(
+                operation_count,
+                content_provenance_spliced,
+            ),
+        })
     }
 
-    fn stage(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> Result<()> {
+    fn stage(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> Result<bool> {
         self.stage_shared(op, target, Arc::new(candidate))
     }
 
-    fn stage_shared(&mut self, op: &str, target: &str, candidate: Arc<Vec<u8>>) -> Result<()> {
+    fn stage_shared(&mut self, op: &str, target: &str, candidate: Arc<Vec<u8>>) -> Result<bool> {
         validate_package_size(candidate.len(), self.before.limits)?;
         let effects = changed_effects(&self.candidate, candidate.as_slice())?;
         if effects.is_empty() {
-            return Ok(());
+            return Ok(false);
         }
         for effect in &effects {
             if let Some(path) = effect.strip_prefix("part:") {
@@ -1851,12 +1869,13 @@ impl Edit {
             target: target.to_string(),
             effects,
         });
-        Ok(())
+        Ok(true)
     }
 
     fn stage_spliced(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> Result<()> {
-        self.stage(op, target, candidate)?;
-        self.spliced_parts.insert("content.xml".to_string());
+        if self.stage(op, target, candidate)? {
+            self.spliced_parts.insert("content.xml".to_string());
+        }
         Ok(())
     }
 
@@ -1866,8 +1885,9 @@ impl Edit {
         target: &str,
         candidate: Arc<Vec<u8>>,
     ) -> Result<()> {
-        self.stage_shared(op, target, candidate)?;
-        self.spliced_parts.insert("content.xml".to_string());
+        if self.stage_shared(op, target, candidate)? {
+            self.spliced_parts.insert("content.xml".to_string());
+        }
         Ok(())
     }
 }
@@ -2049,6 +2069,7 @@ impl Patch {
         Ok(Commit {
             snapshot: target,
             patch: self.clone(),
+            diagnostics: Diagnostics::patch_replay(self.changed()),
         })
     }
 
@@ -2318,6 +2339,92 @@ impl ThreeWayPlan {
 pub struct Commit {
     snapshot: Snapshot,
     patch: Patch,
+    diagnostics: Diagnostics,
+}
+
+/// The bounded publication route observed by one unified ODS commit.
+///
+/// `ProvenanceSplice` means that the changed `content.xml` part retained
+/// checked source provenance through staging. It does not claim that every
+/// unchanged ZIP member was physically copied; the common package publisher
+/// may still use its conservative logical rebuild fallback.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum PublicationRoute {
+    /// No exact package bytes changed.
+    NoOp,
+    /// The changed content part retained checked source provenance.
+    ProvenanceSplice,
+    /// The changed content part used the logical rebuild path.
+    LogicalRebuild,
+    /// A durable patch replay validated an already materialized target.
+    PatchReplay,
+}
+
+/// Content-free facts about one successful unified ODS commit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Diagnostics {
+    operation_count: usize,
+    changed: bool,
+    candidate_reopened: bool,
+    publication_route: PublicationRoute,
+}
+
+impl Diagnostics {
+    const fn unchanged(operation_count: usize) -> Self {
+        Self {
+            operation_count,
+            changed: false,
+            candidate_reopened: false,
+            publication_route: PublicationRoute::NoOp,
+        }
+    }
+
+    const fn for_changed_commit(operation_count: usize, content_provenance_spliced: bool) -> Self {
+        Self {
+            operation_count,
+            changed: true,
+            candidate_reopened: true,
+            publication_route: if content_provenance_spliced {
+                PublicationRoute::ProvenanceSplice
+            } else {
+                PublicationRoute::LogicalRebuild
+            },
+        }
+    }
+
+    const fn patch_replay(changed: bool) -> Self {
+        Self {
+            operation_count: 0,
+            changed,
+            candidate_reopened: changed,
+            publication_route: PublicationRoute::PatchReplay,
+        }
+    }
+
+    /// Number of semantic staging operations represented by this commit.
+    #[must_use]
+    pub const fn operation_count(self) -> usize {
+        self.operation_count
+    }
+
+    /// Whether exact package bytes changed.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+
+    /// Whether a changed candidate was fully reopened before publication.
+    #[must_use]
+    pub const fn candidate_reopened(self) -> bool {
+        self.candidate_reopened
+    }
+
+    /// Publication route observed by the unified transaction.
+    #[must_use]
+    pub const fn publication_route(self) -> PublicationRoute {
+        self.publication_route
+    }
 }
 
 impl Commit {
@@ -2337,6 +2444,12 @@ impl Commit {
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
+    }
+
+    /// Content-free commit diagnostics suitable for benchmark attribution.
+    #[must_use]
+    pub const fn diagnostics(&self) -> Diagnostics {
+        self.diagnostics
     }
 
     /// Consume this publication into its immutable package snapshot.
