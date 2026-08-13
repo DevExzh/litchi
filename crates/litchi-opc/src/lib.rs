@@ -68,6 +68,6 @@ pub use pkgwriter::PackageWriter;
 pub use rel::{Relationship, Relationships, TargetMode};
 pub use source_backed::{
     PartData, PartView, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
-    SourceCacheDiagnostics, SourceCacheLimitError, SourceCacheLimits,
+    SourceCacheDiagnostics, SourceCacheLimitError, SourceCacheLimits, SourceLineage,
 };
 pub use validation::{validate_read_at, validate_read_at_with_limits};

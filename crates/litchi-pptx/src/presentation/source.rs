@@ -5,13 +5,13 @@
 //! metadata. A slide body is loaded when a selected [`SourceSlide`] is read.
 
 use std::io::Write;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
-use litchi_core::ReadAt;
+use litchi_core::{ExecutionContext, ExecutionError, ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    BlobPart, PackURI, Part, PartData, PartView, ReadLimits, Relationships, SourceBackedPackage,
-    TargetMode,
+    PackURI, Part, PartData, PartView, ReadLimits, Relationships, SourceBackedPackage,
+    SourceCacheLimits, SourceLineage, TargetMode,
 };
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -28,7 +28,6 @@ struct SourceSlideData {
     position: usize,
     part_uri: PackURI,
     binding: SlideBinding,
-    part: OnceLock<SourcePart>,
 }
 
 struct SourceInner {
@@ -128,8 +127,39 @@ struct SlideBinding {
 struct SlideClosure {
     package_relationships: Box<[RelationshipBinding]>,
     presentation: PartBinding,
-    presentation_xml: Arc<Vec<u8>>,
+    presentation_xml: PartData,
     slide: SlideBinding,
+}
+
+/// A selected-slide payload either remains attached to the source-backed OPC
+/// cache or is an explicit edit-owned candidate. Keeping the original as a
+/// [`PartData`] handle is important for managed packages: converting it to a
+/// bare `Arc<Vec<u8>>` would detach the caller's budget reservation.
+#[derive(Clone)]
+enum SourcePayload {
+    Original(PartData),
+    Edited(Arc<Vec<u8>>),
+}
+
+impl SourcePayload {
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Original(data) => data.as_bytes(),
+            Self::Edited(data) => data.as_slice(),
+        }
+    }
+}
+
+fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
+    let Some(context) = context else {
+        return Ok(());
+    };
+    context.check().map_err(|error| {
+        Error::Opc(match error {
+            ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+            error => litchi_opc::OpcError::Execution(error),
+        })
+    })
 }
 
 /// Read-only PPTX catalog and selected-slide access over a positional source.
@@ -325,16 +355,20 @@ pub struct SourceBackedPresentationEditor {
 pub struct SourceBackedSlideSnapshot {
     position: usize,
     part_uri: PackURI,
-    xml: Arc<Vec<u8>>,
+    xml: SourcePayload,
     closure: SlideClosure,
     max_output_bytes: usize,
+    source_version: SourceVersion,
+    lineage: SourceLineage,
+    context: Option<ExecutionContext>,
 }
 
 /// An isolated focused edit of one exact-source slide snapshot.
 pub struct SourceBackedSlideEdit {
     source: SourceBackedSlideSnapshot,
-    working: Arc<Vec<u8>>,
+    working: SourcePayload,
     operation_used: bool,
+    context: Option<ExecutionContext>,
 }
 
 /// A reversible, exact-source-checked one-slide XML patch.
@@ -399,6 +433,77 @@ impl SourceBackedPresentation {
         )?)
     }
 
+    /// Open from a positional source with an explicit finite payload-cache
+    /// policy. This compatibility path remains unmanaged; use one of the
+    /// `*_with_execution_context` constructors when cache payloads must be
+    /// charged to a caller-owned hierarchical budget.
+    pub fn from_read_at_with_cache_limits(
+        source: Arc<dyn ReadAt>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
+            source,
+            cache_limits,
+        )?)
+    }
+
+    /// Open from a positional source with explicit read and cache policies.
+    pub fn from_read_at_with_limits_and_cache_limits(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+                source,
+                limits,
+                cache_limits,
+            )?,
+        )
+    }
+
+    /// Open from a positional source with an explicit caller execution
+    /// context. Lazy slide payloads and cache retention remain attached to
+    /// that context; no executor or global scheduler is created by this
+    /// facade.
+    pub fn from_read_at_with_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_execution_context(source, limits, context)
+    }
+
+    /// Open from a positional source with explicit read and execution
+    /// policies while retaining the default finite source cache.
+    pub fn from_read_at_with_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
+            source, limits, context,
+        )?)
+    }
+
+    /// Open from a positional source with explicit read, cache, and
+    /// hierarchical execution policies.
+    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                limits,
+                cache_limits,
+                context,
+            )?,
+        )
+    }
+
     /// Build the read-only PPTX facade from a validated deferred OPC package.
     ///
     /// Only the mandatory presentation payload is read by this constructor.
@@ -408,7 +513,9 @@ impl SourceBackedPresentation {
     /// Returns an error when the main part or its ordered slide graph is not a
     /// coherent PresentationML presentation.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
+        package.check_execution()?;
         let catalog = source_catalog(&package)?;
+        package.check_execution()?;
 
         Ok(Self {
             inner: Arc::new(SourceInner {
@@ -443,6 +550,12 @@ impl SourceBackedPresentation {
             data,
         })
     }
+
+    /// Return content-free source-cache diagnostics without loading a part.
+    #[must_use]
+    pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
+        self.inner.package.cache_diagnostics()
+    }
 }
 
 impl SourceBackedPresentationEditor {
@@ -462,12 +575,84 @@ impl SourceBackedPresentationEditor {
         )
     }
 
+    /// Open a source-backed editor with an explicit finite payload-cache
+    /// policy. This compatibility path remains unmanaged.
+    pub fn from_read_at_with_cache_limits(
+        source: Arc<dyn ReadAt>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_cache_limits(source, cache_limits)?,
+            ReadLimits::default(),
+        )
+    }
+
+    /// Open a source-backed editor with explicit read and cache policies.
+    pub fn from_read_at_with_limits_and_cache_limits(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+                source,
+                limits,
+                cache_limits,
+            )?,
+            limits,
+        )
+    }
+
+    /// Open a source-backed editor with an explicit caller execution context.
+    /// Lazy payloads remain budget-managed for the lifetime of snapshots and
+    /// edits, and no hidden executor is installed.
+    pub fn from_read_at_with_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_execution_context(source, limits, context)
+    }
+
+    /// Open a source-backed editor with explicit read and execution policies.
+    pub fn from_read_at_with_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_execution_context(source, limits, context)?,
+            limits,
+        )
+    }
+
+    /// Open a source-backed editor with explicit read, cache, and hierarchical
+    /// execution policies.
+    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                limits,
+                cache_limits,
+                context,
+            )?,
+            limits,
+        )
+    }
+
     /// Build an owning editor from a validated deferred OPC package.
     fn from_source_backed_package(
         package: SourceBackedPackage,
         limits: ReadLimits,
     ) -> Result<Self> {
+        package.check_execution()?;
         let catalog = source_catalog(&package)?;
+        package.check_execution()?;
         Ok(Self {
             package,
             _presentation: catalog.presentation,
@@ -497,12 +682,15 @@ impl SourceBackedPresentationEditor {
     /// semantic shape offsets must describe the same bytes that will later be
     /// published.
     pub fn slide_snapshot(&self, position: usize) -> Result<SourceBackedSlideSnapshot> {
+        self.package.check_execution()?;
         self.slide_snapshot_for(position, "slide_snapshot")
     }
 
     /// Begin an isolated focused edit of one existing slide.
     pub fn edit_slide(&self, position: usize) -> Result<SourceBackedSlideEdit> {
-        Ok(self.slide_snapshot_for(position, "edit_slide")?.edit())
+        self.package.check_execution()?;
+        self.slide_snapshot_for(position, "edit_slide")?
+            .edit_checked()
     }
 
     /// Begin an atomic, bounded shape-text edit across existing slides.
@@ -530,15 +718,17 @@ impl SourceBackedPresentationEditor {
         writer: W,
         commit: &SourceBackedSlideCommit,
     ) -> Result<SourceBackedSlideSnapshot> {
+        self.package.check_execution()?;
         let current = self.slide_snapshot_for(
             commit.patch.source().position,
             "publish_slide_commit_to_stream",
         )?;
         let target = commit.patch.apply(&current)?;
+        self.package.check_execution()?;
         self.package.write_part_overlay_to_stream(
             writer,
             &current.part_uri,
-            target.xml.as_ref().clone(),
+            target.xml.as_bytes().to_vec(),
         )?;
         Ok(target)
     }
@@ -553,6 +743,7 @@ impl SourceBackedPresentationEditor {
         writer: W,
         commit: &SourceBackedSlideBatchCommit,
     ) -> Result<SourceBackedSlideBatchSnapshot> {
+        self.package.check_execution()?;
         let catalog = source_catalog(&self.package)?;
         let mut slides = Vec::new();
         slides
@@ -572,6 +763,7 @@ impl SourceBackedPresentationEditor {
             slides: slides.into_boxed_slice(),
         };
         let target = commit.patch.apply(&current)?;
+        self.package.check_execution()?;
         let mut replacements = Vec::new();
         replacements
             .try_reserve_exact(target.slide_count())
@@ -580,7 +772,7 @@ impl SourceBackedPresentationEditor {
                 source,
             })?;
         for slide in target.slides() {
-            replacements.push((slide.part_uri.clone(), slide.xml.as_ref().clone()));
+            replacements.push((slide.part_uri.clone(), slide.xml.as_bytes().to_vec()));
         }
         self.package
             .write_part_overlays_to_stream(writer, replacements)?;
@@ -592,8 +784,11 @@ impl SourceBackedPresentationEditor {
         position: usize,
         operation: &'static str,
     ) -> Result<SourceBackedSlideSnapshot> {
+        self.package.check_execution()?;
         let catalog = source_catalog(&self.package)?;
-        self.slide_snapshot_from_catalog(&catalog, position, operation)
+        let snapshot = self.slide_snapshot_from_catalog(&catalog, position, operation)?;
+        self.package.check_execution()?;
+        Ok(snapshot)
     }
 
     fn slide_snapshot_from_catalog(
@@ -602,6 +797,7 @@ impl SourceBackedPresentationEditor {
         position: usize,
         operation: &'static str,
     ) -> Result<SourceBackedSlideSnapshot> {
+        self.package.check_execution()?;
         let data = catalog
             .slides
             .get(position)
@@ -610,10 +806,15 @@ impl SourceBackedPresentationEditor {
                 len: catalog.slides.len(),
             })?;
         let view = self.package.part(&data.part_uri)?;
-        let raw = view.data()?.into_arc()?;
-        let part = owned_part_shared(&view, Arc::clone(&raw))?;
+        let raw = view.data()?;
+        self.package.check_execution()?;
+        let lineage = self.package.source_lineage();
+        let context = self.package.execution_context();
+        let part = SourcePart::from_view(&view, raw.clone());
         SlidePart::from_part(&part)?;
-        let scene = crate::shape::Scene::read(raw.as_slice())?;
+        let scene = crate::shape::Scene::read(raw.as_bytes())?;
+        self.package.check_execution()?;
+        let source_version = self.package.source_version()?;
         if scene.is_rewritten() {
             return Err(Error::UnsafeEdit {
                 operation,
@@ -623,14 +824,17 @@ impl SourceBackedPresentationEditor {
         Ok(SourceBackedSlideSnapshot {
             position,
             part_uri: data.part_uri.clone(),
-            xml: raw,
+            xml: SourcePayload::Original(raw),
             closure: SlideClosure {
                 package_relationships: catalog.package_relationships.clone(),
                 presentation: catalog.presentation_binding.clone(),
-                presentation_xml: catalog.presentation.data.into_arc()?,
+                presentation_xml: catalog.presentation.data.clone(),
                 slide: data.binding.clone(),
             },
             max_output_bytes: source_slide_output_limit(self.limits),
+            source_version,
+            lineage,
+            context,
         })
     }
 }
@@ -649,7 +853,10 @@ impl SourceBackedSlideSnapshot {
     /// forms return a typed refusal instead of being projected into a mutable
     /// approximation.
     pub fn transition(&self) -> Result<Option<crate::transition::Transition>> {
-        crate::presentation::transition::read_direct(self.xml.as_slice())
+        self.check_execution()?;
+        let transition = crate::presentation::transition::read_direct(self.xml.as_bytes())?;
+        self.check_execution()?;
+        Ok(transition)
     }
 
     /// Start an isolated focused edit from this exact source snapshot.
@@ -657,18 +864,33 @@ impl SourceBackedSlideSnapshot {
     pub fn edit(&self) -> SourceBackedSlideEdit {
         SourceBackedSlideEdit {
             source: self.clone(),
-            working: Arc::clone(&self.xml),
+            working: self.xml.clone(),
             operation_used: false,
+            context: self.context.clone(),
         }
+    }
+
+    /// Check the retained caller execution policy before creating an edit
+    /// handle. The infallible [`Self::edit`] constructor remains available for
+    /// compatibility because it performs no payload I/O.
+    pub fn edit_checked(&self) -> Result<SourceBackedSlideEdit> {
+        self.check_execution()?;
+        Ok(self.edit())
+    }
+
+    fn check_execution(&self) -> Result<()> {
+        check_execution_context(self.context.as_ref())
     }
 
     fn same_source(&self, other: &Self) -> bool {
         self.position == other.position
             && self.part_uri == other.part_uri
-            && self.xml == other.xml
+            && self.source_version == other.source_version
+            && self.lineage == other.lineage
+            && self.xml.as_bytes() == other.xml.as_bytes()
             && self.closure.package_relationships == other.closure.package_relationships
             && self.closure.presentation == other.closure.presentation
-            && self.closure.presentation_xml == other.closure.presentation_xml
+            && self.closure.presentation_xml.as_bytes() == other.closure.presentation_xml.as_bytes()
             && self.closure.slide == other.closure.slide
             && self.max_output_bytes == other.max_output_bytes
     }
@@ -704,6 +926,7 @@ impl SourceBackedSlideEdit {
         value: Option<&crate::transition::Transition>,
         operation: &'static str,
     ) -> Result<bool> {
+        self.check_execution()?;
         if self.operation_used {
             return Err(Error::UnsafeEdit {
                 operation,
@@ -711,16 +934,17 @@ impl SourceBackedSlideEdit {
             });
         }
         let (xml, changed) = crate::presentation::transition::stage(
-            self.working.as_slice(),
-            self.source.closure.presentation_xml.as_slice(),
+            self.working.as_bytes(),
+            self.source.closure.presentation_xml.as_bytes(),
             value,
             self.source.max_output_bytes,
             operation,
         )?;
         if let Some(xml) = xml {
-            self.working = Arc::new(xml);
+            self.working = SourcePayload::Edited(Arc::new(xml));
         }
         self.operation_used = true;
+        self.check_execution()?;
         Ok(changed)
     }
 
@@ -751,6 +975,7 @@ impl SourceBackedSlideEdit {
         &mut self,
         replacements: &[crate::opened::ShapeTextReplacement<'_>],
     ) -> Result<usize> {
+        self.check_execution()?;
         if replacements.is_empty() {
             return Ok(0);
         }
@@ -761,33 +986,53 @@ impl SourceBackedSlideEdit {
             });
         }
         let (xml, changed) = crate::opened::stage_shape_texts(
-            self.working.as_slice(),
+            self.working.as_bytes(),
             replacements,
             crate::opened::Limits::default().max_text_bytes(),
             self.source.max_output_bytes,
         )?;
         if let Some(xml) = xml {
-            self.working = Arc::new(xml);
+            self.working = SourcePayload::Edited(Arc::new(xml));
         }
         self.operation_used = true;
+        self.check_execution()?;
         Ok(changed)
     }
 
-    /// Validate and freeze this isolated edit for source-backed publication.
-    #[must_use]
-    pub fn commit(self) -> SourceBackedSlideCommit {
+    fn check_execution(&self) -> Result<()> {
+        check_execution_context(self.context.as_ref())
+    }
+
+    fn into_commit(self) -> SourceBackedSlideCommit {
         let snapshot = SourceBackedSlideSnapshot {
             position: self.source.position,
             part_uri: self.source.part_uri.clone(),
             xml: self.working,
             closure: self.source.closure.clone(),
             max_output_bytes: self.source.max_output_bytes,
+            source_version: self.source.source_version,
+            lineage: self.source.lineage.clone(),
+            context: self.source.context.clone(),
         };
         let patch = SourceBackedSlidePatch {
             before: self.source,
             after: snapshot.clone(),
         };
         SourceBackedSlideCommit { snapshot, patch }
+    }
+
+    /// Validate and freeze this isolated edit for source-backed publication.
+    #[must_use]
+    pub fn commit(self) -> SourceBackedSlideCommit {
+        self.into_commit()
+    }
+
+    /// Check cancellation and freeze this isolated edit for publication.
+    pub fn commit_checked(self) -> Result<SourceBackedSlideCommit> {
+        self.check_execution()?;
+        let commit = self.into_commit();
+        commit.snapshot.check_execution()?;
+        Ok(commit)
     }
 }
 
@@ -821,6 +1066,8 @@ impl SourceBackedSlidePatch {
 
     /// Apply only to the exact raw slide source captured by this patch.
     pub fn apply(&self, source: &SourceBackedSlideSnapshot) -> Result<SourceBackedSlideSnapshot> {
+        self.before.check_execution()?;
+        source.check_execution()?;
         if !source.same_source(&self.before) {
             return Err(Error::StaleSource);
         }
@@ -863,6 +1110,7 @@ impl SourceBackedSlideBatchEdit<'_> {
         position: usize,
         replacements: &[crate::opened::ShapeTextReplacement<'_>],
     ) -> Result<usize> {
+        self.editor.package.check_execution()?;
         if replacements.is_empty() {
             return Ok(0);
         }
@@ -920,13 +1168,15 @@ impl SourceBackedSlideBatchEdit<'_> {
                 resource: "source-backed slide batch edits",
                 source,
             })?;
-        self.commits.push(edit.commit());
+        self.commits.push(edit.commit_checked()?);
+        self.editor.package.check_execution()?;
         self.text_bytes = text_bytes;
         Ok(changed)
     }
 
     /// Validate and freeze this selected slide set for publication.
     pub fn commit(mut self) -> Result<SourceBackedSlideBatchCommit> {
+        self.editor.package.check_execution()?;
         if self.commits.is_empty() {
             return Err(Error::UnsafeEdit {
                 operation: "commit_slide_batch",
@@ -950,6 +1200,7 @@ impl SourceBackedSlideBatchEdit<'_> {
                 source,
             })?;
         for commit in self.commits {
+            commit.patch.before.check_execution()?;
             before.push(commit.patch.before);
             after.push(commit.patch.after);
         }
@@ -990,6 +1241,13 @@ impl SourceBackedSlideBatchSnapshot {
                 .zip(other.slides.iter())
                 .all(|(left, right)| left.same_source(right))
     }
+
+    fn check_execution(&self) -> Result<()> {
+        for slide in &self.slides {
+            slide.check_execution()?;
+        }
+        Ok(())
+    }
 }
 
 impl SourceBackedSlideBatchPatch {
@@ -1025,6 +1283,8 @@ impl SourceBackedSlideBatchPatch {
         &self,
         source: &SourceBackedSlideBatchSnapshot,
     ) -> Result<SourceBackedSlideBatchSnapshot> {
+        self.before.check_execution()?;
+        source.check_execution()?;
         if !source.same_source(&self.before) {
             return Err(Error::StaleSource);
         }
@@ -1065,15 +1325,20 @@ impl SourceSlide {
 
     /// Flatten DrawingML text runs from this selected slide in source order.
     ///
-    /// The slide payload is loaded and retained on first use. No other slide
-    /// payload is read.
+    /// The slide payload is loaded only for this call and is released from the
+    /// facade's view when the call returns. No other slide payload is read.
     ///
     /// # Errors
     ///
     /// Returns an error if the source changed, the selected slide exceeds the
     /// retained OPC limits, or its PresentationML is malformed.
     pub fn text(&self) -> Result<String> {
-        SlidePart::from_part(self.part()?)?.text()
+        self.owner.package.check_execution()?;
+        let part = self.part()?;
+        let text = SlidePart::from_part(&part)?.text()?;
+        self.owner.package.check_execution()?;
+        self.owner.package.source_version()?;
+        Ok(text)
     }
 
     /// List direct `p:pic` image descriptors in scene order.
@@ -1085,14 +1350,15 @@ impl SourceSlide {
     /// Markup-compatibility branches and ambiguous or malformed picture
     /// grammar are refused rather than projected into a lossy descriptor.
     pub fn images(&self) -> Result<Vec<SourceImageDescriptor>> {
+        self.owner.package.check_execution()?;
         let view = self.owner.package.part(&self.data.part_uri)?;
         let part = self.load_part(&view)?;
-        validate_source_slide_root(part)?;
+        validate_source_slide_root(&part)?;
         reject_picture_markup_compatibility(part.blob())?;
         // Keep the normal borrowed part validation on the safe path as well;
         // the raw-root check above prevents MCE preprocessing from masking a
         // malformed selected slide before our refusal scan runs.
-        SlidePart::from_part(part)?;
+        SlidePart::from_part(&part)?;
         let scene = crate::shape::Scene::read(part.blob())?;
         if scene.is_rewritten() {
             return Err(Error::UnsafeEdit {
@@ -1125,6 +1391,8 @@ impl SourceSlide {
                 target,
             });
         }
+        self.owner.package.check_execution()?;
+        self.owner.package.source_version()?;
         Ok(descriptors)
     }
 
@@ -1152,6 +1420,7 @@ impl SourceSlide {
     /// [`Self::images`] but are refused here without any network or filesystem
     /// access.
     pub fn read_image(&self, position: usize) -> Result<SourceImage> {
+        self.owner.package.check_execution()?;
         let descriptor = self.image(position)?;
         let SourceImageTarget::Internal { part_uri, .. } = &descriptor.target else {
             return Err(Error::Relationship(format!(
@@ -1166,26 +1435,24 @@ impl SourceSlide {
             )));
         }
         let data = view.data()?;
+        self.owner.package.check_execution()?;
+        self.owner.package.source_version()?;
         Ok(SourceImage { descriptor, data })
     }
 
-    fn part(&self) -> Result<&SourcePart> {
+    fn part(&self) -> Result<SourcePart> {
+        self.owner.package.check_execution()?;
         // The metadata lookup keeps source-version checks active even after a
         // selected slide payload has entered the local cache.
         let view = self.owner.package.part(&self.data.part_uri)?;
         self.load_part(&view)
     }
 
-    fn load_part<'a>(&'a self, view: &PartView<'_>) -> Result<&'a SourcePart> {
-        if let Some(part) = self.data.part.get() {
-            return Ok(part);
-        }
-
+    fn load_part(&self, view: &PartView<'_>) -> Result<SourcePart> {
+        self.owner.package.check_execution()?;
         let part = SourcePart::from_view(view, view.data()?);
-        let _publish_result = self.data.part.set(part);
-        self.data.part.get().ok_or_else(|| {
-            Error::Invalid("source-backed slide cache did not publish a value".to_string())
-        })
+        self.owner.package.check_execution()?;
+        Ok(part)
     }
 }
 
@@ -1692,6 +1959,7 @@ fn validate_slide_graph(
     presentation: &PartView<'_>,
     references: &[SlideReference],
 ) -> Result<Box<[Arc<SourceSlideData>]>> {
+    package.check_execution()?;
     let mut slides = Vec::new();
     slides
         .try_reserve_exact(references.len())
@@ -1700,6 +1968,7 @@ fn validate_slide_graph(
             source,
         })?;
     for (position, reference) in references.iter().enumerate() {
+        package.check_execution()?;
         let relationship = presentation
             .rels()
             .get(reference.relationship_id())
@@ -1737,9 +2006,9 @@ fn validate_slide_graph(
                 presentation_relationship: relationship_binding(relationship),
                 slide: part_binding(&slide),
             },
-            part: OnceLock::new(),
         }));
     }
+    package.check_execution()?;
     Ok(slides.into_boxed_slice())
 }
 
@@ -1755,34 +2024,21 @@ fn source_slide_output_limit(limits: ReadLimits) -> usize {
 }
 
 fn source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalog> {
+    package.check_execution()?;
     let view = package.main_document_part()?;
     let presentation = SourcePart::from_view(&view, view.data()?);
+    package.check_execution()?;
     let presentation_binding = part_binding(&view);
     let references = PresentationPart::from_part(&presentation)?.slide_references()?;
+    package.check_execution()?;
     let slides = validate_slide_graph(package, &view, &references)?;
+    package.check_execution()?;
     Ok(SourceCatalog {
         presentation,
         package_relationships: relationship_bindings(package.rels()),
         presentation_binding,
         slides,
     })
-}
-
-fn owned_part_shared(view: &PartView<'_>, bytes: Arc<Vec<u8>>) -> Result<BlobPart> {
-    let mut part = BlobPart::new_shared(
-        view.partname().clone(),
-        view.content_type().to_string(),
-        bytes,
-    );
-    for relationship in view.rels().iter() {
-        part.rels_mut().try_add_relationship(
-            relationship.reltype().to_string(),
-            relationship.target_ref().to_string(),
-            relationship.r_id().to_string(),
-            relationship.target_mode(),
-        )?;
-    }
-    Ok(part)
 }
 
 fn part_binding(view: &PartView<'_>) -> PartBinding {
@@ -1822,10 +2078,10 @@ mod tests {
         Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
         SourceVersion,
     };
-    use litchi_opc::{ReadLimits, ReadResource, SourceBackedPackage};
+    use litchi_opc::{PackURI, ReadLimits, ReadResource, SourceBackedPackage};
     use soapberry_zip::office::StreamingArchiveWriter;
 
-    use super::{SourceBackedPresentation, SourceImageTarget};
+    use super::{SourceBackedPresentation, SourceBackedPresentationEditor, SourceImageTarget};
     use crate::Error;
 
     const SECOND_MARKER: &[u8] = b"source-backed-unrequested-second-slide";
@@ -2054,6 +2310,239 @@ mod tests {
             Some("image/png"),
             None,
         )
+    }
+
+    fn source_backed_context(memory_limit: u64) -> (Budget, CancellationSource, ExecutionContext) {
+        let budget = Budget::root(
+            "pptx-source-managed-test",
+            Limits::new(
+                memory_limit,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            ),
+        );
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(memory_limit.max(1)).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+        (budget, cancellation_source, context)
+    }
+
+    fn source_backed_root_and_second_slide_bytes() -> (u64, u64) {
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_backed_pptx())))
+                .unwrap();
+        let presentation = package.main_document_part().unwrap();
+        let root = presentation.data().unwrap().as_bytes().len() as u64;
+        let second = package
+            .part(&PackURI::new("/ppt/slides/slide2.xml").unwrap())
+            .unwrap()
+            .data()
+            .unwrap()
+            .as_bytes()
+            .len() as u64;
+        (root, second)
+    }
+
+    #[test]
+    fn managed_selected_slide_materialization_is_exact_and_one_under_fails_before_io() {
+        let archive = source_backed_pptx();
+        let (root_bytes, second_bytes) = source_backed_root_and_second_slide_bytes();
+        let exact_source = Arc::new(CountingSource::new(archive.clone()));
+        let (exact_budget, _cancel, exact_context) =
+            source_backed_context(root_bytes + second_bytes);
+        let exact_editor =
+            SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+                exact_source.clone(),
+                ReadLimits::default(),
+                exact_context,
+            )
+            .unwrap();
+        assert_eq!(exact_editor.cache_diagnostics().retained_entries, 1);
+        let snapshot = exact_editor.slide_snapshot(1).unwrap();
+        assert_eq!(snapshot.position(), 1);
+        assert!(exact_source.second_payload_reads.load(Ordering::SeqCst) > 0);
+        assert_eq!(
+            exact_budget.used(Resource::Memory),
+            root_bytes + second_bytes
+        );
+        assert_eq!(exact_editor.cache_diagnostics().retained_entries, 2);
+        drop(snapshot);
+        drop(exact_editor);
+        assert_eq!(exact_budget.used(Resource::Memory), 0);
+
+        let under_source = Arc::new(CountingSource::new(archive));
+        let (under_budget, _cancel, under_context) =
+            source_backed_context(root_bytes + second_bytes - 1);
+        let under_editor =
+            SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+                under_source.clone(),
+                ReadLimits::default(),
+                under_context,
+            )
+            .unwrap();
+        assert!(under_editor.slide_snapshot(1).is_err());
+        assert_eq!(under_source.second_payload_reads.load(Ordering::SeqCst), 0);
+        drop(under_editor);
+        assert_eq!(under_budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_editor_exact_noop_keeps_source_bytes_and_budgeted_handles() {
+        let archive = source_backed_pptx();
+        let source = Arc::new(CountingSource::new(archive.clone()));
+        let (budget, _cancel, context) = source_backed_context(archive.len() as u64);
+        let editor = SourceBackedPresentationEditor::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let mut edit = editor.edit_slide(0).unwrap();
+        assert!(!edit.clear_transition().unwrap());
+        let commit = edit.commit();
+        assert!(!commit.is_changed());
+        let mut output = Vec::new();
+        editor
+            .publish_slide_commit_to_stream(&mut output, &commit)
+            .unwrap();
+        assert_eq!(output, archive);
+        drop(commit);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_source_cancellation_refuses_cached_semantic_reads() {
+        let source = Arc::new(CountingSource::new(source_backed_pptx()));
+        let (budget, cancellation_source, context) = source_backed_context(u64::MAX);
+        let presentation = SourceBackedPresentation::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let slide = presentation.slide(0).unwrap();
+        assert_eq!(slide.text().unwrap(), "First slide");
+        cancellation_source.cancel();
+        assert!(matches!(
+            slide.text(),
+            Err(Error::Opc(litchi_opc::OpcError::Cancelled))
+        ));
+        drop(slide);
+        drop(presentation);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_presentation_diagnostics_report_cache_mode_and_release_on_drop() {
+        let source = Arc::new(CountingSource::new(source_backed_pptx()));
+        let (budget, _cancel, context) = source_backed_context(u64::MAX);
+        let presentation = SourceBackedPresentation::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let opening = presentation.cache_diagnostics();
+        assert!(opening.budget_managed);
+        assert_eq!(opening.retained_entries, 1);
+        assert!(opening.budget_cache_reserved_bytes > 0);
+        let _ = presentation.slide(0).unwrap().text().unwrap();
+        let selected = presentation.cache_diagnostics();
+        assert!(selected.budget_managed);
+        assert_eq!(selected.retained_entries, 2);
+        assert!(selected.budget_cache_reserved_bytes > opening.budget_cache_reserved_bytes);
+        drop(presentation);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_selected_slide_payload_is_evictable_after_view_drop() {
+        let source = Arc::new(CountingSource::new(source_backed_pptx()));
+        let (_budget, _cancel, context) = source_backed_context(u64::MAX);
+        let cache_limits = litchi_opc::SourceCacheLimits::new(usize::MAX, 2).unwrap();
+        let presentation = SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            source,
+            ReadLimits::default(),
+            cache_limits,
+            context,
+        )
+        .unwrap();
+
+        presentation.slide(0).unwrap().text().unwrap();
+        let after_first = presentation.cache_diagnostics();
+        assert_eq!(after_first.retained_entries, 2);
+
+        // The root remains intentionally pinned by the facade. The selected
+        // read-only slide handle has already dropped its PartData, so loading
+        // the next slide can evict that payload instead of bypassing cache
+        // retention because a metadata owner still holds it forever.
+        presentation.slide(1).unwrap().text().unwrap();
+        let after_second = presentation.cache_diagnostics();
+        assert_eq!(after_second.retained_entries, 2);
+        assert!(after_second.evictions >= 1);
+    }
+
+    #[test]
+    fn identical_foreign_source_closure_is_rejected_by_lineage() {
+        let first = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let second = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let mut edit = first.edit_slide(0).unwrap();
+        assert!(!edit.clear_transition().unwrap());
+        let patch = edit.commit_checked().unwrap().patch().clone();
+        let foreign = second.slide_snapshot(0).unwrap();
+
+        assert!(matches!(patch.apply(&foreign), Err(Error::StaleSource)));
+    }
+
+    #[test]
+    fn managed_snapshot_edit_and_patch_checks_are_cooperatively_cancelled() {
+        let (_budget, cancellation_source, context) = source_backed_context(u64::MAX);
+        let editor = SourceBackedPresentationEditor::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source_backed_pptx())),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let snapshot = editor.slide_snapshot(0).unwrap();
+        let patch = snapshot.edit().commit_checked().unwrap().patch().clone();
+        cancellation_source.cancel();
+
+        assert!(matches!(
+            snapshot.transition(),
+            Err(Error::Opc(litchi_opc::OpcError::Cancelled))
+        ));
+        assert!(matches!(
+            snapshot.edit_checked(),
+            Err(Error::Opc(litchi_opc::OpcError::Cancelled))
+        ));
+        let mut edit = snapshot.edit();
+        assert!(matches!(
+            edit.clear_transition(),
+            Err(Error::Opc(litchi_opc::OpcError::Cancelled))
+        ));
+        assert!(matches!(
+            edit.commit_checked(),
+            Err(Error::Opc(litchi_opc::OpcError::Cancelled))
+        ));
+        assert!(matches!(
+            patch.apply(&snapshot),
+            Err(Error::Opc(litchi_opc::OpcError::Cancelled))
+        ));
     }
 
     #[test]
