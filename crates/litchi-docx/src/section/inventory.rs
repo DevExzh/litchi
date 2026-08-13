@@ -1,5 +1,6 @@
 //! Immutable, bounded inventory of main-document section boundaries.
 
+use super::codec::{validate_element_qname, validate_namespace_declaration, validate_qname};
 use super::{Margins, PageSize, Reference, Section, Start};
 use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
@@ -90,7 +91,10 @@ pub enum Ownership {
 /// A half-open range of source-order main-story paragraphs.
 ///
 /// Positions use the same namespace-aware paragraph order as the document's
-/// paragraph inventory, including paragraphs nested in tables and controls.
+/// paragraph inventory, including paragraphs nested in main-story tables and
+/// controls. A `w:sectPr` in a table-cell paragraph is content in that
+/// paragraph, not a main-story section boundary, and is therefore ignored by
+/// this inventory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ParagraphRange {
     start: Position,
@@ -411,6 +415,7 @@ impl Snapshot {
 struct ParagraphContext {
     depth: usize,
     main_story: bool,
+    section_boundary: bool,
     position: Position,
     saw_properties: bool,
     saw_content: bool,
@@ -468,6 +473,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
     let mut events = 0usize;
     let mut root_seen = false;
     let mut body_depth = None;
+    let mut table_depth = 0usize;
     let mut body_seen = false;
     let mut root_closed = false;
     let mut paragraphs = Vec::<ParagraphContext>::new();
@@ -507,6 +513,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                 enforce_limit("XML depth", child_depth, limits.max_depth)?;
                 let word = is_wordprocessing_namespace(&namespace);
                 let local = element.local_name();
+                validate_namespace_bindings(&element, &namespace, &resolver, reader.decoder())?;
                 inspect_reference(
                     &element,
                     &namespace,
@@ -529,6 +536,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                     &mut root_seen,
                     &mut body_seen,
                     &mut body_depth,
+                    &mut table_depth,
                     &mut paragraphs,
                     &mut capture,
                     &mut state,
@@ -554,6 +562,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                 enforce_limit("XML depth", child_depth, limits.max_depth)?;
                 let word = is_wordprocessing_namespace(&namespace);
                 let local = element.local_name();
+                validate_namespace_bindings(&element, &namespace, &resolver, reader.decoder())?;
                 inspect_reference(
                     &element,
                     &namespace,
@@ -576,6 +585,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                     &mut root_seen,
                     &mut body_seen,
                     &mut body_depth,
+                    &mut table_depth,
                     &mut paragraphs,
                     &mut capture,
                     &mut state,
@@ -609,6 +619,13 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                     && element.local_name().as_ref() == b"body"
                 {
                     body_depth = None;
+                }
+                if is_wordprocessing_namespace(&namespace)
+                    && element.local_name().as_ref() == b"tbl"
+                {
+                    table_depth = table_depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("main-document table nesting underflow".into())
+                    })?;
                 }
                 if depth == 1 {
                     if !is_wordprocessing_namespace(&namespace)
@@ -681,6 +698,7 @@ fn inspect_element(
     root_seen: &mut bool,
     body_seen: &mut bool,
     body_depth: &mut Option<usize>,
+    table_depth: &mut usize,
     paragraphs: &mut Vec<ParagraphContext>,
     capture: &mut Option<Capture>,
     state: &mut ScanState,
@@ -715,6 +733,12 @@ fn inspect_element(
         ));
     }
 
+    if word && local == b"tbl" && !empty {
+        *table_depth = table_depth
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("main-document table nesting overflow".into()))?;
+    }
+
     if word && local == b"p" && body_depth.is_some() {
         if !paragraphs.is_empty() {
             if !empty {
@@ -727,6 +751,7 @@ fn inspect_element(
                 paragraphs.push(ParagraphContext {
                     depth: child_depth,
                     main_story: false,
+                    section_boundary: false,
                     position: Position::new(0),
                     saw_properties: false,
                     saw_content: false,
@@ -756,6 +781,7 @@ fn inspect_element(
             paragraphs.push(ParagraphContext {
                 depth: child_depth,
                 main_story: true,
+                section_boundary: *table_depth == 0,
                 position,
                 saw_properties: false,
                 saw_content: false,
@@ -795,6 +821,14 @@ fn inspect_element(
                 ));
             }
             if word && local == b"sectPr" {
+                if !context.section_boundary {
+                    // ECMA-376 permits `w:pPr/w:sectPr` in the common
+                    // paragraph property model, but a table-cell paragraph
+                    // cannot terminate a main-story section. Keep its
+                    // content inert and leave boundary/range accounting to
+                    // the direct body story.
+                    return Ok(());
+                }
                 context.section_seen = true;
                 let ownership = Ownership::Paragraph(context.position);
                 if empty {
@@ -948,6 +982,50 @@ fn append_section(
     Ok(())
 }
 
+fn validate_namespace_bindings(
+    element: &BytesStart<'_>,
+    namespace: &ResolveResult<'_>,
+    resolver: &NamespaceResolver,
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<()> {
+    validate_element_qname(element.name().as_ref(), "main-document")?;
+    if let ResolveResult::Unknown(prefix) = namespace {
+        return Err(Error::InvalidFormat(format!(
+            "main-document element uses unbound namespace prefix '{}'",
+            String::from_utf8_lossy(prefix)
+        )));
+    }
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        validate_qname(attribute.key.as_ref(), "main-document", "attribute")?;
+        let prefix = attribute.key.prefix();
+        let is_namespace_declaration = (prefix.is_none()
+            && attribute.key.local_name().as_ref() == b"xmlns")
+            || prefix
+                .as_ref()
+                .is_some_and(|value| value.as_ref() == b"xmlns");
+        if is_namespace_declaration {
+            let value = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            validate_namespace_declaration(
+                attribute.key.as_ref(),
+                value.as_ref(),
+                "main-document",
+            )?;
+            continue;
+        }
+        let (attribute_namespace, _) = resolver.resolve_attribute(attribute.key);
+        if let ResolveResult::Unknown(prefix) = attribute_namespace {
+            return Err(Error::InvalidFormat(format!(
+                "main-document attribute uses unbound namespace prefix '{}'",
+                String::from_utf8_lossy(&prefix)
+            )));
+        }
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 fn inspect_reference(
     element: &BytesStart<'_>,
@@ -1066,10 +1144,7 @@ fn self_contained_fragment(
     bindings: &[RelationshipBinding],
     max_section_bytes: usize,
 ) -> Result<Vec<u8>> {
-    let open_end = source
-        .iter()
-        .position(|byte| *byte == b'>')
-        .ok_or_else(|| Error::InvalidFormat("section opening element is incomplete".into()))?;
+    let open_end = root_opening_end(source)?;
     let mut added = 0usize;
     for binding in bindings {
         if !root_declares_prefix(source, &binding.prefix)? {
@@ -1112,6 +1187,36 @@ fn self_contained_fragment(
     }
     fragment.extend_from_slice(&source[insertion..]);
     Ok(fragment)
+}
+
+fn root_opening_end(source: &[u8]) -> Result<usize> {
+    if source.first() != Some(&b'<') {
+        return Err(Error::InvalidFormat(
+            "section fragment does not begin with an opening element".into(),
+        ));
+    }
+    let mut quote = None;
+    for (index, byte) in source.iter().enumerate().skip(1) {
+        if let Some(delimiter) = quote {
+            if *byte == delimiter {
+                quote = None;
+            }
+            continue;
+        }
+        match *byte {
+            b'\'' | b'"' => quote = Some(*byte),
+            b'>' => return Ok(index),
+            _ => {},
+        }
+    }
+    if quote.is_some() {
+        return Err(Error::InvalidFormat(
+            "section opening element has an unterminated quoted attribute".into(),
+        ));
+    }
+    Err(Error::InvalidFormat(
+        "section opening element is incomplete".into(),
+    ))
 }
 
 fn root_declares_prefix(source: &[u8], prefix: &[u8]) -> Result<bool> {

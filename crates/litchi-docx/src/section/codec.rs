@@ -35,6 +35,7 @@ use super::model::{
 use crate::error::{Error, Result};
 use crate::header_footer::Kind;
 use crate::namespace::is_wordprocessing_namespace;
+use litchi_ooxml_common::xml_name::{is_ncname, is_qualified_name};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
@@ -505,6 +506,95 @@ fn write_columns(raw: &Raw, columns: &Columns) -> Result<Vec<u8>> {
     Ok(xml.into_bytes())
 }
 
+pub(crate) fn validate_element_qname(value: &[u8], owner: &str) -> Result<()> {
+    validate_qname(value, owner, "element")?;
+    if value
+        .split(|byte| *byte == b':')
+        .next()
+        .is_some_and(|prefix| prefix == b"xmlns")
+        && value.contains(&b':')
+    {
+        return Err(Error::InvalidFormat(format!(
+            "{owner} element cannot use the reserved xmlns prefix"
+        )));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_qname(value: &[u8], owner: &str, kind: &str) -> Result<()> {
+    let value = std::str::from_utf8(value)
+        .map_err(|error| Error::Xml(format!("invalid UTF-8 in {owner} {kind} QName: {error}")))?;
+    if !is_qualified_name(value) {
+        return Err(Error::InvalidFormat(format!(
+            "{owner} {kind} has an invalid QName '{value}'"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_attribute_qnames(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    owner: &str,
+) -> Result<()> {
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        validate_qname(attribute.key.as_ref(), owner, "attribute")?;
+        let prefix = attribute.key.prefix();
+        let is_namespace_declaration = (prefix.is_none()
+            && attribute.key.local_name().as_ref() == b"xmlns")
+            || prefix
+                .as_ref()
+                .is_some_and(|value| value.as_ref() == b"xmlns");
+        if !is_namespace_declaration {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        validate_namespace_declaration(attribute.key.as_ref(), value.as_ref(), owner)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_namespace_declaration(name: &[u8], value: &str, owner: &str) -> Result<()> {
+    const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
+    const XMLNS_NAMESPACE: &str = "http://www.w3.org/2000/xmlns/";
+    let prefix = name.strip_prefix(b"xmlns:");
+    if let Some(prefix) = prefix {
+        let prefix = std::str::from_utf8(prefix).map_err(|error| {
+            Error::Xml(format!(
+                "invalid UTF-8 in {owner} namespace prefix: {error}"
+            ))
+        })?;
+        if !is_ncname(prefix) || prefix == "xmlns" {
+            return Err(Error::InvalidFormat(format!(
+                "{owner} namespace declaration has an invalid prefix '{prefix}'"
+            )));
+        }
+        if value.is_empty() {
+            return Err(Error::InvalidFormat(format!(
+                "{owner} namespace prefix '{prefix}' cannot be undeclared"
+            )));
+        }
+        if (prefix == "xml") != (value == XML_NAMESPACE) {
+            return Err(Error::InvalidFormat(
+                "the XML namespace URI may be bound only to the xml prefix".into(),
+            ));
+        }
+    } else if value == XML_NAMESPACE {
+        return Err(Error::InvalidFormat(
+            "the XML namespace URI may be bound only to the xml prefix".into(),
+        ));
+    }
+    if value == XMLNS_NAMESPACE {
+        return Err(Error::InvalidFormat(
+            "the xmlns namespace URI cannot be rebound".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn parse_raw(xml: &[u8]) -> Result<Raw> {
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::InvalidFormat(format!(
@@ -530,9 +620,27 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
 
     loop {
         let event_start = offset(&reader)?;
+        let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
+        match &event {
+            Event::Start(element) | Event::Empty(element) => {
+                validate_element_qname(element.name().as_ref(), "section")?;
+                validate_attribute_qnames(element, decoder, "section")?;
+            },
+            Event::End(element) => {
+                validate_element_qname(element.name().as_ref(), "section end")?;
+            },
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)
+            | Event::Eof => {},
+        }
         if stack.is_empty() && matches!(event, Event::Start(_) | Event::Empty(_)) {
             validate_root_namespace(&namespace)?;
         }
@@ -876,10 +984,49 @@ fn parse_reference(raw: &Raw, xml: &[u8]) -> Result<Reference> {
             "section header/footer relationship ID is empty".into(),
         ));
     }
+    if !is_xml_id(&relationship_id) {
+        return Err(Error::InvalidFormat(
+            "section header/footer relationship ID is not an XML ID".into(),
+        ));
+    }
     Ok(Reference {
         kind,
         relationship_id,
     })
+}
+
+fn is_xml_id(value: &str) -> bool {
+    let mut characters = value.chars();
+    characters.next().is_some_and(is_ncname_start) && characters.all(is_ncname_char)
+}
+
+fn is_ncname_start(character: char) -> bool {
+    matches!(
+        character,
+        'A'..='Z'
+            | '_'
+            | 'a'..='z'
+            | '\u{00c0}'..='\u{00d6}'
+            | '\u{00d8}'..='\u{00f6}'
+            | '\u{00f8}'..='\u{02ff}'
+            | '\u{0370}'..='\u{037d}'
+            | '\u{037f}'..='\u{1fff}'
+            | '\u{200c}'..='\u{200d}'
+            | '\u{2070}'..='\u{218f}'
+            | '\u{2c00}'..='\u{2fef}'
+            | '\u{3001}'..='\u{d7ff}'
+            | '\u{f900}'..='\u{fdcf}'
+            | '\u{fdf0}'..='\u{fffd}'
+            | '\u{10000}'..='\u{effff}'
+    )
+}
+
+fn is_ncname_char(character: char) -> bool {
+    is_ncname_start(character)
+        || matches!(
+            character,
+            '-' | '.' | '0'..='9' | '\u{00b7}' | '\u{0300}'..='\u{036f}' | '\u{203f}'..='\u{2040}'
+        )
 }
 
 fn validate_references(references: &[Reference]) -> Result<()> {
@@ -1022,6 +1169,9 @@ fn attributes(xml: &[u8], family: AttributeFamily<'_>) -> Result<Vec<(String, St
         .name()
         .prefix()
         .map(|prefix| prefix.into_inner().to_vec());
+    let decoder = reader.decoder();
+    validate_element_qname(element.name().as_ref(), "section")?;
+    validate_attribute_qnames(&element, decoder, "section")?;
     let mut result = Vec::new();
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
@@ -1057,7 +1207,7 @@ fn attributes(xml: &[u8], family: AttributeFamily<'_>) -> Result<Vec<(String, St
             )));
         }
         let value = attribute
-            .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
         result.push((name, value));
