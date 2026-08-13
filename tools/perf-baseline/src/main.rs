@@ -38,7 +38,10 @@ use litchi_opc::{
     SourceBackedPackage, SourceCacheLimits, TargetMode,
     constants::{content_type as opc_content_type, relationship_type},
 };
-use litchi_xlsx::{Cell as XlsxCell, Rect, SourceBackedWorkbook, Value as XlsxValue, Workbook};
+use litchi_xlsx::{
+    Cell as XlsxCell, Rect, SourceBackedWorkbook, StreamingCell, StreamingCellValue,
+    StreamingWorkbookLimits, StreamingWorkbookWriter, Value as XlsxValue, Workbook,
+};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::ArchiveReader;
@@ -96,6 +99,15 @@ const ODP_MEDIA_CORPUS_GENERATOR: &str = "litchi-odp-media-textbox-publication-v
 const ODP_TEXT_BOX_BATCH_CORPUS_GENERATOR: &str = "litchi-odp-cross-slide-textbox-publication-v1";
 const SEMANTIC_RTF_CORPUS_GENERATOR: &str = "litchi-rtf-semantic-v2";
 const RTF_LIFECYCLE_CORPUS_GENERATOR: &str = "litchi-rtf-paragraph-lifecycle-v1";
+const XLSX_STREAMING_CORPUS_GENERATOR: &str = "litchi-xlsx-streaming-create-v1";
+const RTF_STREAMING_CORPUS_GENERATOR: &str = "litchi-rtf-streaming-create-v1";
+const XLSX_STREAMING_ROW_BYTES: u64 = 4 * 1024;
+const RTF_STREAMING_SCRATCH_BYTES: u64 = 37;
+const XLS_COMMENTS_EDIT_CORPUS_GENERATOR: &str = "litchi-xls-comments-opaque-heavy-v1";
+const XLS_COMMENTS_SOURCE_COUNT: usize = 256;
+const XLS_COMMENTS_BATCH_COUNT: usize = 256;
+const XLS_COMMENTS_OPAQUE_STREAM_COUNT: usize = 8;
+const XLS_COMMENTS_OPAQUE_STREAM_BYTES: usize = 2 * 1024 * 1024;
 const ODS_MEDIA_ENTRY_COUNT: usize = 8;
 const ODS_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const DOCX_SOURCE_MEDIA_ENTRY_COUNT: usize = 8;
@@ -244,6 +256,14 @@ impl SemanticShape {
 
     const fn rtf_paragraphs(self) -> usize {
         self.docx_paragraphs()
+    }
+
+    const fn streaming_units(self) -> usize {
+        match self {
+            Self::Tiny => 64,
+            Self::Medium => 8_192,
+            Self::Large => 131_072,
+        }
     }
 
     const fn pptx_slides(self) -> usize {
@@ -449,6 +469,10 @@ enum Case {
     XlsSemanticFullCellScan,
     XlsSemanticNoopEditSave,
     XlsSemanticOneEditSave,
+    XlsCommentsEagerEditSave,
+    XlsCommentsSourceBackedEditSave,
+    XlsCommentsEagerBatchEditSave,
+    XlsCommentsSourceBackedBatchEditSave,
     PptSemanticOpen,
     PptSemanticListSlides,
     PptSemanticOneShapeText,
@@ -473,6 +497,7 @@ enum Case {
     XlsxSourceListSheets,
     XlsxSourceFirstCell,
     XlsxSourceNarrowColumnRangeScan,
+    XlsxStreamingCreate,
     OpcRangeSourceOpen,
     OpcRangeSourceOpenMainRead,
     XlsxRangeSourceOpen,
@@ -494,6 +519,7 @@ enum Case {
     RtfSemanticOnePercentEditSave,
     RtfSemanticRemoveParagraphSave,
     RtfSemanticMoveParagraphSave,
+    RtfStreamingCreate,
     DocxSemanticOpen,
     DocxSemanticListParagraphs,
     DocxSemanticOneParagraph,
@@ -680,6 +706,12 @@ impl Case {
             Self::XlsSemanticFullCellScan => "xls_semantic_full_cell_scan",
             Self::XlsSemanticNoopEditSave => "xls_semantic_noop_edit_save",
             Self::XlsSemanticOneEditSave => "xls_semantic_one_edit_save",
+            Self::XlsCommentsEagerEditSave => "xls_comments_eager_edit_save",
+            Self::XlsCommentsSourceBackedEditSave => "xls_comments_source_backed_edit_save",
+            Self::XlsCommentsEagerBatchEditSave => "xls_comments_eager_batch_edit_save",
+            Self::XlsCommentsSourceBackedBatchEditSave => {
+                "xls_comments_source_backed_batch_edit_save"
+            },
             Self::PptSemanticOpen => "ppt_semantic_open",
             Self::PptSemanticListSlides => "ppt_semantic_list_slides",
             Self::PptSemanticOneShapeText => "ppt_semantic_one_shape_text",
@@ -704,6 +736,7 @@ impl Case {
             Self::XlsxSourceListSheets => "xlsx_source_list_sheets",
             Self::XlsxSourceFirstCell => "xlsx_source_first_cell",
             Self::XlsxSourceNarrowColumnRangeScan => "xlsx_source_narrow_column_range_scan",
+            Self::XlsxStreamingCreate => "xlsx_streaming_create",
             Self::OpcRangeSourceOpen => "opc_range_source_open",
             Self::OpcRangeSourceOpenMainRead => "opc_range_source_open_main_read",
             Self::XlsxRangeSourceOpen => "xlsx_range_source_open",
@@ -727,6 +760,7 @@ impl Case {
             Self::RtfSemanticOnePercentEditSave => "rtf_semantic_one_percent_edit_save",
             Self::RtfSemanticRemoveParagraphSave => "rtf_semantic_remove_paragraph_save",
             Self::RtfSemanticMoveParagraphSave => "rtf_semantic_move_paragraph_save",
+            Self::RtfStreamingCreate => "rtf_streaming_create",
             Self::DocxSemanticOpen => "docx_semantic_open",
             Self::DocxSemanticListParagraphs => "docx_semantic_list_paragraphs",
             Self::DocxSemanticOneParagraph => "docx_semantic_one_paragraph",
@@ -854,6 +888,16 @@ impl Case {
         )
     }
 
+    const fn is_xls_comments_edit_save(self) -> bool {
+        matches!(
+            self,
+            Self::XlsCommentsEagerEditSave
+                | Self::XlsCommentsSourceBackedEditSave
+                | Self::XlsCommentsEagerBatchEditSave
+                | Self::XlsCommentsSourceBackedBatchEditSave
+        )
+    }
+
     const fn uses_semantic_ppt(self) -> bool {
         matches!(
             self,
@@ -892,6 +936,10 @@ impl Case {
                 | Self::XlsxRangeSourceFirstCell
                 | Self::XlsxRangeSourceNarrowColumnRangeScan
         )
+    }
+
+    const fn uses_streaming_creation(self) -> bool {
+        matches!(self, Self::XlsxStreamingCreate | Self::RtfStreamingCreate)
     }
 
     const fn uses_semantic_docx(self) -> bool {
@@ -1196,6 +1244,24 @@ struct Corpus {
 }
 
 #[derive(Clone, Debug)]
+struct StreamingCorpus {
+    manifest: CorpusManifest,
+    shape: SemanticShape,
+    metrics: StreamingMetrics,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct StreamingMetrics {
+    rows: u64,
+    cells: u64,
+    paragraphs: u64,
+    runs: u64,
+    input_bytes: u64,
+    authored_part_bytes: u64,
+    retained_authoring_window_bytes: u64,
+}
+
+#[derive(Clone, Debug)]
 struct XlsxCorpus {
     sheet_count: usize,
     row_count: usize,
@@ -1344,7 +1410,45 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx: Option<XlsxSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    xls_comments: Option<XlsCommentsSourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     simulation: Option<RangeSimulationSummary>,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+struct XlsCommentsSourceSummary {
+    source_counter_scope: &'static str,
+    source_backed: bool,
+    update_count: usize,
+    semantic_staging_plan_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    changed_comments: Vec<usize>,
+    touched_streams: Vec<usize>,
+    source_bytes: Vec<u64>,
+    source_workbook_bytes: Vec<u64>,
+    target_workbook_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    changed_spans: Option<Vec<usize>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_fingerprints: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target_fingerprints: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug)]
+struct XlsCommentsIterationEvidence {
+    source_backed: bool,
+    update_count: usize,
+    semantic_staging_plan_ns: u64,
+    publication_ns: u64,
+    changed_comments: usize,
+    touched_streams: usize,
+    source_bytes: u64,
+    source_workbook_bytes: u64,
+    target_workbook_bytes: u64,
+    changed_spans: Option<usize>,
+    source_fingerprint: Option<String>,
+    target_fingerprint: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -1486,6 +1590,22 @@ struct SinkSummary {
     accepted_bytes: u64,
     write_calls: u64,
     largest_write: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    retained_output_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    retained_authoring_window_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rows: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cells: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    paragraphs: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    runs: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    input_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    authored_part_bytes: Option<u64>,
 }
 
 /// A non-seekable, bounded memory sink that consumes every output byte.
@@ -1508,6 +1628,14 @@ impl CountingSink {
                 accepted_bytes: 0,
                 write_calls: 0,
                 largest_write: 0,
+                retained_output_bytes: None,
+                retained_authoring_window_bytes: None,
+                rows: None,
+                cells: None,
+                paragraphs: None,
+                runs: None,
+                input_bytes: None,
+                authored_part_bytes: None,
             },
             max_bytes,
             max_write,
@@ -1554,6 +1682,69 @@ impl Write for CountingSink {
             .ok_or_else(|| io::Error::other("sequential sink write count overflows u64"))?;
         self.summary.largest_write = self.summary.largest_write.max(length);
         self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+/// A fixed-memory, non-seek sink for streaming-creation timings.
+///
+/// Only SHA-256 state and scalar counters are retained. The complete artifact
+/// used for reopen verification is generated separately outside timing.
+#[derive(Debug)]
+struct HashingDiscardSink {
+    summary: SinkSummary,
+    maximum: u64,
+    digest: Sha256,
+}
+
+impl HashingDiscardSink {
+    fn new(maximum: u64, retained_authoring_window_bytes: u64) -> Self {
+        Self {
+            summary: SinkSummary {
+                retained_output_bytes: Some(0),
+                retained_authoring_window_bytes: Some(retained_authoring_window_bytes),
+                ..SinkSummary::default()
+            },
+            maximum,
+            digest: Sha256::new(),
+        }
+    }
+
+    fn finish(self) -> (SinkSummary, String) {
+        let digest = self.digest.finalize();
+        let mut output = String::with_capacity(digest.len() * 2);
+        for byte in digest {
+            use std::fmt::Write as _;
+            let _ = write!(output, "{byte:02x}");
+        }
+        (self.summary, output)
+    }
+}
+
+impl Write for HashingDiscardSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let length = u64::try_from(bytes.len())
+            .map_err(|_error| io::Error::other("streaming write length does not fit u64"))?;
+        let accepted = self
+            .summary
+            .accepted_bytes
+            .checked_add(length)
+            .ok_or_else(|| io::Error::other("streaming output byte count overflows u64"))?;
+        if accepted > self.maximum {
+            return Err(io::Error::other("streaming output byte ceiling exceeded"));
+        }
+        self.digest.update(bytes);
+        self.summary.accepted_bytes = accepted;
+        self.summary.write_calls = self
+            .summary
+            .write_calls
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("streaming write count overflows u64"))?;
+        self.summary.largest_write = self.summary.largest_write.max(length);
         Ok(bytes.len())
     }
 
@@ -1939,6 +2130,59 @@ impl SourceSummary {
             .push(snapshot.xlsx.styles.read_bytes);
     }
 
+    fn record_xls_comments(
+        &mut self,
+        snapshot: SourceSnapshot,
+        evidence: XlsCommentsIterationEvidence,
+    ) -> Result<(), Box<dyn Error>> {
+        self.record(snapshot);
+        let summary = self
+            .xls_comments
+            .get_or_insert_with(|| XlsCommentsSourceSummary {
+                source_counter_scope: "owned-source-ingress-only",
+                source_backed: evidence.source_backed,
+                update_count: evidence.update_count,
+                ..XlsCommentsSourceSummary::default()
+            });
+        if summary.source_backed != evidence.source_backed
+            || summary.update_count != evidence.update_count
+        {
+            return Err("XLS comment source evidence mixed incompatible cases".into());
+        }
+        summary
+            .semantic_staging_plan_ns
+            .push(evidence.semantic_staging_plan_ns);
+        summary.publication_ns.push(evidence.publication_ns);
+        summary.changed_comments.push(evidence.changed_comments);
+        summary.touched_streams.push(evidence.touched_streams);
+        summary.source_bytes.push(evidence.source_bytes);
+        summary
+            .source_workbook_bytes
+            .push(evidence.source_workbook_bytes);
+        summary
+            .target_workbook_bytes
+            .push(evidence.target_workbook_bytes);
+        if let Some(changed_spans) = evidence.changed_spans {
+            summary
+                .changed_spans
+                .get_or_insert_with(Vec::new)
+                .push(changed_spans);
+        }
+        if let Some(fingerprint) = evidence.source_fingerprint {
+            summary
+                .source_fingerprints
+                .get_or_insert_with(Vec::new)
+                .push(fingerprint);
+        }
+        if let Some(fingerprint) = evidence.target_fingerprint {
+            summary
+                .target_fingerprints
+                .get_or_insert_with(Vec::new)
+                .push(fingerprint);
+        }
+        Ok(())
+    }
+
     fn record_simulation(&mut self, snapshot: RangeSimulationSnapshot) {
         let summary = self
             .simulation
@@ -2004,6 +2248,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_xls()
                     && !case.uses_semantic_ppt()
                     && !case.uses_xlsx()
+                    && !case.uses_streaming_creation()
                     && !case.uses_semantic_rtf()
                     && !case.uses_semantic_docx()
                     && !case.uses_semantic_pptx()
@@ -2030,6 +2275,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_auto_filter_edit_save()
                     && !case.is_xlsx_conditional_formatting_edit_save()
                     && !case.is_xlsx_merge_edit_save()
+                    && !case.is_xls_comments_edit_save()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
                     cfb_corpus
@@ -2074,6 +2320,26 @@ fn main() -> Result<(), Box<dyn Error>> {
             options.warmup_iterations,
             options.samples,
         )?);
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_xls_comments_edit_save())
+    {
+        let corpus = build_xls_comments_edit_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .filter(|case| case.is_xls_comments_edit_save())
+        {
+            results.push(run_xls_comments_edit_save(
+                *case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
     }
 
     if options
@@ -2414,6 +2680,28 @@ fn main() -> Result<(), Box<dyn Error>> {
                     options.warmup_iterations,
                     options.samples,
                     options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_streaming_creation())
+    {
+        for shape in &options.semantic_shapes {
+            for case in options
+                .cases
+                .iter()
+                .filter(|case| case.uses_streaming_creation())
+            {
+                let corpus = build_streaming_corpus(*case, *shape)?;
+                results.push(run_streaming_creation(
+                    *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
                 )?);
             }
         }
@@ -2971,6 +3259,12 @@ fn parse_case(value: &str) -> Option<Case> {
         "xls_semantic_full_cell_scan" => Some(Case::XlsSemanticFullCellScan),
         "xls_semantic_noop_edit_save" => Some(Case::XlsSemanticNoopEditSave),
         "xls_semantic_one_edit_save" => Some(Case::XlsSemanticOneEditSave),
+        "xls_comments_eager_edit_save" => Some(Case::XlsCommentsEagerEditSave),
+        "xls_comments_source_backed_edit_save" => Some(Case::XlsCommentsSourceBackedEditSave),
+        "xls_comments_eager_batch_edit_save" => Some(Case::XlsCommentsEagerBatchEditSave),
+        "xls_comments_source_backed_batch_edit_save" => {
+            Some(Case::XlsCommentsSourceBackedBatchEditSave)
+        },
         "ppt_semantic_open" => Some(Case::PptSemanticOpen),
         "ppt_semantic_list_slides" => Some(Case::PptSemanticListSlides),
         "ppt_semantic_one_shape_text" => Some(Case::PptSemanticOneShapeText),
@@ -2995,6 +3289,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_list_sheets" => Some(Case::XlsxSourceListSheets),
         "xlsx_source_first_cell" => Some(Case::XlsxSourceFirstCell),
         "xlsx_source_narrow_column_range_scan" => Some(Case::XlsxSourceNarrowColumnRangeScan),
+        "xlsx_streaming_create" => Some(Case::XlsxStreamingCreate),
         "opc_range_source_open" => Some(Case::OpcRangeSourceOpen),
         "opc_range_source_open_main_read" => Some(Case::OpcRangeSourceOpenMainRead),
         "xlsx_range_source_open" => Some(Case::XlsxRangeSourceOpen),
@@ -3018,6 +3313,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "rtf_semantic_one_percent_edit_save" => Some(Case::RtfSemanticOnePercentEditSave),
         "rtf_semantic_remove_paragraph_save" => Some(Case::RtfSemanticRemoveParagraphSave),
         "rtf_semantic_move_paragraph_save" => Some(Case::RtfSemanticMoveParagraphSave),
+        "rtf_streaming_create" => Some(Case::RtfStreamingCreate),
         "docx_semantic_open" => Some(Case::DocxSemanticOpen),
         "docx_semantic_list_paragraphs" => Some(Case::DocxSemanticListParagraphs),
         "docx_semantic_one_paragraph" => Some(Case::DocxSemanticOneParagraph),
@@ -3193,6 +3489,10 @@ fn print_usage() {
                                        xls_semantic_open,xls_semantic_list_worksheets,\n\
                                        xls_semantic_one_cell,xls_semantic_full_cell_scan,\n\
                                        xls_semantic_noop_edit_save,xls_semantic_one_edit_save,\n\
+                                       xls_comments_eager_edit_save,\n\
+                                       xls_comments_source_backed_edit_save,\n\
+                                       xls_comments_eager_batch_edit_save,\n\
+                                       xls_comments_source_backed_batch_edit_save,\n\
                                        ppt_semantic_open,ppt_semantic_list_slides,\n\
                                        ppt_semantic_one_shape_text,ppt_semantic_full_text,\n\
                                        ppt_slide_order_snapshot_open,\n\
@@ -3207,6 +3507,7 @@ fn print_usage() {
                                        xlsx_source_open,xlsx_source_list_sheets,\n\
                                        xlsx_source_first_cell,\n\
                                        xlsx_source_narrow_column_range_scan,\n\
+                                       xlsx_streaming_create,\n\
                                        opc_range_source_open,opc_range_source_open_main_read,\n\
                                        xlsx_range_source_open,xlsx_range_source_list_sheets,\n\
                                        xlsx_range_source_first_cell,\n\
@@ -3219,6 +3520,7 @@ fn print_usage() {
                                        rtf_semantic_stream_save,rtf_semantic_noop_edit_save,\n\
                                        rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save,\n\
                                        rtf_semantic_remove_paragraph_save,rtf_semantic_move_paragraph_save,\n\
+                                       rtf_streaming_create,\n\
                                        docx_semantic_open,docx_semantic_list_paragraphs,\n\
                                        docx_semantic_one_paragraph,docx_semantic_full_text,\n\
                                        docx_semantic_create_small,docx_semantic_noop_edit_save,\n\
@@ -5656,6 +5958,12 @@ fn run_case_with_config(
         | Case::XlsSemanticOneEditSave => {
             run_semantic_xls(case, corpus, warmup_iterations, samples)
         },
+        Case::XlsCommentsEagerEditSave
+        | Case::XlsCommentsSourceBackedEditSave
+        | Case::XlsCommentsEagerBatchEditSave
+        | Case::XlsCommentsSourceBackedBatchEditSave => {
+            run_xls_comments_edit_save(case, corpus, warmup_iterations, samples)
+        },
         Case::PptSemanticOpen
         | Case::PptSemanticListSlides
         | Case::PptSemanticOneShapeText
@@ -5695,6 +6003,9 @@ fn run_case_with_config(
         Case::XlsxSourceFirstCell => run_xlsx_source_first_cell(corpus, warmup_iterations, samples),
         Case::XlsxSourceNarrowColumnRangeScan => {
             run_xlsx_source_narrow_column_range_scan(corpus, warmup_iterations, samples)
+        },
+        Case::XlsxStreamingCreate | Case::RtfStreamingCreate => {
+            Err("streaming creation cases use their bounded corpus runner".into())
         },
         Case::OpcRangeSourceOpen => {
             run_opc_range_source_open(corpus, warmup_iterations, samples, range_simulation, false)
@@ -7233,6 +7544,596 @@ fn xls_expected_value(
         .xls_dimensions()
         .ok_or("payload-heavy XLS corpus has no numeric semantic grid")?;
     Ok((sheet * rows * columns + row * columns + column) as f64)
+}
+
+fn xls_comment_value(
+    index: usize,
+    updated: bool,
+) -> Result<litchi_xls::comments::Value, Box<dyn Error>> {
+    let state = if updated { "target" } else { "source" };
+    let author_state = if updated { "Target" } else { "Source" };
+    Ok(litchi_xls::comments::Value::new(
+        format!("{author_state} {index:03}"),
+        format!("comment {state} {index:03}"),
+    )?)
+}
+
+fn xls_comment_opaque_stream_name(index: usize) -> String {
+    format!("Payload{index:03}")
+}
+
+fn build_xls_comments_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let mut workbook_writer = litchi_xls::writer::Writer::new();
+    let comments = workbook_writer.add_worksheet("Comments")?;
+    for index in 0..XLS_COMMENTS_SOURCE_COUNT {
+        let value = xls_comment_value(index, false)?;
+        workbook_writer.add_comment(
+            comments,
+            u32::try_from(index)?,
+            1,
+            value.author(),
+            value.text(),
+        )?;
+    }
+    let untouched = workbook_writer.add_worksheet("Untouched")?;
+    workbook_writer.write_number(untouched, 20, 4, 42.0)?;
+    workbook_writer.add_comment(untouched, 4, 3, "Sentinel", "untouched sentinel")?;
+    let mut workbook_package = Cursor::new(Vec::new());
+    workbook_writer.write_to(&mut workbook_package)?;
+    let mut parsed = OleFile::open(Cursor::new(workbook_package.into_inner()))?;
+    let workbook_stream = parsed.open_stream(&["Workbook"])?;
+
+    let mut writer = OleWriter::new();
+    writer.create_stream_owned(&["Workbook"], workbook_stream)?;
+    writer.create_storage(&["OpaquePayloads"])?;
+    for index in 0..XLS_COMMENTS_OPAQUE_STREAM_COUNT {
+        let name = xls_comment_opaque_stream_name(index);
+        writer.create_stream_owned(
+            &["OpaquePayloads", name.as_str()],
+            payload_bytes(
+                PayloadKind::Incompressible,
+                10_000 + index,
+                XLS_COMMENTS_OPAQUE_STREAM_BYTES,
+            ),
+        )?;
+    }
+    writer.create_stream(
+        &["OpaqueMetadata"],
+        b"litchi-xls-comments-opaque-metadata-v1",
+    )?;
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output)?;
+    let archive = output.into_inner();
+
+    verify_xls_comments_static_guards(&archive)?;
+    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let archive_member_count = parsed.list_streams().len();
+    let target_payload = parsed.open_stream(&["Workbook"])?;
+    let uncompressed_payload_bytes = target_payload
+        .len()
+        .checked_add(XLS_COMMENTS_OPAQUE_STREAM_COUNT * XLS_COMMENTS_OPAQUE_STREAM_BYTES)
+        .and_then(|value| value.checked_add(b"litchi-xls-comments-opaque-metadata-v1".len()))
+        .ok_or("XLS comments corpus payload size overflow")?;
+    if archive_member_count != XLS_COMMENTS_OPAQUE_STREAM_COUNT + 2 {
+        return Err("XLS comments corpus stream inventory differs from specification".into());
+    }
+
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: "xls-comments-opaque-heavy".to_string(),
+            generator: XLS_COMMENTS_EDIT_CORPUS_GENERATOR,
+            package_format: "XLS/CFB",
+            shape: "256-comments-opaque-heavy",
+            payload_kind: PayloadKind::Incompressible.name(),
+            compression: "none",
+            entry_count: XLS_COMMENTS_SOURCE_COUNT + 1,
+            archive_member_count,
+            entry_bytes: XLS_COMMENTS_OPAQUE_STREAM_BYTES,
+            uncompressed_payload_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "Workbook".to_string(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "Workbook".to_string(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn xls_comments_case_parameters(case: Case) -> Result<(bool, usize), Box<dyn Error>> {
+    match case {
+        Case::XlsCommentsEagerEditSave => Ok((false, 1)),
+        Case::XlsCommentsSourceBackedEditSave => Ok((true, 1)),
+        Case::XlsCommentsEagerBatchEditSave => Ok((false, XLS_COMMENTS_BATCH_COUNT)),
+        Case::XlsCommentsSourceBackedBatchEditSave => Ok((true, XLS_COMMENTS_BATCH_COUNT)),
+        _ => Err("non-XLS-comment case passed to XLS comment runner".into()),
+    }
+}
+
+fn stage_xls_comment_updates(
+    edit: &mut litchi_xls::comments::Edit,
+    update_count: usize,
+) -> Result<(), Box<dyn Error>> {
+    use litchi_xls::cell_values::{Reference, Selector};
+    use litchi_xls::comments::Update;
+
+    if update_count == 1 {
+        let index = XLS_COMMENTS_SOURCE_COUNT / 2;
+        edit.replace(
+            Selector::Position(0),
+            Reference::new(u32::try_from(index)?, 1)?,
+            xls_comment_value(index, true)?,
+        )?;
+        return Ok(());
+    }
+    if update_count != XLS_COMMENTS_BATCH_COUNT {
+        return Err("XLS comment benchmark update count is outside its fixed closure".into());
+    }
+    let updates = (0..update_count)
+        .map(|index| {
+            Ok(Update::new(
+                Reference::new(u32::try_from(index)?, 1)?,
+                xls_comment_value(index, true)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+    edit.replace_many(Selector::Position(0), updates)?;
+    Ok(())
+}
+
+enum XlsCommentsPublication {
+    Eager {
+        commit: litchi_xls::comments::Commit,
+        source_bytes: u64,
+        source_workbook_bytes: u64,
+    },
+    SourceBacked(litchi_xls::comments::SourceBackedCommit),
+}
+
+impl XlsCommentsPublication {
+    fn write_to<W: Write>(
+        &self,
+        writer: &mut W,
+    ) -> Result<Option<litchi_cfb::PublishReport>, Box<dyn Error>> {
+        match self {
+            Self::Eager { commit, .. } => {
+                for chunk in commit.snapshot().bytes().chunks(64 * 1024) {
+                    writer.write_all(chunk)?;
+                }
+                writer.flush()?;
+                Ok(None)
+            },
+            Self::SourceBacked(commit) => Ok(Some(commit.write_to(writer)?)),
+        }
+    }
+
+    fn evidence(
+        &self,
+        source_backed: bool,
+        update_count: usize,
+        semantic_staging_plan: Duration,
+        publication: Duration,
+    ) -> Result<XlsCommentsIterationEvidence, Box<dyn Error>> {
+        match self {
+            Self::Eager {
+                commit,
+                source_bytes,
+                source_workbook_bytes,
+            } => {
+                let diagnostics = commit.diagnostics();
+                Ok(XlsCommentsIterationEvidence {
+                    source_backed,
+                    update_count,
+                    semantic_staging_plan_ns: elapsed_ns(semantic_staging_plan)?,
+                    publication_ns: elapsed_ns(publication)?,
+                    changed_comments: diagnostics.changed_comments(),
+                    touched_streams: diagnostics.touched_streams(),
+                    source_bytes: *source_bytes,
+                    source_workbook_bytes: *source_workbook_bytes,
+                    target_workbook_bytes: u64::try_from(
+                        commit.snapshot().workbook_stream().len(),
+                    )?,
+                    changed_spans: None,
+                    source_fingerprint: None,
+                    target_fingerprint: None,
+                })
+            },
+            Self::SourceBacked(commit) => {
+                let diagnostics = commit.diagnostics();
+                Ok(XlsCommentsIterationEvidence {
+                    source_backed,
+                    update_count,
+                    semantic_staging_plan_ns: elapsed_ns(semantic_staging_plan)?,
+                    publication_ns: elapsed_ns(publication)?,
+                    changed_comments: diagnostics.changed_comments(),
+                    touched_streams: diagnostics.touched_streams(),
+                    source_bytes: diagnostics.source_bytes(),
+                    source_workbook_bytes: diagnostics.source_workbook_bytes(),
+                    target_workbook_bytes: diagnostics.target_workbook_bytes(),
+                    changed_spans: Some(diagnostics.changed_spans()),
+                    source_fingerprint: Some(fingerprint_hex(
+                        diagnostics.source_fingerprint().as_bytes(),
+                    )),
+                    target_fingerprint: Some(fingerprint_hex(
+                        diagnostics.target_fingerprint().as_bytes(),
+                    )),
+                })
+            },
+        }
+    }
+}
+
+fn prepare_xls_comments_publication(
+    source: litchi_xls::comments::Snapshot,
+    source_backed: bool,
+    update_count: usize,
+) -> Result<XlsCommentsPublication, Box<dyn Error>> {
+    let source_bytes = u64::try_from(source.bytes().len())?;
+    let source_workbook_bytes = u64::try_from(source.workbook_stream().len())?;
+    let mut edit = source.edit();
+    stage_xls_comment_updates(&mut edit, update_count)?;
+    if source_backed {
+        Ok(XlsCommentsPublication::SourceBacked(
+            edit.commit_source_backed()?,
+        ))
+    } else {
+        Ok(XlsCommentsPublication::Eager {
+            commit: edit.commit()?,
+            source_bytes,
+            source_workbook_bytes,
+        })
+    }
+}
+
+fn read_xls_comments_source(
+    source: &InstrumentedSource,
+    output: &mut [u8],
+) -> Result<(), Box<dyn Error>> {
+    let mut offset = 0_u64;
+    for chunk in output.chunks_mut(64 * 1024) {
+        source.read_exact_at(offset, chunk)?;
+        offset = offset
+            .checked_add(u64::try_from(chunk.len())?)
+            .ok_or("XLS comments source offset overflow")?;
+    }
+    Ok(())
+}
+
+fn verify_xls_untouched_streams(
+    source: &[u8],
+    candidate: &[u8],
+    require_equal_workbook_length: bool,
+) -> Result<(), Box<dyn Error>> {
+    let mut source_ole = OleFile::open(Cursor::new(source))?;
+    let mut candidate_ole = OleFile::open(Cursor::new(candidate))?;
+    let mut source_paths = source_ole.list_streams();
+    let mut candidate_paths = candidate_ole.list_streams();
+    source_paths.sort();
+    candidate_paths.sort();
+    if source_paths != candidate_paths
+        || !source_ole.directory_exists(&["OpaquePayloads"])
+        || !candidate_ole.directory_exists(&["OpaquePayloads"])
+    {
+        return Err("XLS comment publication changed the CFB stream/storage inventory".into());
+    }
+    for path in source_paths {
+        let borrowed = path.iter().map(String::as_str).collect::<Vec<_>>();
+        let source_stream = source_ole.open_stream(&borrowed)?;
+        let candidate_stream = candidate_ole.open_stream(&borrowed)?;
+        let workbook = path.len() == 1
+            && path
+                .first()
+                .is_some_and(|name| name == "Workbook" || name == "Book");
+        if workbook {
+            if source_stream == candidate_stream {
+                return Err("XLS comment publication left the Workbook stream unchanged".into());
+            }
+            if require_equal_workbook_length && source_stream.len() != candidate_stream.len() {
+                return Err(format!(
+                    "XLS comment publication changed Workbook length from {} to {}",
+                    source_stream.len(),
+                    candidate_stream.len()
+                )
+                .into());
+            }
+        } else if source_stream != candidate_stream {
+            return Err("XLS comment publication changed an untouched opaque stream".into());
+        }
+    }
+    Ok(())
+}
+
+fn verify_xls_comments_output(
+    corpus: &Corpus,
+    output: &[u8],
+    update_count: usize,
+) -> Result<(), Box<dyn Error>> {
+    use litchi_core::sheet::Cell as _;
+    use litchi_xls::cell_values::{Reference, Selector};
+
+    if sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256 {
+        return Err("XLS comment source digest differs from its manifest".into());
+    }
+    verify_xls_untouched_streams(&corpus.archive, output, false)?;
+    let snapshot = litchi_xls::comments::Snapshot::from_bytes(output.to_vec())?;
+    if snapshot.worksheet_count() != 2 {
+        return Err("XLS comment output worksheet inventory differs from source".into());
+    }
+    let comments = snapshot
+        .worksheet(Selector::Name("Comments"))?
+        .ok_or("XLS comment output lost its selected worksheet")?;
+    if comments.comments().len() != XLS_COMMENTS_SOURCE_COUNT {
+        return Err("XLS comment output comment inventory differs from source".into());
+    }
+    for index in 0..XLS_COMMENTS_SOURCE_COUNT {
+        let should_update = update_count == XLS_COMMENTS_BATCH_COUNT
+            || (update_count == 1 && index == XLS_COMMENTS_SOURCE_COUNT / 2);
+        let comment = comments
+            .comment(Reference::new(u32::try_from(index)?, 1)?)?
+            .ok_or("XLS comment output lost a selected NOTE owner")?;
+        if litchi_xls::comments::Value::from_comment(comment)
+            != xls_comment_value(index, should_update)?
+        {
+            return Err("XLS comment output semantic value differs from expectation".into());
+        }
+    }
+    let untouched = snapshot
+        .worksheet(Selector::Name("Untouched"))?
+        .ok_or("XLS comment output lost its untouched worksheet")?;
+    let sentinel = untouched
+        .comment(Reference::new(4, 3)?)?
+        .ok_or("XLS comment output lost its untouched sentinel")?;
+    if sentinel.author() != "Sentinel" || sentinel.text() != "untouched sentinel" {
+        return Err("XLS comment output changed the untouched sentinel".into());
+    }
+    let workbook = litchi_xls::Workbook::new(Cursor::new(output))?;
+    let untouched_metadata = workbook
+        .sheets()
+        .iter()
+        .find(|sheet| sheet.name() == "Untouched")
+        .ok_or("XLS comment output lost its untouched worksheet metadata")?;
+    let untouched_cells = workbook.xls_worksheet(
+        untouched_metadata
+            .parsed_worksheet_index()
+            .ok_or("XLS comment untouched tab is not a worksheet")?,
+    )?;
+    let numeric = untouched_cells
+        .get_cell(20, 4)
+        .ok_or("XLS comment output lost its untouched numeric cell")?
+        .value()
+        .as_float()
+        .ok_or("XLS comment untouched numeric cell is no longer numeric")?;
+    if numeric.to_bits() != 42.0_f64.to_bits() {
+        return Err("XLS comment output changed its untouched numeric cell".into());
+    }
+    Ok(())
+}
+
+fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>> {
+    use litchi_xls::cell_values::{Reference, Selector};
+    use litchi_xls::comments::Value;
+
+    let snapshot = litchi_xls::comments::Snapshot::from_bytes(source.to_vec())?;
+    let mut rejected = snapshot.edit();
+    rejected.replace(
+        Selector::Position(0),
+        Reference::new(0, 1)?,
+        Value::new("Target 000", "comment target 000!")?,
+    )?;
+    if rejected.commit_source_backed().is_ok() {
+        return Err("XLS source-backed comment edit accepted a length change".into());
+    }
+
+    let mut rejected_width = snapshot.edit();
+    rejected_width.replace(
+        Selector::Position(0),
+        Reference::new(0, 1)?,
+        Value::new("Target 000", "作者作者作者作者作")?,
+    )?;
+    if rejected_width.commit_source_backed().is_ok() {
+        return Err("XLS source-backed comment edit accepted an encoding-width change".into());
+    }
+
+    let mut fallback = snapshot.edit();
+    fallback.replace(
+        Selector::Position(0),
+        Reference::new(0, 1)?,
+        Value::new("Target 000", "comment target 000!")?,
+    )?;
+    let fallback = fallback.commit()?;
+    verify_xls_untouched_streams(source, fallback.snapshot().bytes(), false)?;
+    let changed = fallback
+        .snapshot()
+        .worksheet(Selector::Position(0))?
+        .ok_or("XLS eager fallback lost its worksheet")?
+        .comment(Reference::new(0, 1)?)?
+        .ok_or("XLS eager fallback lost its comment")?;
+    if changed.text() != "comment target 000!" {
+        return Err("XLS eager fallback did not publish the explicit length change".into());
+    }
+
+    let mut protected_writer = litchi_xls::writer::Writer::new();
+    let sheet = protected_writer.add_worksheet("Protected")?;
+    protected_writer.add_comment(sheet, 0, 0, "Source", "source")?;
+    protected_writer.protect_sheet(sheet, Some("password"), true, false)?;
+    let mut protected_bytes = Cursor::new(Vec::new());
+    protected_writer.write_to(&mut protected_bytes)?;
+    let protected = litchi_xls::comments::Snapshot::from_bytes(protected_bytes.into_inner())?;
+    let mut edit = protected.edit();
+    if edit
+        .replace(
+            Selector::Position(0),
+            Reference::new(0, 0)?,
+            Value::new("Target", "target")?,
+        )
+        .is_ok()
+    {
+        return Err("XLS comment edit accepted a protected worksheet".into());
+    }
+    Ok(())
+}
+
+fn verify_xls_comments_prepared(
+    source: &litchi_xls::comments::Snapshot,
+    prepared: &XlsCommentsPublication,
+    output: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    match prepared {
+        XlsCommentsPublication::Eager { commit, .. } => {
+            let applied = commit.patch().apply(source)?;
+            if applied.bytes() != commit.snapshot().bytes()
+                || commit.patch().apply(commit.snapshot()).is_ok()
+            {
+                return Err("XLS comment eager patch did not enforce its exact source".into());
+            }
+            let restored = commit.patch().inverse().apply(&applied)?;
+            if restored.bytes() != source.bytes() {
+                return Err("XLS comment eager inverse did not restore exact source bytes".into());
+            }
+        },
+        XlsCommentsPublication::SourceBacked(commit) => {
+            let diagnostics = commit.diagnostics();
+            let source_digest: [u8; 32] = Sha256::digest(source.bytes()).into();
+            let target_digest: [u8; 32] = Sha256::digest(output).into();
+            if diagnostics.source_fingerprint().as_bytes() != &source_digest
+                || diagnostics.target_fingerprint().as_bytes() != &target_digest
+            {
+                return Err("XLS comment overlay fingerprints differ from exact artifacts".into());
+            }
+        },
+    }
+    Ok(())
+}
+
+fn run_xls_comments_edit_save(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let (source_backed, update_count) = xls_comments_case_parameters(case)?;
+    if corpus.manifest.generator != XLS_COMMENTS_EDIT_CORPUS_GENERATOR {
+        return Err("XLS comment edit case requires its fixed opaque-heavy corpus".into());
+    }
+
+    let expected_source = litchi_xls::comments::Snapshot::from_bytes(corpus.archive.clone())?;
+    let expected_prepared =
+        prepare_xls_comments_publication(expected_source.clone(), source_backed, update_count)?;
+    let mut expected = Vec::new();
+    let expected_report = expected_prepared.write_to(&mut expected)?;
+    if expected == corpus.archive {
+        return Err("XLS comment expected publication did not change source bytes".into());
+    }
+    verify_xls_comments_output(corpus, &expected, update_count)?;
+    verify_xls_comments_prepared(&expected_source, &expected_prepared, &expected)?;
+    if let Some(report) = expected_report
+        && (report.bytes() != u64::try_from(expected.len())? || report.changed_spans() == 0)
+    {
+        return Err("XLS comment expected overlay report is incomplete".into());
+    }
+    let expected_digest = sha256_hex(&expected);
+    let maximum = u64::try_from(expected.len())?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut measured_digests = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = InstrumentedSource::new(corpus.archive.clone(), Vec::new());
+        let mut source_bytes = vec![0_u8; corpus.archive.len()];
+        let mut sink = CountingSink::bounded(maximum, 64 * 1024);
+        sink.reserve_budget()?;
+
+        read_xls_comments_source(&source, &mut source_bytes)?;
+        let snapshot = litchi_xls::comments::Snapshot::from_bytes(source_bytes)?;
+        let plan_started = Instant::now();
+        let prepared = prepare_xls_comments_publication(snapshot, source_backed, update_count)?;
+        let semantic_staging_plan = plan_started.elapsed();
+
+        let publication_started = Instant::now();
+        let report = prepared.write_to(&mut sink)?;
+        let publication = publication_started.elapsed();
+        let duration = semantic_staging_plan
+            .checked_add(publication)
+            .ok_or("XLS comment total duration overflow")?;
+        let metrics = source.snapshot();
+        let evidence = prepared.evidence(
+            source_backed,
+            update_count,
+            semantic_staging_plan,
+            publication,
+        )?;
+
+        if metrics.read_calls == 0
+            || metrics.read_bytes != u64::try_from(corpus.archive.len())?
+            || evidence.changed_comments != update_count
+            || evidence.touched_streams != 1
+            || (source_backed && evidence.source_workbook_bytes != evidence.target_workbook_bytes)
+            || sink.bytes != expected
+        {
+            return Err("XLS comment iteration has unexpected source/publication evidence".into());
+        }
+        if source_backed {
+            let report = report.ok_or("XLS comment source-backed publication has no report")?;
+            if evidence.changed_spans != Some(report.changed_spans())
+                || report.bytes() != sink.summary().accepted_bytes
+                || evidence.source_fingerprint
+                    != Some(fingerprint_hex(report.source_fingerprint().as_bytes()))
+                || evidence.target_fingerprint
+                    != Some(fingerprint_hex(report.target_fingerprint().as_bytes()))
+            {
+                return Err("XLS comment overlay diagnostics disagree with publication".into());
+            }
+        } else if report.is_some() || evidence.changed_spans.is_some() {
+            return Err("XLS eager comment publication reported overlay-only evidence".into());
+        }
+        verify_xls_comments_output(corpus, &sink.bytes, update_count)?;
+        let digest = sha256_hex(&sink.bytes);
+        if digest != expected_digest {
+            return Err("XLS comment output digest differs from expected output".into());
+        }
+        if iteration >= warmup_iterations {
+            source_summary.record_xls_comments(metrics, evidence)?;
+            sink_summaries.push(sink.summary());
+            measured_digests.push(digest);
+        }
+        std::hint::black_box(&sink.bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("XLS comment measured output hashes are unstable".into());
+    }
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(deterministic_sink_summary(
+            &sink_summaries,
+            "XLS comment publication",
+        )?),
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: Some(expected_digest),
+    })
+}
+
+fn fingerprint_hex(bytes: &[u8; 32]) -> String {
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        use std::fmt::Write as _;
+        let _ = write!(output, "{byte:02x}");
+    }
+    output
 }
 
 fn verify_semantic_xls(
@@ -14651,6 +15552,386 @@ fn verify_ole_common_changed_output(corpus: &Corpus, output: &[u8]) -> Result<()
     Ok(())
 }
 
+fn streaming_context(
+    memory_bytes: u64,
+    input_bytes: u64,
+    output_bytes: u64,
+    objects: u64,
+    work: u64,
+) -> Result<ExecutionContext, Box<dyn Error>> {
+    let one = NonZeroUsize::new(1).ok_or("streaming worker count must be nonzero")?;
+    let in_flight = NonZeroU64::new(memory_bytes.max(1))
+        .ok_or("streaming in-flight byte limit must be nonzero")?;
+    let execution_limits = ExecutionLimits::new(one, one, in_flight, 0)?;
+    let (_cancellation, token) = CancellationSource::pair();
+    Ok(ExecutionContext::new(
+        Budget::root(
+            "litchi-perf-streaming-create",
+            Limits::new(memory_bytes, input_bytes, output_bytes, objects, 32, work),
+        ),
+        token,
+        execution_limits,
+    ))
+}
+
+fn streaming_xlsx_text(row: usize) -> String {
+    format!("litchi-perf-streaming-xlsx-row-{row:06}-café-<&>")
+}
+
+fn streaming_rtf_text(paragraph: usize) -> String {
+    format!("litchi-perf-streaming-rtf-paragraph-{paragraph:06}-café-\\{{}}")
+}
+
+fn write_streaming_xlsx<W: Write>(
+    sink: W,
+    shape: SemanticShape,
+) -> Result<(W, StreamingMetrics), Box<dyn Error>> {
+    let rows = u64::try_from(shape.streaming_units())?;
+    let cells = rows
+        .checked_mul(4)
+        .ok_or("streaming XLSX cell count overflows")?;
+    let max_sheet_xml_bytes = rows
+        .checked_mul(512)
+        .and_then(|value| value.checked_add(4 * 1024))
+        .ok_or("streaming XLSX worksheet ceiling overflows")?;
+    let max_output_bytes = max_sheet_xml_bytes
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("streaming XLSX output ceiling overflows")?;
+    let objects = rows
+        .checked_add(cells)
+        .and_then(|value| value.checked_add(16))
+        .ok_or("streaming XLSX object budget overflows")?;
+    let work = objects
+        .checked_mul(2)
+        .ok_or("streaming XLSX work budget overflows")?;
+    let limits = StreamingWorkbookLimits::new(
+        u32::try_from(rows)?,
+        cells,
+        256,
+        XLSX_STREAMING_ROW_BYTES,
+        max_sheet_xml_bytes,
+        max_output_bytes,
+    );
+    let context = streaming_context(XLSX_STREAMING_ROW_BYTES, 0, max_output_bytes, objects, work)?;
+    let mut writer = StreamingWorkbookWriter::new(sink, context, limits)?;
+    let mut input_bytes = 0u64;
+    for row in 1..=shape.streaming_units() {
+        let text = streaming_xlsx_text(row);
+        let row_number = u32::try_from(row)?;
+        input_bytes = input_bytes
+            .checked_add(u64::try_from(text.len())?)
+            .ok_or("streaming XLSX input byte count overflows")?;
+        writer.write_row(
+            row_number,
+            [
+                StreamingCell::new(1, StreamingCellValue::Number(f64::from(row_number))),
+                StreamingCell::new(2, StreamingCellValue::Text(&text)),
+                StreamingCell::new(3, StreamingCellValue::Bool(row % 2 == 0)),
+                StreamingCell::new(4, StreamingCellValue::Blank),
+            ],
+        )?;
+    }
+    if writer.cell_count() != cells {
+        return Err("streaming XLSX writer cell count differs from its shape".into());
+    }
+    let authored_part_bytes = writer
+        .worksheet_xml_bytes()
+        .checked_add(u64::try_from(b"</sheetData></worksheet>".len())?)
+        .ok_or("streaming XLSX authored XML count overflows")?;
+    let output = writer.finish()?;
+    Ok((
+        output,
+        StreamingMetrics {
+            rows,
+            cells,
+            paragraphs: 0,
+            runs: 0,
+            input_bytes,
+            authored_part_bytes,
+            retained_authoring_window_bytes: XLSX_STREAMING_ROW_BYTES,
+        },
+    ))
+}
+
+fn write_streaming_rtf<W: Write>(
+    sink: W,
+    shape: SemanticShape,
+) -> Result<(W, StreamingMetrics), Box<dyn Error>> {
+    let paragraphs = u64::try_from(shape.streaming_units())?;
+    let runs = paragraphs;
+    let input_bytes = (0..shape.streaming_units()).try_fold(
+        0u64,
+        |total, paragraph| -> Result<u64, Box<dyn Error>> {
+            let text_bytes = u64::try_from(streaming_rtf_text(paragraph).len())?;
+            Ok(total
+                .checked_add(text_bytes)
+                .ok_or("streaming RTF input byte count overflows")?)
+        },
+    )?;
+    let max_output_bytes = input_bytes
+        .checked_mul(8)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("streaming RTF output ceiling overflows")?;
+    let objects = paragraphs
+        .checked_add(runs)
+        .and_then(|value| value.checked_add(8))
+        .ok_or("streaming RTF object budget overflows")?;
+    let work = input_bytes
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(objects))
+        .ok_or("streaming RTF work budget overflows")?;
+    let context = streaming_context(
+        RTF_STREAMING_SCRATCH_BYTES,
+        input_bytes,
+        max_output_bytes,
+        objects,
+        work,
+    )?;
+    let limits = litchi_rtf::write::StreamingRtfLimits::new(
+        input_bytes,
+        max_output_bytes,
+        paragraphs,
+        runs,
+        RTF_STREAMING_SCRATCH_BYTES,
+    );
+    let mut writer = litchi_rtf::write::StreamingRtfWriter::new(sink, context, limits)?;
+    for paragraph in 0..shape.streaming_units() {
+        let text = streaming_rtf_text(paragraph);
+        writer.start_paragraph()?;
+        writer.start_run()?;
+        writer.write_all(text.as_bytes())?;
+        writer.finish_run()?;
+        writer.finish_paragraph()?;
+    }
+    if writer.paragraph_count() != paragraphs
+        || writer.run_count() != runs
+        || writer.input_bytes() != input_bytes
+    {
+        return Err("streaming RTF writer counters differ from its shape".into());
+    }
+    let authored_part_bytes = writer
+        .output_bytes()
+        .checked_add(1)
+        .ok_or("streaming RTF authored byte count overflows")?;
+    let output = writer.finish()?;
+    Ok((
+        output,
+        StreamingMetrics {
+            rows: 0,
+            cells: 0,
+            paragraphs,
+            runs,
+            input_bytes,
+            authored_part_bytes,
+            retained_authoring_window_bytes: RTF_STREAMING_SCRATCH_BYTES,
+        },
+    ))
+}
+
+fn verify_streaming_xlsx(bytes: Vec<u8>, shape: SemanticShape) -> Result<(), Box<dyn Error>> {
+    let workbook = Workbook::from_bytes(bytes)?;
+    if workbook.len() != 1 {
+        return Err("streaming XLSX workbook does not contain exactly one sheet".into());
+    }
+    let sheet = workbook
+        .sheet("Sheet1")?
+        .ok_or("streaming XLSX Sheet1 is missing")?;
+    if sheet.rows()?.count() != shape.streaming_units() {
+        return Err("streaming XLSX explicit row count differs from its shape".into());
+    }
+    let area = format!("A1:D{}", shape.streaming_units());
+    let mut visited = 0usize;
+    for (address, cell) in sheet.cells(area.as_str())? {
+        let row = usize::try_from(address.row().get())? + 1;
+        let column = address.column().get();
+        let matches = match (column, cell) {
+            (0, XlsxCell::Value(XlsxValue::Number(value))) => value.as_f64() == Some(row as f64),
+            (1, XlsxCell::Value(XlsxValue::Text(value))) => {
+                value.as_str() == streaming_xlsx_text(row)
+            },
+            (2, XlsxCell::Value(XlsxValue::Bool(value))) => *value == (row % 2 == 0),
+            (3, XlsxCell::Empty) => true,
+            _ => false,
+        };
+        if !matches {
+            return Err(
+                format!("streaming XLSX cell differs at row {row}, column {column}").into(),
+            );
+        }
+        visited = visited
+            .checked_add(1)
+            .ok_or("streaming XLSX visited-cell count overflows")?;
+    }
+    if visited != shape.streaming_units().saturating_mul(4) {
+        return Err("streaming XLSX stored-cell count differs from its shape".into());
+    }
+    Ok(())
+}
+
+fn verify_streaming_rtf(bytes: &[u8], shape: SemanticShape) -> Result<(), Box<dyn Error>> {
+    let document = litchi_rtf::Document::from_bytes(bytes)?;
+    if document.paragraph_count() != shape.streaming_units() {
+        return Err("streaming RTF paragraph count differs from its shape".into());
+    }
+    for (index, paragraph) in document.body().paragraphs().enumerate() {
+        let expected = streaming_rtf_text(index);
+        let mut runs = paragraph.runs();
+        if runs.next().map(|run| run.text()) != Some(expected.as_str()) || runs.next().is_some() {
+            return Err(format!("streaming RTF paragraph {index} differs from its shape").into());
+        }
+    }
+    Ok(())
+}
+
+fn build_streaming_corpus(
+    case: Case,
+    shape: SemanticShape,
+) -> Result<StreamingCorpus, Box<dyn Error>> {
+    let (artifact, mut metrics, generator, package_format, compression, target_entry, members) =
+        match case {
+            Case::XlsxStreamingCreate => {
+                let (artifact, metrics) = write_streaming_xlsx(Vec::new(), shape)?;
+                verify_streaming_xlsx(artifact.clone(), shape)?;
+                (
+                    artifact,
+                    metrics,
+                    XLSX_STREAMING_CORPUS_GENERATOR,
+                    "xlsx",
+                    "deflate",
+                    "xl/worksheets/sheet1.xml".to_string(),
+                    6,
+                )
+            },
+            Case::RtfStreamingCreate => {
+                let (artifact, metrics) = write_streaming_rtf(Vec::new(), shape)?;
+                verify_streaming_rtf(&artifact, shape)?;
+                (
+                    artifact,
+                    metrics,
+                    RTF_STREAMING_CORPUS_GENERATOR,
+                    "rtf",
+                    "none",
+                    "document".to_string(),
+                    0,
+                )
+            },
+            _ => return Err("non-streaming case requested a streaming corpus".into()),
+        };
+    let target = if case == Case::XlsxStreamingCreate {
+        ArchiveReader::new(&artifact)?.read(&target_entry)?
+    } else {
+        artifact.clone()
+    };
+    metrics.authored_part_bytes = u64::try_from(target.len())?;
+    let archive_sha256 = sha256_hex(&artifact);
+    let target_payload_sha256 = sha256_hex(&target);
+    let manifest = CorpusManifest {
+        name: format!("{package_format}-streaming-create-{}", shape.name()),
+        generator,
+        package_format,
+        shape: shape.name(),
+        payload_kind: "deterministic-scalar-text",
+        compression,
+        entry_count: usize::try_from(metrics.cells.max(metrics.runs))?,
+        archive_member_count: members,
+        entry_bytes: 0,
+        uncompressed_payload_bytes: usize::try_from(metrics.input_bytes)?,
+        archive_bytes: artifact.len(),
+        archive_sha256,
+        target_entry,
+        target_payload_bytes: target.len(),
+        target_payload_sha256,
+        rtf_variant: (case == Case::RtfStreamingCreate).then_some("plain-streaming"),
+        xlsx: (case == Case::XlsxStreamingCreate).then_some(XlsxManifest {
+            sheet_count: 1,
+            rows_per_sheet: shape.streaming_units(),
+            columns_per_sheet: 4,
+            one_percent_update_count: 0,
+            source_members: XlsxSourceMembersManifest {
+                workbook: "xl/workbook.xml".to_string(),
+                worksheets: vec!["xl/worksheets/sheet1.xml".to_string()],
+                shared_strings: None,
+                styles: Some("xl/styles.xml".to_string()),
+            },
+        }),
+    };
+    drop(target);
+    drop(artifact);
+    Ok(StreamingCorpus {
+        manifest,
+        shape,
+        metrics,
+    })
+}
+
+fn run_streaming_creation(
+    case: Case,
+    corpus: &StreamingCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let maximum = u64::try_from(corpus.manifest.archive_bytes)?
+        .checked_add(64 * 1024)
+        .ok_or("streaming sink ceiling overflows")?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summaries = Vec::with_capacity(samples);
+    let mut digests = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let sink = HashingDiscardSink::new(maximum, corpus.metrics.retained_authoring_window_bytes);
+        let started = Instant::now();
+        let (sink, metrics) = match case {
+            Case::XlsxStreamingCreate => write_streaming_xlsx(sink, corpus.shape)?,
+            Case::RtfStreamingCreate => write_streaming_rtf(sink, corpus.shape)?,
+            _ => return Err("non-streaming case reached streaming runner".into()),
+        };
+        let duration = started.elapsed();
+        let (mut summary, digest) = sink.finish();
+        if metrics != corpus.metrics
+            || summary.accepted_bytes != u64::try_from(corpus.manifest.archive_bytes)?
+            || digest != corpus.manifest.archive_sha256
+        {
+            return Err(
+                "streaming creation counters or digest differ from untimed artifact".into(),
+            );
+        }
+        summary.rows = (metrics.rows != 0).then_some(metrics.rows);
+        summary.cells = (metrics.cells != 0).then_some(metrics.cells);
+        summary.paragraphs = (metrics.paragraphs != 0).then_some(metrics.paragraphs);
+        summary.runs = (metrics.runs != 0).then_some(metrics.runs);
+        summary.input_bytes = Some(metrics.input_bytes);
+        summary.authored_part_bytes = Some(metrics.authored_part_bytes);
+        if iteration >= warmup_iterations {
+            summaries.push(summary);
+            digests.push(digest);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let sink = deterministic_sink_summary(&summaries, "streaming creation")?;
+    if sink.retained_output_bytes != Some(0)
+        || sink.retained_authoring_window_bytes
+            != Some(corpus.metrics.retained_authoring_window_bytes)
+    {
+        return Err("streaming creation did not prove its fixed retained-window bound".into());
+    }
+    if digests
+        .iter()
+        .any(|digest| digest != &corpus.manifest.archive_sha256)
+    {
+        return Err("streaming creation output digest changed across samples".into());
+    }
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: None,
+        execution: None,
+        output_sha256: Some(corpus.manifest.archive_sha256.clone()),
+    })
+}
+
 fn run_fresh_writer(
     case: Case,
     corpus: &Corpus,
@@ -14956,18 +16237,20 @@ mod tests {
         build_ole_common_corpus, build_opc_corpus, build_pptx_source_edit_corpus,
         build_rtf_lifecycle_corpus, build_semantic_docx_corpus, build_semantic_odp_corpus,
         build_semantic_ods_corpus, build_semantic_odt_corpus, build_semantic_pptx_corpus,
-        build_semantic_rtf_corpus, build_writer_corpus, build_xlsx_auto_filter_edit_corpus,
+        build_semantic_rtf_corpus, build_streaming_corpus, build_writer_corpus,
+        build_xls_comments_edit_corpus, build_xlsx_auto_filter_edit_corpus,
         build_xlsx_calculation_metadata_edit_corpus, build_xlsx_conditional_formatting_edit_corpus,
         build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
-        build_xlsx_defined_names_edit_corpus, build_xlsx_page_break_edit_corpus,
-        build_xlsx_merge_edit_corpus, build_xlsx_page_margin_edit_corpus,
-        build_xlsx_page_setup_edit_corpus,
-        build_xlsx_print_options_edit_corpus, build_xlsx_sheet_protection_edit_corpus,
-        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
-        payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
+        build_xlsx_defined_names_edit_corpus, build_xlsx_merge_edit_corpus,
+        build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
+        build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
+        build_xlsx_sheet_protection_edit_corpus, expected_opc_overlay_output,
+        ole_common_changed_output, opc_overlay_replacement_payload, payload_bytes,
+        resolve_execution_workers, run_case, run_case_with_config,
         run_docx_source_backed_one_edit_save, run_opc_source_overlay_one_part_save,
         run_pptx_batch_edit_save, run_pptx_multi_slide_batch_edit_save,
-        run_pptx_source_backed_one_edit_save, run_scaling_case, run_xlsx_auto_filter_edit_save,
+        run_pptx_source_backed_one_edit_save, run_scaling_case, run_streaming_creation,
+        run_xls_comments_edit_save, run_xlsx_auto_filter_edit_save,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
         run_xlsx_data_validation_edit_save, run_xlsx_defined_names_edit_save,
         run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
@@ -15044,6 +16327,99 @@ mod tests {
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedAutoFilterEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxEagerConditionalFormattingEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedConditionalFormattingEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsCommentsEagerEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsCommentsSourceBackedEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsCommentsEagerBatchEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsCommentsSourceBackedBatchEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsxStreamingCreate));
+        assert!(!Case::DEFAULT.contains(&Case::RtfStreamingCreate));
+    }
+
+    #[test]
+    fn xls_comment_controls_are_deterministic_bounded_and_source_evidenced() {
+        let corpus = build_xls_comments_edit_corpus().unwrap();
+        let again = build_xls_comments_edit_corpus().unwrap();
+        assert_eq!(corpus.archive, again.archive);
+        assert_eq!(
+            corpus.manifest.generator,
+            "litchi-xls-comments-opaque-heavy-v1"
+        );
+        assert_eq!(corpus.manifest.archive_member_count, 10);
+
+        for (case, updates, source_backed) in [
+            (Case::XlsCommentsEagerEditSave, 1, false),
+            (Case::XlsCommentsSourceBackedEditSave, 1, true),
+            (Case::XlsCommentsEagerBatchEditSave, 256, false),
+            (Case::XlsCommentsSourceBackedBatchEditSave, 256, true),
+        ] {
+            let measured = run_xls_comments_edit_save(case, &corpus, 0, 1).unwrap();
+            assert_eq!(measured.case, case.name());
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            assert!(measured.output_sha256.is_some());
+            let sink = measured.sink.unwrap();
+            assert!(sink.accepted_bytes > 0);
+            if source_backed {
+                assert_eq!(sink.accepted_bytes, measured.corpus.archive_bytes as u64);
+            }
+            assert!(sink.write_calls > 0);
+            assert!(sink.largest_write <= 64 * 1024);
+
+            let source = measured.source.unwrap();
+            assert_eq!(source.read_calls.len(), 1);
+            assert_eq!(source.read_bytes, vec![corpus.archive.len() as u64]);
+            let comments = source.xls_comments.unwrap();
+            assert_eq!(comments.source_counter_scope, "owned-source-ingress-only");
+            assert_eq!(comments.source_backed, source_backed);
+            assert_eq!(comments.update_count, updates);
+            assert_eq!(comments.changed_comments, vec![updates]);
+            assert_eq!(comments.touched_streams, vec![1]);
+            assert_eq!(comments.semantic_staging_plan_ns.len(), 1);
+            assert_eq!(comments.publication_ns.len(), 1);
+            if source_backed {
+                assert_eq!(
+                    comments.source_workbook_bytes,
+                    comments.target_workbook_bytes
+                );
+                assert!(comments.changed_spans.unwrap()[0] > 0);
+                assert_eq!(comments.source_fingerprints.unwrap().len(), 1);
+                assert_eq!(comments.target_fingerprints.unwrap().len(), 1);
+            } else {
+                assert!(comments.changed_spans.is_none());
+                assert!(comments.source_fingerprints.is_none());
+                assert!(comments.target_fingerprints.is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn streaming_creation_evidence_is_fixed_window_and_reopen_verified() {
+        for case in [Case::XlsxStreamingCreate, Case::RtfStreamingCreate] {
+            let small = build_streaming_corpus(case, SemanticShape::Tiny).unwrap();
+            let scaled = build_streaming_corpus(case, SemanticShape::Medium).unwrap();
+            assert_eq!(
+                small.metrics.retained_authoring_window_bytes,
+                scaled.metrics.retained_authoring_window_bytes
+            );
+            assert!(scaled.manifest.archive_bytes > small.manifest.archive_bytes);
+            assert!(scaled.metrics.input_bytes > small.metrics.input_bytes);
+            assert!(
+                u64::try_from(scaled.manifest.archive_bytes).unwrap()
+                    > scaled.metrics.retained_authoring_window_bytes
+            );
+
+            let measured = run_streaming_creation(case, &small, 0, 1).unwrap();
+            let sink = measured.sink.unwrap();
+            assert_eq!(sink.retained_output_bytes, Some(0));
+            assert_eq!(
+                sink.retained_authoring_window_bytes,
+                Some(small.metrics.retained_authoring_window_bytes)
+            );
+            assert_eq!(sink.accepted_bytes, small.manifest.archive_bytes as u64);
+            assert_eq!(
+                measured.output_sha256.as_deref(),
+                Some(small.manifest.archive_sha256.as_str())
+            );
+        }
     }
 
     #[test]
@@ -16583,7 +17959,10 @@ mod tests {
 
     #[test]
     fn xlsx_merge_and_unmerge_cases_are_deterministic_and_reversible() {
-        for case in [Case::XlsxEagerMergeCommitSave, Case::XlsxEagerUnmergeCommitSave] {
+        for case in [
+            Case::XlsxEagerMergeCommitSave,
+            Case::XlsxEagerUnmergeCommitSave,
+        ] {
             let first = build_xlsx_merge_edit_corpus(case).unwrap();
             let second = build_xlsx_merge_edit_corpus(case).unwrap();
             assert_eq!(first.archive, second.archive, "{}", case.name());
