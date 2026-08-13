@@ -422,16 +422,16 @@ const MAX_GROUPS_PER_GROUP: usize = 16_384;
 /// real-world compatibility corpus is 15 levels, so this leaves ample room for
 /// genuine documents while keeping the worst-case stack cost comfortably inside
 /// a default 2 MiB thread stack even in unoptimised builds.
-const MAX_GROUP_NESTING_DEPTH: usize = 32;
+pub(crate) const MAX_GROUP_NESTING_DEPTH: usize = 32;
 const MAX_SHAPE_GROUP_DEPTH: usize = 64;
 const MAX_STORY_GROUP_DEPTH: usize = 64;
 const MAX_SHAPE_PROPERTIES: usize = 65_536;
 const MAX_SHAPE_PROPERTY_BYTES: usize = 1_048_576;
 const MAX_SHAPE_TEXT_BYTES: usize = 16 * 1_048_576;
-const MAX_OBJECTS: usize = 65_536;
+pub(crate) const MAX_OBJECTS: usize = 65_536;
 const MAX_OBJECT_TEXT_BYTES: usize = 1_048_576;
-const MAX_OBJECT_DATA_BYTES: usize = 256 * 1_048_576;
-const MAX_PICTURE_DATA_BYTES: usize = 256 * 1_048_576;
+pub(crate) const MAX_OBJECT_DATA_BYTES: usize = crate::object::MAX_OBJECT_DATA_BYTES;
+pub(crate) const MAX_PICTURE_DATA_BYTES: usize = crate::picture::MAX_PICTURE_WRITE_BYTES;
 use super::super::document_variable::{
     DocumentVariable, MAX_DOCUMENT_VARIABLE_NAME_BYTES, MAX_DOCUMENT_VARIABLE_TEXT_BYTES,
     MAX_DOCUMENT_VARIABLE_VALUE_BYTES, MAX_DOCUMENT_VARIABLES,
@@ -1439,8 +1439,10 @@ pub(crate) struct Parser<'a> {
     token_spans: Option<&'a [Range<usize>]>,
     source: Option<&'a str>,
     limits: ParseLimits,
+    parse_provenance: crate::validation::ParseProvenance,
     opaque_nodes: Vec<crate::opaque::Node>,
     opaque_bytes: usize,
+    unknown_syntax_markers: usize,
     /// Current position in token stream
     pos: usize,
     /// State stack (for handling groups)
@@ -1477,6 +1479,9 @@ pub(crate) struct Parser<'a> {
     picture_compatibility_records: Vec<crate::PictureCompatibilityRecord>,
     /// Extracted fields
     fields: Vec<super::super::field::Field<'a>>,
+    field_safety: Vec<crate::validation::FieldSafety>,
+    /// Bounded recursion guard for generic fields nested in field results.
+    field_nesting_depth: usize,
     field_drawing_captures: Vec<DrawingStoryCapture<'a>>,
     form_fields: Vec<super::super::form_field::FormField<'a>>,
     form_field_text_bytes: usize,
@@ -2056,6 +2061,9 @@ pub(crate) struct ParsedDocument<'a> {
     pub blocks: Vec<StyleBlock<'a>>,
     /// Ordered unsupported syntax retained as inert transport fragments.
     pub opaque_nodes: Vec<crate::opaque::Node>,
+    /// Count of content-free markers for syntax not safely interpreted by a
+    /// focused destination parser.
+    pub unknown_syntax_markers: usize,
     /// Extracted tables
     pub tables: Vec<super::super::table::Table<'a>>,
     /// Extracted pictures
@@ -2064,6 +2072,8 @@ pub(crate) struct ParsedDocument<'a> {
     pub picture_compatibility_records: Vec<crate::PictureCompatibilityRecord>,
     /// Extracted fields
     pub fields: Vec<super::super::field::Field<'a>>,
+    pub field_safety: Vec<crate::validation::FieldSafety>,
+    pub parse_provenance: crate::validation::ParseProvenance,
     pub form_fields: Vec<super::super::form_field::FormField<'a>>,
     pub generator: Option<crate::DocumentGenerator<'a>>,
     pub revision_save: Option<crate::RevisionSaveMetadata>,

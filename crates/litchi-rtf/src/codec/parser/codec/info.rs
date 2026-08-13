@@ -1,10 +1,25 @@
 use super::{
     ControlWord, Cow, Destination, DrawingStoryCapture, InfoTextField, InfoTimeField,
-    MAX_INFO_TEXT_BYTES, Parser, RtfError, RtfResult, SmallVec, State, Token, control_symbol_text,
+    MAX_GROUP_NESTING_DEPTH, MAX_INFO_TEXT_BYTES, Parser, RtfError, RtfResult, SmallVec, State,
+    Token, control_symbol_text,
 };
 use std::mem::size_of;
 
 impl<'a> Parser<'a> {
+    /// Retain only a bounded, content-free marker when a focused destination
+    /// parser encounters syntax it cannot safely interpret.
+    pub(super) fn mark_unknown_syntax(&mut self) -> RtfResult<()> {
+        if self.unknown_syntax_markers >= self.limits.max_opaque_nodes() {
+            return Err(RtfError::LimitExceeded {
+                resource: "unknown syntax markers",
+                observed: self.unknown_syntax_markers.saturating_add(1),
+                limit: self.limits.max_opaque_nodes(),
+            });
+        }
+        self.unknown_syntax_markers += 1;
+        Ok(())
+    }
+
     pub(super) fn parse_info_text(&mut self, field: InfoTextField) -> RtfResult<()> {
         let duplicate = match field {
             InfoTextField::Title => self.info.title.is_some(),
@@ -31,6 +46,11 @@ impl<'a> Parser<'a> {
         while self.pos < self.tokens.len() && depth > 0 {
             match self.tokens.get(self.pos) {
                 Some(Token::OpenBrace) => {
+                    if depth >= MAX_GROUP_NESTING_DEPTH {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF info nesting depth exceeds the safety limit".to_string(),
+                        ));
+                    }
                     depth += 1;
                     self.pos += 1;
                 },
@@ -124,7 +144,14 @@ impl<'a> Parser<'a> {
         let mut depth = 1usize;
         while self.pos < self.tokens.len() && depth > 0 {
             match self.tokens.get(self.pos) {
-                Some(Token::OpenBrace) => depth += 1,
+                Some(Token::OpenBrace) => {
+                    if depth >= MAX_GROUP_NESTING_DEPTH {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF info nesting depth exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    depth += 1;
+                },
                 Some(Token::CloseBrace) => depth -= 1,
                 Some(Token::Control(control)) => match control {
                     ControlWord::Year(value) => timestamp.year = Some(*value),
@@ -239,7 +266,14 @@ impl<'a> Parser<'a> {
         let mut depth = 1usize;
         while self.pos < self.tokens.len() && depth > 0 {
             match self.tokens.get(self.pos) {
-                Some(Token::OpenBrace) => depth += 1,
+                Some(Token::OpenBrace) => {
+                    if depth >= MAX_GROUP_NESTING_DEPTH {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF skipped info nesting depth exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    depth += 1;
+                },
                 Some(Token::CloseBrace) => depth -= 1,
                 _ => {},
             }
@@ -257,7 +291,14 @@ impl<'a> Parser<'a> {
                 break;
             };
             match token {
-                Token::OpenBrace => depth += 1,
+                Token::OpenBrace => {
+                    if depth >= MAX_GROUP_NESTING_DEPTH {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF skipped nesting depth exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    depth += 1;
+                },
                 Token::CloseBrace => depth -= 1,
                 Token::Control(_) | Token::Text(_) | Token::Binary(_) => {},
             }
@@ -282,7 +323,14 @@ impl<'a> Parser<'a> {
                 break;
             };
             match token {
-                Token::OpenBrace => depth += 1,
+                Token::OpenBrace => {
+                    if depth >= MAX_GROUP_NESTING_DEPTH {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF skipped group nesting depth exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    depth += 1;
+                },
                 Token::CloseBrace => depth -= 1,
                 Token::Control(_) | Token::Text(_) | Token::Binary(_) => {},
             }

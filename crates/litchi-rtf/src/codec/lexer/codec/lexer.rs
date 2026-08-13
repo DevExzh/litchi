@@ -5,6 +5,16 @@ use bumpalo::Bump;
 use std::mem::size_of;
 use std::ops::Range;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum BinaryDestination {
+    /// A `binN` payload whose destination has not been identified yet.
+    Generic,
+    /// A payload in a `pict` group.
+    Picture,
+    /// A payload in an `object`/`objdata` group.
+    Object,
+}
+
 /// RTF Lexer using arena allocation.
 pub(crate) struct Lexer<'a> {
     /// Source input
@@ -17,6 +27,10 @@ pub(crate) struct Lexer<'a> {
     pub(super) limits: ParseLimits,
     /// Aggregate bytes claimed by accepted `binN` payloads.
     pub(super) total_binary_bytes: usize,
+    /// Destination markers for open groups.  Keeping this small and bounded
+    /// lets the lexer reject a destination payload before copying it into the
+    /// arena while preserving the ordinary generic binary ceiling elsewhere.
+    pub(super) binary_destinations: Vec<BinaryDestination>,
 }
 
 impl<'a> Lexer<'a> {
@@ -36,7 +50,69 @@ impl<'a> Lexer<'a> {
             arena,
             limits,
             total_binary_bytes: 0,
+            binary_destinations: Vec::with_capacity(crate::codec::parser::MAX_GROUP_NESTING_DEPTH),
         }
+    }
+
+    /// Return the hard destination ceiling that applies before a `binN`
+    /// payload is copied.  Generic binary destinations retain the caller's
+    /// configured limit; pictures and objects use their model/writer ceiling.
+    pub(super) fn binary_destination_limit(&self) -> usize {
+        let mut index = self.binary_destinations.len();
+        while index > 0 {
+            index -= 1;
+            match self.binary_destinations.get(index).copied() {
+                Some(BinaryDestination::Picture) => {
+                    return self
+                        .limits
+                        .max_binary_bytes()
+                        .min(crate::picture::MAX_PICTURE_WRITE_BYTES);
+                },
+                Some(BinaryDestination::Object) => {
+                    return self
+                        .limits
+                        .max_binary_bytes()
+                        .min(crate::object::MAX_OBJECT_DATA_BYTES);
+                },
+                Some(BinaryDestination::Generic) => {},
+                None => {},
+            }
+        }
+        self.limits.max_binary_bytes()
+    }
+
+    pub(super) fn observe_group_token(&mut self, token: &Token<'a>) -> RtfResult<()> {
+        match token {
+            Token::OpenBrace => {
+                // The parser owns the format's 32-level structural-depth
+                // diagnostic.  This lightweight tracker is only for
+                // destination-aware `binN` ceilings, so it is bounded by the
+                // lexer token budget rather than changing parser diagnostics.
+                self.binary_destinations.try_reserve(1).map_err(|_err| {
+                    RtfError::AllocationFailed {
+                        resource: "lexer destination stack",
+                        requested: self.binary_destinations.len().saturating_add(1),
+                    }
+                })?;
+                self.binary_destinations.push(BinaryDestination::Generic);
+            },
+            Token::CloseBrace => {
+                self.binary_destinations.pop();
+            },
+            Token::Control(crate::codec::lexer::ControlWord::Picture) => {
+                if let Some(destination) = self.binary_destinations.last_mut() {
+                    *destination = BinaryDestination::Picture;
+                }
+            },
+            Token::Control(crate::codec::lexer::ControlWord::Object)
+            | Token::Control(crate::codec::lexer::ControlWord::ObjectData) => {
+                if let Some(destination) = self.binary_destinations.last_mut() {
+                    *destination = BinaryDestination::Object;
+                }
+            },
+            _ => {},
+        }
+        Ok(())
     }
 
     /// Tokenize the entire input.
@@ -73,6 +149,7 @@ impl<'a> Lexer<'a> {
                 })?;
             let start = self.pos;
             let token = self.next_token()?;
+            self.observe_group_token(&token)?;
             let end = self.pos;
             tokens.push(token);
             spans.push(start..end);

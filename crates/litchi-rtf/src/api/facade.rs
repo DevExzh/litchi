@@ -225,6 +225,22 @@ impl Document {
         self.inner.model.objects()
     }
 
+    /// Produce a bounded, content-free semantic and security inventory.
+    ///
+    /// The report reuses this immutable snapshot. It never reparses the
+    /// source, follows or resolves references, executes fields or objects,
+    /// repairs syntax, or mutates the document.
+    #[must_use]
+    pub fn validation_report(&self) -> crate::ValidationReport {
+        crate::ValidationReport::from_document(self)
+    }
+
+    /// Alias for [`Self::validation_report`].
+    #[must_use]
+    pub fn security_report(&self) -> crate::ValidationReport {
+        self.validation_report()
+    }
+
     /// Borrow list definitions in list-table order.
     #[must_use]
     pub fn lists(&self) -> &[crate::list::List<'_>] {

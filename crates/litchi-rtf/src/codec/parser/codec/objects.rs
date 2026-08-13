@@ -1,6 +1,6 @@
 use super::{
-    ControlWord, Cow, Destination, MAX_OBJECT_DATA_BYTES, MAX_OBJECT_TEXT_BYTES, Parser, RtfError,
-    RtfResult, Token, control_symbol_text,
+    ControlWord, Cow, Destination, MAX_GROUP_NESTING_DEPTH, MAX_OBJECT_DATA_BYTES,
+    MAX_OBJECT_TEXT_BYTES, Parser, RtfError, RtfResult, Token, control_symbol_text,
 };
 
 impl<'a> Parser<'a> {
@@ -191,11 +191,20 @@ impl<'a> Parser<'a> {
                     ));
                 },
                 Token::OpenBrace => {
+                    if depth >= MAX_GROUP_NESTING_DEPTH {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF object nesting depth exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    self.mark_unknown_syntax()?;
                     depth += 1;
                     self.pos += 1;
                 },
                 Token::CloseBrace if depth == 0 => {
                     self.pos += 1;
+                    if saw_data && object.data.is_empty() {
+                        self.mark_unknown_syntax()?;
+                    }
                     return Ok(object);
                 },
                 Token::CloseBrace => {
@@ -462,7 +471,10 @@ impl<'a> Parser<'a> {
                         "RTF object modifier has an invalid parameter".to_string(),
                     ));
                 },
-                Token::Control(_) | Token::Text(_) | Token::Binary(_) => self.pos += 1,
+                Token::Control(_) | Token::Text(_) | Token::Binary(_) => {
+                    self.mark_unknown_syntax()?;
+                    self.pos += 1;
+                },
             }
         }
         Err(RtfError::UnexpectedEof)
@@ -540,7 +552,10 @@ impl<'a> Parser<'a> {
                     self.parse_group()?;
                     picture_indices.extend(first_picture..self.pictures.len());
                 },
-                Token::OpenBrace => self.skip_group()?,
+                Token::OpenBrace => {
+                    self.mark_unknown_syntax()?;
+                    self.skip_group()?
+                },
                 Token::Control(ControlWord::Unicode(code)) => {
                     text.push_str(&self.parse_destination_unicode_sequence(*code)?);
                 },
@@ -560,7 +575,10 @@ impl<'a> Parser<'a> {
                     text.push_str(&self.decode_transport_text(value)?);
                     self.pos += 1;
                 },
-                Token::Control(_) | Token::Binary(_) => self.pos += 1,
+                Token::Control(_) | Token::Binary(_) => {
+                    self.mark_unknown_syntax()?;
+                    self.pos += 1;
+                },
             }
             if text.len() > MAX_OBJECT_TEXT_BYTES {
                 return Err(RtfError::MalformedDocument(
@@ -588,6 +606,17 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::Unicode(code)) => {
                     text.push_str(&self.parse_destination_unicode_sequence(*code)?);
                 },
+                Token::Control(
+                    ControlWord::IgnorableDestination
+                    | ControlWord::ObjectClass
+                    | ControlWord::ObjectName
+                    | ControlWord::ObjectAlias
+                    | ControlWord::ObjectSection
+                    | ControlWord::ObjectTime
+                    | ControlWord::OleClassId(None),
+                ) => {
+                    self.pos += 1;
+                },
                 Token::Control(control) if control_symbol_text(control).is_some() => {
                     text.push_str(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
@@ -596,7 +625,10 @@ impl<'a> Parser<'a> {
                     text.push_str(&self.decode_transport_text(value)?);
                     self.pos += 1;
                 },
-                Token::Control(_) | Token::Binary(_) => self.pos += 1,
+                Token::Control(_) | Token::Binary(_) => {
+                    self.mark_unknown_syntax()?;
+                    self.pos += 1;
+                },
             }
             if text.len() > MAX_OBJECT_TEXT_BYTES {
                 return Err(RtfError::MalformedDocument(
@@ -657,15 +689,14 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_object_hex_destination(&mut self) -> RtfResult<Vec<u8>> {
         let mut data = Vec::new();
         let mut high_nibble = None;
-        let mut depth = 0usize;
         self.pos += 1; // opening brace
         while let Some(token) = self.tokens.get(self.pos) {
             match token {
                 Token::OpenBrace => {
-                    depth += 1;
-                    self.pos += 1;
+                    self.mark_unknown_syntax()?;
+                    self.skip_group()?;
                 },
-                Token::CloseBrace if depth == 0 => {
+                Token::CloseBrace => {
                     self.pos += 1;
                     if high_nibble.is_some() {
                         return Err(RtfError::MalformedDocument(
@@ -674,11 +705,13 @@ impl<'a> Parser<'a> {
                     }
                     return Ok(data);
                 },
-                Token::CloseBrace => {
-                    depth -= 1;
-                    self.pos += 1;
-                },
                 Token::Text(text) => {
+                    let hex_digits = text
+                        .bytes()
+                        .filter(|byte| !byte.is_ascii_whitespace())
+                        .count();
+                    let decoded_bytes = (usize::from(high_nibble.is_some()) + hex_digits) / 2;
+                    Self::reserve_object_payload(&mut data, decoded_bytes)?;
                     for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
                         let nibble = Self::hex_nibble(byte).ok_or_else(|| {
                             RtfError::MalformedDocument(
@@ -687,11 +720,6 @@ impl<'a> Parser<'a> {
                         })?;
                         if let Some(high) = high_nibble.take() {
                             data.push((high << 4) | nibble);
-                            if data.len() > MAX_OBJECT_DATA_BYTES {
-                                return Err(RtfError::MalformedDocument(
-                                    "RTF embedded object data exceeds the safety limit".to_string(),
-                                ));
-                            }
                         } else {
                             high_nibble = Some(nibble);
                         }
@@ -704,18 +732,49 @@ impl<'a> Parser<'a> {
                             "RTF objdata binary payload splits a hexadecimal byte".to_string(),
                         ));
                     }
+                    Self::reserve_object_payload(&mut data, bytes.len())?;
                     data.extend_from_slice(bytes);
-                    if data.len() > MAX_OBJECT_DATA_BYTES {
-                        return Err(RtfError::MalformedDocument(
-                            "RTF embedded object data exceeds the safety limit".to_string(),
-                        ));
-                    }
                     self.pos += 1;
                 },
-                Token::Control(_) => self.pos += 1,
+                Token::Control(ControlWord::IgnorableDestination | ControlWord::ObjectData) => {
+                    self.pos += 1;
+                },
+                Token::Control(_) => {
+                    self.mark_unknown_syntax()?;
+                    self.pos += 1;
+                },
             }
         }
         Err(RtfError::UnexpectedEof)
+    }
+
+    fn reserve_object_payload(data: &mut Vec<u8>, additional: usize) -> RtfResult<()> {
+        Self::reserve_object_payload_with_limit(
+            data,
+            additional,
+            MAX_OBJECT_DATA_BYTES,
+            "RTF embedded object data",
+            "RTF embedded object data exceeds the safety limit",
+        )
+    }
+
+    fn reserve_object_payload_with_limit(
+        data: &mut Vec<u8>,
+        additional: usize,
+        limit: usize,
+        resource: &'static str,
+        message: &'static str,
+    ) -> RtfResult<()> {
+        let remaining = limit.saturating_sub(data.len());
+        if additional > remaining {
+            return Err(RtfError::MalformedDocument(message.to_string()));
+        }
+        data.try_reserve_exact(additional)
+            .map_err(|_err| RtfError::AllocationFailed {
+                resource,
+                requested: data.len().saturating_add(additional),
+            })?;
+        Ok(())
     }
 
     pub(super) fn hex_nibble(byte: u8) -> Option<u8> {
@@ -725,5 +784,22 @@ impl<'a> Parser<'a> {
             b'A'..=b'F' => Some(byte - b'A' + 10),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Parser;
+
+    #[test]
+    fn object_payload_capacity_rejects_one_over_before_reserving() {
+        let mut data = vec![0_u8, 1_u8];
+        assert!(
+            Parser::reserve_object_payload_with_limit(&mut data, 0, 2, "object", "object",).is_ok()
+        );
+        assert!(
+            Parser::reserve_object_payload_with_limit(&mut data, 1, 2, "object", "object",)
+                .is_err()
+        );
     }
 }

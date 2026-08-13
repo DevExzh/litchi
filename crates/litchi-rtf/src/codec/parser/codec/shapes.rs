@@ -1254,6 +1254,12 @@ impl<'a> Parser<'a> {
                     return Ok(bytes);
                 },
                 Some(Token::Text(text)) => {
+                    let hex_digits = text
+                        .bytes()
+                        .filter(|byte| !byte.is_ascii_whitespace())
+                        .count();
+                    let decoded_bytes = (usize::from(high_nibble.is_some()) + hex_digits) / 2;
+                    Self::reserve_shape_binary_payload(&mut bytes, decoded_bytes)?;
                     for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
                         let nibble = Self::hex_nibble(byte).ok_or_else(|| {
                             RtfError::MalformedDocument(
@@ -1274,6 +1280,7 @@ impl<'a> Parser<'a> {
                             "RTF svb binary payload splits a hexadecimal byte".to_string(),
                         ));
                     }
+                    Self::reserve_shape_binary_payload(&mut bytes, value.len())?;
                     bytes.extend_from_slice(value);
                     self.pos += 1;
                 },
@@ -1284,12 +1291,36 @@ impl<'a> Parser<'a> {
                 },
                 None => return Err(RtfError::UnexpectedEof),
             }
-            if bytes.len() > crate::MAX_SHAPE_PROPERTY_BINARY_BYTES {
-                return Err(RtfError::MalformedDocument(
-                    "RTF svb payload exceeds the safety limit".to_string(),
-                ));
-            }
         }
+    }
+
+    fn reserve_shape_binary_payload(data: &mut Vec<u8>, additional: usize) -> RtfResult<()> {
+        Self::reserve_shape_binary_payload_with_limit(
+            data,
+            additional,
+            crate::MAX_SHAPE_PROPERTY_BINARY_BYTES,
+            "RTF shape binary payload",
+            "RTF svb payload exceeds the safety limit",
+        )
+    }
+
+    fn reserve_shape_binary_payload_with_limit(
+        data: &mut Vec<u8>,
+        additional: usize,
+        limit: usize,
+        resource: &'static str,
+        message: &'static str,
+    ) -> RtfResult<()> {
+        let remaining = limit.saturating_sub(data.len());
+        if additional > remaining {
+            return Err(RtfError::MalformedDocument(message.to_string()));
+        }
+        data.try_reserve_exact(additional)
+            .map_err(|_err| RtfError::AllocationFailed {
+                resource,
+                requested: data.len().saturating_add(additional),
+            })?;
+        Ok(())
     }
 
     pub(super) fn apply_shape_property(
@@ -1751,5 +1782,23 @@ impl<'a> Parser<'a> {
             0 => ShapeType::Group,
             value => ShapeType::Custom(value),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Parser;
+
+    #[test]
+    fn shape_binary_capacity_rejects_one_over_before_reserving() {
+        let mut data = vec![0_u8, 1_u8];
+        assert!(
+            Parser::reserve_shape_binary_payload_with_limit(&mut data, 0, 2, "shape", "shape",)
+                .is_ok()
+        );
+        assert!(
+            Parser::reserve_shape_binary_payload_with_limit(&mut data, 1, 2, "shape", "shape",)
+                .is_err()
+        );
     }
 }
