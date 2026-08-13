@@ -794,6 +794,33 @@ fn table_cell_path(path: &[TableCellAddress]) -> String {
         .join(";")
 }
 
+fn direct_table_cell_path(table: Position, row: Position, cell: Position) -> String {
+    format!("{},{},{}", table.get(), row.get(), cell.get())
+}
+
+fn push_inline_control_ancestor_reads(
+    paragraph: Position,
+    controls: &[Position],
+    reads: &mut Vec<String>,
+) {
+    for end in 1..controls.len() {
+        reads.push(format!(
+            "body/paragraph:{}/content-control-path:{}/text",
+            paragraph.get(),
+            position_path(&controls[..end])
+        ));
+    }
+}
+
+fn push_table_cell_scope_reads(path: &[TableCellAddress], reads: &mut Vec<String>) {
+    for end in 1..=path.len() {
+        reads.push(format!(
+            "body/table-cell-path:{}/text",
+            table_cell_path(&path[..end])
+        ));
+    }
+}
+
 fn operation_effects(
     operations: &[Operation],
     source_paragraphs: usize,
@@ -870,9 +897,9 @@ fn operation_effects(
                 reads.push("body/paragraph-order".to_owned());
                 reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
                 writes.push(format!(
-                    "body/paragraph:{}/content-control:{}/text",
+                    "body/paragraph:{}/content-control-path:{}/text",
                     paragraph.get(),
-                    control.get()
+                    position_path(&[*control])
                 ));
             },
             Operation::ReplaceNestedContentControlText {
@@ -882,6 +909,7 @@ fn operation_effects(
             } => {
                 reads.push("body/paragraph-order".to_owned());
                 reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                push_inline_control_ancestor_reads(*paragraph, controls, &mut reads);
                 writes.push(format!(
                     "body/paragraph:{}/content-control-path:{}/text",
                     paragraph.get(),
@@ -901,6 +929,7 @@ fn operation_effects(
                 );
                 reads.push("body/paragraph-order".to_owned());
                 reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                push_inline_control_ancestor_reads(*paragraph, controls, &mut reads);
                 reads.push(owner.clone());
                 writes.push(format!("{owner}/hyperlink:{}/text", hyperlink.get()));
             },
@@ -930,10 +959,8 @@ fn operation_effects(
             Operation::ReplaceCellText {
                 table, row, cell, ..
             } => writes.push(format!(
-                "body/table:{}/row:{}/cell:{}/text",
-                table.get(),
-                row.get(),
-                cell.get()
+                "body/table-cell-path:{}/text",
+                direct_table_cell_path(*table, *row, *cell)
             )),
             Operation::ReplaceCellParagraphText {
                 table,
@@ -943,26 +970,25 @@ fn operation_effects(
                 ..
             } => {
                 reads.push(format!(
-                    "body/table:{}/row:{}/cell:{}/text",
-                    table.get(),
-                    row.get(),
-                    cell.get()
+                    "body/table-cell-path:{}/text",
+                    direct_table_cell_path(*table, *row, *cell)
                 ));
                 writes.push(format!(
-                    "body/table:{}/row:{}/cell:{}/paragraph:{}/text",
-                    table.get(),
-                    row.get(),
-                    cell.get(),
+                    "body/table-cell-path:{}/paragraph:{}/text",
+                    direct_table_cell_path(*table, *row, *cell),
                     paragraph.get()
                 ));
             },
             Operation::ReplaceNestedCellParagraphText {
                 path, paragraph, ..
-            } => writes.push(format!(
-                "body/table-cell-path:{}/paragraph:{}/text",
-                table_cell_path(path),
-                paragraph.get()
-            )),
+            } => {
+                push_table_cell_scope_reads(path, &mut reads);
+                writes.push(format!(
+                    "body/table-cell-path:{}/paragraph:{}/text",
+                    table_cell_path(path),
+                    paragraph.get()
+                ));
+            },
             Operation::ReplaceNestedCellParagraphHyperlinkText {
                 path,
                 paragraph,
@@ -974,6 +1000,7 @@ fn operation_effects(
                     table_cell_path(path),
                     paragraph.get()
                 );
+                push_table_cell_scope_reads(path, &mut reads);
                 reads.push(owner.clone());
                 writes.push(format!("{owner}/hyperlink:{}/text", hyperlink.get()));
             },

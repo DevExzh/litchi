@@ -5396,6 +5396,102 @@ mod tests {
     }
 
     #[test]
+    fn composition_owner_effects_refuse_ancestor_overlaps_and_cap_atomically() {
+        let source = Snapshot::from_xml(document("<w:p/>")).unwrap();
+        let limits = CompositionLimits::new(8, 16, 32, 16);
+
+        let mut direct_control = source.edit();
+        direct_control
+            .operations
+            .push(Operation::ReplaceContentControlText {
+                paragraph: Position::new(0),
+                control: Position::new(0),
+                before: "before".into(),
+                after: "direct".into(),
+            });
+        let direct_control = direct_control.prepare(limits, "direct-control").unwrap();
+
+        let mut nested_control = source.edit();
+        nested_control
+            .operations
+            .push(Operation::ReplaceNestedContentControlText {
+                paragraph: Position::new(0),
+                controls: Arc::from([Position::new(0), Position::new(0)]),
+                before: "before".into(),
+                after: "nested".into(),
+            });
+        let nested_control = nested_control.prepare(limits, "nested-control").unwrap();
+
+        let mut controls = source.compose(limits);
+        controls.join(direct_control).unwrap();
+        assert!(matches!(
+            controls.join(nested_control).unwrap_err().failure(),
+            SubEditJoinFailure::Overlap(_)
+        ));
+        assert_eq!(controls.len(), 1);
+
+        let cell_source = Snapshot::from_xml(document(
+            "<w:p/><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>",
+        ))
+        .unwrap();
+        let mut broad_cell = cell_source.edit();
+        broad_cell
+            .replace_table_cell_text(
+                Position::new(0),
+                Position::new(0),
+                Position::new(0),
+                "direct cell",
+            )
+            .unwrap();
+        let broad_cell = broad_cell.prepare(limits, "broad-cell").unwrap();
+
+        let mut nested_cell = cell_source.edit();
+        nested_cell
+            .replace_nested_table_cell_paragraph_text(
+                &[TableCellAddress::new(
+                    Position::new(0),
+                    Position::new(0),
+                    Position::new(0),
+                )],
+                Position::new(0),
+                "nested cell",
+            )
+            .unwrap();
+        let nested_cell = nested_cell.prepare(limits, "nested-cell").unwrap();
+
+        let mut cells = cell_source.compose(limits);
+        cells.join(broad_cell).unwrap();
+        assert!(matches!(
+            cells.join(nested_cell).unwrap_err().failure(),
+            SubEditJoinFailure::Overlap(_)
+        ));
+        assert_eq!(cells.len(), 1);
+
+        let capped = CompositionLimits::new(1, 16, 32, 16);
+        let mut first = source.edit();
+        first.operations.push(Operation::ReplaceParagraphText {
+            position: Position::new(0),
+            before: "before".into(),
+            after: "first".into(),
+        });
+        let first = first.prepare(capped, "first").unwrap();
+        let mut second = source.edit();
+        second.operations.push(Operation::ReplaceRunText {
+            paragraph: Position::new(0),
+            run: Position::new(0),
+            before: "before".into(),
+            after: "second".into(),
+        });
+        let second = second.prepare(capped, "second").unwrap();
+        let mut bounded = source.compose(capped);
+        bounded.join(first).unwrap();
+        let error = bounded.join(second).unwrap_err();
+        assert!(matches!(error.failure(), SubEditJoinFailure::Limit(_)));
+        assert_eq!(bounded.len(), 1);
+        assert_eq!(error.into_rejected().identifier(), "second");
+    }
+
+    #[test]
     fn structural_run_text_is_native_and_complex_cells_remain_atomic_refusals() {
         let source = Snapshot::from_xml(document(
             "<w:p><w:r><w:t>safe</w:t><w:br/></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p></w:tc></w:tr></w:tbl>",
