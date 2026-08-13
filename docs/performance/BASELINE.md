@@ -220,9 +220,41 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **162
-selectable cases**: 36 default cases and 198 default records, plus six opt-in
-simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
+The stage-1 records above are retained unchanged. The current harness has **169
+selectable cases**. The historical 36-default-case/198-default-record tranche
+remains measured as documented below; newer selectable cases do not inherit
+those measurements.
+
+Five filesystem cases now exercise eager/source-backed OPC open, eager/source-
+backed one-Part atomic save, and same-length CFB atomic overlay save. A
+one-sample debug correctness/counter smoke covers warm and cold-requested modes
+(10 result records and five evidence records). Source OPC open makes 13 logical
+reads totaling 1,008 bytes and materializes no Parts; eager open materializes
+four Parts. Both OPC saves produce SHA-256
+`f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009`;
+CFB reports one changed span and SHA-256
+`7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc`.
+Cold-requested records contain nonzero physical `read_bytes`, but do not prove
+a reproducible cold cache. The debug, dirty-worktree, one-sample artifact makes
+no latency, allocation, memory, throughput, warm/cold comparison, or
+production-performance claim. See
+[`0087`](changes/0087-filesystem-cache-state-evidence.md) and the
+[compact counter summary](results/filesystem-smoke-0096-summary.json).
+
+Source-backed OPC payload retention is now optionally charged to a caller's
+hierarchical `Budget`. The managed cache preserves pinned handles, reserves
+active single-flight loads, evicts only unpinned clean entries, and reports
+content-free budget diagnostics. Focused tests cover hierarchy, sibling
+competition, cancellation, failure and release, but no controlled contention
+or latency artifact exists. See
+[`0086`](changes/0086-opc-source-cache-budget-management.md).
+
+Bounded forward-only one-sheet XLSX creation and RTF authoring exist in
+production (`8245da20d` and `5918be8ec`). Their performance and peak-memory
+evidence is pending; no result in this baseline is attributed to them.
+
+The previously measured tranche includes six opt-in simulated-range cases,
+two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in media-rich
@@ -758,9 +790,11 @@ incomplete program and CRUD matrix.
 
 See change records [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
-[`0007`](changes/0007-source-backed-opc-and-facades.md). Source cache bytes are
-bounded by `SourceCacheLimits`, but are not yet charged to the hierarchical
-`Budget`.
+[`0007`](changes/0007-source-backed-opc-and-facades.md). Managed source-backed
+OPC caches now charge retained and in-flight payloads to a hierarchical
+`Budget`; compatibility opens retain the finite `SourceCacheLimits` path. The
+budget implementation has correctness tests but no controlled contention or
+latency measurement.
 
 Consolidated changed-crate tests, formatter checks, warning-denied production
 Clippy and rustdoc gates passed. The current ODS all-target Clippy gate retains

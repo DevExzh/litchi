@@ -1,6 +1,6 @@
 # Performance program phase report
 
-Date: 2026-08-12
+Date: 2026-08-13
 Branch: `feat/office-format-completeness`
 Production base for the latest measured tranche: `6df5d4a1fbe53a8216e63f24cc1392be60b714a8`
 
@@ -13,9 +13,11 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **162 selectable cases**: 36 default cases and 198 default
-records, plus six opt-in simulated-range cases, two opt-in scaling cases, one
-opt-in XLSX commit/read attribution case, four opt-in opaque-heavy common OLE2
+harness contains **169 selectable cases**. The measured 36-default-case,
+198-default-record tranche remains historical evidence; newer selectable cases
+do not inherit its performance results. That measured tranche includes six
+opt-in simulated-range cases, two opt-in scaling cases, one opt-in XLSX
+commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
 one opt-in source-backed DOCX semantic publication case, one opt-in
 source-backed media-rich PPTX semantic publication case, four opt-in matched
@@ -46,6 +48,9 @@ is still not broad program or CRUD coverage.
 | Source-backed XLSX data-validation publication | Media-rich one-edit/save p50 **-97.75%** (44.51x), mean **-97.75%**; instructions **-73.43%**; materializations **12 -> 2**; byte-identical output | One existing normal worksheet's complete direct core/Office 2010 validation collections only; cells, formula evaluation, relationships, topology, MCE-selected state and changed signed sources remain outside the capability |
 | Source-backed XLSX auto-filter publication | Media-rich filter/sort edit-save p50 **-97.75%** (44.40x), mean **-97.75%**; instructions **-73.57%**; materializations **12 -> 3**; byte-identical output | One existing normal worksheet's direct auto-filter and sort state only; cells, tables, formula evaluation, relationships, topology, MCE-selected state and changed signed sources remain outside the capability |
 | Deterministic range simulation | XLSX listing has zero timed requests; selected reads have zero unselected-sheet overlap; full physical size distributions recorded | Synthetic latency model, not a cold filesystem or ambient network |
+| [Filesystem cache-state smoke](changes/0087-filesystem-cache-state-evidence.md) | Schema 1 debug artifact completed 10 warm/cold-requested result records and five evidence records; source OPC open uses 13 logical reads/1,008 B and zero Part materializations versus four eager materializations; eager/source saves share the exact `f4bbe4...` output hash; CFB reports one changed span and `799475...` | One sample, no warm-up, dirty worktree, debug build and merely requested cold state. Counter/output correctness only; no latency, allocation, memory, throughput or warm/cold claim |
+| [Managed OPC source cache](changes/0086-opc-source-cache-budget-management.md) | Retained and active-flight payloads can be charged to hierarchical `Budget`; pinned handles are not evicted and same-Part misses remain single-flight | Focused correctness tests only. No controlled contention, latency, allocation or peak-memory artifact exists |
+| Bounded forward-only XLSX/RTF creation | Production APIs exist at `8245da20d` and `5918be8ec` | Performance and memory evidence pending; no result claim |
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |
 | Coalesced DOCX paragraph edits | Large 100-edit/save p50 **-94.99% (19.97x)** and mean **-95.02%**; medium two-edit/save p50 **-12.98%**; scalar one-edit guardrail neutral | Direct-body, strictly ordered paragraph text replacement; generated corpus; scalar API remains separate |
 | ODF semantic baselines and ODS snapshot reuse | Medium/large ODS no-op edit-save p50 **-7.45% / -11.78%**; one-cell edit-save **-3.57% / -2.06%** | Generated ODT/ODS/ODP baseline corpora; focused ODP/ODT publication follow-ups are listed below |
@@ -556,10 +561,13 @@ Ordinary-reader/no-op and tiny direct distributions are retained in the
 counters, Heaptrack and GNU Time artifacts are indexed in
 [`change 0056`](changes/0056-doc-papx-containment-index.md).
 
-Source-backed cache bytes are bounded by `SourceCacheLimits` but are not yet
-charged to hierarchical `Budget`. Raw ZIP preservation is integrated for owned
-same-topology OPC mutations and the bounded consuming source-backed multi-Part
-publisher; broad source-backed semantic editing remains pending.
+Managed source-backed cache bytes are charged to a caller's hierarchical
+`Budget`; compatibility opens remain finite under `SourceCacheLimits`.
+Hierarchy, pinning, eviction, sibling competition, cancellation and release
+are correctness-tested, while controlled contention/latency evidence remains
+pending. Raw ZIP preservation is integrated for owned same-topology OPC
+mutations and the bounded consuming source-backed multi-Part publisher; broad
+source-backed semantic editing remains pending.
 See [`0005`](changes/0005-xlsx-row-start-index.md),
 [`0006`](changes/0006-positional-containers-and-explicit-execution.md), and
 [`0007`](changes/0007-source-backed-opc-and-facades.md),
@@ -901,8 +909,9 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The standalone harness provides 162 selectable cases and a 198-record default
-matrix across deterministic ZIP/OPC, positional CFB/OPC, source-backed XLSX,
+The standalone harness provides 169 selectable cases. Its previously measured
+default matrix remains 198 records across deterministic ZIP/OPC, positional
+CFB/OPC, source-backed XLSX,
 public DOC/XLS/PPT writer and semantic corpora, and DOCX/PPTX/RTF/ODT/ODS/ODP
 semantic corpora. RTF includes deterministic raw CP-1252 and LZFu inputs plus
 a content-addressed producer watermark; its separate native `relsize` chain is
@@ -999,18 +1008,21 @@ Lock-wait evidence remains missing.
 ## Remaining highest-impact work
 
 The largest remaining limitation is the incomplete migration from eager OPC to
-source-backed CRUD: selective open, source versions, finite cache,
-single-flight, and a low-level consuming one-Part publisher now exist, but
-cache bytes are not yet charged to the hierarchical budget and broad semantic
-edit/patch coverage is incomplete. Raw ZIP preservation is integrated for
+source-backed CRUD: selective open, source versions, a finite pinned-aware
+single-flight cache, optional hierarchical budget charging, and a low-level
+consuming one-Part publisher now exist, but controlled cache contention and
+latency evidence and broad semantic edit/patch coverage are incomplete. Raw
+ZIP preservation is integrated for
 eager owned same-topology mutation and this narrow source-backed case; format
 facades, topology changes, signatures and real-producer/media matrices remain.
 The changed-Part handoff and post-validation local-span copies are removed;
 the required selected-Part/compressor buffer remains to be attributed and
 reduced independently.
 
-Other high-priority gaps are cold-filesystem and real range-source matrices,
-threshold tuning/contention work beyond the committed explicit scaling curves,
+Other high-priority gaps are controlled cold-filesystem and real range-source
+matrices beyond the one-sample debug counter smoke, threshold tuning/contention
+work beyond the committed explicit scaling curves, performance and memory
+evidence for bounded forward-only XLSX/RTF creation,
 and broad format-semantic CRUD coverage beyond the generated text/grid slices
 (bulk action distinctions, dependency-copy, merge/split, patch timing, repair,
 security, malformed and real-producer corpora, plus broader ODF and RTF
