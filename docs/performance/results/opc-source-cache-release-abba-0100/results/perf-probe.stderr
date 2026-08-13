@@ -1,0 +1,7 @@
+2893269,,cycles,20997091,100.00,,
+821879,,instructions,20997091,100.00,0.28,insn per cycle
+148272,,branches,20997091,100.00,,
+7570,,branch-misses,20997091,100.00,5.11,of all branches
+26408,,cache-misses,20997091,100.00,,
+53,,minor-faults,20997091,100.00,,
+0,,major-faults,20997091,100.00,,

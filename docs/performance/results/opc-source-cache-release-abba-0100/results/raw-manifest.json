@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "artifact": "opc-source-cache-release-abba-0100",
+  "generated_at_utc": "2026-08-13T15:57:45.836Z",
+  "measurement_revision": "a1b692297b2493a3f523aa064e6be366271c4f52",
+  "measurement_revision_subject": "feat(docx): add bounded semantic validation",
+  "current_branch_head_at_review": "2550137598609dec43927663e5b36f648ea1a2fa",
+  "relevant_diff_measurement_to_review_head": "none for crates/litchi-opc or tools/perf-baseline; later head commit is outside this cache harness scope",
+  "source": {
+    "kind": "git archive of committed HEAD; no linked worktree; no live dirty validators/facades",
+    "archive_revision": "a1b692297b2493a3f523aa064e6be366271c4f52",
+    "archive_tree_path": "src/",
+    "root_worktree_dirty_at_archive_creation": "yes, but dirty files were excluded by git archive",
+    "synthetic_corpus_only": true
+  },
+  "build": {
+    "command": "CARGO_TARGET_DIR=/tmp/litchi-opc-cache-release-0100.YZ2Trf/build-target cargo build --release --locked --manifest-path tools/perf-baseline/Cargo.toml",
+    "profile": "release",
+    "isolated_target": "build-target/",
+    "binary_relative_path": "build-target/release/litchi-perf-baseline",
+    "binary_sha256": "21bac557fc753b17904b60aacdc97e460c3a01f452a29adcbcb5137a1e89df97",
+    "cargo_lock_relative_path": "src/tools/perf-baseline/Cargo.lock",
+    "cargo_lock_sha256": "14f1246f8ac9c810bfffd8beb3cd7b0feb0ba68c769a0695491b8f4b9de965f7"
+  },
+  "execution": {
+    "order": [
+      "control-A",
+      "managed-A",
+      "managed-B",
+      "control-B"
+    ],
+    "abba_definition": "A direction control→managed; B direction managed→control; all four legs use fresh processes and fresh harness-generated packages",
+    "command_template": "taskset -c 0-11 litchi-perf-baseline --warmup 3 --samples 30 --workers 1,2,4,8,available --case <selector> --json <path>",
+    "warmup_iterations_per_case": 3,
+    "samples_per_case": 30,
+    "requested_worker_widths": [
+      1,
+      2,
+      4,
+      8,
+      "available"
+    ],
+    "resolved_worker_widths": [
+      1,
+      2,
+      4,
+      8,
+      12
+    ],
+    "cpu_affinity": "0-11",
+    "filesystem_cache_state": "not-applicable: deterministic in-memory synthetic archive and coordinated source",
+    "deterministic_source_delay_us": 10000,
+    "production_latency_claim": false
+  },
+  "raw_files": [
+    {
+      "name": "boundary",
+      "file": "boundary.json",
+      "selector": "opc_source_cache_budget_boundary",
+      "order": null,
+      "relative_path": "results/boundary.json",
+      "bytes": 32850,
+      "sha256": "995080c6275724695994dff4b483f45b7e0f9c3449d21907e1a971fc11c99744"
+    },
+    {
+      "name": "control-A",
+      "file": "control-A.json",
+      "selector": "opc_source_cache_control_contention",
+      "order": 1,
+      "relative_path": "results/control-A.json",
+      "bytes": 566092,
+      "sha256": "4b3bc2cfa9f5c64fb51bf8c644115cbc62ff403395f8ec69b896367820182a9d"
+    },
+    {
+      "name": "managed-A",
+      "file": "managed-A.json",
+      "selector": "opc_source_cache_managed_contention",
+      "order": 2,
+      "relative_path": "results/managed-A.json",
+      "bytes": 574814,
+      "sha256": "8e3e37cfa87ac6377ff7099c5d31c52cd36b84566a40075bc3caad400f0a5437"
+    },
+    {
+      "name": "managed-B",
+      "file": "managed-B.json",
+      "selector": "opc_source_cache_managed_contention",
+      "order": 3,
+      "relative_path": "results/managed-B.json",
+      "bytes": 574835,
+      "sha256": "f2b69afee42e6d223792b872f424976f589f732f78f01e1145ff6b7975a882fd"
+    },
+    {
+      "name": "control-B",
+      "file": "control-B.json",
+      "selector": "opc_source_cache_control_contention",
+      "order": 4,
+      "relative_path": "results/control-B.json",
+      "bytes": 566120,
+      "sha256": "f0d2141daec173cccb090b12a6d79036baf8660f70df68c861116c7ff3fa1405"
+    },
+    {
+      "name": "perf-probe",
+      "file": "perf-probe.stderr",
+      "selector": null,
+      "order": null,
+      "relative_path": "results/perf-probe.stderr",
+      "bytes": 290,
+      "sha256": "8a83aef5ee11716cf9d8f76b6a0e98a66504fb0bd3167320c99602eb483fbe14"
+    },
+    {
+      "name": "next-change-0100",
+      "file": "next-change-0100.md",
+      "selector": null,
+      "order": null,
+      "relative_path": "results/next-change-0100.md",
+      "bytes": 1362,
+      "sha256": "4a17df6d64120409a01515216575eea824ef9d27b3dc5b77e1c4f882ddc1f17a"
+    }
+  ],
+  "counter_formulae": {
+    "throughput_requests_per_second": "request_count_per_sample * 1e9 / elapsed_p50_ns",
+    "same_part_request_count": "worker_count; request count varies by width, so Amdahl speedup is not applicable",
+    "disjoint_part_request_count": "working_set_parts (fixed 12 for resolved maximum width 12)",
+    "disjoint_speedup": "baseline_worker_1_p50_ns / worker_p50_ns",
+    "disjoint_efficiency": "speedup / worker_count",
+    "amdahl_serial_fraction": "(1 / speedup - 1 / worker_count) / (1 - 1 / worker_count)",
+    "abba_difference": "managed_elapsed_mean_ns - control_elapsed_mean_ns per independent leg; Welch 95% CI, no sorted-sample pairing",
+    "speedup_acceptance": "require managed-faster direction and 95% CI excluding zero in both control→managed and managed→control directions; otherwise no speedup accepted"
+  },
+  "instrumentation_gaps": {
+    "allocations": "not emitted by committed in-process harness",
+    "peak_rss": "not emitted per sample by committed harness",
+    "hardware_counters": "not emitted per sample by committed harness; perf probe succeeded on true but no contention-leg counters were captured",
+    "external_probe_file": "results/perf-probe.stderr"
+  },
+  "summary_sha256": "877f8d607aa75a8b27de31a9458bb2a2bcf9506f92b77aa8d2e0a482feb3abda",
+  "next_change_record": "results/next-change-0100.md",
+  "current_branch_head_at_artifact_finalization": "2550137598609dec43927663e5b36f648ea1a2fa",
+  "current_branch_head_after_archive_before_finalization": "c8083723b7b5805e9cc815ed1cb4ef4779491853"
+}
