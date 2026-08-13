@@ -220,7 +220,7 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The current harness has **160
+The stage-1 records above are retained unchanged. The current harness has **162
 selectable cases**: 36 default cases and 198 default records, plus six opt-in
 simulated-range cases, two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
@@ -233,7 +233,7 @@ line-break, inline-run, hyperlink, insertion, and removal publication cases,
 publication cases, 16 opt-in DOCX/PPTX semantic
 cases, 13 opt-in RTF semantic case names across four capability-bounded
 variants (39 tiny / 70 tiny-plus-large rows), 24 shape-selected ODT/ODS/ODP
-semantic cases, ten fixed media-rich ODF cases, and 21 opt-in native
+semantic cases, twelve fixed media-rich ODF cases, and 21 opt-in native
 DOC/XLS/PPT semantic cases. It remains an
 incomplete program and CRUD matrix.
 
