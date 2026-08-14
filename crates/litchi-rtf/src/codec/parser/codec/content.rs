@@ -1,7 +1,8 @@
 use super::{
-    ControlWord, Cow, Destination, FontCharset, MAX_REVISIONS, ParsedBodyStoryEvent, Parser,
-    RtfEncoding, RtfError, RtfResult, SmallVec, State, StyleBlock, Token, append_transport_bytes,
-    control_symbol_text, parser_classification_error, require_parameterless,
+    ControlWord, Cow, Destination, FontCharset, MAX_REVISIONS, MAX_TEXT_INTERMEDIATE_BYTES,
+    ParsedBodyStoryEvent, Parser, RtfEncoding, RtfError, RtfResult, SmallVec, State, StyleBlock,
+    Token, append_transport_bytes, control_symbol_text, parser_classification_error,
+    require_parameterless,
 };
 
 impl<'a> Parser<'a> {
@@ -486,10 +487,71 @@ impl<'a> Parser<'a> {
             })
     }
 
+    /// Decode a byte-preserving transport slice without allowing the decoder
+    /// to create an unbounded UTF-8 temporary.  A single source byte can
+    /// expand to at most four UTF-8 bytes, so reject a non-ASCII input whose
+    /// worst-case decoded size is already over the intermediate budget before
+    /// calling any code-page decoder.  ASCII remains borrowed by the decoder
+    /// and therefore retains the full budget without a needless 4x penalty.
+    pub(super) fn decode_transport_bytes_bounded<'b>(
+        &self,
+        bytes: &'b [u8],
+        resource: &'static str,
+    ) -> RtfResult<Cow<'b, str>> {
+        let worst_case = if bytes.is_ascii() {
+            bytes.len()
+        } else {
+            bytes.len().saturating_mul(4)
+        };
+        if worst_case > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(RtfError::LimitExceeded {
+                resource,
+                observed: worst_case,
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
+        let decoded = self.current_state()?.encoding.decode(bytes);
+        if decoded.len() > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(RtfError::LimitExceeded {
+                resource,
+                observed: decoded.len(),
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
+        Ok(decoded)
+    }
+
     pub(super) fn decode_transport_text(&self, text: &str) -> RtfResult<String> {
+        if text.len() > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(RtfError::LimitExceeded {
+                resource: "RTF transport text",
+                observed: text.len(),
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
         let mut bytes = SmallVec::<[u8; 64]>::new();
+        bytes
+            .try_reserve_exact(text.len())
+            .map_err(|_error| RtfError::AllocationFailed {
+                resource: "RTF transport text",
+                requested: text.len(),
+            })?;
         append_transport_bytes(&mut bytes, text)?;
-        Ok(self.current_state()?.encoding.decode(&bytes).into_owned())
+        let decoded = self.decode_transport_bytes_bounded(&bytes, "RTF decoded transport text")?;
+        match decoded {
+            Cow::Borrowed(value) => {
+                let mut owned = String::new();
+                owned.try_reserve_exact(value.len()).map_err(|_error| {
+                    RtfError::AllocationFailed {
+                        resource: "RTF decoded transport text",
+                        requested: value.len(),
+                    }
+                })?;
+                owned.push_str(value);
+                Ok(owned)
+            },
+            Cow::Owned(value) => Ok(value),
+        }
     }
 
     pub(super) fn append_semantic_text(&mut self, text: &str) -> RtfResult<()> {

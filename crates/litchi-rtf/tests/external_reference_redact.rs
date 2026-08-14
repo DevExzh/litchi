@@ -170,6 +170,95 @@ fn external_reference_unicode_fallback_rejects_active_control_words() {
     assert!(Document::parse(r#"{\rtf1\ansi{\*\template \u65\par}}"#).is_err());
 }
 
+#[test]
+fn strict_shape_text_unicode_fallback_does_not_consume_active_controls() {
+    let source = concat!(
+        r#"{\rtf1\ansi{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}"#,
+        r#"{\shptxt {\u65\par}}}}}"#,
+    );
+    let document = Document::parse(source).unwrap();
+    // `\par` is a supported shape-text control, but it is not a Unicode
+    // fallback character.  The owner must see it after the finite fallback
+    // scanner stops, preserving the paragraph break.
+    assert_eq!(document.shapes()[0].text, "A\n");
+}
+
+#[test]
+fn strict_refuses_annotation_skipped_destinations() {
+    for hidden in [
+        r#"{\*\template hidden.dot}"#,
+        // The unknown starred wrapper is skipped as one annotation-owned
+        // group; active object/picture syntax inside it must not disappear
+        // from strict diagnostics.
+        r#"{\*\vendor{\object\objemb{\*\objdata 00}}}"#,
+        r#"{\*\vendor{\pict\pngblip 89504e470d0a1a0a}}"#,
+    ] {
+        let source = [
+            r#"{\rtf1\ansi{\*\atnid I}{\*\atnauthor A}\chatn{\*\annotation visible"#,
+            hidden,
+            r#"}}"#,
+        ]
+        .concat();
+        let document = Document::parse(&source)
+            .unwrap_or_else(|error| panic!("annotation hidden destination {hidden}: {error:?}"));
+        let inventory = document.external_reference_redaction_snapshot().unwrap();
+        assert!(
+            inventory
+                .unsupported()
+                .contains(&UnsupportedReference::UnknownSyntax),
+            "annotation hidden destination was not diagnosed: {hidden}"
+        );
+        assert!(inventory.plan(Mode::Strict, patch_limits(2)).is_err());
+    }
+}
+
+#[test]
+fn strict_refuses_unretained_upr_ansi_fallbacks() {
+    for hidden in [
+        r#"{\*\template hidden.dot}"#,
+        r#"{\field{\*\fldinst HYPERLINK "https://example.invalid"}{\fldrslt hidden}}"#,
+        r#"{\object\objemb{\*\objdata 00}}"#,
+    ] {
+        let source = [
+            r#"{\rtf1\ansi{\upr{ansi "#,
+            hidden,
+            r#"}{\*\ud\uc0 Unicode}}Body}"#,
+        ]
+        .concat();
+        let document = Document::parse(&source)
+            .unwrap_or_else(|error| panic!("upr hidden destination {hidden}: {error:?}"));
+        let inventory = document.external_reference_redaction_snapshot().unwrap();
+        assert!(
+            inventory
+                .unsupported()
+                .contains(&UnsupportedReference::UnknownSyntax),
+            "upr hidden destination was not diagnosed: {hidden}"
+        );
+        assert!(inventory.plan(Mode::Strict, patch_limits(2)).is_err());
+    }
+}
+
+#[test]
+fn external_reference_decoder_caps_transport_and_unicode_intermediates() {
+    let mut transport = String::from(r#"{\rtf1\ansi{\*\template "#);
+    transport.push_str(&"x".repeat(65_537));
+    transport.push_str("}}");
+    assert!(Document::parse(&transport).is_err());
+
+    // The encoded transport is below 64 KiB, but a non-ASCII code page byte
+    // can expand to up to four UTF-8 bytes.  The parser must reject before
+    // invoking the decoder rather than allocating an oversized Cow.
+    let mut decoded_intermediate = String::from(r#"{\rtf1\ansi{\*\template "#);
+    decoded_intermediate.push_str(&"é".repeat(16_385));
+    decoded_intermediate.push_str("}}");
+    assert!(Document::parse(&decoded_intermediate).is_err());
+
+    let mut unicode_fallback = String::from(r#"{\rtf1\ansi{\*\template \u65"#);
+    unicode_fallback.push_str(&"a".repeat(65_538));
+    unicode_fallback.push_str("}}");
+    assert!(Document::parse(&unicode_fallback).is_err());
+}
+
 fn assert_strict_refuses_shape_hyperlink(source: &str) {
     let document = Document::parse(source).unwrap();
     let inventory = document.external_reference_redaction_snapshot().unwrap();
@@ -207,6 +296,32 @@ fn strict_shape_diagnostics_cover_header_table_and_field_result_stories() {
         ]
         .concat(),
     );
+}
+
+#[test]
+fn strict_shape_text_diagnostics_refuse_skipped_active_destinations() {
+    let prefix = r#"{\rtf1\ansi{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt x"#;
+    let suffix = r#"}}}}"#;
+    for nested in [
+        // Each destination is syntactically nested inside shptxt and is
+        // intentionally not retained by the visible shape-text story model.
+        r#"{\*\template hidden.dot}"#,
+        r#"{\field{\*\fldinst HYPERLINK "https://example.invalid"}{\fldrslt hidden}}"#,
+        r#"{\object\objemb{\*\objdata 00}}"#,
+        r#"{\pict\pngblip 89504e470d0a1a0a}"#,
+    ] {
+        let source = [prefix, nested, suffix].concat();
+        let document = Document::parse(&source)
+            .unwrap_or_else(|error| panic!("nested destination {nested} failed: {error:?}"));
+        let inventory = document.external_reference_redaction_snapshot().unwrap();
+        assert!(
+            inventory
+                .unsupported()
+                .contains(&UnsupportedReference::UnknownSyntax),
+            "nested shape-text destination was not diagnosed: {nested}"
+        );
+        assert!(inventory.plan(Mode::Strict, patch_limits(2)).is_err());
+    }
 }
 
 #[test]

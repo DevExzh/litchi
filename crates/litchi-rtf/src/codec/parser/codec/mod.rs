@@ -428,6 +428,10 @@ const MAX_STORY_GROUP_DEPTH: usize = 64;
 const MAX_SHAPE_PROPERTIES: usize = 65_536;
 const MAX_SHAPE_PROPERTY_BYTES: usize = 1_048_576;
 const MAX_SHAPE_TEXT_BYTES: usize = 16 * 1_048_576;
+/// Bound temporary transport/Unicode buffers before they can spill into a
+/// large heap allocation.  Larger retained stories use their own aggregate
+/// limits, but decoder intermediates stay bounded independently.
+pub(crate) const MAX_TEXT_INTERMEDIATE_BYTES: usize = 64 * 1_024;
 pub(crate) const MAX_OBJECTS: usize = 65_536;
 const MAX_OBJECT_TEXT_BYTES: usize = 1_048_576;
 pub(crate) const MAX_OBJECT_DATA_BYTES: usize = crate::object::MAX_OBJECT_DATA_BYTES;
