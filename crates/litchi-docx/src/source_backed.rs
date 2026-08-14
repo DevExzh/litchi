@@ -23,6 +23,8 @@ use crate::redact;
 use crate::sanitize::{self, RelationshipState};
 use crate::settings::DocumentSettings;
 use crate::variables;
+#[cfg(any(unix, windows))]
+use litchi_core::FileSource;
 use litchi_core::{ExecutionContext, ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
@@ -35,6 +37,8 @@ use quick_xml::reader::NsReader;
 use sha2::{Digest as _, Sha256};
 use smallvec::SmallVec;
 use std::io::Write;
+#[cfg(any(unix, windows))]
+use std::path::Path;
 use std::sync::Arc;
 
 /// A DOCX package that leaves ordinary part bodies cold at open.
@@ -93,6 +97,113 @@ impl<W: Write> Write for FingerprintingWriter<W> {
 }
 
 impl Package {
+    /// Open a DOCX package from a regular filesystem file without slurping it
+    /// into memory.
+    ///
+    /// The path is opened once as an immutable positional [`FileSource`].
+    /// Ordinary package payloads remain cold until a query asks for them.
+    ///
+    /// This constructor is available on platforms where [`FileSource`] is
+    /// implemented.
+    #[cfg(any(unix, windows))]
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_path(path)
+    }
+
+    /// Open a DOCX package from a regular filesystem file without slurping it
+    /// into memory.
+    ///
+    /// This constructor is available on platforms where [`FileSource`] is
+    /// implemented.
+    #[cfg(any(unix, windows))]
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_read_at(file_source(path)?)
+    }
+
+    /// Open a filesystem-backed DOCX package with explicit OPC read limits.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits(
+        path: impl AsRef<Path>,
+        limits: litchi_opc::ReadLimits,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits(file_source(path)?, limits)
+    }
+
+    /// Open a filesystem-backed DOCX package with an explicit finite payload
+    /// cache policy.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_cache_limits(
+        path: impl AsRef<Path>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_read_at_with_cache_limits(file_source(path)?, cache_limits)
+    }
+
+    /// Open a filesystem-backed DOCX package with explicit OPC read and
+    /// payload-cache policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_cache_limits(
+        path: impl AsRef<Path>,
+        limits: litchi_opc::ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
+    }
+
+    /// Open a filesystem-backed DOCX package with the standard read limits
+    /// and a caller-owned execution context.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_cache_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_cache_limits_and_execution_context(
+            file_source(path)?,
+            cache_limits,
+            context,
+        )
+    }
+
+    /// Open a filesystem-backed DOCX package with explicit OPC read limits
+    /// and a caller-owned execution context.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_execution_context(
+        path: impl AsRef<Path>,
+        limits: litchi_opc::ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
+    }
+
+    /// Open a filesystem-backed DOCX package with explicit OPC read and
+    /// execution policies while retaining the default finite payload cache.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: litchi_opc::ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
+    }
+
+    /// Open a filesystem-backed DOCX package with explicit OPC read,
+    /// payload-cache, and caller-owned execution policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_cache_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: litchi_opc::ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            file_source(path)?,
+            limits,
+            cache_limits,
+            context,
+        )
+    }
+
     /// Open a DOCX source using the standard bounded OPC read policy.
     ///
     /// This validates the main-document relationship and content type but
@@ -1002,6 +1113,11 @@ impl Package {
         }
         Ok(())
     }
+}
+
+#[cfg(any(unix, windows))]
+fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
+    Ok(Arc::new(FileSource::open(path)?))
 }
 
 fn transaction_error_to_document(error: crate::document::TransactionError) -> Error {
