@@ -31,6 +31,7 @@ use std::{
     sync::Arc,
 };
 
+pub use crate::package::paragraph_transfer::ParagraphTransferPlan;
 /// Shared zero-based semantic collection position.
 pub use litchi_core::Position;
 pub use litchi_core::{
@@ -38,6 +39,7 @@ pub use litchi_core::{
 };
 
 const MAX_PACKAGE_BYTES: usize = 64 * 1024 * 1024;
+const MAX_DURABLE_TRANSFER_EXPANSION_BYTES: usize = MAX_PACKAGE_BYTES;
 const MAX_OPERATIONS: usize = 1_024;
 const MAX_WIRE_JSON_BYTES: usize = 192 * 1024 * 1024;
 const MAX_SEMANTIC_TEXT_BYTES: usize = 1024 * 1024;
@@ -107,6 +109,43 @@ impl Snapshot {
     /// Reports the package envelope policy enforced by immutable edits.
     pub fn envelope_kind(&self) -> Result<EnvelopeKind> {
         envelope_kind(self)
+    }
+
+    /// Plans transfer of one dependency-free direct plain paragraph from an
+    /// immutable donor snapshot into this destination snapshot.
+    ///
+    /// The target position is an insertion position, so `paragraph_count` is
+    /// accepted for append.  The donor and destination are both checked before
+    /// any bytes are retained by the plan.
+    pub fn plan_plain_paragraph_transfer_from(
+        &self,
+        donor: &Snapshot,
+        source: Position,
+        target: Position,
+    ) -> Result<ParagraphTransferPlan> {
+        crate::package::paragraph_transfer::plan_one(self, donor, source, target)
+    }
+
+    /// Plans transfer of a bounded ordered batch of dependency-free direct
+    /// plain paragraphs from an immutable donor snapshot.
+    pub fn plan_plain_paragraphs_transfer_from(
+        &self,
+        donor: &Snapshot,
+        sources: &[Position],
+        target: Position,
+    ) -> Result<ParagraphTransferPlan> {
+        crate::package::paragraph_transfer::plan_many(self, donor, sources, target)
+    }
+
+    /// Alias using the singular operation name for callers passing a batch
+    /// slice of length one or more.
+    pub fn plan_plain_paragraph_transfer_batch_from(
+        &self,
+        donor: &Snapshot,
+        sources: &[Position],
+        target: Position,
+    ) -> Result<ParagraphTransferPlan> {
+        self.plan_plain_paragraphs_transfer_from(donor, sources, target)
     }
 }
 
@@ -226,6 +265,72 @@ impl Edit {
             from: from.get(),
             to: to.get(),
         })
+    }
+
+    /// Stages one checked dependency-free direct plain paragraph transfer.
+    pub fn copy_plain_paragraph_from(
+        &mut self,
+        donor: &Snapshot,
+        source: Position,
+        target: Position,
+    ) -> Result<&mut Self> {
+        let plan = self
+            .source
+            .plan_plain_paragraph_transfer_from(donor, source, target)?;
+        self.stage_plain_paragraph_transfer(&plan)
+    }
+
+    /// Alias for [`Edit::copy_plain_paragraph_from`].
+    pub fn copy_plain_paragraph_transfer_from(
+        &mut self,
+        donor: &Snapshot,
+        source: Position,
+        target: Position,
+    ) -> Result<&mut Self> {
+        self.copy_plain_paragraph_from(donor, source, target)
+    }
+
+    /// Stages a checked ordered batch of dependency-free direct plain
+    /// paragraph transfers.
+    pub fn copy_plain_paragraphs_from(
+        &mut self,
+        donor: &Snapshot,
+        sources: &[Position],
+        target: Position,
+    ) -> Result<&mut Self> {
+        let plan = self
+            .source
+            .plan_plain_paragraphs_transfer_from(donor, sources, target)?;
+        self.stage_plain_paragraph_transfer(&plan)
+    }
+
+    /// Alias for [`Edit::copy_plain_paragraphs_from`].
+    pub fn copy_plain_paragraphs_transfer_from(
+        &mut self,
+        donor: &Snapshot,
+        sources: &[Position],
+        target: Position,
+    ) -> Result<&mut Self> {
+        self.copy_plain_paragraphs_from(donor, sources, target)
+    }
+
+    /// Applies a previously planned transfer to this exact target edit.
+    pub fn apply_plain_paragraph_transfer(
+        &mut self,
+        plan: &ParagraphTransferPlan,
+    ) -> Result<&mut Self> {
+        self.stage_plain_paragraph_transfer(plan)
+    }
+
+    pub(crate) fn stage_plain_paragraph_transfer(
+        &mut self,
+        plan: &ParagraphTransferPlan,
+    ) -> Result<&mut Self> {
+        plan.validate_integrity(&self.source)?;
+        if plan.fragments.is_empty() {
+            return Ok(self);
+        }
+        self.push(Operation::TransferPlainParagraphs(plan.operation()))
     }
 
     /// Stages one typed text run at the end of a paragraph.
@@ -905,6 +1010,12 @@ impl Edit {
 
     /// Validates every staged operation and publishes one immutable snapshot.
     pub fn commit(self) -> Result<Commit> {
+        if !transfer_operations_are_isolated(&self.operations) {
+            return Err(Error::InvalidFormat(
+                "ODT paragraph transfer cannot be composed with another staged mutation"
+                    .to_string(),
+            ));
+        }
         if self.operations.is_empty() {
             return Ok(Commit::new(
                 self.source.clone(),
@@ -992,6 +1103,30 @@ impl Edit {
                     )?;
                     document = moved.document()?;
                     OperationResult::Unit
+                },
+                Operation::TransferPlainParagraphs(transfer) => {
+                    let snapshot = Snapshot::from_document(&document)?;
+                    let transferred =
+                        crate::package::paragraph_transfer::apply_operation(&snapshot, transfer)?;
+                    document = transferred.document()?;
+                    let mut indexes = Vec::new();
+                    indexes
+                        .try_reserve_exact(transfer.fragments.len())
+                        .map_err(|source| Error::Allocation {
+                            resource: "ODT paragraph transfer result indexes",
+                            source,
+                        })?;
+                    indexes.extend(
+                        transfer.target_position
+                            ..transfer
+                                .target_position
+                                .saturating_add(transfer.fragments.len()),
+                    );
+                    if indexes.len() == 1 {
+                        OperationResult::Index(indexes[0])
+                    } else {
+                        OperationResult::Indices(indexes)
+                    }
                 },
                 Operation::AppendRun {
                     paragraph,
@@ -1450,7 +1585,10 @@ impl Edit {
             // source-provenance XML splices. A reordered producer document can
             // retain formatting whitespace and therefore need not reduce to
             // the single maximal splice recognized by this fallback audit.
-            if !matches!(operation, Operation::MovePlainParagraph { .. }) {
+            if !matches!(
+                operation,
+                Operation::MovePlainParagraph { .. } | Operation::TransferPlainParagraphs(_)
+            ) {
                 audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
             }
             results.push(result);
@@ -1599,6 +1737,14 @@ impl JoinedEdit {
         identifier: impl Into<String>,
         edit: Edit,
     ) -> std::result::Result<&mut Self, JoinConflict> {
+        if !transfer_operations_are_isolated(&edit.operations) {
+            // The core composition vocabulary has no format-specific
+            // isolation variant. Report this admission refusal through its
+            // invalid-effect branch rather than retaining an unsafe payload.
+            return Err(JoinConflict {
+                failure: SubEditJoinFailure::Limit(litchi_core::CompositionError::InvalidEffect),
+            });
+        }
         let (reads, writes) = operation_effects(&edit.operations);
         let sub_edit = SubEdit::new(
             Lineage(edit.source.bytes.clone()),
@@ -1630,10 +1776,18 @@ impl JoinedEdit {
     }
 
     /// Atomically commits accepted work in stable identifier order.
+    /// Transfer operations are isolated from every other mutation so their
+    /// exact lexical destination authentication remains valid.
     pub fn commit(self) -> Result<Commit> {
         let mut operations = Vec::new();
         for edit in self.inner.into_sub_edits() {
-            operations.extend(edit.into_payload());
+            let payload = edit.into_payload();
+            if !transfer_operations_are_isolated(&payload) {
+                return Err(Error::InvalidFormat(
+                    "ODT paragraph transfer cannot be composed within one sub-edit".to_string(),
+                ));
+            }
+            operations.extend(payload);
         }
         Edit {
             source: self.source,
@@ -1808,6 +1962,7 @@ enum Operation {
         from: usize,
         to: usize,
     },
+    TransferPlainParagraphs(crate::package::paragraph_transfer::PlainParagraphTransferOperation),
     AppendRun {
         paragraph: usize,
         text: String,
@@ -3071,6 +3226,11 @@ fn semantic_patch_operation(
             "/body/paragraphs/order".to_string(),
             serde_json::json!({"from": from, "to": to}),
         ),
+        Operation::TransferPlainParagraphs(transfer) => (
+            "paragraph.transfer_plain",
+            format!("/body/paragraphs/{}/transfer", transfer.target_position),
+            plain_paragraph_transfer_value(transfer, source, blobs)?,
+        ),
         Operation::AppendRun {
             paragraph,
             text,
@@ -3485,7 +3645,7 @@ fn validate_sealed_patch(patch: &CorePatch<ForwardOnly>) -> Result<()> {
 }
 
 fn validate_patch_direction<Mode>(patch: &CorePatch<Mode>) -> Result<()> {
-    durable_lineage(patch)?;
+    let lineage = durable_lineage(patch)?;
     let restoring = patch
         .operations()
         .iter()
@@ -3494,6 +3654,7 @@ fn validate_patch_direction<Mode>(patch: &CorePatch<Mode>) -> Result<()> {
         restore_target_bytes(patch)?.ok_or_else(invalid_durable_patch)?;
         return Ok(());
     }
+    preflight_transfer_expansion(patch.operations(), patch.blobs(), lineage.source_id)?;
     let mut referenced_blobs = BTreeSet::new();
     for operation in patch.operations() {
         decode_semantic_operation(operation, patch.blobs())?;
@@ -3505,6 +3666,95 @@ fn validate_patch_direction<Mode>(patch: &CorePatch<Mode>) -> Result<()> {
             .any(|id| blob_by_hex(patch.blobs(), id).is_none())
     {
         return Err(invalid_durable_patch());
+    }
+    Ok(())
+}
+
+fn preflight_transfer_expansion(
+    operations: &[PatchOperation],
+    blobs: &BlobBundle,
+    expected_destination: &str,
+) -> Result<()> {
+    let mut total_bytes = 0_usize;
+    for operation in operations {
+        if operation.op != "paragraph.transfer_plain" {
+            continue;
+        }
+        let expected = operation
+            .preconditions
+            .get(SOURCE_PRECONDITION)
+            .and_then(Value::as_str)
+            .ok_or_else(invalid_durable_patch)?;
+        if expected != expected_destination {
+            return Err(invalid_durable_patch());
+        }
+        let value = exact_object(&operation.value, 5)?;
+        let destination = object_required_string_map(value, "destination")?;
+        if !is_canonical_digest(destination) || destination != expected_destination {
+            return Err(invalid_durable_patch());
+        }
+        let target_position = parse_transfer_target(&operation.target)?;
+        if target_position
+            > crate::package::paragraph_transfer::MAX_PLAIN_PARAGRAPH_TRANSFER_PARAGRAPHS
+        {
+            return Err(invalid_durable_patch());
+        }
+        let encoded_target = parse_transfer_target_value(
+            value
+                .get("target_position")
+                .ok_or_else(invalid_durable_patch)?,
+        )?;
+        if encoded_target != target_position {
+            return Err(invalid_durable_patch());
+        }
+        let positions = value
+            .get("source_positions")
+            .and_then(Value::as_array)
+            .ok_or_else(invalid_durable_patch)?;
+        let fragments = value
+            .get("fragments")
+            .and_then(Value::as_array)
+            .ok_or_else(invalid_durable_patch)?;
+        if positions.len() != fragments.len()
+            || positions.len()
+                > crate::package::paragraph_transfer::MAX_PLAIN_PARAGRAPH_TRANSFER_PARAGRAPHS
+        {
+            return Err(invalid_durable_patch());
+        }
+        // An empty plan is represented by no transaction operation.  A
+        // durable transfer carrying no fragments must therefore never be
+        // admitted: otherwise its target position would bypass destination
+        // paragraph-count validation in the exact no-op fast path.
+        if positions.is_empty() {
+            return Err(invalid_durable_patch());
+        }
+        for position in positions {
+            let position = json_usize(Some(position))?;
+            if position
+                >= crate::package::paragraph_transfer::MAX_PLAIN_PARAGRAPH_TRANSFER_PARAGRAPHS
+            {
+                return Err(invalid_durable_patch());
+            }
+        }
+        for fragment in fragments {
+            let fragment = exact_object(fragment, 1)?;
+            let digest = object_required_string_map(fragment, "blob")?;
+            if !is_canonical_digest(digest) {
+                return Err(invalid_durable_patch());
+            }
+            let bytes = blob_by_hex(blobs, digest).ok_or_else(invalid_durable_patch)?;
+            if bytes.len()
+                > crate::package::paragraph_transfer::MAX_PLAIN_PARAGRAPH_TRANSFER_FRAGMENT_BYTES
+            {
+                return Err(invalid_durable_patch());
+            }
+            total_bytes = total_bytes
+                .checked_add(bytes.len())
+                .ok_or_else(invalid_durable_patch)?;
+            if total_bytes > MAX_DURABLE_TRANSFER_EXPANSION_BYTES {
+                return Err(invalid_durable_patch());
+            }
+        }
     }
     Ok(())
 }
@@ -3578,11 +3828,11 @@ fn restore_target_bytes<Mode>(patch: &CorePatch<Mode>) -> Result<Option<&[u8]>> 
 }
 
 fn apply_durable_patch<Mode>(patch: &CorePatch<Mode>, source: &Snapshot) -> Result<Snapshot> {
-    validate_patch_direction(patch)?;
     let lineage = durable_lineage(patch)?;
     if BlobId::of(source.as_bytes()).as_hex() != lineage.source_id {
         return Err(durable_source_mismatch());
     }
+    validate_patch_direction(patch)?;
     if let Some(bytes) = restore_target_bytes(patch)? {
         return Snapshot::from_bytes(copy_bytes(bytes)?);
     }
@@ -3654,6 +3904,22 @@ fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> 
                 return Err(invalid_durable_patch());
             }
             Ok(Operation::MovePlainParagraph { from, to })
+        },
+        "paragraph.transfer_plain" => {
+            let target_position = parse_transfer_target(&operation.target)?;
+            let transfer = plain_paragraph_transfer_from_value(
+                &operation.value,
+                blobs,
+                operation
+                    .preconditions
+                    .get(SOURCE_PRECONDITION)
+                    .and_then(Value::as_str)
+                    .ok_or_else(invalid_durable_patch)?,
+            )?;
+            if transfer.target_position != target_position {
+                return Err(invalid_durable_patch());
+            }
+            Ok(Operation::TransferPlainParagraphs(transfer))
         },
         "run.append" => {
             let value = operation
@@ -3991,6 +4257,174 @@ fn form_control_fragment_from_value(value: &Value) -> Result<String> {
 
 fn move_target_from_value(value: &Value) -> Result<usize> {
     json_usize(exact_object(value, 1)?.get("to"))
+}
+
+fn plain_paragraph_transfer_value(
+    transfer: &crate::package::paragraph_transfer::PlainParagraphTransferOperation,
+    destination: &BlobId,
+    blobs: &mut BlobBundle,
+) -> Result<Value> {
+    if transfer.destination_fingerprint != destination.as_hex() {
+        return Err(invalid_durable_patch());
+    }
+    if transfer.source_positions.len() != transfer.fragments.len()
+        || transfer.source_positions.len()
+            > crate::package::paragraph_transfer::MAX_PLAIN_PARAGRAPH_TRANSFER_PARAGRAPHS
+    {
+        return Err(invalid_durable_patch());
+    }
+    let mut source_positions = Vec::new();
+    source_positions
+        .try_reserve_exact(transfer.source_positions.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT paragraph transfer durable positions",
+            source,
+        })?;
+    for position in &transfer.source_positions {
+        source_positions.push(serde_json::json!(position));
+    }
+    let mut fragments = Vec::new();
+    fragments
+        .try_reserve_exact(transfer.fragments.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT paragraph transfer durable fragments",
+            source,
+        })?;
+    for fragment in &transfer.fragments {
+        let blob = blobs.insert(fragment).map_err(durable_wire_error)?;
+        fragments.push(serde_json::json!({"blob": blob.as_hex()}));
+    }
+    let value = serde_json::json!({
+        "destination": transfer.destination_fingerprint,
+        "fragment_digest": transfer.fragment_digest,
+        "fragments": fragments,
+        "source_positions": source_positions,
+        "target_position": transfer.target_position,
+    });
+    Ok(value)
+}
+
+fn plain_paragraph_transfer_from_value(
+    value: &Value,
+    blobs: &BlobBundle,
+    expected_destination: &str,
+) -> Result<crate::package::paragraph_transfer::PlainParagraphTransferOperation> {
+    let value = exact_object(value, 5)?;
+    let destination = object_required_string_map(value, "destination")?;
+    let fragment_digest = object_required_string_map(value, "fragment_digest")?;
+    if !is_canonical_digest(destination)
+        || !is_canonical_digest(fragment_digest)
+        || destination != expected_destination
+    {
+        return Err(invalid_durable_patch());
+    }
+    let target_position = parse_transfer_target_value(
+        value
+            .get("target_position")
+            .ok_or_else(invalid_durable_patch)?,
+    )?;
+    let source_positions = transfer_positions_from_value(
+        value
+            .get("source_positions")
+            .ok_or_else(invalid_durable_patch)?,
+    )?;
+    let fragments_value = value
+        .get("fragments")
+        .and_then(Value::as_array)
+        .ok_or_else(invalid_durable_patch)?;
+    if fragments_value.len() != source_positions.len() {
+        return Err(invalid_durable_patch());
+    }
+    // Empty in-memory plans are exact no-ops and are not serialized as
+    // operations.  Refuse forged empty durable operations before any blob
+    // lookup or owned fragment allocation.
+    if fragments_value.is_empty() {
+        return Err(invalid_durable_patch());
+    }
+    let mut total_fragment_bytes = 0_usize;
+    for fragment in fragments_value {
+        let fragment = exact_object(fragment, 1)?;
+        let digest = object_required_string_map(fragment, "blob")?;
+        if !is_canonical_digest(digest) {
+            return Err(invalid_durable_patch());
+        }
+        let bytes = blob_by_hex(blobs, digest).ok_or_else(invalid_durable_patch)?;
+        if bytes.len()
+            > crate::package::paragraph_transfer::MAX_PLAIN_PARAGRAPH_TRANSFER_FRAGMENT_BYTES
+        {
+            return Err(invalid_durable_patch());
+        }
+        total_fragment_bytes = total_fragment_bytes
+            .checked_add(bytes.len())
+            .ok_or_else(invalid_durable_patch)?;
+        if total_fragment_bytes
+            > crate::package::paragraph_transfer::MAX_PLAIN_PARAGRAPH_TRANSFER_BYTES
+        {
+            return Err(invalid_durable_patch());
+        }
+    }
+
+    // The aggregate preflight above must finish before any blob bytes are
+    // copied into operation-owned vectors.  A small wire array may repeat one
+    // content-addressed blob many times, so validating only after each copy
+    // would turn a bounded rejection into an avoidable large allocation.
+    let mut fragments = Vec::new();
+    fragments
+        .try_reserve_exact(fragments_value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT paragraph transfer durable fragment decode",
+            source,
+        })?;
+    for fragment in fragments_value {
+        let fragment = exact_object(fragment, 1)?;
+        let digest = object_required_string_map(fragment, "blob")?;
+        let bytes = blob_by_hex(blobs, digest).ok_or_else(invalid_durable_patch)?;
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(bytes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODT paragraph transfer durable fragment",
+                source,
+            })?;
+        owned.extend_from_slice(bytes);
+        fragments.push(owned);
+    }
+    let operation = crate::package::paragraph_transfer::PlainParagraphTransferOperation {
+        destination_fingerprint: destination.to_owned(),
+        source_positions,
+        target_position,
+        fragments,
+        fragment_digest: fragment_digest.to_owned(),
+    };
+    crate::package::paragraph_transfer::validate_operation_for_durable(&operation)?;
+    Ok(operation)
+}
+
+fn parse_transfer_target(target: &str) -> Result<usize> {
+    parse_target_index(target, "/body/paragraphs/", "/transfer")
+}
+
+fn parse_transfer_target_value(value: &Value) -> Result<usize> {
+    json_usize(Some(value))
+}
+
+fn transfer_positions_from_value(value: &Value) -> Result<Vec<usize>> {
+    let positions = value.as_array().ok_or_else(invalid_durable_patch)?;
+    if positions.len() > crate::package::paragraph_transfer::MAX_PLAIN_PARAGRAPH_TRANSFER_PARAGRAPHS
+    {
+        return Err(invalid_durable_patch());
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(positions.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT paragraph transfer durable source positions",
+            source,
+        })?;
+    for position in positions {
+        output.push(json_usize(Some(position))?);
+    }
+    Ok(output)
 }
 
 fn dynamic_field_from_value(value: &Value) -> Result<DynamicTextField> {
@@ -4808,9 +5242,55 @@ fn bounded_semantic_text(value: String, field: &str) -> Result<String> {
     Ok(value)
 }
 
+/// Transfer operations splice authenticated source bytes into the original
+/// content.xml. Any additional mutation may regenerate that XML and alter
+/// CDATA, entity, namespace-prefix, or formatting spelling, so transfers are
+/// admitted only as an isolated operation (a batch remains one operation).
+fn transfer_operations_are_isolated(operations: &[Operation]) -> bool {
+    let mut transfer_count = 0usize;
+    let mut has_non_transfer = false;
+    for operation in operations {
+        match operation {
+            Operation::Noop => {},
+            Operation::TransferPlainParagraphs(_) => {
+                if has_non_transfer {
+                    return false;
+                }
+                transfer_count = transfer_count.saturating_add(1);
+                if transfer_count > 1 {
+                    return false;
+                }
+            },
+            _ => {
+                has_non_transfer = true;
+                if transfer_count > 0 {
+                    return false;
+                }
+            },
+        }
+    }
+    true
+}
+
 fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
+    const PARAGRAPH_TRANSFER_GLOBAL_EFFECT: &str = "/package/paragraph-transfer/global";
+    let mut reads = Vec::new();
     let mut writes = Vec::new();
     for operation in operations {
+        match operation {
+            Operation::Noop => {},
+            Operation::TransferPlainParagraphs(_) => {
+                writes.push(PARAGRAPH_TRANSFER_GLOBAL_EFFECT.to_string());
+            },
+            _ => {
+                // Transfer operations authenticate the exact destination
+                // package before splicing source bytes. Any other mutation
+                // may regenerate content.xml or alter package dependencies,
+                // so every non-noop operation shares one conservative read
+                // facet with transfers.
+                reads.push(PARAGRAPH_TRANSFER_GLOBAL_EFFECT.to_string());
+            },
+        }
         match operation {
             Operation::Noop => {},
             Operation::InsertParagraph { index, .. } | Operation::RemoveParagraph { index } => {
@@ -4823,15 +5303,19 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
                     writes.push(format!("/body/paragraphs/{index}/content"));
                 }
             },
+            Operation::TransferPlainParagraphs(_) => {},
             Operation::ReplaceParagraph { index, .. } => {
+                append_paragraph_index_point_effects(&mut reads, *index);
                 writes.push(format!("/body/paragraphs/{index}/content"));
             },
             Operation::AppendRun { paragraph, .. }
             | Operation::AppendHyperlink { paragraph, .. }
             | Operation::AppendLineBreak { index: paragraph } => {
+                append_paragraph_index_point_effects(&mut reads, *paragraph);
                 writes.push(format!("/body/paragraphs/{paragraph}/content"));
             },
             Operation::InsertNote { paragraph, .. } => {
+                append_paragraph_index_point_effects(&mut reads, *paragraph);
                 writes.push(format!("/body/paragraphs/{paragraph}/content"));
                 writes.push("/body/notes/order".to_string());
             },
@@ -4839,6 +5323,7 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
                 writes.push(format!("/body/notes/{index}"));
             },
             Operation::InsertRubyAnnotation { paragraph, .. } => {
+                append_paragraph_index_point_effects(&mut reads, *paragraph);
                 writes.push(format!("/body/paragraphs/{paragraph}/content"));
                 writes.push("/body/ruby/order".to_string());
             },
@@ -4847,6 +5332,7 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
                 writes.push(format!("/body/ruby/{index}"));
             },
             Operation::InsertDynamicTextField { paragraph, .. } => {
+                append_paragraph_index_point_effects(&mut reads, *paragraph);
                 writes.push(format!("/body/paragraphs/{paragraph}/content"));
             },
             Operation::ReplaceDynamicTextField { index, .. }
@@ -5004,7 +5490,30 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
             Operation::RestoreSnapshot => writes.push("/package".to_string()),
         }
     }
-    (Vec::new(), writes)
+    (reads, writes)
+}
+
+// Keep ordinary paragraph selector effects bounded while retaining the
+// existing format-owned composition semantics. Transfer isolation itself is
+// represented by the single package-wide effect above.
+const PARAGRAPH_INDEX_BITS: usize = 9;
+const PARAGRAPH_INDEX_LIMIT: usize = (1 << PARAGRAPH_INDEX_BITS) - 1;
+const PARAGRAPH_INDEX_OVERFLOW_EFFECT: &str = "/body/paragraphs/index-shift/overflow";
+
+fn append_paragraph_index_point_effects(reads: &mut Vec<String>, index: usize) {
+    if index > PARAGRAPH_INDEX_LIMIT {
+        reads.push(PARAGRAPH_INDEX_OVERFLOW_EFFECT.to_string());
+        return;
+    }
+
+    for depth in 0..=PARAGRAPH_INDEX_BITS {
+        let prefix = if depth == 0 {
+            0
+        } else {
+            index >> (PARAGRAPH_INDEX_BITS - depth)
+        };
+        reads.push(format!("/body/paragraphs/index-shift/{depth}/{prefix}"));
+    }
 }
 
 fn envelope_kind(snapshot: &Snapshot) -> Result<EnvelopeKind> {
