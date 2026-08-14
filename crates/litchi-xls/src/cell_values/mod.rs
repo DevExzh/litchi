@@ -63,6 +63,8 @@ const WORKSHEET: u16 = 0x0010;
 const NUMBER_PAYLOAD_BYTES: usize = 14;
 const NUMBER_VALUE_OFFSET: usize = 6;
 const MAX_STAGED_CHANGES: usize = 4_096;
+const MAX_SCALAR_TRANSFER_CELLS: usize = 4_096;
+const MAX_SCALAR_TRANSFER_BYTES: usize = 4 * 1024 * 1024;
 
 pub(crate) fn replace_workbook_ranges_and_adjust_bounds(
     workbook: &mut Vec<u8>,
@@ -114,6 +116,91 @@ impl Reference {
         self.column
     }
 }
+
+/// An inclusive, checked BIFF8 worksheet rectangle.
+///
+/// Cross-workbook cell transfer deliberately uses an explicit rectangle
+/// instead of accepting an unbounded iterator.  This keeps the selector
+/// deterministic and lets the transaction preflight the complete destination
+/// before it stages its first operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CellRange {
+    start: Reference,
+    end: Reference,
+}
+
+impl CellRange {
+    /// Creates an inclusive rectangle from its top-left and bottom-right
+    /// references.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidCellReference`] when the end precedes the
+    /// start on either axis.
+    pub fn new(start: Reference, end: Reference) -> Result<Self> {
+        if end.row() < start.row() || end.column() < start.column() {
+            return Err(Error::InvalidCellReference(
+                "cell range end precedes its start".into(),
+            ));
+        }
+        Ok(Self { start, end })
+    }
+
+    /// Returns the inclusive top-left reference.
+    #[must_use]
+    pub const fn start(self) -> Reference {
+        self.start
+    }
+
+    /// Returns the inclusive bottom-right reference.
+    #[must_use]
+    pub const fn end(self) -> Reference {
+        self.end
+    }
+
+    /// Returns the number of cells in this rectangle, if representable.
+    #[must_use]
+    pub fn cell_count(self) -> Option<usize> {
+        let rows = usize::from(self.end.row())
+            .checked_sub(usize::from(self.start.row()))?
+            .checked_add(1)?;
+        let columns = usize::from(self.end.column())
+            .checked_sub(usize::from(self.start.column()))?
+            .checked_add(1)?;
+        rows.checked_mul(columns)
+    }
+
+    fn contains(self, reference: Reference) -> bool {
+        reference.row() >= self.start.row()
+            && reference.row() <= self.end.row()
+            && reference.column() >= self.start.column()
+            && reference.column() <= self.end.column()
+    }
+
+    fn target_reference(self, source: Reference, anchor: Reference) -> Result<Reference> {
+        let row_offset = u32::from(source.row())
+            .checked_sub(u32::from(self.start.row()))
+            .ok_or_else(|| Error::InvalidCellReference("source row precedes range start".into()))?;
+        let column_offset = u32::from(source.column())
+            .checked_sub(u32::from(self.start.column()))
+            .ok_or_else(|| {
+                Error::InvalidCellReference("source column precedes range start".into())
+            })?;
+        Reference::new(
+            u32::from(anchor.row())
+                .checked_add(row_offset)
+                .ok_or_else(|| Error::InvalidCellReference("target row overflows BIFF8".into()))?,
+            u32::from(anchor.column())
+                .checked_add(column_offset)
+                .ok_or_else(|| {
+                    Error::InvalidCellReference("target column overflows BIFF8".into())
+                })?,
+        )
+    }
+}
+
+/// Backward-compatible short name for [`CellRange`].
+pub type Range = CellRange;
 
 /// A semantic worksheet selector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1008,6 +1095,316 @@ impl Transaction {
             )));
         }
         self.stage(sheet_index, entry, Storage::Number, Value::Number(value))
+    }
+
+    /// Copies a bounded dependency-free scalar rectangle from another opened
+    /// XLS snapshot into this transaction.
+    ///
+    /// Only existing standalone `Number` and formatting-only `Blank` records
+    /// in the donor are representable.  Source styles are required to use
+    /// canonical default cell XF, and no donor XF, SST, formula, drawing, relationship, or
+    /// unknown BIFF owner is carried across the workbook boundary.  A missing
+    /// target cell is authored with the target workbook's canonical default XF.  An
+    /// existing target is accepted only when both source and target use the
+    /// same fixed-width family (`Number` to `Number`, or `Blank` to `Blank`).
+    /// Any family change, occupied target with no corresponding source cell,
+    /// unsupported source owner, protected input, stale staged operation, or
+    /// range beyond the finite transfer bound is rejected before this edit is
+    /// changed.
+    ///
+    /// The operation is failure-atomic.  Its normal [`Self::commit`] path
+    /// fully reopens the composed CFB and emits the existing exact-source
+    /// reversible patch; same-width Number targets therefore retain the
+    /// fixed-field publication fast path, while inserted cells use the
+    /// checked structural closure already owned by this module.
+    ///
+    /// `Ok(None)` means that either worksheet selector did not resolve.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, security, dependency, occupancy, allocation,
+    /// or representability refusal without partially staging a transfer.
+    pub fn copy_scalar_cells_from<'source, 'target>(
+        &mut self,
+        donor: &Snapshot,
+        source_selector: impl Into<Selector<'source>>,
+        source_range: CellRange,
+        target_selector: impl Into<Selector<'target>>,
+        target_anchor: Reference,
+    ) -> Result<Option<&mut Self>> {
+        let source_selector = source_selector.into();
+        let target_selector = target_selector.into();
+        let Some(source_sheet) = donor.resolve_sheet(source_selector)? else {
+            return Ok(None);
+        };
+        let Some(target_sheet) = self.source.resolve_sheet(target_selector)? else {
+            return Ok(None);
+        };
+        let target_range = translated_range(source_range, target_anchor)?;
+        let cell_count = source_range
+            .cell_count()
+            .ok_or_else(|| Error::InvalidData("scalar transfer area overflows usize".into()))?;
+        if cell_count > MAX_SCALAR_TRANSFER_CELLS {
+            return Err(Error::UnsafeEdit(format!(
+                "cross-workbook scalar transfer contains {cell_count} cells; limit is {MAX_SCALAR_TRANSFER_CELLS}"
+            )));
+        }
+
+        ensure_scalar_transfer_container(donor, source_sheet)?;
+        ensure_scalar_transfer_container(&self.source, target_sheet)?;
+        ensure_transfer_has_no_staged_target_overlap(self, target_sheet, target_range)?;
+
+        let source_entries = &donor.inner.sheets[source_sheet].entries;
+        let target_entries = &self.source.inner.sheets[target_sheet].entries;
+        let mut source_cells = Vec::new();
+        source_cells
+            .try_reserve_exact(cell_count.min(source_entries.len()))
+            .map_err(|_error| Error::Allocation("staging scalar transfer source cells"))?;
+        let mut estimated_bytes = 0_usize;
+        let source_style = scalar_default_style(donor)?;
+        for entry in source_entries
+            .iter()
+            .filter(|entry| source_range.contains(entry.cell.reference))
+        {
+            if source_cells.len() >= cell_count {
+                return Err(Error::UnsafeEdit(
+                    "cross-workbook scalar transfer source inventory exceeds its checked range"
+                        .into(),
+                ));
+            }
+            if entry.cell.style != source_style {
+                return Err(Error::UnsafeEdit(
+                    "cross-workbook scalar transfer refuses source XF remapping".into(),
+                ));
+            }
+            if !matches!(entry.cell.storage, Storage::Number | Storage::Blank) {
+                return Err(Error::UnsupportedFeature(
+                    "cross-workbook scalar transfer accepts only Number and Blank cells".into(),
+                ));
+            }
+            let value_bytes: usize = match entry.cell.storage {
+                Storage::Number => 8,
+                Storage::Blank => 0,
+                _ => 0,
+            };
+            estimated_bytes = estimated_bytes
+                .checked_add(value_bytes.saturating_add(32))
+                .ok_or_else(|| Error::InvalidData("scalar transfer size overflows usize".into()))?;
+            if estimated_bytes > MAX_SCALAR_TRANSFER_BYTES {
+                return Err(Error::UnsafeEdit(format!(
+                    "cross-workbook scalar transfer exceeds {MAX_SCALAR_TRANSFER_BYTES} staged bytes"
+                )));
+            }
+            push_bounded(
+                &mut source_cells,
+                (
+                    entry.cell.reference,
+                    entry.cell.storage,
+                    entry.cell.value.clone(),
+                ),
+                cell_count,
+                "staging scalar transfer source cells",
+            )?;
+        }
+        source_cells.sort_unstable_by_key(|(reference, _, _)| *reference);
+        for duplicate in source_cells.windows(2) {
+            if duplicate[0].0 == duplicate[1].0 {
+                return Err(Error::UnsafeEdit(format!(
+                    "cell ({}, {}) has duplicate BIFF8 owners",
+                    duplicate[0].0.row(),
+                    duplicate[0].0.column()
+                )));
+            }
+        }
+        let source_cell_count = source_cells.len();
+
+        let mut target_cells = Vec::new();
+        target_cells
+            .try_reserve_exact(cell_count.min(target_entries.len()))
+            .map_err(|_error| Error::Allocation("indexing scalar transfer target cells"))?;
+        for (entry_index, entry) in target_entries
+            .iter()
+            .enumerate()
+            .filter(|(_, entry)| target_range.contains(entry.cell.reference))
+        {
+            if target_cells.len() >= cell_count {
+                return Err(Error::UnsafeEdit(
+                    "cross-workbook scalar transfer target inventory exceeds its checked range"
+                        .into(),
+                ));
+            }
+            push_bounded(
+                &mut target_cells,
+                (entry.cell.reference, entry_index),
+                cell_count,
+                "indexing scalar transfer target cells",
+            )?;
+        }
+        target_cells.sort_unstable_by_key(|(reference, _)| *reference);
+        for duplicate in target_cells.windows(2) {
+            if duplicate[0].0 == duplicate[1].0 {
+                return Err(Error::UnsafeEdit(format!(
+                    "cell ({}, {}) has duplicate BIFF8 target owners",
+                    duplicate[0].0.row(),
+                    duplicate[0].0.column()
+                )));
+            }
+        }
+
+        // Every existing target owner is checked before any target operation
+        // is staged.  Sparse donor coordinates are intentionally not allowed
+        // to overwrite unrelated target owners.
+        for &(target_reference, target_index) in &target_cells {
+            let target_entry = &target_entries[target_index];
+            let source_reference =
+                inverse_target_reference(source_range, target_anchor, target_reference)?;
+            let Some(source_index) = source_cells
+                .binary_search_by_key(&source_reference, |(reference, _, _)| *reference)
+                .ok()
+            else {
+                return Err(Error::UnsafeEdit(
+                    "cross-workbook scalar transfer target range is occupied by an unrelated cell"
+                        .into(),
+                ));
+            };
+            let source_storage = source_cells[source_index].1;
+            if !matches!(target_entry.cell.storage, Storage::Number | Storage::Blank)
+                || target_entry.cell.storage != source_storage
+            {
+                return Err(Error::UnsafeEdit(
+                    "cross-workbook scalar transfer would change a BIFF cell record width or family"
+                        .into(),
+                ));
+            }
+        }
+
+        // Resolve every source-to-target mapping while the source and target
+        // inventories are still immutable.  The detached clone below is the
+        // only object touched during operation staging.
+        let mut planned = Vec::new();
+        planned
+            .try_reserve_exact(source_cells.len())
+            .map_err(|_error| Error::Allocation("staging scalar transfer targets"))?;
+        for (source_reference, storage, value) in source_cells {
+            let target_reference =
+                source_range.target_reference(source_reference, target_anchor)?;
+            let existing = target_cells
+                .binary_search_by_key(&target_reference, |(reference, _)| *reference)
+                .ok()
+                .map(|target_index| &target_entries[target_cells[target_index].1]);
+            match (storage, value, existing) {
+                (Storage::Number, Value::Number(value), None) => {
+                    push_bounded(
+                        &mut planned,
+                        TransferCell::Insert {
+                            reference: target_reference,
+                            value: Value::Number(value),
+                        },
+                        source_cell_count,
+                        "staging scalar transfer targets",
+                    )?;
+                },
+                (Storage::Number, Value::Number(value), Some(entry))
+                    if entry.cell.storage == Storage::Number =>
+                {
+                    push_bounded(
+                        &mut planned,
+                        TransferCell::SetNumber {
+                            reference: target_reference,
+                            value,
+                        },
+                        source_cell_count,
+                        "staging scalar transfer targets",
+                    )?;
+                },
+                (Storage::Blank, Value::Blank, None) => {
+                    push_bounded(
+                        &mut planned,
+                        TransferCell::Insert {
+                            reference: target_reference,
+                            value: Value::Blank,
+                        },
+                        source_cell_count,
+                        "staging scalar transfer targets",
+                    )?;
+                },
+                (Storage::Blank, Value::Blank, Some(entry))
+                    if entry.cell.storage == Storage::Blank => {},
+                _ => {
+                    return Err(Error::UnsafeEdit(
+                        "cross-workbook scalar transfer source value is not representable in the target slot"
+                            .into(),
+                    ));
+                },
+            }
+        }
+
+        let mut staged = self.clone();
+        let target_position = staged.inner_sheet_position(target_sheet)?;
+        let target_style = scalar_default_style(&staged.source)?;
+        for operation in planned {
+            match operation {
+                TransferCell::Insert { reference, value } => {
+                    staged.insert_cell_with_style(
+                        Selector::Position(target_position),
+                        reference,
+                        value,
+                        target_style,
+                    )?;
+                },
+                TransferCell::SetNumber { reference, value } => {
+                    staged.set_number(Selector::Position(target_position), reference, value)?;
+                },
+            }
+        }
+        *self = staged;
+        Ok(Some(self))
+    }
+
+    /// Alias for [`Self::copy_scalar_cells_from`] using the conventional
+    /// worksheet-copy spelling.
+    pub fn copy_cells_from<'source, 'target>(
+        &mut self,
+        donor: &Snapshot,
+        source_selector: impl Into<Selector<'source>>,
+        source_range: CellRange,
+        target_selector: impl Into<Selector<'target>>,
+        target_anchor: Reference,
+    ) -> Result<Option<&mut Self>> {
+        self.copy_scalar_cells_from(
+            donor,
+            source_selector,
+            source_range,
+            target_selector,
+            target_anchor,
+        )
+    }
+
+    /// Copies one exact scalar cell from another snapshot.
+    pub fn copy_scalar_cell_from<'source, 'target>(
+        &mut self,
+        donor: &Snapshot,
+        source_selector: impl Into<Selector<'source>>,
+        source_reference: Reference,
+        target_selector: impl Into<Selector<'target>>,
+        target_reference: Reference,
+    ) -> Result<Option<&mut Self>> {
+        self.copy_scalar_cells_from(
+            donor,
+            source_selector,
+            CellRange::new(source_reference, source_reference)?,
+            target_selector,
+            target_reference,
+        )
+    }
+
+    fn inner_sheet_position(&self, sheet: usize) -> Result<usize> {
+        self.source
+            .inner
+            .sheets
+            .get(sheet)
+            .map(|item| item.workbook_index)
+            .ok_or_else(|| Error::UnsafeEdit("target worksheet inventory is stale".into()))
     }
 
     /// Sets an existing cell through a storage-aware, dependency-checked path.
@@ -2106,6 +2503,339 @@ impl fmt::Debug for Transaction {
             .field("structural_changes", &self.structural_changes.len())
             .field("resource_changes", &self.resource_changes.len())
             .finish()
+    }
+}
+
+#[derive(Debug)]
+enum TransferCell {
+    Insert { reference: Reference, value: Value },
+    SetNumber { reference: Reference, value: f64 },
+}
+
+fn scalar_default_style(snapshot: &Snapshot) -> Result<StyleIndex> {
+    // BIFF8 keeps fifteen style XFs before the first cell XF.  The existing
+    // writer emits the canonical default cell XF at index 15; very small
+    // foreign producers sometimes expose only a single XF, where index zero
+    // is the only safe default.  No other source style can cross a workbook
+    // boundary without a resource remapping closure.
+    let index = if snapshot.inner.xf_records.len() > 15 {
+        15
+    } else {
+        0
+    };
+    StyleIndex::new(snapshot, index)
+}
+
+fn push_bounded<T>(items: &mut Vec<T>, item: T, limit: usize, context: &'static str) -> Result<()> {
+    if items.len() >= limit {
+        return Err(Error::UnsafeEdit(
+            "cross-workbook scalar transfer inventory exceeds its checked bound".into(),
+        ));
+    }
+    items
+        .try_reserve(1)
+        .map_err(|_error| Error::Allocation(context))?;
+    items.push(item);
+    Ok(())
+}
+
+fn translated_range(source: CellRange, anchor: Reference) -> Result<CellRange> {
+    let end = source.target_reference(source.end(), anchor)?;
+    CellRange::new(anchor, end)
+}
+
+fn inverse_target_reference(
+    source: CellRange,
+    anchor: Reference,
+    target: Reference,
+) -> Result<Reference> {
+    if target.row() < anchor.row() || target.column() < anchor.column() {
+        return Err(Error::UnsafeEdit(
+            "target cell precedes the scalar transfer anchor".into(),
+        ));
+    }
+    let source_row = u32::from(source.start().row())
+        .checked_add(u32::from(target.row() - anchor.row()))
+        .ok_or_else(|| Error::InvalidCellReference("source row overflows BIFF8".into()))?;
+    let source_column = u32::from(source.start().column())
+        .checked_add(u32::from(target.column() - anchor.column()))
+        .ok_or_else(|| Error::InvalidCellReference("source column overflows BIFF8".into()))?;
+    let reference = Reference::new(source_row, source_column)?;
+    if !source.contains(reference) {
+        return Err(Error::UnsafeEdit(
+            "target cell lies outside the scalar transfer source range".into(),
+        ));
+    }
+    Ok(reference)
+}
+
+fn ensure_transfer_has_no_staged_target_overlap(
+    transaction: &Transaction,
+    sheet: usize,
+    target_range: CellRange,
+) -> Result<()> {
+    if transaction
+        .changes
+        .iter()
+        .any(|change| change.sheet == sheet && target_range.contains(change.reference))
+        || transaction.structural_changes.iter().any(|change| {
+            operation_sheet_index(change) == sheet
+                && !matches!(change, StructuralChange::RenameSheet { .. })
+        })
+        || transaction.resource_changes.iter().any(|change| {
+            formula_resource_cell(change).is_some_and(|(resource_sheet, reference)| {
+                resource_sheet == sheet && target_range.contains(reference)
+            })
+        })
+    {
+        return Err(Error::UnsafeEdit(
+            "cross-workbook scalar transfer overlaps a staged target operation".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn ensure_scalar_transfer_container(snapshot: &Snapshot, sheet: usize) -> Result<()> {
+    let mut records = Records::new(&snapshot.inner.workbook_stream);
+    let _globals = records.next().ok_or(Error::Eof("Workbook globals BOF"))??;
+    let mut bound_sheet_position = None;
+    let mut bound_sheet_index = 0_usize;
+    for record_result in records.by_ref() {
+        let record = record_result?;
+        match record.kind().get() {
+            BOUND_SHEET => {
+                if bound_sheet_index == snapshot.inner.sheets[sheet].workbook_index {
+                    bound_sheet_position = Some(binary::read_u32_le_at(record.payload(), 0)?);
+                }
+                bound_sheet_index = bound_sheet_index
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidData("BoundSheet index overflow".into()))?;
+            },
+            EOF => break,
+            kind if transfer_unsafe_record(kind)
+                || transfer_protected_record(kind, record.payload()) =>
+            {
+                return Err(Error::UnsafeEdit(format!(
+                    "cross-workbook scalar transfer refuses protected or dependency BIFF record 0x{kind:04X}"
+                )));
+            },
+            kind if !transfer_known_global_record(kind) => {
+                return Err(Error::UnsafeEdit(format!(
+                    "cross-workbook scalar transfer refuses unknown global BIFF record 0x{kind:04X}"
+                )));
+            },
+            _ => {},
+        }
+    }
+    let position = bound_sheet_position.ok_or_else(|| {
+        Error::UnsafeEdit("selected worksheet has no unambiguous BoundSheet owner".into())
+    })?;
+    let start = usize::try_from(position)
+        .map_err(|_error| Error::InvalidData("BoundSheet position does not fit usize".into()))?;
+    let worksheet = snapshot
+        .inner
+        .workbook_stream
+        .get(start..)
+        .ok_or_else(|| Error::UnsafeEdit("BoundSheet owner lies outside Workbook".into()))?;
+    let mut worksheet_records = Records::new(worksheet);
+    let first = worksheet_records
+        .next()
+        .ok_or(Error::Eof("worksheet BOF"))??;
+    require_bof(first.payload(), WORKSHEET)?;
+    let mut found_eof = false;
+    for record_result in worksheet_records {
+        let record = record_result?;
+        let kind = record.kind().get();
+        if transfer_unsafe_record(kind) || transfer_protected_record(kind, record.payload()) {
+            return Err(Error::UnsafeEdit(format!(
+                "cross-workbook scalar transfer refuses protected, dependency, drawing, or unsupported BIFF record 0x{kind:04X}"
+            )));
+        }
+        if kind == EOF {
+            found_eof = true;
+            break;
+        }
+        if !transfer_known_worksheet_record(kind) {
+            return Err(Error::UnsafeEdit(format!(
+                "cross-workbook scalar transfer refuses unknown worksheet BIFF record 0x{kind:04X}"
+            )));
+        }
+    }
+    if !found_eof {
+        return Err(Error::Eof("worksheet EOF"));
+    }
+    Ok(())
+}
+
+fn transfer_known_global_record(kind: u16) -> bool {
+    matches!(
+        kind,
+        BOF | EOF
+            | CODE_PAGE
+            | BOUND_SHEET
+            | 0x00C1 // MMS
+            | 0x00E1 // INTERFACEHDR
+            | 0x00E2 // INTERFACEEND
+            | 0x005C // WRITEACCESS
+            | 0x005B // FILESHARING (password verifier checked separately)
+            | 0x0161 // DSF
+            | 0x01C0 // EXCEL9FILE
+            | 0x013D // TABID
+            | 0x009C // FNGROUPCOUNT
+            | 0x009A // FNGROUPNAME
+            | 0x0898 // FNGROUPNAME (ContinueFRT12 form)
+            | 0x0019 // WINDOWPROTECT (must be disabled)
+            | 0x0012 // PROTECT (must be disabled)
+            | 0x0013 // PASSWORD (must be zero)
+            | 0x01AF // PROT4REV (must be disabled)
+            | 0x01BC // PROT4REVPASS (must be zero)
+            | 0x003D // WINDOW1
+            | 0x0040 // BACKUP
+            | 0x008D // HIDEOBJ
+            | 0x0022 // DATE1904
+            | 0x000E // PRECISION
+            | 0x00DA // BOOKBOOL
+            | 0x0031 // FONT
+            | 0x041E // FORMAT
+            | XF
+            | 0x0293 // STYLE
+            | 0x087C // XFCRC
+            | 0x0160 // USESELFS
+            | 0x008C // COUNTRY
+            | 0x01C1 // RECALCID
+    )
+}
+
+fn transfer_known_worksheet_record(kind: u16) -> bool {
+    matches!(
+        kind,
+        BOF | EOF
+            | 0x0000 // Unused padding occasionally emitted by legacy writers.
+            | 0x000C // CalcCount
+            | 0x000D // CalcMode
+            | 0x000E // Precision
+            | 0x000F // RefMode
+            | 0x0010 // Iteration
+            | 0x0011 // IterationEnabled
+            | 0x0014 // Header
+            | 0x0015 // Footer
+            | 0x001D // Selection
+            | 0x0026 // LeftMargin
+            | 0x0027 // RightMargin
+            | 0x0028 // TopMargin
+            | 0x0029 // BottomMargin
+            | 0x002A // PrintHeaders
+            | 0x002B // PrintGridlines
+            | 0x0041 // Pane
+            | 0x005E // Uncalced
+            | 0x005F // RecalcBeforeSave
+            | 0x0055 // DefColWidth
+            | 0x007D // ColInfo
+            | 0x0080 // Guts
+            | 0x0081 // WSBool
+            | 0x0082 // Gridset
+            | 0x0083 // HCenter
+            | 0x0084 // VCenter
+            | 0x0099 // RowDefaults
+            | 0x00A1 // Uncalced
+            | 0x00A0 // PrintTitles
+            | 0x00BD // MulRk (also listed explicitly for audit clarity)
+            | 0x00D7 // DBCELL
+            | 0x00E0 // XF in malformed worksheet-local streams; validation still checks owner.
+            | 0x013D // Window2
+            | 0x0140 // SCL
+            | 0x0161 // DSF
+            | 0x0012 // PROTECT (must be disabled)
+            | 0x0063 // OBJECTPROTECT (must be disabled)
+            | 0x00DD // SCENPROTECT (must be disabled)
+            | 0x01AF // PROT4REV (must be disabled)
+            | 0x0200 // Dimensions
+            | 0x0201 // Blank
+            | 0x0203 // Number
+            | 0x0205 // BoolErr
+            | 0x0208 // Row
+            | 0x020B // Index
+            | 0x0225 // DefaultRowHeight
+            | 0x0236 // Array/legacy formula metadata
+            | 0x023E // Window2 extension
+            | 0x027E // RK
+            | 0x041E // Format
+            | 0x087C // XFCRC
+            | 0x089C // HeaderFooter
+            | 0x00FC // SST is rejected by transfer_unsafe_record before this list.
+            | 0x00FD // LabelSst is rejected by transfer_unsafe_record before this list.
+            | 0x0006 // Formula is rejected by transfer_unsafe_record before this list.
+            | 0x0207 // String is rejected by transfer_unsafe_record before this list.
+            | 0x003C // Continue is rejected by transfer_unsafe_record before this list.
+    )
+}
+
+fn transfer_unsafe_record(kind: u16) -> bool {
+    matches!(
+        kind,
+        FILE_PASS
+            | SST
+            | LABEL_SST
+            | FORMULA
+            | STRING
+            | CONTINUE
+            | 0x0018 // NAME
+            | 0x0017 // ExternSheet
+            | 0x001C // Note
+            | 0x0023 // ExternName
+            | 0x01AE // SUPBOOK
+            | 0x009D // AutoFilterInfo
+            | 0x009E // AutoFilter
+            | 0x009F // AutoFilter compatibility owner
+            | 0x0059 // XCT
+            | 0x005A // CRN
+            | 0x005D // Obj
+            | 0x00E5 // MergedCells
+            | 0x007F // IMDATA
+            | 0x0086 // WriteProtect
+            | 0x00D1 // DCon
+            | 0x00EB // MsoDrawingGroup
+            | 0x00EC // MsoDrawing
+            | 0x00ED // MsoDrawingSelection
+            | 0x00E9 // UserSViewBegin
+            | 0x00EA // UserSViewEnd
+            | 0x00AF // AutoFilterInfo/legacy owner
+            | 0x00B0 // AutoFilter
+            | 0x01B6 // TXO
+            | 0x01B8 // LinkTable
+            | 0x01B9 // DdeLink
+            | 0x01B7 // REFRESHALL may trigger external/dependency refresh.
+            | 0x00AE // SCENMAN
+            | 0x01AA // CUSTOMVIEW begin
+            | 0x01AB // CUSTOMVIEW end
+            | 0x01B2 // DVAL
+            | 0x01BE // ScenarioProtect extension
+            | 0x01C2 // CodeName is a macro/dependency owner.
+            | 0x01C4 // RealTimeData
+            | 0x0813 // RealTimeData (BIFF8 record family)
+            | 0x0218 // Hyperlink
+            | 0x0221 // Array formula extension
+            | 0x0236 // Shared/array formula extension
+            | 0x04BC // Table formula extension
+            | 0x0091 // Shared formula extension
+            | 0x0866 // HeaderFooter picture
+    )
+}
+
+fn transfer_protected_record(kind: u16, payload: &[u8]) -> bool {
+    match kind {
+        // WINDOWPROTECT, PROTECT, OBJECTPROTECT, SCENPROTECT, and
+        // PROTECTIONREV4 carry a checked BIFF Boolean.  The writer emits
+        // these records even when the protection bit is false.
+        0x0019 | 0x0012 | 0x0063 | 0x00DD | 0x01AF => payload != [0_u8, 0].as_slice(),
+        // PASSWORD and PASSWORDREV4 are inert when their verifier is zero.
+        0x0013 | 0x01BC => payload != [0_u8, 0].as_slice(),
+        // FILESHARING's write-password verifier is bytes 2..4.  A
+        // read-only recommendation alone does not lock the workbook.
+        0x005B => payload
+            .get(2..4)
+            .is_none_or(|password| password != [0_u8, 0].as_slice()),
+        _ => false,
     }
 }
 
