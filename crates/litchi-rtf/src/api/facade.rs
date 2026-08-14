@@ -271,6 +271,23 @@ impl Document {
         self.inner.model.info()
     }
 
+    /// Borrow inert top-level `nextfile` and `template` metadata without
+    /// resolving either name.
+    #[must_use]
+    pub fn external_references(&self) -> &crate::DocumentExternalReferences<'_> {
+        self.inner.model.external_references()
+    }
+
+    /// Capture the bounded source inventory used by the narrow external-
+    /// reference redaction API.  The inventory is non-mutating and refuses no
+    /// content merely because it is unsupported; strict planning reports those
+    /// surfaces explicitly.
+    pub fn external_reference_redaction_snapshot(
+        &self,
+    ) -> Result<crate::redact::Snapshot, crate::edit::Error> {
+        crate::redact::Snapshot::from_document(self)
+    }
+
     /// Borrow annotations in source order.
     #[must_use]
     pub fn annotations(&self) -> &[crate::review::Annotation<'_>] {
@@ -398,6 +415,23 @@ impl Document {
         patch: &litchi_core::patch::Patch<Mode>,
     ) -> Result<Self, crate::edit::Error> {
         crate::edit::apply_durable(self, patch)
+    }
+
+    /// Apply a sealed forward-only passive external-reference redaction patch.
+    ///
+    /// This is separate from ordinary reversible edit replay.  The operation
+    /// is source/artifact checked, candidate-parsed, and visible-text checked;
+    /// no inverse or repair certification is provided.  The returned value is
+    /// an ordinary [`Document`]; replay does not carry the [`crate::redact::Diagnostics`]
+    /// captured when the patch was planned.  In particular, a best-effort
+    /// patch can only replay its source-bound removals: callers must capture a
+    /// fresh [`Self::external_reference_redaction_snapshot`] and inspect its
+    /// unsupported surfaces before treating the replay as complete.
+    pub fn apply_external_reference_redaction(
+        &self,
+        patch: &litchi_core::patch::Patch<litchi_core::patch::ForwardOnly>,
+    ) -> Result<Self, crate::edit::Error> {
+        crate::redact::apply_forward(self, patch)
     }
 }
 

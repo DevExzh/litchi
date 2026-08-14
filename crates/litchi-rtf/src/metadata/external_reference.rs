@@ -2,6 +2,7 @@
 
 use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
+use std::ops::Range;
 
 /// Maximum decoded UTF-8 byte length of one external document name.
 pub const MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES: usize = 65_536;
@@ -18,6 +19,18 @@ pub struct DocumentExternalReferences<'a> {
     pub next_file: Option<Cow<'a, str>>,
     /// Name of the document's related template (`template`).
     pub template: Option<Cow<'a, str>>,
+}
+
+/// Exact source ownership for the two passive document-reference groups.
+///
+/// The parser fills this only while token spans still address the original
+/// uncompressed ASCII transport.  It is deliberately crate-private: callers
+/// receive the checked ranges through the redaction inventory rather than
+/// being able to use offsets without the source snapshot that owns them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct DocumentExternalReferenceSpans {
+    pub(crate) next_file: Option<Range<usize>>,
+    pub(crate) template: Option<Range<usize>>,
 }
 
 impl DocumentExternalReferences<'_> {

@@ -16,6 +16,8 @@ pub(crate) mod write_reservation;
 pub(crate) mod xml_namespace;
 pub(crate) mod xsl_transform;
 
+pub(crate) use external_reference::DocumentExternalReferenceSpans;
+
 pub use info::{
     DocumentInfo as Info, DocumentProtection as Protection, ProtectionLevel, ProtectionType,
     RtfTimestamp as Timestamp,

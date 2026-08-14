@@ -670,7 +670,36 @@ impl Parser<'_> {
                                         .to_string(),
                                 ));
                             }
+                            // `self.pos` points at the starred marker.  The
+                            // immediately preceding token is therefore the
+                            // opening brace, and the destination parser
+                            // leaves `self.pos` immediately after its exact
+                            // closing brace.  Retain this whole-group span
+                            // only as parser provenance; the model later
+                            // drops it for transformed/compressed transport.
+                            let group_start = self
+                                .token_spans
+                                .and_then(|spans| spans.get(self.pos.saturating_sub(1)))
+                                .map(|span| span.start);
                             let value = self.parse_external_reference_destination(*control)?;
+                            let group_end = self
+                                .token_spans
+                                .and_then(|spans| spans.get(self.pos.saturating_sub(1)))
+                                .map(|span| span.end);
+                            if let (Some(start), Some(end)) = (group_start, group_end)
+                                && start < end
+                            {
+                                let span = start..end;
+                                match control {
+                                    ControlWord::NextFile => {
+                                        self.external_reference_spans.next_file = Some(span);
+                                    },
+                                    ControlWord::DocumentTemplate => {
+                                        self.external_reference_spans.template = Some(span);
+                                    },
+                                    _ => return Err(parser_classification_error()),
+                                }
+                            }
                             match control {
                                 ControlWord::NextFile => {
                                     self.external_references.next_file = Some(value);

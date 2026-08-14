@@ -181,6 +181,9 @@ pub struct RtfDocument<'a> {
     hyphenation: crate::DocumentHyphenation,
     /// Inert names from `nextfile` and `template` document destinations.
     external_references: crate::DocumentExternalReferences<'a>,
+    /// Exact source groups for passive document references when transport
+    /// provenance is byte-for-byte addressable.
+    external_reference_spans: crate::metadata::DocumentExternalReferenceSpans,
     /// Passive document view and zoom metadata.
     document_view: crate::DocumentView,
     /// Passive review-display suppression preferences.
@@ -609,6 +612,11 @@ impl<'a> RtfDocument<'a> {
                 .map(crate::ProtectionUserTable::into_owned),
             hyphenation: parsed.hyphenation,
             external_references: parsed.external_references.into_owned(),
+            external_reference_spans: if retain_ordinary_body_source_span {
+                parsed.external_reference_spans
+            } else {
+                crate::metadata::DocumentExternalReferenceSpans::default()
+            },
             document_view: parsed.document_view,
             review_display: parsed.review_display,
             window_caption: parsed
@@ -1038,6 +1046,12 @@ impl<'a> RtfDocument<'a> {
 
     pub(crate) fn preserved_source(&self) -> Option<&[u8]> {
         self.preserved_source.as_deref()
+    }
+
+    pub(crate) fn external_reference_source_spans(
+        &self,
+    ) -> &crate::metadata::DocumentExternalReferenceSpans {
+        &self.external_reference_spans
     }
 
     pub(crate) const fn parse_limits(&self) -> ParseLimits {
