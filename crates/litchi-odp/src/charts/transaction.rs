@@ -150,19 +150,26 @@ impl<'source> Transaction<'source> {
     /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn commit(self) -> Result<Commit<'source>> {
         let changed = self.original != self.draft;
-        let bytes = if changed {
-            Cow::Owned(package::apply(self.source, &self.original, &self.draft)?)
+        let package = if changed {
+            Some(OwnedPackage::from_bytes(package::apply(
+                self.source,
+                &self.original,
+                &self.draft,
+            )?)?)
         } else {
-            Cow::Borrowed(self.source.as_bytes())
+            None
         };
-        if changed {
-            super::snapshot::validate_compact_package(bytes.as_ref())?;
+        if let Some(package) = package.as_ref() {
+            super::snapshot::validate_compact_package(package)?;
             let reopened =
-                super::snapshot::Snapshot::from_bytes_with(bytes.as_ref().to_vec(), self.limits)?;
+                super::snapshot::Snapshot::from_owned_package(package.clone(), self.limits)?;
             if !super::snapshot::charts_semantically_equal(reopened.charts(), &self.draft) {
                 return invalid("ODP chart transaction failed typed readback");
             }
         }
+        let bytes = package
+            .map(|package| Cow::Owned(package.into_inner()))
+            .unwrap_or_else(|| Cow::Borrowed(self.source.as_bytes()));
         Ok(Commit {
             bytes,
             charts: self.draft,

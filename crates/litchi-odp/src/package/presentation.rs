@@ -6,7 +6,6 @@ use crate::model::{Reference, Settings, Slide, declaration, page_layout, page_me
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::{constants::ODF_PRESENTATION, core::PreparedPackage};
 use std::path::Path;
-use std::sync::Arc;
 
 const BODY_MARKER: &str = "<office:presentation";
 
@@ -120,12 +119,6 @@ impl Presentation {
         Self::from_prepared_package(prepared)
     }
 
-    /// Create a presentation while sharing an existing archive allocation.
-    pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
-        Package::from_shared_bytes(bytes, ODF_PRESENTATION, BODY_MARKER, "ODP")
-            .map(|package| Self { package })
-    }
-
     /// Adopt an already validated archive without copying its package bytes.
     pub(crate) fn from_owned_package(package: OwnedPackage) -> Result<Self> {
         Package::from_owned_package(package, ODF_PRESENTATION, BODY_MARKER, "ODP")
@@ -213,7 +206,7 @@ impl Presentation {
         &self,
         limits: crate::charts::Limits,
     ) -> Result<crate::charts::Snapshot> {
-        crate::charts::Snapshot::from_shared_bytes(self.package.shared_bytes(), limits)
+        crate::charts::Snapshot::from_owned_package(self.package.package().clone(), limits)
     }
 
     /// Borrow the optional validated `styles.xml` snapshot without reparsing it.
@@ -619,7 +612,7 @@ impl Presentation {
     ///
     /// Returns an error if the retained package exceeds editing limits or cannot be reparsed.
     pub fn snapshot(&self) -> Result<crate::edit::Snapshot> {
-        crate::edit::Snapshot::from_shared_bytes(self.package.shared_bytes())
+        crate::edit::Snapshot::from_owned_package(self.package.package().clone())
     }
 
     /// Save the presentation to a new file.
