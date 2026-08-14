@@ -2,17 +2,18 @@ use super::{
     Alignment, CharacterType, ColorRef, ControlWord, Cow, DeferredText, Destination, FontRef,
     Formatting, LatentStyleExceptionBuilder, MAX_LIST_LEVELS, MAX_LIST_TABS, MAX_LIST_TEXT_BYTES,
     MAX_LISTS, MAX_PARAGRAPH_DROP_CAP_LINES, MAX_REVISION_AUTHOR_BYTES, MAX_REVISION_AUTHORS,
-    MAX_STYLE_NAME_BYTES, MAX_STYLES, NonZeroU16, Paragraph, ParagraphBorderSide, ParagraphDropCap,
-    ParagraphDropCapKind, ParagraphFontAlignment, ParagraphWrapping, Parser, RtfError, RtfResult,
-    SmallVec, State, TextDirection, Token, UnderlineStyle, animated_text, append_transport_bytes,
-    apply_associated_character_control, associated_font_ref, character_grid,
-    character_style_reference, character_type_selector, complex_script_selector,
-    control_symbol_text, emphasis_mark, fit_text, nonnegative_author_index,
-    paragraph_style_reference, parser_classification_error, require_parameterless,
-    required_list_spacing, required_paragraph_bool, required_paragraph_indent,
-    required_table_value, section_style_reference, strict_paragraph_selector,
-    strict_paragraph_toggle, table_style_reference,
+    MAX_STYLE_NAME_BYTES, MAX_STYLES, MAX_TEXT_INTERMEDIATE_BYTES, NonZeroU16, Paragraph,
+    ParagraphBorderSide, ParagraphDropCap, ParagraphDropCapKind, ParagraphFontAlignment,
+    ParagraphWrapping, Parser, RtfError, RtfResult, SmallVec, State, TextDirection, Token,
+    UnderlineStyle, animated_text, append_transport_bytes, apply_associated_character_control,
+    associated_font_ref, character_grid, character_style_reference, character_type_selector,
+    complex_script_selector, control_symbol_text, emphasis_mark, fit_text,
+    nonnegative_author_index, paragraph_style_reference, parser_classification_error,
+    require_parameterless, required_list_spacing, required_paragraph_bool,
+    required_paragraph_indent, required_table_value, section_style_reference,
+    strict_paragraph_selector, strict_paragraph_toggle, table_style_reference,
 };
+use std::mem::size_of;
 
 impl<'a> Parser<'a> {
     #[allow(
@@ -848,6 +849,13 @@ impl<'a> Parser<'a> {
         value: &mut String,
         text: &str,
     ) -> RtfResult<()> {
+        if text.len() > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(RtfError::LimitExceeded {
+                resource: "RTF external document reference transport",
+                observed: text.len(),
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
         let mut bytes = Vec::new();
         bytes
             .try_reserve_exact(text.len())
@@ -856,7 +864,10 @@ impl<'a> Parser<'a> {
                 requested: text.len(),
             })?;
         append_transport_bytes(&mut bytes, text)?;
-        let decoded = self.current_state()?.encoding.decode(&bytes);
+        let decoded = self.decode_transport_bytes_bounded(
+            &bytes,
+            "RTF external document reference decoded transport",
+        )?;
         Self::append_external_reference_text(value, decoded.as_ref())
     }
 
@@ -894,6 +905,57 @@ impl<'a> Parser<'a> {
             value.push(character);
         }
         Ok(())
+    }
+
+    pub(super) fn push_bounded_unicode_code(
+        utf16: &mut SmallVec<[u16; 4]>,
+        code: i32,
+    ) -> RtfResult<()> {
+        let observed = utf16.len().saturating_add(1).saturating_mul(4);
+        if observed > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(RtfError::LimitExceeded {
+                resource: "RTF Unicode fallback",
+                observed,
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
+        utf16
+            .try_reserve(1)
+            .map_err(|_error| RtfError::AllocationFailed {
+                resource: "RTF Unicode fallback",
+                requested: observed.saturating_mul(size_of::<u16>()),
+            })?;
+        utf16.push(code as u16);
+        Ok(())
+    }
+
+    /// Decode a bounded UTF-16 sequence with fallible capacity reservation.
+    /// `String::from_utf16` allocates before its caller can enforce a limit;
+    /// the explicit decoder keeps both the logical output and its reserved
+    /// capacity within the same 64 KiB intermediate budget.
+    pub(super) fn decode_bounded_utf16(utf16: &[u16], resource: &'static str) -> RtfResult<String> {
+        let worst_case = utf16.len().saturating_mul(4);
+        if worst_case > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(RtfError::LimitExceeded {
+                resource,
+                observed: worst_case,
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
+        let mut decoded = String::new();
+        decoded
+            .try_reserve_exact(worst_case)
+            .map_err(|_error| RtfError::AllocationFailed {
+                resource,
+                requested: worst_case,
+            })?;
+        for result in std::char::decode_utf16(utf16.iter().copied()) {
+            let character = result.map_err(|error| {
+                RtfError::InvalidUnicode(format!("invalid {resource}: {error}"))
+            })?;
+            decoded.push(character);
+        }
+        Ok(decoded)
     }
 
     pub(super) fn parse_protection_user_table(&mut self) -> RtfResult<()> {
@@ -2769,10 +2831,10 @@ impl<'a> Parser<'a> {
         unicode_skip: i32,
     ) -> RtfResult<(String, String)> {
         let mut utf16 = SmallVec::<[u16; 4]>::new();
-        utf16.push(first_code as u16);
+        Self::push_bounded_unicode_code(&mut utf16, first_code)?;
         self.pos += 1;
         while let Some(Token::Control(ControlWord::Unicode(code))) = self.tokens.get(self.pos) {
-            utf16.push(*code as u16);
+            Self::push_bounded_unicode_code(&mut utf16, *code)?;
             self.pos += 1;
         }
 
@@ -2796,6 +2858,19 @@ impl<'a> Parser<'a> {
                                     "RTF Unicode fallback size overflow".to_string(),
                                 )
                             })?;
+                        let observed =
+                            remainder.len().checked_add(additional).ok_or_else(|| {
+                                RtfError::MalformedDocument(
+                                    "RTF Unicode fallback size overflow".to_string(),
+                                )
+                            })?;
+                        if observed > MAX_TEXT_INTERMEDIATE_BYTES {
+                            return Err(RtfError::LimitExceeded {
+                                resource: "RTF Unicode fallback text",
+                                observed,
+                                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+                            });
+                        }
                         remainder.try_reserve_exact(additional).map_err(|_error| {
                             RtfError::AllocationFailed {
                                 resource: "RTF Unicode fallback text",
@@ -2823,8 +2898,7 @@ impl<'a> Parser<'a> {
                 },
             }
         }
-        let decoded = String::from_utf16(&utf16)
-            .map_err(|error| RtfError::InvalidUnicode(format!("invalid style name: {error}")))?;
+        let decoded = Self::decode_bounded_utf16(&utf16, "RTF style name Unicode")?;
         Ok((decoded, remainder))
     }
 
@@ -2835,7 +2909,24 @@ impl<'a> Parser<'a> {
     ) -> RtfResult<String> {
         let (mut decoded, remainder) =
             self.parse_unicode_with_remainder(first_code, unicode_skip)?;
-        decoded.push_str(&self.decode_transport_text(&remainder)?);
+        let fallback = self.decode_transport_text(&remainder)?;
+        let observed = decoded.len().checked_add(fallback.len()).ok_or_else(|| {
+            RtfError::MalformedDocument("RTF Unicode fallback size overflow".to_string())
+        })?;
+        if observed > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(RtfError::LimitExceeded {
+                resource: "RTF Unicode fallback text",
+                observed,
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
+        decoded
+            .try_reserve_exact(fallback.len())
+            .map_err(|_error| RtfError::AllocationFailed {
+                resource: "RTF Unicode fallback text",
+                requested: observed,
+            })?;
+        decoded.push_str(&fallback);
         Ok(decoded)
     }
 

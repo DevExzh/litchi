@@ -161,6 +161,10 @@ impl<'a> Parser<'a> {
             ));
         }
         // A Unicode-aware reader must ignore the first (ANSI) representation.
+        // It is not retained by the model, so conservatively mark the whole
+        // owner as unknown: active syntax inside the skipped branch cannot be
+        // proven absent without replaying that branch.
+        self.mark_unknown_syntax()?;
         self.skip_group()?;
         if !matches!(
             self.tokens.get(self.pos..self.pos + 3),

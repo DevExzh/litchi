@@ -4,8 +4,9 @@
     reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
 )]
 use super::{
-    ControlWord, Cow, MAX_STORY_GROUP_DEPTH, ParsedBodyStoryEvent, Parser, RtfError, RtfResult,
-    SmallVec, State, Token, control_symbol_text, is_section_control, require_parameterless,
+    ControlWord, Cow, MAX_STORY_GROUP_DEPTH, MAX_TEXT_INTERMEDIATE_BYTES, ParsedBodyStoryEvent,
+    Parser, RtfError, RtfResult, SmallVec, State, Token, control_symbol_text, is_section_control,
+    require_parameterless,
 };
 
 impl<'a> Parser<'a> {
@@ -368,10 +369,10 @@ impl<'a> Parser<'a> {
     ) -> RtfResult<String> {
         let skip_count = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut utf16 = SmallVec::<[u16; 4]>::new();
-        utf16.push(first_code as u16);
+        Self::push_bounded_unicode_code(&mut utf16, first_code)?;
         self.pos += 1;
         while let Some(Token::Control(ControlWord::Unicode(code))) = self.tokens.get(self.pos) {
-            utf16.push(*code as u16);
+            Self::push_bounded_unicode_code(&mut utf16, *code)?;
             self.pos += 1;
         }
 
@@ -384,22 +385,75 @@ impl<'a> Parser<'a> {
                     if count <= fallback_skip {
                         fallback_skip -= count;
                     } else {
-                        remainder.extend(text.chars().skip(fallback_skip));
+                        let tail = text.chars().skip(fallback_skip);
+                        let additional = tail
+                            .clone()
+                            .map(char::len_utf8)
+                            .try_fold(0usize, |total, length| total.checked_add(length))
+                            .ok_or_else(|| {
+                                RtfError::MalformedDocument(
+                                    "RTF Unicode fallback size overflow".to_string(),
+                                )
+                            })?;
+                        let observed =
+                            remainder.len().checked_add(additional).ok_or_else(|| {
+                                RtfError::MalformedDocument(
+                                    "RTF Unicode fallback size overflow".to_string(),
+                                )
+                            })?;
+                        if observed > MAX_TEXT_INTERMEDIATE_BYTES {
+                            return Err(RtfError::LimitExceeded {
+                                resource: "RTF Unicode fallback text",
+                                observed,
+                                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+                            });
+                        }
+                        remainder.try_reserve_exact(additional).map_err(|_error| {
+                            RtfError::AllocationFailed {
+                                resource: "RTF Unicode fallback text",
+                                requested: observed,
+                            }
+                        })?;
+                        remainder.extend(tail);
                         fallback_skip = 0;
                     }
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::Unicode(_))) | None => break,
-                Some(_) => {
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     fallback_skip = fallback_skip.saturating_sub(1);
                     self.pos += 1;
                 },
+                Some(
+                    Token::OpenBrace | Token::CloseBrace | Token::Binary(_) | Token::Control(_),
+                ) => {
+                    // Only plain text and the finite control-symbol
+                    // vocabulary can be a Unicode fallback character.  Leave
+                    // active controls for the owning story parser instead of
+                    // consuming them as fallback bytes.
+                    break;
+                },
             }
         }
-        let mut decoded = String::from_utf16(&utf16).map_err(|error| {
-            RtfError::InvalidUnicode(format!("invalid destination Unicode: {error}"))
+        let mut decoded = Self::decode_bounded_utf16(&utf16, "RTF destination Unicode")?;
+        let fallback = self.decode_transport_text(&remainder)?;
+        let observed = decoded.len().checked_add(fallback.len()).ok_or_else(|| {
+            RtfError::MalformedDocument("RTF Unicode fallback size overflow".to_string())
         })?;
-        decoded.push_str(&self.decode_transport_text(&remainder)?);
+        if observed > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(RtfError::LimitExceeded {
+                resource: "RTF Unicode fallback text",
+                observed,
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
+        decoded
+            .try_reserve_exact(fallback.len())
+            .map_err(|_error| RtfError::AllocationFailed {
+                resource: "RTF Unicode fallback text",
+                requested: observed,
+            })?;
+        decoded.push_str(&fallback);
         Ok(decoded)
     }
 

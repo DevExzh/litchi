@@ -151,6 +151,11 @@ impl Parser<'_> {
                             ));
                         },
                         Some(_) => {
+                            // The annotation model does not retain arbitrary
+                            // nested destinations.  Mark the skipped group so
+                            // sanitization cannot claim complete coverage for
+                            // hidden fields, links, objects, or metadata.
+                            self.mark_unknown_syntax()?;
                             self.skip_group()?;
                         },
                         _ => {
@@ -164,8 +169,42 @@ impl Parser<'_> {
                 Some(Token::Text(value)) => {
                     let skipped = fallback_skip.min(value.chars().count());
                     fallback_skip -= skipped;
-                    let remainder: String = value.chars().skip(skipped).collect();
-                    text.push_str(&self.decode_transport_text(&remainder)?);
+                    let tail = value.chars().skip(skipped);
+                    let remainder_bytes = tail
+                        .clone()
+                        .map(char::len_utf8)
+                        .try_fold(0usize, |total, length| total.checked_add(length))
+                        .ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF annotation text size overflow".to_string(),
+                            )
+                        })?;
+                    let mut remainder = String::new();
+                    remainder
+                        .try_reserve_exact(remainder_bytes)
+                        .map_err(|_error| RtfError::AllocationFailed {
+                            resource: "RTF annotation text",
+                            requested: remainder_bytes,
+                        })?;
+                    remainder.extend(tail);
+                    let decoded = self.decode_transport_text(&remainder)?;
+                    let observed = text.len().checked_add(decoded.len()).ok_or_else(|| {
+                        RtfError::MalformedDocument("RTF annotation text size overflow".to_string())
+                    })?;
+                    if observed > MAX_ANNOTATION_TEXT_BYTES {
+                        return Err(RtfError::LimitExceeded {
+                            resource: "RTF annotation text",
+                            observed,
+                            limit: MAX_ANNOTATION_TEXT_BYTES,
+                        });
+                    }
+                    text.try_reserve_exact(decoded.len()).map_err(|_error| {
+                        RtfError::AllocationFailed {
+                            resource: "RTF annotation text",
+                            requested: observed,
+                        }
+                    })?;
+                    text.push_str(&decoded);
                 },
                 Some(Token::Control(ControlWord::Unicode(_))) => {
                     let code = match self.tokens.get(self.pos) {
@@ -194,6 +233,9 @@ impl Parser<'_> {
                     return Err(RtfError::MalformedDocument(
                         "RTF annotation body cannot contain active data".to_string(),
                     ));
+                },
+                Some(Token::Control(_)) => {
+                    self.mark_unknown_syntax()?;
                 },
                 Some(Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(

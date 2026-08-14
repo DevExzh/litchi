@@ -574,6 +574,11 @@ impl<'a> Parser<'a> {
                         )
                     }) =>
                 {
+                    // Shape-text stories retain visible text but skip nested
+                    // destinations.  Keep a bounded uncertainty marker so
+                    // hidden fields, objects, pictures, and starred metadata
+                    // cannot be mistaken for a complete passive story.
+                    self.mark_unknown_syntax()?;
                     self.skip_group()?;
                 },
                 Some(Token::OpenBrace) => {
@@ -655,7 +660,12 @@ impl<'a> Parser<'a> {
                         "RTF shptxt contains direct binary data".to_string(),
                     ));
                 },
-                Some(Token::Control(_)) => self.pos += 1,
+                Some(Token::Control(_)) => {
+                    // Controls outside the finite shape-text grammar may
+                    // introduce active syntax that is not retained here.
+                    self.mark_unknown_syntax()?;
+                    self.pos += 1;
+                },
                 None => return Err(RtfError::UnexpectedEof),
             }
             if text.len() > MAX_SHAPE_TEXT_BYTES {
