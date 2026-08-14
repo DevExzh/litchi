@@ -1147,6 +1147,7 @@ fn read_bounded_stream(
 }
 
 fn reject_macro_components(shared: &SharedOleFile) -> Result<()> {
+    let mut dual_storages = 0usize;
     for entry in shared.directory_entries() {
         if is_macro_storage_name(&entry.name) {
             return Err(Error::Refused(Refusal::UnsupportedSource));
@@ -1155,10 +1156,15 @@ fn reject_macro_components(shared: &SharedOleFile) -> Result<()> {
         // closure. The root and the one legacy dual-layout storage are the
         // only accepted storage topology; every other storage is an explicit
         // conservative refusal, including `ObjectPool` and nested OLE data.
-        if entry.entry_type == litchi_cfb::consts::STGTY_STORAGE
-            && !entry.name.eq_ignore_ascii_case("PP97_DUALSTORAGE")
-        {
-            return Err(Error::Refused(Refusal::UnsupportedDependency));
+        if entry.entry_type == litchi_cfb::consts::STGTY_STORAGE {
+            if entry.name.eq_ignore_ascii_case("PP97_DUALSTORAGE") {
+                dual_storages = dual_storages.saturating_add(1);
+                if dual_storages > 1 {
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
+                }
+            } else {
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
+            }
         }
     }
     Ok(())
@@ -1184,16 +1190,39 @@ fn reject_macro_records(
         )
         .into());
     }
-    inspect_live_macro_records(&record, false, false)
+    inspect_live_macro_records(&record, false, false, &mut LiveMacroOwners::default())
+}
+
+#[derive(Default)]
+struct LiveMacroOwners {
+    doc_info_lists: usize,
+    vba_infos: usize,
 }
 
 fn inspect_live_macro_records(
     record: &crate::Record,
     in_doc_info_list: bool,
     in_vba_info: bool,
+    owners: &mut LiveMacroOwners,
 ) -> Result<()> {
+    if record.record_type_raw == RecordType::DocInfoList as u16 {
+        owners.doc_info_lists = owners.doc_info_lists.saturating_add(1);
+        if owners.doc_info_lists > 1 {
+            return Err(PackageError::Corrupted(
+                "live PPT DocumentContainer has multiple DocInfoList owners".into(),
+            )
+            .into());
+        }
+    }
     match record.record_type_raw {
         value if value == RecordType::VBAInfo as u16 && in_doc_info_list => {
+            owners.vba_infos = owners.vba_infos.saturating_add(1);
+            if owners.vba_infos > 1 {
+                return Err(PackageError::Corrupted(
+                    "live PPT DocInfoList has multiple VBAInfo owners".into(),
+                )
+                .into());
+            }
             let [atom] = record.children.as_slice() else {
                 return Err(PackageError::Corrupted(
                     "live PPT VBAInfo container has invalid child ownership".into(),
@@ -1249,7 +1278,7 @@ fn inspect_live_macro_records(
     let child_doc_info = record.record_type_raw == RecordType::DocInfoList as u16;
     let child_vba_info = record.record_type_raw == RecordType::VBAInfo as u16;
     for child in &record.children {
-        inspect_live_macro_records(child, child_doc_info, child_vba_info)?;
+        inspect_live_macro_records(child, child_doc_info, child_vba_info, owners)?;
     }
     Ok(())
 }
@@ -3630,6 +3659,41 @@ mod tests {
             Err(Error::Refused(Refusal::UnsupportedSource))
         ));
 
+        let mut empty_atom_data = [0_u8; 12];
+        empty_atom_data[8..12].copy_from_slice(&2_u32.to_le_bytes());
+        let empty_atom = raw_record(
+            2,
+            0,
+            crate::RecordType::VBAInfoAtom as u16,
+            &empty_atom_data,
+        );
+        let empty_info = raw_record(0x0F, 1, crate::RecordType::VBAInfo as u16, &empty_atom);
+        let duplicate_info = raw_record(
+            0x0F,
+            0,
+            crate::RecordType::DocInfoList as u16,
+            &[empty_info.clone(), empty_info.clone()].concat(),
+        );
+        let document = raw_record(0x0F, 0, crate::RecordType::Document as u16, &duplicate_info);
+        assert!(matches!(
+            super::reject_macro_records(&document, 0, crate::RecordLimits::default()),
+            Err(Error::Package(crate::package::Error::Corrupted(message)))
+                if message.contains("multiple VBAInfo")
+        ));
+
+        let doc_info = raw_record(0x0F, 0, crate::RecordType::DocInfoList as u16, &empty_info);
+        let document = raw_record(
+            0x0F,
+            0,
+            crate::RecordType::Document as u16,
+            &[doc_info.clone(), doc_info].concat(),
+        );
+        assert!(matches!(
+            super::reject_macro_records(&document, 0, crate::RecordLimits::default()),
+            Err(Error::Package(crate::package::Error::Corrupted(message)))
+                if message.contains("multiple DocInfoList")
+        ));
+
         let orphan_atom = raw_record(
             2,
             0,
@@ -3649,6 +3713,15 @@ mod tests {
         .unwrap();
         assert!(matches!(
             embedded_storage.edit_text(target()),
+            Err(Error::Refused(Refusal::UnsupportedDependency))
+        ));
+
+        let nested_dual_storage = super::SourceSnapshot::open(Arc::new(OwnedSource::new(
+            with_storage(fixture("abc"), &["PP97_DUALSTORAGE", "PP97_DUALSTORAGE"]),
+        )))
+        .unwrap();
+        assert!(matches!(
+            nested_dual_storage.edit_text(target()),
             Err(Error::Refused(Refusal::UnsupportedDependency))
         ));
 
