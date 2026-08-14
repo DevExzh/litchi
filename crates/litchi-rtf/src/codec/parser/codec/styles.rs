@@ -4,7 +4,7 @@ use super::{
     MAX_LISTS, MAX_PARAGRAPH_DROP_CAP_LINES, MAX_REVISION_AUTHOR_BYTES, MAX_REVISION_AUTHORS,
     MAX_STYLE_NAME_BYTES, MAX_STYLES, NonZeroU16, Paragraph, ParagraphBorderSide, ParagraphDropCap,
     ParagraphDropCapKind, ParagraphFontAlignment, ParagraphWrapping, Parser, RtfError, RtfResult,
-    SmallVec, State, TextDirection, Token, UnderlineStyle, animated_text,
+    SmallVec, State, TextDirection, Token, UnderlineStyle, animated_text, append_transport_bytes,
     apply_associated_character_control, associated_font_ref, character_grid,
     character_style_reference, character_type_selector, complex_script_selector,
     control_symbol_text, emphasis_mark, fit_text, nonnegative_author_index,
@@ -814,22 +814,22 @@ impl<'a> Parser<'a> {
                     return Ok(Cow::Borrowed(stored));
                 },
                 Some(Token::Text(text)) => {
-                    value.extend(
-                        self.decode_transport_text(text)?
-                            .chars()
-                            .filter(|character| !matches!(character, '\r' | '\n')),
-                    );
+                    self.append_external_reference_transport_text(&mut value, text)?;
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::Unicode(first))) => {
-                    value.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                    let decoded = self.parse_style_unicode(*first, unicode_skip)?;
+                    Self::append_external_reference_text(&mut value, &decoded)?;
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(skip))) => {
                     unicode_skip = (*skip).max(0);
                     self.pos += 1;
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
-                    value.push_str(control_symbol_text(control).unwrap_or_default());
+                    Self::append_external_reference_text(
+                        &mut value,
+                        control_symbol_text(control).unwrap_or_default(),
+                    )?;
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
@@ -840,12 +840,60 @@ impl<'a> Parser<'a> {
                 },
                 None => return Err(RtfError::UnexpectedEof),
             }
-            if value.len() > crate::MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES {
-                return Err(RtfError::MalformedDocument(
-                    "RTF external document reference exceeds the safety limit".to_string(),
-                ));
-            }
         }
+    }
+
+    fn append_external_reference_transport_text(
+        &self,
+        value: &mut String,
+        text: &str,
+    ) -> RtfResult<()> {
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(text.len())
+            .map_err(|_error| RtfError::AllocationFailed {
+                resource: "RTF external document reference transport",
+                requested: text.len(),
+            })?;
+        append_transport_bytes(&mut bytes, text)?;
+        let decoded = self.current_state()?.encoding.decode(&bytes);
+        Self::append_external_reference_text(value, decoded.as_ref())
+    }
+
+    fn append_external_reference_text(value: &mut String, decoded: &str) -> RtfResult<()> {
+        let additional = decoded
+            .chars()
+            .filter(|character| !matches!(character, '\r' | '\n'))
+            .map(char::len_utf8)
+            .try_fold(0usize, |total, length| total.checked_add(length))
+            .ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF external document reference size overflow".to_string(),
+                )
+            })?;
+        let observed = value.len().checked_add(additional).ok_or_else(|| {
+            RtfError::MalformedDocument("RTF external document reference size overflow".to_string())
+        })?;
+        if observed > crate::MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES {
+            return Err(RtfError::LimitExceeded {
+                resource: "RTF external document reference",
+                observed,
+                limit: crate::MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES,
+            });
+        }
+        value
+            .try_reserve_exact(additional)
+            .map_err(|_error| RtfError::AllocationFailed {
+                resource: "RTF external document reference",
+                requested: observed,
+            })?;
+        for character in decoded
+            .chars()
+            .filter(|character| !matches!(character, '\r' | '\n'))
+        {
+            value.push(character);
+        }
+        Ok(())
     }
 
     pub(super) fn parse_protection_user_table(&mut self) -> RtfResult<()> {
@@ -2738,15 +2786,40 @@ impl<'a> Parser<'a> {
                     if count <= fallback_skip {
                         fallback_skip -= count;
                     } else {
-                        remainder.extend(text.chars().skip(fallback_skip));
+                        let tail = text.chars().skip(fallback_skip);
+                        let additional = tail
+                            .clone()
+                            .map(char::len_utf8)
+                            .try_fold(0usize, |total, length| total.checked_add(length))
+                            .ok_or_else(|| {
+                                RtfError::MalformedDocument(
+                                    "RTF Unicode fallback size overflow".to_string(),
+                                )
+                            })?;
+                        remainder.try_reserve_exact(additional).map_err(|_error| {
+                            RtfError::AllocationFailed {
+                                resource: "RTF Unicode fallback text",
+                                requested: remainder.len().saturating_add(additional),
+                            }
+                        })?;
+                        remainder.extend(tail);
                         fallback_skip = 0;
                     }
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::Unicode(_))) | None => break,
-                Some(_) => {
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     fallback_skip -= 1;
                     self.pos += 1;
+                },
+                Some(
+                    Token::OpenBrace | Token::CloseBrace | Token::Binary(_) | Token::Control(_),
+                ) => {
+                    // Only plain text and the finite control-symbol character
+                    // vocabulary can represent one Unicode fallback scalar.
+                    // Active control words (for example `\par`) must remain
+                    // visible to the owning grammar and be rejected there.
+                    break;
                 },
             }
         }

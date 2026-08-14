@@ -73,6 +73,7 @@ pub mod metadata;
 mod model;
 mod numbering;
 mod policy;
+pub mod redact;
 mod resource;
 pub mod review;
 pub mod streaming;
