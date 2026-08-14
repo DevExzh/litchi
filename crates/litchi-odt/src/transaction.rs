@@ -56,21 +56,39 @@ const DEFAULT_COMPOSITION_LIMITS: CompositionLimits =
 #[derive(Clone)]
 pub struct Snapshot {
     bytes: Arc<Vec<u8>>,
+    /// The validated physical package is retained alongside its byte owner.
+    ///
+    /// `OwnedPackage` keeps the immutable ZIP index in an `Arc`, so reopening
+    /// a snapshot for semantic validation can reuse the already-built
+    /// central-directory/index state instead of rebuilding it from the same
+    /// bytes. The byte handle remains separate because lineage and exact
+    /// source authorization intentionally compare the immutable artifact.
+    package: crate::core::OwnedPackage,
 }
 
 impl Snapshot {
     /// Opens and retains an ODT package as an immutable snapshot.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         ensure_package_size(bytes.len(), "ODT transaction input")?;
-        let document = Document::from_bytes(bytes)?;
-        Self::from_document(&document)
+        let package = crate::core::OwnedPackage::from_bytes(bytes)?;
+        // Constructing the semantic document performs family validation,
+        // while the retained package is moved into the immutable snapshot so
+        // its validated ZIP index can be shared by subsequent reopenings.
+        Document::from_owned_package(package.clone())?;
+        Self::from_owned_package(package)
     }
 
     /// Captures the exact bytes backing an already validated document.
     pub fn from_document(document: &Document) -> Result<Self> {
         ensure_package_size(document.original_bytes().len(), "ODT transaction package")?;
+        Self::from_owned_package(document.transaction_package().clone_without_password())
+    }
+
+    fn from_owned_package(package: crate::core::OwnedPackage) -> Result<Self> {
+        ensure_package_size(package.as_bytes().len(), "ODT transaction package")?;
         Ok(Self {
-            bytes: document.transaction_package().shared_bytes(),
+            bytes: package.shared_bytes(),
+            package,
         })
     }
 
@@ -82,7 +100,15 @@ impl Snapshot {
 
     /// Reopens this immutable snapshot for semantic inspection.
     pub fn document(&self) -> Result<Document> {
-        Document::from_shared_bytes(Arc::clone(&self.bytes))
+        Document::from_owned_package(self.package.clone())
+    }
+
+    /// Return the identity of the validated physical package index retained
+    /// by this snapshot.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn prepared_index_identity(&self) -> usize {
+        self.package.prepared_index_identity()
     }
 
     /// Starts a detached, failure-atomic package edit.
@@ -1066,10 +1092,6 @@ impl Edit {
                 audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
                 continue;
             }
-            #[allow(
-                deprecated,
-                reason = "only this dispatch expression still reaches validated legacy codecs"
-            )]
             let result = match operation {
                 Operation::Noop => OperationResult::Unit,
                 Operation::RestoreSnapshot => {
@@ -1262,15 +1284,24 @@ impl Edit {
                 Operation::AddRdfGraph {
                     preferred_path,
                     triples,
-                } => OperationResult::Path(
-                    document.add_rdf_graph(preferred_path.as_deref(), triples)?,
-                ),
+                } => {
+                    let (bytes, path) = crate::rdf::add_graph(
+                        document.transaction_package(),
+                        preferred_path.as_deref(),
+                        triples,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
+                    OperationResult::Path(path)
+                },
                 Operation::ReplaceRdfGraph { path, triples } => {
-                    document.replace_rdf_graph(path, triples)?;
+                    let bytes =
+                        crate::rdf::replace_graph(document.transaction_package(), path, triples)?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveRdfGraph { path } => {
-                    document.remove_rdf_graph(path)?;
+                    let bytes = crate::rdf::remove_graph(document.transaction_package(), path)?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::SetProtection { policy } => {
@@ -1328,7 +1359,17 @@ impl Edit {
                     OperationResult::Unit
                 },
                 Operation::AddForm { group_index, form } => {
-                    OperationResult::Index(document.add_form(*group_index, form)?)
+                    let (bytes, index) = crate::package::forms::add_form(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        crate::package::forms::FormHost::Text,
+                        *group_index,
+                        None,
+                        form,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
+                    OperationResult::Index(index)
                 },
                 Operation::AddFormFragment {
                     group_index,
@@ -1432,7 +1473,14 @@ impl Edit {
                     OperationResult::Unit
                 },
                 Operation::ReplaceForm { index, form } => {
-                    document.replace_form(*index, form)?;
+                    let bytes = crate::package::forms::replace_form(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *index,
+                        form,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::ReplaceFormFragment { index, fragment } => {
@@ -1447,15 +1495,37 @@ impl Edit {
                     OperationResult::Unit
                 },
                 Operation::RemoveForm { index } => {
-                    document.remove_form(*index)?;
+                    let bytes = crate::package::forms::remove_form(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *index,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::MoveForm { from, to } => {
-                    document.move_form(*from, *to)?;
+                    let bytes = crate::package::forms::move_form(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *from,
+                        *to,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::AddEmbeddedChart { definition } => {
-                    OperationResult::Index(document.add_embedded_chart(definition)?)
+                    let (bytes, index) = crate::package::charts::add_embedded_chart(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        crate::package::charts::EmbeddedChartHost::Text,
+                        crate::package::charts::EmbeddedChartStorage::PackageSubdocument,
+                        definition,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
+                    OperationResult::Index(index)
                 },
                 Operation::AddEmbeddedChartWithStorage {
                     definition,
@@ -1485,7 +1555,14 @@ impl Edit {
                     OperationResult::Index(index)
                 },
                 Operation::ReplaceEmbeddedChart { index, definition } => {
-                    document.replace_embedded_chart(*index, definition)?;
+                    let bytes = crate::package::charts::replace_embedded_chart(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *index,
+                        definition,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::ReplaceEmbeddedChartContent { index, content } => {
@@ -1500,11 +1577,25 @@ impl Edit {
                     OperationResult::Unit
                 },
                 Operation::RemoveEmbeddedChart { index } => {
-                    document.remove_embedded_chart(*index)?;
+                    let bytes = crate::package::charts::remove_embedded_chart(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *index,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::AddEmbeddedResource { resource } => {
-                    OperationResult::Index(document.add_embedded_resource(resource)?)
+                    let (bytes, index) = crate::package::embedded::add(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        crate::package::charts::EmbeddedChartHost::Text,
+                        resource,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
+                    OperationResult::Index(index)
                 },
                 Operation::EmbeddedResourceBatch { changes } => {
                     let (bytes, indices) = crate::package::embedded::apply_batch(
@@ -1529,27 +1620,73 @@ impl Edit {
                     OperationResult::Unit
                 },
                 Operation::ReplaceEmbeddedObject { index, resource } => {
-                    document.replace_embedded_object(*index, resource)?;
+                    let bytes = crate::package::embedded::replace(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *index,
+                        crate::package::embedded::ResourceTarget::Object,
+                        resource,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::ReplaceEmbeddedImage { index, resource } => {
-                    document.replace_embedded_image(*index, resource)?;
+                    let bytes = crate::package::embedded::replace(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *index,
+                        crate::package::embedded::ResourceTarget::Image,
+                        resource,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveEmbeddedObject { index } => {
-                    document.remove_embedded_object(*index)?;
+                    let bytes = crate::package::embedded::remove(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *index,
+                        crate::package::embedded::ResourceTarget::Object,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveEmbeddedImage { index } => {
-                    document.remove_embedded_image(*index)?;
+                    let bytes = crate::package::embedded::remove(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *index,
+                        crate::package::embedded::ResourceTarget::Image,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::MoveEmbeddedObject { from, to } => {
-                    document.move_embedded_object(*from, *to)?;
+                    let bytes = crate::package::embedded::reorder(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *from,
+                        *to,
+                        crate::package::embedded::ResourceTarget::Object,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::MoveEmbeddedImage { from, to } => {
-                    document.move_embedded_image(*from, *to)?;
+                    let bytes = crate::package::embedded::reorder(
+                        document.transaction_package(),
+                        document.transaction_content_xml(),
+                        document.transaction_styles_xml(),
+                        *from,
+                        *to,
+                        crate::package::embedded::ResourceTarget::Image,
+                    )?;
+                    document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
                 Operation::AddScriptResource { resource } => {
@@ -5537,7 +5674,7 @@ fn envelope_kind(snapshot: &Snapshot) -> Result<EnvelopeKind> {
 
 fn envelope_package(snapshot: &Snapshot) -> Result<crate::core::OwnedPackage> {
     ensure_package_size(snapshot.as_bytes().len(), "ODT transaction package")?;
-    crate::core::OwnedPackage::from_shared_bytes(Arc::clone(&snapshot.bytes))
+    Ok(snapshot.package.clone())
 }
 
 fn copy_bytes(source: &[u8]) -> Result<Vec<u8>> {
@@ -5735,6 +5872,10 @@ mod tests {
         let snapshot = Snapshot::from_document(&document)?;
 
         assert!(Arc::ptr_eq(&snapshot.bytes, &package_bytes));
+        assert_eq!(
+            snapshot.prepared_index_identity(),
+            document.prepared_index_identity()
+        );
         assert_eq!(snapshot.as_bytes(), document.original_bytes());
         Ok(())
     }
@@ -5757,6 +5898,10 @@ mod tests {
         assert!(Arc::ptr_eq(&snapshot.bytes, &changed_bytes));
         assert_eq!(snapshot.as_bytes(), copied_and_reparsed.as_bytes());
         assert_ne!(snapshot.as_bytes(), source.as_bytes());
+        assert_ne!(
+            snapshot.prepared_index_identity(),
+            source.prepared_index_identity()
+        );
         assert_eq!(snapshot.document()?.text()?, "after");
         Ok(())
     }
@@ -5774,7 +5919,35 @@ mod tests {
 
         assert_eq!(snapshot.as_bytes().as_ptr(), source_pointer);
         assert!(Arc::ptr_eq(&snapshot.bytes, &document_bytes));
+        assert_eq!(
+            snapshot.prepared_index_identity(),
+            document.prepared_index_identity()
+        );
         assert_eq!(snapshot.as_bytes(), document.original_bytes());
+        Ok(())
+    }
+
+    #[test]
+    fn repeated_snapshot_reopens_reuse_the_validated_package_index() -> Result<()> {
+        let mut mutable = MutableDocument::new();
+        mutable.add_paragraph("reused package index")?;
+        let snapshot = Snapshot::from_bytes(mutable.to_bytes()?)?;
+
+        let first = snapshot.document()?;
+        let second = snapshot.document()?;
+
+        assert_eq!(
+            first.prepared_index_identity(),
+            snapshot.prepared_index_identity()
+        );
+        assert_eq!(
+            second.prepared_index_identity(),
+            snapshot.prepared_index_identity()
+        );
+        assert_eq!(
+            first.prepared_index_identity(),
+            second.prepared_index_identity()
+        );
         Ok(())
     }
 
@@ -5787,7 +5960,26 @@ mod tests {
         let package = envelope_package(&snapshot)?;
 
         assert!(Arc::ptr_eq(&snapshot.bytes, &package.shared_bytes()));
+        assert_eq!(
+            snapshot.prepared_index_identity(),
+            package.prepared_index_identity()
+        );
         assert_eq!(envelope_kind(&snapshot)?, EnvelopeKind::Plain);
+        Ok(())
+    }
+
+    #[test]
+    fn exact_noop_commit_shares_bytes_and_package_index() -> Result<()> {
+        let mut mutable = MutableDocument::new();
+        mutable.add_paragraph("exact no-op")?;
+        let snapshot = Snapshot::from_bytes(mutable.to_bytes()?)?;
+        let commit = snapshot.edit().commit()?;
+
+        assert!(Arc::ptr_eq(&snapshot.bytes, &commit.snapshot().bytes));
+        assert_eq!(
+            snapshot.prepared_index_identity(),
+            commit.snapshot().prepared_index_identity()
+        );
         Ok(())
     }
 

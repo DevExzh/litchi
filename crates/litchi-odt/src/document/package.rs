@@ -4,7 +4,7 @@ use super::model::Document;
 use crate::core::{Content, Meta, OwnedPackage, PreparedPackage, Styles};
 use crate::elements::style::{StyleElements, StyleRegistry};
 use litchi_core::{Error, Result};
-use std::{path::Path, sync::Arc};
+use std::path::Path;
 
 impl Document {
     pub(crate) fn into_package(self) -> OwnedPackage {
@@ -117,11 +117,6 @@ impl Document {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let owned_package = OwnedPackage::from_bytes(bytes)?;
         Self::from_owned_package(owned_package)
-    }
-
-    /// Reopen immutable package bytes already owned by a transaction snapshot.
-    pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
-        Self::from_owned_package(OwnedPackage::from_shared_bytes(bytes)?)
     }
 
     /// Create a document from password-encrypted ODT bytes.
