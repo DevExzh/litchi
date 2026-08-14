@@ -4,12 +4,18 @@
     reason = "these tests intentionally panic on an unexpected transaction result"
 )]
 
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits,
+    Limits as CoreLimits, Resource,
+};
 use litchi_rtf::tail_append::{
     DurableTailAppendPatch, PlainParagraph, PlainRun, TailAppendError, TailAppendLimits,
+    TailAppendOutputProgress, TailAppendPublicationError, TailAppendPublicationLimits,
     TailSelector,
 };
 use litchi_rtf::{Document, ParseLimits, ProtectionType};
 use std::io::{self, Write};
+use std::num::{NonZeroU64, NonZeroUsize};
 
 fn patch_limits() -> TailAppendLimits {
     TailAppendLimits::new(8, 32, 128, 1024, 4096, 16 * 1024)
@@ -25,6 +31,107 @@ fn retained_bytes(document: &Document) -> Vec<u8> {
         .write_to(&mut output, patch_limits())
         .expect("in-memory sink should accept the retained source");
     output
+}
+
+fn publication_context(
+    memory: u64,
+    input: u64,
+    output: u64,
+    work: u64,
+) -> (Budget, CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "rtf-tail-publication-test",
+        CoreLimits::new(memory, input, output, 1_000_000, 64, work),
+    );
+    let (source, token) = CancellationSource::pair();
+    let execution = ExecutionLimits::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroU64::new(64 * 1024).unwrap(),
+        0,
+    )
+    .unwrap();
+    let context = ExecutionContext::new(budget.clone(), token, execution);
+    (budget, source, context)
+}
+
+struct PublicationSink {
+    output: Vec<u8>,
+    max_accept: usize,
+    fail_after: Option<usize>,
+    interrupted: usize,
+    zero: bool,
+    excess: bool,
+    cancel_after_write: Option<CancellationSource>,
+    writes: usize,
+    largest: usize,
+    flush_error: bool,
+}
+
+impl PublicationSink {
+    fn accepting(max_accept: usize) -> Self {
+        Self {
+            output: Vec::new(),
+            max_accept,
+            fail_after: None,
+            interrupted: 0,
+            zero: false,
+            excess: false,
+            cancel_after_write: None,
+            writes: 0,
+            largest: 0,
+            flush_error: false,
+        }
+    }
+}
+
+impl Write for PublicationSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.writes = self.writes.saturating_add(1);
+        self.largest = self.largest.max(bytes.len());
+        if self.excess {
+            return Ok(bytes.len().saturating_add(1));
+        }
+        if self.zero {
+            return Ok(0);
+        }
+        if self.interrupted != 0 {
+            self.interrupted -= 1;
+            return Err(io::Error::new(io::ErrorKind::Interrupted, "retry"));
+        }
+        if self
+            .fail_after
+            .is_some_and(|limit| self.output.len() >= limit)
+        {
+            return Err(io::Error::new(io::ErrorKind::BrokenPipe, "partial"));
+        }
+        let count = bytes.len().min(self.max_accept);
+        self.output.extend_from_slice(&bytes[..count]);
+        if let Some(source) = self.cancel_after_write.take() {
+            source.cancel();
+        }
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if self.flush_error {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "flush"))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+fn changed_publication_plan(
+    source: &Document,
+    text: &str,
+    limits: TailAppendLimits,
+    publication_limits: TailAppendPublicationLimits,
+) -> litchi_rtf::tail_append::TailAppendPublicationPlan {
+    let mut edit = source.tail_append_with_limits(TailSelector::Body, limits);
+    edit.append_text_paragraphs(&[text]).unwrap();
+    edit.publication_plan_with_limits(publication_limits)
+        .unwrap()
 }
 
 fn replace_once(mut bytes: Vec<u8>, from: &[u8], to: &[u8]) -> Vec<u8> {
@@ -478,4 +585,359 @@ fn sequential_sink_reports_partial_progress() {
         }
     ));
     assert_eq!(sink.accepted, 7);
+}
+
+#[test]
+fn publication_plan_emits_exact_reopenable_bytes_with_hard_windows() {
+    let source = Document::from_bytes(b"{\\rtf1\\ansi A\\par {\\b B}} \r\n").unwrap();
+    let publication_limits = TailAppendPublicationLimits::new(5, 3);
+    let plan = changed_publication_plan(&source, "C{D}\\E", patch_limits(), publication_limits);
+
+    let mut semantic_edit = source.tail_append_with_limits(TailSelector::Body, patch_limits());
+    semantic_edit.append_text_paragraphs(&["C{D}\\E"]).unwrap();
+    let semantic_commit = semantic_edit.commit().unwrap();
+    let mut expected = Vec::new();
+    semantic_commit
+        .write_to(&mut expected, patch_limits())
+        .unwrap();
+
+    let (_budget, _cancellation, context) = publication_context(
+        16 * 1024,
+        expected.len() as u64,
+        expected.len() as u64,
+        expected.len() as u64,
+    );
+    let mut sink = PublicationSink::accepting(2);
+    let report = plan.write_to(&mut sink, &context).unwrap();
+    assert_eq!(sink.output, expected);
+    assert_eq!(report.bytes(), expected.len());
+    assert_eq!(report.source_bytes(), retained_bytes(&source).len());
+    assert_eq!(report.inserted_bytes(), plan.inserted_bytes());
+    assert_eq!(report.largest_write(), 3);
+    assert!(sink.largest <= 3);
+    let reopened = Document::from_bytes(&sink.output).unwrap();
+    assert_eq!(reopened.text(), "A\nB\nC{D}\\E\n");
+}
+
+#[test]
+fn publication_plan_noop_preserves_source_identity_and_bytes() {
+    let source = Document::from_bytes(br"{\rtf1\ansi A B}").unwrap();
+    let plan = source
+        .tail_append(TailSelector::Body)
+        .publication_plan_with_limits(TailAppendPublicationLimits::new(4, 2))
+        .unwrap();
+    assert!(plan.is_noop());
+    assert!(plan.source().same_snapshot(&source));
+    let (_budget, _cancellation, context) = publication_context(
+        16 * 1024,
+        retained_bytes(&source).len() as u64,
+        retained_bytes(&source).len() as u64,
+        retained_bytes(&source).len() as u64,
+    );
+    let mut sink = PublicationSink::accepting(1);
+    let report = plan.write_to(&mut sink, &context).unwrap();
+    assert_eq!(sink.output, retained_bytes(&source));
+    assert_eq!(report.inserted_bytes(), 0);
+    assert_eq!(report.bytes(), sink.output.len());
+    assert_eq!(report.largest_write(), 2);
+}
+
+#[test]
+fn context_aware_publication_planning_reserves_before_encoding() {
+    let source = Document::parse(r"{\rtf1\ansi A}").unwrap();
+    let publication_limits = TailAppendPublicationLimits::new(4, 3);
+
+    let (_budget, _cancellation, context) = publication_context(0, 4096, 4096, 4096);
+    let mut edit = source.tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    let error = edit
+        .publication_plan_with_limits_and_context(publication_limits, &context)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        TailAppendPublicationError::Execution {
+            error: ExecutionError::ResourceLimit(_),
+            written: 0
+        }
+    ));
+
+    let (budget, _cancellation, context) = publication_context(4096, 4096, 4096, 4096);
+    let mut edit = source.tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    let plan = edit
+        .publication_plan_with_limits_and_context(publication_limits, &context)
+        .unwrap();
+    assert!(budget.used(Resource::Memory) >= plan.inserted_bytes() as u64);
+    let mut sink = PublicationSink::accepting(2);
+    plan.write_to(&mut sink, &context).unwrap();
+    assert!(budget.used(Resource::Memory) > 0);
+    drop(plan);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn publication_plan_rejects_foreign_source_before_output() {
+    let source = Document::parse(r"{\rtf1\ansi A}").unwrap();
+    let plan = changed_publication_plan(
+        &source,
+        "B",
+        patch_limits(),
+        TailAppendPublicationLimits::new(8, 4),
+    );
+    let foreign = Document::parse(r"{\rtf1\ansi A}").unwrap();
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut sink = PublicationSink::accepting(4);
+    let error = plan
+        .write_to_source(&foreign, &mut sink, &context)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        TailAppendPublicationError::SourceVersionChanged { .. }
+    ));
+    assert!(sink.output.is_empty());
+}
+
+#[test]
+fn publication_plan_refuses_active_protected_and_compressed_sources_before_output() {
+    let active = Document::parse(
+        r#"{\rtf1\ansi {\field{\*\fldinst INCLUDETEXT "file:///tmp/x"}{\fldrslt x}}}"#,
+    )
+    .unwrap();
+    let mut active_edit = active.tail_append(TailSelector::Body);
+    active_edit.append_text_paragraphs(&["x"]).unwrap();
+    assert!(matches!(
+        active_edit.publication_plan_with_limits(TailAppendPublicationLimits::new(8, 4)),
+        Err(TailAppendError::UnsupportedSource(_))
+    ));
+
+    let protected = Document::parse(r"{\rtf1\ansi\readprot\enforceprot1 A}").unwrap();
+    let mut protected_edit = protected.tail_append(TailSelector::Body);
+    protected_edit.append_text_paragraphs(&["x"]).unwrap();
+    assert!(matches!(
+        protected_edit.publication_plan_with_limits(TailAppendPublicationLimits::new(8, 4)),
+        Err(TailAppendError::ProtectedDocument(ProtectionType::ReadOnly))
+    ));
+
+    let compressed = litchi_rtf::transport::compress(br"{\rtf1\ansi A}", true).unwrap();
+    let compressed = Document::from_bytes(&compressed).unwrap();
+    let mut compressed_edit = compressed.tail_append(TailSelector::Body);
+    compressed_edit.append_text_paragraphs(&["x"]).unwrap();
+    assert!(matches!(
+        compressed_edit.publication_plan_with_limits(TailAppendPublicationLimits::new(8, 4)),
+        Err(TailAppendError::UnsupportedSource(_))
+    ));
+}
+
+#[test]
+fn publication_plan_reports_partial_zero_interrupted_and_excess_sinks() {
+    let source = Document::parse(r"{\rtf1\ansi A}").unwrap();
+    let plan = changed_publication_plan(
+        &source,
+        "B",
+        patch_limits(),
+        TailAppendPublicationLimits::new(4, 3),
+    );
+
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut partial = PublicationSink::accepting(2);
+    partial.fail_after = Some(7);
+    let error = plan.write_to(&mut partial, &context).unwrap_err();
+    assert!(matches!(
+        error.progress(),
+        Some(TailAppendOutputProgress::Prefix { accepted, expected })
+            if accepted > 0 && accepted < expected
+    ));
+    assert!(error.written() > 0);
+
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut zero = PublicationSink::accepting(2);
+    zero.zero = true;
+    let error = plan.write_to(&mut zero, &context).unwrap_err();
+    assert!(matches!(
+        &error,
+        TailAppendPublicationError::Sink {
+            kind: io::ErrorKind::WriteZero,
+            written: 0,
+            ..
+        }
+    ));
+    assert!(error.progress().is_none());
+
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut interrupted = PublicationSink::accepting(2);
+    interrupted.interrupted = 3;
+    let report = plan.write_to(&mut interrupted, &context).unwrap();
+    assert_eq!(report.bytes(), interrupted.output.len());
+    assert_eq!(interrupted.output.len(), plan.output_bytes());
+
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut flush_failure = PublicationSink::accepting(2);
+    flush_failure.flush_error = true;
+    let error = plan.write_to(&mut flush_failure, &context).unwrap_err();
+    assert!(matches!(
+        error.progress(),
+        Some(TailAppendOutputProgress::CompleteUnflushed { bytes })
+            if bytes == plan.output_bytes() as u64
+    ));
+
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut excess = PublicationSink::accepting(2);
+    excess.excess = true;
+    let error = plan.write_to(&mut excess, &context).unwrap_err();
+    assert!(matches!(
+        error.progress(),
+        Some(TailAppendOutputProgress::Indeterminate { accepted_before: 0 })
+    ));
+    assert!(excess.output.is_empty());
+}
+
+#[test]
+fn publication_plan_checks_cancellation_and_all_resource_dimensions() {
+    let source = Document::parse(r"{\rtf1\ansi A}").unwrap();
+    let plan = changed_publication_plan(
+        &source,
+        "B",
+        patch_limits(),
+        TailAppendPublicationLimits::new(4, 3),
+    );
+    let expected = plan.output_bytes() as u64;
+
+    let (_budget, cancellation, context) =
+        publication_context(16 * 1024, expected, expected, expected);
+    cancellation.cancel();
+    let mut before = PublicationSink::accepting(2);
+    let error = plan.write_to(&mut before, &context).unwrap_err();
+    assert!(matches!(
+        &error,
+        TailAppendPublicationError::Execution {
+            error: ExecutionError::Cancelled,
+            written: 0
+        }
+    ));
+    assert!(before.output.is_empty());
+
+    let (_budget, cancellation, context) =
+        publication_context(16 * 1024, expected, expected, expected);
+    let mut during = PublicationSink::accepting(2);
+    during.cancel_after_write = Some(cancellation);
+    let error = plan.write_to(&mut during, &context).unwrap_err();
+    assert!(matches!(
+        error.progress(),
+        Some(TailAppendOutputProgress::Prefix { accepted, expected: total })
+            if accepted > 0 && total == expected
+    ));
+
+    let (_budget, _cancellation, context) = publication_context(0, expected, expected, expected);
+    let mut memory = PublicationSink::accepting(2);
+    let error = plan.write_to(&mut memory, &context).unwrap_err();
+    assert!(matches!(
+        &error,
+        TailAppendPublicationError::Execution {
+            error: ExecutionError::ResourceLimit(_),
+            written: 0
+        }
+    ));
+    assert!(memory.output.is_empty());
+
+    let (_budget, _cancellation, context) =
+        publication_context(16 * 1024, expected - 1, expected, expected);
+    let mut input = PublicationSink::accepting(2);
+    let error = plan.write_to(&mut input, &context).unwrap_err();
+    assert!(matches!(
+        &error,
+        TailAppendPublicationError::Execution {
+            error: ExecutionError::ResourceLimit(_),
+            written: 0
+        }
+    ));
+    assert!(input.output.is_empty());
+
+    let (_budget, _cancellation, context) =
+        publication_context(16 * 1024, expected, expected - 1, expected);
+    let mut output = PublicationSink::accepting(2);
+    let error = plan.write_to(&mut output, &context).unwrap_err();
+    assert!(matches!(
+        &error,
+        TailAppendPublicationError::Execution {
+            error: ExecutionError::ResourceLimit(_),
+            written: 0
+        }
+    ));
+    assert!(output.output.is_empty());
+
+    let (_budget, _cancellation, context) =
+        publication_context(16 * 1024, expected, expected, expected - 1);
+    let mut work = PublicationSink::accepting(2);
+    let error = plan.write_to(&mut work, &context).unwrap_err();
+    assert!(matches!(
+        &error,
+        TailAppendPublicationError::Execution {
+            error: ExecutionError::ResourceLimit(_),
+            written: 0
+        }
+    ));
+    assert!(work.output.is_empty());
+}
+
+#[test]
+fn publication_plan_enforces_exact_and_over_output_bounds() {
+    let source = Document::parse(r"{\rtf1\ansi A}").unwrap();
+    let broad = changed_publication_plan(
+        &source,
+        "B",
+        patch_limits(),
+        TailAppendPublicationLimits::new(8, 4),
+    );
+    let exact_output = broad.output_bytes();
+    let exact_limits = TailAppendLimits::new(8, 32, 128, 1024, exact_output, 16 * 1024);
+    let exact = changed_publication_plan(
+        &source,
+        "B",
+        exact_limits,
+        TailAppendPublicationLimits::new(8, 4),
+    );
+    let (_budget, _cancellation, context) = publication_context(
+        16 * 1024,
+        exact_output as u64,
+        exact_output as u64,
+        exact_output as u64,
+    );
+    let mut sink = PublicationSink::accepting(4);
+    assert_eq!(
+        exact.write_to(&mut sink, &context).unwrap().bytes(),
+        exact_output
+    );
+
+    let over_limits =
+        TailAppendLimits::new(8, 32, 128, 1024, exact_output.saturating_sub(1), 16 * 1024);
+    let mut edit = source.tail_append_with_limits(TailSelector::Body, over_limits);
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    assert!(matches!(
+        edit.publication_plan_with_limits(TailAppendPublicationLimits::new(8, 4)),
+        Err(TailAppendError::LimitExceeded {
+            resource: "output bytes",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn publication_plan_preserves_unknown_source_bytes_and_semantic_closure() {
+    let source = Document::parse(r"{\rtf1\ansi A\future42 B}").unwrap();
+    let plan = changed_publication_plan(
+        &source,
+        "C",
+        patch_limits(),
+        TailAppendPublicationLimits::new(4, 3),
+    );
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut sink = PublicationSink::accepting(2);
+    plan.write_to(&mut sink, &context).unwrap();
+    assert!(
+        sink.output
+            .windows(br"\future42".len())
+            .any(|window| window == br"\future42")
+    );
+    let reopened = Document::from_bytes(&sink.output).unwrap();
+    assert_eq!(reopened.text(), "AB\nC\n");
 }

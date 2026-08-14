@@ -342,6 +342,16 @@ impl Document {
         self.inner.model.preserved_source()
     }
 
+    pub(crate) fn source_version(&self) -> litchi_core::SourceVersion {
+        let identity = Arc::as_ptr(&self.inner) as usize as u64;
+        let revision = self
+            .inner
+            .model
+            .preserved_source()
+            .map_or(0, |bytes| u64::try_from(bytes.len()).unwrap_or(u64::MAX));
+        litchi_core::SourceVersion::new(identity, revision)
+    }
+
     /// Starts a bounded, detached edit of this immutable snapshot.
     #[must_use]
     pub fn edit(&self) -> crate::edit::Edit {

@@ -7,11 +7,14 @@
 //! group.  The source is never normalized or mutated.
 
 use crate::{Document, RtfError};
-use litchi_core::patch::BlobId;
+use litchi_core::{
+    ExecutionContext, ExecutionError, Reservation, Resource, SourceVersion, patch::BlobId,
+};
 use serde_json::{Map, Value};
 use std::collections::BTreeSet;
 use std::fmt;
 use std::io::{self, Write};
+use std::sync::Arc;
 
 /// The only story currently accepted by the logical-tail splice.
 ///
@@ -119,6 +122,298 @@ impl Default for TailAppendLimits {
             64 * 1024 * 1024,
             2 * 1024 * 1024,
         )
+    }
+}
+
+/// Hard publication-window bounds for an existing-document logical-tail
+/// append.
+///
+/// The semantic [`TailAppendCommit`] path intentionally retains its complete
+/// validated candidate.  A [`TailAppendPublicationPlan`] instead emits the
+/// exact source prefix, bounded inserted span, and exact source suffix
+/// directly to a sequential sink.  `max_window_bytes` bounds each source or
+/// inserted window offered to the sink, while `max_write_bytes` is the hard
+/// maximum passed to one `Write::write` call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TailAppendPublicationLimits {
+    /// Maximum bytes retained in one publication window.
+    pub max_window_bytes: usize,
+    /// Maximum bytes offered to one sequential sink write.
+    pub max_write_bytes: usize,
+}
+
+impl TailAppendPublicationLimits {
+    /// Creates explicit finite publication-window bounds.
+    #[must_use]
+    pub const fn new(max_window_bytes: usize, max_write_bytes: usize) -> Self {
+        Self {
+            max_window_bytes,
+            max_write_bytes,
+        }
+    }
+
+    fn validate(self) -> Result<(), TailAppendPublicationError> {
+        if self.max_window_bytes == 0 {
+            return Err(TailAppendPublicationError::InvalidLimits(
+                "publication window must be positive",
+            ));
+        }
+        if self.max_write_bytes == 0 {
+            return Err(TailAppendPublicationError::InvalidLimits(
+                "publication write cap must be positive",
+            ));
+        }
+        if self.max_write_bytes > self.max_window_bytes {
+            return Err(TailAppendPublicationError::InvalidLimits(
+                "publication write cap must not exceed the window",
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl Default for TailAppendPublicationLimits {
+    fn default() -> Self {
+        Self::new(16 * 1024, 16 * 1024)
+    }
+}
+
+/// Exact progress known after a non-atomic sequential publication failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TailAppendOutputProgress {
+    /// The sink accepted no bytes.
+    Untouched,
+    /// The sink accepted an exact prefix of the planned artifact.
+    Prefix {
+        /// Bytes definitely accepted by the sink.
+        accepted: u64,
+        /// Complete planned artifact length.
+        expected: u64,
+    },
+    /// Every planned artifact byte was accepted but flush failed.
+    CompleteUnflushed {
+        /// Complete planned artifact length.
+        bytes: u64,
+    },
+    /// Every planned artifact byte was accepted but a post-write proof failed.
+    CompleteUnverified {
+        /// Complete planned artifact length.
+        bytes: u64,
+    },
+    /// The sink reported more bytes than were offered, so exact progress is
+    /// unknowable beyond this point.
+    Indeterminate {
+        /// Bytes definitely accepted before the invalid report.
+        accepted_before: u64,
+    },
+}
+
+/// Failure from bounded publication of an existing-document logical tail.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum TailAppendPublicationError {
+    /// The publication plan could not be constructed or its source proof
+    /// failed before output began.
+    Plan(TailAppendError),
+    /// The caller supplied an invalid publication window configuration.
+    InvalidLimits(&'static str),
+    /// The caller supplied a different immutable source snapshot.
+    SourceVersionChanged {
+        /// Version captured while planning.
+        expected: SourceVersion,
+        /// Version observed at publication.
+        observed: SourceVersion,
+    },
+    /// The source bytes no longer match the exact planning fingerprint.
+    SourceFingerprintChanged {
+        /// Fingerprint captured while planning.
+        expected: BlobId,
+        /// Fingerprint observed at publication.
+        observed: BlobId,
+    },
+    /// A caller execution context rejected a check or resource reservation.
+    Execution {
+        /// Underlying cancellation or hierarchical budget failure.
+        error: ExecutionError,
+        /// Bytes accepted before the failure.
+        written: u64,
+    },
+    /// A local publication bound was exceeded.
+    LimitExceeded {
+        /// Stable resource name.
+        resource: &'static str,
+        /// Observed value.
+        observed: u64,
+        /// Configured maximum.
+        limit: u64,
+        /// Bytes accepted before the failure.
+        written: u64,
+    },
+    /// A sequential sink failed after accepting the reported bytes.
+    Sink {
+        /// Underlying I/O category.
+        kind: io::ErrorKind,
+        /// Stable sink diagnostic.
+        message: String,
+        /// Bytes accepted before the failure.
+        written: u64,
+    },
+    /// A sink failure or post-write proof failure left a typed partial output.
+    IncompleteOutput {
+        /// Exact progress classification.
+        progress: TailAppendOutputProgress,
+        /// Underlying failure cause.
+        source: Box<TailAppendPublicationError>,
+    },
+}
+
+impl TailAppendPublicationError {
+    /// Bytes definitely accepted before this failure.
+    #[must_use]
+    pub const fn written(&self) -> u64 {
+        match self {
+            Self::Plan(_) | Self::InvalidLimits(_) => 0,
+            Self::SourceVersionChanged { .. } | Self::SourceFingerprintChanged { .. } => 0,
+            Self::Execution { written, .. }
+            | Self::LimitExceeded { written, .. }
+            | Self::Sink { written, .. } => *written,
+            Self::IncompleteOutput { progress, .. } => match progress {
+                TailAppendOutputProgress::Untouched => 0,
+                TailAppendOutputProgress::Prefix { accepted, .. } => *accepted,
+                TailAppendOutputProgress::CompleteUnflushed { bytes }
+                | TailAppendOutputProgress::CompleteUnverified { bytes } => *bytes,
+                TailAppendOutputProgress::Indeterminate { accepted_before } => *accepted_before,
+            },
+        }
+    }
+
+    /// Returns exact output progress when publication reached the sink.
+    #[must_use]
+    pub const fn progress(&self) -> Option<TailAppendOutputProgress> {
+        match self {
+            Self::IncompleteOutput { progress, .. } => Some(*progress),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for TailAppendPublicationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Plan(error) => write!(formatter, "RTF tail publication plan failed: {error}"),
+            Self::InvalidLimits(reason) => {
+                write!(formatter, "invalid RTF tail publication limits: {reason}")
+            },
+            Self::SourceVersionChanged { expected, observed } => write!(
+                formatter,
+                "RTF tail publication source version changed from {expected:?} to {observed:?}"
+            ),
+            Self::SourceFingerprintChanged { .. } => {
+                formatter.write_str("RTF tail publication source fingerprint changed")
+            },
+            Self::Execution { error, written } => write!(
+                formatter,
+                "RTF tail publication execution failed after {written} bytes: {error}"
+            ),
+            Self::LimitExceeded {
+                resource,
+                observed,
+                limit,
+                written,
+            } => write!(
+                formatter,
+                "RTF tail publication limit exceeded for {resource}: observed {observed}, limit {limit}, output {written}"
+            ),
+            Self::Sink {
+                kind,
+                message,
+                written,
+            } => write!(
+                formatter,
+                "RTF tail publication sink failed ({kind}) after {written} bytes: {message}"
+            ),
+            Self::IncompleteOutput { progress, source } => write!(
+                formatter,
+                "incomplete RTF tail publication output ({progress:?}): {source}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for TailAppendPublicationError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Plan(error) => Some(error),
+            Self::IncompleteOutput { source, .. } => Some(source),
+            Self::InvalidLimits(_)
+            | Self::SourceVersionChanged { .. }
+            | Self::SourceFingerprintChanged { .. }
+            | Self::Execution { .. }
+            | Self::LimitExceeded { .. }
+            | Self::Sink { .. } => None,
+        }
+    }
+}
+
+impl From<TailAppendError> for TailAppendPublicationError {
+    fn from(error: TailAppendError) -> Self {
+        Self::Plan(error)
+    }
+}
+
+/// Evidence returned after bounded direct publication succeeds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TailAppendPublicationReport {
+    bytes: usize,
+    source_bytes: usize,
+    inserted_bytes: usize,
+    source_version: SourceVersion,
+    source_fingerprint: BlobId,
+    writes: usize,
+    largest_write: usize,
+}
+
+impl TailAppendPublicationReport {
+    /// Complete output bytes accepted by the sink.
+    #[must_use]
+    pub const fn bytes(&self) -> usize {
+        self.bytes
+    }
+
+    /// Exact source bytes emitted before insertion.
+    #[must_use]
+    pub const fn source_bytes(&self) -> usize {
+        self.source_bytes
+    }
+
+    /// Exact inserted bytes emitted between source prefix and suffix.
+    #[must_use]
+    pub const fn inserted_bytes(&self) -> usize {
+        self.inserted_bytes
+    }
+
+    /// Source version checked before and after publication.
+    #[must_use]
+    pub const fn source_version(&self) -> SourceVersion {
+        self.source_version
+    }
+
+    /// Exact source fingerprint checked before and after publication.
+    #[must_use]
+    pub fn source_fingerprint(&self) -> &BlobId {
+        &self.source_fingerprint
+    }
+
+    /// Number of sink write calls, excluding flush.
+    #[must_use]
+    pub const fn writes(&self) -> usize {
+        self.writes
+    }
+
+    /// Largest byte slice offered to one sink write call.
+    #[must_use]
+    pub const fn largest_write(&self) -> usize {
+        self.largest_write
     }
 }
 
@@ -450,6 +745,234 @@ impl TailAppendEdit {
         self.append_runs(runs)
     }
 
+    /// Converts this staged transaction into a publication-only plan using
+    /// the default bounded source/write window.
+    ///
+    /// Unlike [`Self::commit`], this path does not construct, reopen, or retain
+    /// a complete candidate artifact.  It proves the exact source tail and
+    /// stores only the bounded inserted span; callers can later publish it to
+    /// a sequential non-seek sink with an explicit [`ExecutionContext`].
+    pub fn publication_plan(self) -> Result<TailAppendPublicationPlan, TailAppendError> {
+        self.publication_plan_with_limits(TailAppendPublicationLimits::default())
+    }
+
+    /// Converts this staged transaction into a publication-only plan with an
+    /// explicit hard source/write window.
+    ///
+    /// This constructor uses the transaction's finite [`TailAppendLimits`]
+    /// as its allocation boundary.  Call
+    /// [`Self::publication_plan_with_limits_and_context`] when planning must
+    /// also reserve execution-budget memory before the encoded insertion is
+    /// allocated.
+    pub fn publication_plan_with_limits(
+        self,
+        publication_limits: TailAppendPublicationLimits,
+    ) -> Result<TailAppendPublicationPlan, TailAppendError> {
+        self.publication_plan_inner(publication_limits, None)
+            .map_err(|error| match error {
+                TailAppendPublicationError::Plan(error) => error,
+                TailAppendPublicationError::InvalidLimits(_)
+                | TailAppendPublicationError::SourceVersionChanged { .. }
+                | TailAppendPublicationError::SourceFingerprintChanged { .. }
+                | TailAppendPublicationError::Execution { .. }
+                | TailAppendPublicationError::LimitExceeded { .. }
+                | TailAppendPublicationError::Sink { .. }
+                | TailAppendPublicationError::IncompleteOutput { .. } => {
+                    TailAppendError::UnsupportedSource(
+                        "publication planning failed outside the source proof",
+                    )
+                },
+            })
+    }
+
+    /// Converts this staged transaction into a publication-only plan while
+    /// reserving its bounded retained insertion before encoding it.
+    ///
+    /// This context-aware constructor is the ownership boundary for callers
+    /// that need an execution budget to cover planning allocations.  The
+    /// returned plan retains that reservation until all clones of the plan are
+    /// dropped; publication itself borrows source and insertion windows
+    /// directly and therefore does not allocate a complete candidate.
+    pub fn publication_plan_with_context(
+        self,
+        context: &ExecutionContext,
+    ) -> Result<TailAppendPublicationPlan, TailAppendPublicationError> {
+        self.publication_plan_with_limits_and_context(
+            TailAppendPublicationLimits::default(),
+            context,
+        )
+    }
+
+    /// Context-aware variant with explicit bounded source/write windows.
+    pub fn publication_plan_with_limits_and_context(
+        self,
+        publication_limits: TailAppendPublicationLimits,
+        context: &ExecutionContext,
+    ) -> Result<TailAppendPublicationPlan, TailAppendPublicationError> {
+        publication_limits.validate()?;
+        self.publication_plan_inner(publication_limits, Some(context))
+    }
+
+    fn publication_plan_inner(
+        self,
+        publication_limits: TailAppendPublicationLimits,
+        planning_context: Option<&ExecutionContext>,
+    ) -> Result<TailAppendPublicationPlan, TailAppendPublicationError> {
+        if self.selector != TailSelector::Body {
+            return Err(TailAppendError::UnsupportedSelector.into());
+        }
+        let source_bytes = self
+            .source
+            .source_bytes()
+            .ok_or(TailAppendError::UnsupportedSource(
+                "snapshot has no exact RTF source",
+            ))?;
+        let source_length = source_bytes.len();
+        if source_length > self.limits.max_output_bytes {
+            return Err(TailAppendError::LimitExceeded {
+                resource: "output bytes",
+                observed: source_length,
+                limit: self.limits.max_output_bytes,
+            }
+            .into());
+        }
+        let source_fingerprint = BlobId::of(source_bytes);
+        let source_version = self.source.source_version();
+
+        let (root_close, inserted_len, input_bytes, paragraphs, runs, ends_with_par) =
+            if self.paragraphs.is_empty() {
+                // An empty append remains an exact identity transition, but the
+                // publication-only path still proves that the source is eligible
+                // for direct output before it touches the sink.  The established
+                // semantic commit path retains its broader exact-no-op behavior.
+                let proof = prove_splice_source(&self.source, self.selector)?;
+                (source_length, 0, 0, 0, 0, proof.ends_with_par)
+            } else {
+                let proof = prove_splice_source(&self.source, self.selector)?;
+                let inserted_len =
+                    encoded_inserted_len(&self.source, &self.paragraphs, proof.ends_with_par)?;
+                (
+                    proof.root_close,
+                    inserted_len,
+                    self.input_bytes,
+                    self.paragraphs.len(),
+                    self.run_count,
+                    proof.ends_with_par,
+                )
+            };
+        if inserted_len > self.limits.max_inserted_bytes {
+            return Err(TailAppendError::LimitExceeded {
+                resource: "inserted bytes",
+                observed: inserted_len,
+                limit: self.limits.max_inserted_bytes,
+            }
+            .into());
+        }
+        let output_length =
+            source_length
+                .checked_add(inserted_len)
+                .ok_or(TailAppendError::LimitExceeded {
+                    resource: "output bytes",
+                    observed: usize::MAX,
+                    limit: self.limits.max_output_bytes,
+                })?;
+        if output_length > self.limits.max_output_bytes {
+            return Err(TailAppendError::LimitExceeded {
+                resource: "output bytes",
+                observed: output_length,
+                limit: self.limits.max_output_bytes,
+            }
+            .into());
+        }
+        if output_length > self.source.limits().max_source_bytes() {
+            return Err(TailAppendError::LimitExceeded {
+                resource: "source bytes",
+                observed: output_length,
+                limit: self.source.limits().max_source_bytes(),
+            }
+            .into());
+        }
+
+        let planning_memory = if let Some(context) = planning_context {
+            let window = publication_limits.max_window_bytes.min(output_length);
+            let amount = window.checked_add(inserted_len).ok_or({
+                TailAppendPublicationError::Plan(TailAppendError::LimitExceeded {
+                    resource: "memory",
+                    observed: usize::MAX,
+                    limit: self.limits.max_output_bytes,
+                })
+            })?;
+            context
+                .check()
+                .map_err(|error| publication_execution(error, 0))?;
+            Some(Arc::new(
+                context
+                    .reserve(Resource::Memory, u64::try_from(amount).unwrap_or(u64::MAX))
+                    .map_err(|error| publication_execution(error, 0))?,
+            ))
+        } else {
+            None
+        };
+
+        let inserted = if inserted_len == 0 {
+            Box::new([])
+        } else {
+            encode_inserted(&self.source, &self.paragraphs, ends_with_par, inserted_len)?
+                .into_boxed_slice()
+        };
+        if inserted.len() != inserted_len {
+            return Err(TailAppendError::UnsupportedSource(
+                "encoded insertion length changed after bounded preflight",
+            )
+            .into());
+        }
+        Ok(TailAppendPublicationPlan {
+            source: self.source,
+            selector: self.selector,
+            append_limits: self.limits,
+            publication_limits,
+            root_close,
+            inserted,
+            planning_memory,
+            source_version,
+            source_fingerprint,
+            source_bytes: source_length,
+            input_bytes,
+            paragraphs,
+            runs,
+        })
+    }
+
+    /// Alias for [`Self::publication_plan`].
+    pub fn plan_publication(self) -> Result<TailAppendPublicationPlan, TailAppendError> {
+        self.publication_plan()
+    }
+
+    /// Alias for [`Self::publication_plan_with_limits`].
+    pub fn plan_publication_with_limits(
+        self,
+        publication_limits: TailAppendPublicationLimits,
+    ) -> Result<TailAppendPublicationPlan, TailAppendError> {
+        self.publication_plan_with_limits(publication_limits)
+    }
+
+    /// Alias for [`Self::publication_plan_with_context`].
+    pub fn plan_publication_with_context(
+        self,
+        context: &ExecutionContext,
+    ) -> Result<TailAppendPublicationPlan, TailAppendPublicationError> {
+        self.publication_plan_with_context(context)
+    }
+
+    /// Alias for [`Self::publication_plan_with_limits_and_context`].
+    pub fn plan_publication_with_limits_and_context(
+        self,
+        publication_limits: TailAppendPublicationLimits,
+        context: &ExecutionContext,
+    ) -> Result<TailAppendPublicationPlan, TailAppendPublicationError> {
+        self.publication_plan_with_limits_and_context(publication_limits, context)
+    }
+
     /// Atomically validates and publishes the candidate artifact.
     pub fn commit(self) -> Result<TailAppendCommit, TailAppendError> {
         if self.selector != TailSelector::Body {
@@ -571,6 +1094,541 @@ impl TailAppendEdit {
                 output_bytes: output_len,
             },
         })
+    }
+}
+
+/// Fully validated, publication-only logical-tail plan.
+///
+/// The plan owns the immutable source handle and only the bounded encoded
+/// insertion.  It never constructs or retains a complete target artifact;
+/// [`Self::write_to`] emits source prefix, insertion, and source suffix in
+/// bounded windows after rechecking source version and exact bytes.
+#[derive(Debug, Clone)]
+pub struct TailAppendPublicationPlan {
+    source: Document,
+    selector: TailSelector,
+    append_limits: TailAppendLimits,
+    publication_limits: TailAppendPublicationLimits,
+    root_close: usize,
+    inserted: Box<[u8]>,
+    planning_memory: Option<Arc<Reservation>>,
+    source_version: SourceVersion,
+    source_fingerprint: BlobId,
+    source_bytes: usize,
+    input_bytes: usize,
+    paragraphs: usize,
+    runs: usize,
+}
+
+impl TailAppendPublicationPlan {
+    /// Immutable source snapshot retained by this plan.
+    #[must_use]
+    pub const fn source(&self) -> &Document {
+        &self.source
+    }
+
+    /// Selector retained by this plan.
+    #[must_use]
+    pub const fn selector(&self) -> TailSelector {
+        self.selector
+    }
+
+    /// Whether this plan is an exact source identity publication.
+    #[must_use]
+    pub const fn is_noop(&self) -> bool {
+        self.inserted.is_empty() && self.root_close == self.source_bytes
+    }
+
+    /// Exact source byte length captured during planning.
+    #[must_use]
+    pub const fn source_bytes(&self) -> usize {
+        self.source_bytes
+    }
+
+    /// Exact encoded insertion byte length.
+    #[must_use]
+    pub const fn inserted_bytes(&self) -> usize {
+        self.inserted.len()
+    }
+
+    /// Exact target byte length emitted by this plan.
+    #[must_use]
+    pub const fn output_bytes(&self) -> usize {
+        self.source_bytes.saturating_add(self.inserted.len())
+    }
+
+    /// UTF-8 bytes copied from caller-owned paragraph runs during staging.
+    #[must_use]
+    pub const fn input_bytes(&self) -> usize {
+        self.input_bytes
+    }
+
+    /// Number of paragraphs represented by the bounded insertion.
+    #[must_use]
+    pub const fn paragraphs(&self) -> usize {
+        self.paragraphs
+    }
+
+    /// Number of plain runs represented by the bounded insertion.
+    #[must_use]
+    pub const fn runs(&self) -> usize {
+        self.runs
+    }
+
+    /// Exact root-close insertion offset, or the source length for a no-op.
+    #[must_use]
+    pub const fn root_close(&self) -> usize {
+        self.root_close
+    }
+
+    /// Source version captured during planning.
+    #[must_use]
+    pub const fn source_version(&self) -> SourceVersion {
+        self.source_version
+    }
+
+    /// Exact source fingerprint captured during planning.
+    #[must_use]
+    pub fn source_fingerprint(&self) -> &BlobId {
+        &self.source_fingerprint
+    }
+
+    /// Publication window bounds retained by this plan.
+    #[must_use]
+    pub const fn publication_limits(&self) -> TailAppendPublicationLimits {
+        self.publication_limits
+    }
+
+    /// Emits the plan against its retained immutable source.
+    pub fn write_to<W: Write>(
+        &self,
+        sink: &mut W,
+        context: &ExecutionContext,
+    ) -> Result<TailAppendPublicationReport, TailAppendPublicationError> {
+        self.write_to_source(&self.source, sink, context)
+    }
+
+    /// Alias for [`Self::write_to`].
+    pub fn publish_to<W: Write>(
+        &self,
+        sink: &mut W,
+        context: &ExecutionContext,
+    ) -> Result<TailAppendPublicationReport, TailAppendPublicationError> {
+        self.write_to(sink, context)
+    }
+
+    /// Alias for [`Self::write_to_source`] for callers that make the source
+    /// authorization boundary explicit at the call site.
+    pub fn publish_to_source<W: Write>(
+        &self,
+        source: &Document,
+        sink: &mut W,
+        context: &ExecutionContext,
+    ) -> Result<TailAppendPublicationReport, TailAppendPublicationError> {
+        self.write_to_source(source, sink, context)
+    }
+
+    /// Emits the plan against an explicitly supplied source snapshot.
+    ///
+    /// The supplied source must be the exact immutable snapshot captured by
+    /// the plan.  A foreign or stale source is rejected before the first sink
+    /// write, even when its bytes happen to be equal.
+    pub fn write_to_source<W: Write>(
+        &self,
+        source: &Document,
+        sink: &mut W,
+        context: &ExecutionContext,
+    ) -> Result<TailAppendPublicationReport, TailAppendPublicationError> {
+        self.publication_limits.validate()?;
+        if self.selector != TailSelector::Body {
+            return Err(TailAppendPublicationError::Plan(
+                TailAppendError::UnsupportedSelector,
+            ));
+        }
+        let source_bytes = source
+            .source_bytes()
+            .ok_or(TailAppendPublicationError::Plan(
+                TailAppendError::UnsupportedSource("snapshot has no exact RTF source"),
+            ))?;
+        let observed_version = source.source_version();
+        if observed_version != self.source_version {
+            return Err(TailAppendPublicationError::SourceVersionChanged {
+                expected: self.source_version,
+                observed: observed_version,
+            });
+        }
+        let observed_fingerprint = BlobId::of(source_bytes);
+        if source_bytes.len() != self.source_bytes
+            || observed_fingerprint != self.source_fingerprint
+        {
+            return Err(TailAppendPublicationError::SourceFingerprintChanged {
+                expected: self.source_fingerprint.clone(),
+                observed: observed_fingerprint,
+            });
+        }
+        if self.inserted.len() > self.append_limits.max_inserted_bytes {
+            return Err(TailAppendPublicationError::LimitExceeded {
+                resource: "inserted bytes",
+                observed: u64::try_from(self.inserted.len()).unwrap_or(u64::MAX),
+                limit: u64::try_from(self.append_limits.max_inserted_bytes).unwrap_or(u64::MAX),
+                written: 0,
+            });
+        }
+        let output_length = source_bytes.len().checked_add(self.inserted.len()).ok_or(
+            TailAppendPublicationError::LimitExceeded {
+                resource: "output bytes",
+                observed: u64::MAX,
+                limit: u64::try_from(self.append_limits.max_output_bytes).unwrap_or(u64::MAX),
+                written: 0,
+            },
+        )?;
+        if output_length != self.output_bytes() {
+            return Err(TailAppendPublicationError::Plan(
+                TailAppendError::UnsupportedSource(
+                    "publication output length no longer matches its proof",
+                ),
+            ));
+        }
+        if output_length > self.append_limits.max_output_bytes {
+            return Err(TailAppendPublicationError::LimitExceeded {
+                resource: "output bytes",
+                observed: u64::try_from(output_length).unwrap_or(u64::MAX),
+                limit: u64::try_from(self.append_limits.max_output_bytes).unwrap_or(u64::MAX),
+                written: 0,
+            });
+        }
+        if output_length > source.limits().max_source_bytes() {
+            return Err(TailAppendPublicationError::LimitExceeded {
+                resource: "source bytes",
+                observed: u64::try_from(output_length).unwrap_or(u64::MAX),
+                limit: u64::try_from(source.limits().max_source_bytes()).unwrap_or(u64::MAX),
+                written: 0,
+            });
+        }
+        if self.root_close > source_bytes.len() {
+            return Err(TailAppendPublicationError::Plan(
+                TailAppendError::UnsupportedSource(
+                    "publication root-close proof is outside the source",
+                ),
+            ));
+        }
+        let expected = u64::try_from(output_length).map_err(|_error| {
+            TailAppendPublicationError::LimitExceeded {
+                resource: "output bytes",
+                observed: u64::MAX,
+                limit: u64::try_from(self.append_limits.max_output_bytes).unwrap_or(u64::MAX),
+                written: 0,
+            }
+        })?;
+        context
+            .check()
+            .map_err(|error| publication_execution(error, 0))?;
+
+        let window = self.publication_limits.max_window_bytes.min(output_length);
+        let memory_amount = if self.planning_memory.is_some() {
+            0
+        } else {
+            window.checked_add(self.inserted.len()).ok_or(
+                TailAppendPublicationError::LimitExceeded {
+                    resource: "memory",
+                    observed: u64::MAX,
+                    limit: u64::try_from(window).unwrap_or(u64::MAX),
+                    written: 0,
+                },
+            )?
+        };
+        let mut memory = Some(
+            context
+                .reserve(
+                    Resource::Memory,
+                    u64::try_from(memory_amount).unwrap_or(u64::MAX),
+                )
+                .map_err(|error| publication_execution(error, 0))?,
+        );
+        let mut input = Some(
+            context
+                .reserve(Resource::InputBytes, expected)
+                .map_err(|error| publication_execution(error, 0))?,
+        );
+        let mut output = Some(
+            context
+                .reserve(Resource::OutputBytes, expected)
+                .map_err(|error| publication_execution(error, 0))?,
+        );
+        let mut work = Some(
+            context
+                .reserve(Resource::Work, expected)
+                .map_err(|error| publication_execution(error, 0))?,
+        );
+
+        let root_close = if self.is_noop() {
+            source_bytes.len()
+        } else {
+            self.root_close
+        };
+        let prefix = source_bytes
+            .get(..root_close)
+            .ok_or(TailAppendPublicationError::Plan(
+                TailAppendError::UnsupportedSource(
+                    "publication prefix proof is outside the source",
+                ),
+            ))?;
+        let suffix = source_bytes
+            .get(root_close..)
+            .ok_or(TailAppendPublicationError::Plan(
+                TailAppendError::UnsupportedSource(
+                    "publication suffix proof is outside the source",
+                ),
+            ))?;
+        let segments = [prefix, self.inserted.as_ref(), suffix];
+        let chunk_limit = self
+            .publication_limits
+            .max_window_bytes
+            .min(self.publication_limits.max_write_bytes);
+        let mut accepted = 0usize;
+        let mut writes = 0usize;
+        let mut largest_write = 0usize;
+        for segment in segments {
+            if let Err(error) = write_publication_segment(
+                sink,
+                segment,
+                chunk_limit,
+                context,
+                &mut accepted,
+                &mut writes,
+                &mut largest_write,
+            ) {
+                settle_publication_reservations(
+                    &mut memory,
+                    &mut input,
+                    &mut output,
+                    &mut work,
+                    u64::try_from(accepted).unwrap_or(u64::MAX),
+                );
+                return Err(with_publication_progress(
+                    error,
+                    u64::try_from(accepted).unwrap_or(u64::MAX),
+                    expected,
+                ));
+            }
+        }
+        if let Err(error) = sink.flush() {
+            settle_publication_reservations(
+                &mut memory,
+                &mut input,
+                &mut output,
+                &mut work,
+                u64::try_from(accepted).unwrap_or(u64::MAX),
+            );
+            return Err(TailAppendPublicationError::IncompleteOutput {
+                progress: TailAppendOutputProgress::CompleteUnflushed { bytes: expected },
+                source: Box::new(TailAppendPublicationError::Sink {
+                    kind: error.kind(),
+                    message: error.to_string(),
+                    written: expected,
+                }),
+            });
+        }
+        if let Err(error) = context.check() {
+            settle_publication_reservations(
+                &mut memory,
+                &mut input,
+                &mut output,
+                &mut work,
+                u64::try_from(accepted).unwrap_or(u64::MAX),
+            );
+            return Err(TailAppendPublicationError::IncompleteOutput {
+                progress: TailAppendOutputProgress::CompleteUnverified { bytes: expected },
+                source: Box::new(publication_execution(error, expected)),
+            });
+        }
+        let observed_version = source.source_version();
+        if observed_version != self.source_version {
+            settle_publication_reservations(
+                &mut memory,
+                &mut input,
+                &mut output,
+                &mut work,
+                u64::try_from(accepted).unwrap_or(u64::MAX),
+            );
+            return Err(TailAppendPublicationError::IncompleteOutput {
+                progress: TailAppendOutputProgress::CompleteUnverified { bytes: expected },
+                source: Box::new(TailAppendPublicationError::SourceVersionChanged {
+                    expected: self.source_version,
+                    observed: observed_version,
+                }),
+            });
+        }
+        let observed_fingerprint = BlobId::of(source_bytes);
+        if observed_fingerprint != self.source_fingerprint {
+            settle_publication_reservations(
+                &mut memory,
+                &mut input,
+                &mut output,
+                &mut work,
+                u64::try_from(accepted).unwrap_or(u64::MAX),
+            );
+            return Err(TailAppendPublicationError::IncompleteOutput {
+                progress: TailAppendOutputProgress::CompleteUnverified { bytes: expected },
+                source: Box::new(TailAppendPublicationError::SourceFingerprintChanged {
+                    expected: self.source_fingerprint.clone(),
+                    observed: observed_fingerprint,
+                }),
+            });
+        }
+        settle_publication_reservations(&mut memory, &mut input, &mut output, &mut work, expected);
+        Ok(TailAppendPublicationReport {
+            bytes: output_length,
+            source_bytes: self.source_bytes,
+            inserted_bytes: self.inserted.len(),
+            source_version: self.source_version,
+            source_fingerprint: self.source_fingerprint.clone(),
+            writes,
+            largest_write,
+        })
+    }
+}
+
+#[derive(Debug)]
+enum PublicationWriteFailure {
+    Execution(ExecutionError),
+    Sink {
+        kind: io::ErrorKind,
+        message: String,
+    },
+    Overreported,
+}
+
+fn write_publication_segment<W: Write>(
+    sink: &mut W,
+    bytes: &[u8],
+    chunk_limit: usize,
+    context: &ExecutionContext,
+    accepted: &mut usize,
+    writes: &mut usize,
+    largest_write: &mut usize,
+) -> Result<(), PublicationWriteFailure> {
+    if bytes.is_empty() {
+        return Ok(());
+    }
+    let mut offset = 0usize;
+    while offset < bytes.len() {
+        context
+            .check()
+            .map_err(PublicationWriteFailure::Execution)?;
+        let end = offset
+            .checked_add(chunk_limit)
+            .unwrap_or(usize::MAX)
+            .min(bytes.len());
+        let window = bytes
+            .get(offset..end)
+            .ok_or(PublicationWriteFailure::Sink {
+                kind: io::ErrorKind::InvalidData,
+                message: "publication window is outside the source span".to_string(),
+            })?;
+        let mut window_offset = 0usize;
+        while window_offset < window.len() {
+            context
+                .check()
+                .map_err(PublicationWriteFailure::Execution)?;
+            let remaining = window
+                .get(window_offset..)
+                .ok_or(PublicationWriteFailure::Sink {
+                    kind: io::ErrorKind::InvalidData,
+                    message: "publication write window is outside the source span".to_string(),
+                })?;
+            *writes = writes.saturating_add(1);
+            *largest_write = (*largest_write).max(remaining.len());
+            match sink.write(remaining) {
+                Ok(0) => {
+                    return Err(PublicationWriteFailure::Sink {
+                        kind: io::ErrorKind::WriteZero,
+                        message: "publication sink returned zero progress".to_string(),
+                    });
+                },
+                Ok(count) if count > remaining.len() => {
+                    return Err(PublicationWriteFailure::Overreported);
+                },
+                Ok(count) => {
+                    window_offset = window_offset.saturating_add(count);
+                    *accepted = accepted.saturating_add(count);
+                    context
+                        .check()
+                        .map_err(PublicationWriteFailure::Execution)?;
+                },
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => {},
+                Err(error) => {
+                    return Err(PublicationWriteFailure::Sink {
+                        kind: error.kind(),
+                        message: error.to_string(),
+                    });
+                },
+            }
+        }
+        offset = end;
+    }
+    Ok(())
+}
+
+fn settle_publication_reservations(
+    memory: &mut Option<Reservation>,
+    input: &mut Option<Reservation>,
+    output: &mut Option<Reservation>,
+    work: &mut Option<Reservation>,
+    accepted: u64,
+) {
+    if let Some(reservation) = memory.take() {
+        let _ = reservation.commit(0);
+    }
+    if let Some(reservation) = input.take() {
+        let _ = reservation.commit(accepted);
+    }
+    if let Some(reservation) = output.take() {
+        let _ = reservation.commit(accepted);
+    }
+    if let Some(reservation) = work.take() {
+        let _ = reservation.commit(accepted);
+    }
+}
+
+fn publication_execution(error: ExecutionError, written: u64) -> TailAppendPublicationError {
+    TailAppendPublicationError::Execution { error, written }
+}
+
+fn with_publication_progress(
+    error: PublicationWriteFailure,
+    accepted: u64,
+    expected: u64,
+) -> TailAppendPublicationError {
+    let indeterminate = matches!(&error, PublicationWriteFailure::Overreported);
+    let error = match error {
+        PublicationWriteFailure::Execution(error) => publication_execution(error, accepted),
+        PublicationWriteFailure::Sink { kind, message } => TailAppendPublicationError::Sink {
+            kind,
+            message,
+            written: accepted,
+        },
+        PublicationWriteFailure::Overreported => TailAppendPublicationError::Sink {
+            kind: io::ErrorKind::InvalidData,
+            message: "publication sink reported more bytes than offered".to_string(),
+            written: accepted,
+        },
+    };
+    if accepted == 0 && !indeterminate {
+        return error;
+    }
+    let progress = if indeterminate {
+        TailAppendOutputProgress::Indeterminate {
+            accepted_before: accepted,
+        }
+    } else if accepted == expected {
+        TailAppendOutputProgress::CompleteUnverified { bytes: accepted }
+    } else {
+        TailAppendOutputProgress::Prefix { accepted, expected }
+    };
+    TailAppendPublicationError::IncompleteOutput {
+        progress,
+        source: Box::new(error),
     }
 }
 
