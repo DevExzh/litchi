@@ -10,17 +10,49 @@ use crate::model::legacy_animation::validate_legacy_animation_root;
 use crate::model::media::{EmbeddedMedia, embed_media, validate_package_media_path};
 use crate::{Presentation, Reference, Shape, Slide};
 use litchi_core::{Result, xml::escape_xml};
-use quick_xml::{Reader, events::Event};
+use quick_xml::{
+    Decoder, Reader, XmlVersion,
+    events::{BytesStart, Event},
+    name::{Namespace, ResolveResult},
+    reader::NsReader,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 const MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES: usize = 64 * 1024;
 const MAX_DEPENDENCY_FREE_COPY_NAME_BYTES: usize = 4 * 1024;
+const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const DRAW_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
+const STYLE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+const PRESENTATION_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+const TEXT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const SVG_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
+const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink";
+const ANIMATION_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:animation:1.0";
+const SMIL_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0";
+const DR3D_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0";
+const SCRIPT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:script:1.0";
+const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
+const XMLNS_DEFAULT: &[u8] = b"xmlns";
+const XMLNS_PREFIX: &[u8] = b"xmlns:";
+const MAX_NAMESPACE_BINDINGS: usize = 512;
 
 pub(super) struct DependencyFreeBlankSlideCopy {
     slide: Slide,
     page: String,
     page_metadata: crate::model::page_metadata::Collection,
     source_origin: usize,
+}
+
+pub(super) struct ForeignDependencyFreeBlankSlideCopy {
+    slide: Slide,
+    page: String,
+    page_metadata: crate::model::page_metadata::Collection,
+}
+
+impl ForeignDependencyFreeBlankSlideCopy {
+    pub(super) fn resource_bytes(&self) -> usize {
+        self.page.len()
+    }
 }
 
 pub(super) struct DependencyFreeBlankSlideRemoval {
@@ -93,6 +125,9 @@ pub(super) struct MutablePresentation {
     /// Ordinary source pages continue to borrow their fragment through
     /// `origins`; a copied page owns only the minimally renamed duplicate.
     page_overrides: Vec<Option<String>>,
+    /// A foreign copied page has no local source origin. Its owned fragment is
+    /// retained only while the imported semantic slide remains untouched.
+    foreign_page_overrides: Vec<bool>,
     /// Declaration state exactly as parsed; changing it rewrites every page.
     source_declarations: Option<crate::model::declaration::Collection>,
     /// Lazy result of the current writer's whole-content publication audit.
@@ -158,13 +193,14 @@ impl MutablePresentation {
                 ));
             },
         };
-        let retained_source = content_source.filter(|_| !source_slides.is_empty());
+        let retained_source = content_source;
         let origins = if retained_source.is_some() {
             (0..slides.len()).map(Some).collect()
         } else {
             vec![None; slides.len()]
         };
         let page_overrides = (0..slides.len()).map(|_| None).collect();
+        let foreign_page_overrides = (0..slides.len()).map(|_| false).collect();
 
         Ok(Self {
             slides,
@@ -180,6 +216,7 @@ impl MutablePresentation {
             source_slides,
             origins,
             page_overrides,
+            foreign_page_overrides,
             slide_move_supported: None,
         })
     }
@@ -191,6 +228,18 @@ impl MutablePresentation {
 
     /// Return whether rewriting this slide would discard retained source XML.
     pub(super) fn retains_source_slide(&self, index: usize) -> bool {
+        if self
+            .foreign_page_overrides
+            .get(index)
+            .copied()
+            .unwrap_or(false)
+        {
+            return self
+                .page_overrides
+                .get(index)
+                .and_then(Option::as_ref)
+                .is_some();
+        }
         self.slides
             .get(index)
             .is_some_and(|slide| self.retained_page(index, slide).is_some())
@@ -376,10 +425,156 @@ impl MutablePresentation {
                 source,
             }
         })?;
+        self.foreign_page_overrides
+            .try_reserve_exact(1)
+            .map_err(|source| litchi_core::Error::Allocation {
+                resource: "ODP copied slide provenance",
+                source,
+            })?;
         let index = self.slides.len();
         self.slides.push(copy.slide);
         self.origins.push(Some(copy.source_origin));
         self.page_overrides.push(Some(copy.page));
+        self.foreign_page_overrides.push(false);
+        self.page_metadata = Some(copy.page_metadata);
+        Ok(index)
+    }
+
+    /// Prepare an append-only dependency-free page imported from another
+    /// presentation. The donor fragment is admitted only when it is a
+    /// canonical self-closing `draw:page` with a single semantic attribute,
+    /// `draw:name`; all destination page identity is rebuilt locally.
+    pub(super) fn prepare_foreign_dependency_free_blank_slide_copy(
+        &mut self,
+        source_page: &str,
+        source_slide: &Slide,
+        source_name: &str,
+    ) -> Result<ForeignDependencyFreeBlankSlideCopy> {
+        self.check_slide_move_supported()?;
+        self.check_foreign_transfer_destination_safety()?;
+        if self.content_source.is_none() {
+            return Err(litchi_core::Error::Unsupported(
+                "ODP foreign slide transfer requires a retained destination presentation body"
+                    .to_string(),
+            ));
+        }
+        if source_page.len() > MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP foreign blank page exceeds {MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES} bytes"
+            )));
+        }
+        let name_value = dependency_free_blank_name_value(source_page)?;
+        if source_name.is_empty() {
+            return Err(litchi_core::Error::Unsupported(
+                "ODP foreign blank page requires a non-empty draw:name".to_string(),
+            ));
+        }
+        if source_name.len() > MAX_DEPENDENCY_FREE_COPY_NAME_BYTES {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP foreign blank page name exceeds {MAX_DEPENDENCY_FREE_COPY_NAME_BYTES} bytes"
+            )));
+        }
+        if source_slide.title.is_some()
+            || !source_slide.text.is_empty()
+            || source_slide.notes.is_some()
+            || source_slide.transition.is_some()
+            || !source_slide.animations.is_empty()
+            || source_slide.legacy_animation.is_some()
+            || !source_slide.shapes.is_empty()
+        {
+            return Err(litchi_core::Error::Unsupported(
+                "ODP foreign slide transfer requires a dependency-free blank page".to_string(),
+            ));
+        }
+        let names = crate::model::page_metadata::effective_page_names(
+            self.page_metadata.as_ref(),
+            self.slides.len(),
+        )?;
+        let new_name = foreign_copy_name(source_name, &names)?;
+        let escaped_name = escape_xml(&new_name);
+        let new_page_len = source_page
+            .len()
+            .checked_sub(name_value.end - name_value.start)
+            .and_then(|value| value.checked_add(escaped_name.len()))
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(
+                    "ODP foreign blank page size overflow".to_string(),
+                )
+            })?;
+        if new_page_len > MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP foreign copied page exceeds {MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES} bytes"
+            )));
+        }
+        let mut page = String::new();
+        page.try_reserve_exact(new_page_len)
+            .map_err(|source| litchi_core::Error::Allocation {
+                resource: "ODP foreign blank page fragment",
+                source,
+            })?;
+        page.push_str(&source_page[..name_value.start]);
+        page.push_str(&escaped_name);
+        page.push_str(&source_page[name_value.end..]);
+
+        let page_metadata =
+            crate::model::page_metadata::metadata_after_foreign_dependency_free_page_copy(
+                self.page_metadata.as_ref(),
+                self.slides.len(),
+                new_name,
+            )?;
+        let slide = Slide {
+            title: None,
+            text: String::new(),
+            index: self.slides.len(),
+            notes: None,
+            transition: None,
+            animations: Vec::new(),
+            legacy_animation: None,
+            shapes: Vec::new(),
+        };
+        Ok(ForeignDependencyFreeBlankSlideCopy {
+            slide,
+            page,
+            page_metadata,
+        })
+    }
+
+    /// Atomically append a prevalidated dependency-free page imported from a
+    /// different presentation. The page carries no local source origin and is
+    /// retained through its explicit foreign provenance marker.
+    pub(super) fn apply_foreign_dependency_free_blank_slide_copy(
+        &mut self,
+        copy: ForeignDependencyFreeBlankSlideCopy,
+    ) -> Result<usize> {
+        self.slides
+            .try_reserve_exact(1)
+            .map_err(|source| litchi_core::Error::Allocation {
+                resource: "ODP foreign copied slide projection",
+                source,
+            })?;
+        self.origins
+            .try_reserve_exact(1)
+            .map_err(|source| litchi_core::Error::Allocation {
+                resource: "ODP foreign copied slide origins",
+                source,
+            })?;
+        self.page_overrides.try_reserve_exact(1).map_err(|source| {
+            litchi_core::Error::Allocation {
+                resource: "ODP foreign copied slide fragments",
+                source,
+            }
+        })?;
+        self.foreign_page_overrides
+            .try_reserve_exact(1)
+            .map_err(|source| litchi_core::Error::Allocation {
+                resource: "ODP foreign copied slide provenance",
+                source,
+            })?;
+        let index = self.slides.len();
+        self.slides.push(copy.slide);
+        self.origins.push(None);
+        self.page_overrides.push(Some(copy.page));
+        self.foreign_page_overrides.push(true);
         self.page_metadata = Some(copy.page_metadata);
         Ok(index)
     }
@@ -485,6 +680,7 @@ impl MutablePresentation {
         let slide = self.slides.remove(removal.index);
         self.origins.remove(removal.index);
         self.page_overrides.remove(removal.index);
+        self.foreign_page_overrides.remove(removal.index);
         self.page_metadata = removal.page_metadata;
         for (index, slide) in self.slides.iter_mut().enumerate().skip(removal.index) {
             slide.index = index;
@@ -511,6 +707,15 @@ impl MutablePresentation {
             ));
         }
         Ok(())
+    }
+
+    fn check_foreign_transfer_destination_safety(&self) -> Result<()> {
+        let package = self.source_package.as_ref().ok_or_else(|| {
+            litchi_core::Error::Unsupported(
+                "ODP foreign blank-slide transfer requires a retained source package".to_string(),
+            )
+        })?;
+        ensure_foreign_transfer_package_safety(package, "destination")
     }
 
     fn check_dependency_free_removal_name_ownership(&self, selected_name: &str) -> Result<()> {
@@ -644,6 +849,7 @@ impl MutablePresentation {
             self.slides.insert(index, slide);
             self.origins.insert(index, None);
             self.page_overrides.insert(index, None);
+            self.foreign_page_overrides.insert(index, false);
             self.page_metadata = Some(candidate_metadata);
 
             // Update indices of subsequent slides
@@ -714,6 +920,7 @@ impl MutablePresentation {
             let slide = self.slides.remove(index);
             self.origins.remove(index);
             self.page_overrides.remove(index);
+            self.foreign_page_overrides.remove(index);
             self.page_metadata = candidate_metadata;
 
             // Update indices of subsequent slides
@@ -764,6 +971,9 @@ impl MutablePresentation {
         self.origins.insert(to, origin);
         let page_override = self.page_overrides.remove(from);
         self.page_overrides.insert(to, page_override);
+        let foreign_page_override = self.foreign_page_overrides.remove(from);
+        self.foreign_page_overrides
+            .insert(to, foreign_page_override);
         self.page_metadata = candidate_metadata;
         for (index, slide) in self.slides.iter_mut().enumerate() {
             slide.index = index;
@@ -928,6 +1138,17 @@ impl MutablePresentation {
         let source = self.content_source.as_ref()?;
         if self.declarations != self.source_declarations {
             return None;
+        }
+        if self
+            .foreign_page_overrides
+            .get(slide_index)
+            .copied()
+            .unwrap_or(false)
+        {
+            return self
+                .page_overrides
+                .get(slide_index)
+                .and_then(Option::as_deref);
         }
         let source_index = self.origins.get(slide_index).copied().flatten()?;
         self.source_slides
@@ -1209,9 +1430,301 @@ impl MutablePresentation {
     }
 }
 
+pub(super) fn ensure_foreign_transfer_package_safety(
+    package: &OwnedPackage,
+    side: &str,
+) -> Result<()> {
+    let archive = package.package()?;
+    let files = archive.files()?;
+    if files.iter().any(|path| is_macro_owner_path(path)) {
+        return Err(litchi_core::Error::Unsupported(format!(
+            "ODP foreign blank-slide transfer refuses {side} package macro owners"
+        )));
+    }
+    if files.iter().any(|path| is_signature_owner_path(path)) {
+        return Err(litchi_core::Error::Unsupported(format!(
+            "ODP foreign blank-slide transfer refuses {side} signature owners"
+        )));
+    }
+    let manifest = archive.manifest();
+    if manifest.has_encrypted_entries() {
+        return Err(litchi_core::Error::Unsupported(format!(
+            "ODP foreign blank-slide transfer refuses encrypted {side} package entries"
+        )));
+    }
+    for path in files {
+        if !is_xml_owner_part(&path, manifest.get_media_type(&path)) {
+            continue;
+        }
+        let bytes = archive.get_file(&path)?;
+        let xml = std::str::from_utf8(&bytes).map_err(|error| {
+            litchi_core::Error::InvalidFormat(format!(
+                "ODP {side} XML part '{path}' is not UTF-8 during transfer safety validation: {error}"
+            ))
+        })?;
+        ensure_no_macro_xml_owners(xml, side)?;
+        ensure_no_protected_xml(xml, side)?;
+        if path.eq_ignore_ascii_case("content.xml") {
+            ensure_foreign_transfer_namespace_ancestors(xml, side)?;
+        }
+    }
+    Ok(())
+}
+
+fn ensure_foreign_transfer_namespace_ancestors(xml: &str, side: &str) -> Result<()> {
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut scopes = Vec::new();
+    let mut root_scope = None;
+    loop {
+        let decoder = reader.decoder();
+        let (resolved, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_core::Error::InvalidFormat(format!(
+                "invalid ODP {side} content.xml during namespace validation: {error}"
+            ))
+        })?;
+        match event {
+            Event::Start(element) => {
+                let scope = effective_namespace_scope(scopes.last(), &element, decoder, side)?;
+                let target = namespace_ancestor_target(&resolved, element.local_name().as_ref());
+                if scopes.is_empty() {
+                    root_scope = Some(scope.clone());
+                }
+                if let Some(target) = target {
+                    validate_namespace_ancestor(root_scope.as_ref(), &scope, target, false, side)?;
+                }
+                scopes.push(scope);
+            },
+            Event::Empty(element) => {
+                let scope = effective_namespace_scope(scopes.last(), &element, decoder, side)?;
+                let target = namespace_ancestor_target(&resolved, element.local_name().as_ref());
+                if scopes.is_empty() {
+                    root_scope = Some(scope.clone());
+                }
+                if let Some(target) = target {
+                    validate_namespace_ancestor(root_scope.as_ref(), &scope, target, true, side)?;
+                }
+            },
+            Event::End(_) => {
+                scopes.pop().ok_or_else(|| {
+                    litchi_core::Error::InvalidFormat(format!(
+                        "ODP {side} content.xml namespace scope underflow"
+                    ))
+                })?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if !scopes.is_empty() {
+        return Err(litchi_core::Error::InvalidFormat(format!(
+            "ODP {side} content.xml namespace scope is unterminated"
+        )));
+    }
+    Ok(())
+}
+
+fn effective_namespace_scope(
+    parent: Option<&BTreeMap<String, String>>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    side: &str,
+) -> Result<BTreeMap<String, String>> {
+    let mut scope = parent.cloned().unwrap_or_default();
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute.map_err(|error| {
+            litchi_core::Error::InvalidFormat(format!(
+                "invalid ODP {side} namespace declaration: {error}"
+            ))
+        })?;
+        let key = attribute.key.as_ref();
+        let prefix = if key == XMLNS_DEFAULT {
+            String::new()
+        } else if let Some(rest) = key.strip_prefix(XMLNS_PREFIX) {
+            String::from_utf8(rest.to_vec()).map_err(|error| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "invalid ODP {side} namespace prefix: {error}"
+                ))
+            })?
+        } else {
+            continue;
+        };
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "invalid ODP {side} namespace URI: {error}"
+                ))
+            })?;
+        scope.insert(prefix, value.into_owned());
+        if scope.len() > MAX_NAMESPACE_BINDINGS {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP foreign blank-slide transfer refuses {side} namespace scope above {MAX_NAMESPACE_BINDINGS} bindings"
+            )));
+        }
+    }
+    Ok(scope)
+}
+
+fn namespace_ancestor_target<'a>(resolved: &ResolveResult<'_>, local: &[u8]) -> Option<&'a str> {
+    let ResolveResult::Bound(Namespace(uri)) = resolved else {
+        return None;
+    };
+    if *uri != OFFICE_NAMESPACE.as_bytes() {
+        return None;
+    }
+    match local {
+        b"body" => Some("office:body"),
+        b"presentation" => Some("office:presentation"),
+        b"automatic-styles" => Some("office:automatic-styles"),
+        _ => None,
+    }
+}
+
+fn validate_namespace_ancestor(
+    root: Option<&BTreeMap<String, String>>,
+    current: &BTreeMap<String, String>,
+    target: &str,
+    empty: bool,
+    side: &str,
+) -> Result<()> {
+    if target == "office:presentation" && empty {
+        return Err(litchi_core::Error::Unsupported(format!(
+            "ODP foreign blank-slide transfer refuses self-closing {side} office:presentation"
+        )));
+    }
+    let Some(root) = root else {
+        return Err(litchi_core::Error::InvalidFormat(format!(
+            "ODP {side} namespace validation found {target} before document root"
+        )));
+    };
+    if root.get("") != current.get("") {
+        return Err(litchi_core::Error::Unsupported(format!(
+            "ODP foreign blank-slide transfer refuses {side} default-namespace rebinding at {target}"
+        )));
+    }
+    const REQUIRED: [(&str, &str); 12] = [
+        ("office", OFFICE_NAMESPACE),
+        ("draw", DRAW_NAMESPACE),
+        ("style", STYLE_NAMESPACE),
+        ("presentation", PRESENTATION_NAMESPACE),
+        ("text", TEXT_NAMESPACE),
+        ("svg", SVG_NAMESPACE),
+        ("xlink", XLINK_NAMESPACE),
+        ("anim", ANIMATION_NAMESPACE),
+        ("smil", SMIL_NAMESPACE),
+        ("dr3d", DR3D_NAMESPACE),
+        ("script", SCRIPT_NAMESPACE),
+        ("xml", XML_NAMESPACE),
+    ];
+    for (prefix, expected) in REQUIRED {
+        let root_binding = root.get(prefix);
+        let current_binding = current.get(prefix);
+        if root_binding != current_binding {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP foreign blank-slide transfer refuses {side} namespace rebinding of '{prefix}' at {target}"
+            )));
+        }
+        if let Some(binding) = current_binding
+            && binding != expected
+        {
+            return Err(litchi_core::Error::Unsupported(format!(
+                "ODP foreign blank-slide transfer refuses {side} prefix '{prefix}' bound to '{binding}' at {target}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn is_macro_owner_path(path: &str) -> bool {
+    path.trim_start_matches('/').split('/').any(|component| {
+        component.eq_ignore_ascii_case("basic") || component.eq_ignore_ascii_case("scripts")
+    })
+}
+
+fn is_signature_owner_path(path: &str) -> bool {
+    let normalized = path.trim_start_matches('/').to_ascii_lowercase();
+    normalized == "meta-inf/documentsignatures.xml" || normalized == "meta-inf/macrosignatures.xml"
+}
+
+pub(super) fn ensure_no_macro_xml_owners(content: &str, side: &str) -> Result<()> {
+    let mut reader = Reader::from_str(content);
+    reader.config_mut().check_end_names = true;
+    loop {
+        match reader.read_event().map_err(|error| {
+            litchi_core::Error::InvalidFormat(format!(
+                "invalid ODP {side} content.xml during macro-owner validation: {error}"
+            ))
+        })? {
+            Event::Start(element) => {
+                if is_macro_owner_name(element.local_name().as_ref()) {
+                    return Err(litchi_core::Error::Unsupported(format!(
+                        "ODP foreign blank-slide transfer refuses {side} XML macro owners"
+                    )));
+                }
+            },
+            Event::Empty(element) => {
+                let local_name = element.local_name();
+                if is_macro_owner_name(local_name.as_ref()) && local_name.as_ref() != b"scripts" {
+                    return Err(litchi_core::Error::Unsupported(format!(
+                        "ODP foreign blank-slide transfer refuses {side} XML macro owners"
+                    )));
+                }
+            },
+            Event::DocType(_) | Event::GeneralRef(_) => {
+                return Err(litchi_core::Error::Unsupported(format!(
+                    "ODP foreign blank-slide transfer refuses {side} DTD or entity owners"
+                )));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn ensure_no_protected_xml(content: &str, side: &str) -> Result<()> {
+    let mut reader = Reader::from_str(content);
+    reader.config_mut().check_end_names = true;
+    loop {
+        match reader.read_event().map_err(|error| {
+            litchi_core::Error::InvalidFormat(format!(
+                "invalid ODP {side} content.xml during protection validation: {error}"
+            ))
+        })? {
+            Event::Start(element) | Event::Empty(element) => {
+                for attribute in element.attributes() {
+                    let attribute = attribute.map_err(|error| {
+                        litchi_core::Error::InvalidFormat(format!(
+                            "invalid ODP {side} protection attribute: {error}"
+                        ))
+                    })?;
+                    let local_name = attribute.key.local_name();
+                    if matches!(
+                        local_name.as_ref(),
+                        b"protect" | b"protected" | b"protection-key" | b"protection-key-digest"
+                    ) {
+                        return Err(litchi_core::Error::Unsupported(format!(
+                            "ODP foreign blank-slide transfer refuses {side} protected XML"
+                        )));
+                    }
+                }
+            },
+            Event::DocType(_) | Event::GeneralRef(_) => {
+                return Err(litchi_core::Error::Unsupported(format!(
+                    "ODP foreign blank-slide transfer refuses {side} DTD or entity owners"
+                )));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(())
+}
+
 fn count_selected_name_owners(
     reader: &Reader<&[u8]>,
-    element: &quick_xml::events::BytesStart<'_>,
+    element: &BytesStart<'_>,
     selected_name: &str,
     selected_name_owners: &mut usize,
 ) -> Result<()> {
@@ -1222,7 +1735,7 @@ fn count_selected_name_owners(
             ))
         })?;
         let value = attribute
-            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| {
                 litchi_core::Error::InvalidFormat(format!(
                     "invalid ODP XML attribute value during blank-slide ownership validation: {error}"
@@ -1324,7 +1837,10 @@ fn is_xml_owner_part(path: &str, media_type: Option<&str>) -> bool {
                 .get(value.len().saturating_sub(4)..)
                 .is_some_and(|suffix| suffix.eq_ignore_ascii_case("+xml"))
     });
-    matches!(path, "content.xml" | "styles.xml") || xml_extension || xml_media_type
+    path.eq_ignore_ascii_case("content.xml")
+        || path.eq_ignore_ascii_case("styles.xml")
+        || xml_extension
+        || xml_media_type
 }
 
 fn dependency_free_copy_name(old_name: &str, names: &[String]) -> Result<String> {
@@ -1361,6 +1877,20 @@ fn dependency_free_copy_name(old_name: &str, names: &[String]) -> Result<String>
     Err(litchi_core::Error::InvalidFormat(
         "ODP dependency-free copied page name space is exhausted".to_string(),
     ))
+}
+
+fn foreign_copy_name(source_name: &str, names: &[String]) -> Result<String> {
+    if !names.iter().any(|name| name == source_name) {
+        let mut name = String::new();
+        name.try_reserve_exact(source_name.len())
+            .map_err(|source| litchi_core::Error::Allocation {
+                resource: "ODP foreign copied page name",
+                source,
+            })?;
+        name.push_str(source_name);
+        return Ok(name);
+    }
+    dependency_free_copy_name(source_name, names)
 }
 
 fn dependency_free_blank_name_value(page: &str) -> Result<std::ops::Range<usize>> {

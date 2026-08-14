@@ -759,6 +759,119 @@ impl Transaction {
         Ok(Some(copied_index))
     }
 
+    /// Append one dependency-free blank slide from an independent ODP
+    /// snapshot.
+    ///
+    /// This deliberately admits only a self-closing donor `draw:page` whose
+    /// sole semantic attribute is `draw:name`. The donor page has no body,
+    /// layout, master, identifier, navigation, hyperlink, animation, macro,
+    /// protection, or package-resource closure to remap. Its name is remapped
+    /// deterministically against the destination page names and the exact
+    /// donor fragment is retained as a destination-owned page override.
+    ///
+    /// The destination must already contain a retained source presentation
+    /// body and cannot have staged slide/page-indexed operations, declarations,
+    /// settings, macros, signatures, or encryption. The donor is never
+    /// modified. A missing selector is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unsupported donor or destination package,
+    /// ambiguous selector, dependency-bearing page, exhausted limits, or a
+    /// read-only source. Refusal leaves the transaction unchanged.
+    pub fn transfer_dependency_free_blank_slide_from<'a, S>(
+        &mut self,
+        source: &Snapshot,
+        selector: S,
+    ) -> Result<Option<usize>>
+    where
+        S: Into<Selector<'a>>,
+    {
+        if self.dependency_free_slide_copy_changed {
+            return unsupported(
+                "ODP transaction already contains a dependency-free blank-slide copy",
+            );
+        }
+        if self.slide_order_changed {
+            return unsupported(
+                "ODP foreign blank-slide transfer cannot be staged after a slide move",
+            );
+        }
+        let Some(source_index) = select(source.slides(), selector.into())? else {
+            return Ok(None);
+        };
+        if self.dependency_free_slide_removal_changed {
+            return unsupported(
+                "ODP foreign blank-slide transfer cannot be staged after a slide removal",
+            );
+        }
+        if self.changed || self.has_page_indexed_operations() {
+            return unsupported(
+                "ODP foreign blank-slide transfer cannot combine with slide or page-indexed operations",
+            );
+        }
+        if self.draft.slides().len() == MAX_SLIDES {
+            return invalid("ODP transaction exceeds the slide-count limit");
+        }
+
+        let source_package = OwnedPackage::from_shared_bytes(Arc::clone(&source.bytes))?;
+        ensure_editable_source(&source_package)?;
+        super::mutable::ensure_foreign_transfer_package_safety(&source_package, "donor")?;
+        let source_presentation = Presentation::from_shared_bytes(Arc::clone(&source.bytes))?;
+        audit::verify_authored(
+            source_presentation.content_xml().as_bytes(),
+            audit::Limits::default(),
+        )
+        .map(|_report| ())
+        .map_err(|error| {
+            Error::Unsupported(format!(
+                "ODP foreign blank-slide transfer refuses unaudited donor XML: {error}"
+            ))
+        })?;
+        if source_presentation.settings()?.is_some()
+            || !source_presentation.declarations()?.is_empty()
+        {
+            return unsupported(
+                "ODP foreign blank-slide transfer refuses donor settings or declarations",
+            );
+        }
+        let source_pages = source_presentation.pages()?;
+        let source_page = source_pages.page(source_index).ok_or_else(|| {
+            invalid_error("ODP foreign blank-slide transfer donor page metadata is missing")
+        })?;
+        let source_name = source_page.name.as_deref().ok_or_else(|| {
+            Error::Unsupported(
+                "ODP foreign blank-slide transfer donor requires draw:name".to_string(),
+            )
+        })?;
+        let source_content =
+            crate::codec::content_source::ContentSource::parse(source_presentation.content_xml())?
+                .ok_or_else(|| {
+                    Error::Unsupported(
+                "ODP foreign blank-slide transfer requires retained donor content fragments"
+                    .to_string(),
+            )
+                })?;
+        let donor_page = source_content.page(source_index).ok_or_else(|| {
+            invalid_error("ODP foreign blank-slide transfer donor page is outside content coverage")
+        })?;
+        let copy = self
+            .draft
+            .prepare_foreign_dependency_free_blank_slide_copy(
+                donor_page,
+                &source.slides()[source_index],
+                source_name,
+            )?;
+        let candidate = self.resource_candidate(0, copy.resource_bytes())?;
+        let copied_index = self
+            .draft
+            .apply_foreign_dependency_free_blank_slide_copy(copy)?;
+        self.resource_bytes = candidate;
+        self.dependency_free_slide_copy_changed = true;
+        self.changed = true;
+        Ok(Some(copied_index))
+    }
+
     /// Remove one exact retained dependency-free blank source slide.
     ///
     /// This is intentionally not a general slide-removal API. It accepts only
