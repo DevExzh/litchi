@@ -36,13 +36,14 @@ The narrow owner refuses or rejects:
 - length changes, overlapping/out-of-bounds splices, stale versions,
   fingerprint changes and finite-limit violations.
 
-The source-backed resolver currently materializes complete bounded copies of
-the `PowerPoint Document` and `Current User` streams to reuse the existing
-live persist and slide directory implementation. The common publisher also
-retains full-artifact integrity checks. This change therefore establishes a
-validated equal-length replacement-staging and physical-splice API, not
-proportional selected-range source I/O, lower latency, lower allocation count,
-bounded total memory, peak-heap/RSS improvement or cold-filesystem behavior.
+The initial source-backed resolver materialized complete bounded copies of the
+`PowerPoint Document` and `Current User` streams to reuse the existing live
+persist and slide directory implementation. [Change 0102](0102-ppt-source-backed-selector-range-reads.md)
+replaces that selector stage with bounded positional reads while retaining the
+common publisher's full-artifact integrity checks. The API remains
+correctness-only: neither change claims lower end-to-end latency, allocation
+count, bounded total memory, peak-heap/RSS improvement or cold-filesystem
+behavior.
 
 ## Verification
 

@@ -209,7 +209,7 @@ impl Record {
     }
 
     /// Check if a record type is a container that can hold child records.
-    fn is_container_record(record_type: RecordType) -> bool {
+    pub(crate) fn is_container_record(record_type: RecordType) -> bool {
         matches!(
             record_type,
             RecordType::Document
@@ -752,6 +752,47 @@ impl RecordParseSession {
     pub(crate) fn account_existing(&mut self, logical_depth: usize) -> Result<()> {
         self.budget.charge_visit(logical_depth)
     }
+
+    /// Charge a record that a range-aware resolver validates from its header
+    /// without copying its payload.
+    pub(crate) fn account_existing_header(
+        &mut self,
+        logical_depth: usize,
+        payload_bytes: usize,
+    ) -> Result<()> {
+        self.budget.charge_record(logical_depth, payload_bytes)
+    }
+
+    /// Charge a record whose complete payload was materialized without using
+    /// the semantic record parser.
+    pub(crate) fn account_materialized_record(
+        &mut self,
+        logical_depth: usize,
+        payload_bytes: usize,
+    ) -> Result<()> {
+        self.budget.charge_record(logical_depth, payload_bytes)?;
+        self.budget.charge_copy(payload_bytes)
+    }
+
+    /// Parse one complete strict record while retaining this session's shared
+    /// record/depth/copy budget.
+    pub(crate) fn parse_strict_record(
+        &mut self,
+        data: &[u8],
+        offset: usize,
+    ) -> Result<(Record, usize)> {
+        self.parse_strict_record_at_depth(data, offset, 0)
+    }
+
+    /// Parse one strict record at an already-known logical nesting depth.
+    pub(crate) fn parse_strict_record_at_depth(
+        &mut self,
+        data: &[u8],
+        offset: usize,
+        logical_depth: usize,
+    ) -> Result<(Record, usize)> {
+        Record::parse_impl(data, offset, true, logical_depth, &mut self.budget)
+    }
 }
 
 impl ParseBudget {
@@ -1115,6 +1156,52 @@ mod tests {
         assert!(matches!(
             depth_session.parse_sequence(&bytes, "deep", 2),
             Err(Error::ResourceLimit(_))
+        ));
+    }
+
+    #[test]
+    fn header_only_accounting_does_not_consume_copy_budget() {
+        let bytes = atom(0x2222, &[1, 2, 3, 4]);
+        let mut header_session = RecordParseSession::new(
+            RecordLimits {
+                max_copied_payload_bytes: 0,
+                max_record_payload_bytes: 4,
+                max_record_bytes: bytes.len(),
+                max_records: 1,
+                ..RecordLimits::default()
+            },
+            0,
+        )
+        .unwrap();
+        header_session.account_existing_header(0, 4).unwrap();
+
+        let mut exact_session = RecordParseSession::new(
+            RecordLimits {
+                max_copied_payload_bytes: 4,
+                max_record_payload_bytes: 4,
+                max_record_bytes: bytes.len(),
+                max_records: 1,
+                ..RecordLimits::default()
+            },
+            bytes.len(),
+        )
+        .unwrap();
+        exact_session.parse_strict_record(&bytes, 0).unwrap();
+
+        let mut one_under_session = RecordParseSession::new(
+            RecordLimits {
+                max_copied_payload_bytes: 3,
+                max_record_payload_bytes: 4,
+                max_record_bytes: bytes.len(),
+                max_records: 1,
+                ..RecordLimits::default()
+            },
+            bytes.len(),
+        )
+        .unwrap();
+        assert!(matches!(
+            one_under_session.parse_strict_record(&bytes, 0),
+            Err(Error::ResourceLimit(message)) if message.contains("copied payload")
         ));
     }
 
