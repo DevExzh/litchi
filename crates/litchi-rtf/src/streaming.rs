@@ -22,6 +22,10 @@ use crate::write::Charset;
 // Four bytes hold one incomplete UTF-8 scalar, 32 bytes hold the largest
 // escaped scalar, and one byte records a pending CR for CRLF normalization.
 const FIXED_SCRATCH_BYTES: u64 = 37;
+// ASCII body writes are bounded to the fixed escape-buffer scale. Cancellation
+// is checked between these chunks, so one full sink call can accept at most 32
+// body bytes before cancellation is observed.
+const MAX_ASCII_BATCH_BYTES: usize = 32;
 const DEFAULT_MAX_BYTES: u64 = 256 * 1024 * 1024;
 const DEFAULT_MAX_PARAGRAPHS: u64 = 1_000_000;
 const DEFAULT_MAX_RUNS: u64 = 4_000_000;
@@ -560,6 +564,199 @@ impl<W: Write> StreamingRtfWriter<W> {
         Ok(())
     }
 
+    fn process_valid_text(
+        &mut self,
+        text: &str,
+        accepted: &mut usize,
+        input_already_counted: bool,
+    ) -> Result<(), StreamingRtfError> {
+        let bytes = text.as_bytes();
+        let mut offset = 0usize;
+        while offset < bytes.len() {
+            if !self.pending_cr && is_batchable_ascii(bytes[offset]) {
+                let start = offset;
+                offset = offset.saturating_add(1);
+                while offset < bytes.len() && is_batchable_ascii(bytes[offset]) {
+                    offset = offset.saturating_add(1);
+                }
+                let mut chunk_start = start;
+                while chunk_start < offset {
+                    let chunk_end = chunk_start
+                        .saturating_add(MAX_ASCII_BATCH_BYTES)
+                        .min(offset);
+                    let span = bytes
+                        .get(chunk_start..chunk_end)
+                        .ok_or_else(|| self.fail_invalid("ASCII span is outside the input"))?;
+                    if !self.try_emit_ascii_span(span, accepted, input_already_counted)? {
+                        for byte in span {
+                            if !input_already_counted {
+                                *accepted = accepted.saturating_add(1);
+                            }
+                            self.emit_character(char::from(*byte))?;
+                        }
+                    }
+                    chunk_start = chunk_end;
+                }
+                continue;
+            }
+
+            let character = text
+                .get(offset..)
+                .and_then(|remaining| remaining.chars().next())
+                .ok_or_else(|| self.fail_invalid("UTF-8 character is outside the input"))?;
+            offset = offset.saturating_add(character.len_utf8());
+            if !input_already_counted {
+                *accepted = accepted.saturating_add(character.len_utf8());
+            }
+            self.emit_character(character)?;
+        }
+        Ok(())
+    }
+
+    fn try_emit_ascii_span(
+        &mut self,
+        span: &[u8],
+        accepted: &mut usize,
+        input_already_counted: bool,
+    ) -> Result<bool, StreamingRtfError> {
+        if span.len() < 2 || span.len() > MAX_ASCII_BATCH_BYTES {
+            return Ok(false);
+        }
+        let requested = u64::try_from(span.len()).unwrap_or(u64::MAX);
+        let observed = self.output_bytes.saturating_add(requested);
+        if observed > self.limits.max_output_bytes {
+            return Ok(false);
+        }
+
+        // Work is cumulative while output is outstanding. Holding both
+        // reservations makes the span atomic against local and hierarchical
+        // limits; failure of either reservation falls back to scalar output,
+        // which retains the original per-character boundary and precedence.
+        let work = match self.context.reserve(Resource::Work, requested) {
+            Ok(reservation) => reservation,
+            Err(_error) => return Ok(false),
+        };
+        let output = match self.context.reserve(Resource::OutputBytes, requested) {
+            Ok(reservation) => reservation,
+            Err(_error) => {
+                drop(work);
+                return Ok(false);
+            },
+        };
+        self.emit_reserved_ascii(span, accepted, input_already_counted, work, output)?;
+        Ok(true)
+    }
+
+    fn emit_reserved_ascii(
+        &mut self,
+        bytes: &[u8],
+        accepted: &mut usize,
+        input_already_counted: bool,
+        work: Reservation,
+        output: Reservation,
+    ) -> Result<(), StreamingRtfError> {
+        let requested = bytes.len();
+        let requested_u64 = u64::try_from(requested).unwrap_or(u64::MAX);
+        let mut written = 0usize;
+        loop {
+            if let Err(error) = self.context.check() {
+                self.commit_reserved_ascii(
+                    work,
+                    output,
+                    written,
+                    requested,
+                    accepted,
+                    input_already_counted,
+                );
+                return Err(self.fail_execution(error));
+            }
+            match self.writer.write(&bytes[written..]) {
+                Ok(0) => {
+                    self.commit_reserved_ascii(
+                        work,
+                        output,
+                        written,
+                        requested,
+                        accepted,
+                        input_already_counted,
+                    );
+                    return Err(self.fail_io(io::Error::new(
+                        io::ErrorKind::WriteZero,
+                        "streaming RTF sink returned zero progress",
+                    )));
+                },
+                Ok(count) => {
+                    if count > bytes.len().saturating_sub(written) {
+                        self.commit_reserved_ascii(
+                            work,
+                            output,
+                            written,
+                            requested,
+                            accepted,
+                            input_already_counted,
+                        );
+                        return Err(
+                            self.fail_invalid("streaming RTF sink reported excess progress")
+                        );
+                    }
+                    written = written.saturating_add(count);
+                    if let Err(error) = self.context.check() {
+                        self.commit_reserved_ascii(
+                            work,
+                            output,
+                            written,
+                            requested,
+                            accepted,
+                            input_already_counted,
+                        );
+                        return Err(self.fail_execution(error));
+                    }
+                    if written >= bytes.len() {
+                        let _ = work.commit(requested_u64);
+                        let _ = output.commit(requested_u64);
+                        if !input_already_counted {
+                            *accepted = accepted.saturating_add(requested);
+                        }
+                        self.output_bytes = self.output_bytes.saturating_add(requested_u64);
+                        return Ok(());
+                    }
+                },
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => {},
+                Err(error) => {
+                    self.commit_reserved_ascii(
+                        work,
+                        output,
+                        written,
+                        requested,
+                        accepted,
+                        input_already_counted,
+                    );
+                    return Err(self.fail_io(error));
+                },
+            }
+        }
+    }
+
+    fn commit_reserved_ascii(
+        &mut self,
+        work: Reservation,
+        output: Reservation,
+        written: usize,
+        requested: usize,
+        accepted: &mut usize,
+        input_already_counted: bool,
+    ) {
+        let attempted = written.saturating_add(1).min(requested);
+        let _ = work.commit(u64::try_from(attempted).unwrap_or(u64::MAX));
+        let _ = output.commit(u64::try_from(written).unwrap_or(u64::MAX));
+        if !input_already_counted {
+            *accepted = accepted.saturating_add(attempted);
+        }
+        self.output_bytes = self
+            .output_bytes
+            .saturating_add(u64::try_from(written).unwrap_or(u64::MAX));
+    }
+
     fn write_utf8(&mut self, bytes: &[u8]) -> Result<usize, StreamingRtfError> {
         if bytes.is_empty() {
             return Ok(0);
@@ -611,9 +808,7 @@ impl<W: Write> StreamingRtfWriter<W> {
             match std::str::from_utf8(&completed[..expected]) {
                 Ok(text) => {
                     self.pending_len = 0;
-                    for character in text.chars() {
-                        self.emit_character(character)?;
-                    }
+                    self.process_valid_text(text, accepted, true)?;
                 },
                 Err(_error) => {
                     self.pending_len = 0;
@@ -629,23 +824,14 @@ impl<W: Write> StreamingRtfWriter<W> {
             self.fail_invalid("UTF-8 input offset is outside the provided buffer")
         })?;
         match std::str::from_utf8(remaining) {
-            Ok(text) => {
-                for character in text.chars() {
-                    *accepted = accepted.saturating_add(character.len_utf8());
-                    self.emit_character(character)?;
-                }
-                Ok(())
-            },
+            Ok(text) => self.process_valid_text(text, accepted, false),
             Err(error) => {
                 let valid = error.valid_up_to();
                 if let Some(text_bytes) = remaining.get(..valid) {
                     let text = std::str::from_utf8(text_bytes).map_err(|_error| {
                         self.fail_invalid("UTF-8 prefix is unexpectedly malformed")
                     })?;
-                    for character in text.chars() {
-                        *accepted = accepted.saturating_add(character.len_utf8());
-                        self.emit_character(character)?;
-                    }
+                    self.process_valid_text(text, accepted, false)?;
                 }
                 if error.error_len().is_none() {
                     let tail = remaining.get(valid..).ok_or_else(|| {
@@ -770,6 +956,10 @@ const fn resource_name(resource: Resource) -> &'static str {
         Resource::Work => "work",
         _ => "unknown",
     }
+}
+
+fn is_batchable_ascii(byte: u8) -> bool {
+    matches!(byte, 0x20..=0x7e) && !matches!(byte, b'\\' | b'{' | b'}')
 }
 
 fn encode_character(character: char, charset: Charset, output: &mut [u8; 32]) -> usize {
@@ -960,6 +1150,23 @@ mod tests {
         configured_context(1024 * 1024, output, output, 10_000, 10_000_000)
     }
 
+    fn hierarchical_context(
+        parent_limits: Limits,
+        child_limits: Limits,
+    ) -> (Budget, ExecutionContext) {
+        let parent = Budget::root("rtf-stream-parent", parent_limits);
+        let child = parent.child("rtf-stream-child", child_limits);
+        let (_source, token) = CancellationSource::pair();
+        let execution = ExecutionLimits::new(
+            NonZeroUsize::new(1).expect("nonzero"),
+            NonZeroUsize::new(1).expect("nonzero"),
+            NonZeroU64::new(1024 * 1024).expect("nonzero"),
+            1,
+        )
+        .expect("valid limits");
+        (parent, ExecutionContext::new(child, token, execution))
+    }
+
     fn writer() -> StreamingRtfWriter<Vec<u8>> {
         StreamingRtfWriter::new(
             Vec::new(),
@@ -975,6 +1182,202 @@ mod tests {
         writer.write_all(text.as_bytes()).expect("text");
         writer.finish_run().expect("run finish");
         writer.finish_paragraph().expect("paragraph finish");
+    }
+
+    #[derive(Debug, Default)]
+    struct InstrumentedSink {
+        bytes: Vec<u8>,
+        write_calls: usize,
+        max_request: usize,
+    }
+
+    impl Write for InstrumentedSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.write_calls = self.write_calls.saturating_add(1);
+            self.max_request = self.max_request.max(bytes.len());
+            self.bytes.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn legacy_write_calls(text: &str) -> usize {
+        // Header emission for the default Windows-1252/\deff0 options.
+        let mut calls = 9usize;
+        // start_paragraph, start_run, finish_run, and finish_paragraph.
+        calls = calls.saturating_add(4);
+        let mut pending_cr = false;
+        for character in text.chars() {
+            if pending_cr {
+                calls = calls.saturating_add(1);
+                if character == '\n' {
+                    pending_cr = false;
+                    continue;
+                }
+                pending_cr = false;
+            }
+            if character == '\r' {
+                pending_cr = true;
+            } else {
+                calls = calls.saturating_add(1);
+            }
+        }
+        if pending_cr {
+            calls = calls.saturating_add(1);
+        }
+        // finish() emits the document's final brace.
+        calls.saturating_add(1)
+    }
+
+    #[test]
+    fn contiguous_ascii_spans_reduce_calls_and_reopen_long_text() {
+        let inputs = [
+            "plain ASCII span ".repeat(256),
+            "plain \\ braces { and } plus café ".repeat(128),
+            "café ".repeat(256),
+        ];
+        for text in inputs {
+            let input_bytes = u64::try_from(text.len()).expect("input length");
+            let limits = StreamingRtfLimits::new(input_bytes, 1_048_576, 1, 1, 64);
+            let context = configured_context(
+                1_048_576,
+                input_bytes,
+                1_048_576,
+                16,
+                input_bytes.saturating_add(64),
+            );
+            let mut value = StreamingRtfWriter::new(InstrumentedSink::default(), context, limits)
+                .expect("writer");
+            finish_one_run(&mut value, &text);
+            let sink = value.finish().expect("finish");
+            let legacy_calls = legacy_write_calls(&text);
+            assert!(
+                sink.write_calls.saturating_mul(4) < legacy_calls.saturating_mul(3),
+                "batched calls {} were not materially below legacy {}",
+                sink.write_calls,
+                legacy_calls
+            );
+
+            assert!(sink.max_request <= MAX_ASCII_BATCH_BYTES);
+            let document = Document::from_bytes(&sink.bytes).expect("reopen");
+            assert_eq!(
+                document
+                    .body()
+                    .paragraphs()
+                    .next()
+                    .expect("paragraph")
+                    .to_text(),
+                text
+            );
+        }
+    }
+
+    #[test]
+    fn batching_preserves_prechange_wire_for_representative_text() {
+        let cases = [
+            (
+                "ASCII",
+                br"{\rtf1\ansi\ansicpg1252\uc1\deff0 \pard {\plain ASCII}\par }".as_slice(),
+            ),
+            (
+                r"slashes \ braces { }",
+                br"{\rtf1\ansi\ansicpg1252\uc1\deff0 \pard {\plain slashes \\ braces \{ \}}\par }"
+                    .as_slice(),
+            ),
+            (
+                "CP1252 é €",
+                br"{\rtf1\ansi\ansicpg1252\uc1\deff0 \pard {\plain CP1252 \'e9 \'80}\par }"
+                    .as_slice(),
+            ),
+            (
+                "line\r\nnext\rlast",
+                br"{\rtf1\ansi\ansicpg1252\uc1\deff0 \pard {\plain line\line next\line last}\par }"
+                    .as_slice(),
+            ),
+        ];
+        for (text, expected) in cases {
+            let input_bytes = u64::try_from(text.len()).expect("input length");
+            let output_bytes = u64::try_from(expected.len()).expect("output length");
+            let limits = StreamingRtfLimits::new(input_bytes, output_bytes, 1, 1, 64);
+            let context = configured_context(
+                1_048_576,
+                input_bytes,
+                output_bytes,
+                16,
+                input_bytes.saturating_add(64),
+            );
+            let mut value = StreamingRtfWriter::new(InstrumentedSink::default(), context, limits)
+                .expect("writer");
+            finish_one_run(&mut value, text);
+            let sink = value.finish().expect("finish");
+            assert_eq!(sink.bytes, expected);
+        }
+    }
+
+    #[test]
+    fn hierarchical_work_one_under_falls_back_to_scalar_progress() {
+        let span = b"abcdefgh";
+        let (parent, context) = hierarchical_context(
+            Limits::new(1_048_576, 1024, 1024, 16, 64, 9),
+            Limits::new(1_048_576, 1024, 1024, 16, 64, 1024),
+        );
+        let limits = StreamingRtfLimits::new(span.len() as u64, 1024, 1, 1, 64);
+        let mut value = StreamingRtfWriter::new(Vec::new(), context, limits).expect("writer");
+        value.start_paragraph().expect("paragraph");
+        value.start_run().expect("run");
+        let prefix = value.output_bytes();
+        let error = value.write_utf8(span).expect_err("one-under parent Work");
+        assert!(matches!(
+            error,
+            StreamingRtfError::LimitExceeded {
+                resource: "work",
+                observed: 10,
+                limit: 9,
+                written,
+            } if written == prefix + 7
+        ));
+        assert_eq!(value.output_bytes(), prefix + 7);
+        assert_eq!(value.input_bytes(), span.len() as u64);
+        assert_eq!(parent.used(Resource::Work), 9);
+        assert!(value.is_poisoned());
+    }
+
+    #[test]
+    fn hierarchical_output_one_under_falls_back_to_scalar_progress() {
+        let span = b"abcdefgh";
+        let prefix = u64::try_from(
+            b"{\\rtf1\\ansi\\ansicpg1252\\uc1\\deff0 ".len()
+                + b"\\pard ".len()
+                + b"{\\plain ".len(),
+        )
+        .expect("prefix length");
+        let output_limit = prefix + span.len() as u64 - 1;
+        let (parent, context) = hierarchical_context(
+            Limits::new(1_048_576, 1024, output_limit, 16, 64, 1024),
+            Limits::new(1_048_576, 1024, 1024, 16, 64, 1024),
+        );
+        let limits = StreamingRtfLimits::new(span.len() as u64, 1024, 1, 1, 64);
+        let mut value = StreamingRtfWriter::new(Vec::new(), context, limits).expect("writer");
+        value.start_paragraph().expect("paragraph");
+        value.start_run().expect("run");
+        assert_eq!(value.output_bytes(), prefix);
+        let error = value.write_utf8(span).expect_err("one-under parent output");
+        assert!(matches!(
+            error,
+            StreamingRtfError::LimitExceeded {
+                resource: "output bytes",
+                observed,
+                limit,
+                written,
+            } if observed == output_limit + 1 && limit == output_limit && written == output_limit
+        ));
+        assert_eq!(value.output_bytes(), output_limit);
+        assert_eq!(value.input_bytes(), span.len() as u64);
+        assert_eq!(parent.used(Resource::OutputBytes), output_limit);
+        assert!(value.is_poisoned());
     }
 
     #[test]
@@ -1347,6 +1750,83 @@ mod tests {
     }
 
     #[test]
+    fn malformed_utf8_preserves_ascii_prefix_suffix_and_split_progress() {
+        let mut value = writer();
+        value.start_paragraph().expect("paragraph");
+        value.start_run().expect("run");
+        let output_prefix = value.output_bytes();
+        let ascii_prefix = b"ascii-prefix";
+        let error = value
+            .write_utf8(b"ascii-prefix\xffascii-suffix")
+            .expect_err("malformed suffix");
+        assert!(matches!(
+            error,
+            StreamingRtfError::InvalidInput { written, .. } if written
+                == output_prefix + u64::try_from(ascii_prefix.len()).expect("prefix length")
+        ));
+        assert_eq!(
+            value.input_bytes(),
+            u64::try_from(ascii_prefix.len()).expect("prefix length")
+        );
+        assert_eq!(
+            value.output_bytes(),
+            output_prefix + u64::try_from(ascii_prefix.len()).expect("prefix length")
+        );
+        assert!(value.is_poisoned());
+
+        let mut value = writer();
+        value.start_paragraph().expect("paragraph");
+        value.start_run().expect("run");
+        let mut first = b"ascii-prefix".to_vec();
+        first.push(0xe2);
+        assert_eq!(
+            value.write_utf8(&first).expect("split UTF-8 prefix"),
+            first.len()
+        );
+        assert_eq!(
+            value
+                .write_utf8(b"\x82\xacascii-suffix")
+                .expect("split UTF-8 suffix"),
+            2 + b"ascii-suffix".len()
+        );
+        value.finish_run().expect("run");
+        value.finish_paragraph().expect("paragraph");
+        let bytes = value.finish().expect("finish");
+        let document = Document::from_bytes(&bytes).expect("parse");
+        assert_eq!(
+            document
+                .body()
+                .paragraphs()
+                .next()
+                .expect("paragraph")
+                .to_text(),
+            "ascii-prefix€ascii-suffix"
+        );
+
+        let mut value = writer();
+        value.start_paragraph().expect("paragraph");
+        value.start_run().expect("run");
+        let mut split_prefix = b"ascii-prefix".to_vec();
+        split_prefix.push(0xe2);
+        assert_eq!(
+            value
+                .write_utf8(&split_prefix)
+                .expect("malformed split prefix"),
+            split_prefix.len()
+        );
+        let error = value
+            .write_utf8(b"\x28suffix")
+            .expect_err("malformed split continuation");
+        let accepted = split_prefix.len().saturating_add(2);
+        assert!(matches!(error, StreamingRtfError::InvalidInput { .. }));
+        assert_eq!(
+            value.input_bytes(),
+            u64::try_from(accepted).expect("accepted malformed prefix")
+        );
+        assert!(value.is_poisoned());
+    }
+
+    #[test]
     fn incomplete_utf8_cannot_close_a_run() {
         let mut value = writer();
         value.start_paragraph().expect("paragraph");
@@ -1402,6 +1882,286 @@ mod tests {
                 Ok(())
             }
         }
+    }
+
+    #[derive(Debug)]
+    struct CancellingBatchSink {
+        source: CancellationSource,
+        armed: bool,
+        accepted: u64,
+    }
+
+    impl Write for CancellingBatchSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if self.armed {
+                self.armed = false;
+                self.source.cancel();
+                let count = bytes.len().min(2);
+                self.accepted = self
+                    .accepted
+                    .saturating_add(u64::try_from(count).unwrap_or(u64::MAX));
+                return Ok(count);
+            }
+            if self.source.is_cancelled() {
+                return Err(io::Error::new(io::ErrorKind::Interrupted, "cancelled"));
+            }
+            self.accepted = self
+                .accepted
+                .saturating_add(u64::try_from(bytes.len()).unwrap_or(u64::MAX));
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[derive(Debug)]
+    struct FullWriteCancellingSink {
+        source: CancellationSource,
+        armed: bool,
+        accepted: u64,
+    }
+
+    impl Write for FullWriteCancellingSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if self.armed {
+                self.armed = false;
+                self.source.cancel();
+                self.accepted = self
+                    .accepted
+                    .saturating_add(u64::try_from(bytes.len()).unwrap_or(u64::MAX));
+                return Ok(bytes.len());
+            }
+            if self.source.is_cancelled() {
+                return Err(io::Error::new(io::ErrorKind::Interrupted, "cancelled"));
+            }
+            self.accepted = self
+                .accepted
+                .saturating_add(u64::try_from(bytes.len()).unwrap_or(u64::MAX));
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[derive(Debug, Default)]
+    struct ExcessProgressBatchSink {
+        armed: bool,
+    }
+
+    impl Write for ExcessProgressBatchSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if self.armed {
+                return Ok(bytes.len().saturating_add(1));
+            }
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn default_body_prefix_bytes() -> u64 {
+        u64::try_from(
+            b"{\\rtf1\\ansi\\ansicpg1252\\uc1\\deff0 ".len()
+                + b"\\pard ".len()
+                + b"{\\plain ".len(),
+        )
+        .expect("prefix length")
+    }
+
+    fn batched_limits() -> StreamingRtfLimits {
+        StreamingRtfLimits::new(8, 1024, 1, 1, 64)
+    }
+
+    fn batched_context() -> ExecutionContext {
+        configured_context(1_048_576, 8, 1024, 16, 1024)
+    }
+
+    #[test]
+    fn batched_ascii_partial_sink_commits_exact_prefix_progress() {
+        let prefix = default_body_prefix_bytes();
+        let sink = FaultSink {
+            accepted: 0,
+            fail_after: Some(prefix + 3),
+            max_chunk: 2,
+            interrupt_once: false,
+            zero_after: false,
+            flush_error: false,
+        };
+        let mut value =
+            StreamingRtfWriter::new(sink, batched_context(), batched_limits()).expect("writer");
+        value.start_paragraph().expect("paragraph");
+        value.start_run().expect("run");
+        let error = value
+            .write_utf8(b"abcdefgh")
+            .expect_err("partial batched sink");
+        assert!(matches!(
+            error,
+            StreamingRtfError::Io {
+                kind: io::ErrorKind::BrokenPipe,
+                written,
+                ..
+            } if written == prefix + 3
+        ));
+        assert_eq!(value.output_bytes(), prefix + 3);
+        assert_eq!(value.input_bytes(), 4);
+        assert_eq!(
+            value.context.budget().used(Resource::OutputBytes),
+            prefix + 3
+        );
+        assert_eq!(value.context.budget().used(Resource::Work), 2 + 4);
+        assert!(value.is_poisoned());
+    }
+
+    #[test]
+    fn batched_ascii_write_zero_commits_only_attempted_prefix() {
+        let prefix = default_body_prefix_bytes();
+        let sink = FaultSink {
+            accepted: 0,
+            fail_after: Some(prefix),
+            max_chunk: usize::MAX,
+            interrupt_once: false,
+            zero_after: true,
+            flush_error: false,
+        };
+        let mut value =
+            StreamingRtfWriter::new(sink, batched_context(), batched_limits()).expect("writer");
+        value.start_paragraph().expect("paragraph");
+        value.start_run().expect("run");
+        let error = value
+            .write_utf8(b"abcdefgh")
+            .expect_err("zero batched sink");
+        assert!(matches!(
+            error,
+            StreamingRtfError::Io {
+                kind: io::ErrorKind::WriteZero,
+                written,
+                ..
+            } if written == prefix
+        ));
+        assert_eq!(value.output_bytes(), prefix);
+        assert_eq!(value.input_bytes(), 1);
+        assert_eq!(value.context.budget().used(Resource::OutputBytes), prefix);
+        assert_eq!(value.context.budget().used(Resource::Work), 2 + 1);
+        assert!(value.is_poisoned());
+    }
+
+    #[test]
+    fn batched_ascii_cancellation_between_short_writes_commits_exact_prefix() {
+        let budget = Budget::root(
+            "rtf-stream-batched-cancel-test",
+            Limits::new(1_048_576, 1024, 1024, 16, 64, 1024),
+        );
+        let (source, token) = CancellationSource::pair();
+        let execution = ExecutionLimits::new(
+            NonZeroUsize::new(1).expect("nonzero"),
+            NonZeroUsize::new(1).expect("nonzero"),
+            NonZeroU64::new(1024).expect("nonzero"),
+            1,
+        )
+        .expect("valid limits");
+        let context = ExecutionContext::new(budget, token, execution);
+        let sink = CancellingBatchSink {
+            source,
+            armed: false,
+            accepted: 0,
+        };
+        let mut value = StreamingRtfWriter::new(sink, context, batched_limits()).expect("writer");
+        value.start_paragraph().expect("paragraph");
+        value.start_run().expect("run");
+        value.writer.armed = true;
+        let prefix = value.output_bytes();
+        let error = value
+            .write_utf8(b"abcdefgh")
+            .expect_err("cancellation between short writes");
+        assert!(matches!(
+            error,
+            StreamingRtfError::Cancelled { written } if written == prefix + 2
+        ));
+        assert_eq!(value.output_bytes(), prefix + 2);
+        assert_eq!(value.input_bytes(), 3);
+        assert_eq!(
+            value.context.budget().used(Resource::OutputBytes),
+            prefix + 2
+        );
+        assert_eq!(value.context.budget().used(Resource::Work), 2 + 3);
+        assert!(value.is_poisoned());
+    }
+
+    #[test]
+    fn batched_ascii_full_write_cancellation_commits_one_bounded_chunk() {
+        let budget = Budget::root(
+            "rtf-stream-batched-full-cancel-test",
+            Limits::new(1_048_576, 1024, 1024, 16, 64, 1024),
+        );
+        let (source, token) = CancellationSource::pair();
+        let execution = ExecutionLimits::new(
+            NonZeroUsize::new(1).expect("nonzero"),
+            NonZeroUsize::new(1).expect("nonzero"),
+            NonZeroU64::new(1024).expect("nonzero"),
+            1,
+        )
+        .expect("valid limits");
+        let context = ExecutionContext::new(budget, token, execution);
+        let sink = FullWriteCancellingSink {
+            source,
+            armed: false,
+            accepted: 0,
+        };
+        let limits = StreamingRtfLimits::new(64, 1024, 1, 1, 64);
+        let mut value = StreamingRtfWriter::new(sink, context, limits).expect("writer");
+        value.start_paragraph().expect("paragraph");
+        value.start_run().expect("run");
+        value.writer.armed = true;
+        let prefix = value.output_bytes();
+        let error = value
+            .write_utf8(&[b'a'; 64])
+            .expect_err("full-write cancellation");
+        let chunk = u64::try_from(MAX_ASCII_BATCH_BYTES).expect("batch length");
+        assert!(matches!(
+            error,
+            StreamingRtfError::Cancelled { written } if written == prefix + chunk
+        ));
+        assert_eq!(value.output_bytes(), prefix + chunk);
+        assert_eq!(value.input_bytes(), chunk);
+        assert_eq!(
+            value.context.budget().used(Resource::OutputBytes),
+            prefix + chunk
+        );
+        assert_eq!(value.context.budget().used(Resource::Work), 2 + chunk);
+        assert_eq!(value.writer.accepted, prefix + chunk);
+        assert!(value.is_poisoned());
+    }
+
+    #[test]
+    fn batched_ascii_excess_progress_poison_reports_attempted_prefix() {
+        let mut value = StreamingRtfWriter::new(
+            ExcessProgressBatchSink::default(),
+            batched_context(),
+            batched_limits(),
+        )
+        .expect("writer");
+        value.start_paragraph().expect("paragraph");
+        value.start_run().expect("run");
+        value.writer.armed = true;
+        let prefix = value.output_bytes();
+        let error = value
+            .write_utf8(b"abcdefgh")
+            .expect_err("excess batch progress");
+        assert!(matches!(
+            error,
+            StreamingRtfError::InvalidInput { written, .. } if written == prefix
+        ));
+        assert_eq!(value.output_bytes(), prefix);
+        assert_eq!(value.input_bytes(), 1);
+        assert_eq!(value.context.budget().used(Resource::OutputBytes), prefix);
+        assert_eq!(value.context.budget().used(Resource::Work), 2 + 1);
+        assert!(value.is_poisoned());
     }
 
     #[test]
