@@ -470,6 +470,8 @@ fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
     let one = one.commit_source_backed().unwrap();
     assert_eq!(one.diagnostics().changed_comments(), 1);
     assert_eq!(one.diagnostics().touched_streams(), 1);
+    assert_eq!(one.diagnostics().splice_count(), 2);
+    assert!(one.diagnostics().replacement_bytes() > 0);
     assert_eq!(
         one.diagnostics().source_workbook_bytes(),
         one.diagnostics().target_workbook_bytes()
@@ -501,6 +503,8 @@ fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
     let all = all.commit_source_backed().unwrap();
     assert_eq!(all.diagnostics().changed_comments(), 256);
     assert_eq!(all.diagnostics().touched_streams(), 1);
+    assert_eq!(all.diagnostics().splice_count(), 512);
+    assert!(all.diagnostics().replacement_bytes() > 0);
     assert!(!all.is_noop());
     let mut output = Vec::new();
     all.write_to(&mut output).unwrap();
@@ -542,6 +546,8 @@ fn source_backed_commit_preserves_compressed_and_utf16_widths() {
     .unwrap();
     let commit = edit.commit_source_backed().unwrap();
     assert_eq!(commit.diagnostics().changed_comments(), 2);
+    assert_eq!(commit.diagnostics().splice_count(), 4);
+    assert!(commit.diagnostics().replacement_bytes() > 0);
     let mut output = Vec::new();
     commit.write_to(&mut output).unwrap();
     let reopened = Snapshot::from_bytes(output).unwrap();
@@ -604,6 +610,8 @@ fn source_backed_commit_exact_noop_unknown_stream_and_atomic_save() {
     let noop = edit.commit_source_backed().unwrap();
     assert!(noop.is_noop());
     assert_eq!(noop.diagnostics().changed_comments(), 0);
+    assert_eq!(noop.diagnostics().splice_count(), 0);
+    assert_eq!(noop.diagnostics().replacement_bytes(), 0);
     let mut output = Vec::new();
     noop.write_to(&mut output).unwrap();
     assert_eq!(output, source);

@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-14",
+  "claim_scope": "structural replacement-byte reduction with matched release ABBA latency guard; no speedup, allocation, RSS, or physical-I/O claim",
+  "protocol": {
+    "order": ["before_a", "after_a", "after_b", "before_b"],
+    "cpu_affinity": "2",
+    "warmup_iterations_per_case": 10,
+    "samples_per_case": 100,
+    "profile": "release",
+    "allocator": "Rust system allocator",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "git_revision": "879178ef88001e446b064764e32cd9f7be141d96",
+    "worktree_dirty": true,
+    "before_binary_sha256": "df1e5c2af6d4a9fe701334d4c5b054628efaa24a9ac75a6ae724682e9aea5657",
+    "after_binary_sha256": "04326ec7296a8c9270cfbfc19b3789966a2f89bc70f381def7dd438fc6a56d43",
+    "raw_local_output_sha256": {
+      "before_a": "7f388fdf3888454de9d7387c5d63afb3cc541fafbcdb981ff254307a9aad85c0",
+      "after_a": "beb982ee6f8e49473153604d26b7a0dabb48af69f979ae67d48ca6d9dd22d1bf",
+      "after_b": "d95f73203f56c3b4dad55999a81a012d9ad97807595a413fbea34ae82708fcb9",
+      "before_b": "687235f208bdca90376f7dce21d5f14919a76b2d109a549d152fb402c1ee3d45"
+    }
+  },
+  "corpora": {
+    "comments": {
+      "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "workbook_stream_bytes": 80946
+    },
+    "visibility": {
+      "archive_sha256": "a9b7396193b505cd1eda7ed78bb1f04b9ef48825d8dfd8c7856fd48395a77a53",
+      "workbook_stream_bytes": 18166
+    }
+  },
+  "source_backed_cases": [
+    {
+      "case": "xls_comments_source_backed_edit_save",
+      "splice_count": 2,
+      "replacement_bytes": 109,
+      "replacement_byte_reduction_percent": 99.865342,
+      "p50_ns": {"before_a": 92555520, "after_a": 92754606, "after_b": 92471688, "before_b": 92288089},
+      "p95_ns": {"before_a": 93556578, "after_a": 94127553, "after_b": 94255623, "before_b": 92648099},
+      "p99_ns": {"before_a": 93882077, "after_a": 94493548, "after_b": 95558207, "before_b": 92914545},
+      "p50_delta_percent": {"a": 0.215099, "b": 0.198941},
+      "p95_delta_percent": {"a": 0.610299, "b": 1.735086}
+    },
+    {
+      "case": "xls_comments_source_backed_batch_edit_save",
+      "splice_count": 512,
+      "replacement_bytes": 27904,
+      "replacement_byte_reduction_percent": 65.527636,
+      "p50_ns": {"before_a": 92242379, "after_a": 93267532, "after_b": 93079993, "before_b": 92493555},
+      "p95_ns": {"before_a": 94048557, "after_a": 94619722, "after_b": 94305756, "before_b": 94958219},
+      "p99_ns": {"before_a": 95144264, "after_a": 95407593, "after_b": 94902716, "before_b": 95910327},
+      "p50_delta_percent": {"a": 1.111369, "b": 0.634031},
+      "p95_delta_percent": {"a": 0.607309, "b": -0.687105}
+    },
+    {
+      "case": "xls_visibility_source_backed_edit_save",
+      "splice_count": 1,
+      "replacement_bytes": 1,
+      "replacement_byte_reduction_percent": 99.994495,
+      "p50_ns": {"before_a": 11117167, "after_a": 11068231, "after_b": 11045846, "before_b": 11064936},
+      "p95_ns": {"before_a": 11346572, "after_a": 11351003, "after_b": 11142455, "before_b": 11220648},
+      "p99_ns": {"before_a": 11437428, "after_a": 11468063, "after_b": 11324648, "before_b": 11444425},
+      "p50_delta_percent": {"a": -0.440184, "b": -0.172527},
+      "p95_delta_percent": {"a": 0.039051, "b": -0.696867}
+    },
+    {
+      "case": "xls_visibility_source_backed_batch_edit_save",
+      "splice_count": 64,
+      "replacement_bytes": 64,
+      "replacement_byte_reduction_percent": 99.647693,
+      "p50_ns": {"before_a": 10961681, "after_a": 11123852, "after_b": 11191163, "before_b": 11076335},
+      "p95_ns": {"before_a": 11046058, "after_a": 11326387, "after_b": 11524284, "before_b": 11201550},
+      "p99_ns": {"before_a": 11108193, "after_a": 11414842, "after_b": 12413655, "before_b": 11291405},
+      "p50_delta_percent": {"a": 1.479435, "b": 1.036697},
+      "p95_delta_percent": {"a": 2.537819, "b": 2.881155}
+    }
+  ],
+  "eager_guard_p50_delta_percent": {
+    "comments_one": {"a": 2.235412, "b": 9.442153},
+    "comments_batch": {"a": 7.108554, "b": -8.566681},
+    "visibility_one": {"a": 0.262314, "b": 4.492444},
+    "visibility_batch": {"a": 2.787717, "b": 1.443892}
+  },
+  "conclusion": {
+    "accepted": [
+      "source-backed publication retains only exact changed NOTE/TXO or BoundSheet8 ranges instead of one complete Workbook replacement",
+      "full semantic readback, fingerprints, opaque-stream preservation, security refusals, and exact output gates remained green",
+      "each source-backed p50 magnitude was smaller than the maximum absolute eager-control p50 drift for its matched workload"
+    ],
+    "not_accepted": [
+      "latency speedup",
+      "allocation count or allocated-byte reduction",
+      "peak heap or RSS reduction",
+      "physical source-I/O reduction",
+      "cold-filesystem behavior"
+    ]
+  }
+}

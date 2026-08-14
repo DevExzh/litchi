@@ -13,8 +13,8 @@ use crate::records::{BoundSheetRecord, Encoding, SheetType};
 use crate::{Error, Result, Workbook};
 use litchi_biff::Records;
 use litchi_cfb::{
-    ArtifactFingerprint, ComposedOverlaySource, OverlayError, OverlayLimits, PublishReport,
-    SameLengthStreamOverlay, ValidatedOverlayPlan,
+    ArtifactFingerprint, ComposedOverlaySource, OverlayError, PublishReport,
+    SameLengthStreamSplice, StreamSpliceLimits, ValidatedOverlayPlan,
 };
 use litchi_core::binary;
 use litchi_core::{ReadAt, SourceVersion};
@@ -574,11 +574,10 @@ impl Edit {
     ///
     /// This path owns only existing NOTE/TXO families. Every generated
     /// replacement must retain its exact source range length and its source
-    /// compressed/UTF-16 encoding width. The complete Workbook/Book stream is
-    /// then submitted as one equal-length overlay to
-    /// [`SourceBackedOverlayPublisher`]. No CFB render fallback is attempted;
-    /// callers needing length-changing edits must explicitly call
-    /// [`Self::commit`].
+    /// compressed/UTF-16 encoding width. Each range is submitted as a bounded
+    /// [`SameLengthStreamSplice`] to [`SourceBackedOverlayPublisher`]. No CFB
+    /// render fallback is attempted; callers needing length-changing edits
+    /// must explicitly call [`Self::commit`].
     ///
     /// # Errors
     ///
@@ -650,20 +649,39 @@ impl Edit {
         replacements.sort_by_key(|replacement| std::cmp::Reverse(replacement.0));
         ensure_disjoint(&replacements)?;
 
-        let target_workbook_bytes = u64::try_from(self.source.inner.workbook_stream.len())
-            .map_err(|_error| Error::InvalidData("candidate Workbook length exceeds u64".into()))?;
-        let replacement_bytes: Arc<[u8]> = if replacements.is_empty() {
-            Arc::clone(&self.source.inner.workbook_stream)
-        } else {
-            let mut workbook = self.source.inner.workbook_stream.to_vec();
-            apply_equal_length_replacements(&mut workbook, &replacements)?;
-            if workbook.len() != self.source.inner.workbook_stream.len() {
-                return Err(Error::UnsafeEdit(
-                    "source-backed comment publication changed Workbook stream length".into(),
-                ));
-            }
-            Arc::from(workbook)
-        };
+        let mut splices = Vec::new();
+        splices
+            .try_reserve_exact(replacements.len())
+            .map_err(|_error| Error::Allocation("staging source-backed comment splices"))?;
+        let splice_count = replacements.len();
+        let mut replacement_bytes = 0_u64;
+        for (start, end, replacement) in replacements {
+            ensure_equal_range_length(start, end, &replacement)?;
+            let expected = self
+                .source
+                .inner
+                .workbook_stream
+                .get(start..end)
+                .ok_or_else(|| {
+                    Error::UnsafeEdit("source-backed comment range is outside Workbook".into())
+                })?;
+            let offset = u64::try_from(start).map_err(|_error| {
+                Error::InvalidData("source-backed comment range offset exceeds u64".into())
+            })?;
+            replacement_bytes = replacement_bytes
+                .checked_add(u64::try_from(replacement.len()).map_err(|_error| {
+                    Error::InvalidData("source-backed comment range exceeds u64".into())
+                })?)
+                .ok_or_else(|| {
+                    Error::InvalidData("source-backed comment replacement bytes overflow".into())
+                })?;
+            splices.push(SameLengthStreamSplice::new(
+                self.source.inner.workbook_path.clone(),
+                offset,
+                Arc::from(expected),
+                Arc::from(replacement),
+            ));
+        }
 
         // Keep the source bytes in their existing Arc-backed allocation. The
         // common publisher only needs a positional ReadAt view and never
@@ -671,12 +689,8 @@ impl Edit {
         let source: Arc<dyn ReadAt> =
             Arc::new(SnapshotSource::new(Arc::clone(&self.source.inner.bytes)));
         let publisher = SourceBackedOverlayPublisher::open(source).map_err(overlay_to_error)?;
-        let replacement = SameLengthStreamOverlay::new(
-            self.source.inner.workbook_path.clone(),
-            replacement_bytes,
-        );
         let plan = publisher
-            .plan(vec![replacement], OverlayLimits::default())
+            .plan_splices(splices, StreamSpliceLimits::default())
             .map_err(overlay_to_error)?;
         if !effective.is_empty() {
             verify_source_backed_readback(&plan, &self.source, &effective)?;
@@ -684,11 +698,14 @@ impl Edit {
 
         let source_workbook_bytes = u64::try_from(self.source.inner.workbook_stream.len())
             .map_err(|_error| Error::InvalidData("Workbook stream length exceeds u64".into()))?;
+        let target_workbook_bytes = source_workbook_bytes;
         let source_bytes = u64::try_from(self.source.inner.bytes.len())
             .map_err(|_error| Error::InvalidData("source CFB length exceeds u64".into()))?;
         let diagnostics = SourceBackedDiagnostics {
             changed_comments: effective.len(),
             touched_streams: usize::from(!plan.is_noop()),
+            splice_count,
+            replacement_bytes,
             changed_spans: plan.changed_spans(),
             source_bytes,
             source_workbook_bytes,
@@ -889,6 +906,8 @@ impl Commit {
 pub struct SourceBackedDiagnostics {
     changed_comments: usize,
     touched_streams: usize,
+    splice_count: usize,
+    replacement_bytes: u64,
     changed_spans: usize,
     source_bytes: u64,
     source_workbook_bytes: u64,
@@ -908,6 +927,18 @@ impl SourceBackedDiagnostics {
     #[must_use]
     pub const fn touched_streams(self) -> usize {
         self.touched_streams
+    }
+
+    /// Number of source-relative NOTE/TXO splices submitted to CFB.
+    #[must_use]
+    pub const fn splice_count(self) -> usize {
+        self.splice_count
+    }
+
+    /// Aggregate replacement bytes retained by the splice plan.
+    #[must_use]
+    pub const fn replacement_bytes(self) -> u64 {
+        self.replacement_bytes
     }
 
     /// Number of physical CFB spans changed by the overlay.
@@ -1119,20 +1150,6 @@ fn ensure_equal_range_length(start: usize, end: usize, replacement: &[u8]) -> Re
         return Err(Error::UnsafeEdit(
             "source-backed comment replacement changes a NOTE/TXO range length".into(),
         ));
-    }
-    Ok(())
-}
-
-fn apply_equal_length_replacements(
-    workbook: &mut [u8],
-    replacements: &[(usize, usize, Vec<u8>)],
-) -> Result<()> {
-    for (start, end, replacement) in replacements {
-        ensure_equal_range_length(*start, *end, replacement)?;
-        let target = workbook.get_mut(*start..*end).ok_or_else(|| {
-            Error::UnsafeEdit("source-backed comment range is outside Workbook".into())
-        })?;
-        target.copy_from_slice(replacement);
     }
     Ok(())
 }

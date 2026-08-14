@@ -7,8 +7,8 @@
 
 use crate::protection::reject_protected_shared_container;
 use litchi_cfb::{
-    OverlayError, OverlayLimits, SameLengthStreamOverlay, SharedOleFile, SharedOleFileLimits,
-    ValidatedOverlayPlan,
+    OverlayError, OverlayLimits, SameLengthStreamOverlay, SameLengthStreamSplice, SharedOleFile,
+    SharedOleFileLimits, StreamSpliceLimits, ValidatedOverlayPlan,
 };
 use litchi_core::{ReadAt, SourceVersion};
 use std::sync::Arc;
@@ -65,6 +65,21 @@ impl SourceBackedOverlayPublisher {
     ) -> Result<ValidatedOverlayPlan, OverlayError> {
         self.cfb.plan_same_length_stream_overlays(overlays, limits)
     }
+
+    /// Builds a fully reopened, reusable plan for bounded same-length ranges.
+    ///
+    /// Each splice is checked against the source before a plan is returned;
+    /// this avoids staging a complete replacement stream when a semantic
+    /// owner already has exact source-relative ranges to publish. The common
+    /// source version, protected-container checks, full artifact fingerprints,
+    /// and candidate CFB reopen remain unchanged from [`Self::plan`].
+    pub fn plan_splices(
+        &self,
+        splices: Vec<SameLengthStreamSplice>,
+        limits: StreamSpliceLimits,
+    ) -> Result<ValidatedOverlayPlan, OverlayError> {
+        self.cfb.plan_same_length_stream_splices(splices, limits)
+    }
 }
 
 #[cfg(test)]
@@ -105,6 +120,32 @@ mod tests {
         plan.write_to(&mut output).unwrap();
         let mut ole = OleFile::open(Cursor::new(output)).unwrap();
         assert_eq!(ole.open_stream(&["Target"]).unwrap(), b"change");
+        assert_eq!(ole.open_stream(&["Opaque"]).unwrap(), b"unchanged");
+    }
+
+    #[test]
+    fn wrapper_publishes_only_the_validated_equal_length_splice() {
+        let bytes = write_cfb(|writer| {
+            writer.create_stream(&["Target"], b"before").unwrap();
+            writer.create_stream(&["Opaque"], b"unchanged").unwrap();
+        });
+        let publisher =
+            SourceBackedOverlayPublisher::open(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let plan = publisher
+            .plan_splices(
+                vec![SameLengthStreamSplice::new(
+                    vec!["Target".to_string()],
+                    2,
+                    Arc::from(b"fo".as_slice()),
+                    Arc::from(b"XX".as_slice()),
+                )],
+                StreamSpliceLimits::default(),
+            )
+            .unwrap();
+        let mut output = Vec::new();
+        plan.write_to(&mut output).unwrap();
+        let mut ole = OleFile::open(Cursor::new(output)).unwrap();
+        assert_eq!(ole.open_stream(&["Target"]).unwrap(), b"beXXre");
         assert_eq!(ole.open_stream(&["Opaque"]).unwrap(), b"unchanged");
     }
 

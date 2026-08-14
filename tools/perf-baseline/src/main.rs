@@ -1785,6 +1785,10 @@ struct XlsCommentsSourceSummary {
     source_workbook_bytes: Vec<u64>,
     target_workbook_bytes: Vec<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    splice_count: Option<Vec<usize>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    replacement_bytes: Option<Vec<u64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     changed_spans: Option<Vec<usize>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     source_fingerprints: Option<Vec<String>>,
@@ -1803,6 +1807,8 @@ struct XlsCommentsIterationEvidence {
     source_bytes: u64,
     source_workbook_bytes: u64,
     target_workbook_bytes: u64,
+    splice_count: Option<usize>,
+    replacement_bytes: Option<u64>,
     changed_spans: Option<usize>,
     source_fingerprint: Option<String>,
     target_fingerprint: Option<String>,
@@ -1820,6 +1826,10 @@ struct XlsVisibilitySourceSummary {
     source_bytes: Vec<u64>,
     source_workbook_bytes: Vec<u64>,
     target_workbook_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    splice_count: Option<Vec<usize>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    replacement_bytes: Option<Vec<u64>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     changed_spans: Option<Vec<usize>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1839,6 +1849,8 @@ struct XlsVisibilityIterationEvidence {
     source_bytes: u64,
     source_workbook_bytes: u64,
     target_workbook_bytes: u64,
+    splice_count: Option<usize>,
+    replacement_bytes: Option<u64>,
     changed_spans: Option<usize>,
     source_fingerprint: Option<String>,
     target_fingerprint: Option<String>,
@@ -2814,6 +2826,18 @@ impl SourceSummary {
         summary
             .target_workbook_bytes
             .push(evidence.target_workbook_bytes);
+        if let Some(splice_count) = evidence.splice_count {
+            summary
+                .splice_count
+                .get_or_insert_with(Vec::new)
+                .push(splice_count);
+        }
+        if let Some(replacement_bytes) = evidence.replacement_bytes {
+            summary
+                .replacement_bytes
+                .get_or_insert_with(Vec::new)
+                .push(replacement_bytes);
+        }
         if let Some(changed_spans) = evidence.changed_spans {
             summary
                 .changed_spans
@@ -2867,6 +2891,18 @@ impl SourceSummary {
         summary
             .target_workbook_bytes
             .push(evidence.target_workbook_bytes);
+        if let Some(splice_count) = evidence.splice_count {
+            summary
+                .splice_count
+                .get_or_insert_with(Vec::new)
+                .push(splice_count);
+        }
+        if let Some(replacement_bytes) = evidence.replacement_bytes {
+            summary
+                .replacement_bytes
+                .get_or_insert_with(Vec::new)
+                .push(replacement_bytes);
+        }
         if let Some(changed_spans) = evidence.changed_spans {
             summary
                 .changed_spans
@@ -9827,6 +9863,8 @@ impl XlsVisibilityPublication {
                     target_workbook_bytes: u64::try_from(
                         commit.snapshot().workbook_stream().len(),
                     )?,
+                    splice_count: None,
+                    replacement_bytes: None,
                     changed_spans: None,
                     source_fingerprint: None,
                     target_fingerprint: None,
@@ -9844,6 +9882,8 @@ impl XlsVisibilityPublication {
                     source_bytes: diagnostics.source_bytes(),
                     source_workbook_bytes: diagnostics.source_workbook_bytes(),
                     target_workbook_bytes: diagnostics.target_workbook_bytes(),
+                    splice_count: Some(diagnostics.splice_count()),
+                    replacement_bytes: Some(diagnostics.replacement_bytes()),
                     changed_spans: Some(diagnostics.changed_spans()),
                     source_fingerprint: Some(fingerprint_hex(
                         diagnostics.source_fingerprint().as_bytes(),
@@ -10017,6 +10057,8 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
     let capped = capped.commit_source_backed()?;
     if capped.diagnostics().changed_worksheets() != XLS_VISIBILITY_BATCH_COUNT
         || capped.diagnostics().touched_streams() != 1
+        || capped.diagnostics().splice_count() != XLS_VISIBILITY_BATCH_COUNT
+        || capped.diagnostics().replacement_bytes() != u64::try_from(XLS_VISIBILITY_BATCH_COUNT)?
     {
         return Err("XLS visibility exact-cap plan has unexpected diagnostics".into());
     }
@@ -10184,6 +10226,15 @@ fn run_xls_visibility_edit_save(
             );
         }
         if source_backed {
+            let expected_splices = update_count;
+            let expected_replacement_bytes = u64::try_from(update_count)?;
+            if evidence.splice_count != Some(expected_splices)
+                || evidence.replacement_bytes != Some(expected_replacement_bytes)
+            {
+                return Err(
+                    "XLS visibility source-backed splice diagnostics disagree with changed BoundSheet8 ranges".into(),
+                );
+            }
             let report = report.ok_or("XLS visibility source-backed publication has no report")?;
             if evidence.changed_spans != Some(report.changed_spans())
                 || report.bytes() != sink.summary().accepted_bytes
@@ -10330,6 +10381,8 @@ impl XlsCommentsPublication {
                     target_workbook_bytes: u64::try_from(
                         commit.snapshot().workbook_stream().len(),
                     )?,
+                    splice_count: None,
+                    replacement_bytes: None,
                     changed_spans: None,
                     source_fingerprint: None,
                     target_fingerprint: None,
@@ -10347,6 +10400,8 @@ impl XlsCommentsPublication {
                     source_bytes: diagnostics.source_bytes(),
                     source_workbook_bytes: diagnostics.source_workbook_bytes(),
                     target_workbook_bytes: diagnostics.target_workbook_bytes(),
+                    splice_count: Some(diagnostics.splice_count()),
+                    replacement_bytes: Some(diagnostics.replacement_bytes()),
                     changed_spans: Some(diagnostics.changed_spans()),
                     source_fingerprint: Some(fingerprint_hex(
                         diagnostics.source_fingerprint().as_bytes(),
@@ -10671,6 +10726,22 @@ fn run_xls_comments_edit_save(
             return Err("XLS comment iteration has unexpected source/publication evidence".into());
         }
         if source_backed {
+            let expected_splices = evidence
+                .changed_comments
+                .checked_mul(2)
+                .ok_or("XLS comment splice-count expectation overflow")?;
+            let replacement_bytes = evidence.replacement_bytes.ok_or(
+                "XLS comment source-backed publication omitted replacement-byte diagnostics",
+            )?;
+            if evidence.splice_count != Some(expected_splices)
+                || replacement_bytes == 0
+                || replacement_bytes >= evidence.source_workbook_bytes
+            {
+                return Err(
+                    "XLS comment source-backed splice diagnostics disagree with NOTE/TXO ranges"
+                        .into(),
+                );
+            }
             let report = report.ok_or("XLS comment source-backed publication has no report")?;
             if evidence.changed_spans != Some(report.changed_spans())
                 || report.bytes() != sink.summary().accepted_bytes
@@ -21142,10 +21213,20 @@ mod tests {
                     comments.source_workbook_bytes,
                     comments.target_workbook_bytes
                 );
+                assert_eq!(comments.splice_count, Some(vec![updates * 2]));
+                let replacement_bytes = comments
+                    .replacement_bytes
+                    .as_ref()
+                    .expect("source-backed XLS comment replacement-byte evidence");
+                assert_eq!(replacement_bytes.len(), 1);
+                assert!(replacement_bytes[0] > 0);
+                assert!(replacement_bytes[0] < comments.source_workbook_bytes[0]);
                 assert!(comments.changed_spans.unwrap()[0] > 0);
                 assert_eq!(comments.source_fingerprints.unwrap().len(), 1);
                 assert_eq!(comments.target_fingerprints.unwrap().len(), 1);
             } else {
+                assert!(comments.splice_count.is_none());
+                assert!(comments.replacement_bytes.is_none());
                 assert!(comments.changed_spans.is_none());
                 assert!(comments.source_fingerprints.is_none());
                 assert!(comments.target_fingerprints.is_none());
@@ -21201,10 +21282,17 @@ mod tests {
                 visibility.target_workbook_bytes
             );
             if source_backed {
-                assert_eq!(visibility.changed_spans.unwrap(), vec![1]);
+                assert_eq!(visibility.splice_count, Some(vec![updates]));
+                assert_eq!(
+                    visibility.replacement_bytes,
+                    Some(vec![u64::try_from(updates).unwrap()])
+                );
+                assert_eq!(visibility.changed_spans.unwrap(), vec![updates]);
                 assert_eq!(visibility.source_fingerprints.unwrap().len(), 1);
                 assert_eq!(visibility.target_fingerprints.unwrap().len(), 1);
             } else {
+                assert!(visibility.splice_count.is_none());
+                assert!(visibility.replacement_bytes.is_none());
                 assert!(visibility.changed_spans.is_none());
                 assert!(visibility.source_fingerprints.is_none());
                 assert!(visibility.target_fingerprints.is_none());

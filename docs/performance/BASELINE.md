@@ -334,6 +334,18 @@ publication sink bound limits writes, and retained output is only for digest
 and reopen assertions, not a candidate-memory bound. See
 [`0091`](changes/0091-xls-visibility-source-overlay-evidence.md).
 
+Change 0095 replaces the complete source-backed `Workbook` handoff for both
+existing-comment and worksheet-visibility publication with checked logical
+range splices. One/256-comment plans now submit 109/27,904 replacement bytes
+instead of 80,946, while one/64-visibility plans submit 1/64 instead of
+18,166. A CPU-pinned 10-warm-up/100-sample balanced ABBA run kept every
+source-backed p50 direction inside 1.5%; for each matched workload, the largest
+absolute source-backed delta was below the largest absolute eager-control delta,
+so no latency improvement is accepted. Allocation, RSS and physical-I/O
+claims remain open; full semantic readback, exact fingerprints and every
+preservation/refusal gate remain. See [change 0095](changes/0095-xls-semantic-splice-publication.md)
+and its [compact result](results/xls-semantic-splice-abba-0107-summary.json).
+
 The previously measured tranche includes six opt-in simulated-range cases,
 two opt-in execution-scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2 publication
