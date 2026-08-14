@@ -2,7 +2,7 @@
 
 Date: 2026-08-15
 
-This is a coverage map, not a completion claim. It compares the 214 selectable
+This is a coverage map, not a completion claim. It compares the 216 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -784,9 +784,10 @@ under a hard 32-byte request ceiling, with exact bytes and hashes. This does not
 claim existing-document edit, allocation, RSS or cold-I/O improvement. iWork
 remains deliberately deferred while the `iwa-*` crates change separately.
 
-Change 0116 adds six opt-in native PPT `Pictures` selectors to the current
-214-name matrix: matched eager/source-backed presentation-open cases, first
-`images()` query cases, and repeated-query cases. The deterministic corpus has
+Change 0116 adds eight opt-in native PPT `Pictures` selectors to the current
+216-name matrix: matched eager/source-backed presentation-open cases, cold
+all-`images()` query cases, repeated-query cases, and directly timed fresh
+open-plus-all-images cases. The deterministic corpus has
 eight slides, 32 distinct PNG records, and 256 KiB per record. The corpus
 manifest records the exact `Pictures` stream length and SHA-256; per-result
 source evidence records the canonical ordered image semantic SHA-256. Both
@@ -796,9 +797,11 @@ both paths. Source evidence reports `ReadAt` calls/bytes and overlap with the
 contiguous `Pictures` payload window in this generated fixture: open must show
 zero overlap, first query must show the full stream, and the repeated
 source-backed query must show zero additional overlap. These are fixture-scoped
-source-read observations, not a general CFB sector map or internal
-materialization counters; no latency, allocation, RSS, cold-I/O, or release
-ABBA claim is made.
+source-read observations from independent untimed replays, not per-sample
+timing counters, a general CFB sector map, or internal materialization counts.
+Source-backed elapsed samples instead use uninstrumented immutable
+`litchi_core::OwnedSource`. No latency, allocation, RSS, cold-I/O, or release
+ABBA claim is made by change 0116.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

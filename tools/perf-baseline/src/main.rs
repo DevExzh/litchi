@@ -581,6 +581,8 @@ enum Case {
     PptPicturesSourceBackedFirstImage,
     PptPicturesEagerCachedRepeat,
     PptPicturesSourceBackedCachedRepeat,
+    PptPicturesEagerOpenAllImages,
+    PptPicturesSourceBackedOpenAllImages,
     XlsxOpenOwned,
     XlsxListSheets,
     XlsxFirstCell,
@@ -879,6 +881,10 @@ impl Case {
             Self::PptPicturesSourceBackedFirstImage => "ppt_pictures_source_backed_first_image",
             Self::PptPicturesEagerCachedRepeat => "ppt_pictures_eager_cached_repeat",
             Self::PptPicturesSourceBackedCachedRepeat => "ppt_pictures_source_backed_cached_repeat",
+            Self::PptPicturesEagerOpenAllImages => "ppt_pictures_eager_open_all_images",
+            Self::PptPicturesSourceBackedOpenAllImages => {
+                "ppt_pictures_source_backed_open_all_images"
+            },
             Self::XlsxOpenOwned => "xlsx_open_owned",
             Self::XlsxListSheets => "xlsx_list_sheets",
             Self::XlsxFirstCell => "xlsx_first_cell",
@@ -1104,6 +1110,8 @@ impl Case {
                 | Self::PptPicturesSourceBackedFirstImage
                 | Self::PptPicturesEagerCachedRepeat
                 | Self::PptPicturesSourceBackedCachedRepeat
+                | Self::PptPicturesEagerOpenAllImages
+                | Self::PptPicturesSourceBackedOpenAllImages
         )
     }
 
@@ -1816,6 +1824,9 @@ struct PptPicturesSourceSummary {
     implementation: &'static str,
     phase: &'static str,
     timing_scope: &'static str,
+    timed_source_adapter: &'static str,
+    read_evidence_adapter: &'static str,
+    read_evidence_scope: &'static str,
     picture_count: usize,
     picture_stream_bytes: u64,
     picture_stream_sha256: String,
@@ -5137,6 +5148,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_pictures_source_backed_cached_repeat" => {
             Some(Case::PptPicturesSourceBackedCachedRepeat)
         },
+        "ppt_pictures_eager_open_all_images" => Some(Case::PptPicturesEagerOpenAllImages),
+        "ppt_pictures_source_backed_open_all_images" => {
+            Some(Case::PptPicturesSourceBackedOpenAllImages)
+        },
         "xlsx_open_owned" => Some(Case::XlsxOpenOwned),
         "xlsx_list_sheets" => Some(Case::XlsxListSheets),
         "xlsx_first_cell" => Some(Case::XlsxFirstCell),
@@ -5399,6 +5414,8 @@ fn print_usage() {
                                        ppt_pictures_source_backed_first_image,\n\
                                        ppt_pictures_eager_cached_repeat,\n\
                                        ppt_pictures_source_backed_cached_repeat,\n\
+                                       ppt_pictures_eager_open_all_images,\n\
+                                       ppt_pictures_source_backed_open_all_images,\n\
                                        xlsx_open_owned,xlsx_list_sheets,xlsx_first_cell,\n\
                                        xlsx_full_cell_scan,xlsx_narrow_column_range_scan,\n\
                                        xlsx_noop_commit,xlsx_noop_commit_save,\n\
@@ -6127,14 +6144,22 @@ fn ppt_pictures_case_parameters(
         Case::PptPicturesSourceBackedOpen => {
             Ok(("source_backed", "presentation_open_no_image_query", false))
         },
-        Case::PptPicturesEagerFirstImage => Ok(("eager", "first_image_query", false)),
+        Case::PptPicturesEagerFirstImage => Ok(("eager", "cold_all_images_query", false)),
         Case::PptPicturesSourceBackedFirstImage => {
-            Ok(("source_backed", "first_image_query", false))
+            Ok(("source_backed", "cold_all_images_query", false))
         },
-        Case::PptPicturesEagerCachedRepeat => Ok(("eager", "cached_repeat_image_query", true)),
+        Case::PptPicturesEagerCachedRepeat => Ok(("eager", "cached_all_images_query", true)),
         Case::PptPicturesSourceBackedCachedRepeat => {
-            Ok(("source_backed", "cached_repeat_image_query", true))
+            Ok(("source_backed", "cached_all_images_query", true))
         },
+        Case::PptPicturesEagerOpenAllImages => {
+            Ok(("eager", "fresh_open_plus_cold_all_images_query", false))
+        },
+        Case::PptPicturesSourceBackedOpenAllImages => Ok((
+            "source_backed",
+            "fresh_open_plus_cold_all_images_query",
+            false,
+        )),
         _ => Err("non-PPT Pictures case passed to PPT Pictures runner".into()),
     }
 }
@@ -6144,6 +6169,182 @@ fn verify_ppt_picture_images(
 ) -> Result<(), Box<dyn Error>> {
     if ppt_picture_semantic_digest_from_images(images)? != ppt_picture_semantic_digest() {
         return Err("PPT Pictures image query returned an unexpected semantic digest".into());
+    }
+    Ok(())
+}
+
+fn time_ppt_pictures_eager(
+    phase: &str,
+    cached_repeat: bool,
+    archive: &[u8],
+    record_limits: litchi_ppt::RecordLimits,
+) -> Result<Duration, Box<dyn Error>> {
+    let cursor = Cursor::new(archive);
+    if phase == "presentation_open_no_image_query" {
+        let started = Instant::now();
+        let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, record_limits)?;
+        let presentation = package.presentation_with_limits(record_limits)?;
+        std::hint::black_box(&presentation);
+        let duration = started.elapsed();
+        if !presentation.has_pictures() {
+            return Err("PPT eager open did not retain Pictures payload".into());
+        }
+        return Ok(duration);
+    }
+
+    if phase == "fresh_open_plus_cold_all_images_query" {
+        let started = Instant::now();
+        let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, record_limits)?;
+        let presentation = package.presentation_with_limits(record_limits)?;
+        let images = presentation.images()?;
+        std::hint::black_box(&images);
+        let duration = started.elapsed();
+        verify_ppt_picture_images(&images)?;
+        return Ok(duration);
+    }
+
+    let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, record_limits)?;
+    let presentation = package.presentation_with_limits(record_limits)?;
+    if cached_repeat {
+        let first = presentation.images()?;
+        verify_ppt_picture_images(&first)?;
+    }
+    let started = Instant::now();
+    let images = presentation.images()?;
+    std::hint::black_box(&images);
+    let duration = started.elapsed();
+    verify_ppt_picture_images(&images)?;
+    Ok(duration)
+}
+
+fn time_ppt_pictures_source_backed(
+    phase: &str,
+    cached_repeat: bool,
+    source: Arc<dyn ReadAt>,
+    record_limits: litchi_ppt::RecordLimits,
+) -> Result<Duration, Box<dyn Error>> {
+    if phase == "presentation_open_no_image_query" {
+        let started = Instant::now();
+        let package =
+            litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, record_limits)?;
+        let presentation = package.presentation_with_limits(record_limits)?;
+        std::hint::black_box(&presentation);
+        let duration = started.elapsed();
+        if !presentation.has_pictures() {
+            return Err("PPT source-backed open did not retain Pictures descriptor".into());
+        }
+        return Ok(duration);
+    }
+
+    if phase == "fresh_open_plus_cold_all_images_query" {
+        let started = Instant::now();
+        let package =
+            litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, record_limits)?;
+        let presentation = package.presentation_with_limits(record_limits)?;
+        let images = presentation.images()?;
+        std::hint::black_box(&images);
+        let duration = started.elapsed();
+        verify_ppt_picture_images(&images)?;
+        return Ok(duration);
+    }
+
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, record_limits)?;
+    let presentation = package.presentation_with_limits(record_limits)?;
+    if cached_repeat {
+        let first = presentation.images()?;
+        verify_ppt_picture_images(&first)?;
+    }
+    let started = Instant::now();
+    let images = presentation.images()?;
+    std::hint::black_box(&images);
+    let duration = started.elapsed();
+    verify_ppt_picture_images(&images)?;
+    Ok(duration)
+}
+
+fn collect_ppt_pictures_source_evidence(
+    phase: &str,
+    cached_repeat: bool,
+    archive: &[u8],
+    picture_ranges: &[Range<u64>],
+    record_limits: litchi_ppt::RecordLimits,
+) -> Result<SourceSnapshot, Box<dyn Error>> {
+    let source = Arc::new(InstrumentedSource::new(
+        archive.to_vec(),
+        picture_ranges.to_vec(),
+    ));
+
+    if phase == "presentation_open_no_image_query" {
+        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
+            source.clone(),
+            record_limits,
+        )?;
+        let presentation = package.presentation_with_limits(record_limits)?;
+        if !presentation.has_pictures() {
+            return Err("PPT source-backed evidence open lost Pictures descriptor".into());
+        }
+        return Ok(source.snapshot());
+    }
+
+    let package =
+        litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source.clone(), record_limits)?;
+    let presentation = package.presentation_with_limits(record_limits)?;
+    if phase != "fresh_open_plus_cold_all_images_query" {
+        source.reset();
+    }
+    if cached_repeat {
+        let first = presentation.images()?;
+        verify_ppt_picture_images(&first)?;
+        source.reset();
+    }
+    let images = presentation.images()?;
+    verify_ppt_picture_images(&images)?;
+    Ok(source.snapshot())
+}
+
+fn verify_ppt_pictures_source_evidence(
+    phase: &str,
+    snapshot: SourceSnapshot,
+    picture_stream_bytes: u64,
+) -> Result<(), Box<dyn Error>> {
+    match phase {
+        "presentation_open_no_image_query" => {
+            if snapshot.read_calls == 0
+                || snapshot.read_bytes == 0
+                || snapshot.ordinary_payload_read_calls != 0
+                || snapshot.ordinary_payload_read_bytes != 0
+            {
+                return Err("PPT source-backed open read evidence is inconsistent".into());
+            }
+        },
+        "cold_all_images_query" => {
+            if snapshot.read_calls != 1
+                || snapshot.read_bytes != picture_stream_bytes
+                || snapshot.ordinary_payload_read_calls != 1
+                || snapshot.ordinary_payload_read_bytes != picture_stream_bytes
+            {
+                return Err("PPT source-backed cold images evidence is inconsistent".into());
+            }
+        },
+        "cached_all_images_query" => {
+            if snapshot.read_calls != 0
+                || snapshot.read_bytes != 0
+                || snapshot.ordinary_payload_read_calls != 0
+                || snapshot.ordinary_payload_read_bytes != 0
+            {
+                return Err("PPT source-backed cached images evidence is inconsistent".into());
+            }
+        },
+        "fresh_open_plus_cold_all_images_query" => {
+            if snapshot.read_calls <= 1
+                || snapshot.read_bytes <= picture_stream_bytes
+                || snapshot.ordinary_payload_read_calls != 1
+                || snapshot.ordinary_payload_read_bytes != picture_stream_bytes
+            {
+                return Err("PPT source-backed fresh first-use evidence is inconsistent".into());
+            }
+        },
+        _ => return Err("unknown PPT Pictures evidence phase".into()),
     }
     Ok(())
 }
@@ -6165,14 +6366,34 @@ fn run_ppt_pictures(
     let picture_stream_sha256 = corpus.manifest.target_payload_sha256.clone();
     let canonical_semantic_sha256 = ppt_picture_semantic_digest();
     let mut elapsed = Vec::with_capacity(samples);
+    let timed_source: Option<Arc<dyn ReadAt>> = source_backed
+        .then(|| Arc::new(OwnedSource::new(corpus.archive.clone())) as Arc<dyn ReadAt>);
     let mut source_summary = PptPicturesSourceSummary {
         implementation,
         phase,
         timing_scope: match phase {
             "presentation_open_no_image_query" => "package_open_plus_presentation_open",
-            "first_image_query" => "images_query_after_open",
-            "cached_repeat_image_query" => "second_images_query_after_untimed_first_query",
+            "cold_all_images_query" => "cold_images_query_after_untimed_open",
+            "cached_all_images_query" => "second_images_query_after_untimed_open_and_first_query",
+            "fresh_open_plus_cold_all_images_query" => {
+                "fresh_package_open_plus_presentation_open_plus_cold_images_query"
+            },
             _ => unreachable!("validated PPT Pictures phase"),
+        },
+        timed_source_adapter: if source_backed {
+            "litchi_core::OwnedSource"
+        } else {
+            "std::io::Cursor<&[u8]>"
+        },
+        read_evidence_adapter: if source_backed {
+            "harness::InstrumentedSource"
+        } else {
+            "not_applicable"
+        },
+        read_evidence_scope: if source_backed {
+            "separate_untimed_replay_per_measured_sample"
+        } else {
+            "not_applicable"
         },
         picture_count: PPT_PICTURE_COUNT,
         picture_stream_bytes,
@@ -6182,104 +6403,38 @@ fn run_ppt_pictures(
     };
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let (duration, source_snapshot) = if source_backed {
-            let source = Arc::new(InstrumentedSource::new(
-                corpus.archive.clone(),
-                picture_ranges.clone(),
-            ));
-            let (duration, snapshot) = if phase == "presentation_open_no_image_query" {
-                let started = Instant::now();
-                let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
-                    source.clone(),
-                    record_limits,
-                )?;
-                let presentation = package.presentation_with_limits(record_limits)?;
-                let duration = started.elapsed();
-                if !presentation.has_pictures() {
-                    return Err("PPT source-backed open did not retain Pictures descriptor".into());
-                }
-                std::hint::black_box(presentation);
-                (duration, source.snapshot())
-            } else {
-                let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
-                    source.clone(),
-                    record_limits,
-                )?;
-                let presentation = package.presentation_with_limits(record_limits)?;
-                source.reset();
-                if cached_repeat {
-                    let first = presentation.images()?;
-                    verify_ppt_picture_images(&first)?;
-                    source.reset();
-                }
-                let started = Instant::now();
-                let images = presentation.images()?;
-                let duration = started.elapsed();
-                verify_ppt_picture_images(&images)?;
-                std::hint::black_box(&images);
-                (duration, source.snapshot())
-            };
-            (duration, Some(snapshot))
-        } else if phase == "presentation_open_no_image_query" {
-            let started = Instant::now();
-            let mut package = litchi_ppt::Package::from_reader_with_limits(
-                Cursor::new(corpus.archive.as_slice()),
-                record_limits,
-            )?;
-            let presentation = package.presentation_with_limits(record_limits)?;
-            let duration = started.elapsed();
-            if !presentation.has_pictures() {
-                return Err("PPT eager open did not retain Pictures payload".into());
-            }
-            std::hint::black_box(presentation);
-            (duration, None)
+        let duration = if let Some(source) = timed_source.as_ref() {
+            time_ppt_pictures_source_backed(phase, cached_repeat, source.clone(), record_limits)?
         } else {
-            let mut package = litchi_ppt::Package::from_reader_with_limits(
-                Cursor::new(corpus.archive.as_slice()),
+            time_ppt_pictures_eager(
+                phase,
+                cached_repeat,
+                corpus.archive.as_slice(),
+                record_limits,
+            )?
+        };
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    if source_backed {
+        for _ in 0..samples {
+            let snapshot = collect_ppt_pictures_source_evidence(
+                phase,
+                cached_repeat,
+                corpus.archive.as_slice(),
+                &picture_ranges,
                 record_limits,
             )?;
-            let presentation = package.presentation_with_limits(record_limits)?;
-            if cached_repeat {
-                let first = presentation.images()?;
-                verify_ppt_picture_images(&first)?;
-            }
-            let started = Instant::now();
-            let images = presentation.images()?;
-            let duration = started.elapsed();
-            verify_ppt_picture_images(&images)?;
-            std::hint::black_box(&images);
-            (duration, None)
-        };
-
-        if let Some(snapshot) = source_snapshot {
-            if phase == "presentation_open_no_image_query"
-                && snapshot.ordinary_payload_read_bytes != 0
-            {
-                return Err("PPT source-backed open read Pictures before an image query".into());
-            }
-            if phase == "first_image_query"
-                && snapshot.ordinary_payload_read_bytes != picture_stream_bytes
-            {
-                return Err(
-                    "PPT source-backed first image query read an unexpected Pictures byte count"
-                        .into(),
-                );
-            }
-            if cached_repeat && snapshot.ordinary_payload_read_bytes != 0 {
-                return Err("PPT source-backed cached image query reread Pictures".into());
-            }
-            if iteration >= warmup_iterations {
-                source_summary.source_read_calls.push(snapshot.read_calls);
-                source_summary.source_read_bytes.push(snapshot.read_bytes);
-                source_summary
-                    .pictures_read_calls
-                    .push(snapshot.ordinary_payload_read_calls);
-                source_summary
-                    .pictures_read_bytes
-                    .push(snapshot.ordinary_payload_read_bytes);
-            }
+            verify_ppt_pictures_source_evidence(phase, snapshot, picture_stream_bytes)?;
+            source_summary.source_read_calls.push(snapshot.read_calls);
+            source_summary.source_read_bytes.push(snapshot.read_bytes);
+            source_summary
+                .pictures_read_calls
+                .push(snapshot.ordinary_payload_read_calls);
+            source_summary
+                .pictures_read_bytes
+                .push(snapshot.ordinary_payload_read_bytes);
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
 
     let source = Some(SourceSummary {
@@ -9348,7 +9503,9 @@ fn run_case_with_config(
         | Case::PptPicturesEagerFirstImage
         | Case::PptPicturesSourceBackedFirstImage
         | Case::PptPicturesEagerCachedRepeat
-        | Case::PptPicturesSourceBackedCachedRepeat => {
+        | Case::PptPicturesSourceBackedCachedRepeat
+        | Case::PptPicturesEagerOpenAllImages
+        | Case::PptPicturesSourceBackedOpenAllImages => {
             run_ppt_pictures(case, corpus, warmup_iterations, samples)
         },
         Case::XlsxOpenOwned => run_xlsx_open_owned(corpus, warmup_iterations, samples),
@@ -23120,9 +23277,13 @@ mod tests {
             Case::PptPicturesEagerOpen,
             Case::PptPicturesEagerFirstImage,
             Case::PptPicturesEagerCachedRepeat,
+            Case::PptPicturesEagerOpenAllImages,
         ] {
             let observed = evidence(case);
             assert_eq!(observed.implementation, "eager");
+            assert_eq!(observed.timed_source_adapter, "std::io::Cursor<&[u8]>");
+            assert_eq!(observed.read_evidence_adapter, "not_applicable");
+            assert_eq!(observed.read_evidence_scope, "not_applicable");
             assert_eq!(observed.picture_count, PPT_PICTURE_COUNT);
             assert_eq!(observed.picture_stream_bytes, expected_stream_bytes);
             assert_eq!(
@@ -23139,6 +23300,15 @@ mod tests {
         let source_open = evidence(Case::PptPicturesSourceBackedOpen);
         assert_eq!(source_open.implementation, "source_backed");
         assert_eq!(source_open.phase, "presentation_open_no_image_query");
+        assert_eq!(source_open.timed_source_adapter, "litchi_core::OwnedSource");
+        assert_eq!(
+            source_open.read_evidence_adapter,
+            "harness::InstrumentedSource"
+        );
+        assert_eq!(
+            source_open.read_evidence_scope,
+            "separate_untimed_replay_per_measured_sample"
+        );
         assert_eq!(source_open.pictures_read_calls, vec![0]);
         assert_eq!(source_open.pictures_read_bytes, vec![0]);
         assert!(!source_open.source_read_calls.is_empty());
@@ -23146,7 +23316,7 @@ mod tests {
 
         let source_first = evidence(Case::PptPicturesSourceBackedFirstImage);
         assert_eq!(source_first.implementation, "source_backed");
-        assert_eq!(source_first.phase, "first_image_query");
+        assert_eq!(source_first.phase, "cold_all_images_query");
         assert!(source_first.source_read_calls[0] > 0);
         assert_eq!(source_first.pictures_read_calls, vec![1]);
         assert_eq!(
@@ -23154,12 +23324,10 @@ mod tests {
             vec![expected_stream_bytes]
         );
 
-        let warmed = run_ppt_pictures(Case::PptPicturesSourceBackedFirstImage, &first, 1, 2)
-            .unwrap()
-            .source
-            .unwrap()
-            .ppt_pictures
-            .unwrap();
+        let warmed_result =
+            run_ppt_pictures(Case::PptPicturesSourceBackedFirstImage, &first, 1, 2).unwrap();
+        assert_eq!(warmed_result.elapsed_ns.samples.len(), 2);
+        let warmed = warmed_result.source.unwrap().ppt_pictures.unwrap();
         assert_eq!(warmed.source_read_calls.len(), 2);
         assert_eq!(warmed.source_read_bytes.len(), 2);
         assert_eq!(warmed.pictures_read_calls.len(), 2);
@@ -23169,11 +23337,35 @@ mod tests {
 
         let source_cached = evidence(Case::PptPicturesSourceBackedCachedRepeat);
         assert_eq!(source_cached.implementation, "source_backed");
-        assert_eq!(source_cached.phase, "cached_repeat_image_query");
+        assert_eq!(source_cached.phase, "cached_all_images_query");
         assert_eq!(source_cached.source_read_calls, vec![0]);
         assert_eq!(source_cached.source_read_bytes, vec![0]);
         assert_eq!(source_cached.pictures_read_calls, vec![0]);
         assert_eq!(source_cached.pictures_read_bytes, vec![0]);
+
+        let source_first_use = evidence(Case::PptPicturesSourceBackedOpenAllImages);
+        assert_eq!(
+            source_first_use.phase,
+            "fresh_open_plus_cold_all_images_query"
+        );
+        assert!(source_first_use.source_read_calls[0] > 1);
+        assert!(source_first_use.source_read_bytes[0] > expected_stream_bytes);
+        assert_eq!(source_first_use.pictures_read_calls, vec![1]);
+        assert_eq!(
+            source_first_use.pictures_read_bytes,
+            vec![expected_stream_bytes]
+        );
+
+        assert_eq!(
+            super::parse_case("ppt_pictures_eager_open_all_images"),
+            Some(Case::PptPicturesEagerOpenAllImages)
+        );
+        assert_eq!(
+            super::parse_case("ppt_pictures_source_backed_open_all_images"),
+            Some(Case::PptPicturesSourceBackedOpenAllImages)
+        );
+        assert!(!Case::DEFAULT.contains(&Case::PptPicturesEagerOpenAllImages));
+        assert!(!Case::DEFAULT.contains(&Case::PptPicturesSourceBackedOpenAllImages));
     }
 
     #[test]
