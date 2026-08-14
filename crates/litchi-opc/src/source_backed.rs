@@ -28,6 +28,7 @@ use std::time::Duration;
 
 const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
 const MAX_SOURCE_OVERLAY_PARTS: usize = 64;
+const MAX_SOURCE_RELATIONSHIP_REMOVALS: usize = 4096;
 
 struct PendingOverlay {
     target: usize,
@@ -1725,9 +1726,9 @@ impl SourceBackedPackage {
         replacement: Vec<u8>,
         mut removed_relationship_ids: Vec<String>,
     ) -> Result<()> {
-        if removed_relationship_ids.len() > MAX_SOURCE_OVERLAY_PARTS {
+        if removed_relationship_ids.len() > MAX_SOURCE_RELATIONSHIP_REMOVALS {
             return Err(overlay_unavailable(format!(
-                "relationship removal set exceeds the {MAX_SOURCE_OVERLAY_PARTS}-relationship bound"
+                "relationship removal set exceeds the {MAX_SOURCE_RELATIONSHIP_REMOVALS}-relationship bound"
             )));
         }
         if removed_relationship_ids.is_empty() {
@@ -1814,6 +1815,229 @@ impl SourceBackedPackage {
                 replacement: Arc::new(relationship_xml),
             },
         ];
+        self.write_changed_overlays(writer, &changed)
+    }
+
+    /// Replace several existing Parts while removing bounded sets of
+    /// external relationships owned by those Parts.
+    ///
+    /// The payload and each selected `.rels` member are regenerated together;
+    /// every other ZIP member is raw-copied. Relationship IDs must be unique
+    /// and must identify external relationships. The caller owns the XML
+    /// proof that removed IDs are no longer referenced by replacement
+    /// payloads. A real change to a signed source is refused before output.
+    pub fn write_part_overlays_with_external_relationship_removals_to_stream<W: Write>(
+        self,
+        writer: W,
+        mut overlays: Vec<(PackURI, Vec<u8>, Vec<String>)>,
+    ) -> Result<()> {
+        if overlays.len() > MAX_SOURCE_OVERLAY_PARTS {
+            return Err(overlay_unavailable(format!(
+                "replacement set exceeds the {MAX_SOURCE_OVERLAY_PARTS}-Part bound"
+            )));
+        }
+        if overlays.is_empty() {
+            return self.write_exact_source(writer);
+        }
+        overlays.sort_unstable_by(|left, right| left.0.as_str().cmp(right.0.as_str()));
+        if let Some(duplicate) = overlays.windows(2).find(|pair| pair[0].0 == pair[1].0) {
+            return Err(OpcError::DuplicatePartName(duplicate[0].0.to_string()));
+        }
+
+        let mut part_overlays = Vec::new();
+        part_overlays
+            .try_reserve_exact(overlays.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship overlay parts",
+                source,
+            })?;
+        let mut relationship_overlays = Vec::new();
+        relationship_overlays
+            .try_reserve_exact(overlays.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship overlay members",
+                source,
+            })?;
+        let mut removed_relationship_total = 0usize;
+
+        for (partname, replacement, mut removed_relationship_ids) in overlays {
+            if removed_relationship_ids.len() > MAX_SOURCE_RELATIONSHIP_REMOVALS {
+                return Err(overlay_unavailable(format!(
+                    "relationship removal set exceeds the {MAX_SOURCE_RELATIONSHIP_REMOVALS}-relationship bound"
+                )));
+            }
+            removed_relationship_ids.sort_unstable();
+            if let Some(duplicate) = removed_relationship_ids
+                .windows(2)
+                .find(|pair| pair[0] == pair[1])
+            {
+                return Err(OpcError::DuplicateRelationshipId(duplicate[0].clone()));
+            }
+            removed_relationship_total = removed_relationship_total
+                .checked_add(removed_relationship_ids.len())
+                .ok_or_else(|| overlay_unavailable("relationship removal count overflows usize"))?;
+            if removed_relationship_total > MAX_SOURCE_RELATIONSHIP_REMOVALS {
+                return Err(overlay_unavailable(format!(
+                    "aggregate relationship removal set exceeds the {MAX_SOURCE_RELATIONSHIP_REMOVALS}-relationship bound"
+                )));
+            }
+            let target = self
+                .parts_by_name
+                .get(&partname)
+                .copied()
+                .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
+            let target_part = &self.parts[target];
+            if removed_relationship_ids.is_empty() {
+                part_overlays.push(PendingOverlay {
+                    target,
+                    replacement,
+                });
+                continue;
+            }
+            for id in &removed_relationship_ids {
+                let relationship = target_part.relationships.get(id).ok_or_else(|| {
+                    OpcError::RelationshipNotFound(format!("relationship '{id}' was not found"))
+                })?;
+                if !relationship.is_external() {
+                    return Err(OpcError::InvalidRelationship(format!(
+                        "relationship '{id}' is not external"
+                    )));
+                }
+            }
+            let relationship_xml =
+                relationship_xml_without(&target_part.relationships, &removed_relationship_ids)?;
+            self.limits.check(
+                ReadResource::RelationshipXmlBytes,
+                relationship_xml.len() as u64,
+                self.limits.max_relationship_xml_bytes() as u64,
+            )?;
+            let relationship_uri = partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
+            let relationship_member = relationship_uri.membername().to_owned();
+            let relationship_entry =
+                self.archive.entry_id(&relationship_member).ok_or_else(|| {
+                    OpcError::RelationshipNotFound(format!(
+                        "relationships member '{}' was not found",
+                        relationship_uri.as_str()
+                    ))
+                })?;
+            part_overlays.push(PendingOverlay {
+                target,
+                replacement,
+            });
+            relationship_overlays.push((
+                target,
+                relationship_entry,
+                relationship_member,
+                relationship_xml,
+            ));
+        }
+
+        for (index, left) in relationship_overlays.iter().enumerate() {
+            for right in relationship_overlays.iter().skip(index + 1) {
+                if left.2 == right.2 {
+                    return Err(overlay_unavailable(
+                        "multiple relationship overlays resolve to one ZIP member",
+                    ));
+                }
+            }
+            for part in &part_overlays {
+                if self.parts[part.target].partname.membername() == left.2 {
+                    return Err(overlay_unavailable(
+                        "a relationship overlay collides with a Part ZIP member",
+                    ));
+                }
+            }
+        }
+
+        let mut payload_lengths = Vec::new();
+        payload_lengths
+            .try_reserve_exact(part_overlays.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship payload limits",
+                source,
+            })?;
+        for overlay in &part_overlays {
+            payload_lengths.push((overlay.target, overlay.replacement.len()));
+        }
+        let mut changed = Vec::new();
+        changed
+            .try_reserve_exact(
+                part_overlays
+                    .len()
+                    .checked_add(relationship_overlays.len())
+                    .and_then(|count| count.checked_mul(2))
+                    .ok_or_else(|| {
+                        overlay_unavailable("relationship overlay count overflows usize")
+                    })?,
+            )
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship changed overlays",
+                source,
+            })?;
+        let mut relationship_entries = Vec::new();
+        relationship_entries
+            .try_reserve_exact(relationship_overlays.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship overlay limits",
+                source,
+            })?;
+
+        for (target, relationship_entry, _, relationship_xml) in &relationship_overlays {
+            let original_relationships = match self.archive.read_entry(*relationship_entry) {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    if let Some(execution) = take_source_execution_failure(&self.source) {
+                        return Err(map_execution_error(execution));
+                    }
+                    return Err(error.into());
+                },
+            };
+            self.source.ensure_current()?;
+            let relationship_uri = self.parts[*target]
+                .partname
+                .rels_uri()
+                .map_err(OpcError::InvalidPackUri)?;
+            validate_overlay_xml(relationship_uri.as_str(), original_relationships.as_slice())?;
+            validate_overlay_xml(relationship_uri.as_str(), relationship_xml)?;
+            relationship_entries.push((*relationship_entry, relationship_xml.len()));
+        }
+        self.validate_combined_relationship_overlay_limits(
+            &payload_lengths,
+            &relationship_entries,
+        )?;
+
+        for (_, _, relationship_member, relationship_xml) in relationship_overlays {
+            changed.push(ChangedOverlay {
+                target: ChangedOverlayTarget::Member(relationship_member),
+                replacement: Arc::new(relationship_xml),
+            });
+        }
+
+        for overlay in part_overlays {
+            let original = self.read_part(overlay.target)?;
+            self.source.ensure_current()?;
+            let target_part = &self.parts[overlay.target];
+            if xml_minifier::audit::package::is_xml_part(
+                target_part.partname.as_str(),
+                &target_part.content_type,
+            ) {
+                validate_overlay_xml(target_part.partname.as_str(), original.as_bytes())?;
+                validate_overlay_xml(target_part.partname.as_str(), &overlay.replacement)?;
+            }
+            if original.as_bytes() != overlay.replacement.as_slice() {
+                changed.push(ChangedOverlay {
+                    target: ChangedOverlayTarget::Part(overlay.target),
+                    replacement: Arc::new(overlay.replacement),
+                });
+            }
+        }
+
+        if changed.is_empty() {
+            return self.write_exact_source(writer);
+        }
+        if self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
         self.write_changed_overlays(writer, &changed)
     }
 
@@ -2078,6 +2302,124 @@ impl SourceBackedPackage {
             relationship_bytes,
             ReadResource::TotalRelationshipXmlBytes,
             self.limits.max_total_relationship_xml_bytes() as u64,
+        )?;
+        self.limits.check(
+            ReadResource::TotalRelationshipXmlBytes,
+            adjusted_relationships,
+            self.limits.max_total_relationship_xml_bytes() as u64,
+        )
+    }
+
+    fn validate_combined_relationship_overlay_limits(
+        &self,
+        part_overlays: &[(usize, usize)],
+        relationship_overlays: &[(EntryId, usize)],
+    ) -> Result<()> {
+        for (_, replacement_len) in part_overlays {
+            let replacement_bytes = *replacement_len as u64;
+            self.limits.check(
+                ReadResource::PartBytes,
+                replacement_bytes,
+                self.limits.max_part_bytes(),
+            )?;
+            self.limits.check(
+                ReadResource::ArchiveEntryBytes,
+                replacement_bytes,
+                self.limits.max_archive_entry_bytes(),
+            )?;
+        }
+        for (_, replacement_len) in relationship_overlays {
+            let replacement_bytes = *replacement_len as u64;
+            self.limits.check(
+                ReadResource::ArchiveEntryBytes,
+                replacement_bytes,
+                self.limits.max_archive_entry_bytes(),
+            )?;
+            self.limits.check(
+                ReadResource::RelationshipXmlBytes,
+                replacement_bytes,
+                self.limits.max_relationship_xml_bytes() as u64,
+            )?;
+        }
+        let mut archive_total = 0_u64;
+        let mut part_total = 0_u64;
+        let mut relationship_total = 0_u64;
+        for name in self.archive.file_names() {
+            let bytes = self.archive.metadata(name)?.uncompressed_size();
+            archive_total = checked_overlay_total(
+                archive_total,
+                bytes,
+                ReadResource::ArchiveTotalBytes,
+                self.limits.max_archive_total_bytes(),
+            )?;
+            if is_relationship_member_name(name) {
+                relationship_total = checked_overlay_total(
+                    relationship_total,
+                    bytes,
+                    ReadResource::TotalRelationshipXmlBytes,
+                    self.limits.max_total_relationship_xml_bytes() as u64,
+                )?;
+            }
+        }
+        for part in &self.parts {
+            part_total = checked_overlay_total(
+                part_total,
+                self.archive
+                    .metadata_for(part.entry_id)?
+                    .uncompressed_size(),
+                ReadResource::TotalPartBytes,
+                self.limits.max_total_part_bytes(),
+            )?;
+        }
+        let mut adjusted_archive = archive_total;
+        let mut adjusted_parts = part_total;
+        let mut adjusted_relationships = relationship_total;
+        for (target, replacement_len) in part_overlays {
+            let original = self
+                .archive
+                .metadata_for(self.parts[*target].entry_id)?
+                .uncompressed_size();
+            adjusted_archive = adjusted_overlay_total(
+                adjusted_archive,
+                original,
+                *replacement_len as u64,
+                ReadResource::ArchiveTotalBytes,
+                self.limits.max_archive_total_bytes(),
+            )?;
+            adjusted_parts = adjusted_overlay_total(
+                adjusted_parts,
+                original,
+                *replacement_len as u64,
+                ReadResource::TotalPartBytes,
+                self.limits.max_total_part_bytes(),
+            )?;
+        }
+        for (entry, replacement_len) in relationship_overlays {
+            let original = self.archive.metadata_for(*entry)?.uncompressed_size();
+            adjusted_archive = adjusted_overlay_total(
+                adjusted_archive,
+                original,
+                *replacement_len as u64,
+                ReadResource::ArchiveTotalBytes,
+                self.limits.max_archive_total_bytes(),
+            )?;
+            adjusted_relationships = adjusted_overlay_total(
+                adjusted_relationships,
+                original,
+                *replacement_len as u64,
+                ReadResource::TotalRelationshipXmlBytes,
+                self.limits.max_total_relationship_xml_bytes() as u64,
+            )?;
+        }
+        self.limits.check(
+            ReadResource::ArchiveTotalBytes,
+            adjusted_archive,
+            self.limits.max_archive_total_bytes(),
+        )?;
+        self.limits.check(
+            ReadResource::TotalPartBytes,
+            adjusted_parts,
+            self.limits.max_total_part_bytes(),
         )?;
         self.limits.check(
             ReadResource::TotalRelationshipXmlBytes,
@@ -2447,44 +2789,58 @@ fn relationship_xml_without(
         .ok_or_else(|| {
             overlay_unavailable("relationship removal serialization capacity overflows usize")
         })?;
-    let mut xml = String::new();
+    let mut xml = Vec::new();
     xml.try_reserve_exact(capacity)
         .map_err(|source| OpcError::Allocation {
             resource: "source-backed relationship removal XML",
             source,
         })?;
-    xml.push_str(HEADER);
+    append_relationship_xml_bytes(&mut xml, HEADER.as_bytes())?;
     for relationship in retained {
-        xml.push_str(r#"<Relationship Id=""#);
-        push_xml_escaped(&mut xml, relationship.r_id());
-        xml.push_str(r#"" Type=""#);
-        push_xml_escaped(&mut xml, relationship.reltype());
-        xml.push_str(r#"" Target=""#);
-        push_xml_escaped(&mut xml, relationship.target_ref());
+        append_relationship_xml_bytes(&mut xml, br#"<Relationship Id=""#)?;
+        push_xml_escaped(&mut xml, relationship.r_id())?;
+        append_relationship_xml_bytes(&mut xml, br#"" Type=""#)?;
+        push_xml_escaped(&mut xml, relationship.reltype())?;
+        append_relationship_xml_bytes(&mut xml, br#"" Target=""#)?;
+        push_xml_escaped(&mut xml, relationship.target_ref())?;
         if relationship.target_mode() == TargetMode::External {
-            xml.push_str(r#"" TargetMode="External"/>"#);
+            append_relationship_xml_bytes(&mut xml, br#"" TargetMode="External"/>"#)?;
         } else {
-            xml.push_str(r#""/>"#);
+            append_relationship_xml_bytes(&mut xml, br#""/>"#)?;
         }
     }
-    xml.push_str(FOOTER);
-    Ok(xml.into_bytes())
+    append_relationship_xml_bytes(&mut xml, FOOTER.as_bytes())?;
+    Ok(xml)
 }
 
-fn push_xml_escaped(output: &mut String, value: &str) {
-    for character in value.chars() {
-        output.push_str(match character {
-            '&' => "&amp;",
-            '<' => "&lt;",
-            '>' => "&gt;",
-            '"' => "&quot;",
-            '\'' => "&apos;",
-            _ => {
-                output.push(character);
-                continue;
-            },
-        });
+fn append_relationship_xml_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
+    output
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed relationship removal XML",
+            source,
+        })?;
+    output.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn push_xml_escaped(output: &mut Vec<u8>, value: &str) -> Result<()> {
+    for byte in value.as_bytes() {
+        let escaped = match byte {
+            b'&' => Some(b"&amp;".as_slice()),
+            b'<' => Some(b"&lt;".as_slice()),
+            b'>' => Some(b"&gt;".as_slice()),
+            b'"' => Some(b"&quot;".as_slice()),
+            b'\'' => Some(b"&apos;".as_slice()),
+            _ => None,
+        };
+        if let Some(escaped) = escaped {
+            append_relationship_xml_bytes(output, escaped)?;
+        } else {
+            append_relationship_xml_bytes(output, std::slice::from_ref(byte))?;
+        }
     }
+    Ok(())
 }
 
 fn relationships_for_package(
@@ -3289,6 +3645,61 @@ mod tests {
 
     fn document_relationships() -> &'static [u8] {
         br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rExternal" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://remove.invalid/" TargetMode="External"/><Relationship Id="rInternal" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../custom/orphan.xml"/></Relationships>"#
+    }
+
+    fn relationship_batch(prefix: &str, count: usize) -> (Vec<String>, Vec<u8>) {
+        let mut ids = Vec::new();
+        let mut xml = String::from(
+            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#,
+        );
+        for index in 0..count {
+            let id = format!("r{prefix}{index}");
+            ids.push(id.clone());
+            xml.push_str(&format!(
+                r#"<Relationship Id="{id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://{prefix}{index}.invalid/" TargetMode="External"/>"#
+            ));
+        }
+        xml.push_str("</Relationships>");
+        (ids, xml.into_bytes())
+    }
+
+    fn archive_with_relationship_batches(
+        first: usize,
+        second: usize,
+    ) -> (Vec<u8>, Vec<String>, Vec<String>) {
+        let (first_ids, first_rels) = relationship_batch("first", first);
+        let (second_ids, second_rels) = relationship_batch("second", second);
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored("_rels/.rels", root_relationships())
+            .unwrap();
+        writer
+            .write_stored("word/document.xml", b"<before/>")
+            .unwrap();
+        writer
+            .write_stored("word/_rels/document.xml.rels", &first_rels)
+            .unwrap();
+        writer
+            .write_stored("custom/orphan.xml", b"<before/>")
+            .unwrap();
+        writer
+            .write_stored("custom/_rels/orphan.xml.rels", &second_rels)
+            .unwrap();
+        (writer.finish_to_bytes().unwrap(), first_ids, second_ids)
+    }
+
+    fn source_archive_total(package: &SourceBackedPackage) -> u64 {
+        package
+            .archive
+            .file_names()
+            .map(|name| package.archive.metadata(name).unwrap().uncompressed_size())
+            .sum()
     }
 
     #[test]
@@ -4662,6 +5073,205 @@ mod tests {
     }
 
     #[test]
+    fn multi_part_relationship_removal_has_exact_and_one_over_aggregate_bounds() {
+        let exact_each = MAX_SOURCE_RELATIONSHIP_REMOVALS / 2;
+        let (source_bytes, first_ids, second_ids) =
+            archive_with_relationship_batches(exact_each, exact_each);
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let orphan = PackURI::new("/custom/orphan.xml").unwrap();
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes))).unwrap();
+        let mut output = Vec::new();
+        package
+            .write_part_overlays_with_external_relationship_removals_to_stream(
+                &mut output,
+                vec![
+                    (document.clone(), b"<after/>".to_vec(), first_ids),
+                    (orphan.clone(), b"<after/>".to_vec(), second_ids),
+                ],
+            )
+            .unwrap();
+        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        assert!(reopened.get_part(&document).unwrap().rels().is_empty());
+        assert!(reopened.get_part(&orphan).unwrap().rels().is_empty());
+
+        let (source_bytes, first_ids, second_ids) =
+            archive_with_relationship_batches(exact_each, exact_each + 1);
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes))).unwrap();
+        output.clear();
+        assert!(matches!(
+            package.write_part_overlays_with_external_relationship_removals_to_stream(
+                &mut output,
+                vec![
+                    (document, b"<after/>".to_vec(), first_ids),
+                    (orphan, b"<after/>".to_vec(), second_ids),
+                ],
+            ),
+            Err(OpcError::SourceBackedOverlayUnavailable { .. })
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn multi_part_relationship_removal_checks_combined_part_and_archive_totals() {
+        let (source_bytes, first_ids, second_ids) = archive_with_relationship_batches(1, 1);
+        let source_package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+                .unwrap();
+        let source_total = source_archive_total(&source_package);
+        drop(source_package);
+        let large = format!("<after>{}</after>", "x".repeat(4096)).into_bytes();
+        let overlays = vec![
+            (
+                PackURI::new("/word/document.xml").unwrap(),
+                large.clone(),
+                first_ids.clone(),
+            ),
+            (
+                PackURI::new("/custom/orphan.xml").unwrap(),
+                large.clone(),
+                second_ids.clone(),
+            ),
+        ];
+        let part_limits = ReadLimits::builder()
+            .max_total_part_bytes(19)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = SourceBackedPackage::from_read_at_with_limits(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            part_limits,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        assert!(matches!(
+            package.write_part_overlays_with_external_relationship_removals_to_stream(
+                &mut output,
+                overlays.clone(),
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::TotalPartBytes,
+                ..
+            })
+        ));
+        assert!(output.is_empty());
+        let limits = ReadLimits::builder()
+            .max_archive_total_bytes(source_total + 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = SourceBackedPackage::from_read_at_with_limits(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            limits,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        assert!(matches!(
+            package.write_part_overlays_with_external_relationship_removals_to_stream(
+                &mut output,
+                overlays,
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::ArchiveTotalBytes,
+                ..
+            })
+        ));
+        assert!(output.is_empty());
+
+        let (source_bytes, first_ids, second_ids) = archive_with_relationship_batches(1, 1);
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+                .unwrap();
+        let mut unrestricted = Vec::new();
+        package
+            .write_part_overlays_with_external_relationship_removals_to_stream(
+                &mut unrestricted,
+                vec![
+                    (
+                        PackURI::new("/word/document.xml").unwrap(),
+                        large.clone(),
+                        first_ids.clone(),
+                    ),
+                    (
+                        PackURI::new("/custom/orphan.xml").unwrap(),
+                        large.clone(),
+                        second_ids.clone(),
+                    ),
+                ],
+            )
+            .unwrap();
+        let published =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(unrestricted))).unwrap();
+        let published_total = source_archive_total(&published);
+        assert!(published_total > source_total);
+        drop(published);
+        let exact_limits = ReadLimits::builder()
+            .max_archive_total_bytes(published_total)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = SourceBackedPackage::from_read_at_with_limits(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            exact_limits,
+        )
+        .unwrap();
+        let mut exact_output = Vec::new();
+        package
+            .write_part_overlays_with_external_relationship_removals_to_stream(
+                &mut exact_output,
+                vec![
+                    (
+                        PackURI::new("/word/document.xml").unwrap(),
+                        large.clone(),
+                        first_ids.clone(),
+                    ),
+                    (
+                        PackURI::new("/custom/orphan.xml").unwrap(),
+                        large.clone(),
+                        second_ids.clone(),
+                    ),
+                ],
+            )
+            .unwrap();
+        assert!(!exact_output.is_empty());
+
+        let under_limits = ReadLimits::builder()
+            .max_archive_total_bytes(published_total - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = SourceBackedPackage::from_read_at_with_limits(
+            Arc::new(CountingSource::new(source_bytes)),
+            under_limits,
+        )
+        .unwrap();
+        let mut under_output = Vec::new();
+        assert!(matches!(
+            package.write_part_overlays_with_external_relationship_removals_to_stream(
+                &mut under_output,
+                vec![
+                    (
+                        PackURI::new("/word/document.xml").unwrap(),
+                        large.clone(),
+                        first_ids,
+                    ),
+                    (
+                        PackURI::new("/custom/orphan.xml").unwrap(),
+                        large,
+                        second_ids,
+                    ),
+                ],
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::ArchiveTotalBytes,
+                ..
+            })
+        ));
+        assert!(under_output.is_empty());
+    }
+
+    #[test]
     fn external_relationship_removal_overlay_changes_only_owner_and_rels_member() {
         let source_bytes = archive_with_document_relationships(document_relationships());
         let source_raw = raw_records(&source_bytes);
@@ -4748,6 +5358,42 @@ mod tests {
             }
             assert!(output.is_empty());
         }
+
+        let exact_bound_ids = (0..MAX_SOURCE_RELATIONSHIP_REMOVALS)
+            .map(|index| format!("missing-{index}"))
+            .collect();
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+                .unwrap();
+        let mut output = Vec::new();
+        assert!(matches!(
+            package.write_part_overlay_with_external_relationship_removals_to_stream(
+                &mut output,
+                &document,
+                b"<after/>".to_vec(),
+                exact_bound_ids,
+            ),
+            Err(OpcError::RelationshipNotFound(_))
+        ));
+        assert!(output.is_empty());
+
+        let over_bound_ids = (0..=MAX_SOURCE_RELATIONSHIP_REMOVALS)
+            .map(|index| format!("missing-{index}"))
+            .collect();
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+                .unwrap();
+        let mut output = Vec::new();
+        assert!(matches!(
+            package.write_part_overlay_with_external_relationship_removals_to_stream(
+                &mut output,
+                &document,
+                b"<after/>".to_vec(),
+                over_bound_ids,
+            ),
+            Err(OpcError::SourceBackedOverlayUnavailable { .. })
+        ));
+        assert!(output.is_empty());
 
         let limits = ReadLimits::builder()
             .max_part_bytes(10)
