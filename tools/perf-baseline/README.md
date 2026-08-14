@@ -139,10 +139,13 @@ relationships, deterministic hashes, and the bounded sink; eager outputs also
 check untouched media payloads. Source-backed outputs additionally compare raw
 local and central ZIP records for every unselected member, including media,
 relationships, content types, workbook, and unselected worksheets. Source read
-and successful materialization counters are sampled after the
-timed segments (with diagnostics excluded from the reported sum). These
-controls are evidence for later release ABBA work,
-not a speedup claim by themselves.
+and successful materialization counters are sampled after the timed segments
+(with diagnostics excluded from the reported sum). Balanced release ABBA in
+[change 0096](../../docs/performance/changes/0096-xlsx-source-provenance-publication.md)
+accepts removal of the redundant publication-time semantic worksheet reparse:
+source-backed p50 geomean improves 21.66%/22.65% in the two directions, while
+physical read/materialization counters remain unchanged. No allocation, RSS,
+cold-I/O or decompression claim is attached to that result.
 
 Measure the opt-in OPC source-cache Budget boundary and controlled contention
 matrix on one fixed many-small incompressible corpus:
@@ -840,6 +843,15 @@ The `sink` record additionally reports exact rows/cells or paragraphs/runs,
 input bytes, authored worksheet/RTF bytes, `retained_output_bytes: 0`, and the
 production writer's explicit `retained_authoring_window_bytes`. Increasing total output
 therefore cannot be mistaken for an increasing retained authoring window.
+
+The RTF writer batches only escape-free printable ASCII, with a hard 32-byte
+sink-request ceiling and no additional retained writer buffer. Balanced
+release ABBA in
+[change 0097](../../docs/performance/changes/0097-rtf-bounded-ascii-streaming.md)
+records p50 geomean improvements of 76.41%/76.47%; the large case falls from
+7,208,970 to 1,441,802 sink calls while exact bytes and hashes remain stable.
+This is a fresh-creation result, not an existing-document edit or memory-profile
+claim.
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \

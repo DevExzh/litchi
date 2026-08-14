@@ -153,7 +153,8 @@ Confirmed source facts:
 - `litchi-xlsx` now exposes bounded forward-only creation for one-sheet
   workbooks. Its correctness and resource-limit tests do not establish latency,
   allocation, peak-memory, or large-stream performance; matching harness and
-  profiler evidence remains pending.
+  profiler evidence remains pending. This is distinct from the source-backed
+  existing-cell publication result below.
 - The legacy eager path still materializes all admitted Parts. The additive
   source-backed XLSX facade avoids timed source reads while listing after open;
   managed source-backed OPC caches charge exact physical `InputBytes`,
@@ -214,6 +215,15 @@ Confirmed source facts:
 - A targeted cell edit performs a semantic parse, an independent lossless
   layout scan, full replacement-byte construction, and a full changed-sheet
   semantic readback before publication.
+- Source-backed scalar-cell publication now carries a tri-state source
+  provenance proof from the checked snapshot into the publisher. Matched
+  lineage/version avoids a second publication-time semantic worksheet reload;
+  mismatched sources refuse and unavailable provenance retains the prior full
+  reload/readback path. Balanced release ABBA across one-cell, `ceil(1%)` and
+  exact-256 batches accepts p50 geomean improvements of 21.66%/22.65% and p95
+  improvements of 21.38%/22.70%. Physical source reads and successful
+  materializations are unchanged, so this is a semantic-reparse result rather
+  than an I/O claim. See [`change 0096`](changes/0096-xlsx-source-provenance-publication.md).
 - Plain worksheets previously ran a separate namespace-aware x14ac collection
   before every complete semantic parse even when no `dyDescent` token existed.
   Successful no-token reads now skip that pass; rejected inputs rerun it to
@@ -683,10 +693,15 @@ only 2.61%/2.30%, with p95 +0.54%; it was fully reverted. See
 
 ## RTF path
 
-`litchi-rtf` now also exposes bounded forward-only authoring. That production
-capability has correctness and resource-limit coverage but no retained
-performance or peak-memory artifact, so it is not treated as an accepted
-optimization result here.
+`litchi-rtf` now also exposes bounded forward-only authoring. Escape-free
+printable ASCII is emitted in direct spans capped at 32 bytes, without adding a
+retained writer buffer and while retaining Work/Output reservations and
+per-write cancellation checks. Balanced release ABBA accepts p50 geomean
+improvements of 76.41%/76.47% and p95 improvements of 75.23%/75.76%; the large
+case drops from 7,208,970 to 1,441,802 sink calls with exact bytes and hashes.
+This is fresh creation only, and allocation, peak-memory/RSS and cold-I/O
+evidence remain open. See
+[`change 0097`](changes/0097-rtf-bounded-ascii-streaming.md).
 
 Existing-document logical-tail append is now a separate, opt-in harness path
 from streaming creation. Tiny/medium/large plain corpora append 4/64/256
