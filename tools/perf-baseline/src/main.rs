@@ -570,6 +570,9 @@ enum Case {
     PptSemanticOpen,
     PptSemanticListSlides,
     PptSemanticOneShapeText,
+    PptSourceBackedOneShapeText,
+    PptSemanticFreshOpenOneShapeText,
+    PptSourceBackedFreshOpenOneShapeText,
     PptSemanticFullText,
     PptSlideOrderSnapshotOpen,
     PptTextEditOneEditSave,
@@ -870,6 +873,11 @@ impl Case {
             Self::PptSemanticOpen => "ppt_semantic_open",
             Self::PptSemanticListSlides => "ppt_semantic_list_slides",
             Self::PptSemanticOneShapeText => "ppt_semantic_one_shape_text",
+            Self::PptSourceBackedOneShapeText => "ppt_source_backed_one_shape_text",
+            Self::PptSemanticFreshOpenOneShapeText => "ppt_semantic_fresh_open_one_shape_text",
+            Self::PptSourceBackedFreshOpenOneShapeText => {
+                "ppt_source_backed_fresh_open_one_shape_text"
+            },
             Self::PptSemanticFullText => "ppt_semantic_full_text",
             Self::PptSlideOrderSnapshotOpen => "ppt_slide_order_snapshot_open",
             Self::PptTextEditOneEditSave => "ppt_text_edit_one_edit_save",
@@ -1093,6 +1101,9 @@ impl Case {
             Self::PptSemanticOpen
                 | Self::PptSemanticListSlides
                 | Self::PptSemanticOneShapeText
+                | Self::PptSourceBackedOneShapeText
+                | Self::PptSemanticFreshOpenOneShapeText
+                | Self::PptSourceBackedFreshOpenOneShapeText
                 | Self::PptSemanticFullText
                 | Self::PptSlideOrderSnapshotOpen
                 | Self::PptTextEditOneEditSave
@@ -1812,6 +1823,8 @@ struct SourceSummary {
     odt_mixed: Option<OdtMixedPublicationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ppt_pictures: Option<PptPicturesSourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ppt_shape_text: Option<PptShapeTextSourceSummary>,
 }
 
 /// Positional-read evidence for the native PPT lazy `Pictures` selectors.
@@ -1835,6 +1848,21 @@ struct PptPicturesSourceSummary {
     source_read_bytes: Vec<u64>,
     pictures_read_calls: Vec<u64>,
     pictures_read_bytes: Vec<u64>,
+}
+
+/// Positional-read evidence for the native PPT source-backed selected-shape
+/// text query.  The source counters come from an independent replay so the
+/// timed query remains an uninstrumented immutable-source measurement.
+#[derive(Clone, Debug, Default, Serialize)]
+struct PptShapeTextSourceSummary {
+    implementation: &'static str,
+    phase: &'static str,
+    timing_scope: &'static str,
+    target_slide: usize,
+    target_shape: usize,
+    canonical_text_sha256: String,
+    source_read_calls: Vec<u64>,
+    source_read_bytes: Vec<u64>,
 }
 
 /// Untimed correctness counters paired with the ODT mixed model-content
@@ -5135,6 +5163,11 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_semantic_open" => Some(Case::PptSemanticOpen),
         "ppt_semantic_list_slides" => Some(Case::PptSemanticListSlides),
         "ppt_semantic_one_shape_text" => Some(Case::PptSemanticOneShapeText),
+        "ppt_source_backed_one_shape_text" => Some(Case::PptSourceBackedOneShapeText),
+        "ppt_semantic_fresh_open_one_shape_text" => Some(Case::PptSemanticFreshOpenOneShapeText),
+        "ppt_source_backed_fresh_open_one_shape_text" => {
+            Some(Case::PptSourceBackedFreshOpenOneShapeText)
+        },
         "ppt_semantic_full_text" => Some(Case::PptSemanticFullText),
         "ppt_slide_order_snapshot_open" => Some(Case::PptSlideOrderSnapshotOpen),
         "ppt_text_edit_one_edit_save" => Some(Case::PptTextEditOneEditSave),
@@ -5405,6 +5438,9 @@ fn print_usage() {
                                        xls_visibility_source_backed_batch_edit_save,\n\
                                        ppt_semantic_open,ppt_semantic_list_slides,\n\
                                        ppt_semantic_one_shape_text,ppt_semantic_full_text,\n\
+                                       ppt_source_backed_one_shape_text,\n\
+                                       ppt_semantic_fresh_open_one_shape_text,\n\
+                                       ppt_source_backed_fresh_open_one_shape_text,\n\
                                        ppt_slide_order_snapshot_open,\n\
                                        ppt_text_edit_one_edit_save,\n\
                                        ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save,\n\
@@ -9495,6 +9531,11 @@ fn run_case_with_config(
         | Case::PptSemanticOneEditSave => {
             run_semantic_ppt(case, corpus, warmup_iterations, samples)
         },
+        Case::PptSourceBackedOneShapeText
+        | Case::PptSemanticFreshOpenOneShapeText
+        | Case::PptSourceBackedFreshOpenOneShapeText => {
+            run_ppt_selected_shape_text(case, corpus, warmup_iterations, samples)
+        },
         Case::PptTextEditOneEditSave => {
             run_ppt_text_edit_one_edit_save(corpus, warmup_iterations, samples)
         },
@@ -12540,6 +12581,205 @@ fn verify_semantic_ppt(
         return Err("semantic PPT full text differs from writer specification".into());
     }
     Ok(())
+}
+
+fn replay_ppt_selected_shape_source(
+    archive: &[u8],
+    target: litchi_ppt::text_edit::Target,
+    expected: &str,
+    query_only: bool,
+) -> Result<SourceSnapshot, Box<dyn Error>> {
+    let source = Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new()));
+    let snapshot = litchi_ppt::text_edit::SourceSnapshot::open(source.clone())?;
+    if query_only {
+        // Opening a source-backed snapshot validates the complete CFB
+        // identity. Reset the independent replay so this phase reports only
+        // the selected-shape query's logical reads.
+        source.reset();
+    }
+    let text = snapshot.read_text(target)?;
+    if text != expected {
+        return Err(
+            "PPT source-backed selected-shape replay differs from the eager semantic text".into(),
+        );
+    }
+    Ok(source.snapshot())
+}
+
+fn verify_ppt_selected_shape_source_counter(
+    snapshot: SourceSnapshot,
+    query_only: bool,
+) -> Result<(), Box<dyn Error>> {
+    if snapshot.read_calls == 0 || snapshot.read_bytes == 0 || snapshot.max_in_flight_reads != 1 {
+        return Err(format!(
+            "PPT source-backed selected-shape {} replay has incomplete logical read evidence",
+            if query_only {
+                "query-only"
+            } else {
+                "fresh-open-plus-query"
+            }
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn run_ppt_selected_shape_text(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    use litchi_ppt::text_edit::Target;
+
+    let shape = writer_shape(corpus)?;
+    if shape == WriterShape::PayloadHeavy {
+        return Err(
+            "payload-heavy PPT corpus is excluded from selected-shape semantic cases".into(),
+        );
+    }
+    let (slide_count, boxes_per_slide) = shape.ppt_dimensions();
+    let linear = slide_count * boxes_per_slide / 2;
+    let selected = (linear / boxes_per_slide, linear % boxes_per_slide);
+    let target = Target::new(Position::new(selected.0), Position::new(selected.1));
+    let expected = writer_text("ppt", selected.0, selected.1, 0);
+    let source_backed = matches!(
+        case,
+        Case::PptSourceBackedOneShapeText | Case::PptSourceBackedFreshOpenOneShapeText
+    );
+    let fresh_open = matches!(
+        case,
+        Case::PptSemanticFreshOpenOneShapeText | Case::PptSourceBackedFreshOpenOneShapeText
+    );
+    let query_only = !fresh_open;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut shape_source_summary = source_backed.then(|| PptShapeTextSourceSummary {
+        implementation: "source-backed",
+        phase: if query_only {
+            "selected-shape-query-only"
+        } else {
+            "fresh-open-plus-selected-shape-query"
+        },
+        timing_scope: if query_only {
+            "prepared-source-and-semantic-owner-outside-timing"
+        } else {
+            "source-open-and-selected-shape-query"
+        },
+        target_slide: selected.0,
+        target_shape: selected.1,
+        canonical_text_sha256: sha256_hex(expected.as_bytes()),
+        ..PptShapeTextSourceSummary::default()
+    });
+    let mut exact_source_counter_gate = None;
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let (text, duration) = if source_backed {
+            let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
+            if fresh_open {
+                let started = Instant::now();
+                let snapshot = litchi_ppt::text_edit::SourceSnapshot::open(source)?;
+                let text = snapshot.read_text(target)?;
+                (text, started.elapsed())
+            } else {
+                // Match the eager query-only control: source validation and
+                // semantic-owner preparation are outside the timed interval.
+                let snapshot = litchi_ppt::text_edit::SourceSnapshot::open(source)?;
+                let started = Instant::now();
+                let text = snapshot.read_text(target)?;
+                (text, started.elapsed())
+            }
+        } else if fresh_open {
+            let started = Instant::now();
+            let mut package =
+                litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+            let presentation = package.presentation()?;
+            let text = presentation
+                .slides()?
+                .into_iter()
+                .nth(selected.0)
+                .ok_or("semantic PPT selected slide is missing")?
+                .shapes()?
+                .get(selected.1)
+                .ok_or("semantic PPT selected shape is missing")?
+                .text()?
+                .to_owned();
+            (text, started.elapsed())
+        } else {
+            let mut package =
+                litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+            let presentation = package.presentation()?;
+            let started = Instant::now();
+            let text = presentation
+                .slides()?
+                .into_iter()
+                .nth(selected.0)
+                .ok_or("semantic PPT selected slide is missing")?
+                .shapes()?
+                .get(selected.1)
+                .ok_or("semantic PPT selected shape is missing")?
+                .text()?
+                .to_owned();
+            (text, started.elapsed())
+        };
+
+        if text != expected {
+            return Err(format!(
+                "{} selected shape differs from writer specification",
+                case.name()
+            )
+            .into());
+        }
+        // The full eager semantic oracle is deliberately outside the timed
+        // interval. It keeps both phases on the same deterministic corpus
+        // without turning this selected-query case into a full-text claim.
+        verify_semantic_ppt(&corpus.archive, shape, None)?;
+
+        std::hint::black_box(text);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    if source_backed {
+        // Keep independent read accounting entirely outside the timed loop:
+        // warmups never enter the evidence vectors and cannot perturb the
+        // query/open latency samples.
+        for _ in 0..samples {
+            let snapshot =
+                replay_ppt_selected_shape_source(&corpus.archive, target, &expected, query_only)?;
+            verify_ppt_selected_shape_source_counter(snapshot, query_only)?;
+            if let Some(expected_snapshot) = exact_source_counter_gate {
+                if expected_snapshot != snapshot {
+                    return Err(format!(
+                        "{} source-read counters changed across deterministic samples",
+                        case.name()
+                    )
+                    .into());
+                }
+            } else {
+                exact_source_counter_gate = Some(snapshot);
+            }
+            source_summary.record(snapshot);
+            if let Some(summary) = shape_source_summary.as_mut() {
+                summary.source_read_calls.push(snapshot.read_calls);
+                summary.source_read_bytes.push(snapshot.read_bytes);
+            }
+        }
+    }
+
+    if let Some(summary) = shape_source_summary {
+        if summary.source_read_calls.len() != samples || summary.source_read_bytes.len() != samples
+        {
+            return Err(format!(
+                "{} source-read evidence does not contain exactly one replay per measured sample",
+                case.name()
+            )
+            .into());
+        }
+        source_summary.ppt_shape_text = Some(summary);
+        Ok(result_with_source(case, corpus, elapsed, source_summary))
+    } else {
+        Ok(result(case, corpus, elapsed, None))
+    }
 }
 
 fn run_semantic_ppt(
@@ -24428,11 +24668,29 @@ mod tests {
         for case in [
             Case::PptSlideOrderSnapshotOpen,
             Case::PptTextEditOneEditSave,
+            Case::PptSourceBackedOneShapeText,
+            Case::PptSemanticFreshOpenOneShapeText,
+            Case::PptSourceBackedFreshOpenOneShapeText,
         ] {
             let measured = run_case(case, &ppt, 0, 1).unwrap();
             assert_eq!(measured.case, case.name());
             assert_eq!(measured.elapsed_ns.samples.len(), 1);
             assert!(measured.sink.is_none());
+            if matches!(
+                case,
+                Case::PptSourceBackedOneShapeText | Case::PptSourceBackedFreshOpenOneShapeText
+            ) {
+                let source = measured.source.expect("source-backed PPT query evidence");
+                let shape_text = source
+                    .ppt_shape_text
+                    .expect("selected-shape source evidence");
+                assert_eq!(shape_text.source_read_calls.len(), 1);
+                assert_eq!(shape_text.source_read_bytes.len(), 1);
+                assert!(shape_text.source_read_calls[0] > 0);
+                assert!(shape_text.source_read_bytes[0] > 0);
+            } else {
+                assert!(measured.source.is_none());
+            }
         }
     }
 

@@ -61,7 +61,7 @@ two bounded XLSX/RTF streaming-creation cases,
 four matched CFB selective-read cases,
 four matched native XLS existing-comment publication cases,
 four matched native XLS worksheet-visibility publication cases,
-four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
+four opaque-heavy common OLE2 stage/edit-save cases, 24 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, 15 RTF semantic cases (13 transport/read/edit
 cases plus two logical-tail publication cases), 38 ODF semantic cases, and one
 ODF `mimetype` repair-plan case are opt-in. Eight additional native PPT
@@ -70,7 +70,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 use an uninstrumented `litchi_core::OwnedSource`; independent untimed
 `InstrumentedSource` replays provide the source-read counters. The current
-`Case` matrix exposes 216 selectable case
+`Case` matrix exposes 219 selectable case
 names in total;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
@@ -578,12 +578,12 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
 ```
 
 Run the complete native DOC/XLS/PPT semantic matrix over the same deterministic
-tiny and large writer artifacts (40 records):
+tiny and large writer artifacts (46 records):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 3 --samples 15 --writer-shape tiny,large \
-  --case doc_semantic_open,doc_semantic_list_paragraphs,doc_semantic_one_paragraph,doc_semantic_full_text,doc_semantic_noop_edit_save,doc_semantic_one_edit_save,xls_semantic_open,xls_semantic_list_worksheets,xls_semantic_one_cell,xls_semantic_full_cell_scan,xls_semantic_noop_edit_save,xls_semantic_one_edit_save,ppt_semantic_open,ppt_semantic_list_slides,ppt_semantic_one_shape_text,ppt_semantic_full_text,ppt_slide_order_snapshot_open,ppt_text_edit_one_edit_save,ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save \
+  --case doc_semantic_open,doc_semantic_list_paragraphs,doc_semantic_one_paragraph,doc_semantic_full_text,doc_semantic_noop_edit_save,doc_semantic_one_edit_save,xls_semantic_open,xls_semantic_list_worksheets,xls_semantic_one_cell,xls_semantic_full_cell_scan,xls_semantic_noop_edit_save,xls_semantic_one_edit_save,ppt_semantic_open,ppt_semantic_list_slides,ppt_semantic_one_shape_text,ppt_source_backed_one_shape_text,ppt_semantic_fresh_open_one_shape_text,ppt_source_backed_fresh_open_one_shape_text,ppt_semantic_full_text,ppt_slide_order_snapshot_open,ppt_text_edit_one_edit_save,ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save \
   --json target/perf/ole2-semantic-baseline.json
 ```
 
@@ -1320,6 +1320,15 @@ cfb_selective_fat_legacy_read,cfb_selective_fat_shared_read \
   `ppt_semantic_full_text`: enumerate slides, resolve one middle textbox, or
   extract all presentation text. The selected-shape path necessarily builds
   the public slide collection.
+- `ppt_source_backed_one_shape_text` is the matched positional-source
+  selected-shape query. It opens `text_edit::SourceSnapshot` before timing,
+  then times only `read_text(Target)`; `ppt_semantic_fresh_open_one_shape_text`
+  and `ppt_source_backed_fresh_open_one_shape_text` pair fresh eager/source
+  open-plus-query phases. All four controls use the same deterministic PPT
+  corpus and target. Source-backed elapsed samples use an uninstrumented
+  immutable source; an independent `InstrumentedSource` replay reports exact
+  logical read calls/bytes under `source.ppt_shape_text`. These controls make
+  no allocation, physical-I/O, or speedup claim.
 - `ppt_slide_order_snapshot_open`: capture the public exact-source root
   `slide_order::Snapshot`, including its complete package, live-document,
   slide-order, and review-history validation. Generic public-reader semantic
@@ -1542,7 +1551,7 @@ bandwidth, and maximum physical range. `configuration.execution_workers`
 records the resolved, capped, deduplicated scaling points in deterministic
 ascending order.
 
-The twenty-one positional cases add a `source` object; older cases omit it. Its
+The twenty-three positional cases add a `source` object; older cases omit it. Its
 arrays contain one value for every measured iteration and record `read_calls`,
 `read_bytes`, compressed ordinary-OPC-payload range overlap, and
 `max_in_flight_reads`. Applicable OPC cases also record a semantic per-sample
@@ -1552,6 +1561,9 @@ physical request-amplification metric: bounded ZIP metadata reads may fetch
 adjacent compressed payload bytes without decompressing or caching that Part.
 Accordingly, `opc_source_open` may report overlap while still reporting zero
 materializations; its post-timing cold access proves the distinction.
+Native PPT selected-shape source cases additionally record the scalar canonical
+text digest and per-sample logical read calls/bytes under
+`source.ppt_shape_text`.
 
 Simulated-range records additionally contain `source.simulation`: per-sample
 logical read calls/bytes, physical request count/bytes, sorted physical request

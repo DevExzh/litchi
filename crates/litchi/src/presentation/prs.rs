@@ -12,6 +12,8 @@ use crate::ppt;
 use litchi_ole_common::property_set::PropertySetReader;
 
 use std::path::Path;
+#[cfg(all(feature = "ppt", any(unix, windows)))]
+use std::sync::Arc;
 
 /// A PowerPoint presentation.
 ///
@@ -252,6 +254,11 @@ impl Presentation {
     /// # Ok::<(), litchi::common::Error>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        #[cfg(all(feature = "ppt", any(unix, windows), not(feature = "pptx")))]
+        if let Some(presentation) = Self::open_native_ppt_path(path.as_ref())? {
+            return Ok(presentation);
+        }
+
         #[cfg(feature = "pptx")]
         {
             Self::open_with_limits(path, crate::pptx::ReadLimits::default())
@@ -279,6 +286,11 @@ impl Presentation {
                 .map_err(crate::map_ooxml_error)?
         {
             return Self::from_detected(detected);
+        }
+
+        #[cfg(all(feature = "ppt", any(unix, windows)))]
+        if let Some(presentation) = Self::open_native_ppt_path(path.as_ref())? {
+            return Ok(presentation);
         }
 
         let bytes = std::fs::read(path.as_ref())?;
@@ -338,6 +350,43 @@ impl Presentation {
                 crate::detection_smart::detect_format_smart(bytes).ok_or(Error::NotOfficeFile)?;
             Self::from_detected(detected)
         }
+    }
+
+    #[cfg(all(feature = "ppt", any(unix, windows)))]
+    fn open_native_ppt_path(path: &Path) -> Result<Option<Self>> {
+        let source = Arc::new(litchi_core::FileSource::open(path)?);
+        let shared = match litchi_cfb::SharedOleFile::open(source) {
+            Ok(shared) => shared,
+            // Classification failures precede PPT ownership. Preserve the
+            // established byte/detection fallback for malformed or non-CFB
+            // inputs instead of leaking a PPT-specific error.
+            Err(_error) => return Ok(None),
+        };
+
+        #[cfg(feature = "doc")]
+        if shared.exists(&["WordDocument"]) {
+            // Match the existing smart detector's DOC-before-PPT precedence
+            // for valid OLE polyglots. The byte fallback below then returns
+            // the established non-presentation result for the DOC owner.
+            return Ok(None);
+        }
+
+        let Some(package) =
+            ppt::SourceBackedPackage::from_shared_if_powerpoint(shared).map_err(Error::from)?
+        else {
+            return Ok(None);
+        };
+
+        let cached_metadata = package
+            .metadata()
+            .ok()
+            .map(litchi_core::Metadata::from)
+            .filter(|metadata| metadata.has_data());
+        let pres = package.presentation().map_err(Error::from)?;
+        Ok(Some(Self {
+            inner: PresentationImpl::Ppt(pres),
+            cached_metadata,
+        }))
     }
 
     /// Create a presentation from bytes with an explicit PPTX/OPC resource
@@ -1022,5 +1071,148 @@ mod tests {
             .extract_text_for_markdown()
             .expect("Failed to extract text");
         assert!(!slides_text.is_empty(), "Expected text extraction results");
+    }
+}
+
+#[cfg(all(test, feature = "ppt", any(unix, windows)))]
+mod native_ppt_path_tests {
+    use super::Presentation;
+    use litchi_cfb::{OleFile, OleWriter};
+    use std::io::Cursor;
+    use std::path::PathBuf;
+
+    fn test_data_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data")
+    }
+
+    #[test]
+    fn native_path_matches_byte_facade_for_core_queries_and_metadata() {
+        let path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let from_path = Presentation::open(&path).expect("open native PPT path");
+        let from_bytes = Presentation::from_bytes(std::fs::read(&path).expect("read PPT"))
+            .expect("open PPT bytes");
+
+        assert_eq!(
+            from_path.slide_count().unwrap(),
+            from_bytes.slide_count().unwrap()
+        );
+        assert_eq!(from_path.text().unwrap(), from_bytes.text().unwrap());
+        assert_eq!(
+            from_path
+                .metadata()
+                .unwrap()
+                .map(|metadata| format!("{metadata:?}")),
+            from_bytes
+                .metadata()
+                .unwrap()
+                .map(|metadata| format!("{metadata:?}"))
+        );
+    }
+
+    #[test]
+    fn non_powerpoint_ole_keeps_the_existing_facade_fallback() {
+        let path = test_data_path().join("ole/doc/documentProperties.doc");
+        let path_error = match Presentation::open(&path) {
+            Ok(_) => panic!("a Word OLE package is not a presentation"),
+            Err(error) => error.to_string(),
+        };
+        let bytes_error = match Presentation::from_bytes(std::fs::read(&path).expect("read DOC")) {
+            Ok(_) => panic!("a Word OLE package is not a presentation"),
+            Err(error) => error.to_string(),
+        };
+
+        assert_eq!(path_error, bytes_error);
+    }
+
+    #[test]
+    fn malformed_ole_keeps_the_existing_facade_fallback() {
+        let mut bytes = litchi_core::detection::utils::OLE2_SIGNATURE.to_vec();
+        bytes.resize(512, 0);
+        let temporary = tempfile::NamedTempFile::new().expect("temporary malformed OLE path");
+        std::fs::write(temporary.path(), &bytes).expect("write malformed OLE");
+
+        let path_error = match Presentation::open(temporary.path()) {
+            Ok(_) => panic!("malformed OLE path must not become a presentation"),
+            Err(error) => error.to_string(),
+        };
+        let bytes_error = match Presentation::from_bytes(bytes) {
+            Ok(_) => panic!("malformed OLE bytes must not become a presentation"),
+            Err(error) => error.to_string(),
+        };
+        assert_eq!(path_error, bytes_error);
+    }
+
+    #[cfg(feature = "pptx")]
+    #[test]
+    fn ooxml_suffix_preflight_precedes_native_ole_routing() {
+        let source = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let temporary = tempfile::Builder::new()
+            .suffix(".pptx")
+            .tempfile()
+            .expect("temporary OOXML-suffixed path");
+        std::fs::write(
+            temporary.path(),
+            std::fs::read(source).expect("read native PPT"),
+        )
+        .expect("write OOXML-suffixed PPT");
+
+        let error = match Presentation::open(temporary.path()) {
+            Ok(_) => panic!("OOXML suffix must reject native OLE bytes"),
+            Err(error) => error.to_string(),
+        };
+        assert!(
+            error.contains("OOXML-suffixed input does not have ZIP magic"),
+            "unexpected extension error: {error}"
+        );
+    }
+
+    #[cfg(feature = "doc")]
+    #[test]
+    fn doc_host_stream_keeps_doc_before_ppt_precedence() {
+        let doc_path = test_data_path().join("ole/doc/documentProperties.doc");
+        let ppt_path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let mut doc = OleFile::open(Cursor::new(std::fs::read(doc_path).expect("read DOC")))
+            .expect("open DOC OLE");
+        let mut ppt = OleFile::open(Cursor::new(std::fs::read(ppt_path).expect("read PPT")))
+            .expect("open PPT OLE");
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(
+                &["WordDocument"],
+                &doc.open_stream(&["WordDocument"]).expect("DOC stream"),
+            )
+            .expect("write DOC host stream");
+        writer
+            .create_stream(
+                &["PowerPoint Document"],
+                &ppt.open_stream(&["PowerPoint Document"])
+                    .expect("PPT stream"),
+            )
+            .expect("write PPT document stream");
+        writer
+            .create_stream(
+                &["Current User"],
+                &ppt.open_stream(&["Current User"])
+                    .expect("PPT current-user stream"),
+            )
+            .expect("write PPT current-user stream");
+        let mut output = Cursor::new(Vec::new());
+        writer
+            .write_to(&mut output)
+            .expect("serialize OLE polyglot");
+        let bytes = output.into_inner();
+
+        let bytes_error = match Presentation::from_bytes(bytes.clone()) {
+            Ok(_) => panic!("DOC precedence should reject the polyglot as a presentation"),
+            Err(error) => error.to_string(),
+        };
+        let temporary = tempfile::NamedTempFile::new().expect("temporary OLE path");
+        std::fs::write(temporary.path(), bytes).expect("write OLE polyglot");
+        let path_error = match Presentation::open(temporary.path()) {
+            Ok(_) => panic!("DOC precedence should reject the polyglot as a presentation"),
+            Err(error) => error.to_string(),
+        };
+
+        assert_eq!(path_error, bytes_error);
     }
 }

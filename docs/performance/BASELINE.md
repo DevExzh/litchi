@@ -342,7 +342,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**216 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**219 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -360,6 +360,13 @@ latency, allocation, RSS-attribution, cold-cache, or save-path result is
 accepted. See
 [`0117`](changes/0117-ppt-pictures-release-evidence.md) and the
 [raw report](results/ppt-pictures-release-0117.json).
+
+Change 0119 adds three opt-in native PPT selected-shape controls: a positional
+query-only pair against the existing eager case and a fresh-open-plus-query
+eager/source-backed pair. Independent untimed replays retain deterministic
+logical source-read counters and semantic hashes while timed source-backed
+samples remain uninstrumented. No latency or resource claim is accepted
+without a frozen release ABBA run.
 
 Five filesystem cases now exercise eager/source-backed OPC open, eager/source-
 backed one-Part atomic save, and same-length CFB atomic overlay save. A

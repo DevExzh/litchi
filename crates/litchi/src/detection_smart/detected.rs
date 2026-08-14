@@ -192,7 +192,10 @@ pub(crate) fn detect_prepared_odp(
     }
 }
 
-#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+#[cfg(all(
+    any(feature = "ods", feature = "odp"),
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+))]
 fn ooxml_probe_wins(bytes: &[u8]) -> bool {
     let Ok(package) =
         crate::opc::OpcPackage::from_bytes_with_limits(bytes, crate::opc::ReadLimits::default())

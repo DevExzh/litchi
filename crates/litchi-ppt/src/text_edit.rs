@@ -467,6 +467,25 @@ impl SourceSnapshot {
     /// The returned transaction admits only an equal encoded-length
     /// replacement. There is no fallback to the ordinary full-record editor.
     pub fn edit_text(&self, target: Target) -> Result<SourceTransaction> {
+        let resolved = self.resolve_source_text(target)?;
+        Ok(SourceTransaction {
+            source: self.clone(),
+            resolved,
+            replacement: None,
+        })
+    }
+
+    /// Reads one existing slide/shape text atom using semantic positions.
+    ///
+    /// The returned text is owned, so the source-backed selector does not
+    /// expose a source lifetime or any physical CFB identity. Resolution uses
+    /// the same bounded positional path and refusal checks as
+    /// [`Self::edit_text`].
+    pub fn read_text(&self, target: Target) -> Result<String> {
+        Ok(self.resolve_source_text(target)?.text)
+    }
+
+    fn resolve_source_text(&self, target: Target) -> Result<SourceResolved> {
         self.ensure_current()?;
         let shared = open_shared_source(self)?;
         reject_macro_components(&shared)?;
@@ -481,11 +500,7 @@ impl SourceSnapshot {
             self.inner.options.record_limits,
         )?;
         self.ensure_current()?;
-        Ok(SourceTransaction {
-            source: self.clone(),
-            resolved,
-            replacement: None,
-        })
+        Ok(resolved)
     }
 
     fn ensure_current(&self) -> Result<()> {
@@ -3298,7 +3313,10 @@ mod tests {
     use litchi_cfb::{OleFile, OutputProgress, OverlayError, SharedOleFile, StreamSpliceLimits};
     use litchi_core::{OwnedSource, ReadAt, SourceVersion};
     use std::io::{self, Cursor, Write};
-    use std::sync::{Arc, Mutex};
+    use std::sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    };
 
     fn fixture(text: &str) -> Vec<u8> {
         let mut writer = Writer::new();
@@ -3338,7 +3356,7 @@ mod tests {
     struct CountingSource {
         bytes: Arc<Vec<u8>>,
         metrics: Arc<Mutex<ReadMetrics>>,
-        version: SourceVersion,
+        revision: Arc<AtomicU64>,
     }
 
     impl CountingSource {
@@ -3347,7 +3365,7 @@ mod tests {
             let source = Self {
                 bytes: Arc::new(bytes),
                 metrics: Arc::clone(&metrics),
-                version: SourceVersion::new(0x5050_5443, 0),
+                revision: Arc::new(AtomicU64::new(0)),
             };
             (source, metrics)
         }
@@ -3376,7 +3394,10 @@ mod tests {
         }
 
         fn version(&self) -> io::Result<SourceVersion> {
-            Ok(self.version)
+            Ok(SourceVersion::new(
+                0x5050_5443,
+                self.revision.load(Ordering::Acquire),
+            ))
         }
     }
 
@@ -3922,6 +3943,84 @@ mod tests {
         assert!(metrics.calls > 0);
         assert!(metrics.bytes < document.len());
         assert!(metrics.max_request < document.len());
+    }
+
+    #[test]
+    fn source_backed_read_text_matches_eager_shape_text() {
+        let bytes = generated_fixture(6, 4);
+        let source =
+            super::SourceSnapshot::open(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
+
+        let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+        let presentation = package.presentation().unwrap();
+        let slides = presentation.slides().unwrap();
+        for (slide_index, slide) in slides.iter().enumerate() {
+            for (shape_index, shape) in slide.shapes().unwrap().iter().enumerate() {
+                let target = Target::new(Position::new(slide_index), Position::new(shape_index));
+                assert_eq!(
+                    source.read_text(target).unwrap(),
+                    shape.text().unwrap(),
+                    "source-backed text differs at slide {slide_index}, shape {shape_index}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn source_backed_read_text_preserves_stale_and_refusal_gates() {
+        let (counting, _metrics) = CountingSource::new(fixture("abc"));
+        let revision = Arc::clone(&counting.revision);
+        let stale = super::SourceSnapshot::open(Arc::new(counting)).unwrap();
+        revision.fetch_add(1, Ordering::AcqRel);
+        assert!(matches!(
+            stale.read_text(target()),
+            Err(Error::Source(OverlayError::SourceChanged { .. }))
+        ));
+
+        let macro_source = super::SourceSnapshot::open(Arc::new(OwnedSource::new(with_stream(
+            fixture("abc"),
+            &["VBA"],
+            b"macro bytes",
+        ))))
+        .unwrap();
+        assert!(matches!(
+            macro_source.read_text(target()),
+            Err(Error::Refused(Refusal::UnsupportedSource))
+        ));
+
+        let topology_source = super::SourceSnapshot::open(Arc::new(OwnedSource::new(
+            relocate_root_stream_to_dual(fixture("abc"), "Current User"),
+        )))
+        .unwrap();
+        assert!(matches!(
+            topology_source.read_text(target()),
+            Err(Error::Refused(Refusal::UnsupportedDependency))
+        ));
+
+        let limited = super::SourceSnapshot::open_with_options(
+            Arc::new(OwnedSource::new(fixture("abc"))),
+            super::SourceBackedOptions {
+                record_limits: crate::RecordLimits {
+                    max_aggregate_input_bytes: 1,
+                    ..crate::RecordLimits::default()
+                },
+                ..super::SourceBackedOptions::default()
+            },
+        )
+        .unwrap();
+        assert!(matches!(
+            limited.read_text(target()),
+            Err(Error::Package(crate::package::Error::ResourceLimit(message)))
+                if message.contains("total") || message.contains("aggregate")
+        ));
+
+        let valid =
+            super::SourceSnapshot::open(Arc::new(OwnedSource::new(fixture("abc")))).unwrap();
+        assert!(matches!(
+            valid.read_text(Target::new(Position::new(1), Position::new(0))),
+            Err(Error::Refused(Refusal::SlideNotFound { position }))
+                if position == Position::new(1)
+        ));
     }
 
     #[test]
