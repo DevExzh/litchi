@@ -24,6 +24,10 @@ use soapberry_zip::{
 pub const MAX_CONTENT_REPLACEMENT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_ADDITION_BYTES: usize = 64 * 1024 * 1024;
 const CENTRAL_LOCAL_HEADER_OFFSET: Range<usize> = 42..46;
+const ZIP_LOCAL_HEADER_SIZE: usize = 30;
+const ZIP_CENTRAL_HEADER_SIZE: usize = 46;
+const ZIP_UTF8_FLAG: u16 = 1 << 11;
+const ZIP_DATA_DESCRIPTOR_FLAG: u16 = 1 << 3;
 
 #[derive(Clone, Debug)]
 struct RawMemberRanges {
@@ -125,6 +129,34 @@ fn raw_member_is_identical(
 /// Returns an error when the replacement is oversized, invalid XML, or cannot
 /// be published through either the preserving or established rebuild path.
 pub fn replace_content_xml(source: &OwnedPackage, content: &str) -> Result<Vec<u8>> {
+    replace_content_xml_with_mode(source, content, false)
+}
+
+/// Replace `content.xml` while opting into verification of every untouched
+/// source payload before raw preservation.
+///
+/// The exact semantic no-op still returns the source bytes before this
+/// verification is considered. Callers that need to validate every member
+/// during a changed-content publication should use this entry point; the
+/// ordinary shared helper intentionally keeps the raw-copy fast path lazy for
+/// opaque media members.
+///
+/// # Errors
+///
+/// Returns an error when the replacement is oversized, invalid XML, or cannot
+/// be published through either the preserving or established rebuild path.
+pub fn replace_content_xml_with_payload_verification(
+    source: &OwnedPackage,
+    content: &str,
+) -> Result<Vec<u8>> {
+    replace_content_xml_with_mode(source, content, true)
+}
+
+fn replace_content_xml_with_mode(
+    source: &OwnedPackage,
+    content: &str,
+    verify_payloads: bool,
+) -> Result<Vec<u8>> {
     if content.len() > MAX_CONTENT_REPLACEMENT_BYTES {
         return invalid("outer content.xml exceeds package mutation limit");
     }
@@ -137,7 +169,8 @@ pub fn replace_content_xml(source: &OwnedPackage, content: &str) -> Result<Vec<u
         if path != constants::ODF_CONTENT || replacement != content.as_bytes() {
             return invalid("checked content.xml splice assembled unexpected bytes");
         }
-        if let Some(bytes) = try_preserve_content_replacement(source, replacement) {
+        if let Some(bytes) = try_preserve_content_replacement(source, replacement, verify_payloads)
+        {
             return Ok(bytes);
         }
     }
@@ -182,7 +215,7 @@ pub fn replace_content_xml_spliced(
     if source.get_file(constants::ODF_CONTENT)? == replacement {
         return Ok(source.as_bytes().to_vec());
     }
-    if let Some(bytes) = try_preserve_content_replacement(source, replacement) {
+    if let Some(bytes) = try_preserve_content_replacement(source, replacement, false) {
         return Ok(bytes);
     }
     rebuild_package(
@@ -198,17 +231,29 @@ pub fn replace_content_xml_spliced(
 fn try_preserve_content_replacement(
     source: &OwnedPackage,
     replacement: Vec<u8>,
+    verify_payloads: bool,
 ) -> Option<Vec<u8>> {
     let mut replacement = Some(replacement);
     let package = source.package().ok()?;
+    let files = package.files().ok()?;
+    if package.manifest().entries.keys().any(|path| {
+        path != constants::ODF_CONTENT
+            && soapberry_zip::path::ZipFilePath::from_str(path.as_str()).as_str()
+                == constants::ODF_CONTENT
+    }) {
+        // Match the archive reader's path normalization before preserving raw
+        // bytes. A normalized alias (including traversal and backslash forms)
+        // can carry stale manifest:size metadata without being visible through
+        // the canonical lookup. Refuse raw preservation while retaining the
+        // established logical rebuild, which regenerates the manifest.
+        return None;
+    }
     if package.manifest().has_encrypted_entries()
         || package
             .manifest()
             .get_entry(constants::ODF_CONTENT)
             .is_some_and(|entry| entry.size.is_some())
-        || package
-            .files()
-            .ok()?
+        || files
             .iter()
             .any(|path| path.starts_with("META-INF/") && path.ends_with("signatures.xml"))
     {
@@ -220,6 +265,25 @@ fn try_preserve_content_replacement(
         .into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
     let index = PreservationIndex::new(&archive, &mut buffer).ok()?;
+    if !canonical_odf_mimetype(source.as_bytes(), &package, &index) {
+        return None;
+    }
+    if !validate_preserved_member_framing(source.as_bytes(), &index) {
+        return None;
+    }
+    if verify_payloads {
+        // Preservation copies compressed bytes without asking the ZIP writer
+        // to verify them. The opt-in caller asks us to validate every source
+        // file first so a malformed payload cannot take the raw path when the
+        // established logical rebuild would have rejected the source.
+        for path in &files {
+            // `replace_content_xml*` has already read and verified content.xml
+            // before reaching this helper; avoid inflating that member twice.
+            if path != constants::ODF_CONTENT && !path.ends_with('/') {
+                package.get_file(path).ok()?;
+            }
+        }
+    }
     let mut records = archive.entries(&mut buffer);
     let mut plan = PreservationPlan::new();
     let mut replaced = false;
@@ -250,6 +314,304 @@ fn try_preserve_content_replacement(
         return None;
     }
     index.write_to(&plan, Vec::new()).ok()
+}
+
+fn validate_preserved_member_framing(
+    source: &[u8],
+    index: &PreservationIndex<'_, impl soapberry_zip::ReaderAt>,
+) -> bool {
+    for entry in index.entries() {
+        let Some(local_span) = checked_range(entry.local_span(), source.len()) else {
+            return false;
+        };
+        let Some(central_span) = checked_range(entry.central_record(), source.len()) else {
+            return false;
+        };
+        let Some(local_fixed_end) = local_span.start.checked_add(ZIP_LOCAL_HEADER_SIZE) else {
+            return false;
+        };
+        let Some(local_fixed) = source.get(local_span.start..local_fixed_end) else {
+            return false;
+        };
+        let Some(central_fixed_end) = central_span.start.checked_add(ZIP_CENTRAL_HEADER_SIZE)
+        else {
+            return false;
+        };
+        let Some(central_fixed) = source.get(central_span.start..central_fixed_end) else {
+            return false;
+        };
+        let Some(local_name_len) = le_u16(local_fixed, 26).map(usize::from) else {
+            return false;
+        };
+        let Some(local_extra_len) = le_u16(local_fixed, 28).map(usize::from) else {
+            return false;
+        };
+        let Some(payload_start) = local_span
+            .start
+            .checked_add(ZIP_LOCAL_HEADER_SIZE)
+            .and_then(|offset| offset.checked_add(local_name_len))
+            .and_then(|offset| offset.checked_add(local_extra_len))
+        else {
+            return false;
+        };
+        let Some(compressed_size) = le_u32(central_fixed, 20).map(u64::from) else {
+            return false;
+        };
+        let Some(local_crc) = le_u32(local_fixed, 14) else {
+            return false;
+        };
+        let Some(local_compressed) = le_u32(local_fixed, 18) else {
+            return false;
+        };
+        let Some(local_uncompressed) = le_u32(local_fixed, 22) else {
+            return false;
+        };
+        let Some(payload_end) =
+            payload_start.checked_add(usize::try_from(compressed_size).ok().unwrap_or(usize::MAX))
+        else {
+            return false;
+        };
+        if payload_end > local_span.end {
+            return false;
+        }
+        let Some(flags) = le_u16(central_fixed, 8) else {
+            return false;
+        };
+        if flags & ZIP_DATA_DESCRIPTOR_FLAG == 0 {
+            if payload_end != local_span.end {
+                return false;
+            }
+            continue;
+        }
+
+        let Some(descriptor) = source.get(payload_end..local_span.end) else {
+            return false;
+        };
+        let Some(expected_crc) = le_u32(central_fixed, 16) else {
+            return false;
+        };
+        let Some(expected_uncompressed) = le_u32(central_fixed, 24).map(u64::from) else {
+            return false;
+        };
+        let (descriptor_crc, descriptor_compressed, descriptor_uncompressed) =
+            match descriptor.len() {
+                12 if le_u32(descriptor, 0) != Some(0x0807_4b50) => (
+                    le_u32(descriptor, 0),
+                    le_u32(descriptor, 4).map(u64::from),
+                    le_u32(descriptor, 8).map(u64::from),
+                ),
+                16 if le_u32(descriptor, 0) == Some(0x0807_4b50) => (
+                    le_u32(descriptor, 4),
+                    le_u32(descriptor, 8).map(u64::from),
+                    le_u32(descriptor, 12).map(u64::from),
+                ),
+                20 if le_u32(descriptor, 0) != Some(0x0807_4b50) => (
+                    le_u32(descriptor, 0),
+                    le_u64(descriptor, 4),
+                    le_u64(descriptor, 12),
+                ),
+                24 if le_u32(descriptor, 0) == Some(0x0807_4b50) => (
+                    le_u32(descriptor, 4),
+                    le_u64(descriptor, 8),
+                    le_u64(descriptor, 16),
+                ),
+                _ => return false,
+            };
+        if descriptor_crc != Some(expected_crc)
+            || descriptor_compressed != Some(compressed_size)
+            || descriptor_uncompressed != Some(expected_uncompressed)
+            || !((local_crc == 0 && local_compressed == 0 && local_uncompressed == 0)
+                || (local_crc == expected_crc
+                    && u64::from(local_compressed) == compressed_size
+                    && u64::from(local_uncompressed) == expected_uncompressed))
+        {
+            return false;
+        }
+    }
+    true
+}
+
+fn canonical_odf_mimetype(
+    source: &[u8],
+    package: &crate::core::package::Package<'_>,
+    index: &PreservationIndex<'_, impl soapberry_zip::ReaderAt>,
+) -> bool {
+    let mimetype = package.mimetype();
+    if !constants::is_odf_mime_type(mimetype)
+        || package.manifest().mimetype != mimetype
+        || index.entries().is_empty()
+    {
+        return false;
+    }
+
+    let Some((mimetype_index, entry)) = index
+        .entries()
+        .iter()
+        .enumerate()
+        .find(|(_, entry)| entry.raw_name_bytes() == b"mimetype")
+    else {
+        return false;
+    };
+    if mimetype_index != 0
+        || index
+            .entries()
+            .iter()
+            .filter(|entry| entry.raw_name_bytes() == b"mimetype")
+            .count()
+            != 1
+        || entry.local_span().start != 0
+    {
+        return false;
+    }
+
+    let local_start = 0_usize;
+    let Some(local_fixed) = source.get(local_start..local_start + ZIP_LOCAL_HEADER_SIZE) else {
+        return false;
+    };
+    if le_u32(local_fixed, 0) != Some(0x0403_4b50) {
+        return false;
+    }
+    let Some(local_flags) = le_u16(local_fixed, 6) else {
+        return false;
+    };
+    let Some(local_method) = le_u16(local_fixed, 8) else {
+        return false;
+    };
+    let Some(local_crc) = le_u32(local_fixed, 14) else {
+        return false;
+    };
+    let Some(local_compressed_u32) = le_u32(local_fixed, 18) else {
+        return false;
+    };
+    let Some(local_uncompressed) = le_u32(local_fixed, 22) else {
+        return false;
+    };
+    let Some(local_name_len) = le_u16(local_fixed, 26).map(usize::from) else {
+        return false;
+    };
+    let Some(local_extra_len) = le_u16(local_fixed, 28).map(usize::from) else {
+        return false;
+    };
+    let Some(local_name_end) = ZIP_LOCAL_HEADER_SIZE.checked_add(local_name_len) else {
+        return false;
+    };
+    let Some(local_payload_start) = local_name_end.checked_add(local_extra_len) else {
+        return false;
+    };
+    let Some(local_compressed) = usize::try_from(local_compressed_u32).ok() else {
+        return false;
+    };
+    let Some(local_payload_end) = local_payload_start.checked_add(local_compressed) else {
+        return false;
+    };
+    let Some(local_span) = checked_range(entry.local_span(), source.len()) else {
+        return false;
+    };
+    let Some(local_name) = source.get(ZIP_LOCAL_HEADER_SIZE..local_name_end) else {
+        return false;
+    };
+    let Some(local_payload) = source.get(local_payload_start..local_payload_end) else {
+        return false;
+    };
+    if local_name != b"mimetype"
+        || local_flags & !(ZIP_UTF8_FLAG) != 0
+        || local_flags & ZIP_DATA_DESCRIPTOR_FLAG != 0
+        || local_method != CompressionMethod::Store.as_id().as_u16()
+        || local_name_len != b"mimetype".len()
+        || local_extra_len != 0
+        || local_compressed_u32 != local_uncompressed
+        || local_payload_end != local_span.end
+        || local_crc != soapberry_zip::crc32(local_payload)
+        || local_payload != mimetype.as_bytes()
+    {
+        return false;
+    }
+
+    let Some(central_span) = checked_range(entry.central_record(), source.len()) else {
+        return false;
+    };
+    let Some(central_fixed_end) = central_span.start.checked_add(ZIP_CENTRAL_HEADER_SIZE) else {
+        return false;
+    };
+    let Some(central_fixed) = source.get(central_span.start..central_fixed_end) else {
+        return false;
+    };
+    if le_u32(central_fixed, 0) != Some(0x0201_4b50) {
+        return false;
+    }
+    let Some(central_flags) = le_u16(central_fixed, 8) else {
+        return false;
+    };
+    let Some(central_method) = le_u16(central_fixed, 10) else {
+        return false;
+    };
+    let Some(central_crc) = le_u32(central_fixed, 16) else {
+        return false;
+    };
+    let Some(central_compressed) = le_u32(central_fixed, 20) else {
+        return false;
+    };
+    let Some(central_uncompressed) = le_u32(central_fixed, 24) else {
+        return false;
+    };
+    let Some(central_name_len) = le_u16(central_fixed, 28).map(usize::from) else {
+        return false;
+    };
+    let Some(central_extra_len) = le_u16(central_fixed, 30).map(usize::from) else {
+        return false;
+    };
+    let Some(central_comment_len) = le_u16(central_fixed, 32).map(usize::from) else {
+        return false;
+    };
+    let Some(central_name_end) = ZIP_CENTRAL_HEADER_SIZE.checked_add(central_name_len) else {
+        return false;
+    };
+    let Some(central_end) = central_name_end
+        .checked_add(central_extra_len)
+        .and_then(|end| end.checked_add(central_comment_len))
+    else {
+        return false;
+    };
+    let Some(central_name_start) = central_span.start.checked_add(ZIP_CENTRAL_HEADER_SIZE) else {
+        return false;
+    };
+    let Some(central_name_end) = central_span.start.checked_add(central_name_end) else {
+        return false;
+    };
+    let Some(central_name) = source.get(central_name_start..central_name_end) else {
+        return false;
+    };
+    central_span.len() == central_end
+        && central_name == b"mimetype"
+        && central_flags == local_flags
+        && central_method == local_method
+        && central_crc == local_crc
+        && central_compressed == local_compressed_u32
+        && central_uncompressed == local_uncompressed
+        && central_name_len == local_name_len
+        && central_extra_len == 0
+        && central_compressed == u32::try_from(local_payload.len()).ok().unwrap_or(u32::MAX)
+}
+
+fn le_u16(bytes: &[u8], offset: usize) -> Option<u16> {
+    bytes
+        .get(offset..offset.checked_add(2)?)
+        .and_then(|value| value.try_into().ok())
+        .map(u16::from_le_bytes)
+}
+
+fn le_u32(bytes: &[u8], offset: usize) -> Option<u32> {
+    bytes
+        .get(offset..offset.checked_add(4)?)
+        .and_then(|value| value.try_into().ok())
+        .map(u32::from_le_bytes)
+}
+
+fn le_u64(bytes: &[u8], offset: usize) -> Option<u64> {
+    bytes
+        .get(offset..offset.checked_add(8)?)
+        .and_then(|value| value.try_into().ok())
+        .map(u64::from_le_bytes)
 }
 
 /// Rebuild an ODF package while replacing only the requested semantic parts.

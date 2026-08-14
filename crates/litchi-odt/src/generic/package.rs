@@ -5,6 +5,7 @@ use super::model::{Family, Package};
 use crate::constants;
 use crate::core::{Meta, OwnedPackage};
 use litchi_core::{Error, Metadata, Result};
+use litchi_odf_common::package::replace_content_xml_with_payload_verification;
 use std::io::Read;
 use std::path::Path;
 
@@ -22,25 +23,8 @@ impl Package {
         std::str::from_utf8(content.as_bytes())
             .map_err(|_error| Error::InvalidFormat("invalid UTF-8 in content.xml".to_string()))?;
 
-        let mut writer = crate::core::PackageWriter::new();
-        writer.set_mimetype(&self.mimetype)?;
-        writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
-        for path in [
-            constants::ODF_STYLES,
-            constants::ODF_META,
-            constants::ODF_SETTINGS,
-        ] {
-            if self.package.has_file(path)? {
-                let bytes = self.package.get_file(path)?;
-                writer.add_file(path, &bytes)?;
-            }
-        }
-        writer.copy_auxiliary_files_from_except(
-            &self.package,
-            &[constants::ODF_SETTINGS.to_string()],
-            &[],
-        )?;
-        Package::from_bytes(writer.finish_to_bytes()?)
+        let bytes = replace_content_xml_with_payload_verification(&self.package, &content)?;
+        Package::from_bytes(bytes)
     }
 
     /// Replace `content.xml` while preserving optional core parts and every

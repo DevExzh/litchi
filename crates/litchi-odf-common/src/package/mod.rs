@@ -19,8 +19,8 @@ pub use codec::{is_media_path, parse_manifest, read_manifest};
 )]
 pub use edit::{
     Addition, MAX_CONTENT_REPLACEMENT_BYTES, content_splice_publication, raw_identical_members,
-    rebuild_package, replace_content_xml, replace_content_xml_spliced, splice,
-    xml_splice_publication,
+    rebuild_package, replace_content_xml, replace_content_xml_spliced,
+    replace_content_xml_with_payload_verification, splice, xml_splice_publication,
 };
 pub(crate) use model::PreparedArchive;
 pub use model::{Archive, ArchiveNames, Entry, Manifest};
