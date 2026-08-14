@@ -2208,11 +2208,92 @@ struct ConfidenceInterval {
     upper: f64,
 }
 
+/// Fixed logical output-write size buckets. These count accepted `Write::write`
+/// calls, not operating-system writes, copies, compression, or disk I/O.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+struct WriteSizeBuckets {
+    bytes_0: u64,
+    bytes_1_to_512: u64,
+    bytes_513_to_4096: u64,
+    bytes_4097_to_16384: u64,
+    bytes_16385_to_65536: u64,
+    bytes_over_65536: u64,
+}
+
+impl WriteSizeBuckets {
+    const fn empty() -> Self {
+        Self {
+            bytes_0: 0,
+            bytes_1_to_512: 0,
+            bytes_513_to_4096: 0,
+            bytes_4097_to_16384: 0,
+            bytes_16385_to_65536: 0,
+            bytes_over_65536: 0,
+        }
+    }
+
+    fn checked_record(self, bytes: u64) -> io::Result<Self> {
+        let mut next = self;
+        let bucket = match bytes {
+            0 => &mut next.bytes_0,
+            1..=512 => &mut next.bytes_1_to_512,
+            513..=4096 => &mut next.bytes_513_to_4096,
+            4097..=16384 => &mut next.bytes_4097_to_16384,
+            16385..=65536 => &mut next.bytes_16385_to_65536,
+            _ => &mut next.bytes_over_65536,
+        };
+        *bucket = bucket
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("sink write-size bucket count overflows u64"))?;
+        Ok(next)
+    }
+
+    const fn can_record_any_length(self) -> bool {
+        self.bytes_0 < u64::MAX
+            && self.bytes_1_to_512 < u64::MAX
+            && self.bytes_513_to_4096 < u64::MAX
+            && self.bytes_4097_to_16384 < u64::MAX
+            && self.bytes_16385_to_65536 < u64::MAX
+            && self.bytes_over_65536 < u64::MAX
+    }
+
+    fn record_prevalidated(&mut self, bytes: u64) {
+        let bucket = match bytes {
+            0 => &mut self.bytes_0,
+            1..=512 => &mut self.bytes_1_to_512,
+            513..=4096 => &mut self.bytes_513_to_4096,
+            4097..=16384 => &mut self.bytes_4097_to_16384,
+            16385..=65536 => &mut self.bytes_16385_to_65536,
+            _ => &mut self.bytes_over_65536,
+        };
+        // Every caller has first checked the selected bucket (or all buckets
+        // for the seekable sink), so this increment cannot overflow.
+        *bucket += 1;
+    }
+
+    const fn total(self) -> Option<u64> {
+        let Some(total) = self.bytes_0.checked_add(self.bytes_1_to_512) else {
+            return None;
+        };
+        let Some(total) = total.checked_add(self.bytes_513_to_4096) else {
+            return None;
+        };
+        let Some(total) = total.checked_add(self.bytes_4097_to_16384) else {
+            return None;
+        };
+        let Some(total) = total.checked_add(self.bytes_16385_to_65536) else {
+            return None;
+        };
+        total.checked_add(self.bytes_over_65536)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 struct SinkSummary {
     accepted_bytes: u64,
     write_calls: u64,
     largest_write: u64,
+    write_size_buckets: WriteSizeBuckets,
     #[serde(skip_serializing_if = "Option::is_none")]
     retained_output_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2231,6 +2312,76 @@ struct SinkSummary {
     authored_part_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rtf_tail_append: Option<RtfTailAppendSummary>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PreparedSinkWrite {
+    accepted_bytes: u64,
+    write_calls: u64,
+    largest_write: u64,
+    write_size_buckets: WriteSizeBuckets,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SeekWritePreflight {
+    accepted_bytes_before: u64,
+    requested_length: u64,
+    write_calls: u64,
+}
+
+impl SinkSummary {
+    fn prepare_write(&self, length: u64) -> io::Result<PreparedSinkWrite> {
+        let accepted_bytes = self
+            .accepted_bytes
+            .checked_add(length)
+            .ok_or_else(|| io::Error::other("sink byte count overflows u64"))?;
+        let write_calls = self
+            .write_calls
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("sink write count overflows u64"))?;
+        let write_size_buckets = self.write_size_buckets.checked_record(length)?;
+        Ok(PreparedSinkWrite {
+            accepted_bytes,
+            write_calls,
+            largest_write: self.largest_write.max(length),
+            write_size_buckets,
+        })
+    }
+
+    fn commit_write(&mut self, prepared: PreparedSinkWrite) {
+        self.accepted_bytes = prepared.accepted_bytes;
+        self.write_calls = prepared.write_calls;
+        self.largest_write = prepared.largest_write;
+        self.write_size_buckets = prepared.write_size_buckets;
+    }
+
+    fn preflight_seek_write(&self, requested_length: u64) -> io::Result<SeekWritePreflight> {
+        self.accepted_bytes
+            .checked_add(requested_length)
+            .ok_or_else(|| io::Error::other("seekable sink byte count overflows u64"))?;
+        let write_calls = self
+            .write_calls
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("seekable sink write count overflows u64"))?;
+        if !self.write_size_buckets.can_record_any_length() {
+            return Err(io::Error::other(
+                "seekable sink write-size bucket count overflows u64",
+            ));
+        }
+        Ok(SeekWritePreflight {
+            accepted_bytes_before: self.accepted_bytes,
+            requested_length,
+            write_calls,
+        })
+    }
+
+    fn commit_seek_write(&mut self, preflight: SeekWritePreflight, accepted_length: u64) {
+        debug_assert!(accepted_length <= preflight.requested_length);
+        self.accepted_bytes = preflight.accepted_bytes_before + accepted_length;
+        self.write_calls = preflight.write_calls;
+        self.largest_write = self.largest_write.max(accepted_length);
+        self.write_size_buckets.record_prevalidated(accepted_length);
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -2270,6 +2421,7 @@ impl CountingSink {
                 accepted_bytes: 0,
                 write_calls: 0,
                 largest_write: 0,
+                write_size_buckets: WriteSizeBuckets::empty(),
                 retained_output_bytes: None,
                 retained_authoring_window_bytes: None,
                 rows: None,
@@ -2308,22 +2460,12 @@ impl Write for CountingSink {
                 "sequential sink write exceeds configured maximum",
             ));
         }
-        let accepted = self
-            .summary
-            .accepted_bytes
-            .checked_add(length)
-            .ok_or_else(|| io::Error::other("sequential sink byte count overflows u64"))?;
-        if accepted > self.max_bytes {
+        let prepared = self.summary.prepare_write(length)?;
+        if prepared.accepted_bytes > self.max_bytes {
             return Err(io::Error::other("sequential sink byte budget exceeded"));
         }
 
-        self.summary.accepted_bytes = accepted;
-        self.summary.write_calls = self
-            .summary
-            .write_calls
-            .checked_add(1)
-            .ok_or_else(|| io::Error::other("sequential sink write count overflows u64"))?;
-        self.summary.largest_write = self.summary.largest_write.max(length);
+        self.summary.commit_write(prepared);
         self.bytes.extend_from_slice(bytes);
         Ok(bytes.len())
     }
@@ -2414,22 +2556,13 @@ impl Write for HashingDiscardSink {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let length = u64::try_from(bytes.len())
             .map_err(|_error| io::Error::other("streaming write length does not fit u64"))?;
-        let accepted = self
-            .summary
-            .accepted_bytes
-            .checked_add(length)
-            .ok_or_else(|| io::Error::other("streaming output byte count overflows u64"))?;
-        if accepted > self.maximum {
+        let prepared = self.summary.prepare_write(length)?;
+        if prepared.accepted_bytes > self.maximum {
             return Err(io::Error::other("streaming output byte ceiling exceeded"));
         }
+
+        self.summary.commit_write(prepared);
         self.digest.update(bytes);
-        self.summary.accepted_bytes = accepted;
-        self.summary.write_calls = self
-            .summary
-            .write_calls
-            .checked_add(1)
-            .ok_or_else(|| io::Error::other("streaming write count overflows u64"))?;
-        self.summary.largest_write = self.summary.largest_write.max(length);
         Ok(bytes.len())
     }
 
@@ -2493,27 +2626,19 @@ impl Write for WindowedHashingSink {
         let count = bytes.len().min(self.window);
         let length = u64::try_from(count)
             .map_err(|_error| io::Error::other("logical-tail write length does not fit u64"))?;
-        let accepted = self
-            .summary
-            .accepted_bytes
-            .checked_add(length)
-            .ok_or_else(|| io::Error::other("logical-tail output byte count overflows u64"))?;
-        if accepted > self.maximum {
-            return Err(io::Error::other("logical-tail output ceiling exceeded"));
-        }
-        self.digest.update(bytes.get(..count).ok_or_else(|| {
+        let window = bytes.get(..count).ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
                 "logical-tail sink window is outside the write buffer",
             )
-        })?);
-        self.summary.accepted_bytes = accepted;
-        self.summary.write_calls = self
-            .summary
-            .write_calls
-            .checked_add(1)
-            .ok_or_else(|| io::Error::other("logical-tail write count overflows u64"))?;
-        self.summary.largest_write = self.summary.largest_write.max(length);
+        })?;
+        let prepared = self.summary.prepare_write(length)?;
+        if prepared.accepted_bytes > self.maximum {
+            return Err(io::Error::other("logical-tail output ceiling exceeded"));
+        }
+
+        self.summary.commit_write(prepared);
+        self.digest.update(window);
         Ok(count)
     }
 
@@ -2539,20 +2664,16 @@ impl CountingSeekSink {
 
 impl Write for CountingSeekSink {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let requested_length = u64::try_from(bytes.len())
+            .map_err(|_error| io::Error::other("seekable sink request length does not fit u64"))?;
+        let preflight = self.summary.preflight_seek_write(requested_length)?;
         let accepted = self.cursor.write(bytes)?;
-        let accepted_u64 = u64::try_from(accepted)
-            .map_err(|_error| io::Error::other("seekable sink write length does not fit u64"))?;
-        self.summary.accepted_bytes = self
-            .summary
-            .accepted_bytes
-            .checked_add(accepted_u64)
-            .ok_or_else(|| io::Error::other("seekable sink byte count overflows u64"))?;
-        self.summary.write_calls = self
-            .summary
-            .write_calls
-            .checked_add(1)
-            .ok_or_else(|| io::Error::other("seekable sink write count overflows u64"))?;
-        self.summary.largest_write = self.summary.largest_write.max(accepted_u64);
+        // `Cursor<Vec<u8>>` obeys `Write`'s guarantee that accepted bytes do
+        // not exceed the request. The request conversion above proves that
+        // this infallible cast preserves the accepted length as well.
+        debug_assert!(accepted <= bytes.len());
+        let accepted_u64 = accepted as u64;
+        self.summary.commit_seek_write(preflight, accepted_u64);
         Ok(accepted)
     }
 
@@ -21910,20 +22031,22 @@ mod tests {
     use litchi_core::ReadAt;
 
     use super::{
-        Case, CfbSelectiveTarget, CorpusShape, CountingSink, InstrumentedSource,
-        ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES, ODP_TEXT_BOX_BATCH_COUNT,
-        ODT_RESOURCE_BATCH_COUNT, OpcCacheMode, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind,
-        RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
-        RtfSemanticVariant, SemanticShape, SimulatedRangeSource, SourceBackedPackage, WriterShape,
-        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
-        XlsxCellCrudShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
-        build_docx_source_edit_corpus, build_odf_repair_corpus, build_odp_media_corpus,
-        build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
-        build_odt_resource_batch_corpus, build_ole_common_corpus, build_opc_corpus,
-        build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_semantic_docx_corpus,
-        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
-        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
-        build_writer_corpus, build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
+        Case, CfbSelectiveTarget, CorpusShape, CountingSeekSink, CountingSink, HashingDiscardSink,
+        InstrumentedSource, ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES,
+        ODP_TEXT_BOX_BATCH_COUNT, ODT_RESOURCE_BATCH_COUNT, OpcCacheMode,
+        PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
+        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
+        SimulatedRangeSource, SinkSummary, SourceBackedPackage, WindowedHashingSink,
+        WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
+        XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape, XlsxShape,
+        build_cfb_corpus, build_cfb_selective_corpus, build_docx_source_edit_corpus,
+        build_odf_repair_corpus, build_odp_media_corpus, build_odp_text_box_batch_corpus,
+        build_ods_media_corpus, build_odt_media_corpus, build_odt_resource_batch_corpus,
+        build_ole_common_corpus, build_opc_corpus, build_pptx_source_edit_corpus,
+        build_rtf_lifecycle_corpus, build_semantic_docx_corpus, build_semantic_odp_corpus,
+        build_semantic_ods_corpus, build_semantic_odt_corpus, build_semantic_pptx_corpus,
+        build_semantic_rtf_corpus, build_streaming_corpus, build_writer_corpus,
+        build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
         build_xlsx_auto_filter_edit_corpus, build_xlsx_calculation_metadata_edit_corpus,
         build_xlsx_cell_crud_corpus, build_xlsx_conditional_formatting_edit_corpus,
         build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
@@ -24400,6 +24523,148 @@ mod tests {
         assert_eq!(sink.summary().accepted_bytes, 0);
         sink.write_all(b"abc").unwrap();
         assert!(sink.write_all(b"de").is_err());
-        assert_eq!(sink.summary().accepted_bytes, 3);
+        let summary = sink.summary();
+        assert_eq!(summary.accepted_bytes, 3);
+        assert_eq!(summary.write_calls, 1);
+        assert_eq!(summary.write_size_buckets.bytes_1_to_512, 1);
+        assert_eq!(
+            summary.write_size_buckets.total(),
+            Some(summary.write_calls)
+        );
+    }
+
+    #[test]
+    fn sink_write_size_buckets_are_serializable_and_boundary_stable() {
+        let mut sink = CountingSink::bounded(1_000_000, u64::MAX);
+        for size in [0, 1, 512, 513, 4096, 4097, 16384, 16385, 65536, 65537] {
+            if size == 0 {
+                sink.write(&[]).unwrap();
+            } else {
+                sink.write_all(&vec![0_u8; size]).unwrap();
+            }
+        }
+
+        let summary = sink.summary();
+        assert_eq!(summary.write_calls, 10);
+        assert_eq!(summary.write_size_buckets.bytes_0, 1);
+        assert_eq!(summary.write_size_buckets.bytes_1_to_512, 2);
+        assert_eq!(summary.write_size_buckets.bytes_513_to_4096, 2);
+        assert_eq!(summary.write_size_buckets.bytes_4097_to_16384, 2);
+        assert_eq!(summary.write_size_buckets.bytes_16385_to_65536, 2);
+        assert_eq!(summary.write_size_buckets.bytes_over_65536, 1);
+        assert_eq!(
+            summary.write_size_buckets.total(),
+            Some(summary.write_calls)
+        );
+
+        let encoded = serde_json::to_value(summary).unwrap();
+        assert_eq!(
+            encoded["write_size_buckets"]["bytes_0"],
+            serde_json::Value::from(1_u64)
+        );
+        assert_eq!(
+            encoded["write_size_buckets"]["bytes_over_65536"],
+            serde_json::Value::from(1_u64)
+        );
+    }
+
+    #[test]
+    fn summarized_sinks_cover_zero_partial_limit_and_seek_accounting() {
+        let mut counting = CountingSink::bounded(2, 2);
+        assert_eq!(counting.write(&[]).unwrap(), 0);
+        assert_eq!(counting.write(b"ab").unwrap(), 2);
+        assert!(counting.write(b"x").is_err());
+        assert_eq!(counting.bytes, b"ab");
+        let summary = counting.summary();
+        assert_eq!(summary.accepted_bytes, 2);
+        assert_eq!(summary.write_calls, 2);
+        assert_eq!(summary.write_size_buckets.bytes_0, 1);
+        assert_eq!(
+            summary.write_size_buckets.total(),
+            Some(summary.write_calls)
+        );
+
+        let mut hashing = HashingDiscardSink::without_authoring_window(2);
+        assert_eq!(hashing.write(&[]).unwrap(), 0);
+        assert_eq!(hashing.write(b"ab").unwrap(), 2);
+        assert!(hashing.write(b"x").is_err());
+        let (summary, digest) = hashing.finish();
+        assert_eq!(summary.accepted_bytes, 2);
+        assert_eq!(summary.write_calls, 2);
+        assert_eq!(summary.write_size_buckets.bytes_0, 1);
+        assert_eq!(
+            summary.write_size_buckets.total(),
+            Some(summary.write_calls)
+        );
+        assert_eq!(digest, sha256_hex(b"ab"));
+
+        let mut windowed = WindowedHashingSink::new(3, 2).unwrap();
+        assert_eq!(windowed.write(&[]).unwrap(), 0);
+        assert_eq!(windowed.write(b"abc").unwrap(), 2);
+        assert!(windowed.write(b"de").is_err());
+        let (summary, digest) = windowed.finish();
+        assert_eq!(summary.accepted_bytes, 2);
+        assert_eq!(summary.write_calls, 2);
+        assert_eq!(summary.write_size_buckets.bytes_0, 1);
+        assert_eq!(summary.largest_write, 2);
+        assert_eq!(
+            summary.write_size_buckets.total(),
+            Some(summary.write_calls)
+        );
+        assert_eq!(digest, sha256_hex(b"ab"));
+
+        let mut seek = CountingSeekSink::default();
+        assert_eq!(seek.write(&[]).unwrap(), 0);
+        assert_eq!(seek.write(b"abc").unwrap(), 3);
+        let (output, summary) = seek.into_parts();
+        assert_eq!(output, b"abc");
+        assert_eq!(summary.accepted_bytes, 3);
+        assert_eq!(summary.write_calls, 2);
+        assert_eq!(summary.write_size_buckets.bytes_0, 1);
+        assert_eq!(
+            summary.write_size_buckets.total(),
+            Some(summary.write_calls)
+        );
+    }
+
+    #[test]
+    fn sink_accounting_overflow_is_checked_and_transactional() {
+        let mut counting = CountingSink::bounded(u64::MAX, u64::MAX);
+        counting.summary.accepted_bytes = u64::MAX;
+        assert!(counting.write(b"x").is_err());
+        assert!(counting.bytes.is_empty());
+        assert_eq!(counting.summary.write_calls, 0);
+
+        let mut hashing = HashingDiscardSink::without_authoring_window(u64::MAX);
+        hashing.summary.write_calls = u64::MAX;
+        assert!(hashing.write(b"x").is_err());
+        let (summary, digest) = hashing.finish();
+        assert_eq!(summary.accepted_bytes, 0);
+        assert_eq!(summary.write_calls, u64::MAX);
+        assert_eq!(digest, sha256_hex(&[]));
+
+        let mut windowed = WindowedHashingSink::new(u64::MAX, 2).unwrap();
+        windowed.summary.write_size_buckets.bytes_1_to_512 = u64::MAX;
+        assert!(windowed.write(b"x").is_err());
+        let (summary, digest) = windowed.finish();
+        assert_eq!(summary.accepted_bytes, 0);
+        assert_eq!(summary.write_calls, 0);
+        assert_eq!(digest, sha256_hex(&[]));
+
+        let mut seek = CountingSeekSink::default();
+        seek.summary.accepted_bytes = u64::MAX;
+        assert!(seek.write(b"x").is_err());
+        let (output, summary) = seek.into_parts();
+        assert!(output.is_empty());
+        assert_eq!(summary.accepted_bytes, u64::MAX);
+        assert_eq!(summary.write_calls, 0);
+
+        let mut buckets = WriteSizeBuckets::empty();
+        buckets.bytes_0 = u64::MAX;
+        assert_eq!(buckets.total(), None);
+
+        let mut summary = SinkSummary::default();
+        summary.write_size_buckets.bytes_0 = u64::MAX;
+        assert_eq!(summary.write_size_buckets.total(), None);
     }
 }

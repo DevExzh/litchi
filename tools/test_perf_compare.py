@@ -182,6 +182,29 @@ class PerfCompareTests(unittest.TestCase):
         self.assertEqual(result["summary"]["compared_metrics"], 6)
         self.assertFalse(result["regressions"])
 
+    def test_additive_sink_histogram_field_is_comparator_compatible(self):
+        current = report(revision="current")
+        current["results"][0]["sink"] = {
+            "accepted_bytes": 3,
+            "write_calls": 2,
+            "largest_write": 2,
+            "write_size_buckets": {
+                "bytes_0": 0,
+                "bytes_1_to_512": 2,
+                "bytes_513_to_4096": 0,
+                "bytes_4097_to_16384": 0,
+                "bytes_16385_to_65536": 0,
+                "bytes_over_65536": 0,
+            },
+        }
+        sink = current["results"][0]["sink"]
+        self.assertEqual(sum(sink["write_size_buckets"].values()), sink["write_calls"])
+        self.assertEqual(sink["accepted_bytes"], 3)
+        self.assertEqual(sink["largest_write"], 2)
+        result = perf_compare.compare_reports(report(), current, policy())
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["summary"]["compared_metrics"], 6)
+
     def test_p50_and_p95_regressions_are_reported(self):
         result = perf_compare.compare_reports(report(), report(120, "current"), policy())
         self.assertEqual(result["status"], "regression")

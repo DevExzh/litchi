@@ -146,6 +146,23 @@ jobs:
           import json
           from pathlib import Path
 
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
           report = json.loads(Path("target/perf/opc-smoke.json").read_text())
           assert report["schema_version"] == 1
           assert len(report["results"]) == 36
@@ -153,6 +170,7 @@ jobs:
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 2
               assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
           PY
 
       - name: Run XLSX commit/read attribution smoke
@@ -186,6 +204,23 @@ jobs:
           import json
           from pathlib import Path
 
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
           report = json.loads(Path("target/perf/semantic-smoke.json").read_text())
           assert report["schema_version"] == 1
           assert len(report["results"]) == 16
@@ -193,6 +228,7 @@ jobs:
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 1
               assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
           PY
 
       - name: Run common OLE2 publication smoke
@@ -725,6 +761,14 @@ jobs:
                   "accepted_bytes": expected_bytes,
                   "write_calls": 1,
                   "largest_write": expected_bytes,
+                  "write_size_buckets": {
+                      "bytes_0": 0,
+                      "bytes_1_to_512": 0,
+                      "bytes_513_to_4096": 0,
+                      "bytes_4097_to_16384": 0,
+                      "bytes_16385_to_65536": 0,
+                      "bytes_over_65536": 1,
+                  },
               }
               assert "source" not in measured
           PY
@@ -902,6 +946,23 @@ jobs:
           import json
           from pathlib import Path
 
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
           report = json.loads(Path("target/perf/ole2-semantic-smoke.json").read_text())
           assert report["schema_version"] == 1
           assert len(report["results"]) == 20
@@ -909,6 +970,7 @@ jobs:
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 1
               assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
           PY
 
       - name: Run ODF semantic smoke
@@ -923,6 +985,23 @@ jobs:
           import json
           from pathlib import Path
 
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
           report = json.loads(Path("target/perf/odf-semantic-smoke.json").read_text())
           assert report["schema_version"] == 1
           assert len(report["results"]) == 24
@@ -930,6 +1009,7 @@ jobs:
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 1
               assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
           PY
 
       - name: Run RTF semantic smoke
@@ -945,6 +1025,23 @@ jobs:
           import json
           from pathlib import Path
 
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
           report = json.loads(Path("target/perf/rtf-semantic-smoke.json").read_text())
           assert report["schema_version"] == 1
           assert report["configuration"]["rtf_variants"] == [
@@ -959,6 +1056,7 @@ jobs:
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 1
               assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
           lifecycle = [
               item for item in report["results"]
               if item["case"] in {
@@ -1020,6 +1118,23 @@ jobs:
           import json
           from pathlib import Path
 
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
           report = json.loads(Path("target/perf/container-baseline.json").read_text())
           assert report["schema_version"] == 1
           assert len(report["results"]) == 198
@@ -1027,6 +1142,7 @@ jobs:
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 15
               assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
           PY
 
       - name: Run release XLSX commit/read attribution matrix
@@ -1060,6 +1176,23 @@ jobs:
           import json
           from pathlib import Path
 
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
           report = json.loads(Path("target/perf/semantic-baseline.json").read_text())
           assert report["schema_version"] == 1
           assert len(report["results"]) == 30
@@ -1067,6 +1200,7 @@ jobs:
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 15
               assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
           PY
 
       - name: Run release common OLE2 publication case
@@ -1585,6 +1719,14 @@ jobs:
                   "accepted_bytes": expected_bytes,
                   "write_calls": 1,
                   "largest_write": expected_bytes,
+                  "write_size_buckets": {
+                      "bytes_0": 0,
+                      "bytes_1_to_512": 0,
+                      "bytes_513_to_4096": 0,
+                      "bytes_4097_to_16384": 0,
+                      "bytes_16385_to_65536": 0,
+                      "bytes_over_65536": 1,
+                  },
               }
               assert "source" not in measured
           PY
@@ -1755,6 +1897,23 @@ jobs:
           import json
           from pathlib import Path
 
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
           report = json.loads(Path("target/perf/ole2-semantic-baseline.json").read_text())
           assert report["schema_version"] == 1
           assert len(report["results"]) == 40
@@ -1762,6 +1921,7 @@ jobs:
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 15
               assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
           PY
 
       - name: Run release ODF semantic matrix
@@ -1775,6 +1935,23 @@ jobs:
           import json
           from pathlib import Path
 
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
           report = json.loads(Path("target/perf/odf-semantic-baseline.json").read_text())
           assert report["schema_version"] == 1
           assert len(report["results"]) == 45
@@ -1782,6 +1959,7 @@ jobs:
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 15
               assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
           PY
 
       - name: Run release RTF semantic matrix
@@ -1795,6 +1973,23 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
+
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
 
           report = json.loads(Path("target/perf/rtf-semantic-baseline.json").read_text())
           assert report["schema_version"] == 1
@@ -1810,6 +2005,7 @@ jobs:
           for item in report["results"]:
               assert len(item["elapsed_ns"]["samples"]) == 15
               assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
           lifecycle = [
               item for item in report["results"]
               if item["case"] in {

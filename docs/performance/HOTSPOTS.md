@@ -742,6 +742,14 @@ the transaction's validated candidate snapshot. This is correctness/coverage
 evidence only; no release latency, allocation, RSS, or speedup claim exists.
 See [`change 0090`](changes/0090-rtf-logical-tail-append-evidence.md).
 
+The standalone harness now records a fixed six-bucket distribution for every
+serialized sink summary. It counts logical `Write::write` calls at the point
+where bytes are accepted, includes zero-length calls, excludes rejected calls,
+and checks that the bucket total equals `write_calls` at the exact inclusive
+boundaries. This is reporting evidence only: it does not measure syscalls, disk
+I/O, memory copies, compression, latency, allocation, RSS, or performance.
+See [`change 0107`](changes/0107-output-write-size-evidence.md).
+
 The existing seven native public cases cover owned open, lazy paragraph listing, one
 paragraph, first complete text, exact stream save, exact empty-edit save, and
 one checked paragraph edit/save over 24/200/10,000-paragraph corpora. The

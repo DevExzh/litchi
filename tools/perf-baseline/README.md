@@ -1571,6 +1571,15 @@ content-free scalar evidence; `retained_output_bytes` is always zero and
 `retained_authoring_window_bytes` is the row/text encoder bound, not process RSS or a
 claim about allocator internals.
 
+Every serialized `sink` summary also contains the fixed
+`write_size_buckets` object: `bytes_0`, `bytes_1_to_512`,
+`bytes_513_to_4096`, `bytes_4097_to_16384`, `bytes_16385_to_65536`, and
+`bytes_over_65536`. These are counts of logical bytes accepted by the sink's
+`Write::write` calls, including accepted zero-length calls; rejected calls do
+not increment any counter. The six bucket counts always sum to `write_calls`,
+including at the exact boundary values. They do not measure syscalls, disk
+I/O, memory copies, compression, or performance.
+
 Logical-tail RTF cases also emit `output_sha256`. Their `sink.rtf_tail_append`
 object records the operation (`append` or `exact_noop`), source, caller-input,
 inserted, and published output bytes, appended paragraph/run counts, the 16 KiB
