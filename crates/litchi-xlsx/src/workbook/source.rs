@@ -633,6 +633,17 @@ impl SourceWorksheet {
         Ok(values)
     }
 
+    /// Bounding rectangle of stored cell records.
+    ///
+    /// The worksheet payload is loaded and parsed on first use. `None` means
+    /// that the selected worksheet has no explicit cell records.
+    pub fn stored_extent(&self) -> Result<Option<Rect>> {
+        let extent = self.store()?.extents().stored();
+        self.owner.package.source_version()?;
+        self.owner.execution_check()?;
+        Ok(extent)
+    }
+
     fn store(&self) -> Result<&Store> {
         self.owner.execution_check()?;
         if self.data.kind != WorksheetKind::Worksheet {
