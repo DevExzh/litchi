@@ -99,6 +99,13 @@ pub const MAX_SHEET_OWNERS: usize = 64;
 /// Maximum aggregate worksheet XML retained by one multi-sheet transaction.
 pub const MAX_MULTI_WORKSHEET_BYTES: usize = 64 * 1024 * 1024;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SourceProvenance {
+    Matched,
+    Mismatched,
+    Unavailable,
+}
+
 /// Immutable source closure for a bounded set of worksheets.
 ///
 /// Selected worksheet payload bytes are retained for editing and reversible
@@ -283,6 +290,31 @@ impl MultiSnapshot {
                 .iter()
                 .zip(&other.sheets)
                 .all(|(left, right)| left.same_source(right))
+    }
+
+    /// Check that this source-backed closure still belongs to the exact
+    /// opened package and source revision without reloading any Part body.
+    pub(crate) fn matches_source_backed(
+        &self,
+        package: &SourceBackedPackage,
+    ) -> Result<SourceProvenance> {
+        package.check_execution()?;
+        let version = package.source_version()?;
+        package.check_execution()?;
+        let lineage = package.source_lineage();
+        let mut unavailable = false;
+        for snapshot in &self.sheets {
+            match snapshot.source_provenance(&lineage, version) {
+                SourceProvenance::Matched => {},
+                SourceProvenance::Mismatched => return Ok(SourceProvenance::Mismatched),
+                SourceProvenance::Unavailable => unavailable = true,
+            }
+        }
+        Ok(if unavailable {
+            SourceProvenance::Unavailable
+        } else {
+            SourceProvenance::Matched
+        })
     }
 }
 
@@ -639,6 +671,40 @@ impl Snapshot {
         self.sheet_name == other.sheet_name
             && self.sheet_position == other.sheet_position
             && self.source.same_owner(&other.source)
+    }
+
+    fn source_provenance(
+        &self,
+        lineage: &SourceLineage,
+        version: SourceVersion,
+    ) -> SourceProvenance {
+        match (
+            self.source.source_lineage.as_ref(),
+            self.source.source_version,
+        ) {
+            (Some(expected_lineage), Some(expected_version)) => {
+                if expected_lineage == lineage && expected_version == version {
+                    SourceProvenance::Matched
+                } else {
+                    SourceProvenance::Mismatched
+                }
+            },
+            (None, None) => SourceProvenance::Unavailable,
+            _ => SourceProvenance::Unavailable,
+        }
+    }
+
+    /// Check that this source-backed closure still belongs to the exact
+    /// opened package and source revision without reloading any Part body.
+    pub(crate) fn matches_source_backed(
+        &self,
+        package: &SourceBackedPackage,
+    ) -> Result<SourceProvenance> {
+        package.check_execution()?;
+        let version = package.source_version()?;
+        package.check_execution()?;
+        let lineage = package.source_lineage();
+        Ok(self.source_provenance(&lineage, version))
     }
 
     pub(super) fn matches_current_source(&self, package: &OpcPackage) -> bool {

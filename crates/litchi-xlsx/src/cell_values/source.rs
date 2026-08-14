@@ -8,6 +8,7 @@ use litchi_core::ReadAt;
 use litchi_opc::{ReadLimits, SourceBackedPackage};
 use litchi_sheet::Cell as Address;
 
+use super::snapshot::SourceProvenance;
 use super::{Commit, MAX_SHEET_OWNERS, MultiCommit, MultiPatch, MultiSnapshot, Patch, Snapshot};
 use crate::Selector;
 use crate::cell::{Content, Value};
@@ -233,15 +234,28 @@ impl SourceBackedEditor {
         writer: W,
         commit: &Commit,
     ) -> Result<Snapshot> {
-        let current =
-            Snapshot::load_source_backed(&self.package, commit.patch().before().sheet_position())?;
-        if !current.same_source(commit.patch().before()) {
+        let before = commit.patch().before();
+        let current = match before.matches_source_backed(&self.package)? {
+            SourceProvenance::Matched => None,
+            SourceProvenance::Mismatched => {
+                return Err(Error::PatchConflict {
+                    part: before.worksheet_part_name().to_string(),
+                });
+            },
+            SourceProvenance::Unavailable => Some(Snapshot::load_source_backed(
+                &self.package,
+                before.sheet_position(),
+            )?),
+        };
+        if let Some(current) = &current
+            && !current.same_source(before)
+        {
             return Err(Error::PatchConflict {
                 part: current.worksheet_part_name().to_string(),
             });
         }
         let target = if commit.patch().is_empty() {
-            current
+            current.unwrap_or_else(|| before.clone())
         } else {
             commit.patch().after().clone()
         };
@@ -268,20 +282,32 @@ impl SourceBackedEditor {
         writer: W,
         commit: &MultiCommit,
     ) -> Result<MultiSnapshot> {
-        let current = MultiSnapshot::load_source_backed(
-            &self.package,
-            commit
-                .patch()
-                .before()
-                .sheets()
-                .iter()
-                .map(|snapshot| snapshot.sheet_position().into()),
-        )?;
-        if !current.same_source(commit.patch().before()) {
+        let before = commit.patch().before();
+        let current = match before.matches_source_backed(&self.package)? {
+            SourceProvenance::Matched => None,
+            SourceProvenance::Mismatched => {
+                return Err(Error::PatchConflict {
+                    part: before
+                        .sheets()
+                        .first()
+                        .map_or_else(String::new, |snapshot| {
+                            snapshot.worksheet_part_name().to_string()
+                        }),
+                });
+            },
+            SourceProvenance::Unavailable => Some(MultiSnapshot::load_source_backed(
+                &self.package,
+                before
+                    .sheets()
+                    .iter()
+                    .map(|snapshot| snapshot.sheet_position().into()),
+            )?),
+        };
+        if let Some(current) = &current
+            && !current.same_source(before)
+        {
             return Err(Error::PatchConflict {
-                part: commit
-                    .patch()
-                    .before()
+                part: before
                     .sheets()
                     .first()
                     .map_or_else(String::new, |snapshot| {
@@ -290,14 +316,14 @@ impl SourceBackedEditor {
             });
         }
         let target = if commit.patch().is_empty() {
-            current
+            current.unwrap_or_else(|| before.clone())
         } else {
             commit.patch().after().clone()
         };
         let replacements = target
             .sheets()
             .iter()
-            .zip(commit.patch().before().sheets())
+            .zip(before.sheets())
             .filter(|(after, before)| after.source_xml() != before.source_xml())
             .map(|(snapshot, _)| {
                 (
