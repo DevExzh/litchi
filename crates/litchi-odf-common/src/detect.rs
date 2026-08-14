@@ -14,6 +14,7 @@
 
 use crate::constants;
 use crate::core::{OwnedPackage, PreparedPackage};
+use litchi_core::{Error, ReadAt, SourceVersion};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -140,6 +141,57 @@ pub fn packaged_mime(value: &[u8]) -> Option<Format> {
     mime(packaged_mime_bytes(value)?)
 }
 
+/// Detect a packaged ODF MIME type from a positional source.
+///
+/// This probe reads only the fixed local header, the `mimetype` name, and its
+/// bounded stored payload.  It does not allocate or inspect the central
+/// directory, and it leaves ownership and complete package validation to the
+/// family facade.  The source identity is checked before and after the probe;
+/// a source that changes while it is being read is rejected instead of being
+/// classified from a mixed snapshot.
+pub fn packaged_mime_read_at(source: &dyn ReadAt) -> litchi_core::Result<Option<Format>> {
+    let expected = source.version()?;
+    let detected = (|| {
+        let length = source.len()?;
+        let local_name_end = u64::try_from(LOCAL_HEADER_BYTES + MIMETYPE_NAME.len())
+            .expect("fixed local header size fits in u64");
+        if length < local_name_end {
+            return Ok(None);
+        }
+
+        let mut header = [0_u8; LOCAL_HEADER_BYTES];
+        source.read_exact_at(0, &mut header)?;
+        let mut name = [0_u8; MIMETYPE_NAME.len()];
+        source.read_exact_at(LOCAL_HEADER_BYTES as u64, &mut name)?;
+        let Some((data_start, compressed, expected_crc)) = packaged_mime_layout(&header, &name)
+        else {
+            return Ok(None);
+        };
+
+        let data_start = u64::try_from(data_start).expect("fixed local header size fits in u64");
+        let data_end = data_start
+            .checked_add(u64::try_from(compressed).expect("bounded MIME size fits in u64"))
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "mimetype range overflow")
+            })?;
+        if data_end > length {
+            return Ok(None);
+        }
+
+        // The local grammar bounds this to MAX_MIMETYPE_BYTES before any
+        // source read.  A fixed array keeps this detector allocation-free.
+        let mut data = [0_u8; MAX_MIMETYPE_BYTES];
+        source.read_exact_at(data_start, &mut data[..compressed])?;
+        if soapberry_zip::crc32(&data[..compressed]) != expected_crc {
+            return Ok(None);
+        }
+        Ok(mime(&data[..compressed]))
+    })();
+    let observed = source.version()?;
+    ensure_source_current(expected, observed)?;
+    detected
+}
+
 /// Detect a packaged ODF document while retaining its validated ZIP index.
 ///
 /// This is the ownership-taking counterpart to [`bytes`]. The local
@@ -194,16 +246,28 @@ pub fn reader<R: Read + Seek>(value: &mut R) -> Option<Format> {
 }
 
 fn packaged_mime_bytes(value: &[u8]) -> Option<&[u8]> {
-    if value.get(..4)? != ZIP_SIGNATURE {
+    let header = value.get(..LOCAL_HEADER_BYTES)?;
+    let name = value.get(LOCAL_HEADER_BYTES..LOCAL_HEADER_BYTES + MIMETYPE_NAME.len())?;
+    let (data_start, compressed, expected_crc) = packaged_mime_layout(header, name)?;
+    let data_end = data_start.checked_add(compressed)?;
+    let data = value.get(data_start..data_end)?;
+    (soapberry_zip::crc32(data) == expected_crc).then_some(data)
+}
+
+/// Validate the strict local `mimetype` header grammar shared by complete-byte
+/// and positional detection.  The caller supplies the already-read filename
+/// bytes so no temporary concatenation is needed for a `ReadAt` probe.
+fn packaged_mime_layout(header: &[u8], name: &[u8]) -> Option<(usize, usize, u32)> {
+    if header.get(..4)? != ZIP_SIGNATURE {
         return None;
     }
-    let flags = little_u16(value, 6)?;
-    let compression = little_u16(value, 8)?;
-    let expected_crc = little_u32(value, 14)?;
-    let compressed = usize::try_from(little_u32(value, 18)?).ok()?;
-    let uncompressed = usize::try_from(little_u32(value, 22)?).ok()?;
-    let name_len = usize::from(little_u16(value, 26)?);
-    let extra_len = usize::from(little_u16(value, 28)?);
+    let flags = little_u16(header, 6)?;
+    let compression = little_u16(header, 8)?;
+    let expected_crc = little_u32(header, 14)?;
+    let compressed = usize::try_from(little_u32(header, 18)?).ok()?;
+    let uncompressed = usize::try_from(little_u32(header, 22)?).ok()?;
+    let name_len = usize::from(little_u16(header, 26)?);
+    let extra_len = usize::from(little_u16(header, 28)?);
 
     // ODF permits the UTF-8 file-name flag, but its mimetype entry must be
     // stored, sized in the local header, unencrypted, and have no extra field.
@@ -213,18 +277,25 @@ fn packaged_mime_bytes(value: &[u8]) -> Option<&[u8]> {
         || uncompressed > MAX_MIMETYPE_BYTES
         || name_len != MIMETYPE_NAME.len()
         || extra_len != 0
+        || name != MIMETYPE_NAME
     {
         return None;
     }
-    let name_start = LOCAL_HEADER_BYTES;
-    let name_end = name_start.checked_add(name_len)?;
-    if value.get(name_start..name_end)? != MIMETYPE_NAME {
-        return None;
+    let data_start = LOCAL_HEADER_BYTES
+        .checked_add(name_len)?
+        .checked_add(extra_len)?;
+    Some((data_start, compressed, expected_crc))
+}
+
+fn ensure_source_current(
+    expected: SourceVersion,
+    observed: SourceVersion,
+) -> litchi_core::Result<()> {
+    if expected == observed {
+        Ok(())
+    } else {
+        Err(Error::SourceChanged { expected, observed })
     }
-    let data_start = name_end.checked_add(extra_len)?;
-    let data_end = data_start.checked_add(compressed)?;
-    let data = value.get(data_start..data_end)?;
-    (soapberry_zip::crc32(data) == expected_crc).then_some(data)
 }
 
 fn little_u16(value: &[u8], offset: usize) -> Option<u16> {
@@ -462,6 +533,31 @@ mod tests {
         assert_eq!(bytes(&package[..LOCAL_HEADER_BYTES]), None);
         let local_entry_end = LOCAL_HEADER_BYTES + MIMETYPE_NAME.len() + constants::ODF_TEXT.len();
         assert_eq!(bytes(&package[..local_entry_end]), None);
+    }
+
+    #[test]
+    fn positional_packaged_probe_reuses_strict_local_mimetype_grammar() {
+        let mut writer = crate::core::PackageWriter::new();
+        writer
+            .set_mimetype(constants::ODF_PRESENTATION)
+            .expect("test package MIME");
+        writer
+            .add_file("content.xml", b"<office:document-content/>")
+            .expect("test content");
+        let package = writer.finish_to_bytes().expect("test package");
+        let source = litchi_core::OwnedSource::new(package.clone());
+
+        assert_eq!(
+            packaged_mime_read_at(&source).expect("positional probe"),
+            packaged_mime(&package)
+        );
+        assert_eq!(
+            packaged_mime_read_at(&litchi_core::OwnedSource::new(
+                package[..LOCAL_HEADER_BYTES].to_vec()
+            ))
+            .expect("short positional probe"),
+            None
+        );
     }
 
     #[test]

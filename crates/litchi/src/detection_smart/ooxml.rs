@@ -116,6 +116,7 @@ pub fn detect_ooxml_format_from_package(package: &crate::opc::OpcPackage) -> Opt
     })
 }
 
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 fn detect_ooxml_format_from_content_types(
     visit_content_types: impl FnOnce(&mut dyn FnMut(&str)),
 ) -> Option<FileFormat> {
@@ -162,7 +163,7 @@ fn detect_ooxml_format_from_content_types(
 /// validated source-backed PPTX owner to the unified API while retaining the
 /// existing eager [`detect_ooxml_format_from_package`] path for byte-backed
 /// callers and non-PPTX fallbacks.
-#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+#[cfg(all(feature = "pptx", any(unix, windows)))]
 pub(crate) fn detect_ooxml_format_from_source_backed_package(
     package: &litchi_opc::SourceBackedPackage,
 ) -> Option<FileFormat> {

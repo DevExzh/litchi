@@ -48,6 +48,13 @@ pub(super) enum PresentationImpl {
     /// OpenDocument Presentation format
     #[cfg(feature = "odp")]
     Odp(litchi_odp::Presentation),
+    /// Filesystem-backed OpenDocument Presentation with deferred package data.
+    #[cfg(all(feature = "odp", any(unix, windows)))]
+    #[allow(
+        dead_code,
+        reason = "feature combinations with another OOXML leaf but without PPTX deliberately retain the eager ODP fallback to preserve OOXML polyglot precedence"
+    )]
+    OdpSource(litchi_odp::SourceBackedPresentation),
 }
 
 /// Presentation format detection.
