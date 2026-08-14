@@ -355,6 +355,264 @@ fn consecutive_paragraph_replacements_refuse_late_invalid_position_atomically() 
 }
 
 #[test]
+fn mixed_model_content_run_matches_scalar_semantics_and_patch_replay() {
+    let mut document = MutableDocument::new();
+    for text in ["zero", "one", "two"] {
+        document.add_paragraph(text).unwrap();
+    }
+    let snapshot = Document::from_bytes(document.to_bytes().unwrap())
+        .unwrap()
+        .snapshot()
+        .unwrap();
+
+    let mut coalesced = snapshot.edit();
+    coalesced
+        .remove_paragraph(Position::new(0))
+        .unwrap()
+        .insert_paragraph(Position::new(1), "inserted")
+        .unwrap()
+        .replace_paragraph(Position::new(2), "TWO")
+        .unwrap()
+        .append_run(Position::new(1), " run", Some("Emphasis"))
+        .unwrap()
+        .append_hyperlink(Position::new(2), "https://example.invalid/mixed", " linked")
+        .unwrap();
+    let coalesced = coalesced.commit().unwrap();
+
+    let mut scalar = snapshot.clone();
+    for operation in [
+        (0usize, "", 4u8),
+        (1, "inserted", 0),
+        (2, "TWO", 1),
+        (1, " run", 2),
+        (2, " linked", 3),
+    ] {
+        let mut edit = scalar.edit();
+        match operation.2 {
+            0 => {
+                edit.insert_paragraph(Position::new(operation.0), operation.1)
+                    .unwrap();
+            },
+            1 => {
+                edit.replace_paragraph(Position::new(operation.0), operation.1)
+                    .unwrap();
+            },
+            2 => {
+                edit.append_run(Position::new(operation.0), operation.1, Some("Emphasis"))
+                    .unwrap();
+            },
+            3 => {
+                edit.append_hyperlink(
+                    Position::new(operation.0),
+                    "https://example.invalid/mixed",
+                    operation.1,
+                )
+                .unwrap();
+            },
+            4 => {
+                edit.remove_paragraph(Position::new(operation.0)).unwrap();
+            },
+            _ => unreachable!(),
+        }
+        scalar = edit.commit().unwrap().into_snapshot();
+    }
+
+    assert_eq!(coalesced.results().len(), 5);
+    assert_eq!(coalesced.results()[0], OperationResult::Unit);
+    assert_eq!(coalesced.results()[1], OperationResult::Index(1));
+    assert!(
+        coalesced.results()[2..]
+            .iter()
+            .all(|result| matches!(result, OperationResult::Unit))
+    );
+
+    // A repeated scalar publication is not a whole-archive byte oracle for
+    // this rich mixed run: each reopen may canonicalize the content model.
+    // Compare the semantic projection and untouched package members instead.
+    let reopened = coalesced.snapshot().document().unwrap();
+    let scalar_reopened = scalar.document().unwrap();
+    assert_eq!(reopened.text().unwrap(), "one\ninserted run\nTWO linked");
+    assert_eq!(reopened.text().unwrap(), scalar_reopened.text().unwrap());
+    assert_eq!(
+        reopened.hyperlinks().unwrap(),
+        [(
+            " linked".to_string(),
+            "https://example.invalid/mixed".to_string(),
+        )]
+    );
+    let content = String::from_utf8(reopened.get_file("content.xml").unwrap()).unwrap();
+    assert!(content.contains("<text:span text:style-name=\"Emphasis\"> run</text:span>"));
+    assert!(content.contains("<text:a xlink:href=\"https://example.invalid/mixed\""));
+
+    let coalesced_package =
+        CoreOwnedPackage::from_bytes(coalesced.snapshot().as_bytes().to_vec()).unwrap();
+    let scalar_package = CoreOwnedPackage::from_bytes(scalar.as_bytes().to_vec()).unwrap();
+    let coalesced_archive = coalesced_package.package().unwrap();
+    let scalar_archive = scalar_package.package().unwrap();
+    let mut coalesced_paths = coalesced_archive.files().unwrap();
+    let mut scalar_paths = scalar_archive.files().unwrap();
+    coalesced_paths.sort();
+    scalar_paths.sort();
+    assert_eq!(coalesced_paths, scalar_paths);
+    for path in coalesced_paths {
+        if path != "content.xml" {
+            assert_eq!(
+                coalesced_archive.get_file(&path).unwrap(),
+                scalar_archive.get_file(&path).unwrap(),
+                "logical package member diverged: {path}"
+            );
+        }
+    }
+    let raw_identical =
+        raw_identical_members(snapshot.as_bytes(), coalesced.snapshot().as_bytes()).unwrap();
+    for path in [
+        "mimetype",
+        "styles.xml",
+        "meta.xml",
+        "META-INF/manifest.xml",
+    ] {
+        assert!(raw_identical.contains(path), "{path}");
+    }
+    assert!(!raw_identical.contains("content.xml"));
+
+    let durable = coalesced.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    assert_eq!(
+        decoded.apply(&snapshot).unwrap().as_bytes(),
+        coalesced.snapshot().as_bytes()
+    );
+    assert_eq!(
+        decoded
+            .inverse()
+            .apply(coalesced.snapshot())
+            .unwrap()
+            .as_bytes(),
+        snapshot.as_bytes()
+    );
+
+    let mut foreign_document = MutableDocument::new();
+    for text in ["zero", "one", "foreign"] {
+        foreign_document.add_paragraph(text).unwrap();
+    }
+    let foreign = Document::from_bytes(foreign_document.to_bytes().unwrap())
+        .unwrap()
+        .snapshot()
+        .unwrap();
+    assert!(coalesced.patch().apply(&foreign).is_err());
+    assert!(coalesced.patch().apply(coalesced.snapshot()).is_err());
+}
+
+#[test]
+fn inline_append_then_plain_replace_starts_a_fresh_batch() {
+    let snapshot = source().snapshot().unwrap();
+    let mut edit = snapshot.edit();
+    edit.append_run(Position::new(0), " run", Some("Emphasis"))
+        .unwrap()
+        .append_hyperlink(
+            Position::new(0),
+            "https://example.invalid/barrier",
+            " linked",
+        )
+        .unwrap()
+        .replace_paragraph(Position::new(0), "replacement")
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    let reopened = committed.snapshot().document().unwrap();
+
+    assert_eq!(committed.results().len(), 3);
+    assert_eq!(reopened.text().unwrap(), "replacement");
+    assert!(reopened.hyperlinks().unwrap().is_empty());
+    let content = String::from_utf8(reopened.get_file("content.xml").unwrap()).unwrap();
+    assert!(!content.contains("text:span"));
+    assert!(!content.contains("text:a"));
+}
+
+#[test]
+fn plain_replace_then_inline_append_stays_in_one_batch() {
+    let snapshot = source().snapshot().unwrap();
+    let mut edit = snapshot.edit();
+    edit.replace_paragraph(Position::new(0), "replacement")
+        .unwrap()
+        .append_run(Position::new(0), " run", Some("Emphasis"))
+        .unwrap()
+        .append_hyperlink(
+            Position::new(0),
+            "https://example.invalid/ordered",
+            " linked",
+        )
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    let reopened = committed.snapshot().document().unwrap();
+
+    assert_eq!(committed.results().len(), 3);
+    assert_eq!(reopened.text().unwrap(), "replacement run linked");
+    assert_eq!(
+        reopened.hyperlinks().unwrap(),
+        [(
+            " linked".to_string(),
+            "https://example.invalid/ordered".to_string(),
+        )]
+    );
+    let content = String::from_utf8(reopened.get_file("content.xml").unwrap()).unwrap();
+    assert!(content.contains("<text:span text:style-name=\"Emphasis\"> run</text:span>"));
+    assert!(content.contains("<text:a xlink:href=\"https://example.invalid/ordered\""));
+}
+
+#[test]
+fn mixed_model_content_run_refuses_late_invalid_operation_atomically() {
+    let source = source().snapshot().unwrap();
+    let source_bytes = source.as_bytes().to_vec();
+    let mut edit = source.edit();
+    edit.replace_paragraph(Position::new(0), "changed")
+        .unwrap()
+        .append_hyperlink(Position::new(1), "https://example.invalid/late", "missing")
+        .unwrap();
+
+    assert!(edit.commit().is_err());
+    assert_eq!(source.as_bytes(), source_bytes);
+    assert_eq!(
+        source.document().unwrap().text().unwrap(),
+        "Unique paragraph"
+    );
+}
+
+#[test]
+fn xml_only_line_break_remains_a_model_content_batch_barrier() {
+    let source = source().snapshot().unwrap();
+
+    let mut edit = source.edit();
+    edit.replace_paragraph(Position::new(0), "before break")
+        .unwrap()
+        .append_line_break(ParagraphSelector::position(Position::new(0)))
+        .unwrap()
+        .replace_paragraph(Position::new(0), "after break")
+        .unwrap();
+    let committed = edit.commit().unwrap();
+
+    let mut scalar = source.clone();
+    let mut edit = scalar.edit();
+    edit.replace_paragraph(Position::new(0), "before break")
+        .unwrap();
+    scalar = edit.commit().unwrap().into_snapshot();
+    let mut edit = scalar.edit();
+    edit.append_line_break(ParagraphSelector::position(Position::new(0)))
+        .unwrap();
+    scalar = edit.commit().unwrap().into_snapshot();
+    let mut edit = scalar.edit();
+    edit.replace_paragraph(Position::new(0), "after break")
+        .unwrap();
+    scalar = edit.commit().unwrap().into_snapshot();
+
+    assert_eq!(committed.results().len(), 3);
+    assert_eq!(committed.snapshot().as_bytes(), scalar.as_bytes());
+    assert_eq!(
+        committed.snapshot().document().unwrap().text().unwrap(),
+        "after break"
+    );
+}
+
+#[test]
 fn non_replacement_operation_ends_paragraph_replacement_run() {
     let mut document = MutableDocument::new();
     document.add_paragraph("zero").unwrap();

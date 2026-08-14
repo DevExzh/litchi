@@ -932,23 +932,23 @@ impl Edit {
         while operation_index < self.operations.len() {
             let operation = &self.operations[operation_index];
             let before_operation = document.transaction_package().clone();
-            if matches!(operation, Operation::ReplaceParagraph { .. })
-                && matches!(
-                    self.operations.get(operation_index + 1),
-                    Some(Operation::ReplaceParagraph { .. })
-                )
-            {
-                // Plain-text replacement cannot change paragraph topology, so
-                // consecutive operations retain their scalar position and
-                // last-write ordering when applied to one mutable candidate.
-                // Publish and audit only that candidate: no intermediate
-                // package is observable through the transaction API.
+            let run_end = model_content_run_end(&self.operations, operation_index);
+            if is_model_content_operation(operation) && run_end - operation_index >= 2 {
+                // Keep singleton operations on the established scalar path;
+                // the optimization applies only to a real contiguous run.
+                // These five operations only touch the mutable document's
+                // projected paragraph model. Applying them in order to one
+                // candidate preserves the scalar selector state, while a
+                // late error still drops the unpublished candidate. XML-only
+                // edits, structural moves, and every resource/style/RDF
+                // operation intentionally remain barriers below.
                 let mut mutable = MutableDocument::from_document(document)?;
-                while let Some(Operation::ReplaceParagraph { index, text }) =
-                    self.operations.get(operation_index)
-                {
-                    mutable.replace_semantic_paragraph(*index, text)?;
-                    results.push(OperationResult::Unit);
+                while operation_index < run_end {
+                    let result = apply_model_content_operation(
+                        &mut mutable,
+                        &self.operations[operation_index],
+                    )?;
+                    results.push(result);
                     operation_index += 1;
                 }
                 document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
@@ -1461,6 +1461,90 @@ impl Edit {
         // candidate even when a writer implementation changes independently.
         after.document()?;
         Ok(Commit::new(self.source, after, results, self.operations))
+    }
+}
+
+fn is_model_content_operation(operation: &Operation) -> bool {
+    matches!(
+        operation,
+        Operation::InsertParagraph { .. }
+            | Operation::ReplaceParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::AppendRun { .. }
+            | Operation::AppendHyperlink { .. }
+    )
+}
+
+fn is_inline_append_operation(operation: &Operation) -> bool {
+    matches!(
+        operation,
+        Operation::AppendRun { .. } | Operation::AppendHyperlink { .. }
+    )
+}
+
+fn model_content_run_end(operations: &[Operation], start: usize) -> usize {
+    let Some(operation) = operations.get(start) else {
+        return start;
+    };
+    if !is_model_content_operation(operation) {
+        return start + 1;
+    }
+
+    let mut end = start;
+    let mut saw_inline_append = false;
+    while let Some(operation) = operations.get(end) {
+        if !is_model_content_operation(operation) {
+            break;
+        }
+        // Reopening after an inline append is an established semantic
+        // boundary: a later plain/topology operation must not retain stale
+        // inline children in the mutable projection. Consecutive inline
+        // appends remain coalescable and preserve their ordered children.
+        if saw_inline_append && !is_inline_append_operation(operation) {
+            break;
+        }
+        saw_inline_append |= is_inline_append_operation(operation);
+        end += 1;
+    }
+    end
+}
+
+fn apply_model_content_operation(
+    mutable: &mut MutableDocument,
+    operation: &Operation,
+) -> Result<OperationResult> {
+    match operation {
+        Operation::InsertParagraph { index, text } => {
+            mutable.insert_semantic_paragraph(*index, text)?;
+            Ok(OperationResult::Index(*index))
+        },
+        Operation::ReplaceParagraph { index, text } => {
+            mutable.replace_semantic_paragraph(*index, text)?;
+            Ok(OperationResult::Unit)
+        },
+        Operation::RemoveParagraph { index } => {
+            mutable.remove_semantic_paragraph(*index)?;
+            Ok(OperationResult::Unit)
+        },
+        Operation::AppendRun {
+            paragraph,
+            text,
+            style_name,
+        } => {
+            mutable.append_semantic_run(*paragraph, text, style_name.as_deref())?;
+            Ok(OperationResult::Unit)
+        },
+        Operation::AppendHyperlink {
+            paragraph,
+            href,
+            text,
+        } => {
+            mutable.append_semantic_hyperlink(*paragraph, href, text)?;
+            Ok(OperationResult::Unit)
+        },
+        _ => Err(Error::InvalidFormat(
+            "ODT model-content batch received a non-content operation".to_string(),
+        )),
     }
 }
 

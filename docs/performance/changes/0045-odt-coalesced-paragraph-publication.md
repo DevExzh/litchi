@@ -118,9 +118,13 @@ All retained evidence hashes are indexed by
 
 ## Remaining work
 
-- Coalescing is limited to adjacent plain-text replacements. Structural,
-  inline-run, note, field, RDF, form, chart, resource and mixed operations keep
-  their existing boundaries.
+- The current implementation also coalesces contiguous model-backed paragraph
+  insert, replace, remove, inline-run and hyperlink operations. Inline appends
+  form a one-way boundary before a later plain/topology operation so scalar
+  reopen semantics are preserved. This follow-on correctness extension is not
+  represented by the retained 0045 latency or allocation measurements.
+- XML-only line breaks, moves, notes, fields, RDF, forms, charts, resources and
+  other package domains keep their existing publication boundaries.
 - The final large candidate still performs one full mutable-document parse,
   content generation, package publication, package reopen, compact audit,
   final snapshot validation and complete semantic benchmark readback.
