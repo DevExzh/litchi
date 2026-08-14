@@ -2,7 +2,7 @@
 
 Date: 2026-08-15
 
-This is a coverage map, not a completion claim. It compares the 227 selectable
+This is a coverage map, not a completion claim. It compares the 229 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -826,6 +826,16 @@ classify compressed payload ranges exactly (catalog-only open/count,
 target-slide-only selection, and all-slides/no-media listing), while full
 metadata, size, names, text hashes and parity remain outside timing. This is
 correctness/logical-read coverage only; no latency or resource claim is made.
+
+Change 0121 adds two opt-in native PPT repeated selected-shape query controls,
+bringing the current matrix to 229 names while preserving the default 36 cases
+/ 198 records. The eager and source-backed controls retain one prepared owner
+and issue eight identical queries; source timing is uninstrumented and a
+separate replay records calls, bytes, prior-covered range bytes, and a
+canonical semantic digest. The production two-query regression binds
+74 calls / 8,310 bytes for legacy CFB reconstruction and 66 calls / 3,190
+bytes with a retained parsed CFB index. These are logical-I/O/correctness
+figures only, with no latency or resource claim.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

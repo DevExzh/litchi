@@ -70,10 +70,13 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 use an uninstrumented `litchi_core::OwnedSource`; independent untimed
 `InstrumentedSource` replays provide the source-read counters. The current
-`Case` matrix exposes 227 selectable case names in total. Eight additional
+`Case` matrix exposes 229 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
-default 36 cases / 198 records;
+default 36 cases / 198 records. Two repeated native-PPT selected-shape query
+selectors (`ppt_semantic_repeated_shape_text` and
+`ppt_source_backed_repeated_shape_text`) are also opt-in and use matched
+eight-query eager/source-backed controls;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 
@@ -614,7 +617,7 @@ tiny and large writer artifacts (46 records):
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 3 --samples 15 --writer-shape tiny,large \
-  --case doc_semantic_open,doc_semantic_list_paragraphs,doc_semantic_one_paragraph,doc_semantic_full_text,doc_semantic_noop_edit_save,doc_semantic_one_edit_save,xls_semantic_open,xls_semantic_list_worksheets,xls_semantic_one_cell,xls_semantic_full_cell_scan,xls_semantic_noop_edit_save,xls_semantic_one_edit_save,ppt_semantic_open,ppt_semantic_list_slides,ppt_semantic_one_shape_text,ppt_source_backed_one_shape_text,ppt_semantic_fresh_open_one_shape_text,ppt_source_backed_fresh_open_one_shape_text,ppt_semantic_full_text,ppt_slide_order_snapshot_open,ppt_text_edit_one_edit_save,ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save \
+  --case doc_semantic_open,doc_semantic_list_paragraphs,doc_semantic_one_paragraph,doc_semantic_full_text,doc_semantic_noop_edit_save,doc_semantic_one_edit_save,xls_semantic_open,xls_semantic_list_worksheets,xls_semantic_one_cell,xls_semantic_full_cell_scan,xls_semantic_noop_edit_save,xls_semantic_one_edit_save,ppt_semantic_open,ppt_semantic_list_slides,ppt_semantic_one_shape_text,ppt_source_backed_one_shape_text,ppt_semantic_repeated_shape_text,ppt_source_backed_repeated_shape_text,ppt_semantic_fresh_open_one_shape_text,ppt_source_backed_fresh_open_one_shape_text,ppt_semantic_full_text,ppt_slide_order_snapshot_open,ppt_text_edit_one_edit_save,ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save \
   --json target/perf/ole2-semantic-baseline.json
 ```
 
@@ -1367,6 +1370,14 @@ cfb_selective_fat_legacy_read,cfb_selective_fat_shared_read \
   immutable source; an independent `InstrumentedSource` replay reports exact
   logical read calls/bytes under `source.ppt_shape_text`. These controls make
   no allocation, physical-I/O, or speedup claim.
+- `ppt_semantic_repeated_shape_text` / `ppt_source_backed_repeated_shape_text`
+  keep one prepared eager/source-backed owner and issue eight identical
+  selected-shape text queries. Setup is outside timing; source timing uses an
+  uninstrumented `OwnedSource`, while an untimed replay records exact logical
+  `ReadAt` calls, bytes, prior-covered bytes per later logical read, and one
+  canonical semantic digest. Range overlap is coalesced within each current
+  read; a byte may contribute again on a later query. These controls make no
+  latency or resource claim.
 - `ppt_slide_order_snapshot_open`: capture the public exact-source root
   `slide_order::Snapshot`, including its complete package, live-document,
   slide-order, and review-history validation. Generic public-reader semantic

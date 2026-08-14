@@ -19,7 +19,7 @@ use std::sync::Arc;
 /// Opening applies the same signing, encryption, and DRM refusal as the common
 /// object editor, including markers represented by empty storages.
 pub struct SourceBackedOverlayPublisher {
-    cfb: SharedOleFile,
+    cfb: Arc<SharedOleFile>,
 }
 
 impl std::fmt::Debug for SourceBackedOverlayPublisher {
@@ -46,7 +46,17 @@ impl SourceBackedOverlayPublisher {
     ) -> Result<Self, OverlayError> {
         let cfb = SharedOleFile::open_with_limits(source, limits)?;
         reject_protected_shared_container(&cfb, "source-backed stream overlay publication")?;
-        Ok(Self { cfb })
+        Ok(Self { cfb: Arc::new(cfb) })
+    }
+
+    /// Returns the validated positional CFB owner for repeated semantic reads.
+    ///
+    /// The returned handle retains the parsed directory/FAT index and shares
+    /// the same source-version and lazy mini-stream state as this publisher.
+    /// Callers must still perform their operation-level source-version and
+    /// fingerprint checks before using it.
+    pub fn shared(&self) -> Arc<SharedOleFile> {
+        Arc::clone(&self.cfb)
     }
 
     /// Exact source identity/revision captured during open.
