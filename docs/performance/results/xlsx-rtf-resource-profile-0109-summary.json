@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "record": {
+    "change": "0098",
+    "date": "2026-08-14",
+    "status": "recorded-evidence-no-production-code-change",
+    "production_commits": {
+      "xlsx_source_provenance": "85ec86106",
+      "rtf_bounded_ascii_streaming": "d38cd455d"
+    }
+  },
+  "binaries": {
+    "before": {
+      "path": "/tmp/litchi-perf-baseline-before-xlsx-managed-0108",
+      "sha256": "04326ec7296a8c9270cfbfc19b3789966a2f89bc70f381def7dd438fc6a56d43",
+      "embedded_git_revision": "7fc9ce27c2b5d42cb5afd8900cfd6222661ae261",
+      "embedded_worktree_dirty": true
+    },
+    "after": {
+      "path": "/tmp/litchi-perf-baseline-after-xlsx-rtf-0108",
+      "sha256": "0b604c3872bc9c559f39bff2916525e5efbe8d19939f20f28e37b58277c2d8a5",
+      "embedded_git_revision": "7fc9ce27c2b5d42cb5afd8900cfd6222661ae261",
+      "embedded_worktree_dirty": true
+    }
+  },
+  "environment": {
+    "os": "linux",
+    "kernel": "Linux 6.8.0-101-generic",
+    "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "total_memory_bytes": 33605935104,
+    "page_size_bytes": 4096,
+    "perf_event_paranoid": "1",
+    "heaptrack_version": "1.5.0",
+    "perf_version": "6.8.12",
+    "time_tool": "GNU /usr/bin/time (version output unknown)"
+  },
+  "method": {
+    "time_process_repetitions": 5,
+    "time_warmup_iterations": 5,
+    "time_samples_per_process": 30,
+    "heaptrack_warmup_iterations": 1,
+    "heaptrack_samples_per_process": 1,
+    "heaptrack_scope": "whole process including startup, deterministic corpus construction, one warmup and one measured sample",
+    "heaptrack_allocated_bytes_method": "sum of histogram allocation_size_bytes multiplied by allocation_count from heaptrack_print -H",
+    "rss_scope": "maximum process RSS from uninstrumented /usr/bin/time -v; includes process setup and all harness samples",
+    "exact_output_verification": "harness output SHA-256 and sink counters were checked for every process sample",
+    "cargo_in_profile": false
+  },
+  "commands": {
+    "time_xlsx_before": "/usr/bin/time -v taskset -c 2 /tmp/litchi-perf-baseline-before-xlsx-managed-0108 --warmup 5 --samples 30 --case xlsx_source_backed_cell_values_batch_edit_save --xlsx-cell-crud-shape {medium,dense-sparse} --json /tmp/resprofile-before-xlsx-{medium,dense-sparse}-0109-rN.json",
+    "time_xlsx_after": "/usr/bin/time -v taskset -c 2 /tmp/litchi-perf-baseline-after-xlsx-rtf-0108 --warmup 5 --samples 30 --case xlsx_source_backed_cell_values_batch_edit_save --xlsx-cell-crud-shape {medium,dense-sparse} --json /tmp/resprofile-after-xlsx-{medium,dense-sparse}-0109-rN.json",
+    "time_rtf_before": "/usr/bin/time -v taskset -c 2 /tmp/litchi-perf-baseline-before-xlsx-managed-0108 --warmup 5 --samples 30 --case rtf_streaming_create --semantic-shape {medium,large} --json /tmp/resprofile-before-rtf-{medium,large}-0109-rN.json",
+    "time_rtf_after": "/usr/bin/time -v taskset -c 2 /tmp/litchi-perf-baseline-after-xlsx-rtf-0108 --warmup 5 --samples 30 --case rtf_streaming_create --semantic-shape {medium,large} --json /tmp/resprofile-after-rtf-{medium,large}-0109-rN.json",
+    "heaptrack_xlsx": "taskset -c 2 heaptrack --record-only -o /tmp/resprofile-heaptrack-<leg>-xlsx-<shape>-0109.heaptrack /tmp/litchi-perf-baseline-<binary> --warmup 1 --samples 1 --case xlsx_source_backed_cell_values_batch_edit_save --xlsx-cell-crud-shape <shape> --json /tmp/resprofile-heaptrack-<leg>-xlsx-<shape>-0109.json",
+    "heaptrack_rtf": "taskset -c 2 heaptrack --record-only -o /tmp/resprofile-heaptrack-<leg>-rtf-<shape>-0109.heaptrack /tmp/litchi-perf-baseline-<binary> --warmup 1 --samples 1 --case rtf_streaming_create --semantic-shape <shape> --json /tmp/resprofile-heaptrack-<leg>-rtf-<shape>-0109.json",
+    "heaptrack_histogram": "heaptrack_print -H /tmp/resprofile-heaptrack-<leg>-<case>-0109.hist.tsv /tmp/resprofile-heaptrack-<leg>-<case>-0109.heaptrack.zst",
+    "perf_before": "taskset -c 2 perf stat -x, -e cycles,instructions,branches,branch-misses,cache-misses,page-faults /tmp/litchi-perf-baseline-before-xlsx-managed-0108 --warmup 1 --samples 1 --case rtf_streaming_create --semantic-shape medium --json /tmp/resprofile-perf-before-rtf-medium-0109.json",
+    "perf_after": "taskset -c 2 perf stat -x, -e cycles,instructions,branches,branch-misses,cache-misses,page-faults /tmp/litchi-perf-baseline-after-xlsx-rtf-0108 --warmup 1 --samples 1 --case rtf_streaming_create --semantic-shape medium --json /tmp/resprofile-perf-after-rtf-medium-0109.json"
+  },
+  "cases": [
+    {
+      "id": "xlsx-medium-exact-256",
+      "case": "xlsx_source_backed_cell_values_batch_edit_save",
+      "selector": "exact MAX_BATCH_EDITS (256) existing scalar cells",
+      "corpus": {
+        "name": "xlsx-cell-values-medium",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231168,
+        "archive_bytes": 4226429,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": ["xl/worksheets/sheet1.xml", "xl/worksheets/sheet2.xml", "xl/worksheets/sheet3.xml", "xl/worksheets/sheet4.xml"],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "before": {
+        "output_sha256": "99ef583896aa201cebcc62e205ff9979bf08b4e21df15bcd04604a2ddd14a3fd",
+        "sink": {"accepted_bytes": 4226645, "write_calls": 163, "largest_write": 32768},
+        "source_per_sample": {"read_calls": 225, "read_bytes": 4230793, "ordinary_payload_read_calls": 144, "ordinary_payload_read_bytes": 4223777, "ordinary_payload_materializations": 6, "max_in_flight_reads": 1},
+        "latency_ns": {
+          "p50": [44593965, 44729422, 44386249, 45306092, 45699668],
+          "p95": [45567827, 46682191, 46363963, 46949930, 47728160],
+          "p99": [46091558, 47602428, 47383687, 47542667, 48062572],
+          "median": {"p50": 44729422, "p95": 46682191, "p99": 47542667}
+        },
+        "time_v": {"maximum_rss_kib": [65164, 65420, 65060, 65176, 65160], "user_seconds": [2.54, 2.57, 2.58, 2.57, 2.60], "wall_clock": ["0:02.75", "0:02.64", "0:02.64", "0:02.78", "0:02.85"]},
+        "heaptrack": {"artifact": "/tmp/resprofile-heaptrack-before-xlsx-medium-0109.heaptrack.zst", "artifact_bytes": 567834, "artifact_sha256": "ca2c4741525be6d84201b7acb7ae0e1ffdbd7e673433b849d451ac6a522b20b3", "allocation_calls": 8547384, "allocated_bytes": 1240794320, "temporary_allocations": 1387508, "peak_heap_reported": "59.86M", "peak_rss_with_heaptrack_reported": "72.01M", "total_runtime_reported": "3.02s"}
+      },
+      "after": {
+        "output_sha256": "99ef583896aa201cebcc62e205ff9979bf08b4e21df15bcd04604a2ddd14a3fd",
+        "sink": {"accepted_bytes": 4226645, "write_calls": 163, "largest_write": 32768},
+        "source_per_sample": {"read_calls": 225, "read_bytes": 4230793, "ordinary_payload_read_calls": 144, "ordinary_payload_read_bytes": 4223777, "ordinary_payload_materializations": 6, "max_in_flight_reads": 1},
+        "latency_ns": {
+          "p50": [34264898, 34460608, 33877540, 33727938, 34155072],
+          "p95": [35681133, 34814069, 35049893, 34476864, 35735568],
+          "p99": [36543581, 34892216, 35226568, 36559222, 35899442],
+          "median": {"p50": 34155072, "p95": 35049893, "p99": 35899442}
+        },
+        "time_v": {"maximum_rss_kib": [65384, 65256, 65160, 65288, 65448], "user_seconds": [2.18, 2.19, 2.17, 2.17, 2.17], "wall_clock": ["0:02.26", "0:02.26", "0:02.24", "0:02.24", "0:02.24"]},
+        "heaptrack": {"artifact": "/tmp/resprofile-heaptrack-after-xlsx-medium-0109.heaptrack.zst", "artifact_bytes": 475266, "artifact_sha256": "4c2d70464dba8cd94b0cef83ee9acdcf62948aeb2869e0ea61596023af369be2", "allocation_calls": 7139187, "allocated_bytes": 1129397606, "temporary_allocations": 1186287, "peak_heap_reported": "59.86M", "peak_rss_with_heaptrack_reported": "67.83M", "total_runtime_reported": "2.65s"}
+      }
+    },
+    {
+      "id": "xlsx-dense-sparse-exact-256",
+      "case": "xlsx_source_backed_cell_values_batch_edit_save",
+      "selector": "exact MAX_BATCH_EDITS (256) existing scalar cells",
+      "corpus": {"name": "xlsx-cell-values-dense-sparse", "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1", "package_format": "XLSX/OPC/ZIP", "shape": "dense-sparse", "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media", "compression": "deflate", "entry_count": 17792, "archive_member_count": 17, "entry_bytes": 4, "uncompressed_payload_bytes": 4265472, "archive_bytes": 4251863, "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a", "target_entry": "Sheet1!A1", "target_payload_bytes": 1, "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9", "xlsx": {"sheet_count": 4, "rows_per_sheet": 128, "columns_per_sheet": 128, "one_percent_update_count": 178, "source_members": {"workbook": "xl/workbook.xml", "worksheets": ["xl/worksheets/sheet1.xml", "xl/worksheets/sheet2.xml", "xl/worksheets/sheet3.xml", "xl/worksheets/sheet4.xml"], "shared_strings": null, "styles": "xl/styles.xml"}}},
+      "before": {"output_sha256": "484b3370ee54f2264ec8c4b4939fc0ea02e5ab3431761e9ca627dc82cfc1ca46", "sink": {"accepted_bytes": 4251968, "write_calls": 163, "largest_write": 46713}, "source_per_sample": {"read_calls": 226, "read_bytes": 4256227, "ordinary_payload_read_calls": 145, "ordinary_payload_read_bytes": 4249211, "ordinary_payload_materializations": 6, "max_in_flight_reads": 1}, "latency_ns": {"p50": [87797261, 87716669, 88805435, 86681532, 86303941], "p95": [92393615, 98709562, 93829242, 90022121, 90047305], "p99": [96500030, 104608426, 106033139, 90223436, 96213697], "median": {"p50": 87716669, "p95": 92393615, "p99": 96500030}}, "time_v": {"maximum_rss_kib": [79264, 79276, 78744, 78872, 79328], "user_seconds": [4.88, 4.87, 4.91, 4.82, 4.78], "wall_clock": ["0:04.97", "0:04.97", "0:05.00", "0:04.91", "0:05.02"]}, "heaptrack": {"artifact": "/tmp/resprofile-heaptrack-before-xlsx-dense-sparse-0109.heaptrack.zst", "artifact_bytes": 683890, "artifact_sha256": "8870656a49b466caf8ba015aa584959a0ec4147e15af3be4407e3c2a3f8f2ab5", "allocation_calls": 26669033, "allocated_bytes": 2525388751, "temporary_allocations": 4205037, "peak_heap_reported": "70.60M", "peak_rss_with_heaptrack_reported": "85.44M", "total_runtime_reported": "8.33s"}},
+      "after": {"output_sha256": "484b3370ee54f2264ec8c4b4939fc0ea02e5ab3431761e9ca627dc82cfc1ca46", "sink": {"accepted_bytes": 4251968, "write_calls": 163, "largest_write": 46713}, "source_per_sample": {"read_calls": 226, "read_bytes": 4256227, "ordinary_payload_read_calls": 145, "ordinary_payload_read_bytes": 4249211, "ordinary_payload_materializations": 6, "max_in_flight_reads": 1}, "latency_ns": {"p50": [65781141, 66601892, 66646477, 67152795, 66988514], "p95": [69538526, 73514450, 69274362, 69579831, 72663578], "p99": [69685198, 74545109, 69755534, 69806544, 90647534], "median": {"p50": 66646477, "p95": 69579831, "p99": 69806544}}, "time_v": {"maximum_rss_kib": [79328, 79468, 79632, 78896, 79336], "user_seconds": [4.01, 4.02, 4.05, 4.08, 4.09], "wall_clock": ["0:04.09", "0:04.10", "0:04.14", "0:04.17", "0:04.17"]}, "heaptrack": {"artifact": "/tmp/resprofile-heaptrack-after-xlsx-dense-sparse-0109.heaptrack.zst", "artifact_bytes": 617757, "artifact_sha256": "29ea01098b5a8fca213b5dc7128fc3af93877829374996cf1ad7de4b9c34a45c", "allocation_calls": 22930796, "allocated_bytes": 2251515966, "temporary_allocations": 3675056, "peak_heap_reported": "70.60M", "peak_rss_with_heaptrack_reported": "85.30M", "total_runtime_reported": "7.24s"}}
+    },
+    {
+      "id": "rtf-medium-streaming",
+      "case": "rtf_streaming_create",
+      "selector": "plain streaming semantic shape medium",
+      "corpus": {"name": "rtf-streaming-create-medium", "generator": "litchi-rtf-streaming-create-v1", "package_format": "rtf", "shape": "medium", "payload_kind": "deterministic-scalar-text", "compression": "none", "entry_count": 8192, "archive_member_count": 0, "entry_bytes": 0, "uncompressed_payload_bytes": 425984, "archive_bytes": 630819, "archive_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a", "target_entry": "document", "target_payload_bytes": 630819, "target_payload_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a", "rtf_variant": "plain-streaming"},
+      "before": {"output_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a", "sink": {"accepted_bytes": 630819, "write_calls": 450570, "largest_write": 13, "retained_output_bytes": 0, "retained_authoring_window_bytes": 37, "paragraphs": 8192, "runs": 8192, "input_bytes": 425984, "authored_part_bytes": 630819}, "latency_ns": {"p50": [38111745, 38017170, 37769664, 38350739, 38383189], "p95": [38620951, 38333285, 38358810, 39135951, 39203184], "p99": [38662248, 38526872, 38458907, 39732381, 39320045], "median": {"p50": 38111745, "p95": 38620951, "p99": 38662248}}, "time_v": {"maximum_rss_kib": [30720, 30592, 30592, 30592, 30592], "user_seconds": [1.39, 1.39, 1.39, 1.40, 1.41], "wall_clock": ["0:01.44", "0:01.44", "0:01.43", "0:01.45", "0:01.45"]}, "heaptrack": {"artifact": "/tmp/resprofile-heaptrack-before-rtf-medium-0109.heaptrack.zst", "artifact_bytes": 18022, "artifact_sha256": "824cd0ff9b72caec74997894ca3739d274aa14dc4a8ff9a5901860fb367dff01", "allocation_calls": 2818354, "allocated_bytes": 143120159, "temporary_allocations": 2752540, "peak_heap_reported": "24.82M", "peak_rss_with_heaptrack_reported": "29.66M", "total_runtime_reported": "0.91s"}},
+      "after": {"output_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a", "sink": {"accepted_bytes": 630819, "write_calls": 90122, "largest_write": 32, "retained_output_bytes": 0, "retained_authoring_window_bytes": 37, "paragraphs": 8192, "runs": 8192, "input_bytes": 425984, "authored_part_bytes": 630819}, "latency_ns": {"p50": [8978043, 9273650, 8792938, 8949208, 8987255], "p95": [9135861, 9539556, 10006980, 9156068, 10054626], "p99": [9212336, 9546967, 11093106, 9206068, 11327177], "median": {"p50": 8978043, "p95": 9539556, "p99": 9546967}}, "time_v": {"maximum_rss_kib": [30592, 30592, 30592, 30720, 30592], "user_seconds": [0.34, 0.35, 0.34, 0.35, 0.35], "wall_clock": ["0:00.39", "0:00.40", "0:00.38", "0:00.39", "0:00.40"]}, "heaptrack": {"artifact": "/tmp/resprofile-heaptrack-after-rtf-medium-0109.heaptrack.zst", "artifact_bytes": 13013, "artifact_sha256": "7c5f53e46cd9f9bc989336c900b9809f8a72985009c88bde671cd8f03a530bd1", "allocation_calls": 655666, "allocated_bytes": 73914131, "temporary_allocations": 491557, "peak_heap_reported": "24.82M", "peak_rss_with_heaptrack_reported": "33.22M", "total_runtime_reported": "0.32s"}}
+    },
+    {
+      "id": "rtf-large-streaming",
+      "case": "rtf_streaming_create",
+      "selector": "plain streaming semantic shape large",
+      "corpus": {"name": "rtf-streaming-create-large", "generator": "litchi-rtf-streaming-create-v1", "package_format": "rtf", "shape": "large", "payload_kind": "deterministic-scalar-text", "compression": "none", "entry_count": 131072, "archive_member_count": 0, "entry_bytes": 0, "uncompressed_payload_bytes": 6815744, "archive_bytes": 10092579, "archive_sha256": "001ee0ac2250f12cf841779fac699445567aad28d94af0c9be002ea616297435", "target_entry": "document", "target_payload_bytes": 10092579, "target_payload_sha256": "001ee0ac2250f12cf841779fac699445567aad28d94af0c9be002ea616297435", "rtf_variant": "plain-streaming"},
+      "before": {"output_sha256": "001ee0ac2250f12cf841779fac699445567aad28d94af0c9be002ea616297435", "sink": {"accepted_bytes": 10092579, "write_calls": 7208970, "largest_write": 13, "retained_output_bytes": 0, "retained_authoring_window_bytes": 37, "paragraphs": 131072, "runs": 131072, "input_bytes": 6815744, "authored_part_bytes": 10092579}, "latency_ns": {"p50": [615145639, 630914216, 619944617, 612077296, 616709662], "p95": [624069543, 639075840, 623559205, 618275482, 632546125], "p99": [628502057, 646400695, 627847270, 619102650, 634683137], "median": {"p50": 616709662, "p95": 624069543, "p99": 628502057}}, "time_v": {"maximum_rss_kib": [357888, 357760, 358016, 358016, 357888], "user_seconds": [22.29, 22.79, 22.41, 22.16, 22.39], "wall_clock": ["0:22.43", "0:22.93", "0:22.59", "0:22.31", "0:22.53"]}, "heaptrack": {"artifact": "/tmp/resprofile-heaptrack-before-rtf-large-0109.heaptrack.zst", "artifact_bytes": 99211, "artifact_sha256": "2f4e1f1793c8da6f7731b8310108daf2e8fa21d68344204d9c37480e63e71e23", "allocation_calls": 45089098, "allocated_bytes": 2287130330, "temporary_allocations": 44040208, "peak_heap_reported": "396.04M", "peak_rss_with_heaptrack_reported": "370.03M", "total_runtime_reported": "12.60s"}},
+      "after": {"output_sha256": "001ee0ac2250f12cf841779fac699445567aad28d94af0c9be002ea616297435", "sink": {"accepted_bytes": 10092579, "write_calls": 1441802, "largest_write": 32, "retained_output_bytes": 0, "retained_authoring_window_bytes": 37, "paragraphs": 131072, "runs": 131072, "input_bytes": 6815744, "authored_part_bytes": 10092579}, "latency_ns": {"p50": [148320698, 143126930, 141448680, 144142299, 141401350], "p95": [151159782, 145420909, 143901688, 147878744, 144124155], "p99": [153958316, 145910153, 143939970, 149367494, 147827955], "median": {"p50": 143126930, "p95": 145420909, "p99": 147827955}}, "time_v": {"maximum_rss_kib": [358144, 357888, 358144, 358144, 358144], "user_seconds": [5.47, 5.28, 5.25, 5.34, 5.24], "wall_clock": ["0:05.61", "0:05.41", "0:05.38", "0:05.46", "0:05.38"]}, "heaptrack": {"artifact": "/tmp/resprofile-heaptrack-after-rtf-large-0109.heaptrack.zst", "artifact_bytes": 30801, "artifact_sha256": "d328bf31dc8639f5c657541235563ca50acbb2530dbda4e3d4f5b69fa15901da", "allocation_calls": 10486090, "allocated_bytes": 1179834062, "temporary_allocations": 7864347, "peak_heap_reported": "396.04M", "peak_rss_with_heaptrack_reported": "370.61M", "total_runtime_reported": "3.22s"}}
+    }
+  ],
+  "perf_probe": {
+    "tool": "perf stat",
+    "case": "rtf_streaming_create",
+    "shape": "medium",
+    "warmup": 1,
+    "samples": 1,
+    "scope": "whole process",
+    "before_log": "/tmp/resprofile-perf-before-rtf-medium-0109.log",
+    "after_log": "/tmp/resprofile-perf-after-rtf-medium-0109.log",
+    "events": ["cycles", "instructions", "branches", "branch-misses", "cache-misses", "page-faults"],
+    "before": {"cycles": 911282809, "instructions": 1962637211, "branches": 361907150, "branch_misses": 1103019, "cache_misses": 1558774, "page_faults": 14331, "ipc": 2.15},
+    "after": {"cycles": 467350902, "instructions": 882214897, "branches": 164306533, "branch_misses": 752966, "cache_misses": 1468670, "page_faults": 14334, "ipc": 1.89},
+    "limitation": "one process-wide probe per binary; availability and paired context only, not stable hardware-counter attribution"
+  },
+  "temporary_artifacts": {
+    "not_committed": true,
+    "heaptrack_capture_total_bytes": 2505794,
+    "listed_profile_artifacts_total_bytes": 2845871,
+    "raw_report_globs": [
+      "/tmp/resprofile-{before,after}-xlsx-{medium,dense-sparse}-0109-r{1..5}.json",
+      "/tmp/resprofile-{before,after}-xlsx-{medium,dense-sparse}-0109-r{1..5}.time",
+      "/tmp/resprofile-{before,after}-rtf-{medium,large}-0109-r{1..5}.json",
+      "/tmp/resprofile-{before,after}-rtf-{medium,large}-0109-r{1..5}.time"
+    ],
+    "heaptrack_captures": [
+      {"path": "/tmp/resprofile-heaptrack-before-xlsx-medium-0109.heaptrack.zst", "bytes": 567834, "sha256": "ca2c4741525be6d84201b7acb7ae0e1ffdbd7e673433b849d451ac6a522b20b3"},
+      {"path": "/tmp/resprofile-heaptrack-after-xlsx-medium-0109.heaptrack.zst", "bytes": 475266, "sha256": "4c2d70464dba8cd94b0cef83ee9acdcf62948aeb2869e0ea61596023af369be2"},
+      {"path": "/tmp/resprofile-heaptrack-before-xlsx-dense-sparse-0109.heaptrack.zst", "bytes": 683890, "sha256": "8870656a49b466caf8ba015aa584959a0ec4147e15af3be4407e3c2a3f8f2ab5"},
+      {"path": "/tmp/resprofile-heaptrack-after-xlsx-dense-sparse-0109.heaptrack.zst", "bytes": 617757, "sha256": "29ea01098b5a8fca213b5dc7128fc3af93877829374996cf1ad7de4b9c34a45c"},
+      {"path": "/tmp/resprofile-heaptrack-before-rtf-medium-0109.heaptrack.zst", "bytes": 18022, "sha256": "824cd0ff9b72caec74997894ca3739d274aa14dc4a8ff9a5901860fb367dff01"},
+      {"path": "/tmp/resprofile-heaptrack-after-rtf-medium-0109.heaptrack.zst", "bytes": 13013, "sha256": "7c5f53e46cd9f9bc989336c900b9809f8a72985009c88bde671cd8f03a530bd1"},
+      {"path": "/tmp/resprofile-heaptrack-before-rtf-large-0109.heaptrack.zst", "bytes": 99211, "sha256": "2f4e1f1793c8da6f7731b8310108daf2e8fa21d68344204d9c37480e63e71e23"},
+      {"path": "/tmp/resprofile-heaptrack-after-rtf-large-0109.heaptrack.zst", "bytes": 30801, "sha256": "d328bf31dc8639f5c657541235563ca50acbb2530dbda4e3d4f5b69fa15901da"}
+    ],
+    "retention_note": "The /tmp captures are reproducibility artifacts only and are intentionally not repository files."
+  },
+  "limitations": [
+    "Whole-process heaptrack totals include startup, corpus construction, one warmup and one measured sample.",
+    "Heaptrack peak RSS includes profiler overhead; uninstrumented RSS ranges overlap and no peak-RSS claim is accepted.",
+    "No cold-cache I/O, decompressed/recompressed-byte, concurrency, memory-bandwidth or per-loop attribution was measured.",
+    "The perf probe is one process-wide sample per binary and is not a stable hardware-counter attribution."
+  ]
+}
