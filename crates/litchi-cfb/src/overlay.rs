@@ -626,7 +626,7 @@ impl ValidatedOverlayPlan {
     /// atomic: failures after progress return [`OverlayError::IncompleteOutput`].
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
         self.preflight_fingerprints()?;
-        self.write_validated(writer)
+        self.write_validated(writer, true)
     }
 
     /// Publishes through a synced sibling temporary file and atomic rename.
@@ -645,7 +645,11 @@ impl ValidatedOverlayPlan {
         let result = (|| {
             let mut buffered = BufWriter::new(file);
             let report = self
-                .write_validated(&mut buffered)
+                // `save` has its own mandatory pre-rename preflight below. The
+                // direct sink path keeps the post-emission preflight inside
+                // `write_validated`; skipping only that duplicate scan here
+                // leaves source/target hashing during emission intact.
+                .write_validated(&mut buffered, false)
                 .map_err(strip_staging_progress)?;
             buffered.flush()?;
             buffered.get_ref().sync_all()?;
@@ -682,7 +686,11 @@ impl ValidatedOverlayPlan {
         Ok(())
     }
 
-    fn write_validated<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
+    fn write_validated<W: Write>(
+        &self,
+        writer: &mut W,
+        post_emission_preflight: bool,
+    ) -> Result<PublishReport, OverlayError> {
         let mut buffer = publication_buffer()?;
         let mut source_hasher = Sha256::new();
         let mut target_hasher = Sha256::new();
@@ -734,11 +742,15 @@ impl ValidatedOverlayPlan {
                 false,
             ));
         }
-        // Re-read the complete source after emission. A dishonest adapter may
-        // keep a stable version token while mutating a chunk that has already
-        // been hashed and accepted by the sink.
-        if let Err(error) = self.preflight_fingerprints() {
-            return Err(with_progress(error, accepted, self.source.length, false));
+        // Direct sequential publication must retain this post-emission check:
+        // a dishonest adapter may keep a stable version token while mutating a
+        // chunk that has already been hashed and accepted by the sink. Atomic
+        // `save` skips only this duplicate because it performs the same full
+        // check after flush/fsync and immediately before rename.
+        if post_emission_preflight {
+            if let Err(error) = self.preflight_fingerprints() {
+                return Err(with_progress(error, accepted, self.source.length, false));
+            }
         }
         if let Err(error) = writer.flush() {
             return Err(OverlayError::IncompleteOutput {
