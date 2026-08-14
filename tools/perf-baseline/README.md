@@ -39,7 +39,8 @@ range cases, two execution-scaling cases, one low-level source-overlay save
 case, one source-backed DOCX semantic publication case, one source-backed
 media-rich PPTX semantic publication case, four matched same-slide/multi-slide
 PPTX batch cases, two matched cross-slide ODP text-box publication cases, one
-matched ODT embedded-resource publication pair, one XLSX commit/read attribution case,
+matched ODT embedded-resource publication pair, one matched ODT mixed
+model-content publication pair, one XLSX commit/read attribution case,
 two matched XLSX calculation-metadata publication cases, two matched XLSX
 defined-name publication cases, two matched XLSX
 page-break publication cases, two matched XLSX page-margin publication cases,
@@ -58,9 +59,9 @@ four matched native XLS existing-comment publication cases,
 four matched native XLS worksheet-visibility publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, 15 RTF semantic cases (13 transport/read/edit
-cases plus two logical-tail publication cases), 36 ODF semantic cases, and one
+cases plus two logical-tail publication cases), 38 ODF semantic cases, and one
 ODF `mimetype` repair-plan case are opt-in. The current `Case` matrix exposes
-201 selectable case names in total;
+203 selectable case names in total;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 
@@ -1038,6 +1039,51 @@ exposes no positional source-read or logical-part materialization diagnostics,
 so the report omits them. These cases are selectable evidence only: no latency,
 instruction, allocation, memory, or materialization improvement is claimed
 without a frozen CPU-pinned balanced ABBA capture.
+
+Measure the matched ODT mixed model-content publication controls on the
+deterministic semantic ODT corpus:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 2 --semantic-shape tiny \
+  --case odt_mixed_model_content_scalar_edit_save,odt_mixed_model_content_batch_edit_save \
+  --json target/perf/odt-mixed-model-content-smoke.json
+```
+
+For a measurement matrix, select `--semantic-shape medium,large` and use a
+release-build sample count appropriate for the host:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 15 --semantic-shape medium,large \
+  --case odt_mixed_model_content_scalar_edit_save,odt_mixed_model_content_batch_edit_save \
+  --json target/perf/odt-mixed-model-content.json
+```
+
+The scalar control applies one deterministic five-operation group per selected
+region (`remove`, `insert`, `replace`, styled `append_run`, and inert
+`append_hyperlink`). The operation vector orders all count-preserving plain
+operations first and its complete inline append tail second. The scalar
+control publishes each plain operation separately, then publishes the entire
+inline tail once so later publications cannot canonicalize away an earlier
+styled span. The candidate stages that identical operation vector in one
+transaction so the current model-content coalescing path is exercised. Tiny,
+medium, and large use 1, 16, and 64 groups (5, 80, and 320 operations); the
+paragraph count stays constant. Thus the scalar control reports three times
+the group count plus one inline-tail publication (4, 49, and 193 for tiny,
+medium, and large), while the candidate reports one publication per iteration.
+
+The timed interval starts after a fresh source snapshot has been opened and
+ends after the scalar publication sequence or single candidate commit. Corpus
+construction, operation preparation, full reopen and semantic projection,
+result counts, exact source/target member inventory and untouched raw-member
+identity, volatile and durable replay/inverse/stale checks, barrier and
+late-error atomicity, security-envelope classification, and text/operation
+limits are outside timing. The JSON `source.odt_mixed` object records exact
+operation, publication, result, output-byte, output-hash, and logical-result-hash
+counters for every measured sample. This is matched selector evidence only;
+it makes no latency or speedup claim until a frozen release-build balanced ABBA
+capture is retained.
 
 `odp_media_textbox_edit_save` is a separate fixed-medium source-backed
 publication corpus: 12 slides plus eight deterministic 2 MiB resources under

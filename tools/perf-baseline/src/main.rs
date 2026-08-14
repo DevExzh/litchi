@@ -636,6 +636,8 @@ enum Case {
     OdtSemanticNoopEditSave,
     OdtSemanticOneEditSave,
     OdtSemanticOnePercentEditSave,
+    OdtMixedModelContentScalarEditSave,
+    OdtMixedModelContentBatchEditSave,
     OdfValidationReport,
     OdfMimetypeRepairPlan,
     OdtMediaParagraphEditSave,
@@ -913,6 +915,8 @@ impl Case {
             Self::OdtSemanticNoopEditSave => "odt_semantic_noop_edit_save",
             Self::OdtSemanticOneEditSave => "odt_semantic_one_edit_save",
             Self::OdtSemanticOnePercentEditSave => "odt_semantic_one_percent_edit_save",
+            Self::OdtMixedModelContentScalarEditSave => "odt_mixed_model_content_scalar_edit_save",
+            Self::OdtMixedModelContentBatchEditSave => "odt_mixed_model_content_batch_edit_save",
             Self::OdfValidationReport => "odf_validation_report",
             Self::OdfMimetypeRepairPlan => "odf_mimetype_repair_plan",
             Self::OdtMediaParagraphEditSave => "odt_media_paragraph_edit_save",
@@ -1164,6 +1168,8 @@ impl Case {
                 | Self::OdtSemanticNoopEditSave
                 | Self::OdtSemanticOneEditSave
                 | Self::OdtSemanticOnePercentEditSave
+                | Self::OdtMixedModelContentScalarEditSave
+                | Self::OdtMixedModelContentBatchEditSave
         )
     }
 
@@ -1716,6 +1722,26 @@ struct SourceSummary {
     odf_repair: Option<OdfRepairSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     cfb_selective: Option<CfbSelectiveEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    odt_mixed: Option<OdtMixedPublicationSummary>,
+}
+
+/// Untimed correctness counters paired with the ODT mixed model-content
+/// publication timings.  The vectors contain measured samples only; corpus
+/// construction, source opening, semantic projection, and lifecycle gates
+/// are deliberately outside the elapsed interval.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct OdtMixedPublicationSummary {
+    implementation: &'static str,
+    timing_scope: &'static str,
+    operation_count: usize,
+    publications_per_iteration: usize,
+    result_count_per_iteration: usize,
+    publication_counts: Vec<usize>,
+    result_counts: Vec<usize>,
+    output_bytes: Vec<u64>,
+    output_sha256: Vec<String>,
+    logical_result_sha256: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -4735,6 +4761,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_semantic_noop_edit_save" => Some(Case::OdtSemanticNoopEditSave),
         "odt_semantic_one_edit_save" => Some(Case::OdtSemanticOneEditSave),
         "odt_semantic_one_percent_edit_save" => Some(Case::OdtSemanticOnePercentEditSave),
+        "odt_mixed_model_content_scalar_edit_save" => {
+            Some(Case::OdtMixedModelContentScalarEditSave)
+        },
+        "odt_mixed_model_content_batch_edit_save" => Some(Case::OdtMixedModelContentBatchEditSave),
         "odf_validation_report" => Some(Case::OdfValidationReport),
         "odf_mimetype_repair_plan" => Some(Case::OdfMimetypeRepairPlan),
         "odt_media_paragraph_edit_save" => Some(Case::OdtMediaParagraphEditSave),
@@ -4958,6 +4988,8 @@ fn print_usage() {
                                        odt_semantic_one_paragraph,odt_semantic_full_text,\n\
                                        odt_semantic_create_small,odt_semantic_noop_edit_save,\n\
                                        odt_semantic_one_edit_save,odt_semantic_one_percent_edit_save,\n\
+                                       odt_mixed_model_content_scalar_edit_save,\n\
+                                       odt_mixed_model_content_batch_edit_save,\n\
                                        odt_media_paragraph_edit_save,odt_media_line_break_edit_save,\n\
                                        odt_media_append_run_edit_save,\n\
                                        odt_media_append_hyperlink_edit_save,\n\
@@ -6458,6 +6490,151 @@ fn semantic_pptx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> 
 fn semantic_odt_text(index: usize, updated: bool) -> String {
     let state = if updated { "updated" } else { "source" };
     format!("litchi-perf-baseline-odt-semantic-v1-{state}-{index:05}")
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OdtMixedOperationKind {
+    RemoveParagraph,
+    InsertParagraph,
+    ReplaceParagraph,
+    AppendRun,
+    AppendHyperlink,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct OdtMixedOperation {
+    kind: OdtMixedOperationKind,
+    position: usize,
+    text: String,
+    href: Option<String>,
+    style_name: Option<String>,
+}
+
+fn odt_mixed_group_count(shape: SemanticShape) -> usize {
+    match shape {
+        SemanticShape::Tiny => 1,
+        SemanticShape::Medium => 16,
+        SemanticShape::Large => 64,
+    }
+}
+
+fn odt_mixed_operations(shape: SemanticShape) -> Result<Vec<OdtMixedOperation>, Box<dyn Error>> {
+    let group_count = odt_mixed_group_count(shape);
+    let capacity = group_count
+        .checked_mul(5)
+        .ok_or("ODT mixed operation count overflows usize")?;
+    let mut operations = Vec::with_capacity(capacity);
+    for group in 0..group_count {
+        let base = group
+            .checked_mul(3)
+            .ok_or("ODT mixed operation position overflows usize")?;
+        operations.push(OdtMixedOperation {
+            kind: OdtMixedOperationKind::RemoveParagraph,
+            position: base,
+            text: String::new(),
+            href: None,
+            style_name: None,
+        });
+        operations.push(OdtMixedOperation {
+            kind: OdtMixedOperationKind::InsertParagraph,
+            position: base + 1,
+            text: format!("litchi-perf-odt-mixed-inserted-{group:03}"),
+            href: None,
+            style_name: None,
+        });
+        operations.push(OdtMixedOperation {
+            kind: OdtMixedOperationKind::ReplaceParagraph,
+            position: base + 2,
+            text: format!("litchi-perf-odt-mixed-replaced-{group:03}"),
+            href: None,
+            style_name: None,
+        });
+    }
+    // Keep the complete inline tail after all count-preserving plain edits.
+    // This is still one deterministic operation vector for both controls, but
+    // lets the scalar leg publish every inline append together so a later
+    // publication cannot canonicalize away an earlier styled span.
+    for group in 0..group_count {
+        let base = group
+            .checked_mul(3)
+            .ok_or("ODT mixed inline operation position overflows usize")?;
+        operations.push(OdtMixedOperation {
+            kind: OdtMixedOperationKind::AppendRun,
+            position: base + 1,
+            text: format!(" run-{group:03}"),
+            href: None,
+            style_name: Some("Emphasis".to_owned()),
+        });
+        operations.push(OdtMixedOperation {
+            kind: OdtMixedOperationKind::AppendHyperlink,
+            position: base + 2,
+            text: format!(" linked-{group:03}"),
+            href: Some(format!(
+                "https://example.invalid/litchi/odt/mixed/{group:03}"
+            )),
+            style_name: None,
+        });
+    }
+    Ok(operations)
+}
+
+fn apply_odt_mixed_operation(
+    edit: &mut litchi_odt::transaction::Edit,
+    operation: &OdtMixedOperation,
+) -> Result<(), Box<dyn Error>> {
+    let position = Position::new(operation.position);
+    match operation.kind {
+        OdtMixedOperationKind::RemoveParagraph => {
+            edit.remove_paragraph(position)?;
+        },
+        OdtMixedOperationKind::InsertParagraph => {
+            edit.insert_paragraph(position, &operation.text)?;
+        },
+        OdtMixedOperationKind::ReplaceParagraph => {
+            edit.replace_paragraph(position, &operation.text)?;
+        },
+        OdtMixedOperationKind::AppendRun => {
+            edit.append_run(position, &operation.text, operation.style_name.as_deref())?;
+        },
+        OdtMixedOperationKind::AppendHyperlink => {
+            edit.append_hyperlink(
+                position,
+                operation
+                    .href
+                    .as_deref()
+                    .ok_or("ODT mixed hyperlink has no deterministic target")?,
+                &operation.text,
+            )?;
+        },
+    }
+    Ok(())
+}
+
+fn append_projection_field(output: &mut Vec<u8>, value: &str) -> Result<(), Box<dyn Error>> {
+    output.extend_from_slice(&u64::try_from(value.len())?.to_le_bytes());
+    output.extend_from_slice(value.as_bytes());
+    Ok(())
+}
+
+fn odt_mixed_logical_result_sha256(
+    snapshot: &litchi_odt::transaction::Snapshot,
+) -> Result<String, Box<dyn Error>> {
+    let document = snapshot.document()?;
+    let paragraphs = document.paragraphs()?;
+    let full_text = document.text()?;
+    let hyperlinks = document.hyperlinks()?;
+    let mut projection = Vec::new();
+    projection.extend_from_slice(&u64::try_from(paragraphs.len())?.to_le_bytes());
+    for paragraph in paragraphs {
+        append_projection_field(&mut projection, &paragraph.text()?)?;
+    }
+    append_projection_field(&mut projection, &full_text)?;
+    projection.extend_from_slice(&u64::try_from(hyperlinks.len())?.to_le_bytes());
+    for (text, href) in hyperlinks {
+        append_projection_field(&mut projection, &text)?;
+        append_projection_field(&mut projection, &href)?;
+    }
+    Ok(sha256_hex(&projection))
 }
 
 fn semantic_ods_sheet_name(index: usize) -> String {
@@ -8348,6 +8525,9 @@ fn run_case_with_config(
         | Case::OdtSemanticOneEditSave
         | Case::OdtSemanticOnePercentEditSave => {
             run_semantic_odt(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdtMixedModelContentScalarEditSave | Case::OdtMixedModelContentBatchEditSave => {
+            run_odt_mixed_model_content(case, corpus, warmup_iterations, samples)
         },
         Case::OdfValidationReport => run_odf_validation_report(corpus, warmup_iterations, samples),
         Case::OdfMimetypeRepairPlan => {
@@ -12702,6 +12882,422 @@ fn run_semantic_odt(
         }
     }
     Ok(result(case, corpus, elapsed, None))
+}
+
+fn execute_odt_mixed_scalar(
+    source: &litchi_odt::transaction::Snapshot,
+    operations: &[OdtMixedOperation],
+) -> Result<(litchi_odt::transaction::Snapshot, usize, usize), Box<dyn Error>> {
+    let mut snapshot = source.clone();
+    let mut publications = 0usize;
+    let mut result_count = 0usize;
+    if !operations.len().is_multiple_of(5) {
+        return Err("ODT mixed scalar operation vector is not grouped in fives".into());
+    }
+    let plain_operation_count = operations.len() / 5 * 3;
+    for operation in &operations[..plain_operation_count] {
+        let mut edit = snapshot.edit();
+        apply_odt_mixed_operation(&mut edit, operation)?;
+        let commit = edit.commit()?;
+        if commit.results().len() != 1 {
+            return Err(
+                "ODT mixed scalar plain publication returned an unexpected result count".into(),
+            );
+        }
+        result_count = result_count
+            .checked_add(commit.results().len())
+            .ok_or("ODT mixed scalar result count overflows usize")?;
+        publications = publications
+            .checked_add(1)
+            .ok_or("ODT mixed scalar publication count overflows usize")?;
+        snapshot = commit.into_snapshot();
+    }
+
+    let inline_operations = &operations[plain_operation_count..];
+    if !inline_operations.is_empty() {
+        let mut edit = snapshot.edit();
+        for operation in inline_operations {
+            apply_odt_mixed_operation(&mut edit, operation)?;
+        }
+        let commit = edit.commit()?;
+        if commit.results().len() != inline_operations.len() {
+            return Err(
+                "ODT mixed scalar inline-tail publication returned an unexpected result count"
+                    .into(),
+            );
+        }
+        result_count = result_count
+            .checked_add(commit.results().len())
+            .ok_or("ODT mixed scalar result count overflows usize")?;
+        publications = publications
+            .checked_add(1)
+            .ok_or("ODT mixed scalar publication count overflows usize")?;
+        snapshot = commit.into_snapshot();
+    }
+    Ok((snapshot, publications, result_count))
+}
+
+fn execute_odt_mixed_batch(
+    source: &litchi_odt::transaction::Snapshot,
+    operations: &[OdtMixedOperation],
+) -> Result<litchi_odt::transaction::Commit, Box<dyn Error>> {
+    let mut edit = source.edit();
+    for operation in operations {
+        apply_odt_mixed_operation(&mut edit, operation)?;
+    }
+    let commit = edit.commit()?;
+    if commit.results().len() != operations.len() {
+        return Err("ODT mixed batch publication returned an unexpected result count".into());
+    }
+    Ok(commit)
+}
+
+fn verify_odt_mixed_projection(
+    snapshot: &litchi_odt::transaction::Snapshot,
+    shape: SemanticShape,
+    operations: &[OdtMixedOperation],
+) -> Result<String, Box<dyn Error>> {
+    let document = snapshot.document()?;
+    let paragraphs = document.paragraphs()?;
+    if paragraphs.len() != shape.docx_paragraphs() {
+        return Err("ODT mixed result changed the paragraph count unexpectedly".into());
+    }
+
+    let mut expected = (0..shape.docx_paragraphs())
+        .map(|index| semantic_odt_text(index, false))
+        .collect::<Vec<_>>();
+    if !operations.len().is_multiple_of(5) {
+        return Err("ODT mixed operation vector is not grouped in fives".into());
+    }
+    let group_count = operations.len() / 5;
+    let plain_operation_count = group_count * 3;
+    for group in 0..group_count {
+        let remove = &operations[group * 3];
+        let insert = &operations[group * 3 + 1];
+        let replace = &operations[group * 3 + 2];
+        let append_run = &operations[plain_operation_count + group * 2];
+        let append_hyperlink = &operations[plain_operation_count + group * 2 + 1];
+        if remove.kind != OdtMixedOperationKind::RemoveParagraph
+            || insert.kind != OdtMixedOperationKind::InsertParagraph
+            || replace.kind != OdtMixedOperationKind::ReplaceParagraph
+            || append_run.kind != OdtMixedOperationKind::AppendRun
+            || append_hyperlink.kind != OdtMixedOperationKind::AppendHyperlink
+        {
+            return Err("ODT mixed operation vector has an unexpected group shape".into());
+        }
+        let base = remove.position;
+        expected[base] = semantic_odt_text(base + 1, false);
+        expected[insert.position] = format!("{}{}", insert.text, append_run.text);
+        expected[replace.position] = format!("{}{}", replace.text, append_hyperlink.text);
+    }
+
+    let mut actual = Vec::with_capacity(paragraphs.len());
+    for paragraph in paragraphs {
+        actual.push(paragraph.text()?);
+    }
+    if actual != expected {
+        return Err("ODT mixed result paragraph projection differs from expectation".into());
+    }
+    let expected_text = expected.join("\n");
+    if document.text()? != expected_text {
+        return Err("ODT mixed result full-text projection differs from expectation".into());
+    }
+
+    let expected_hyperlinks = operations
+        .iter()
+        .filter(|operation| operation.kind == OdtMixedOperationKind::AppendHyperlink)
+        .map(|operation| {
+            (
+                operation.text.clone(),
+                operation.href.clone().unwrap_or_default(),
+            )
+        })
+        .collect::<Vec<_>>();
+    if document.hyperlinks()? != expected_hyperlinks {
+        return Err("ODT mixed result hyperlink projection differs from expectation".into());
+    }
+    let content = String::from_utf8(document.get_file("content.xml")?)?;
+    let style_marker = r#"text:style-name="Emphasis""#;
+    let expected_run_count = operations
+        .iter()
+        .filter(|operation| operation.kind == OdtMixedOperationKind::AppendRun)
+        .count();
+    if content.matches(style_marker).count() < expected_run_count {
+        return Err("ODT mixed result lost one or more styled runs".into());
+    }
+
+    odt_mixed_logical_result_sha256(snapshot)
+}
+
+fn verify_odt_mixed_raw_members(source: &[u8], published: &[u8]) -> Result<(), Box<dyn Error>> {
+    let source_members = ArchiveReader::new(source)?
+        .file_names()
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>();
+    let published_members = ArchiveReader::new(published)?
+        .file_names()
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>();
+    if source_members != published_members {
+        return Err(format!(
+            "ODT mixed publication changed package member inventory: source={source_members:?}, published={published_members:?}"
+        )
+        .into());
+    }
+    let identical = litchi_odf_common::package::raw_identical_members(source, published)
+        .ok_or("ODT mixed raw-member comparison failed")?;
+    if identical.contains("content.xml") {
+        return Err("ODT mixed publication left content.xml raw-identical".into());
+    }
+    for path in &source_members {
+        if path != "content.xml" && !identical.contains(path) {
+            return Err(
+                format!("ODT mixed publication changed untouched raw member '{path}'").into(),
+            );
+        }
+    }
+    Ok(())
+}
+
+fn signed_odt_mixed_snapshot(
+    source: &[u8],
+) -> Result<litchi_odt::transaction::Snapshot, Box<dyn Error>> {
+    let archive = ArchiveReader::new(source)?;
+    let mut writer = litchi_odt::core::PackageWriter::new();
+    writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
+    for path in archive.file_names() {
+        if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
+            continue;
+        }
+        writer.add_file(path, &archive.read(path)?)?;
+    }
+    writer.add_file("META-INF/documentsignatures.xml", b"<signatures/>")?;
+    let signed = writer.finish_to_bytes()?;
+    let snapshot = litchi_odt::transaction::Snapshot::from_bytes(signed)?;
+    if !matches!(
+        snapshot.envelope_kind()?,
+        litchi_odt::transaction::EnvelopeKind::Signed
+    ) {
+        return Err("ODT mixed signed security fixture was not classified as signed".into());
+    }
+    Ok(snapshot)
+}
+
+fn verify_odt_mixed_guardrails(
+    source: &litchi_odt::transaction::Snapshot,
+    shape: SemanticShape,
+    operations: &[OdtMixedOperation],
+    scalar: &litchi_odt::transaction::Snapshot,
+    batch: &litchi_odt::transaction::Commit,
+) -> Result<(), Box<dyn Error>> {
+    let scalar_digest = verify_odt_mixed_projection(scalar, shape, operations)?;
+    let batch_digest = verify_odt_mixed_projection(batch.snapshot(), shape, operations)?;
+    if scalar_digest != batch_digest {
+        return Err("ODT mixed scalar and batch logical result digests differ".into());
+    }
+    verify_odt_mixed_raw_members(source.as_bytes(), scalar.as_bytes())?;
+    verify_odt_mixed_raw_members(source.as_bytes(), batch.snapshot().as_bytes())?;
+
+    let replayed = batch.patch().apply(source)?;
+    if replayed.as_bytes() != batch.snapshot().as_bytes() {
+        return Err("ODT mixed volatile patch replay differs from batch output".into());
+    }
+    let durable = batch.patch().durable()?;
+    let wire = durable.to_deterministic_json()?;
+    let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire)?;
+    if decoded.apply(source)?.as_bytes() != batch.snapshot().as_bytes()
+        || decoded.inverse().apply(batch.snapshot())?.as_bytes() != source.as_bytes()
+        || batch.patch().apply(batch.snapshot()).is_ok()
+    {
+        return Err("ODT mixed durable or stale patch lifecycle gate failed".into());
+    }
+
+    let mut foreign_edit = source.edit();
+    foreign_edit.replace_paragraph(Position::new(0), "litchi-perf-odt-mixed-foreign")?;
+    let foreign = foreign_edit.commit()?.into_snapshot();
+    if batch.patch().apply(&foreign).is_ok() || decoded.apply(&foreign).is_ok() {
+        return Err("ODT mixed patch accepted a foreign source".into());
+    }
+
+    let mut barrier_edit = source.edit();
+    barrier_edit
+        .append_run(Position::new(0), " barrier-run", Some("Emphasis"))?
+        .append_hyperlink(
+            Position::new(0),
+            "https://example.invalid/litchi/odt/barrier",
+            " barrier-link",
+        )?
+        .replace_paragraph(Position::new(0), "litchi-perf-odt-mixed-barrier")?;
+    let barrier = barrier_edit.commit()?;
+    if barrier.results().len() != 3
+        || barrier.snapshot().document()?.text()?.split('\n').next()
+            != Some("litchi-perf-odt-mixed-barrier")
+        || !barrier.snapshot().document()?.hyperlinks()?.is_empty()
+    {
+        return Err("ODT mixed inline-to-plain barrier gate failed".into());
+    }
+
+    let mut late_error_edit = source.edit();
+    late_error_edit
+        .replace_paragraph(Position::new(0), "litchi-perf-odt-mixed-late")?
+        .append_hyperlink(
+            Position::new(shape.docx_paragraphs()),
+            "https://example.invalid/litchi/odt/late",
+            "missing",
+        )?;
+    if late_error_edit.commit().is_ok() || source.as_bytes() != source.document()?.original_bytes()
+    {
+        return Err("ODT mixed late-error atomicity gate failed".into());
+    }
+
+    if !matches!(
+        source.envelope_kind()?,
+        litchi_odt::transaction::EnvelopeKind::Plain
+    ) {
+        return Err("ODT mixed semantic corpus has an unexpected security envelope".into());
+    }
+    let signed = signed_odt_mixed_snapshot(source.as_bytes())?;
+    let mut signed_edit = signed.edit();
+    signed_edit.replace_paragraph(Position::new(0), "litchi-perf-odt-mixed-signed")?;
+    if signed_edit.commit().is_ok() {
+        return Err("ODT mixed signed security envelope accepted a semantic edit".into());
+    }
+    let mut oversized_text_edit = source.edit();
+    if oversized_text_edit
+        .replace_paragraph(Position::new(0), "x".repeat(1024 * 1024 + 1))
+        .is_ok()
+    {
+        return Err("ODT mixed semantic text limit accepted oversized input".into());
+    }
+    let mut operation_limit_edit = source.edit();
+    for _ in 0..1_024 {
+        operation_limit_edit.replace_paragraph(Position::new(0), "limit")?;
+    }
+    if operation_limit_edit
+        .replace_paragraph(Position::new(0), "limit")
+        .is_ok()
+    {
+        return Err("ODT mixed transaction operation limit accepted an extra operation".into());
+    }
+    Ok(())
+}
+
+fn run_odt_mixed_model_content(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let operations = odt_mixed_operations(shape)?;
+    let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+    let (scalar_baseline, scalar_publications, scalar_results) =
+        execute_odt_mixed_scalar(&source, &operations)?;
+    let batch_baseline = execute_odt_mixed_batch(&source, &operations)?;
+    let plain_operation_count = operations.len() / 5 * 3;
+    let scalar_publications_per_iteration = plain_operation_count
+        + if plain_operation_count < operations.len() {
+            1
+        } else {
+            0
+        };
+    if scalar_publications != scalar_publications_per_iteration
+        || scalar_results != operations.len()
+        || batch_baseline.results().len() != operations.len()
+    {
+        return Err("ODT mixed baseline counters disagree with operation count".into());
+    }
+    verify_odt_mixed_guardrails(
+        &source,
+        shape,
+        &operations,
+        &scalar_baseline,
+        &batch_baseline,
+    )?;
+    let expected_logical_digest = odt_mixed_logical_result_sha256(&scalar_baseline)?;
+
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut publication_counts = Vec::with_capacity(samples);
+    let mut result_counts = Vec::with_capacity(samples);
+    let mut output_bytes = Vec::with_capacity(samples);
+    let mut output_sha256 = Vec::with_capacity(samples);
+    let mut logical_result_sha256 = Vec::with_capacity(samples);
+    let timing_scope = "source snapshot and operation preparation, full reopen/semantic projection, result-count, raw-member, durable patch/inverse/stale, barrier, late-error, security, and limit gates excluded; scalar times one edit+commit publication per plain operation plus one publication for the complete inline append tail, batch times one staged edit+commit publication";
+    let (publications_per_iteration, implementation) = match case {
+        Case::OdtMixedModelContentScalarEditSave => (
+            scalar_publications_per_iteration,
+            "partitioned-plain-plus-inline-tail-control",
+        ),
+        Case::OdtMixedModelContentBatchEditSave => (1, "coalesced-one-transaction-candidate"),
+        _ => return Err("non-ODT mixed case passed to mixed runner".into()),
+    };
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // Opening a fresh immutable source is intentionally outside the timed
+        // transaction interval. It keeps both legs matched while ensuring the
+        // measured work is publication work rather than corpus setup.
+        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let started = Instant::now();
+        let (snapshot, publications, result_count) = match case {
+            Case::OdtMixedModelContentScalarEditSave => {
+                execute_odt_mixed_scalar(&source, &operations)?
+            },
+            Case::OdtMixedModelContentBatchEditSave => {
+                let commit = execute_odt_mixed_batch(&source, &operations)?;
+                (commit.into_snapshot(), 1, operations.len())
+            },
+            _ => unreachable!("mixed case validated before the measurement loop"),
+        };
+        let duration = started.elapsed();
+
+        // All output and semantic checks remain outside the timed interval.
+        let bytes = snapshot.as_bytes().to_vec();
+        let logical_digest = odt_mixed_logical_result_sha256(&snapshot)?;
+        if logical_digest != expected_logical_digest {
+            return Err("ODT mixed measured logical result differs from scalar baseline".into());
+        }
+        verify_odt_mixed_projection(&snapshot, shape, &operations)?;
+        verify_odt_mixed_raw_members(corpus.archive.as_slice(), &bytes)?;
+        if publications != publications_per_iteration || result_count != operations.len() {
+            return Err("ODT mixed measured counters disagree with operation vector".into());
+        }
+        let digest = sha256_hex(&bytes);
+        if iteration >= warmup_iterations {
+            publication_counts.push(publications);
+            result_counts.push(result_count);
+            output_bytes.push(u64::try_from(bytes.len())?);
+            output_sha256.push(digest);
+            logical_result_sha256.push(logical_digest);
+        }
+        std::hint::black_box(bytes);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    if output_sha256.windows(2).any(|pair| pair[0] != pair[1])
+        || logical_result_sha256
+            .iter()
+            .any(|digest| digest != &expected_logical_digest)
+    {
+        return Err("ODT mixed measured output or logical hashes are not deterministic".into());
+    }
+    let source = SourceSummary {
+        odt_mixed: Some(OdtMixedPublicationSummary {
+            implementation,
+            timing_scope,
+            operation_count: operations.len(),
+            publications_per_iteration,
+            result_count_per_iteration: operations.len(),
+            publication_counts,
+            result_counts,
+            output_bytes,
+            output_sha256: output_sha256.clone(),
+            logical_result_sha256,
+        }),
+        ..SourceSummary::default()
+    };
+    let mut measured = result_with_source(case, corpus, elapsed, source);
+    measured.output_sha256 = output_sha256.first().cloned();
+    Ok(measured)
 }
 
 fn run_odt_media_paragraph_edit_save(
@@ -22837,6 +23433,46 @@ mod tests {
 
         assert_eq!(result.case, "odt_semantic_one_percent_edit_save");
         assert!(result.sink.is_none());
+    }
+
+    #[test]
+    fn semantic_odt_mixed_controls_report_matched_publication_counters() {
+        let odt = build_semantic_odt_corpus(SemanticShape::Tiny).unwrap();
+        let scalar = run_case(Case::OdtMixedModelContentScalarEditSave, &odt, 0, 1).unwrap();
+        let batch = run_case(Case::OdtMixedModelContentBatchEditSave, &odt, 0, 1).unwrap();
+        let scalar = scalar.source.unwrap().odt_mixed.unwrap();
+        let batch = batch.source.unwrap().odt_mixed.unwrap();
+
+        assert_eq!(scalar.operation_count, 5);
+        assert_eq!(batch.operation_count, scalar.operation_count);
+        assert_eq!(scalar.publications_per_iteration, 4);
+        assert_eq!(batch.publications_per_iteration, 1);
+        assert_eq!(scalar.publication_counts, vec![4]);
+        assert_eq!(batch.publication_counts, vec![1]);
+        assert_eq!(scalar.result_counts, vec![5]);
+        assert_eq!(batch.result_counts, vec![5]);
+        assert_eq!(scalar.logical_result_sha256, batch.logical_result_sha256);
+        assert_eq!(scalar.output_sha256.len(), 1);
+        assert_eq!(batch.output_sha256.len(), 1);
+    }
+
+    #[test]
+    fn semantic_odt_mixed_operation_shapes_are_deterministic_and_bounded() {
+        for (shape, expected_groups) in [
+            (SemanticShape::Tiny, 1),
+            (SemanticShape::Medium, 16),
+            (SemanticShape::Large, 64),
+        ] {
+            let first = super::odt_mixed_operations(shape).unwrap();
+            let second = super::odt_mixed_operations(shape).unwrap();
+            assert_eq!(first, second);
+            assert_eq!(first.len(), expected_groups * 5);
+            assert!(
+                first
+                    .iter()
+                    .all(|operation| operation.position < shape.docx_paragraphs())
+            );
+        }
     }
 
     #[test]
