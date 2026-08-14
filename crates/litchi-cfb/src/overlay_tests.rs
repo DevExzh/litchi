@@ -67,6 +67,10 @@ fn replacement(path: &str, byte: u8, length: usize) -> SameLengthStreamOverlay {
     SameLengthStreamOverlay::new(vec![path.to_string()], Arc::from(vec![byte; length]))
 }
 
+fn publication_chunks(file_size: u64) -> usize {
+    usize::try_from(file_size).unwrap().div_ceil(65_536)
+}
+
 #[test]
 fn overlays_minifat_and_fat_cutover_and_preserves_unselected_bytes() {
     let source = sample_bytes();
@@ -439,6 +443,64 @@ impl ReadAt for MutableSource {
 }
 
 #[test]
+fn direct_write_to_retains_three_complete_source_scans() {
+    let source = Arc::new(MutableSource::new(sample_bytes()));
+    let file = SharedOleFile::open(source.clone()).unwrap();
+    let plan = file
+        .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x64, 4_096)], limits())
+        .unwrap();
+    source.reads.store(0, Ordering::SeqCst);
+
+    let mut output = Vec::new();
+    plan.write_to(&mut output).unwrap();
+
+    // Direct sequential publication retains its initial preflight, emission
+    // scan, and post-emission preflight. The output-time source hash is part
+    // of emission and does not add a positional read.
+    assert_eq!(
+        source.reads.load(Ordering::SeqCst),
+        publication_chunks(file.file_size()) * 3
+    );
+    assert_eq!(output.len() as u64, file.file_size());
+}
+
+#[test]
+fn atomic_save_skips_only_the_duplicate_post_emission_source_scan() {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let directory = std::env::temp_dir().join(format!(
+        "litchi-cfb-overlay-scan-count-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    let destination = directory.join("document.ole");
+    std::fs::write(&destination, b"old destination").unwrap();
+
+    let source = Arc::new(MutableSource::new(sample_bytes()));
+    let file = SharedOleFile::open(source.clone()).unwrap();
+    let plan = file
+        .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x65, 4_096)], limits())
+        .unwrap();
+    source.reads.store(0, Ordering::SeqCst);
+
+    let report = plan.save(&destination).unwrap();
+
+    // Atomic save retains the initial preflight, emission scan, and the
+    // mandatory post-flush/fsync pre-rename preflight: 3N instead of the
+    // former 4N sequence that repeated the post-emission preflight inside the
+    // shared writer.
+    assert_eq!(
+        source.reads.load(Ordering::SeqCst),
+        publication_chunks(file.file_size()) * 3
+    );
+    assert_eq!(report.bytes(), file.file_size());
+    assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
+
+    std::fs::remove_file(destination).unwrap();
+    std::fs::remove_dir(directory).unwrap();
+}
+
+#[test]
 fn version_and_stable_token_byte_changes_are_caught_before_output() {
     let source = Arc::new(MutableSource::new(sample_bytes()));
     let file = SharedOleFile::open(source.clone()).unwrap();
@@ -612,13 +674,20 @@ fn atomic_path_late_stable_token_mutation_leaves_destination_unchanged() {
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x53, 4_096)], limits())
         .unwrap();
     source.reads.store(0, Ordering::SeqCst);
-    let chunks = usize::try_from(file.file_size()).unwrap().div_ceil(65_536);
-    source.mutate_after_read.store(chunks + 1, Ordering::SeqCst);
+    let chunks = publication_chunks(file.file_size());
+    // The last emission read is the 2N-th read. Mutate only after that read so
+    // the output-time source hash has already accepted the original bytes; the
+    // mandatory final preflight must then observe the changed byte before
+    // rename, without the removed inner duplicate.
+    source
+        .mutate_after_read
+        .store(chunks.saturating_mul(2), Ordering::SeqCst);
 
     assert!(matches!(
         plan.save(&destination),
         Err(OverlayError::SourceFingerprintChanged { .. })
     ));
+    assert_eq!(source.reads.load(Ordering::SeqCst), chunks * 3);
     assert_eq!(std::fs::read(&destination).unwrap(), b"old destination");
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
     std::fs::remove_file(destination).unwrap();
