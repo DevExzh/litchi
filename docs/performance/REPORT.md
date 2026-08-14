@@ -720,6 +720,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | Native DOC paragraph list after style cache, 512 paragraphs | 454.100 us | 358.414 us | **-21.07% p50 / -20.93% mean** | CHPX range query changes from a full scan per paragraph to binary start plus matching slice; p95 -20.00%; allocations and peak heap/RSS flat |
 | Native DOC exact-source paragraph list after CHPX index, 512 paragraphs | 206.644 us | 168.142 us | **-18.63% p50 / -19.04% mean** | Ordered piece/PAPX containment uses predecessor binary search; instructions -26.13%; allocations and peak heap flat |
 | Native DOC one-paragraph edit/save after PAPX containment index | 888.602 us | 817.424 us | **-8.01% p50 / -7.88% mean** | p95 -7.71%, p99 -8.37%; patch/inverse, candidate owner and independent public readback unchanged |
+| Source-backed DOC Word97+ paragraph splice | — | — | Correctness-only; no matched release comparison | One ordinary main-story paragraph in one uncompressed Unicode piece with unchanged UTF-16 width; positional bounded chunk selector, exact no-op/source/fingerprint/stale checks, candidate reopen/readback, inverse and typed partial output; complete artifact fingerprints and CFB validation/publication scans remain; no end-to-end latency, I/O/range, allocation/RSS, cold/high-latency, real-producer, or broad DOC CRUD claim; see [change 0105](changes/0105-doc-source-backed-paragraph-splice.md) |
 | Native PPT root snapshot open, 144 shapes | 37.522 us | 34.227 us | **-8.78% p50 / -10.58% mean** | Allocation calls -5.01%, temporary allocations -12.22%; peak heap and uninstrumented RSS flat |
 | Native PPT direct text edit/save, 144 shapes | 206.209 us | 177.089 us | **-14.12% p50 / -15.39% mean** | Allocation calls -3.53%, temporary allocations -6.05%; peak heap/RSS flat; minor faults +315.43% with zero major faults |
 | Native PPT root text edit/save, 144 shapes | 352.306 us | 286.805 us | **-18.59% p50 / -17.83% mean** | p95 -16.58%; allocation calls -6.54%; peak heap and uninstrumented RSS flat; custom limits retain full reopen |
@@ -786,6 +787,7 @@ The underlying records are:
 - [`0049-odp-indexed-slide-selector.md`](changes/0049-odp-indexed-slide-selector.md)
 - [`0050-doc-piece-table-physical-index.md`](changes/0050-doc-piece-table-physical-index.md)
 - [`0051-doc-adjacent-style-baseline-cache.md`](changes/0051-doc-adjacent-style-baseline-cache.md)
+- [`0105-doc-source-backed-paragraph-splice.md`](changes/0105-doc-source-backed-paragraph-splice.md)
 - [`0052-odt-final-result-byte-handoff.md`](changes/0052-odt-final-result-byte-handoff.md)
 - [`0053-doc-chpx-range-index.md`](changes/0053-doc-chpx-range-index.md)
 - [`0054-ods-shared-durable-patch-blobs.md`](changes/0054-ods-shared-durable-patch-blobs.md)
