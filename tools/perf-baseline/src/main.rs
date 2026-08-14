@@ -64,6 +64,7 @@ const OPC_CORPUS_GENERATOR: &str = "litchi-opc-synthetic-v2";
 const CFB_CORPUS_GENERATOR: &str = "litchi-cfb-synthetic-v1";
 const CFB_SELECTIVE_CORPUS_GENERATOR: &str = "litchi-cfb-selective-read-v1";
 const LEGACY_WRITER_CORPUS_GENERATOR: &str = "litchi-legacy-writer-v1";
+const PPT_PICTURES_CORPUS_GENERATOR: &str = "litchi-ppt-pictures-lazy-v1";
 const XLSX_CORPUS_GENERATOR: &str = "litchi-xlsx-synthetic-v1";
 const SEMANTIC_DOCX_CORPUS_GENERATOR: &str = "litchi-docx-semantic-v1";
 const DOCX_SOURCE_EDIT_CORPUS_GENERATOR: &str = "litchi-docx-source-edit-media-v1";
@@ -134,6 +135,8 @@ const PPTX_SOURCE_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const PPTX_SOURCE_SLIDE_COUNT: usize = 200;
 const PPTX_SOURCE_TEXT_BOXES_PER_SLIDE: usize = 8;
 const PPTX_MULTI_SLIDE_BATCH_COUNT: usize = 8;
+const PPT_PICTURE_COUNT: usize = 32;
+const PPT_PICTURE_BYTES: usize = 256 * 1024;
 const ODP_TEXT_BOX_BATCH_COUNT: usize = 8;
 const ODT_RESOURCE_BATCH_COUNT: usize = 64;
 const ODT_RESOURCE_PAYLOAD_BYTES: usize = 4 * 1024;
@@ -572,6 +575,12 @@ enum Case {
     PptTextEditOneEditSave,
     PptSemanticNoopEditSave,
     PptSemanticOneEditSave,
+    PptPicturesEagerOpen,
+    PptPicturesSourceBackedOpen,
+    PptPicturesEagerFirstImage,
+    PptPicturesSourceBackedFirstImage,
+    PptPicturesEagerCachedRepeat,
+    PptPicturesSourceBackedCachedRepeat,
     XlsxOpenOwned,
     XlsxListSheets,
     XlsxFirstCell,
@@ -864,6 +873,12 @@ impl Case {
             Self::PptTextEditOneEditSave => "ppt_text_edit_one_edit_save",
             Self::PptSemanticNoopEditSave => "ppt_semantic_noop_edit_save",
             Self::PptSemanticOneEditSave => "ppt_semantic_one_edit_save",
+            Self::PptPicturesEagerOpen => "ppt_pictures_eager_open",
+            Self::PptPicturesSourceBackedOpen => "ppt_pictures_source_backed_open",
+            Self::PptPicturesEagerFirstImage => "ppt_pictures_eager_first_image",
+            Self::PptPicturesSourceBackedFirstImage => "ppt_pictures_source_backed_first_image",
+            Self::PptPicturesEagerCachedRepeat => "ppt_pictures_eager_cached_repeat",
+            Self::PptPicturesSourceBackedCachedRepeat => "ppt_pictures_source_backed_cached_repeat",
             Self::XlsxOpenOwned => "xlsx_open_owned",
             Self::XlsxListSheets => "xlsx_list_sheets",
             Self::XlsxFirstCell => "xlsx_first_cell",
@@ -1077,6 +1092,18 @@ impl Case {
                 | Self::PptTextEditOneEditSave
                 | Self::PptSemanticNoopEditSave
                 | Self::PptSemanticOneEditSave
+        )
+    }
+
+    const fn is_ppt_pictures(self) -> bool {
+        matches!(
+            self,
+            Self::PptPicturesEagerOpen
+                | Self::PptPicturesSourceBackedOpen
+                | Self::PptPicturesEagerFirstImage
+                | Self::PptPicturesSourceBackedFirstImage
+                | Self::PptPicturesEagerCachedRepeat
+                | Self::PptPicturesSourceBackedCachedRepeat
         )
     }
 
@@ -1775,6 +1802,28 @@ struct SourceSummary {
     cfb_selective: Option<CfbSelectiveEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odt_mixed: Option<OdtMixedPublicationSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ppt_pictures: Option<PptPicturesSourceSummary>,
+}
+
+/// Positional-read evidence for the native PPT lazy `Pictures` selectors.
+///
+/// The harness reports bytes observed in the exact stream payload range.  It
+/// deliberately does not call that observation an internal materialization
+/// count: the public API exposes source reads, not its private cache state.
+#[derive(Clone, Debug, Default, Serialize)]
+struct PptPicturesSourceSummary {
+    implementation: &'static str,
+    phase: &'static str,
+    timing_scope: &'static str,
+    picture_count: usize,
+    picture_stream_bytes: u64,
+    picture_stream_sha256: String,
+    canonical_semantic_sha256: String,
+    source_read_calls: Vec<u64>,
+    source_read_bytes: Vec<u64>,
+    pictures_read_calls: Vec<u64>,
+    pictures_read_bytes: Vec<u64>,
 }
 
 /// Untimed correctness counters paired with the ODT mixed model-content
@@ -3745,6 +3794,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_doc()
                     && !case.uses_semantic_xls()
                     && !case.uses_semantic_ppt()
+                    && !case.is_ppt_pictures()
                     && !case.uses_xlsx()
                     && !case.uses_xlsx_cell_values()
                     && !case.uses_streaming_creation()
@@ -4234,6 +4284,23 @@ fn main() -> Result<(), Box<dyn Error>> {
                     options.range_simulation,
                 )?);
             }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.is_ppt_pictures()) {
+        let corpus = build_ppt_pictures_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_ppt_pictures())
+        {
+            results.push(run_ppt_pictures(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
         }
     }
 
@@ -5062,6 +5129,14 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_text_edit_one_edit_save" => Some(Case::PptTextEditOneEditSave),
         "ppt_semantic_noop_edit_save" => Some(Case::PptSemanticNoopEditSave),
         "ppt_semantic_one_edit_save" => Some(Case::PptSemanticOneEditSave),
+        "ppt_pictures_eager_open" => Some(Case::PptPicturesEagerOpen),
+        "ppt_pictures_source_backed_open" => Some(Case::PptPicturesSourceBackedOpen),
+        "ppt_pictures_eager_first_image" => Some(Case::PptPicturesEagerFirstImage),
+        "ppt_pictures_source_backed_first_image" => Some(Case::PptPicturesSourceBackedFirstImage),
+        "ppt_pictures_eager_cached_repeat" => Some(Case::PptPicturesEagerCachedRepeat),
+        "ppt_pictures_source_backed_cached_repeat" => {
+            Some(Case::PptPicturesSourceBackedCachedRepeat)
+        },
         "xlsx_open_owned" => Some(Case::XlsxOpenOwned),
         "xlsx_list_sheets" => Some(Case::XlsxListSheets),
         "xlsx_first_cell" => Some(Case::XlsxFirstCell),
@@ -5318,6 +5393,12 @@ fn print_usage() {
                                        ppt_slide_order_snapshot_open,\n\
                                        ppt_text_edit_one_edit_save,\n\
                                        ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save,\n\
+                                       ppt_pictures_eager_open,\n\
+                                       ppt_pictures_source_backed_open,\n\
+                                       ppt_pictures_eager_first_image,\n\
+                                       ppt_pictures_source_backed_first_image,\n\
+                                       ppt_pictures_eager_cached_repeat,\n\
+                                       ppt_pictures_source_backed_cached_repeat,\n\
                                        xlsx_open_owned,xlsx_list_sheets,xlsx_first_cell,\n\
                                        xlsx_full_cell_scan,xlsx_narrow_column_range_scan,\n\
                                        xlsx_noop_commit,xlsx_noop_commit_save,\n\
@@ -5814,6 +5895,407 @@ fn write_fresh_ppt(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output)?;
     Ok((output.into_inner(), text_box_count, content_bytes))
+}
+
+fn ppt_picture_payload(index: usize) -> Vec<u8> {
+    const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
+    let mut payload = Vec::with_capacity(PPT_PICTURE_BYTES);
+    payload.extend_from_slice(PNG_SIGNATURE);
+    let mut state = (index as u64)
+        .wrapping_mul(0x9e37_79b9_7f4a_7c15)
+        .wrapping_add(0xd1b5_4a32_d192_ed03);
+    while payload.len() < PPT_PICTURE_BYTES {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        payload.push((state >> 24) as u8);
+    }
+    payload
+}
+
+fn build_ppt_pictures_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let mut writer = litchi_ppt::writer::Writer::new();
+    let slide_count = 8;
+    let slides = (0..slide_count)
+        .map(|_| writer.add_slide())
+        .collect::<Result<Vec<_>, _>>()?;
+    for index in 0..PPT_PICTURE_COUNT {
+        let slide = slides[index % slides.len()];
+        writer.add_picture_as(
+            slide,
+            24 + (index % 4) as i32 * 120,
+            24 + (index / 4) as i32 * 96,
+            96,
+            72,
+            ppt_picture_payload(index),
+            litchi_ppt::writer::PictureKind::Png,
+        )?;
+    }
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output)?;
+    let archive = output.into_inner();
+    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let pictures = parsed.open_stream(&["Pictures"])?;
+    if pictures.len() <= 4 * 1024 || pictures.is_empty() {
+        return Err("PPT Pictures corpus did not produce a regular stream".into());
+    }
+    let mut package = litchi_ppt::Package::from_reader(Cursor::new(archive.clone()))?;
+    let presentation = package.presentation()?;
+    let images = presentation.images()?;
+    if images.len() != PPT_PICTURE_COUNT {
+        return Err("PPT Pictures corpus image count differs from specification".into());
+    }
+    let semantic_digest = ppt_picture_semantic_digest_from_images(&images)?;
+    if semantic_digest != ppt_picture_semantic_digest() {
+        return Err("PPT Pictures corpus semantic digest differs from specification".into());
+    }
+    verify_ppt_picture_limit_gates(&archive, pictures.len())?;
+    let uncompressed_payload_bytes = PPT_PICTURE_COUNT
+        .checked_mul(PPT_PICTURE_BYTES)
+        .ok_or("PPT Pictures payload byte count overflows usize")?;
+    let archive_member_count = parsed.list_streams().len();
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: "ppt-pictures-heavy".to_owned(),
+            generator: PPT_PICTURES_CORPUS_GENERATOR,
+            package_format: "PPT/CFB",
+            shape: "picture-heavy",
+            payload_kind: "deterministic-png",
+            compression: "none",
+            entry_count: PPT_PICTURE_COUNT,
+            archive_member_count,
+            entry_bytes: PPT_PICTURE_BYTES,
+            uncompressed_payload_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "Pictures".to_owned(),
+            target_payload_bytes: pictures.len(),
+            target_payload_sha256: sha256_hex(&pictures),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "Pictures".to_owned(),
+        target_payload: pictures,
+        xlsx: None,
+    })
+}
+
+fn ppt_picture_semantic_digest() -> String {
+    let mut digest = Sha256::new();
+    for index in 0..PPT_PICTURE_COUNT {
+        let payload = ppt_picture_payload(index);
+        digest.update((index as u64).to_le_bytes());
+        digest.update(b"png");
+        digest.update((payload.len() as u64).to_le_bytes());
+        digest.update(payload);
+    }
+    let bytes: [u8; 32] = digest.finalize().into();
+    fingerprint_hex(&bytes)
+}
+
+fn ppt_picture_semantic_digest_from_images(
+    images: &[litchi_odraw::image::File<'_>],
+) -> Result<String, Box<dyn Error>> {
+    if images.len() != PPT_PICTURE_COUNT {
+        return Err("PPT Pictures image query returned an unexpected count".into());
+    }
+    let mut digest = Sha256::new();
+    for (index, image) in images.iter().enumerate() {
+        if image.kind() != litchi_odraw::image::Kind::Png {
+            return Err("PPT Pictures image query returned a non-PNG kind".into());
+        }
+        let payload = image.data()?;
+        if payload != ppt_picture_payload(index).as_slice() {
+            return Err("PPT Pictures image query returned an unexpected payload".into());
+        }
+        digest.update((index as u64).to_le_bytes());
+        digest.update(b"png");
+        digest.update((payload.len() as u64).to_le_bytes());
+        digest.update(payload);
+    }
+    let bytes: [u8; 32] = digest.finalize().into();
+    Ok(fingerprint_hex(&bytes))
+}
+
+fn ppt_picture_record_limits(
+    archive: &[u8],
+    pictures_bytes: usize,
+) -> Result<litchi_ppt::RecordLimits, Box<dyn Error>> {
+    let parsed = OleFile::open(Cursor::new(archive))?;
+    let document_bytes = parsed.stream_len(&["PowerPoint Document"])?;
+    let current_user_bytes = parsed.stream_len(&["Current User"])?;
+    let aggregate = document_bytes
+        .checked_add(current_user_bytes)
+        .and_then(|value| value.checked_add(u64::try_from(pictures_bytes).ok()?))
+        .ok_or("PPT Pictures limit aggregate overflows u64")?;
+    Ok(litchi_ppt::RecordLimits {
+        max_package_bytes: archive.len(),
+        max_input_bytes: pictures_bytes,
+        max_aggregate_input_bytes: usize::try_from(aggregate)?,
+        ..litchi_ppt::RecordLimits::default()
+    })
+}
+
+fn verify_ppt_picture_limit_gates(
+    archive: &[u8],
+    pictures_bytes: usize,
+) -> Result<(), Box<dyn Error>> {
+    let exact = ppt_picture_record_limits(archive, pictures_bytes)?;
+    let pictures_payload = {
+        let mut parsed = OleFile::open(Cursor::new(archive))?;
+        parsed.open_stream(&["Pictures"])?
+    };
+    let pictures_range = ppt_picture_payload_range(archive, &pictures_payload)?;
+    let mut eager =
+        litchi_ppt::Package::from_reader_with_limits(Cursor::new(archive.to_vec()), exact)?;
+    eager.presentation_with_limits(exact)?;
+    let source = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
+        Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
+        exact,
+    )?;
+    source.presentation_with_limits(exact)?;
+
+    let mut package_under = exact;
+    package_under.max_package_bytes = package_under
+        .max_package_bytes
+        .checked_sub(1)
+        .ok_or("PPT package fixture is empty")?;
+    if litchi_ppt::Package::from_reader_with_limits(Cursor::new(archive.to_vec()), package_under)
+        .is_ok()
+    {
+        return Err("PPT eager package limit accepted one byte under package size".into());
+    }
+    if litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
+        Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
+        package_under,
+    )
+    .is_ok()
+    {
+        return Err("PPT source-backed package limit accepted one byte under package size".into());
+    }
+
+    let mut pictures_under = exact;
+    pictures_under.max_input_bytes = pictures_under
+        .max_input_bytes
+        .checked_sub(1)
+        .ok_or("PPT Pictures fixture is empty")?;
+    let mut eager =
+        litchi_ppt::Package::from_reader_with_limits(Cursor::new(archive.to_vec()), exact)?;
+    if eager.presentation_with_limits(pictures_under).is_ok() {
+        return Err("PPT eager Pictures limit accepted one byte under stream size".into());
+    }
+    let source = Arc::new(InstrumentedSource::new(
+        archive.to_vec(),
+        vec![pictures_range],
+    ));
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source.clone(), exact)?;
+    source.reset();
+    if package.presentation_with_limits(pictures_under).is_ok() {
+        return Err("PPT source-backed Pictures limit accepted one byte under stream size".into());
+    }
+    let snapshot = source.snapshot();
+    if snapshot.ordinary_payload_read_calls != 0 || snapshot.ordinary_payload_read_bytes != 0 {
+        return Err("PPT source-backed one-under Pictures limit read payload bytes".into());
+    }
+    Ok(())
+}
+
+fn ppt_picture_payload_range(archive: &[u8], payload: &[u8]) -> Result<Range<u64>, Box<dyn Error>> {
+    let start = archive
+        .windows(payload.len())
+        .position(|window| window == payload)
+        .ok_or("PPT Pictures payload was not found in its CFB archive")?;
+    let end = start
+        .checked_add(payload.len())
+        .ok_or("PPT Pictures payload range overflows usize")?;
+    Ok(u64::try_from(start)?..u64::try_from(end)?)
+}
+
+fn ppt_pictures_source_range(corpus: &Corpus) -> Result<Vec<Range<u64>>, Box<dyn Error>> {
+    Ok(vec![ppt_picture_payload_range(
+        &corpus.archive,
+        &corpus.target_payload,
+    )?])
+}
+
+fn ppt_pictures_case_parameters(
+    case: Case,
+) -> Result<(&'static str, &'static str, bool), Box<dyn Error>> {
+    match case {
+        Case::PptPicturesEagerOpen => Ok(("eager", "presentation_open_no_image_query", false)),
+        Case::PptPicturesSourceBackedOpen => {
+            Ok(("source_backed", "presentation_open_no_image_query", false))
+        },
+        Case::PptPicturesEagerFirstImage => Ok(("eager", "first_image_query", false)),
+        Case::PptPicturesSourceBackedFirstImage => {
+            Ok(("source_backed", "first_image_query", false))
+        },
+        Case::PptPicturesEagerCachedRepeat => Ok(("eager", "cached_repeat_image_query", true)),
+        Case::PptPicturesSourceBackedCachedRepeat => {
+            Ok(("source_backed", "cached_repeat_image_query", true))
+        },
+        _ => Err("non-PPT Pictures case passed to PPT Pictures runner".into()),
+    }
+}
+
+fn verify_ppt_picture_images(
+    images: &[litchi_odraw::image::File<'_>],
+) -> Result<(), Box<dyn Error>> {
+    if ppt_picture_semantic_digest_from_images(images)? != ppt_picture_semantic_digest() {
+        return Err("PPT Pictures image query returned an unexpected semantic digest".into());
+    }
+    Ok(())
+}
+
+fn run_ppt_pictures(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != PPT_PICTURES_CORPUS_GENERATOR {
+        return Err("PPT Pictures case requires its fixed picture-heavy corpus".into());
+    }
+    let (implementation, phase, cached_repeat) = ppt_pictures_case_parameters(case)?;
+    let source_backed = implementation == "source_backed";
+    let picture_stream_bytes = u64::try_from(corpus.target_payload.len())?;
+    let record_limits = ppt_picture_record_limits(&corpus.archive, corpus.target_payload.len())?;
+    let picture_ranges = ppt_pictures_source_range(corpus)?;
+    let picture_stream_sha256 = corpus.manifest.target_payload_sha256.clone();
+    let canonical_semantic_sha256 = ppt_picture_semantic_digest();
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut source_summary = PptPicturesSourceSummary {
+        implementation,
+        phase,
+        timing_scope: match phase {
+            "presentation_open_no_image_query" => "package_open_plus_presentation_open",
+            "first_image_query" => "images_query_after_open",
+            "cached_repeat_image_query" => "second_images_query_after_untimed_first_query",
+            _ => unreachable!("validated PPT Pictures phase"),
+        },
+        picture_count: PPT_PICTURE_COUNT,
+        picture_stream_bytes,
+        picture_stream_sha256,
+        canonical_semantic_sha256,
+        ..PptPicturesSourceSummary::default()
+    };
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let (duration, source_snapshot) = if source_backed {
+            let source = Arc::new(InstrumentedSource::new(
+                corpus.archive.clone(),
+                picture_ranges.clone(),
+            ));
+            let (duration, snapshot) = if phase == "presentation_open_no_image_query" {
+                let started = Instant::now();
+                let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
+                    source.clone(),
+                    record_limits,
+                )?;
+                let presentation = package.presentation_with_limits(record_limits)?;
+                let duration = started.elapsed();
+                if !presentation.has_pictures() {
+                    return Err("PPT source-backed open did not retain Pictures descriptor".into());
+                }
+                std::hint::black_box(presentation);
+                (duration, source.snapshot())
+            } else {
+                let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
+                    source.clone(),
+                    record_limits,
+                )?;
+                let presentation = package.presentation_with_limits(record_limits)?;
+                source.reset();
+                if cached_repeat {
+                    let first = presentation.images()?;
+                    verify_ppt_picture_images(&first)?;
+                    source.reset();
+                }
+                let started = Instant::now();
+                let images = presentation.images()?;
+                let duration = started.elapsed();
+                verify_ppt_picture_images(&images)?;
+                std::hint::black_box(&images);
+                (duration, source.snapshot())
+            };
+            (duration, Some(snapshot))
+        } else if phase == "presentation_open_no_image_query" {
+            let started = Instant::now();
+            let mut package = litchi_ppt::Package::from_reader_with_limits(
+                Cursor::new(corpus.archive.as_slice()),
+                record_limits,
+            )?;
+            let presentation = package.presentation_with_limits(record_limits)?;
+            let duration = started.elapsed();
+            if !presentation.has_pictures() {
+                return Err("PPT eager open did not retain Pictures payload".into());
+            }
+            std::hint::black_box(presentation);
+            (duration, None)
+        } else {
+            let mut package = litchi_ppt::Package::from_reader_with_limits(
+                Cursor::new(corpus.archive.as_slice()),
+                record_limits,
+            )?;
+            let presentation = package.presentation_with_limits(record_limits)?;
+            if cached_repeat {
+                let first = presentation.images()?;
+                verify_ppt_picture_images(&first)?;
+            }
+            let started = Instant::now();
+            let images = presentation.images()?;
+            let duration = started.elapsed();
+            verify_ppt_picture_images(&images)?;
+            std::hint::black_box(&images);
+            (duration, None)
+        };
+
+        if let Some(snapshot) = source_snapshot {
+            if phase == "presentation_open_no_image_query"
+                && snapshot.ordinary_payload_read_bytes != 0
+            {
+                return Err("PPT source-backed open read Pictures before an image query".into());
+            }
+            if phase == "first_image_query"
+                && snapshot.ordinary_payload_read_bytes != picture_stream_bytes
+            {
+                return Err(
+                    "PPT source-backed first image query read an unexpected Pictures byte count"
+                        .into(),
+                );
+            }
+            if cached_repeat && snapshot.ordinary_payload_read_bytes != 0 {
+                return Err("PPT source-backed cached image query reread Pictures".into());
+            }
+            if iteration >= warmup_iterations {
+                source_summary.source_read_calls.push(snapshot.read_calls);
+                source_summary.source_read_bytes.push(snapshot.read_bytes);
+                source_summary
+                    .pictures_read_calls
+                    .push(snapshot.ordinary_payload_read_calls);
+                source_summary
+                    .pictures_read_bytes
+                    .push(snapshot.ordinary_payload_read_bytes);
+            }
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let source = Some(SourceSummary {
+        ppt_pictures: Some(source_summary),
+        ..SourceSummary::default()
+    });
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: None,
+        source,
+        execution: None,
+        output_sha256: None,
+    })
 }
 
 fn semantic_shape(corpus: &Corpus) -> Result<SemanticShape, Box<dyn Error>> {
@@ -8860,6 +9342,14 @@ fn run_case_with_config(
         },
         Case::PptTextEditOneEditSave => {
             run_ppt_text_edit_one_edit_save(corpus, warmup_iterations, samples)
+        },
+        Case::PptPicturesEagerOpen
+        | Case::PptPicturesSourceBackedOpen
+        | Case::PptPicturesEagerFirstImage
+        | Case::PptPicturesSourceBackedFirstImage
+        | Case::PptPicturesEagerCachedRepeat
+        | Case::PptPicturesSourceBackedCachedRepeat => {
+            run_ppt_pictures(case, corpus, warmup_iterations, samples)
         },
         Case::XlsxOpenOwned => run_xlsx_open_owned(corpus, warmup_iterations, samples),
         Case::XlsxListSheets => run_xlsx_list_sheets(corpus, warmup_iterations, samples),
@@ -22558,20 +23048,20 @@ mod tests {
     use super::{
         Case, CfbSelectiveTarget, CorpusShape, CountingSeekSink, CountingSink, HashingDiscardSink,
         InstrumentedSource, ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES,
-        ODP_TEXT_BOX_BATCH_COUNT, ODT_RESOURCE_BATCH_COUNT, OpcCacheMode,
-        PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
-        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
-        SimulatedRangeSource, SinkSummary, SourceBackedPackage, WindowedHashingSink,
-        WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
+        ODP_TEXT_BOX_BATCH_COUNT, ODT_RESOURCE_BATCH_COUNT, OpcCacheMode, PPT_PICTURE_BYTES,
+        PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR, PPTX_MULTI_SLIDE_BATCH_COUNT,
+        PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
+        RtfSemanticVariant, SemanticShape, SimulatedRangeSource, SinkSummary, SourceBackedPackage,
+        WindowedHashingSink, WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
         XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape, XlsxShape,
         build_cfb_corpus, build_cfb_selective_corpus, build_docx_source_edit_corpus,
         build_odf_repair_corpus, build_odp_media_corpus, build_odp_text_box_batch_corpus,
         build_ods_media_corpus, build_odt_media_corpus, build_odt_resource_batch_corpus,
-        build_ole_common_corpus, build_opc_corpus, build_pptx_source_edit_corpus,
-        build_rtf_lifecycle_corpus, build_semantic_docx_corpus, build_semantic_odp_corpus,
-        build_semantic_ods_corpus, build_semantic_odt_corpus, build_semantic_pptx_corpus,
-        build_semantic_rtf_corpus, build_streaming_corpus, build_writer_corpus,
-        build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
+        build_ole_common_corpus, build_opc_corpus, build_ppt_pictures_corpus,
+        build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_semantic_docx_corpus,
+        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
+        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
+        build_writer_corpus, build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
         build_xlsx_auto_filter_edit_corpus, build_xlsx_calculation_metadata_edit_corpus,
         build_xlsx_cell_crud_corpus, build_xlsx_conditional_formatting_edit_corpus,
         build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
@@ -22582,7 +23072,7 @@ mod tests {
         ole_common_changed_output, opc_overlay_replacement_payload, payload_bytes,
         resolve_execution_workers, run_case, run_case_with_config, run_cfb_selective_read,
         run_docx_source_backed_one_edit_save, run_opc_source_cache_budget_boundary,
-        run_opc_source_cache_contention, run_opc_source_overlay_one_part_save,
+        run_opc_source_cache_contention, run_opc_source_overlay_one_part_save, run_ppt_pictures,
         run_pptx_batch_edit_save, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_one_edit_save, run_scaling_case, run_streaming_creation,
         run_xls_comments_edit_save, run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
@@ -22593,6 +23083,98 @@ mod tests {
         run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
         xlsx_cell_count,
     };
+
+    #[test]
+    fn ppt_picture_selectors_preserve_semantics_and_phase_read_evidence() {
+        let first = build_ppt_pictures_corpus().unwrap();
+        let second = build_ppt_pictures_corpus().unwrap();
+        assert_eq!(first.archive, second.archive);
+        assert_eq!(first.manifest.generator, PPT_PICTURES_CORPUS_GENERATOR);
+        assert_eq!(first.manifest.entry_count, PPT_PICTURE_COUNT);
+        assert_eq!(first.manifest.entry_bytes, PPT_PICTURE_BYTES);
+        assert_eq!(
+            first.manifest.uncompressed_payload_bytes,
+            PPT_PICTURE_COUNT * PPT_PICTURE_BYTES
+        );
+        assert_eq!(
+            first.manifest.target_payload_bytes,
+            first.target_payload.len()
+        );
+        assert_eq!(
+            first.manifest.target_payload_sha256,
+            sha256_hex(&first.target_payload)
+        );
+
+        let evidence = |case| {
+            run_ppt_pictures(case, &first, 0, 1)
+                .unwrap()
+                .source
+                .unwrap()
+                .ppt_pictures
+                .unwrap()
+        };
+        let expected_stream_bytes = u64::try_from(first.target_payload.len()).unwrap();
+        let expected_semantic_sha256 = super::ppt_picture_semantic_digest();
+
+        for case in [
+            Case::PptPicturesEagerOpen,
+            Case::PptPicturesEagerFirstImage,
+            Case::PptPicturesEagerCachedRepeat,
+        ] {
+            let observed = evidence(case);
+            assert_eq!(observed.implementation, "eager");
+            assert_eq!(observed.picture_count, PPT_PICTURE_COUNT);
+            assert_eq!(observed.picture_stream_bytes, expected_stream_bytes);
+            assert_eq!(
+                observed.picture_stream_sha256,
+                first.manifest.target_payload_sha256
+            );
+            assert_eq!(observed.canonical_semantic_sha256, expected_semantic_sha256);
+            assert!(observed.source_read_calls.is_empty());
+            assert!(observed.source_read_bytes.is_empty());
+            assert!(observed.pictures_read_calls.is_empty());
+            assert!(observed.pictures_read_bytes.is_empty());
+        }
+
+        let source_open = evidence(Case::PptPicturesSourceBackedOpen);
+        assert_eq!(source_open.implementation, "source_backed");
+        assert_eq!(source_open.phase, "presentation_open_no_image_query");
+        assert_eq!(source_open.pictures_read_calls, vec![0]);
+        assert_eq!(source_open.pictures_read_bytes, vec![0]);
+        assert!(!source_open.source_read_calls.is_empty());
+        assert!(source_open.source_read_bytes[0] > 0);
+
+        let source_first = evidence(Case::PptPicturesSourceBackedFirstImage);
+        assert_eq!(source_first.implementation, "source_backed");
+        assert_eq!(source_first.phase, "first_image_query");
+        assert!(source_first.source_read_calls[0] > 0);
+        assert_eq!(source_first.pictures_read_calls, vec![1]);
+        assert_eq!(
+            source_first.pictures_read_bytes,
+            vec![expected_stream_bytes]
+        );
+
+        let warmed = run_ppt_pictures(Case::PptPicturesSourceBackedFirstImage, &first, 1, 2)
+            .unwrap()
+            .source
+            .unwrap()
+            .ppt_pictures
+            .unwrap();
+        assert_eq!(warmed.source_read_calls.len(), 2);
+        assert_eq!(warmed.source_read_bytes.len(), 2);
+        assert_eq!(warmed.pictures_read_calls.len(), 2);
+        assert_eq!(warmed.pictures_read_bytes.len(), 2);
+        assert_eq!(warmed.pictures_read_calls, vec![1, 1]);
+        assert_eq!(warmed.pictures_read_bytes, vec![expected_stream_bytes; 2]);
+
+        let source_cached = evidence(Case::PptPicturesSourceBackedCachedRepeat);
+        assert_eq!(source_cached.implementation, "source_backed");
+        assert_eq!(source_cached.phase, "cached_repeat_image_query");
+        assert_eq!(source_cached.source_read_calls, vec![0]);
+        assert_eq!(source_cached.source_read_bytes, vec![0]);
+        assert_eq!(source_cached.pictures_read_calls, vec![0]);
+        assert_eq!(source_cached.pictures_read_bytes, vec![0]);
+    }
 
     #[test]
     fn corpus_generation_is_deterministic() {
