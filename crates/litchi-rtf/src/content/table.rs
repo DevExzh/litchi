@@ -1035,6 +1035,12 @@ impl<'a> Table<'a> {
         self.rows.push(row);
     }
 
+    pub(crate) fn try_add_row(&mut self, row: Row<'a>) -> crate::RtfResult<()> {
+        crate::error::try_reserve_one(&mut self.rows, "table rows")?;
+        self.rows.push(row);
+        Ok(())
+    }
+
     /// Get the number of rows.
     #[must_use]
     pub fn row_count(&self) -> usize {
@@ -1117,6 +1123,12 @@ impl<'a> Row<'a> {
     /// Add a cell to the row.
     pub fn add_cell(&mut self, cell: Cell<'a>) {
         self.cells.push(cell);
+    }
+
+    pub(crate) fn try_add_cell(&mut self, cell: Cell<'a>) -> crate::RtfResult<()> {
+        crate::error::try_reserve_one(&mut self.cells, "table row cells")?;
+        self.cells.push(cell);
+        Ok(())
     }
 
     /// Get the number of cells.
@@ -1956,6 +1968,23 @@ impl<'a> Cell<'a> {
             nested.table.clear_revision_references();
         }
     }
+
+    pub(crate) fn take_story_content(
+        &mut self,
+    ) -> (
+        Vec<crate::Shape<'a>>,
+        Vec<crate::ShapeGroup<'a>>,
+        Vec<crate::StoryDrawing>,
+        Vec<CellStoryEvent>,
+    ) {
+        (
+            std::mem::take(&mut self.shapes),
+            std::mem::take(&mut self.shape_groups),
+            std::mem::take(&mut self.drawing_order),
+            std::mem::take(&mut self.story_events),
+        )
+    }
+
     pub(crate) fn set_story_content(
         &mut self,
         shapes: Vec<crate::Shape<'a>>,
