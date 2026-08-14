@@ -1558,14 +1558,28 @@ impl SourceBackedPackage {
     /// Look up one ordinary part without reading its payload.
     pub fn part(&self, partname: &PackURI) -> Result<PartView<'_>> {
         self.source.ensure_current()?;
-        self.parts_by_name
-            .get(partname)
-            .copied()
+        self.part_index(partname)
             .map(|index| PartView {
                 package: self,
                 index,
             })
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))
+    }
+
+    /// Resolve a catalog part by OPC part-name equivalence.
+    ///
+    /// The exact hash lookup is the common path. OPC part names compare
+    /// case-insensitively, however, and [`PackageReader`] admits only one
+    /// spelling of an ASCII-case-equivalent name. Consequently a miss can be
+    /// resolved by a bounded, allocation-free scan without introducing a
+    /// second folded-name index into the source-backed catalog.
+    fn part_index(&self, partname: &PackURI) -> Option<usize> {
+        self.parts_by_name.get(partname).copied().or_else(|| {
+            let wanted = partname.as_str();
+            self.parts
+                .iter()
+                .position(|part| part.partname.as_str().eq_ignore_ascii_case(wanted))
+        })
     }
 
     /// Return the unique main document part without reading its payload.
@@ -3619,6 +3633,35 @@ mod tests {
         writer.finish_to_bytes().unwrap()
     }
 
+    fn archive_with_part_names(root_target: &str, part_names: &[&str]) -> Vec<u8> {
+        let root_relationships = format!(
+            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{root_target}"/></Relationships>"#
+        );
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored("_rels/.rels", root_relationships.as_bytes())
+            .unwrap();
+        for (index, part_name) in part_names.iter().enumerate() {
+            writer
+                .write_stored(
+                    part_name,
+                    if index == 0 {
+                        &b"document"[..]
+                    } else {
+                        &b"other"[..]
+                    },
+                )
+                .unwrap();
+        }
+        writer.finish_to_bytes().unwrap()
+    }
+
     fn archive_with_document_relationships(document_relationships: &[u8]) -> Vec<u8> {
         let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
         writer
@@ -3894,6 +3937,41 @@ mod tests {
         let package = SourceBackedPackage::from_read_at(source).unwrap();
         let main = package.main_document_part().unwrap();
         assert!(matches!(main.data(), Err(OpcError::ZipError(_))));
+    }
+
+    #[test]
+    fn part_lookup_prefers_exact_names_and_matches_ascii_case_insensitive_targets() {
+        let exact_name = PackURI::new("/word/document.xml").unwrap();
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_with_part_names("word/document.xml", &["word/document.xml"]),
+        )))
+        .unwrap();
+
+        assert_eq!(package.part(&exact_name).unwrap().partname(), &exact_name);
+        let case_variant = PackURI::new("/WORD/DOCUMENT.XML").unwrap();
+        assert_eq!(package.part(&case_variant).unwrap().partname(), &exact_name);
+
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_with_part_names("WORD/DOCUMENT.XML", &["word/document.xml"]),
+        )))
+        .unwrap();
+        assert_eq!(
+            package.main_document_part().unwrap().partname(),
+            &exact_name
+        );
+    }
+
+    #[test]
+    fn source_catalog_still_rejects_case_equivalent_part_names() {
+        let bytes = archive_with_part_names(
+            "word/document.xml",
+            &["word/document.xml", "WORD/DOCUMENT.XML"],
+        );
+        let Err(error) = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes)))
+        else {
+            panic!("case-equivalent parts must remain ambiguous");
+        };
+        assert!(matches!(error, OpcError::EquivalentPartNames { .. }));
     }
 
     #[test]
