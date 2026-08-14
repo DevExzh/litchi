@@ -70,8 +70,10 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 use an uninstrumented `litchi_core::OwnedSource`; independent untimed
 `InstrumentedSource` replays provide the source-read counters. The current
-`Case` matrix exposes 219 selectable case
-names in total;
+`Case` matrix exposes 227 selectable case names in total. Eight additional
+PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
+list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
+default 36 cases / 198 records;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 
@@ -248,6 +250,35 @@ records its changed-span and published-byte report fields. OPC materialization
 counts are recorded when exposed by the public API. After every prime and
 measured child, the parent re-reads the source and checks its pinned SHA-256
 before proceeding to the next sample.
+
+Measure the matched ordinary-root PPTX filesystem controls:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 5 \
+  --case pptx_file_eager_open,pptx_file_source_open,\
+pptx_file_eager_list_slides,pptx_file_source_list_slides,\
+pptx_file_eager_slide_count,pptx_file_source_slide_count,\
+pptx_file_eager_selected_slide,pptx_file_source_selected_slide \
+  --json target/perf/pptx-root-filesystem.json
+```
+
+These eight cases use the same 200-slide/eight-text-box/eight-2 MiB-media
+PPTX corpus as the source-backed publication controls. Source candidates call
+`litchi::Presentation::open(path)`; eager open times `fs::read` plus
+`Presentation::from_bytes`, while query cases prepare the root before timing.
+`slide_count` counts only, `list_slides` materializes the complete owned slide
+vector, and `selected_slide` uses `Presentation::slide(100)`. Every sample is
+isolated in a fresh warm/cold-requested child and verifies source hash, full
+eager/source metadata, size, name, text, and semantic parity outside timing.
+Source samples add one separate untimed `SourceBackedPresentation` replay with
+exact compressed-range classification: open/count must overlap no slide or
+media payload, selected must overlap only slide 100, and list must overlap all
+slide payloads but no media. Eager samples explicitly have no `ReadAt` replay;
+their generic filesystem counter scope is marked not applicable. These are
+correctness/logical-read observations only, not latency, RSS, allocation,
+decompression, physical-I/O, or cold-cache claims. See
+[`change 0120`](../../docs/performance/changes/0120-pptx-root-source-path-evidence.md).
 
 Measure the media-rich DOCX source-backed semantic-edit control:
 
@@ -1216,6 +1247,13 @@ remain distinguishable.
   edit while materializing only the presentation root and selected slide. Both
   cases require the same deterministic output hash and complete untimed
   preservation/readback checks.
+- `pptx_file_{eager,source}_{open,list_slides,slide_count,selected_slide}`:
+  compare the unified ordinary-root filesystem path with an eager byte-root
+  control on the fixed 200-slide/eight-text-box/eight-2 MiB-media corpus.
+  Source samples use a separate untimed `SourceBackedPresentation` replay for
+  exact slide/media range classification; eager samples have no `ReadAt`
+  counters. These selectors are correctness/logical-read evidence only and
+  do not make a latency or resource claim.
 - `xlsx_eager_calculation_metadata_edit_save`: on the fixed media-rich XLSX
   corpus, time positional open, eager ownership of all twelve ordinary Parts,
   one calculation-properties transaction, and full sequential publication.
@@ -1580,7 +1618,16 @@ publication counters where available. `opc_materialized_parts` is explicit
 zero for the raw-copy source overlay path; CFB records changed spans and
 published bytes. The configuration records selected cache states, process
 isolation, fresh-child sampling, and whether a caller-selected filesystem root
-was used.
+was used. PPTX ordinary-root samples additionally record
+`logical_read_counter_scope` and, for source candidates only, an untimed
+`pptx_source_replay` object with source hash, total request sizes, exact slide
+and media payload-range overlap, selected/unselected slide counters, union
+coverage bytes, full-range coverage counts, semantic hash, and classification.
+Selected replay classification requires the complete target compressed range;
+list replay classification requires every slide range. Eager PPTX samples set
+the replay object to null and mark the generic counter scope
+`not_applicable_eager_pptx`; their zero generic fields must not be interpreted
+as source-read measurements.
 
 Positional XLSX records additionally contain `source.xlsx` arrays for physical
 overlap with the workbook, selected worksheet, all unselected worksheets,

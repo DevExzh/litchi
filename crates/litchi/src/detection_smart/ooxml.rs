@@ -109,60 +109,66 @@ pub fn detect_ooxml_format_from_bytes_with_limits(
 /// This function requires the `ooxml` feature to be enabled.
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub fn detect_ooxml_format_from_package(package: &crate::opc::OpcPackage) -> Option<FileFormat> {
-    fn is_word_main(content_type: &str) -> bool {
-        content_type.contains("wordprocessingml.document.main")
+    detect_ooxml_format_from_content_types(|visit| {
+        for part in package.iter_parts() {
+            visit(part.content_type());
+        }
+    })
+}
+
+fn detect_ooxml_format_from_content_types(
+    visit_content_types: impl FnOnce(&mut dyn FnMut(&str)),
+) -> Option<FileFormat> {
+    let mut word = false;
+    let mut powerpoint = false;
+    let mut excel_binary = false;
+    let mut excel_xml = false;
+
+    visit_content_types(&mut |content_type| {
+        word |= content_type.contains("wordprocessingml.document.main")
             || content_type.contains("wordprocessingml.template.main")
             || content_type.contains("ms-word.document.macroEnabled.main")
-            || content_type.contains("ms-word.template.macroEnabledTemplate.main")
-    }
-
-    fn is_powerpoint_main(content_type: &str) -> bool {
-        content_type.contains("presentationml.presentation.main")
+            || content_type.contains("ms-word.template.macroEnabledTemplate.main");
+        powerpoint |= content_type.contains("presentationml.presentation.main")
             || content_type.contains("presentationml.slideshow.main")
             || content_type.contains("presentationml.template.main")
             || content_type.contains("ms-powerpoint.presentation.macroEnabled.main")
             || content_type.contains("ms-powerpoint.slideshow.macroEnabled.main")
-            || content_type.contains("ms-powerpoint.template.macroEnabled.main")
-    }
-
-    fn is_excel_binary_main(content_type: &str) -> bool {
-        content_type.contains("ms-excel.sheet.binary.macroEnabled.main")
-    }
-
-    fn is_excel_xml_main(content_type: &str) -> bool {
-        content_type.contains("spreadsheetml.sheet.main")
+            || content_type.contains("ms-powerpoint.template.macroEnabled.main");
+        excel_binary |= content_type.contains("ms-excel.sheet.binary.macroEnabled.main");
+        excel_xml |= content_type.contains("spreadsheetml.sheet.main")
             || content_type.contains("spreadsheetml.template.main")
             || content_type.contains("ms-excel.sheet.macroEnabled.main")
-            || content_type.contains("ms-excel.template.macroEnabled.main")
-    }
+            || content_type.contains("ms-excel.template.macroEnabled.main");
+    });
 
-    if package
-        .iter_parts()
-        .any(|part| is_word_main(part.content_type()))
-    {
-        return Some(FileFormat::Docx);
+    // Keep the established precedence when a producer supplies a polyglot
+    // catalog carrying more than one family marker.
+    if word {
+        Some(FileFormat::Docx)
+    } else if powerpoint {
+        Some(FileFormat::Pptx)
+    } else if excel_binary {
+        Some(FileFormat::Xlsb)
+    } else if excel_xml {
+        Some(FileFormat::Xlsx)
+    } else {
+        None
     }
+}
 
-    if package
-        .iter_parts()
-        .any(|part| is_powerpoint_main(part.content_type()))
-    {
-        return Some(FileFormat::Pptx);
-    }
-
-    if package
-        .iter_parts()
-        .any(|part| is_excel_binary_main(part.content_type()))
-    {
-        return Some(FileFormat::Xlsb);
-    }
-
-    if package
-        .iter_parts()
-        .any(|part| is_excel_xml_main(part.content_type()))
-    {
-        return Some(FileFormat::Xlsx);
-    }
-
-    None
+/// Detect an OOXML family from a source-backed OPC catalog without loading
+/// any part payload.  Path facades use this metadata-only probe to hand a
+/// validated source-backed PPTX owner to the unified API while retaining the
+/// existing eager [`detect_ooxml_format_from_package`] path for byte-backed
+/// callers and non-PPTX fallbacks.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub(crate) fn detect_ooxml_format_from_source_backed_package(
+    package: &litchi_opc::SourceBackedPackage,
+) -> Option<FileFormat> {
+    detect_ooxml_format_from_content_types(|visit| {
+        for part in package.iter_parts() {
+            visit(part.content_type());
+        }
+    })
 }

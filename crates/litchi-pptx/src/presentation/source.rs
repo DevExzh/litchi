@@ -685,6 +685,50 @@ impl SourceBackedPresentation {
         self.inner.slides.len()
     }
 
+    /// Check the caller execution policy and exact source revision without
+    /// reading or materializing any package-part payload.
+    ///
+    /// This is useful for cached root projections: callers can validate that
+    /// the source and cancellation state are still current before returning a
+    /// previously retained semantic value.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed OPC cancellation or source-change error when the
+    /// caller policy is cancelled or the positional source has changed.
+    pub fn check_source(&self) -> Result<()> {
+        self.inner.package.check_execution()?;
+        self.inner.package.source_version()?;
+        Ok(())
+    }
+
+    /// Read the relationship-selected OOXML core properties without reading
+    /// any slide or media payload.
+    ///
+    /// A missing core-properties relationship returns `None`; a present but
+    /// empty properties part returns `Some(Props::new())`. The source version
+    /// and caller execution policy are checked before and after the selected
+    /// metadata payload read.
+    pub fn properties(&self) -> Result<Option<litchi_ooxml_common::Props>> {
+        self.inner.package.check_execution()?;
+        let properties = litchi_ooxml_common::properties::read_source_backed(&self.inner.package)?;
+        self.inner.package.check_execution()?;
+        self.inner.package.source_version()?;
+        Ok(properties)
+    }
+
+    /// Presentation slide size in EMUs.
+    ///
+    /// The mandatory presentation root was loaded and retained while the
+    /// source catalog was opened; this method parses only that pinned root.
+    pub fn slide_size(&self) -> Result<(i64, i64)> {
+        self.inner.package.check_execution()?;
+        let size = PresentationPart::from_part(&self.inner._presentation)?.slide_size()?;
+        self.inner.package.check_execution()?;
+        self.inner.package.source_version()?;
+        Ok(size)
+    }
+
     /// Iterate lightweight slide handles without reading slide payloads.
     #[must_use]
     pub fn slides(&self) -> impl ExactSizeIterator<Item = SourceSlide> + DoubleEndedIterator + '_ {
@@ -1620,6 +1664,37 @@ impl SourceSlide {
         self.data.position
     }
 
+    /// Return the producer-visible slide name, falling back to the slide
+    /// part URI when the root has no `name` attribute.
+    ///
+    /// Only this selected slide's XML is loaded. Source-version and caller
+    /// execution checks surround the read, including when the payload is
+    /// already resident in the bounded source cache.
+    pub fn name(&self) -> Result<String> {
+        self.owner.package.check_execution()?;
+        let part = self.part()?;
+        let name = SlidePart::from_part(&part)?.name()?;
+        self.owner.package.check_execution()?;
+        self.owner.package.source_version()?;
+        Ok(name)
+    }
+
+    /// Read the selected slide's name and flattened text with one bounded
+    /// source-part load.
+    ///
+    /// This is the efficient primitive for callers that need both values
+    /// (such as a unified slide projection). The selected slide payload is
+    /// loaded and validated once; unrelated slides and media remain cold.
+    pub fn text_and_name(&self) -> Result<(String, String)> {
+        self.owner.package.check_execution()?;
+        let part = self.part()?;
+        let slide = SlidePart::from_part(&part)?;
+        let (text, name) = slide.text_and_name()?;
+        self.owner.package.check_execution()?;
+        self.owner.package.source_version()?;
+        Ok((text, name))
+    }
+
     /// Flatten DrawingML text runs from this selected slide in source order.
     ///
     /// The slide payload is loaded only for this call and is released from the
@@ -2387,6 +2462,9 @@ mod tests {
 
     const SECOND_MARKER: &[u8] = b"source-backed-unrequested-second-slide";
     const MEDIA_MARKER: &[u8] = b"source-backed-picture-media-payload";
+    const CORE_MARKER: &[u8] = b"source-backed-core-properties-payload";
+    const COLD_SLIDE_MARKER: &[u8] = b"source-backed-core-cold-slide-payload";
+    const COLD_MEDIA_MARKER: &[u8] = b"source-backed-core-cold-media-payload";
 
     struct CountingSource {
         bytes: Vec<u8>,
@@ -2490,6 +2568,77 @@ mod tests {
         }
     }
 
+    struct CorePropertyCountingSource {
+        bytes: Vec<u8>,
+        core_offset: usize,
+        slide_offset: usize,
+        media_offset: usize,
+        core_payload_reads: AtomicUsize,
+        slide_payload_reads: AtomicUsize,
+        media_payload_reads: AtomicUsize,
+    }
+
+    impl CorePropertyCountingSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            let offset = |marker: &[u8]| {
+                bytes
+                    .windows(marker.len())
+                    .position(|window| window == marker)
+                    .expect("source-backed core counter marker is stored in archive")
+            };
+            let core_offset = offset(CORE_MARKER);
+            let slide_offset = offset(COLD_SLIDE_MARKER);
+            let media_offset = offset(COLD_MEDIA_MARKER);
+            Self {
+                bytes,
+                core_offset,
+                slide_offset,
+                media_offset,
+                core_payload_reads: AtomicUsize::new(0),
+                slide_payload_reads: AtomicUsize::new(0),
+                media_payload_reads: AtomicUsize::new(0),
+            }
+        }
+
+        fn record(offset: usize, count: usize, marker_offset: usize, marker: &[u8]) -> bool {
+            let Some(end) = offset.checked_add(count) else {
+                return false;
+            };
+            offset < marker_offset.saturating_add(marker.len()) && marker_offset < end
+        }
+    }
+
+    impl ReadAt for CorePropertyCountingSource {
+        fn len(&self) -> io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let offset = usize::try_from(offset)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset too large"))?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            let end = offset + count;
+            if Self::record(offset, count, self.core_offset, CORE_MARKER) {
+                self.core_payload_reads.fetch_add(1, Ordering::SeqCst);
+            }
+            if Self::record(offset, count, self.slide_offset, COLD_SLIDE_MARKER) {
+                self.slide_payload_reads.fetch_add(1, Ordering::SeqCst);
+            }
+            if Self::record(offset, count, self.media_offset, COLD_MEDIA_MARKER) {
+                self.media_payload_reads.fetch_add(1, Ordering::SeqCst);
+            }
+            output[..count].copy_from_slice(&self.bytes[offset..end]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(94, 0))
+        }
+    }
+
     fn source_backed_pptx() -> Vec<u8> {
         let mut writer = StreamingArchiveWriter::new();
         writer
@@ -2529,6 +2678,64 @@ mod tests {
         );
         writer
             .write_stored("ppt/slides/slide2.xml", second.as_bytes())
+            .unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn source_backed_pptx_with_core_properties() -> Vec<u8> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored(
+                "_rels/.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored(
+                "ppt/presentation.xml",
+                br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored(
+                "ppt/_rels/presentation.xml.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored(
+                "ppt/slides/slide1.xml",
+                format!(
+                    r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:sp>{}</p:sp></p:spTree></p:cSld></p:sld>"#,
+                    std::str::from_utf8(COLD_SLIDE_MARKER).unwrap()
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+        writer
+            .write_stored(
+                "ppt/slides/_rels/slide1.xml.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored("ppt/media/image1.png", COLD_MEDIA_MARKER)
+            .unwrap();
+        writer
+            .write_stored(
+                "docProps/core.xml",
+                format!(
+                    r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>source-backed core</dc:title><dc:description>{}</dc:description></cp:coreProperties>"#,
+                    std::str::from_utf8(CORE_MARKER).unwrap()
+                )
+                .as_bytes(),
+            )
             .unwrap();
         writer.finish_to_bytes().unwrap()
     }
@@ -2661,6 +2868,44 @@ mod tests {
     }
 
     #[test]
+    fn source_presentation_exposes_root_size_and_single_slide_text_name_projection() {
+        let presentation = SourceBackedPresentation::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        assert_eq!(presentation.slide_size().unwrap(), (9_144_000, 6_858_000));
+        let slide = presentation.slide(0).unwrap();
+        assert_eq!(slide.name().unwrap(), "");
+        assert_eq!(
+            slide.text_and_name().unwrap(),
+            ("First slide".to_owned(), String::new())
+        );
+    }
+
+    #[test]
+    fn source_properties_only_materialize_the_selected_core_payload() {
+        let source = Arc::new(CorePropertyCountingSource::new(
+            source_backed_pptx_with_core_properties(),
+        ));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let presentation = SourceBackedPresentation::from_source_backed_package(package).unwrap();
+        assert_eq!(source.core_payload_reads.load(Ordering::SeqCst), 0);
+        assert_eq!(source.slide_payload_reads.load(Ordering::SeqCst), 0);
+        assert_eq!(source.media_payload_reads.load(Ordering::SeqCst), 0);
+
+        presentation.check_source().unwrap();
+        assert_eq!(source.core_payload_reads.load(Ordering::SeqCst), 0);
+        assert_eq!(source.slide_payload_reads.load(Ordering::SeqCst), 0);
+        assert_eq!(source.media_payload_reads.load(Ordering::SeqCst), 0);
+
+        let properties = presentation.properties().unwrap().unwrap();
+        assert_eq!(properties.title.as_deref(), Some("source-backed core"));
+        assert!(source.core_payload_reads.load(Ordering::SeqCst) > 0);
+        assert_eq!(source.slide_payload_reads.load(Ordering::SeqCst), 0);
+        assert_eq!(source.media_payload_reads.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
     fn managed_selected_slide_materialization_is_exact_and_one_under_fails_before_io() {
         let archive = source_backed_pptx();
         let (root_bytes, second_bytes) = source_backed_root_and_second_slide_bytes();
@@ -2739,7 +2984,12 @@ mod tests {
         .unwrap();
         let slide = presentation.slide(0).unwrap();
         assert_eq!(slide.text().unwrap(), "First slide");
+        presentation.check_source().unwrap();
         cancellation_source.cancel();
+        assert!(matches!(
+            presentation.check_source(),
+            Err(Error::Opc(litchi_opc::OpcError::Cancelled))
+        ));
         assert!(matches!(
             slide.text(),
             Err(Error::Opc(litchi_opc::OpcError::Cancelled))
@@ -3276,6 +3526,10 @@ mod tests {
         let slide = presentation.slide(0).unwrap();
         source.changed();
 
+        assert!(matches!(
+            presentation.check_source(),
+            Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+        ));
         assert!(matches!(
             slide.text(),
             Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))

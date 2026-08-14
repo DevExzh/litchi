@@ -9,6 +9,7 @@ use std::{
     error::Error,
     fs::{self, File, OpenOptions},
     io::{self, Write},
+    ops::Range,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{
@@ -22,6 +23,7 @@ use litchi_cfb::{OleFile, OverlayLimits, SameLengthStreamOverlay, SharedOleFile}
 use litchi_core::{FileSource, ReadAt, SourceVersion};
 use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::process_metrics;
 
@@ -38,6 +40,9 @@ const CFB_FILE_SOURCE_SHA256: &str =
 const CFB_FILE_EXPECTED_OUTPUT_SHA256: &str =
     "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc";
 const FILESYSTEM_OLE_COMMON_REPLACEMENT: &[u8] = b"litchi-ole-common-modified-stream-v1";
+const PPTX_FILE_SELECTED_POSITION: usize = super::PPTX_SOURCE_SLIDE_COUNT / 2;
+const PPTX_FILE_CORPUS_GENERATOR: &str = super::PPTX_SOURCE_EDIT_CORPUS_GENERATOR;
+static NEXT_PPTX_REPLAY_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct CacheSelection {
@@ -215,6 +220,7 @@ impl CacheSelection {
 #[derive(Debug, Deserialize, Serialize)]
 struct ChildResult {
     elapsed_ns: u64,
+    logical_read_counter_scope: String,
     logical_read_calls: u64,
     logical_read_requested_bytes: u64,
     logical_read_bytes: u64,
@@ -228,6 +234,44 @@ struct ChildResult {
     opc_materialized_parts: Option<u64>,
     cfb_changed_spans: Option<u64>,
     cfb_published_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pptx_source_replay: Option<PptxSourceReplayEvidence>,
+}
+
+/// Untimed source-backed replay evidence for the ordinary-root PPTX cases.
+///
+/// The replay is intentionally separate from the timed root facade operation.
+/// Its counters describe only compressed ZIP payload-range overlap; central
+/// directory, local-header, relationship, and mandatory catalog reads remain
+/// in the unclassified totals. Eager controls leave this field absent and mark
+/// their generic filesystem counter scope as not applicable.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct PptxSourceReplayEvidence {
+    pub implementation: String,
+    pub operation: String,
+    pub source_bytes: u64,
+    pub source_sha256: String,
+    pub slide_count: usize,
+    pub selected_position: Option<usize>,
+    pub read_calls: u64,
+    pub read_bytes: u64,
+    pub read_range_sizes: Vec<u64>,
+    pub slide_payload_read_calls: u64,
+    pub slide_payload_read_bytes: u64,
+    pub slide_payload_covered_bytes: u64,
+    pub slide_payload_ranges_fully_covered: u64,
+    pub selected_slide_payload_read_calls: u64,
+    pub selected_slide_payload_read_bytes: u64,
+    pub selected_slide_payload_covered_bytes: u64,
+    pub selected_slide_payload_fully_covered: bool,
+    pub unselected_slide_payload_read_calls: u64,
+    pub unselected_slide_payload_read_bytes: u64,
+    pub unselected_slide_payload_covered_bytes: u64,
+    pub media_payload_read_calls: u64,
+    pub media_payload_read_bytes: u64,
+    pub media_payload_covered_bytes: u64,
+    pub semantic_sha256: String,
+    pub classification: String,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -272,6 +316,7 @@ pub(crate) struct SampleEvidence {
     pub elapsed_ns: u64,
     pub parent_wall_ns: u64,
     pub cold_advice: ColdAdvice,
+    pub logical_read_counter_scope: String,
     pub logical_read_calls: u64,
     pub logical_read_requested_bytes: u64,
     pub logical_read_bytes: u64,
@@ -284,6 +329,8 @@ pub(crate) struct SampleEvidence {
     pub opc_materialized_parts: Option<u64>,
     pub cfb_changed_spans: Option<u64>,
     pub cfb_published_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pptx_source_replay: Option<PptxSourceReplayEvidence>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
@@ -340,6 +387,14 @@ enum Operation {
     OpcEagerSave,
     OpcSourceSave,
     CfbOverlaySave,
+    PptxEagerOpen,
+    PptxSourceOpen,
+    PptxEagerListSlides,
+    PptxSourceListSlides,
+    PptxEagerSlideCount,
+    PptxSourceSlideCount,
+    PptxEagerSelectedSlide,
+    PptxSourceSelectedSlide,
 }
 
 impl Operation {
@@ -350,6 +405,14 @@ impl Operation {
             "opc_file_eager_one_part_atomic_save" => Some(Self::OpcEagerSave),
             "opc_file_source_one_part_atomic_save" => Some(Self::OpcSourceSave),
             "cfb_file_same_length_overlay_atomic_save" => Some(Self::CfbOverlaySave),
+            "pptx_file_eager_open" => Some(Self::PptxEagerOpen),
+            "pptx_file_source_open" => Some(Self::PptxSourceOpen),
+            "pptx_file_eager_list_slides" => Some(Self::PptxEagerListSlides),
+            "pptx_file_source_list_slides" => Some(Self::PptxSourceListSlides),
+            "pptx_file_eager_slide_count" => Some(Self::PptxEagerSlideCount),
+            "pptx_file_source_slide_count" => Some(Self::PptxSourceSlideCount),
+            "pptx_file_eager_selected_slide" => Some(Self::PptxEagerSelectedSlide),
+            "pptx_file_source_selected_slide" => Some(Self::PptxSourceSelectedSlide),
             _ => None,
         }
     }
@@ -361,6 +424,14 @@ impl Operation {
             Self::OpcEagerSave => super::Case::OpcFileEagerOnePartAtomicSave,
             Self::OpcSourceSave => super::Case::OpcFileSourceOnePartAtomicSave,
             Self::CfbOverlaySave => super::Case::CfbFileSameLengthOverlayAtomicSave,
+            Self::PptxEagerOpen => super::Case::PptxFileEagerOpen,
+            Self::PptxSourceOpen => super::Case::PptxFileSourceOpen,
+            Self::PptxEagerListSlides => super::Case::PptxFileEagerListSlides,
+            Self::PptxSourceListSlides => super::Case::PptxFileSourceListSlides,
+            Self::PptxEagerSlideCount => super::Case::PptxFileEagerSlideCount,
+            Self::PptxSourceSlideCount => super::Case::PptxFileSourceSlideCount,
+            Self::PptxEagerSelectedSlide => super::Case::PptxFileEagerSelectedSlide,
+            Self::PptxSourceSelectedSlide => super::Case::PptxFileSourceSelectedSlide,
         }
     }
 
@@ -373,6 +444,52 @@ impl Operation {
 
     const fn is_cfb(self) -> bool {
         matches!(self, Self::CfbOverlaySave)
+    }
+
+    const fn is_pptx(self) -> bool {
+        matches!(
+            self,
+            Self::PptxEagerOpen
+                | Self::PptxSourceOpen
+                | Self::PptxEagerListSlides
+                | Self::PptxSourceListSlides
+                | Self::PptxEagerSlideCount
+                | Self::PptxSourceSlideCount
+                | Self::PptxEagerSelectedSlide
+                | Self::PptxSourceSelectedSlide
+        )
+    }
+
+    const fn is_source_pptx(self) -> bool {
+        matches!(
+            self,
+            Self::PptxSourceOpen
+                | Self::PptxSourceListSlides
+                | Self::PptxSourceSlideCount
+                | Self::PptxSourceSelectedSlide
+        )
+    }
+
+    const fn is_pptx_query(self) -> bool {
+        matches!(
+            self,
+            Self::PptxEagerListSlides
+                | Self::PptxSourceListSlides
+                | Self::PptxEagerSlideCount
+                | Self::PptxSourceSlideCount
+                | Self::PptxEagerSelectedSlide
+                | Self::PptxSourceSelectedSlide
+        )
+    }
+
+    const fn pptx_query_name(self) -> Option<&'static str> {
+        match self {
+            Self::PptxEagerOpen | Self::PptxSourceOpen => None,
+            Self::PptxEagerListSlides | Self::PptxSourceListSlides => Some("list_slides"),
+            Self::PptxEagerSlideCount | Self::PptxSourceSlideCount => Some("slide_count"),
+            Self::PptxEagerSelectedSlide | Self::PptxSourceSelectedSlide => Some("selected_slide"),
+            _ => None,
+        }
     }
 }
 
@@ -406,11 +523,23 @@ pub(crate) fn run_selected(
     let result = (|| {
         let opc = super::build_opc_corpus(OPC_FILE_SHAPE, OPC_FILE_PAYLOAD)?;
         let cfb = super::build_ole_common_corpus(&opc)?;
+        let pptx = selected
+            .iter()
+            .any(|(_, operation)| operation.is_pptx())
+            .then(super::build_pptx_source_edit_corpus)
+            .transpose()?;
         assert_pinned_corpora(&opc, &cfb)?;
         let mut runs = Vec::with_capacity(selected.len());
         let mut opc_save_hashes: Option<Vec<(String, String)>> = None;
         for (case, operation) in selected {
-            let corpus = if operation.is_cfb() { &cfb } else { &opc };
+            let corpus = if operation.is_cfb() {
+                &cfb
+            } else if operation.is_pptx() {
+                pptx.as_ref()
+                    .ok_or("PPTX filesystem corpus was not prepared")?
+            } else {
+                &opc
+            };
             let run = run_one(
                 case,
                 operation,
@@ -515,7 +644,11 @@ fn run_one(
     cache_selection: CacheSelection,
 ) -> Result<Run, Box<dyn Error>> {
     let stem = case.name();
-    let source_path = root.join(format!("{stem}.source"));
+    let source_path = if operation.is_pptx() {
+        root.join(format!("{stem}.pptx"))
+    } else {
+        root.join(format!("{stem}.source"))
+    };
     write_synced(&source_path, &corpus.archive)?;
     assert_source_sha256(&source_path, &corpus.manifest.archive_sha256)?;
     let destination_path = root.join(format!("{stem}.destination"));
@@ -666,6 +799,7 @@ fn record_sample(
         elapsed_ns: invocation.child.elapsed_ns,
         parent_wall_ns: invocation.parent_wall_ns,
         cold_advice: invocation.child.cold_advice,
+        logical_read_counter_scope: invocation.child.logical_read_counter_scope,
         logical_read_calls: invocation.child.logical_read_calls,
         logical_read_requested_bytes: invocation.child.logical_read_requested_bytes,
         logical_read_bytes: invocation.child.logical_read_bytes,
@@ -678,6 +812,7 @@ fn record_sample(
         opc_materialized_parts: invocation.child.opc_materialized_parts,
         cfb_changed_spans: invocation.child.cfb_changed_spans,
         cfb_published_bytes: invocation.child.cfb_published_bytes,
+        pptx_source_replay: invocation.child.pptx_source_replay,
     });
     Ok(())
 }
@@ -705,9 +840,16 @@ fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<Strin
             )?))
         },
         Operation::CfbOverlaySave => expected_cfb_output_digest(corpus),
-        Operation::OpcEagerOpen | Operation::OpcSourceOpen => {
-            Err("open operation has no output digest".into())
-        },
+        Operation::OpcEagerOpen
+        | Operation::OpcSourceOpen
+        | Operation::PptxEagerOpen
+        | Operation::PptxSourceOpen
+        | Operation::PptxEagerListSlides
+        | Operation::PptxSourceListSlides
+        | Operation::PptxEagerSlideCount
+        | Operation::PptxSourceSlideCount
+        | Operation::PptxEagerSelectedSlide
+        | Operation::PptxSourceSelectedSlide => Err("open operation has no output digest".into()),
     }
 }
 
@@ -823,6 +965,18 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
     } else {
         ColdAdvice::NotRequested
     };
+    // Query controls compare a prepared eager root with a prepared ordinary
+    // filesystem root. Root construction is therefore outside the query
+    // timer; the dedicated open cases measure construction itself.
+    let prepared_pptx = if operation.is_pptx_query() {
+        if operation.is_source_pptx() {
+            Some(litchi::Presentation::open(&source)?)
+        } else {
+            Some(litchi::Presentation::from_bytes(fs::read(&source)?)?)
+        }
+    } else {
+        None
+    };
     let before = process_metrics::Snapshot::read().ok();
     let started = Instant::now();
     let mut details = OperationDetails::default();
@@ -846,11 +1000,36 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
             &mut details,
         )?,
         Operation::CfbOverlaySave => run_cfb_overlay_save(&source, &destination, &mut details)?,
+        Operation::PptxEagerOpen
+        | Operation::PptxSourceOpen
+        | Operation::PptxEagerListSlides
+        | Operation::PptxSourceListSlides
+        | Operation::PptxEagerSlideCount
+        | Operation::PptxSourceSlideCount
+        | Operation::PptxEagerSelectedSlide
+        | Operation::PptxSourceSelectedSlide => {
+            run_pptx_operation(operation, &source, prepared_pptx.as_ref())?;
+            None
+        },
     };
     let elapsed_ns = u64::try_from(started.elapsed().as_nanos())?;
     let after = process_metrics::Snapshot::read().ok();
     let process_delta = before.zip(after).map(|(before, after)| after.delta(before));
     let snapshot = counter.map_or_else(ReadMetrics::default, |counter| counter.snapshot());
+    let logical_read_counter_scope = if operation.is_pptx() {
+        if operation.is_source_pptx() {
+            "untimed_source_replay_only"
+        } else {
+            "not_applicable_eager_pptx"
+        }
+    } else {
+        "timed_read_at"
+    }
+    .to_owned();
+    let pptx_source_replay = operation
+        .is_source_pptx()
+        .then(|| replay_pptx_source(&source, operation))
+        .transpose()?;
 
     // Correctness and hashing are intentionally after the timed operation and
     // after the operation-only counters have been sampled.
@@ -867,6 +1046,7 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         .transpose()?;
     let result = ChildResult {
         elapsed_ns,
+        logical_read_counter_scope,
         logical_read_calls: snapshot.calls,
         logical_read_requested_bytes: snapshot.requested_bytes,
         logical_read_bytes: snapshot.returned_bytes,
@@ -880,6 +1060,7 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         opc_materialized_parts: details.opc_materialized_parts,
         cfb_changed_spans: details.cfb_changed_spans,
         cfb_published_bytes: details.cfb_published_bytes,
+        pptx_source_replay,
     };
     serde_json::to_writer(io::stdout().lock(), &result)?;
     Ok(true)
@@ -889,12 +1070,503 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
 /// procfs snapshots have completed. The child therefore does not retain the
 /// multi-megabyte synthetic corpus while collecting VmHWM.
 fn filesystem_corpus(operation: Operation) -> Result<super::Corpus, Box<dyn Error>> {
+    if operation.is_pptx() {
+        return super::build_pptx_source_edit_corpus();
+    }
     let opc = super::build_opc_corpus(OPC_FILE_SHAPE, OPC_FILE_PAYLOAD)?;
     if operation.is_cfb() {
         super::build_ole_common_corpus(&opc)
     } else {
         Ok(opc)
     }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct PptxReplayCounters {
+    read_calls: u64,
+    read_bytes: u64,
+    slide_payload_read_calls: u64,
+    slide_payload_read_bytes: u64,
+    selected_slide_payload_read_calls: u64,
+    selected_slide_payload_read_bytes: u64,
+    unselected_slide_payload_read_calls: u64,
+    unselected_slide_payload_read_bytes: u64,
+    media_payload_read_calls: u64,
+    media_payload_read_bytes: u64,
+}
+
+#[derive(Clone, Debug, Default)]
+struct PptxReplayCoverage {
+    slide: Vec<Range<u64>>,
+    selected: Vec<Range<u64>>,
+    media: Vec<Range<u64>>,
+}
+
+#[derive(Debug)]
+struct PptxReplaySource {
+    bytes: Arc<Vec<u8>>,
+    version: SourceVersion,
+    slide_ranges: Vec<Range<u64>>,
+    media_ranges: Vec<Range<u64>>,
+    selected_slide_range: Option<Range<u64>>,
+    counters: Mutex<PptxReplayCounters>,
+    coverage: Mutex<PptxReplayCoverage>,
+    request_sizes: Mutex<Vec<u64>>,
+}
+
+impl PptxReplaySource {
+    fn new(
+        bytes: Arc<Vec<u8>>,
+        slide_ranges: Vec<Range<u64>>,
+        media_ranges: Vec<Range<u64>>,
+        selected_slide_range: Option<Range<u64>>,
+    ) -> Self {
+        Self {
+            bytes,
+            version: SourceVersion::new(
+                NEXT_PPTX_REPLAY_SOURCE_ID.fetch_add(1, Ordering::Relaxed),
+                0,
+            ),
+            slide_ranges,
+            media_ranges,
+            selected_slide_range,
+            counters: Mutex::new(PptxReplayCounters::default()),
+            coverage: Mutex::new(PptxReplayCoverage::default()),
+            request_sizes: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn record(&self, offset: u64, count: usize) -> io::Result<()> {
+        let end = offset
+            .checked_add(
+                u64::try_from(count)
+                    .map_err(|_| io::Error::other("PPTX replay read length does not fit u64"))?,
+            )
+            .ok_or_else(|| io::Error::other("PPTX replay read range overflows u64"))?;
+        let request = offset..end;
+        let mut counters = self
+            .counters
+            .lock()
+            .map_err(|_| io::Error::other("PPTX replay counters are poisoned"))?;
+        let count_u64 = u64::try_from(count)
+            .map_err(|_| io::Error::other("PPTX replay read length does not fit u64"))?;
+        checked_counter_add(&mut counters.read_calls, 1, "read calls")?;
+        checked_counter_add(&mut counters.read_bytes, count_u64, "read bytes")?;
+        let slide_overlap = overlap_with_ranges(&request, &self.slide_ranges);
+        let selected_overlap = self
+            .selected_slide_range
+            .as_ref()
+            .map_or(0, |range| overlap_len(&request, range));
+        let unselected_overlap = slide_overlap.saturating_sub(selected_overlap);
+        let media_overlap = overlap_with_ranges(&request, &self.media_ranges);
+        if slide_overlap != 0 {
+            checked_counter_add(
+                &mut counters.slide_payload_read_calls,
+                1,
+                "slide payload read calls",
+            )?;
+            checked_counter_add(
+                &mut counters.slide_payload_read_bytes,
+                slide_overlap,
+                "slide payload read bytes",
+            )?;
+        }
+        if selected_overlap != 0 {
+            checked_counter_add(
+                &mut counters.selected_slide_payload_read_calls,
+                1,
+                "selected slide payload read calls",
+            )?;
+            checked_counter_add(
+                &mut counters.selected_slide_payload_read_bytes,
+                selected_overlap,
+                "selected slide payload read bytes",
+            )?;
+        }
+        if unselected_overlap != 0 {
+            checked_counter_add(
+                &mut counters.unselected_slide_payload_read_calls,
+                1,
+                "unselected slide payload read calls",
+            )?;
+            checked_counter_add(
+                &mut counters.unselected_slide_payload_read_bytes,
+                unselected_overlap,
+                "unselected slide payload read bytes",
+            )?;
+        }
+        if media_overlap != 0 {
+            checked_counter_add(
+                &mut counters.media_payload_read_calls,
+                1,
+                "media payload read calls",
+            )?;
+            checked_counter_add(
+                &mut counters.media_payload_read_bytes,
+                media_overlap,
+                "media payload read bytes",
+            )?;
+        }
+        drop(counters);
+        let mut coverage = self
+            .coverage
+            .lock()
+            .map_err(|_| io::Error::other("PPTX replay coverage is poisoned"))?;
+        append_overlaps(&request, &self.slide_ranges, &mut coverage.slide);
+        if let Some(range) = self.selected_slide_range.as_ref()
+            && let Some(overlap) = overlap_range(&request, range)
+        {
+            coverage.selected.push(overlap);
+        }
+        append_overlaps(&request, &self.media_ranges, &mut coverage.media);
+        drop(coverage);
+        self.request_sizes
+            .lock()
+            .map_err(|_| io::Error::other("PPTX replay request sizes are poisoned"))?
+            .push(count_u64);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> io::Result<(PptxReplayCounters, PptxReplayCoverage, Vec<u64>)> {
+        let counters = *self
+            .counters
+            .lock()
+            .map_err(|_| io::Error::other("PPTX replay counters are poisoned"))?;
+        let coverage = self
+            .coverage
+            .lock()
+            .map_err(|_| io::Error::other("PPTX replay coverage is poisoned"))?
+            .clone();
+        let mut request_sizes = self
+            .request_sizes
+            .lock()
+            .map_err(|_| io::Error::other("PPTX replay request sizes are poisoned"))?
+            .clone();
+        request_sizes.sort_unstable();
+        Ok((counters, coverage, request_sizes))
+    }
+}
+
+impl ReadAt for PptxReplaySource {
+    fn len(&self) -> io::Result<u64> {
+        u64::try_from(self.bytes.len())
+            .map_err(|_| io::Error::other("PPTX replay source length does not fit u64"))
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let start = match usize::try_from(offset) {
+            Ok(start) => start,
+            Err(_) => {
+                self.record(offset, 0)?;
+                return Ok(0);
+            },
+        };
+        let count = self
+            .bytes
+            .get(start..)
+            .map_or(0, |remaining| remaining.len().min(output.len()));
+        if count != 0 {
+            output[..count].copy_from_slice(&self.bytes[start..start + count]);
+        }
+        self.record(offset, count)?;
+        Ok(count)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(self.version)
+    }
+}
+
+fn checked_counter_add(value: &mut u64, amount: u64, label: &str) -> io::Result<()> {
+    *value = value
+        .checked_add(amount)
+        .ok_or_else(|| io::Error::other(format!("PPTX replay {label} overflow")))?;
+    Ok(())
+}
+
+fn overlap_range(left: &Range<u64>, right: &Range<u64>) -> Option<Range<u64>> {
+    let start = left.start.max(right.start);
+    let end = left.end.min(right.end);
+    (start < end).then_some(start..end)
+}
+
+fn append_overlaps(request: &Range<u64>, ranges: &[Range<u64>], output: &mut Vec<Range<u64>>) {
+    for range in ranges {
+        if let Some(overlap) = overlap_range(request, range) {
+            output.push(overlap);
+        }
+    }
+}
+
+fn overlap_len(left: &Range<u64>, right: &Range<u64>) -> u64 {
+    overlap_range(left, right).map_or(0, |range| range.end - range.start)
+}
+
+fn overlap_with_ranges(request: &Range<u64>, ranges: &[Range<u64>]) -> u64 {
+    ranges.iter().map(|range| overlap_len(request, range)).sum()
+}
+
+fn merged_ranges(mut ranges: Vec<Range<u64>>) -> Vec<Range<u64>> {
+    ranges.sort_by_key(|range| (range.start, range.end));
+    let mut merged: Vec<Range<u64>> = Vec::with_capacity(ranges.len());
+    for range in ranges {
+        if let Some(previous) = merged.last_mut()
+            && range.start <= previous.end
+        {
+            previous.end = previous.end.max(range.end);
+            continue;
+        }
+        merged.push(range);
+    }
+    merged
+}
+
+fn covered_bytes(expected: &[Range<u64>], observed: &[Range<u64>]) -> Result<u64, Box<dyn Error>> {
+    let observed = merged_ranges(observed.to_vec());
+    expected
+        .iter()
+        .flat_map(|expected| {
+            observed
+                .iter()
+                .filter_map(move |observed| overlap_range(expected, observed))
+        })
+        .try_fold(0_u64, |total, overlap| {
+            total
+                .checked_add(overlap.end - overlap.start)
+                .ok_or_else(|| "PPTX replay coverage byte count overflows u64".into())
+        })
+}
+
+fn range_fully_covered(target: &Range<u64>, observed: &[Range<u64>]) -> bool {
+    let mut cursor = target.start;
+    for range in merged_ranges(observed.to_vec()) {
+        if range.end <= cursor {
+            continue;
+        }
+        if range.start > cursor {
+            return false;
+        }
+        cursor = range.end;
+        if cursor >= target.end {
+            return true;
+        }
+    }
+    cursor >= target.end
+}
+
+fn fully_covered_range_count(expected: &[Range<u64>], observed: &[Range<u64>]) -> u64 {
+    u64::try_from(
+        expected
+            .iter()
+            .filter(|range| range_fully_covered(range, observed))
+            .count(),
+    )
+    .expect("PPTX replay range count fits u64")
+}
+
+fn pptx_slide_part_position(name: &str) -> Option<usize> {
+    let number = name
+        .strip_prefix("ppt/slides/slide")?
+        .strip_suffix(".xml")?
+        .parse::<usize>()
+        .ok()?;
+    number.checked_sub(1)
+}
+
+fn pptx_payload_ranges(bytes: &[u8]) -> Result<(Vec<Range<u64>>, Vec<Range<u64>>), Box<dyn Error>> {
+    let archive = soapberry_zip::ZipArchive::from_slice(bytes)?;
+    // The source facade's position is relationship order. This fixed corpus
+    // writes that order as slide1.xml .. slide200.xml, so retain that mapping
+    // by part name and never substitute physical ZIP offset order for it.
+    let mut slide_slots: Vec<Option<Range<u64>>> =
+        (0..super::PPTX_SOURCE_SLIDE_COUNT).map(|_| None).collect();
+    let mut media = Vec::new();
+    for header in archive.entries() {
+        let header = header?;
+        let name = header.file_path().try_normalize()?.as_ref().to_owned();
+        let entry = archive.get_entry(header.wayfinder())?;
+        let (start, end) = entry.compressed_data_range();
+        let range = start..end;
+        if name.starts_with("ppt/slides/slide") && name.ends_with(".xml") {
+            let position = pptx_slide_part_position(&name)
+                .ok_or_else(|| format!("PPTX replay found an invalid slide part name: {name}"))?;
+            let slot = slide_slots
+                .get_mut(position)
+                .ok_or_else(|| format!("PPTX replay found out-of-range slide part name: {name}"))?;
+            if slot.replace(range).is_some() {
+                return Err(format!("PPTX replay found duplicate slide part name: {name}").into());
+            }
+        } else if name.starts_with("ppt/media/") {
+            media.push(range);
+        }
+    }
+    let slides = slide_slots
+        .into_iter()
+        .enumerate()
+        .map(|(position, range)| {
+            range.ok_or_else(|| {
+                format!(
+                    "PPTX replay is missing slide{}.xml for source position {position}",
+                    position + 1
+                )
+                .into()
+            })
+        })
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+    media.sort_by_key(|range| range.start);
+    if slides.len() != super::PPTX_SOURCE_SLIDE_COUNT {
+        return Err(format!(
+            "PPTX replay found {} slide payload ranges, expected {}",
+            slides.len(),
+            super::PPTX_SOURCE_SLIDE_COUNT
+        )
+        .into());
+    }
+    if media.len() != super::PPTX_SOURCE_MEDIA_ENTRY_COUNT {
+        return Err(format!(
+            "PPTX replay found {} media payload ranges, expected {}",
+            media.len(),
+            super::PPTX_SOURCE_MEDIA_ENTRY_COUNT
+        )
+        .into());
+    }
+    Ok((slides, media))
+}
+
+fn replay_pptx_source(
+    source: &Path,
+    operation: Operation,
+) -> Result<PptxSourceReplayEvidence, Box<dyn Error>> {
+    let bytes = Arc::new(fs::read(source)?);
+    let (slide_ranges, media_ranges) = pptx_payload_ranges(&bytes)?;
+    let selected_slide_range = slide_ranges
+        .get(PPTX_FILE_SELECTED_POSITION)
+        .cloned()
+        .ok_or("PPTX replay selected slide position is outside the corpus")?;
+    let replay = Arc::new(PptxReplaySource::new(
+        Arc::clone(&bytes),
+        slide_ranges.clone(),
+        media_ranges.clone(),
+        Some(selected_slide_range.clone()),
+    ));
+    let presentation = litchi_pptx::SourceBackedPresentation::from_read_at(replay.clone())?;
+    let slide_count = presentation.slide_count();
+    let mut semantic = Sha256::new();
+    match operation {
+        Operation::PptxSourceOpen => {},
+        Operation::PptxSourceSlideCount => {
+            if slide_count != super::PPTX_SOURCE_SLIDE_COUNT {
+                return Err("PPTX source replay slide count differs from corpus".into());
+            }
+        },
+        Operation::PptxSourceSelectedSlide => {
+            let slide = presentation
+                .slide(PPTX_FILE_SELECTED_POSITION)
+                .ok_or("PPTX source replay selected slide is missing")?;
+            let (text, name) = slide.text_and_name()?;
+            semantic.update(text.as_bytes());
+            semantic.update([0]);
+            semantic.update(name.as_bytes());
+        },
+        Operation::PptxSourceListSlides => {
+            for slide in presentation.slides() {
+                let (text, name) = slide.text_and_name()?;
+                semantic.update(text.as_bytes());
+                semantic.update([0]);
+                semantic.update(name.as_bytes());
+            }
+        },
+        _ => return Err("non-source PPTX operation passed to source replay".into()),
+    }
+    let (counters, coverage, request_sizes) = replay.snapshot()?;
+    let unselected_slide_ranges = slide_ranges
+        .iter()
+        .enumerate()
+        .filter(|(position, _)| *position != PPTX_FILE_SELECTED_POSITION)
+        .map(|(_, range)| range.clone())
+        .collect::<Vec<_>>();
+    let slide_payload_covered_bytes = covered_bytes(&slide_ranges, &coverage.slide)?;
+    let selected_slide_payload_covered_bytes = covered_bytes(
+        std::slice::from_ref(&selected_slide_range),
+        &coverage.selected,
+    )?;
+    let unselected_slide_payload_covered_bytes =
+        covered_bytes(&unselected_slide_ranges, &coverage.slide)?;
+    let media_payload_covered_bytes = covered_bytes(&media_ranges, &coverage.media)?;
+    let slide_payload_ranges_fully_covered =
+        fully_covered_range_count(&slide_ranges, &coverage.slide);
+    let selected_slide_payload_fully_covered =
+        range_fully_covered(&selected_slide_range, &coverage.selected);
+    let slide_payload_total_bytes = covered_bytes(&slide_ranges, &slide_ranges)?;
+    let slide_range_count = u64::try_from(slide_ranges.len())?;
+    let classification = match operation {
+        Operation::PptxSourceOpen | Operation::PptxSourceSlideCount
+            if counters.slide_payload_read_bytes == 0
+                && counters.media_payload_read_bytes == 0
+                && slide_payload_covered_bytes == 0
+                && media_payload_covered_bytes == 0 =>
+        {
+            "catalog-only:zero-slide-and-media-overlap"
+        },
+        Operation::PptxSourceSelectedSlide
+            if selected_slide_payload_fully_covered
+                && selected_slide_payload_covered_bytes
+                    == selected_slide_range.end - selected_slide_range.start
+                && counters.selected_slide_payload_read_bytes != 0
+                && unselected_slide_payload_covered_bytes == 0
+                && media_payload_covered_bytes == 0
+                && counters.unselected_slide_payload_read_bytes == 0
+                && counters.media_payload_read_bytes == 0 =>
+        {
+            "selected-slide-only:target-slide-no-unselected-or-media-overlap"
+        },
+        Operation::PptxSourceListSlides
+            if slide_payload_ranges_fully_covered == slide_range_count
+                && slide_payload_covered_bytes == slide_payload_total_bytes
+                && media_payload_covered_bytes == 0
+                && counters.media_payload_read_bytes == 0 =>
+        {
+            "list-slides:all-slide-payloads-no-media-overlap"
+        },
+        _ => "classification-failed",
+    }
+    .to_owned();
+    if classification == "classification-failed" {
+        return Err(format!(
+            "PPTX source replay violated {} payload-range classification",
+            operation.case().name()
+        )
+        .into());
+    }
+    Ok(PptxSourceReplayEvidence {
+        implementation: "litchi_pptx::SourceBackedPresentation".to_owned(),
+        operation: operation.pptx_query_name().unwrap_or("open").to_owned(),
+        source_bytes: u64::try_from(bytes.len())?,
+        source_sha256: super::sha256_hex(&bytes),
+        slide_count,
+        selected_position: operation
+            .is_pptx_query()
+            .then_some(PPTX_FILE_SELECTED_POSITION),
+        read_calls: counters.read_calls,
+        read_bytes: counters.read_bytes,
+        read_range_sizes: request_sizes,
+        slide_payload_read_calls: counters.slide_payload_read_calls,
+        slide_payload_read_bytes: counters.slide_payload_read_bytes,
+        slide_payload_covered_bytes,
+        slide_payload_ranges_fully_covered,
+        selected_slide_payload_read_calls: counters.selected_slide_payload_read_calls,
+        selected_slide_payload_read_bytes: counters.selected_slide_payload_read_bytes,
+        selected_slide_payload_covered_bytes,
+        selected_slide_payload_fully_covered,
+        unselected_slide_payload_read_calls: counters.unselected_slide_payload_read_calls,
+        unselected_slide_payload_read_bytes: counters.unselected_slide_payload_read_bytes,
+        unselected_slide_payload_covered_bytes,
+        media_payload_read_calls: counters.media_payload_read_calls,
+        media_payload_read_bytes: counters.media_payload_read_bytes,
+        media_payload_covered_bytes,
+        semantic_sha256: super::sha256_hex(semantic.finalize().as_slice()),
+        classification,
+    })
 }
 
 #[derive(Clone, Debug, Default)]
@@ -1026,6 +1698,57 @@ fn run_opc_source_open(
     Ok(Some(counter))
 }
 
+fn run_pptx_operation(
+    operation: Operation,
+    source: &Path,
+    prepared: Option<&litchi::Presentation>,
+) -> Result<(), Box<dyn Error>> {
+    match operation {
+        Operation::PptxEagerOpen => {
+            let presentation = litchi::Presentation::from_bytes(fs::read(source)?)?;
+            std::hint::black_box(presentation);
+        },
+        Operation::PptxSourceOpen => {
+            // This is the candidate path under measurement. The root facade
+            // must open the filesystem path directly rather than replaying a
+            // caller-owned byte buffer.
+            let presentation = litchi::Presentation::open(source)?;
+            std::hint::black_box(presentation);
+        },
+        Operation::PptxEagerListSlides | Operation::PptxSourceListSlides => {
+            let presentation = prepared.ok_or("PPTX list-slides operation has no prepared root")?;
+            // `slides()` returns owned Slide values. This control deliberately
+            // materializes the complete vector and never uses a lazy iterator.
+            let slides = presentation.slides()?;
+            if slides.len() != super::PPTX_SOURCE_SLIDE_COUNT {
+                return Err("PPTX list-slides count differs from fixed corpus".into());
+            }
+            std::hint::black_box(slides);
+        },
+        Operation::PptxEagerSlideCount | Operation::PptxSourceSlideCount => {
+            let presentation = prepared.ok_or("PPTX slide-count operation has no prepared root")?;
+            let count = presentation.slide_count()?;
+            if count != super::PPTX_SOURCE_SLIDE_COUNT {
+                return Err("PPTX slide-count differs from fixed corpus".into());
+            }
+            std::hint::black_box(count);
+        },
+        Operation::PptxEagerSelectedSlide | Operation::PptxSourceSelectedSlide => {
+            let presentation =
+                prepared.ok_or("PPTX selected-slide operation has no prepared root")?;
+            let slide = presentation
+                .slide(PPTX_FILE_SELECTED_POSITION)?
+                .ok_or("PPTX selected slide is missing")?;
+            // Use the selector-first public primitive. In particular, do not
+            // replace this with `slides().nth(...)`, which would materialize
+            // every slide on the source-backed path.
+            std::hint::black_box(slide);
+        },
+        _ => return Err("non-PPTX operation passed to run_pptx_operation".into()),
+    }
+    Ok(())
+}
+
 fn run_opc_eager_save(
     source: &Path,
     destination: &Path,
@@ -1146,7 +1869,72 @@ fn verify_child_output(
             }
             Ok(())
         },
+        Operation::PptxEagerOpen
+        | Operation::PptxSourceOpen
+        | Operation::PptxEagerListSlides
+        | Operation::PptxSourceListSlides
+        | Operation::PptxEagerSlideCount
+        | Operation::PptxSourceSlideCount
+        | Operation::PptxEagerSelectedSlide
+        | Operation::PptxSourceSelectedSlide => verify_pptx_operation(source, corpus),
     }
+}
+
+fn verify_pptx_operation(source: &Path, corpus: &super::Corpus) -> Result<(), Box<dyn Error>> {
+    if corpus.manifest.generator != PPTX_FILE_CORPUS_GENERATOR {
+        return Err("PPTX filesystem source has the wrong corpus generator".into());
+    }
+    let bytes = fs::read(source)?;
+    if super::sha256_hex(&bytes) != corpus.manifest.archive_sha256 {
+        return Err("PPTX filesystem source hash differs from corpus manifest".into());
+    }
+    if bytes.len() != corpus.manifest.archive_bytes {
+        return Err("PPTX filesystem source length differs from corpus manifest".into());
+    }
+    let eager = litchi::Presentation::from_bytes(bytes)?;
+    let source_backed = litchi::Presentation::open(source)?;
+    let eager_signature = pptx_presentation_signature(&eager)?;
+    let source_signature = pptx_presentation_signature(&source_backed)?;
+    if eager_signature != source_signature {
+        return Err("PPTX eager/source ordinary-root semantic signatures differ".into());
+    }
+    if eager.slide_count()? != super::PPTX_SOURCE_SLIDE_COUNT {
+        return Err("PPTX filesystem corpus slide count differs from specification".into());
+    }
+    Ok(())
+}
+
+fn pptx_presentation_signature(
+    presentation: &litchi::Presentation,
+) -> Result<(usize, Option<i64>, Option<i64>, String, String, String), Box<dyn Error>> {
+    let metadata = serde_json::to_string(&presentation.metadata()?)?;
+    let mut slides_hasher = Sha256::new();
+    for (position, slide) in presentation.slides()?.into_iter().enumerate() {
+        let text = slide.text()?;
+        let name = slide.name()?.unwrap_or_default();
+        slides_hasher.update(position.to_le_bytes());
+        slides_hasher.update((text.len() as u64).to_le_bytes());
+        slides_hasher.update(text.as_bytes());
+        slides_hasher.update((name.len() as u64).to_le_bytes());
+        slides_hasher.update(name.as_bytes());
+    }
+    let selected = presentation
+        .slide(PPTX_FILE_SELECTED_POSITION)?
+        .ok_or("PPTX signature selected slide is missing")?;
+    let selected_text = selected.text()?;
+    let selected_name = selected.name()?.unwrap_or_default();
+    let mut selected_hasher = Sha256::new();
+    selected_hasher.update(selected_text.as_bytes());
+    selected_hasher.update([0]);
+    selected_hasher.update(selected_name.as_bytes());
+    Ok((
+        presentation.slide_count()?,
+        presentation.slide_width()?,
+        presentation.slide_height()?,
+        metadata,
+        super::sha256_hex(slides_hasher.finalize().as_slice()),
+        super::sha256_hex(selected_hasher.finalize().as_slice()),
+    ))
 }
 
 fn verify_opc_package(package: &OpcPackage, corpus: &super::Corpus) -> Result<(), Box<dyn Error>> {
@@ -1204,10 +1992,65 @@ mod tests {
             "opc_file_eager_one_part_atomic_save",
             "opc_file_source_one_part_atomic_save",
             "cfb_file_same_length_overlay_atomic_save",
+            "pptx_file_eager_open",
+            "pptx_file_source_open",
+            "pptx_file_eager_list_slides",
+            "pptx_file_source_list_slides",
+            "pptx_file_eager_slide_count",
+            "pptx_file_source_slide_count",
+            "pptx_file_eager_selected_slide",
+            "pptx_file_source_selected_slide",
         ] {
             assert!(Operation::parse(name).is_some(), "{name}");
         }
         assert!(Operation::parse("ole2_same_length_overlay_atomic_save").is_none());
+    }
+
+    #[test]
+    fn pptx_root_operation_scopes_are_explicit() {
+        assert!(Operation::PptxEagerOpen.is_pptx());
+        assert!(Operation::PptxSourceSelectedSlide.is_source_pptx());
+        assert!(Operation::PptxSourceSelectedSlide.is_pptx_query());
+        assert!(!Operation::PptxSourceOpen.is_pptx_query());
+        assert_eq!(
+            Operation::PptxSourceListSlides.pptx_query_name(),
+            Some("list_slides")
+        );
+        assert_eq!(
+            Operation::PptxEagerSlideCount.pptx_query_name(),
+            Some("slide_count")
+        );
+    }
+
+    #[test]
+    fn pptx_replay_overlap_accounting_is_exact_and_disjoint() {
+        let request = 10..30;
+        assert_eq!(super::overlap_len(&request, &(0..10)), 0);
+        assert_eq!(super::overlap_len(&request, &(20..40)), 10);
+        assert_eq!(super::overlap_with_ranges(&request, &[0..12, 24..28]), 6);
+        assert_eq!(super::overlap_with_ranges(&request, &[30..40]), 0);
+        assert_eq!(
+            super::pptx_slide_part_position("ppt/slides/slide101.xml"),
+            Some(100)
+        );
+        assert_eq!(
+            super::pptx_slide_part_position("ppt/slides/slide1.xml"),
+            Some(0)
+        );
+        assert_eq!(
+            super::pptx_slide_part_position("ppt/slides/slide0.xml"),
+            None
+        );
+        assert_eq!(
+            super::pptx_slide_part_position("ppt/slideLayouts/slideLayout1.xml"),
+            None
+        );
+        assert!(super::range_fully_covered(&(10..20), &[0..12, 12..20]));
+        assert!(!super::range_fully_covered(&(10..20), &[0..12, 13..20]));
+        assert_eq!(
+            super::fully_covered_range_count(&[0..10, 20..30], &[0..10, 20..25]),
+            1
+        );
     }
 
     #[test]

@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **219 selectable cases**; 200 was the count before the
+HEAD harness contains **227 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -1013,7 +1013,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 219 selectable cases. Change
+The committed HEAD standalone harness provides 227 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1059,6 +1059,22 @@ cold-cache, hardware-counter, producer-breadth, or save-path claim is accepted.
 See
 [`change 0117`](changes/0117-ppt-pictures-release-evidence.md) and its
 [raw report](results/ppt-pictures-release-0117.json).
+
+Change 0120 adds eight opt-in PPTX ordinary-root filesystem selectors while
+preserving the 36-case / 198-record default. They compare eager byte-root and
+the unified source-path `litchi::Presentation::open(path)` root over the fixed
+200-slide/eight-text-box/eight-2 MiB-media corpus for open, complete owned slide
+listing, slide-count, and selector-first slide-100 queries. Source samples run
+in fresh warm/cold-requested children and receive one separate untimed
+`SourceBackedPresentation` replay. The replay must classify open/count as zero
+slide/media payload overlap, selected as target-slide-only, and list as all
+slide-payload/no-media overlap. Full source hashes, archive length, metadata,
+slide size, names, text hashes, and eager/source parity are verified outside
+timing; eager controls explicitly have no `ReadAt` replay. The counters are
+logical compressed-range evidence for this generated corpus only. No latency,
+tail, allocation, RSS, decompression, physical-I/O, cold-cache, or release-ABBA
+claim is accepted. See
+[`change 0120`](changes/0120-pptx-root-source-path-evidence.md).
 
 The previously measured
 default matrix remains 198 records across deterministic ZIP/OPC, positional

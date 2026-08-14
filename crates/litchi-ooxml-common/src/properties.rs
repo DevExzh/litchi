@@ -11,7 +11,7 @@ mod read;
 pub mod time;
 mod write;
 
-pub use read::read;
+pub use read::{read, read_source_backed};
 pub use write::{clear, write};
 
 use crate::Result;

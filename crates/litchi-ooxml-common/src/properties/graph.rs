@@ -1,7 +1,7 @@
 use super::{Dialect, STRICT_CORE_PROPERTIES_RELATIONSHIP};
 use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, Part, PartView, Relationships, SourceBackedPackage};
 
 pub(super) struct Graph {
     pub(super) part: Option<PackURI>,
@@ -10,34 +10,98 @@ pub(super) struct Graph {
 }
 
 pub(super) fn inspect(package: &OpcPackage) -> Result<Graph> {
+    inspect_parts(|| package.iter_parts(), package.rels(), || Ok(()))
+}
+
+/// Inspect the same core-properties graph over the metadata-only
+/// source-backed catalog. No ordinary part payload is read here. The
+/// metadata-only part projection is deliberately fed through the same graph
+/// implementation as the eager package path so strict OPC edge rules cannot
+/// drift between ingress modes.
+pub(super) fn inspect_source(package: &SourceBackedPackage) -> Result<Graph> {
+    package.source_version()?;
+    let result = inspect_parts(
+        || package.iter_parts(),
+        package.rels(),
+        || Ok(package.check_execution()?),
+    );
+    package.source_version()?;
+    result
+}
+
+trait GraphPart {
+    fn graph_partname(&self) -> &PackURI;
+    fn graph_content_type(&self) -> &str;
+    fn graph_rels(&self) -> &Relationships;
+}
+
+impl GraphPart for &dyn Part {
+    fn graph_partname(&self) -> &PackURI {
+        self.partname()
+    }
+
+    fn graph_content_type(&self) -> &str {
+        self.content_type()
+    }
+
+    fn graph_rels(&self) -> &Relationships {
+        self.rels()
+    }
+}
+
+impl GraphPart for PartView<'_> {
+    fn graph_partname(&self) -> &PackURI {
+        self.partname()
+    }
+
+    fn graph_content_type(&self) -> &str {
+        self.content_type()
+    }
+
+    fn graph_rels(&self) -> &Relationships {
+        self.rels()
+    }
+}
+
+fn inspect_parts<F, I, P, C>(
+    parts: F,
+    package_relationships: &Relationships,
+    mut check: C,
+) -> Result<Graph>
+where
+    F: Fn() -> I,
+    I: IntoIterator<Item = P>,
+    P: GraphPart,
+    C: FnMut() -> Result<()>,
+{
     let mut core_part = None;
-    for part in package.iter_parts() {
-        if part.content_type() == ct::OPC_CORE_PROPERTIES {
+    for part in parts() {
+        check()?;
+        if part.graph_content_type() == ct::OPC_CORE_PROPERTIES {
             if core_part.is_some() {
                 return Err(Error::Invalid(
                     "package contains multiple core-properties parts".to_owned(),
                 ));
             }
-            core_part = Some(part.partname().clone());
+            core_part = Some(part.graph_partname().clone());
         }
-        if part
-            .rels()
-            .iter()
-            .any(|relationship| is_core_relationship(relationship.reltype()))
-        {
-            return Err(Error::Relationship(format!(
-                "core-properties relationship must be package-level, not owned by '{}'",
-                part.partname().as_str()
-            )));
+        for relationship in part.graph_rels().iter() {
+            check()?;
+            if is_core_relationship(relationship.reltype()) {
+                return Err(Error::Relationship(format!(
+                    "core-properties relationship must be package-level, not owned by '{}'",
+                    part.graph_partname().as_str()
+                )));
+            }
         }
     }
 
     let mut core_relationship = None;
-    for relationship in package
-        .rels()
-        .iter()
-        .filter(|relationship| is_core_relationship(relationship.reltype()))
-    {
+    for relationship in package_relationships.iter() {
+        check()?;
+        if !is_core_relationship(relationship.reltype()) {
+            continue;
+        }
         if core_relationship.is_some() {
             return Err(Error::Relationship(
                 "OPC M4.1 permits at most one core-properties relationship".to_owned(),
@@ -75,22 +139,27 @@ pub(super) fn inspect(package: &OpcPackage) -> Result<Graph> {
             "invalid core-properties relationship target: {error}"
         ))
     })?;
-    let part = package
-        .iter_parts()
-        .find(|part| same_name(part.partname(), &requested))
-        .ok_or_else(|| {
-            Error::Missing(format!(
-                "core-properties relationship target '{}' does not exist",
-                requested.as_str()
-            ))
-        })?;
-    if part.content_type() != ct::OPC_CORE_PROPERTIES {
-        return Err(Error::ContentType {
-            expected: ct::OPC_CORE_PROPERTIES.to_owned(),
-            actual: part.content_type().to_owned(),
-        });
+    let mut actual = None;
+    for part in parts() {
+        check()?;
+        if !same_name(part.graph_partname(), &requested) {
+            continue;
+        }
+        if part.graph_content_type() != ct::OPC_CORE_PROPERTIES {
+            return Err(Error::ContentType {
+                expected: ct::OPC_CORE_PROPERTIES.to_owned(),
+                actual: part.graph_content_type().to_owned(),
+            });
+        }
+        actual = Some(part.graph_partname().clone());
+        break;
     }
-    let actual = part.partname().clone();
+    let actual = actual.ok_or_else(|| {
+        Error::Missing(format!(
+            "core-properties relationship target '{}' does not exist",
+            requested.as_str()
+        ))
+    })?;
     if core_part
         .as_ref()
         .is_some_and(|candidate| !same_name(candidate, &actual))

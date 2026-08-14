@@ -342,7 +342,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**219 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**227 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -367,6 +367,25 @@ eager/source-backed pair. Independent untimed replays retain deterministic
 logical source-read counters and semantic hashes while timed source-backed
 samples remain uninstrumented. No latency or resource claim is accepted
 without a frozen release ABBA run.
+
+Change 0120 adds eight opt-in PPTX ordinary-root filesystem selectors over the
+same fixed 200-slide/eight-text-box/eight-2 MiB-media corpus: matched eager and
+source-path open, full owned slide listing, slide-count, and selector-first
+slide-100 queries. The source candidate calls the unified
+`litchi::Presentation::open(path)` path; the eager open control times
+`fs::read` plus `Presentation::from_bytes`, while query roots are prepared
+before timing. Every sample runs in a fresh warm/cold-requested child and
+checks source hash, full eager/source semantic parity, metadata, slide size,
+slide names, text hashes, and corpus length outside timing. Each measured source
+sample also receives one separate untimed `SourceBackedPresentation` replay with
+exact compressed ZIP range classification: open/count have zero slide/media
+overlap, selected slide 100 has no unselected-slide/media overlap, and listing
+reads all slide payloads without media. Eager controls explicitly have no
+`ReadAt` replay; the generic filesystem counter scope marks them not applicable.
+This change enables correctness and logical-read evidence only. It makes no
+latency, tail, allocation, RSS, decompression, physical-I/O, or cold-cache
+claim before a frozen release ABBA run. See
+[`0120`](changes/0120-pptx-root-source-path-evidence.md).
 
 Five filesystem cases now exercise eager/source-backed OPC open, eager/source-
 backed one-Part atomic save, and same-length CFB atomic overlay save. A

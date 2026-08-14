@@ -435,6 +435,10 @@ pub fn detect_format_smart_with_limits(
 /// existing ODF and iWork paths. A resource-limit or allocation failure is
 /// returned instead of falling back to an unbounded file read.
 #[cfg(any(feature = "docx", feature = "pptx"))]
+#[allow(
+    dead_code,
+    reason = "the unified Presentation path uses the source-backed probe on positional platforms; the eager helper remains for Document and non-positional builds"
+)]
 pub(crate) fn detect_ooxml_path_with_limits(
     path: impl AsRef<std::path::Path>,
     limits: crate::opc::ReadLimits,
@@ -485,6 +489,130 @@ pub(crate) fn detect_ooxml_path_with_limits(
     }
 }
 
+/// Result of the private source-backed PPTX path probe.
+#[cfg(all(feature = "pptx", any(unix, windows)))]
+pub(crate) enum PptxSourcePathDetection {
+    /// A validated, source-retaining PPTX owner.
+    Pptx(crate::pptx::SourceBackedPresentation),
+    /// A recognized OOXML family whose facade is not a presentation.
+    OtherOoxml(litchi_core::detection::FileFormat),
+}
+
+/// Error from the private source-backed PPTX path probe.
+#[cfg(all(feature = "pptx", any(unix, windows)))]
+#[derive(Debug)]
+pub(crate) enum PptxSourcePathError {
+    /// A source or OPC catalog failure, retaining its typed OPC error.
+    Opc(crate::opc::OpcError),
+    /// A validated PPTX catalog failed PresentationML semantic opening.
+    Pptx(crate::pptx::Error),
+}
+
+/// Open a filesystem PPTX through one positional source-backed OPC package.
+///
+/// This is intentionally a private facade handoff rather than an additional
+/// `DetectedFormat` variant: byte-backed smart detection keeps its established
+/// eager owner, while the presentation path can retain the source identity
+/// and defer ordinary slide/media payloads.  A valid non-PPTX OPC package is
+/// classified privately when its owner is enabled; disabled owners and
+/// non-OPC packages return `None` so the existing facade fallback remains in
+/// control.
+#[cfg(all(feature = "pptx", any(unix, windows)))]
+pub(crate) fn detect_pptx_source_path_with_limits(
+    path: &std::path::Path,
+    limits: crate::opc::ReadLimits,
+) -> std::result::Result<Option<PptxSourcePathDetection>, PptxSourcePathError> {
+    use litchi_core::ReadAt;
+
+    let ooxml_extension = has_ooxml_extension(path);
+    let source = std::sync::Arc::new(
+        litchi_core::FileSource::open(path)
+            .map_err(crate::opc::OpcError::IoError)
+            .map_err(PptxSourcePathError::Opc)?,
+    );
+    let mut signature = [0_u8; 4];
+    let read = source
+        .read_at(0, &mut signature)
+        .map_err(crate::opc::OpcError::IoError)
+        .map_err(PptxSourcePathError::Opc)?;
+    let zip_magic = read == signature.len()
+        && litchi_core::detection::simd_utils::signature_matches(
+            &signature,
+            litchi_core::detection::utils::ZIP_SIGNATURE,
+        );
+    if !ooxml_extension && !zip_magic {
+        return Ok(None);
+    }
+
+    // Match the eager path's candidate policy: arbitrary non-ZIP inputs have
+    // already returned `None`; every remaining candidate is checked against
+    // the bounded input-byte policy before an OOXML suffix receives its typed
+    // ZIP-magic refusal.
+    let input_bytes = source
+        .len()
+        .map_err(crate::opc::OpcError::IoError)
+        .map_err(PptxSourcePathError::Opc)?;
+    if input_bytes > limits.max_input_bytes() {
+        return Err(PptxSourcePathError::Opc(crate::opc::OpcError::ReadLimit {
+            resource: crate::opc::ReadResource::InputBytes,
+            actual: input_bytes,
+            maximum: limits.max_input_bytes(),
+        }));
+    }
+
+    if !zip_magic {
+        return Err(PptxSourcePathError::Opc(crate::opc::OpcError::ZipError(
+            "OOXML-suffixed input does not have ZIP magic".to_owned(),
+        )));
+    }
+
+    let package = match crate::opc::SourceBackedPackage::from_read_at_with_limits(source, limits) {
+        Ok(package) => package,
+        Err(error @ crate::opc::OpcError::ReadLimit { .. })
+        | Err(error @ crate::opc::OpcError::Allocation { .. }) => {
+            return Err(PptxSourcePathError::Opc(error));
+        },
+        Err(error) if ooxml_extension => return Err(PptxSourcePathError::Opc(error)),
+        Err(_) => {
+            if crate::detection_smart::detect_file_format(path).is_some() {
+                return Ok(None);
+            }
+            return Err(PptxSourcePathError::Opc(crate::opc::OpcError::ZipError(
+                "ZIP input is not a supported Office package".to_owned(),
+            )));
+        },
+    };
+
+    let Some(format) =
+        crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package)
+    else {
+        return Ok(None);
+    };
+    if format != litchi_core::detection::FileFormat::Pptx {
+        // Match the old eager detector's feature-gated handoff: when the
+        // corresponding non-presentation owner is disabled, leave the path
+        // to the ordinary fallback so it still reports NotOfficeFile.
+        let enabled_other_owner = match format {
+            #[cfg(feature = "docx")]
+            litchi_core::detection::FileFormat::Docx => true,
+            #[cfg(feature = "xlsx")]
+            litchi_core::detection::FileFormat::Xlsx => true,
+            #[cfg(feature = "xlsb")]
+            litchi_core::detection::FileFormat::Xlsb => true,
+            _ => false,
+        };
+        return if enabled_other_owner {
+            Ok(Some(PptxSourcePathDetection::OtherOoxml(format)))
+        } else {
+            Ok(None)
+        };
+    }
+
+    crate::pptx::SourceBackedPresentation::from_source_backed_package(package)
+        .map(|presentation| Some(PptxSourcePathDetection::Pptx(presentation)))
+        .map_err(PptxSourcePathError::Pptx)
+}
+
 #[cfg(any(feature = "docx", feature = "pptx"))]
 fn has_ooxml_extension(path: &std::path::Path) -> bool {
     let Some(extension) = path.extension().and_then(std::ffi::OsStr::to_str) else {
@@ -500,6 +628,10 @@ fn has_ooxml_extension(path: &std::path::Path) -> bool {
 }
 
 #[cfg(any(feature = "docx", feature = "pptx"))]
+#[allow(
+    dead_code,
+    reason = "retained by the eager OOXML path used by the document facade and non-positional builds"
+)]
 fn detect_ooxml_package(package: crate::opc::OpcPackage) -> Option<DetectedFormat> {
     use litchi_core::detection::FileFormat;
 
