@@ -2,7 +2,7 @@
 
 Date: 2026-08-15
 
-This is a coverage map, not a completion claim. It compares the 216 selectable
+This is a coverage map, not a completion claim. It compares the 219 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -12,7 +12,7 @@ performance claim.
 |---|---|---|
 | Open and identify format | Partial | ZIP/OPC/CFB plus owned DOC/XLS/PPT/RTF/XLSX and source-backed XLSX open; opt-in bounded RTF/XLS/DOCX/PPTX/generic-ODF reports now exercise format validation, while RTF still covers plain, raw CP-1252, LZFu and a real-producer watermark input; no smart-detection handoff case |
 | List semantic children without payloads | Partial | XLS/XLSX/ODS sheets, DOC/RTF/DOCX/ODT paragraphs and PPT/PPTX/ODP slides; opt-in `docx_section_inventory` now lists the exact source-backed DOCX section descriptors, but broader section/edit matrices remain missing |
-| Query one property or named object | Partial | XLS/XLSX/ODS cells, one DOC/RTF/DOCX paragraph, an indexed fully validated ODT paragraph, one PPT shape and one PPTX/ODP slide; the already-open RTF paragraph query reuses its parser-derived exact story length and cardinality, while explicit sparse `nth` skips discarded-view construction; broader properties/images remain missing |
+| Query one property or named object | Partial | XLS/XLSX/ODS cells, one DOC/RTF/DOCX paragraph, an indexed fully validated ODT paragraph, one PPT shape and one PPTX/ODP slide; native PPT now also has matched eager/source-backed selected-shape query-only and fresh-open-plus-query controls, with independent untimed logical source-read evidence. The already-open RTF paragraph query reuses its parser-derived exact story length and cardinality, while explicit sparse `nth` skips discarded-view construction; broader properties/images remain missing |
 | Read one cell/paragraph/slide/image/Part | Partial | XLS/XLSX/ODS cells, DOC/RTF/DOCX paragraphs, indexed ODT paragraphs, PPT/PPTX/ODP text objects and generic OPC Part. Three opt-in OPC source-cache selectors add exact managed-Budget boundary evidence plus finite-control/managed same-Part and fixed-work disjoint-Part contention across `1/2x`, `1x`, and `2x` capacities and capped worker widths; their deterministic source delay is correctness evidence, not a latency claim. Semantic image selection remains missing |
 | Scan all cells/paragraphs/slides | Covered for generated native/OOXML/RTF/ODF text corpora | XLS/XLSX/ODS cell scans, including the isolated ODS public-cell sweep; DOC/RTF/DOCX/ODT paragraph enumeration and PPT/PPTX/ODP slide/text enumeration |
 | Full text extraction | Covered for generated DOC/PPT/RTF/DOCX/PPTX/ODT/ODS/ODP | Complete deterministic text or row-major cell text is checked; RTF additionally verifies raw CP-1252/LZFu text and the body plus public header-shape projection of a real-producer watermark; ODT consuming block ownership is measured in change 0023; broader real-producer/media-heavy corpora remain missing |
@@ -784,7 +784,7 @@ under a hard 32-byte request ceiling, with exact bytes and hashes. This does not
 claim existing-document edit, allocation, RSS or cold-I/O improvement. iWork
 remains deliberately deferred while the `iwa-*` crates change separately.
 
-Change 0116 adds eight opt-in native PPT `Pictures` selectors to the current
+Change 0116 adds eight opt-in native PPT `Pictures` selectors to the then-current
 216-name matrix: matched eager/source-backed presentation-open cases, cold
 all-`images()` query cases, repeated-query cases, and directly timed fresh
 open-plus-all-images cases. The deterministic corpus has
@@ -802,6 +802,20 @@ timing counters, a general CFB sector map, or internal materialization counts.
 Source-backed elapsed samples instead use uninstrumented immutable
 `litchi_core::OwnedSource`. No latency, allocation, RSS, cold-I/O, or release
 ABBA claim is made by change 0116.
+
+Change 0119 adds three opt-in native PPT selected-shape selectors, bringing the
+current matrix to 219 names while leaving the default 36 cases / 198 records
+unchanged. The existing eager query-only control is paired with a positional
+source-backed query, and two new cases pair fresh eager/source-backed
+open-plus-query phases over the same generated target. Timed source-backed
+samples use an uninstrumented immutable source; independent untimed replays
+record deterministic logical `ReadAt` calls/bytes once per measured sample,
+excluding warmups, and retain one canonical selected-text digest. The umbrella
+`Presentation::open` path also adopts the positional native-PPT package on
+Unix/Windows after content-derived OLE2 routing, retaining DOC-before-PPT
+polyglot precedence and the existing non-PPT fallback. This is correctness and
+logical-read evidence only: there is no latency, allocation/RSS, physical-I/O,
+cold-filesystem, or release-ABBA claim.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

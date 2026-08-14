@@ -11,6 +11,7 @@ use litchi_cfb::{OleError, SharedOleFile, SharedOleFileLimits};
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
 use litchi_core::{ReadAt, SourceVersion};
+use litchi_ole_common::property_set::{Metadata, SharedPropertySetReader};
 #[cfg(any(unix, windows))]
 use std::path::Path;
 use std::sync::Arc;
@@ -94,6 +95,34 @@ impl SourceBackedPackage {
         })
     }
 
+    /// Adopts an already validated positional CFB owner when it contains
+    /// native PowerPoint ownership streams.
+    ///
+    /// Classification happens before the PPT package-size policy is applied,
+    /// so a generic facade can preserve its fallback behavior for non-PPT OLE
+    /// inputs. A recognized PPT owner still receives the normal typed resource
+    /// error when it exceeds the default package ceiling.
+    pub fn from_shared_if_powerpoint(shared: SharedOleFile) -> Result<Option<Self>> {
+        if !shared_is_powerpoint(&shared) {
+            return Ok(None);
+        }
+        let source_length = shared.file_size();
+        let record_limits = RecordLimits::default();
+        let source_bytes = usize::try_from(source_length).map_err(|_error| {
+            Error::ResourceLimit("PPT package size exceeds this platform".to_string())
+        })?;
+        if source_bytes > record_limits.max_package_bytes {
+            return Err(Error::ResourceLimit(format!(
+                "PPT package size {source_bytes} exceeds limit {}",
+                record_limits.max_package_bytes
+            )));
+        }
+        Ok(Some(Self {
+            shared: Arc::new(shared),
+            record_limits,
+        }))
+    }
+
     /// Open a filesystem-backed PPT without slurping the complete artifact.
     #[cfg(any(unix, windows))]
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
@@ -126,6 +155,15 @@ impl SourceBackedPackage {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// Read standard OLE metadata through the validated positional source.
+    ///
+    /// The projection uses the same property-set grammar as the ordinary
+    /// cursor-backed package. Stream reads retain the shared source's version
+    /// checks and do not require materializing an eager `OleFile`.
+    pub fn metadata(&self) -> std::result::Result<Metadata, OleError> {
+        <SharedOleFile as SharedPropertySetReader>::get_metadata(self.shared.as_ref())
     }
 
     /// Limits inherited by [`Self::presentation`].
@@ -169,4 +207,8 @@ impl SourceBackedPackage {
             limits.constrained_by(self.record_limits),
         )
     }
+}
+
+fn shared_is_powerpoint(shared: &SharedOleFile) -> bool {
+    shared.exists(&["PowerPoint Document"]) || shared.exists(&["Current User"])
 }

@@ -17,7 +17,7 @@ mod support;
 mod tests;
 
 pub use editor::Editor;
-pub use package::PropertySetReader;
+pub use package::{PropertySetReader, SharedPropertySetReader};
 
 use super::model::Section;
 use litchi_cfb::OleError;
