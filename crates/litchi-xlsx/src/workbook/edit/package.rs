@@ -23,6 +23,7 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
         sheets: _,
         added: _,
         removed,
+        cross_workbook_scalar: _,
     } = edit;
     let first_position = removed
         .iter()
@@ -343,6 +344,7 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
             style_guard: None,
             source: Some(base),
             target: Some(workbook),
+            authority: None,
         },
     })
 }

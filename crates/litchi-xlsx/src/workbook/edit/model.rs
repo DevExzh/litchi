@@ -1927,6 +1927,45 @@ pub struct Patch {
     pub(super) style_guard: Option<StyleGuard>,
     pub(super) source: Option<Workbook>,
     pub(super) target: Option<Workbook>,
+    // Cross-workbook scalar transfers are stricter than the ordinary
+    // byte-checked patch path. Keep their exact immutable lineage pair so a
+    // worksheet-only delta cannot be replayed onto a foreign or protected
+    // workbook that happens to share changed-part bytes. Durable patches bind
+    // complete package bytes through their wire envelope and do not use this.
+    pub(super) authority: Option<PatchAuthority>,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct PatchAuthority {
+    source: Workbook,
+    target: Workbook,
+}
+
+impl PatchAuthority {
+    pub(super) fn new(source: Workbook, target: Workbook) -> Self {
+        Self { source, target }
+    }
+
+    fn inverse(&self) -> Self {
+        Self {
+            source: self.target.clone(),
+            target: self.source.clone(),
+        }
+    }
+
+    fn validate(&self, workbook: &Workbook) -> Result<()> {
+        if !Arc::ptr_eq(&workbook.inner, &self.source.inner) {
+            return Err(Error::PatchConflict {
+                part: "workbook lineage".to_owned(),
+            });
+        }
+        if workbook.workbook_protection_metadata()?.is_some() {
+            return Err(Error::Unsupported {
+                feature: "applying a cross-workbook scalar patch to a protected workbook",
+            });
+        }
+        Ok(())
+    }
 }
 
 impl Patch {
@@ -2008,6 +2047,7 @@ impl Patch {
             style_guard: self.style_guard.clone(),
             source: self.target.clone(),
             target: self.source.clone(),
+            authority: self.authority.as_ref().map(PatchAuthority::inverse),
         }
     }
 
@@ -2024,6 +2064,9 @@ impl Patch {
 
     pub(in crate::workbook) fn apply_to(&self, workbook: &Workbook) -> Result<Commit> {
         ensure_unsigned(workbook)?;
+        if let Some(authority) = &self.authority {
+            authority.validate(workbook)?;
+        }
         let source = workbook.clone();
         if let Some(guard) = &self.style_guard {
             guard.validate(workbook)?;
@@ -2032,6 +2075,12 @@ impl Patch {
             let mut patch = self.clone();
             patch.source = Some(workbook.clone());
             patch.target = Some(workbook.clone());
+            if patch.authority.is_some() {
+                patch.authority = Some(PatchAuthority {
+                    source: workbook.clone(),
+                    target: workbook.clone(),
+                });
+            }
             return Ok(Commit {
                 workbook: workbook.clone(),
                 patch,
@@ -2070,6 +2119,12 @@ impl Patch {
         let mut patch = self.clone();
         for change in &mut patch.changes {
             change.rebind_style(&workbook);
+        }
+        if self.authority.is_some() {
+            patch.authority = Some(PatchAuthority {
+                source: source.clone(),
+                target: workbook.clone(),
+            });
         }
         patch.source = Some(source);
         patch.target = Some(workbook.clone());

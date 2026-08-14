@@ -33,7 +33,8 @@ use crate::style::StyleLineage;
 use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 
 use super::super::model::{
-    PartChange, StyleGuard, defaults_after, ensure_merge_area, merge_conflicts, project_merges,
+    PartChange, PatchAuthority, StyleGuard, defaults_after, ensure_merge_area, merge_conflicts,
+    project_merges,
 };
 use super::super::validation::{
     Added, FinalOrder, MergeIntent, OptionalAction, OrderPlan, PanesAction, Placement,
@@ -71,6 +72,7 @@ pub struct Edit {
     pub(in crate::workbook::edit) sheets: BTreeMap<usize, SheetActions>,
     pub(in crate::workbook::edit) added: Vec<Added>,
     pub(in crate::workbook::edit) removed: BTreeSet<usize>,
+    pub(in crate::workbook::edit) cross_workbook_scalar: bool,
 }
 
 impl Edit {
@@ -86,6 +88,7 @@ impl Edit {
             sheets: BTreeMap::new(),
             added: Vec::new(),
             removed: BTreeSet::new(),
+            cross_workbook_scalar: false,
         })
     }
 
@@ -599,6 +602,49 @@ impl Edit {
         self.transfer_cells(source, range, target, anchor, CellTransfer::Copy)
     }
 
+    /// Copy a bounded dependency-free scalar range from an immutable donor
+    /// workbook into this transaction's target workbook.
+    ///
+    /// Unlike [`Self::copy_cells`], this cross-workbook operation deliberately
+    /// accepts only scalar cell values whose source worksheet has no modeled
+    /// relationship or annotation surface. It never carries donor styles,
+    /// shared-string identities, formulas, or package relationships across
+    /// the workbook boundary. Target cells must be absent in the projected
+    /// transaction state. Both workbooks must be ordinary, unsigned,
+    /// plaintext, and unprotected; encrypted, signed, workbook-protected, or
+    /// worksheet-protected donors are refused rather than declassified or
+    /// copied through a lock. A donor from this exact workbook lineage
+    /// delegates to [`Self::copy_cells`] so established same-workbook behavior
+    /// remains unchanged.
+    ///
+    /// `Ok(None)` means either semantic sheet selector did not resolve.
+    pub fn copy_cells_from<'source, 'range, 'target, 'anchor>(
+        &mut self,
+        donor: &Workbook,
+        source: impl Into<Selector<'source>>,
+        range: impl Into<Area<'range>>,
+        target: impl Into<Selector<'target>>,
+        anchor: impl Into<At<'anchor>>,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "cross-workbook scalar cell transfer")?;
+        if Arc::ptr_eq(&self.base.inner, &donor.inner) {
+            return self.copy_cells(source, range, target, anchor);
+        }
+        super::super::transfer::copy_scalar_cells_from(self, donor, source, range, target, anchor)
+    }
+
+    /// Descriptive alias for [`Self::copy_cells_from`].
+    pub fn copy_scalar_cells_from<'source, 'range, 'target, 'anchor>(
+        &mut self,
+        donor: &Workbook,
+        source: impl Into<Selector<'source>>,
+        range: impl Into<Area<'range>>,
+        target: impl Into<Selector<'target>>,
+        anchor: impl Into<At<'anchor>>,
+    ) -> Result<Option<&mut Self>> {
+        self.copy_cells_from(donor, source, range, target, anchor)
+    }
+
     /// Move a bounded cell region with the same dependency closure and
     /// refusals as [`Self::copy_cells`].
     ///
@@ -852,6 +898,7 @@ impl Edit {
             });
         }
 
+        let other_cross_workbook_scalar = other.cross_workbook_scalar;
         let added_offset = self.added.len();
         if self.panes.is_none() {
             self.panes = other.panes;
@@ -938,6 +985,7 @@ impl Edit {
         }
         self.added.extend(other.added);
         self.removed.extend(other.removed);
+        self.cross_workbook_scalar |= other_cross_workbook_scalar;
         Ok(self)
     }
 
@@ -968,6 +1016,7 @@ impl Edit {
             mut sheets,
             added,
             removed: _,
+            cross_workbook_scalar,
         } = self;
         ensure_defined_name_edit_is_composable(
             requested_defined_names.as_deref(),
@@ -2384,6 +2433,8 @@ impl Edit {
             codec::validate_web_integrity(&workbook)?;
         }
         workbook.adopt_validated_worksheet_stores(&base, validated_worksheet_stores)?;
+        let authority =
+            cross_workbook_scalar.then(|| PatchAuthority::new(base.clone(), workbook.clone()));
         Ok(Commit {
             workbook: workbook.clone(),
             patch: Patch {
@@ -2395,6 +2446,7 @@ impl Edit {
                 style_guard,
                 source: Some(base),
                 target: Some(workbook),
+                authority,
             },
         })
     }
