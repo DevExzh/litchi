@@ -32,7 +32,7 @@ performance claim.
 | Explicit repair plan | Partial (correctness only) | Generic ODF exposes one bounded typed `RepairPlan<NonDestructive>` for an otherwise-valid first/stored `mimetype` with one recognized Extended Timestamp local-header extra. It binds source length and SHA-256 evidence, rejects stale/foreign reports and unsafe ZIP/security/semantic cases before output, previews deterministic changed-member/archive effects without source bytes, removes only that local extra, reopens the candidate, proves member digest equality and raw preservation, and reports sequential-sink progress. Explicit `apply` yields a source-checked reversible patch with an exact inverse; destructive plans and unsupported structural/XML/encryption/signature/macro repairs remain unconstructible. No latency claim is made. |
 | Preserve unknown extension during understood edit | Partial | Targeted OPC raw-copy framing/unknown-member tests, exact untouched opaque ODS rows/members, and exact raw ODT/ODS/ODP auxiliary/media members during neighboring edits; ODT resource replacement retains frame attributes and unknown children while removal retains payload files; ODP model batches retain unselected producer content; the new XLSX closures raw-copy unselected Parts and refuse selected MCE/unknown owners. This is narrow fail-closed preservation, not general extension-aware editing |
 | Replace one or a bounded set of low-level Parts, preserve the rest | Covered for owned OPC, bounded source-backed OPC, guarded DOCX main-document semantics, guarded PPTX selected/multi-slide semantics, and guarded XLSX worksheet/workbook semantics | Changes 0008/0021/0022 test owned raw framing, fallback and payload ownership; changes 0037/0077 add consuming one-Part/bounded multi-Part publishers; changes 0039, 0044/0063/0077, 0046, 0061, 0067, 0070, 0073, 0076, 0078, 0079 and 0080 integrate accepted measured guarded semantic transactions while refusing unsafe MCE, signatures, stale closure, topology, relationship, style-reference and printer-reference cases before output. Change 0082 adds matched selectable XLSX conditional-formatting publication through one selected worksheet after workbook/relationship/styles validation, with no latency claim before ABBA. Correctness-only guarded closures add direct standard PPTX transition set/replace/clear through one selected slide Part, XLSX tab-state publication through the workbook alone or the workbook plus old/new active worksheets, and DOCX main-document-only hyperlink-wrapper detachment. General XLSX cell/formula/table-filter, printer graph and structural/inherited/extension-transition PPTX editing remain outside the closure |
-| Same-length OLE2 stream edits and metadata moves | Substrate correctness plus bounded range-read evidence | `litchi-cfb` resolves existing logical streams through validated FAT/MiniFAT chains for bounded same-length whole-stream overlays and byte-range splices, and can move existing stream directory entries without copying payload sectors. Its writer also moves storage subtrees atomically while retaining descendant payload allocations and order. Exact source/version and target checks, overlap/duplicate/path/topology limits, complete reopen, direct sequential publication and atomic path output are covered where exposed. `litchi-ole-common` retains signing/encryption/DRM refusals. Change 0094 adds four opt-in paired legacy-full-stream/positional-exact-range controls over deterministic 36-byte MiniFAT and 4 MiB FAT targets at 256/2,048 siblings. Pinned ABBA proves that the MiniFAT range seam reads 36 bytes instead of 261,184 or 2,096,192 while retaining one request, with read-stage p50 improvement in both directions. Mandatory CFB open still dominates end-to-end latency; unstable FAT tails and cold-filesystem/allocation/RSS evidence remain open. These are generic CFB/OLE2 substrate APIs, not DOC/XLS/PPT semantic CRUD or general end-to-end certification |
+| Same-length OLE2 stream edits and metadata moves | Substrate plus bounded native-XLS consumers | `litchi-cfb` resolves existing logical streams through validated FAT/MiniFAT chains for bounded same-length whole-stream overlays and byte-range splices, and can move existing stream directory entries without copying payload sectors. Its writer also moves storage subtrees atomically while retaining descendant payload allocations and order. Exact source/version and target checks, overlap/duplicate/path/topology limits, complete reopen, direct sequential publication and atomic path output are covered where exposed. `litchi-ole-common` retains signing/encryption/DRM refusals. Change 0094 proves proportional MiniFAT exact-range reads at the generic substrate. Change 0095 adds semantic existing-comment and worksheet-visibility publishers: one/256-comment plans submit 109/27,904 bytes instead of an 80,946-byte Workbook, and one/64-visibility plans submit 1/64 instead of 18,166. Balanced ABBA accepts no latency speedup; allocation/RSS/source-I/O, DOC/PPT consumers, unstable FAT tails and cold/high-latency evidence remain open |
 
 The source/output matrix is also incomplete. Owned bytes and instrumented
 `ReadAt` exist for OPC/XLSX, and the deterministic range simulator covers
@@ -594,14 +594,15 @@ incompressible streams and an opaque metadata stream. All replacements preserve
 record length and compressed encoding width. The report records distinct
 semantic staging/plan and publication samples, complete bounded sink counters,
 per-case output hashes, and source-backed changed-comment/stream/span counts,
-equal Workbook lengths, and exact source/target fingerprints. Untimed gates
+equal Workbook lengths, exact NOTE/TXO splice/replacement-byte diagnostics, and
+source/target fingerprints. Untimed gates
 reopen all comments, compare every untouched stream, prove eager patch replay,
 inverse and stale refusal, preserve the explicit eager fallback for a
 length-changing update, and refuse protected edits. Generic source counters are
 limited and labeled to the explicit owned-source ingress because this public XLS
-API does not accept a caller-provided `ReadAt`. This is selectable correctness
-evidence only; it makes no latency, allocation, memory, I/O, or materialization
-claim without a frozen release-build, CPU-pinned ABBA run.
+API does not accept a caller-provided `ReadAt`. Change 0095 accepts only the
+exact replacement-byte reduction; its balanced release ABBA establishes no
+speedup, and allocation, RSS and source-I/O remain open.
 
 Change 0091 adds four opt-in native XLS worksheet-visibility cases over one
 deterministic CFB corpus with 66 worksheets, eight 256 KiB incompressible opaque
@@ -615,10 +616,10 @@ stream catalog and every opaque stream, verify the exact one-byte `hsState`
 offset set, prove eager patch replay/inverse, source-backed fingerprints and
 changed-span counts, exact no-op identity, the 64-owner cap refusal, and
 protected-source refusal. Source counters are explicitly limited to owned
-source ingress, as with the comment tranche. The source-backed path retains
-the complete candidate snapshot today; this evidence therefore makes no
-allocation, peak-memory, I/O, or speedup claim without controlled release
-ABBA.
+source ingress, as with the comment tranche. Change 0095 submits 1/64 exact
+visibility bytes rather than one 18,166-byte Workbook replacement. The
+complete candidate snapshot remains; balanced ABBA accepts no speedup and
+allocation, peak-memory and I/O evidence remain open.
 
 The 2026-08-12 non-iWork wave from `cb797b382` through `f6bbdf19c` adds
 correctness-only bounded validation reports for CFB, OPC and generic ODF;

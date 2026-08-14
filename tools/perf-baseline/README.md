@@ -493,8 +493,11 @@ batch cases replace exactly the supported 256-owner limit. Author/text lengths
 and compressed encoding width stay unchanged. Each sample separately records
 semantic staging/plan and publication time while total `elapsed_ns` is their
 sum. The source-backed reports additionally retain changed comments, logical
-streams, physical spans, equal Workbook lengths, and exact source/target CFB
-fingerprints. Generic source counters cover only the explicit owned-source
+streams, exact NOTE/TXO splice counts and replacement-byte totals, physical
+spans, equal Workbook lengths, and exact source/target CFB fingerprints. The
+one-owner control requires two splices (one NOTE and one TXO family), while
+the 256-owner control requires 512; replacement bytes must be nonzero and
+remain below the full Workbook stream. Generic source counters cover only the explicit owned-source
 ingress because the public XLS comments API owns its source bytes internally;
 sink counters cover complete bounded publication. Complete reopen, all 256
 semantic values, worksheet/comment inventory, every untouched stream, explicit
@@ -522,8 +525,10 @@ batch cases change exactly the supported 64-owner limit by hiding positions
 records semantic staging/commit and sequential publication time through a
 bounded 64 KiB sink; total `elapsed_ns`
 is their sum. Source-backed reports additionally retain changed-owner/stream,
-physical-span, equal Workbook-length, and exact source/target CFB fingerprint
-evidence. Generic source counters cover only explicit owned-source ingress;
+exact source-relative splice and replacement-byte diagnostics, physical-span,
+equal Workbook-length, and exact source/target CFB fingerprint evidence. The
+one-owner control requires 1 splice and 1 replacement byte; the 64-owner
+control requires 64 and 64. Generic source counters cover only explicit owned-source ingress;
 sink counters cover complete bounded publication. Complete worksheet/catalog
 reopen, opaque-stream preservation, exact offset checks, eager patch
 replay/inverse, no-op identity, cap-plus-one refusal, and protected-source
@@ -1515,12 +1520,15 @@ and source-conflict gates. `retained_output_bytes: 0` describes only the timed
 sink; the append API intentionally retains its validated candidate snapshot,
 so the window is not a process-RSS or transaction-memory claim.
 
-Native XLS worksheet-visibility cases emit `output_sha256` and a
-`source.xls_visibility` object with the explicit owned-source counter scope,
-source-backed flag, update count, separate semantic/publication distributions,
-changed worksheet/stream counts, source and Workbook lengths, and (for
-source-backed cases) changed physical spans and exact source/target
-fingerprints. These diagnostics are content-free and do not imply a bounded
+Native XLS comment cases emit `output_sha256` and a `source.xls_comments`
+object with the explicit owned-source counter scope, source-backed flag,
+update count, separate semantic/publication distributions, changed
+comment/stream counts, exact NOTE/TXO `splice_count` and `replacement_bytes`
+(source-backed cases), source and Workbook lengths, and changed physical spans
+and exact source/target fingerprints. Native XLS worksheet-visibility cases
+emit the same shape under `source.xls_visibility`, with changed
+worksheet/stream counts and exact `BoundSheet8.hsState` splice/replacement
+diagnostics. These diagnostics are content-free and do not imply a bounded
 candidate allocation or a performance advantage.
 
 `docx_source_backed_one_edit_save` also emits `output_sha256`, source/sink

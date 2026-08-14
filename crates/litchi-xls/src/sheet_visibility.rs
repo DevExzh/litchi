@@ -22,8 +22,8 @@ use crate::records::{BoundSheetRecord, Encoding, SheetType, SheetVisible};
 use crate::{Error, Result, SheetKind, SheetVisibility, Workbook};
 use litchi_biff::Records;
 use litchi_cfb::{
-    ArtifactFingerprint, ComposedOverlaySource, OleFile, OverlayError, OverlayLimits,
-    PublishReport, SameLengthStreamOverlay, ValidatedOverlayPlan,
+    ArtifactFingerprint, ComposedOverlaySource, OleFile, OverlayError, PublishReport,
+    SameLengthStreamSplice, StreamSpliceLimits, ValidatedOverlayPlan,
 };
 use litchi_core::binary;
 use litchi_core::{ReadAt, SourceVersion};
@@ -421,8 +421,8 @@ impl Transaction {
 
     /// Plans a protected, source-backed same-length visibility publication.
     ///
-    /// The complete `Workbook`/`Book` stream is staged first and then submitted
-    /// as one [`SameLengthStreamOverlay`]. The common CFB publisher retains the
+    /// The changed `BoundSheet8` fields are submitted as bounded
+    /// [`SameLengthStreamSplice`] values. The common CFB publisher retains the
     /// source topology and all unselected streams, while the composed target is
     /// reopened through the complete XLS reader before the plan is returned.
     /// This method never falls back to [`Self::commit`]; callers that need a
@@ -446,40 +446,44 @@ impl Transaction {
             require_final_visible_worksheet(&self.source, &self.changes)?;
         }
 
-        let mut workbook = Vec::new();
-        workbook
-            .try_reserve_exact(self.source.inner.workbook_stream.len())
-            .map_err(|_error| Error::Allocation("staging source-backed Workbook stream"))?;
-        workbook.extend_from_slice(&self.source.inner.workbook_stream);
+        let mut splices = Vec::new();
+        splices
+            .try_reserve_exact(effective.len())
+            .map_err(|_error| Error::Allocation("staging source-backed visibility splices"))?;
         for change in &effective {
             let entry = self.source.inner.sheets.get(change.sheet).ok_or_else(|| {
                 Error::UnsafeEdit("source-backed worksheet visibility owner is stale".into())
             })?;
-            let field = workbook.get_mut(entry.visibility_offset).ok_or_else(|| {
-                Error::InvalidData("BoundSheet8 visibility field is outside Workbook".into())
-            })?;
-            if *field != encode_visibility(change.before) {
+            let field = self
+                .source
+                .inner
+                .workbook_stream
+                .get(entry.visibility_offset)
+                .ok_or_else(|| {
+                    Error::InvalidData("BoundSheet8 visibility field is outside Workbook".into())
+                })?;
+            let before = encode_visibility(change.before);
+            if *field != before {
                 return Err(Error::UnsafeEdit(
                     "BoundSheet8 visibility precondition is stale".into(),
                 ));
             }
-            *field = encode_visibility(change.after);
-        }
-        if workbook.len() != self.source.inner.workbook_stream.len() {
-            return Err(Error::UnsafeEdit(
-                "source-backed visibility publication changed Workbook stream length".into(),
+            let offset = u64::try_from(entry.visibility_offset).map_err(|_error| {
+                Error::InvalidData("BoundSheet8 visibility offset exceeds u64".into())
+            })?;
+            splices.push(SameLengthStreamSplice::new(
+                self.source.inner.workbook_path.clone(),
+                offset,
+                Arc::from(vec![before]),
+                Arc::from(vec![encode_visibility(change.after)]),
             ));
         }
 
         let source: Arc<dyn ReadAt> =
             Arc::new(SnapshotSource::new(Arc::clone(&self.source.inner.bytes)));
         let publisher = SourceBackedOverlayPublisher::open(source).map_err(overlay_to_error)?;
-        let replacement = SameLengthStreamOverlay::new(
-            self.source.inner.workbook_path.clone(),
-            Arc::from(workbook),
-        );
         let plan = publisher
-            .plan(vec![replacement], OverlayLimits::default())
+            .plan_splices(splices, StreamSpliceLimits::default())
             .map_err(overlay_to_error)?;
         verify_source_backed_readback(&plan, &self.source, &effective)?;
 
@@ -490,6 +494,10 @@ impl Transaction {
         let diagnostics = SourceBackedDiagnostics {
             changed_worksheets: effective.len(),
             touched_streams: usize::from(!plan.is_noop()),
+            splice_count: effective.len(),
+            replacement_bytes: u64::try_from(effective.len()).map_err(|_error| {
+                Error::InvalidData("visibility splice count exceeds u64".into())
+            })?,
             changed_spans: plan.changed_spans(),
             source_bytes,
             source_workbook_bytes,
@@ -591,6 +599,8 @@ impl fmt::Debug for Commit {
 pub struct SourceBackedDiagnostics {
     changed_worksheets: usize,
     touched_streams: usize,
+    splice_count: usize,
+    replacement_bytes: u64,
     changed_spans: usize,
     source_bytes: u64,
     source_workbook_bytes: u64,
@@ -610,6 +620,18 @@ impl SourceBackedDiagnostics {
     #[must_use]
     pub const fn touched_streams(self) -> usize {
         self.touched_streams
+    }
+
+    /// Number of source-relative visibility splices submitted to CFB.
+    #[must_use]
+    pub const fn splice_count(self) -> usize {
+        self.splice_count
+    }
+
+    /// Aggregate replacement bytes retained by the splice plan.
+    #[must_use]
+    pub const fn replacement_bytes(self) -> u64 {
+        self.replacement_bytes
     }
 
     /// Number of physical CFB spans retained by the overlay plan.
@@ -1512,6 +1534,8 @@ mod tests {
         let commit = edit.commit_source_backed().unwrap();
         assert_eq!(commit.diagnostics().changed_worksheets(), 1);
         assert_eq!(commit.diagnostics().touched_streams(), 1);
+        assert_eq!(commit.diagnostics().splice_count(), 1);
+        assert_eq!(commit.diagnostics().replacement_bytes(), 1);
         assert!(commit.diagnostics().changed_spans() > 0);
         assert_ne!(
             commit.diagnostics().source_fingerprint(),
@@ -1562,6 +1586,11 @@ mod tests {
             bounded.diagnostics().changed_worksheets(),
             MAX_VISIBILITY_CHANGES
         );
+        assert_eq!(bounded.diagnostics().splice_count(), MAX_VISIBILITY_CHANGES);
+        assert_eq!(
+            bounded.diagnostics().replacement_bytes(),
+            MAX_VISIBILITY_CHANGES as u64
+        );
         let mut output = Vec::new();
         bounded.write_to(&mut output).unwrap();
         let reopened = Snapshot::from_bytes(output).unwrap();
@@ -1581,6 +1610,8 @@ mod tests {
         assert!(noop.is_noop());
         assert_eq!(noop.diagnostics().changed_worksheets(), 0);
         assert_eq!(noop.diagnostics().touched_streams(), 0);
+        assert_eq!(noop.diagnostics().splice_count(), 0);
+        assert_eq!(noop.diagnostics().replacement_bytes(), 0);
         assert_eq!(
             noop.diagnostics().source_fingerprint(),
             noop.diagnostics().target_fingerprint()
