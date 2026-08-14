@@ -10,8 +10,23 @@ use super::model::{
 use crate::cell::{Cell, Date, ErrorValue, Number, Stored, Text, Unknown, Value};
 use crate::error::{Result, invalid};
 use crate::formula::{Cache, Formula, Kind};
+use litchi_sheet::{Cell as Address, Rect};
 
 pub(super) fn materialize(raw: RawCell, strings: Option<&[Text]>) -> Result<Stored> {
+    let formula_range = if let Some(range) = raw.formula_range {
+        Some(formula_range_rect(range)?)
+    } else {
+        raw.formula
+            .as_ref()
+            .and_then(|formula| match &formula.kind {
+                RawFormulaKind::Array(range) | RawFormulaKind::DataTable(range) => range.as_deref(),
+                RawFormulaKind::Scalar
+                | RawFormulaKind::Shared { .. }
+                | RawFormulaKind::Unknown(_) => None,
+            })
+            .map(Rect::from_a1)
+            .transpose()?
+    };
     let shared_string =
         if raw.formula.is_none() && raw.inline.is_none() && raw.cell_type.as_deref() == Some("s") {
             raw.value
@@ -74,9 +89,16 @@ pub(super) fn materialize(raw: RawCell, strings: Option<&[Text]>) -> Result<Stor
         cell,
         style: raw.style,
         shared_string,
+        inline_rich: raw.inline_rich,
+        formula_range,
         cell_metadata: raw.cell_metadata,
         value_metadata: raw.value_metadata,
     })
+}
+
+fn formula_range_rect(range: FormulaRange) -> Result<Rect> {
+    let start = Address::at(range.first_row - 1, range.first_column - 1)?;
+    Ok(Rect::new(start, range.last_row, range.last_column)?)
 }
 
 fn parse_value(
@@ -229,9 +251,13 @@ pub(super) fn resolve_shared_formulas(cells: &mut [RawCell]) -> Result<()> {
                 member.column,
             )
         };
-        let formula = cells
+        let cell = cells
             .get_mut(member.cell_index)
-            .and_then(|cell| cell.formula.as_mut())
+            .ok_or_else(|| invalid("shared formula membership lost its cell"))?;
+        cell.formula_range = Some(master.range);
+        let formula = cell
+            .formula
+            .as_mut()
             .ok_or_else(|| invalid("shared formula membership lost its cell"))?;
         formula.text = text;
         formula.kind = RawFormulaKind::Scalar;

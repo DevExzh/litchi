@@ -121,6 +121,11 @@ pub(super) struct RawCell {
     pub(super) cell_type: Option<String>,
     pub(super) value: Option<String>,
     pub(super) inline: Option<String>,
+    pub(super) inline_rich: bool,
+    // Shared formulas are expanded into ordinary formula text before
+    // materialization. Keep the master's declared range beside that text so
+    // a scalar-looking follower cannot lose its range ownership.
+    pub(super) formula_range: Option<FormulaRange>,
     pub(super) formula: Option<RawFormula>,
 }
 

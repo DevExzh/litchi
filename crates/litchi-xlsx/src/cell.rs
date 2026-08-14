@@ -611,6 +611,15 @@ pub(crate) struct Stored {
     // Retained so same-workbook transfers can preserve the exact shared-string
     // item, including rich-text runs, without exposing its physical index.
     pub(crate) shared_string: Option<usize>,
+    // Inline strings are flattened into `Cell::Value(Text)` for the ordinary
+    // facade. Retain whether the source carried rich runs so dependency-aware
+    // transfers can refuse formatting-bearing inline text as a plain scalar.
+    pub(crate) inline_rich: bool,
+    // Array/data-table formula ranges and expanded shared-formula ownership
+    // are retained even when the ordinary formula facade exposes a scalar
+    // member. Range-aware transfers use this provenance to refuse copying
+    // through an owner whose anchor is outside the selected rectangle.
+    pub(crate) formula_range: Option<Rect>,
     #[allow(
         dead_code,
         reason = "the cached column supports internal sparse-cell indexing"
@@ -951,6 +960,8 @@ mod tests {
                 cell: Cell::Empty,
                 style: None,
                 shared_string: None,
+                inline_rich: false,
+                formula_range: None,
                 cell_metadata: None,
                 value_metadata: None,
             })

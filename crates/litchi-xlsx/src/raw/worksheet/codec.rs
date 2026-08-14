@@ -968,6 +968,8 @@ impl Parser {
             cell_type: cell.cell_type,
             value: cell.saw_value.then_some(cell.value),
             inline: cell.saw_inline.then_some(cell.inline),
+            inline_rich: cell.saw_inline_run,
+            formula_range: None,
             formula,
         });
         Ok(())
