@@ -13,8 +13,12 @@
 //! bounded owned copy) without detaching a managed reservation.
 
 use std::collections::HashMap;
+#[cfg(any(unix, windows))]
+use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
+#[cfg(any(unix, windows))]
+use litchi_core::FileSource;
 use litchi_core::{
     ExecutionContext, ExecutionError, ReadAt, Selector as CoreSelector, SourceVersion,
 };
@@ -149,6 +153,155 @@ pub struct SourceCell {
 }
 
 impl SourceBackedWorkbook {
+    /// Open an ordinary XLSX package from a regular filesystem path.
+    ///
+    /// The path is held through an open [`FileSource`]; the package is not
+    /// slurped into memory and subsequent worksheet reads remain positional
+    /// and lazy. Replacing the pathname after this call does not retarget the
+    /// open source, while a detected metadata change returns a typed source
+    /// version error on the next operation.
+    #[cfg(any(unix, windows))]
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_path_with_limits(path, ReadLimits::default())
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit OPC limits.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_read_at_with_limits(file_source(path)?, limits)
+    }
+
+    /// Open a filesystem-backed XLSX package with an explicit deferred-Part
+    /// cache policy.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_cache_limits(
+        path: impl AsRef<Path>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_read_at_with_cache_limits(file_source(path)?, cache_limits)
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit read and cache
+    /// policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_cache_limits(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit read and execution
+    /// policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit read and execution
+    /// policies while retaining the default finite cache.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit read, cache, and
+    /// execution policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_cache_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            file_source(path)?,
+            limits,
+            cache_limits,
+            context,
+        )
+    }
+
+    /// Open a filesystem-backed XLSX package from a regular path.
+    #[cfg(any(unix, windows))]
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_path(path)
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit OPC limits.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_path_with_limits(path, limits)
+    }
+
+    /// Open a filesystem-backed XLSX package with an explicit finite cache.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_cache_limits(
+        path: impl AsRef<Path>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_path_with_cache_limits(path, cache_limits)
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit read and cache
+    /// policies.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits_and_cache_limits(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit read and execution
+    /// policies.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_path_with_execution_context(path, limits, context)
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit read and execution
+    /// policies while retaining the default finite cache.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_path_with_limits_and_execution_context(path, limits, context)
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit read, cache, and
+    /// execution policies.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits_and_cache_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_path_with_limits_and_cache_limits_and_execution_context(
+            path,
+            limits,
+            cache_limits,
+            context,
+        )
+    }
+
     /// Open an ordinary XLSX package from a caller-provided positional source.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
         Self::from_read_at_with_limits(source, ReadLimits::default())
@@ -208,6 +361,16 @@ impl SourceBackedWorkbook {
             context.clone(),
         )?;
         Self::from_source_backed_package_with_execution_context(package, Some(context))
+    }
+
+    /// Open from a positional source with explicit read and execution
+    /// policies while retaining the default finite cache.
+    pub fn from_read_at_with_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_execution_context(source, limits, context)
     }
 
     /// Open an XLSX source with explicit read, cache, and execution policies.
@@ -389,6 +552,13 @@ impl SourceBackedWorkbook {
             data,
         })
     }
+}
+
+#[cfg(any(unix, windows))]
+fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
+    Ok(Arc::new(FileSource::open(path).map_err(|error| {
+        Error::Package(litchi_opc::OpcError::from(error))
+    })?))
 }
 
 impl SourceWorksheet {
