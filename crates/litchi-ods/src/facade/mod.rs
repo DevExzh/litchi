@@ -6,7 +6,7 @@ use litchi_core::Result;
 use std::{
     path::Path,
     sync::{
-        OnceLock,
+        Arc, OnceLock,
         atomic::{AtomicUsize, Ordering},
     },
 };
@@ -17,7 +17,7 @@ pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 
 /// Immutable ODS document facade.
 pub struct Spreadsheet {
-    package: crate::package::Package,
+    package: Arc<crate::package::Package>,
     definitions: Vec<Definition>,
     sheets: Vec<crate::worksheet::Sheet>,
     metadata: crate::metadata::Snapshot,
@@ -90,6 +90,10 @@ impl Spreadsheet {
     }
 
     pub(crate) fn from_package(package: crate::package::Package) -> Result<Self> {
+        Self::from_shared_package(Arc::new(package))
+    }
+
+    pub(crate) fn from_shared_package(package: Arc<crate::package::Package>) -> Result<Self> {
         let definitions = package.definitions()?;
         let sheets = package.sheets()?;
         let metadata = package.metadata_snapshot()?;
@@ -111,7 +115,23 @@ impl Spreadsheet {
     ///
     /// Returns an error when package bounds or complete facade readback fail.
     pub fn document_snapshot(&self) -> Result<crate::document::Snapshot> {
-        crate::document::Snapshot::from_bytes(self.package.package().as_bytes().to_vec())
+        if self
+            .package
+            .package()
+            .package()?
+            .manifest()
+            .has_encrypted_entries()
+        {
+            return crate::document::Snapshot::from_shared_package(
+                Arc::clone(&self.package),
+                crate::document::Limits::default(),
+            );
+        }
+        let package = self.package.clone_without_password()?;
+        crate::document::Snapshot::from_shared_package(
+            Arc::new(package),
+            crate::document::Limits::default(),
+        )
     }
 
     /// Apply one durable exact-source unified package patch.
@@ -347,7 +367,8 @@ impl Spreadsheet {
     ///
     /// Returns an error when the retained package or worksheet graph is invalid.
     pub fn worksheet_snapshot(&self) -> Result<crate::worksheet::Snapshot> {
-        crate::worksheet::Snapshot::from_bytes(self.package.package().as_bytes().to_vec())
+        let package = self.package.clone_without_password()?;
+        crate::worksheet::Snapshot::from_shared_package(Arc::new(package))
     }
 
     /// Apply an exact-source reversible worksheet patch.
@@ -526,7 +547,10 @@ impl Spreadsheet {
 
     #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
-        self.package.into_bytes()
+        match Arc::try_unwrap(self.package) {
+            Ok(package) => package.into_bytes(),
+            Err(package) => package.package().as_bytes().to_vec(),
+        }
     }
 
     /// Return all global and sheet-local named definitions in document order.
@@ -625,7 +649,7 @@ impl Spreadsheet {
     pub fn set_definitions(&mut self, definitions: Vec<Definition>) -> Result<()> {
         let updated = crate::codec::names::replace(self.package.content_xml(), &definitions)?;
         let package = self.package.replace_content_xml(&updated)?;
-        self.package = package;
+        self.package = Arc::new(package);
         self.definitions = definitions;
         Ok(())
     }
@@ -633,7 +657,7 @@ impl Spreadsheet {
     /// Publish a validated worksheet snapshot as one package transaction.
     pub(crate) fn publish_sheets(&mut self, sheets: Vec<crate::worksheet::Sheet>) -> Result<()> {
         let package = self.package.replace_sheets(&sheets)?;
-        self.package = package;
+        self.package = Arc::new(package);
         self.sheets = sheets;
         Ok(())
     }
@@ -829,6 +853,23 @@ mod tests {
         let spreadsheet =
             Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
         assert!(spreadsheet.content_xml().contains("office:spreadsheet"));
+    }
+
+    #[test]
+    fn worksheet_snapshot_reuses_the_facade_package_index() {
+        let bytes = Builder::new()
+            .build()
+            .expect("test fixture or operation should succeed");
+        let spreadsheet =
+            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+        let snapshot = spreadsheet
+            .worksheet_snapshot()
+            .expect("test fixture or operation should succeed");
+
+        assert_eq!(
+            snapshot.prepared_index_identity(),
+            spreadsheet.prepared_index_identity()
+        );
     }
 
     #[test]
