@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "evidence_id": "cfb-atomic-save-scan-0112",
+  "date": "2026-08-14",
+  "case": "cfb_file_same_length_overlay_atomic_save",
+  "protocol": {
+    "order": ["before-A", "after-A", "after-B", "before-B"],
+    "profile": "release",
+    "samples_per_leg": 30,
+    "warmups_per_leg": 5,
+    "filesystem_cache_states": ["warm"],
+    "fresh_child_per_sample": true,
+    "process_isolated": true,
+    "filesystem_type": "ext2/ext3",
+    "cpu_affinity": "2",
+    "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+    "git_worktree_dirty": false,
+    "binary_sha256_prefixes": {
+      "before": "b95c5d3e",
+      "after": "88a5adb7"
+    }
+  },
+  "legs": [
+    {
+      "label": "before-A",
+      "revision": "32e5a9f819399111bcb2cd70b8c2b7f6887c1773",
+      "raw_report": "cfb-save-atomic-scan-before-a-0112.json",
+      "raw_report_sha256": "8930a63782469b403c519fe98af7e2a3a677fce726bae90fb2d83f68f48ccbbf",
+      "p50_ns": 143425701,
+      "p95_ns": 199477308,
+      "p99_ns": 299130158,
+      "mean_ns": 161620646.73333332,
+      "logical_read_calls": 2084,
+      "logical_read_requested_bytes": 101751908,
+      "logical_read_bytes": 101751908,
+      "output_sha256": "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc",
+      "output_bytes": 16913408,
+      "parent_wall_ns_range": [454927594, 848401174],
+      "process_read_bytes_range": [0, 4096]
+    },
+    {
+      "label": "after-A",
+      "revision": "4ededfa245173d2e03f357b91ebf81b867ebc01f",
+      "raw_report": "cfb-save-atomic-scan-after-a-0112.json",
+      "raw_report_sha256": "40c6c552487d78a0989b7b077117351628540caef3aff99e217049468b670a7a",
+      "p50_ns": 148870583,
+      "p95_ns": 187851440,
+      "p99_ns": 226814448,
+      "mean_ns": 145769405.2333333,
+      "logical_read_calls": 1825,
+      "logical_read_requested_bytes": 84838500,
+      "logical_read_bytes": 84838500,
+      "output_sha256": "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc",
+      "output_bytes": 16913408,
+      "parent_wall_ns_range": [437006671, 588156807],
+      "process_read_bytes_range": [0, 4096]
+    },
+    {
+      "label": "after-B",
+      "revision": "4ededfa245173d2e03f357b91ebf81b867ebc01f",
+      "raw_report": "cfb-save-atomic-scan-after-b-0112.json",
+      "raw_report_sha256": "43878dd4da31d1b6734fd5f3dff0c58a27f2131912ac4e21414d50c12b64fc4e",
+      "p50_ns": 148368923,
+      "p95_ns": 159838650,
+      "p99_ns": 163817138,
+      "mean_ns": 139601980.1,
+      "logical_read_calls": 1825,
+      "logical_read_requested_bytes": 84838500,
+      "logical_read_bytes": 84838500,
+      "output_sha256": "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc",
+      "output_bytes": 16913408,
+      "parent_wall_ns_range": [444292542, 501226686],
+      "process_read_bytes_range": [0, 0]
+    },
+    {
+      "label": "before-B",
+      "revision": "32e5a9f819399111bcb2cd70b8c2b7f6887c1773",
+      "raw_report": "cfb-save-atomic-scan-before-b-0112.json",
+      "raw_report_sha256": "7c0565cfedfeb458e885659bd3b300fed60968ba9220b3892a573a880dcccd31",
+      "p50_ns": 164880142,
+      "p95_ns": 173455329,
+      "p99_ns": 175031860,
+      "mean_ns": 157191806.0,
+      "logical_read_calls": 2084,
+      "logical_read_requested_bytes": 101751908,
+      "logical_read_bytes": 101751908,
+      "output_sha256": "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc",
+      "output_bytes": 16913408,
+      "parent_wall_ns_range": [458447252, 508950450],
+      "process_read_bytes_range": [0, 0]
+    }
+  ],
+  "comparison": {
+    "logical_read_requested_bytes_before": 101751908,
+    "logical_read_requested_bytes_after": 84838500,
+    "logical_read_bytes_reduction": 16913408,
+    "logical_read_bytes_reduction_percent": 16.622202308,
+    "logical_read_calls_before": 2084,
+    "logical_read_calls_after": 1825,
+    "logical_read_calls_reduction": 259,
+    "logical_read_calls_reduction_percent": 12.428023033,
+    "output_sha256_equal": true,
+    "output_bytes_equal": true,
+    "after_A_vs_before_A_p50_percent": 3.796308445,
+    "after_B_vs_before_B_p50_percent": -10.014073739,
+    "latency_claim": "withheld: the two balanced directions disagree"
+  },
+  "mechanism": {
+    "atomic_save_scan_shape_before": "4N",
+    "atomic_save_scan_shape_after": "3N",
+    "direct_write_scan_shape": "unchanged",
+    "accepted_claim": "exact logical ReadAt work reduction for this atomic-save case"
+  },
+  "not_claimed": [
+    "latency or speedup",
+    "RSS, allocation, or peak-memory change",
+    "physical cold-cache or storage-device behavior",
+    "decompressed, recompressed, copied, or write-byte reduction",
+    "general CFB or DOC/XLS/PPT semantic CRUD performance"
+  ]
+}

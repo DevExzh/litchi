@@ -157,6 +157,32 @@ evidence; it does not certify DOC/XLS/PPT semantic CRUD adoption. See the
 [change record](changes/0094-cfb-selective-read-evidence.md) and
 [compact ABBA summary](results/cfb-selective-range-abba-0106-summary.json).
 
+## CFB atomic-save scan evidence
+
+Change 0103 measures the same-length `cfb_file_same_length_overlay_atomic_save`
+case across a pinned release before-A/after-A/after-B/before-B run (five
+warm-ups and 30 fresh-child samples per leg, CPU 2, warm ext2/ext3). The
+atomic `save` path removes only the duplicate post-emission fingerprint scan:
+its complete source-scan shape is mechanically `4N -> 3N`. Direct
+`write_to` retains its post-emission scan and is unchanged.
+
+| Leg | Revision | Logical reads | p50 | Output |
+|---|---|---:|---:|---|
+| before-A | `32e5a9f8` | 2,084 calls / 101,751,908 B | 143,425,701 ns | 16,913,408 B, SHA `7994759e...` |
+| after-A | `4ededfa2` | 1,825 calls / 84,838,500 B | 148,870,583 ns | same |
+| after-B | `4ededfa2` | 1,825 calls / 84,838,500 B | 148,368,923 ns | same |
+| before-B | `32e5a9f8` | 2,084 calls / 101,751,908 B | 164,880,142 ns | same |
+
+The exact logical reduction is 16,913,408 bytes (16.6222%) and 259 calls
+(12.4280%), with identical output bytes and SHA-256 on every leg. The latency
+directions disagree: after-A is +3.7963% versus before-A, while after-B is
+-10.0141% versus before-B. This is therefore logical `ReadAt` work and
+correctness evidence only; no latency, allocation, RSS, peak-memory,
+physical-cold, high-latency, or general semantic CRUD claim is accepted.
+Parent-wall and warm process `read_bytes` fields remain descriptive counters,
+not speed or storage-device evidence. See the [change record](changes/0103-cfb-atomic-save-scan-evidence.md)
+and [compact summary](results/cfb-save-atomic-scan-0112-summary.json).
+
 ## Parallel scaling observation
 
 This historical `opc_open` experiment used `RAYON_NUM_THREADS` in separate
