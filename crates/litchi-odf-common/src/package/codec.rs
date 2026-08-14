@@ -67,14 +67,15 @@ impl<'data> Archive<'data> {
     /// Returns an error when neither conventional manifest location can be
     /// read as UTF-8.
     pub fn read_manifest_xml(&self) -> Result<String> {
-        match self.read_string(MANIFEST_PATHS[0]) {
-            Ok(manifest) => Ok(manifest),
-            Err(first_error) => self.read_string(MANIFEST_PATHS[1]).map_err(|second_error| {
-                Error::InvalidFormat(format!(
-                    "No manifest.xml found in ODF package: {first_error}; {second_error}"
-                ))
-            }),
+        if self.contains(MANIFEST_PATHS[0]) {
+            return self.read_string(MANIFEST_PATHS[0]);
         }
+        if self.contains(MANIFEST_PATHS[1]) {
+            return self.read_string(MANIFEST_PATHS[1]);
+        }
+        Err(Error::InvalidFormat(
+            "No manifest.xml found in ODF package".to_string(),
+        ))
     }
 
     /// Check whether an archive member exists.

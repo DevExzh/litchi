@@ -1,0 +1,325 @@
+//! Immutable, positional-source ODP reads.
+//!
+//! [`SourceBackedPresentation`] is deliberately additive: the existing
+//! [`super::Presentation`] keeps its owned-byte and mutation behavior.  This
+//! facade retains only the validated XML needed for ordinary semantic reads;
+//! package media remains cold until [`SourceBackedPresentation::media_data`]
+//! selects a member.
+
+use std::sync::Arc;
+
+#[cfg(any(unix, windows))]
+use std::path::Path;
+
+#[cfg(any(unix, windows))]
+use litchi_core::FileSource;
+use litchi_core::{Error, ReadAt, Result, SourceVersion};
+use litchi_odf_common::core::{
+    Meta, SourceBackedPackage, SourcePackageLimits, validate_content_part,
+};
+
+use crate::codec::Parser;
+use crate::model::{Reference, Slide};
+
+const ODF_PRESENTATION: &str = "application/vnd.oasis.opendocument.presentation";
+const BODY_MARKER: &str = "<office:presentation";
+const FAMILY_NAME: &str = "ODP";
+
+/// The bounded ZIP-index limits accepted by source-backed ODF facades.
+pub type ReadLimits = SourcePackageLimits;
+
+#[cfg(any(unix, windows))]
+fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
+    Ok(Arc::new(FileSource::open(path)?))
+}
+
+/// Read-only ODP access over an immutable positional source.
+///
+/// Opening validates the ZIP archive, MIME member, and family content root,
+/// then loads only `content.xml` and the optional `styles.xml`.  Other package
+/// members—including pictures and audio/video payloads—remain deferred until
+/// [`Self::media_data`] is called.  Every public operation checks the captured
+/// [`SourceVersion`] before and after work, returning
+/// [`Error::SourceChanged`] when the source revision is no longer current.
+///
+/// This type has no edit or output methods.  Use [`super::Presentation`] for
+/// the established owned-byte/mutation API.
+pub struct SourceBackedPresentation {
+    package: SourceBackedPackage,
+    source: Arc<dyn ReadAt>,
+    source_version: SourceVersion,
+    content_xml: String,
+    styles_xml: Option<String>,
+    metadata: Option<litchi_core::Metadata>,
+}
+
+impl SourceBackedPresentation {
+    /// Open an ODP from a regular filesystem file without slurping it.
+    #[cfg(any(unix, windows))]
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_read_at(file_source(path)?)
+    }
+
+    /// Open an ODP from a regular filesystem file with explicit ZIP limits.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_read_at_with_limits(file_source(path)?, limits)
+    }
+
+    /// Open a password-protected ODP from a regular filesystem file.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_password(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        Self::from_read_at_with_password(file_source(path)?, password)
+    }
+
+    /// Open a password-protected ODP from a regular filesystem file with
+    /// explicit ZIP limits.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_password(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_password(file_source(path)?, limits, password)
+    }
+
+    /// Alias for [`Self::from_path`].
+    #[cfg(any(unix, windows))]
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_path(path)
+    }
+
+    /// Alias for [`Self::from_path_with_limits`].
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_path_with_limits(path, limits)
+    }
+
+    /// Alias for [`Self::from_path_with_password`].
+    #[cfg(any(unix, windows))]
+    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
+        Self::from_path_with_password(path, password)
+    }
+
+    /// Alias for [`Self::from_path_with_limits_and_password`].
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits_and_password(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        Self::from_path_with_limits_and_password(path, limits, password)
+    }
+
+    /// Open an ODP from a caller-provided positional source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when source I/O, ZIP validation, MIME validation, or
+    /// family content validation fails.
+    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
+        Self::from_read_at_with_limits(source, ReadLimits::default())
+    }
+
+    /// Open a password-protected ODP from a caller-provided positional source.
+    pub fn from_read_at_with_password(
+        source: Arc<dyn ReadAt>,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        Self::from_read_at_inner(source, ReadLimits::default(), Some(password.into()))
+    }
+
+    /// Open an ODP from a positional source with explicit bounded ZIP limits.
+    ///
+    /// The archive index is retained by the common ODF owner.  Payloads not
+    /// needed for mandatory family validation are not read by this constructor.
+    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
+        Self::from_read_at_inner(source, limits, None)
+    }
+
+    /// Open a password-protected ODP from a positional source with explicit
+    /// bounded ZIP limits.
+    pub fn from_read_at_with_limits_and_password(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        Self::from_read_at_inner(source, limits, Some(password.into()))
+    }
+
+    fn from_read_at_inner(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        password: Option<String>,
+    ) -> Result<Self> {
+        let source_version = source.version()?;
+        let package = match password {
+            Some(password) => SourceBackedPackage::from_read_at_with_limits_and_password(
+                Arc::clone(&source),
+                limits,
+                password,
+            )?,
+            None => SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits)?,
+        };
+        let mimetype = package.mimetype()?;
+        if mimetype != ODF_PRESENTATION {
+            return Err(Error::InvalidFormat(format!(
+                "expected {FAMILY_NAME} package MIME type '{ODF_PRESENTATION}', found '{mimetype}'"
+            )));
+        }
+
+        let content_xml = String::from_utf8(package.get_file("content.xml")?).map_err(|error| {
+            Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
+        })?;
+        validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
+
+        let styles_xml = if package.has_file("styles.xml")? {
+            Some(
+                String::from_utf8(package.get_file("styles.xml")?).map_err(|error| {
+                    Error::InvalidFormat(format!("{FAMILY_NAME} styles.xml is not UTF-8: {error}"))
+                })?,
+            )
+        } else {
+            None
+        };
+
+        // Match the ordinary family package's mandatory metadata validation:
+        // a malformed optional meta.xml must not become observable only after
+        // a source-backed facade is opened.
+        let metadata = if package.has_file("meta.xml")? {
+            Some(Meta::from_bytes(&package.get_file("meta.xml")?)?.try_extract_metadata()?)
+        } else {
+            None
+        };
+
+        let observed = source.version()?;
+        ensure_current(source_version, observed)?;
+
+        Ok(Self {
+            package,
+            source,
+            source_version,
+            content_xml,
+            styles_xml,
+            metadata,
+        })
+    }
+
+    /// Check the source identity and revision without reading a package part.
+    pub fn check_source(&self) -> Result<()> {
+        ensure_current(self.source_version, self.source.version()?)
+    }
+
+    /// Return the source identity captured during open.
+    #[must_use = "the captured source version is needed to identify this source"]
+    pub fn source_version(&self) -> Result<SourceVersion> {
+        self.check_source()?;
+        Ok(self.source_version)
+    }
+
+    /// Borrow the validated `content.xml` snapshot.
+    pub fn content_xml(&self) -> Result<&str> {
+        self.check_source()?;
+        Ok(&self.content_xml)
+    }
+
+    /// Borrow the optional validated `styles.xml` snapshot.
+    pub fn styles_xml(&self) -> Result<Option<&str>> {
+        self.check_source()?;
+        Ok(self.styles_xml.as_deref())
+    }
+
+    /// Return common document metadata projected from the optional
+    /// `meta.xml` part, matching [`super::Presentation::metadata`].
+    pub fn metadata(&self) -> Result<litchi_core::Metadata> {
+        self.check_source()?;
+        Ok(self.metadata.clone().unwrap_or_default())
+    }
+
+    /// Return the number of slides after running the ordinary parser's full
+    /// validation path.
+    pub fn slide_count(&self) -> Result<usize> {
+        let slides = self.slides()?;
+        Ok(slides.len())
+    }
+
+    /// Parse all slides with the same semantic parser used by [`super::Presentation`].
+    pub fn slides(&self) -> Result<Vec<Slide>> {
+        self.check_source()?;
+        let result =
+            Parser::parse_slides_with_styles(&self.content_xml, self.styles_xml.as_deref());
+        let observed = self.source.version()?;
+        ensure_current(self.source_version, observed)?;
+        result
+    }
+
+    /// Parse one slide while retaining the parser's complete-document
+    /// validation semantics.
+    pub fn slide(&self, index: usize) -> Result<Option<Slide>> {
+        self.check_source()?;
+        let result = Parser::parse_slide_with_styles_at(
+            &self.content_xml,
+            self.styles_xml.as_deref(),
+            index,
+        );
+        let observed = self.source.version()?;
+        ensure_current(self.source_version, observed)?;
+        result
+    }
+
+    /// Extract all visible presentation text with the ordinary facade's
+    /// ordering and separator semantics.
+    pub fn text(&self) -> Result<String> {
+        let slides = self.slides()?;
+        let mut all_text = Vec::new();
+        for slide in slides {
+            let text = slide.all_text();
+            if !text.is_empty() {
+                all_text.push(text);
+            }
+        }
+        self.check_source()?;
+        Ok(all_text.join("\n\n"))
+    }
+
+    /// Read one package-contained media payload without following external
+    /// URLs, fragments, or unsafe relative paths.
+    ///
+    /// The selected member is decompressed only when this method is called;
+    /// opening and semantic slide queries do not materialize media payloads.
+    pub fn media_data(&self, media: &Reference) -> Result<Option<Vec<u8>>> {
+        self.check_source()?;
+        let Some(path) = media.package_path() else {
+            self.check_source()?;
+            return Ok(None);
+        };
+        if !self.package.has_file(path)? {
+            self.check_source()?;
+            return Ok(None);
+        }
+        let bytes = self.package.get_file(path)?;
+        let observed = self.source.version()?;
+        ensure_current(self.source_version, observed)?;
+        Ok(Some(bytes))
+    }
+
+    /// Materialize the exact source into the established mutable presentation
+    /// owner.  This is an explicit transition; read-only source operations do
+    /// not allocate a complete package buffer.
+    pub fn materialize(self) -> Result<super::Presentation> {
+        self.package
+            .materialize()
+            .and_then(super::Presentation::from_owned_package)
+    }
+}
+
+fn ensure_current(expected: SourceVersion, observed: SourceVersion) -> Result<()> {
+    if expected == observed {
+        Ok(())
+    } else {
+        Err(Error::SourceChanged { expected, observed })
+    }
+}

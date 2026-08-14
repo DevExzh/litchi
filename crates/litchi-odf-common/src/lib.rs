@@ -26,7 +26,7 @@ pub mod signature;
 pub mod style;
 pub mod validation;
 
-pub use core::{OwnedPackage, PreparedPackage};
+pub use core::{OwnedPackage, PreparedPackage, SourceBackedPackage, SourcePackageLimits};
 pub use repair::{
     Destructive, MIMETYPE_LOCAL_EXTRA_ISSUE, MIMETYPE_LOCAL_EXTRA_REPAIR,
     MIMETYPE_REPAIR_PLAN_SCHEMA, MimetypeRepairPlan, NonDestructive, OdfRepairLimits,

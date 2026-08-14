@@ -698,6 +698,10 @@ enum Case {
     OdpMediaTextBoxEditSave,
     OdpMediaTextBoxScalarReplaceSave,
     OdpMediaTextBoxBatchReplaceSave,
+    OdpMediaEagerOpen,
+    OdpMediaSourceBackedOpen,
+    OdpMediaEagerOneSlide,
+    OdpMediaSourceBackedOneSlide,
 }
 
 impl Case {
@@ -1019,6 +1023,10 @@ impl Case {
             Self::OdpMediaTextBoxEditSave => "odp_media_textbox_edit_save",
             Self::OdpMediaTextBoxScalarReplaceSave => "odp_media_textbox_scalar_replace_save",
             Self::OdpMediaTextBoxBatchReplaceSave => "odp_media_textbox_batch_replace_save",
+            Self::OdpMediaEagerOpen => "odp_media_eager_open",
+            Self::OdpMediaSourceBackedOpen => "odp_media_source_backed_open",
+            Self::OdpMediaEagerOneSlide => "odp_media_eager_one_slide",
+            Self::OdpMediaSourceBackedOneSlide => "odp_media_source_backed_one_slide",
         }
     }
 
@@ -1310,7 +1318,14 @@ impl Case {
     }
 
     const fn uses_odp_media(self) -> bool {
-        matches!(self, Self::OdpMediaTextBoxEditSave)
+        matches!(
+            self,
+            Self::OdpMediaTextBoxEditSave
+                | Self::OdpMediaEagerOpen
+                | Self::OdpMediaSourceBackedOpen
+                | Self::OdpMediaEagerOneSlide
+                | Self::OdpMediaSourceBackedOneSlide
+        )
     }
 
     const fn uses_odp_text_box_batch(self) -> bool {
@@ -1856,6 +1871,8 @@ struct SourceSummary {
     ppt_pictures: Option<PptPicturesSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ppt_shape_text: Option<PptShapeTextSourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    odp_media: Option<OdpMediaSourceSummary>,
 }
 
 /// Positional-read evidence for the native PPT lazy `Pictures` selectors.
@@ -1897,6 +1914,41 @@ struct PptShapeTextSourceSummary {
     source_read_calls: Vec<u64>,
     source_read_bytes: Vec<u64>,
     source_read_range_overlap_bytes: Vec<u64>,
+}
+
+/// Matched ODP media-rich open/one-slide evidence.  Source timing uses an
+/// uninstrumented immutable source; every source vector is populated by a
+/// separate untimed replay.  `pictures_*` vectors classify overlap with all
+/// compressed `Pictures/*` payload ranges, while the explicit-media vectors
+/// prove that one selected media read covers only its selected Pictures range.
+#[derive(Clone, Debug, Default, Serialize)]
+struct OdpMediaSourceSummary {
+    implementation: &'static str,
+    phase: &'static str,
+    timing_scope: &'static str,
+    timed_source_adapter: &'static str,
+    read_evidence_adapter: &'static str,
+    read_evidence_scope: &'static str,
+    target_slide: usize,
+    selected_media_path: String,
+    selected_media_compressed_range_bytes: u64,
+    selected_media_uncompressed_bytes: u64,
+    selected_media_uncompressed_payload_sha256: String,
+    pictures_count: usize,
+    pictures_compressed_range_bytes: u64,
+    pictures_uncompressed_payload_bytes: u64,
+    pictures_uncompressed_payload_sha256: String,
+    canonical_semantic_sha256: String,
+    source_read_calls: Vec<u64>,
+    source_read_bytes: Vec<u64>,
+    source_read_range_overlap_bytes: Vec<u64>,
+    pictures_read_calls: Vec<u64>,
+    pictures_read_compressed_range_bytes: Vec<u64>,
+    selected_media_read_calls: Vec<u64>,
+    selected_media_read_bytes: Vec<u64>,
+    selected_media_read_prior_range_overlap_bytes: Vec<u64>,
+    selected_media_read_compressed_range_overlap_bytes: Vec<u64>,
+    selected_media_read_non_picture_overlap_bytes: Vec<u64>,
 }
 
 /// Untimed correctness counters paired with the ODT mixed model-content
@@ -5413,6 +5465,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_media_textbox_edit_save" => Some(Case::OdpMediaTextBoxEditSave),
         "odp_media_textbox_scalar_replace_save" => Some(Case::OdpMediaTextBoxScalarReplaceSave),
         "odp_media_textbox_batch_replace_save" => Some(Case::OdpMediaTextBoxBatchReplaceSave),
+        "odp_media_eager_open" => Some(Case::OdpMediaEagerOpen),
+        "odp_media_source_backed_open" => Some(Case::OdpMediaSourceBackedOpen),
+        "odp_media_eager_one_slide" => Some(Case::OdpMediaEagerOneSlide),
+        "odp_media_source_backed_one_slide" => Some(Case::OdpMediaSourceBackedOneSlide),
         _ => None,
     }
 }
@@ -5645,7 +5701,9 @@ fn print_usage() {
                                        odp_semantic_create_small,odp_semantic_noop_edit_save,\n\
                                        odp_semantic_one_edit_save,odp_media_textbox_edit_save,\n\
                                        odp_media_textbox_scalar_replace_save,\n\
-                                       odp_media_textbox_batch_replace_save\n\
+                                       odp_media_textbox_batch_replace_save,\n\
+                                       odp_media_eager_open,odp_media_source_backed_open,\n\
+                                       odp_media_eager_one_slide,odp_media_source_backed_one_slide\n\
            --shape LIST                tiny,many-small,few-large,wide-root\n\
            --payload LIST              compressible,incompressible\n\
            --writer-shape LIST         tiny,large,payload-heavy\n\
@@ -8552,6 +8610,87 @@ fn build_odp_media_corpus() -> Result<Corpus, Box<dyn Error>> {
     })
 }
 
+fn odp_media_payload_inventory(
+    corpus: &Corpus,
+) -> Result<(Vec<(String, Range<u64>)>, Range<u64>), Box<dyn Error>> {
+    let mut media = zip_member_ranges(&corpus.archive)?
+        .into_iter()
+        .filter(|(name, _range)| name.starts_with("Pictures/"))
+        .collect::<Vec<_>>();
+    media.sort_by(|left, right| left.0.cmp(&right.0));
+    if media.len() != ODS_MEDIA_ENTRY_COUNT {
+        return Err("ODP media source evidence found an unexpected Pictures count".into());
+    }
+    let selected_path = odp_media_path(ODS_MEDIA_ENTRY_COUNT / 2);
+    let selected = media
+        .iter()
+        .find(|(name, _range)| name == &selected_path)
+        .map(|(_name, range)| range.clone())
+        .ok_or("ODP selected media source range is missing")?;
+    Ok((media, selected))
+}
+
+fn odp_media_payload_digest() -> String {
+    let mut digest = Sha256::new();
+    for index in 0..ODS_MEDIA_ENTRY_COUNT {
+        digest.update((index as u64).to_le_bytes());
+        digest.update(odp_media_payload(index));
+    }
+    fingerprint_hex(&digest.finalize().into())
+}
+
+fn odp_media_semantic_digest(
+    slides: &[litchi_odp::model::Slide],
+) -> Result<String, Box<dyn Error>> {
+    let mut digest = Sha256::new();
+    for slide in slides {
+        digest.update((slide.index() as u64).to_le_bytes());
+        let text = slide.all_text();
+        digest.update((text.len() as u64).to_le_bytes());
+        digest.update(text.as_bytes());
+    }
+    Ok(fingerprint_hex(&digest.finalize().into()))
+}
+
+fn odp_media_instrumented_source(
+    archive: &[u8],
+    picture_ranges: &[Range<u64>],
+) -> Arc<InstrumentedSource> {
+    let mut source = InstrumentedSource::new(archive.to_vec(), picture_ranges.to_vec());
+    source.track_read_ranges = true;
+    Arc::new(source)
+}
+
+fn odp_media_eager_semantics(
+    archive: &[u8],
+) -> Result<(Vec<litchi_odp::model::Slide>, String), Box<dyn Error>> {
+    let presentation = litchi_odp::Presentation::from_bytes(archive.to_vec())?;
+    let slides = presentation.slides()?;
+    let digest = odp_media_semantic_digest(&slides)?;
+    Ok((slides, digest))
+}
+
+fn verify_odp_media_eager_semantics_and_media(
+    presentation: &litchi_odp::Presentation,
+    expected_slides: &[litchi_odp::model::Slide],
+    expected_digest: &str,
+    selected_media_path: &str,
+    expected_media_payload: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let slides = presentation.slides()?;
+    if slides != expected_slides || odp_media_semantic_digest(&slides)? != expected_digest {
+        return Err("ODP eager full semantic projection differs from canonical oracle".into());
+    }
+    let reference = litchi_odp::model::Reference::new(selected_media_path)?;
+    let payload = presentation
+        .media_data(&reference)?
+        .ok_or("ODP eager selected media payload is missing")?;
+    if payload.as_slice() != expected_media_payload {
+        return Err("ODP eager selected media payload differs from corpus".into());
+    }
+    Ok(())
+}
+
 fn build_odp_text_box_batch_corpus() -> Result<Corpus, Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let archive = odp_text_box_batch_archive()?;
@@ -9863,6 +10002,12 @@ fn run_case_with_config(
         },
         Case::OdpMediaTextBoxScalarReplaceSave | Case::OdpMediaTextBoxBatchReplaceSave => {
             run_odp_text_box_model_publication(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdpMediaEagerOpen
+        | Case::OdpMediaSourceBackedOpen
+        | Case::OdpMediaEagerOneSlide
+        | Case::OdpMediaSourceBackedOneSlide => {
+            run_odp_media_source_access(case, corpus, warmup_iterations, samples)
         },
         Case::OpcOpenSessionScaling | Case::CfbBulkReadScaling => {
             Err("scaling case requires an explicit worker count".into())
@@ -15792,6 +15937,351 @@ fn run_odp_media_textbox_edit_save(
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
     Ok(result(Case::OdpMediaTextBoxEditSave, corpus, elapsed, None))
+}
+
+fn odp_media_case_parameters(
+    case: Case,
+) -> Result<(&'static str, &'static str, bool), Box<dyn Error>> {
+    match case {
+        Case::OdpMediaEagerOpen => Ok(("eager", "presentation_open_no_slide_query", false)),
+        Case::OdpMediaSourceBackedOpen => {
+            Ok(("source_backed", "presentation_open_no_slide_query", false))
+        },
+        Case::OdpMediaEagerOneSlide => Ok(("eager", "one_middle_slide_query", true)),
+        Case::OdpMediaSourceBackedOneSlide => Ok(("source_backed", "one_middle_slide_query", true)),
+        _ => Err("non-media ODP source case passed to ODP media case parameters".into()),
+    }
+}
+
+fn verify_odp_media_selected_slide(
+    slide: &litchi_odp::model::Slide,
+    target_slide: usize,
+) -> Result<(), Box<dyn Error>> {
+    if slide.index() != target_slide
+        || slide.all_text()
+            != format!(
+                "{}\n{}",
+                semantic_odp_title(target_slide, false),
+                semantic_odp_text(target_slide, false)
+            )
+    {
+        return Err("ODP media-rich selected slide differs from the deterministic corpus".into());
+    }
+    Ok(())
+}
+
+fn verify_odp_media_source_semantics(
+    presentation: &litchi_odp::SourceBackedPresentation,
+    expected_slides: &[litchi_odp::model::Slide],
+    expected_digest: &str,
+) -> Result<(), Box<dyn Error>> {
+    if presentation.slide_count()? != expected_slides.len() {
+        return Err("ODP source-backed slide count differs from eager semantic oracle".into());
+    }
+    let mut slides = Vec::with_capacity(expected_slides.len());
+    for index in 0..expected_slides.len() {
+        slides.push(
+            presentation
+                .slide(index)?
+                .ok_or("ODP source-backed semantic slide is missing")?,
+        );
+    }
+    let digest = odp_media_semantic_digest(&slides)?;
+    if digest != expected_digest || slides != expected_slides {
+        return Err("ODP source-backed full semantic projection differs from eager oracle".into());
+    }
+    Ok(())
+}
+
+fn collect_odp_media_source_phase(
+    archive: &[u8],
+    picture_ranges: &[Range<u64>],
+    target_slide: usize,
+    query: bool,
+) -> Result<SourceSnapshot, Box<dyn Error>> {
+    let source = odp_media_instrumented_source(archive, picture_ranges);
+    let presentation = litchi_odp::SourceBackedPresentation::from_read_at(source.clone())?;
+    if query {
+        // The source-backed facade pins the validated content XML at open;
+        // selecting one slide therefore performs no additional ReadAt call.
+        source.reset();
+        let slide = presentation
+            .slide(target_slide)?
+            .ok_or("ODP source-backed evidence target slide is missing")?;
+        verify_odp_media_selected_slide(&slide, target_slide)?;
+    }
+    Ok(source.snapshot())
+}
+
+fn collect_odp_media_selected_media(
+    archive: &[u8],
+    picture_ranges: &[Range<u64>],
+    selected_range: Range<u64>,
+    selected_path: &str,
+) -> Result<(SourceSnapshot, SourceSnapshot), Box<dyn Error>> {
+    let reference = litchi_odp::model::Reference::new(selected_path)?;
+    let all_source = odp_media_instrumented_source(archive, picture_ranges);
+    let all_pictures = litchi_odp::SourceBackedPresentation::from_read_at(all_source.clone())?;
+    all_source.reset();
+    let payload = all_pictures
+        .media_data(&reference)?
+        .ok_or("ODP source-backed selected media payload is missing")?;
+    let expected_index = ODS_MEDIA_ENTRY_COUNT / 2;
+    if payload != odp_media_payload(expected_index) {
+        return Err("ODP source-backed selected media payload differs from corpus".into());
+    }
+    let all_snapshot = all_source.snapshot();
+
+    let selected_source = odp_media_instrumented_source(archive, &[selected_range]);
+    let selected_pictures =
+        litchi_odp::SourceBackedPresentation::from_read_at(selected_source.clone())?;
+    selected_source.reset();
+    let payload = selected_pictures
+        .media_data(&reference)?
+        .ok_or("ODP selected-range media payload is missing")?;
+    if payload != odp_media_payload(expected_index) {
+        return Err("ODP selected-range media payload differs from corpus".into());
+    }
+    Ok((all_snapshot, selected_source.snapshot()))
+}
+
+fn verify_odp_media_source_phase(
+    snapshot: SourceSnapshot,
+    phase: &str,
+) -> Result<(), Box<dyn Error>> {
+    if phase == "one_middle_slide_query" {
+        if snapshot.read_calls != 0 || snapshot.read_bytes != 0 {
+            return Err("ODP source-backed selected-slide replay performed a source read".into());
+        }
+    } else if snapshot.read_calls == 0 || snapshot.read_bytes == 0 {
+        return Err("ODP source-backed open replay has no logical reads".into());
+    }
+    Ok(())
+}
+
+fn run_odp_media_source_access(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != ODP_MEDIA_CORPUS_GENERATOR {
+        return Err("ODP media source cases require the fixed media-rich corpus".into());
+    }
+    let (implementation, phase, query) = odp_media_case_parameters(case)?;
+    let target_slide = SemanticShape::Medium.pptx_slides() / 2;
+    let (expected_slides, canonical_semantic_sha256) = odp_media_eager_semantics(&corpus.archive)?;
+    verify_odp_media_selected_slide(&expected_slides[target_slide], target_slide)?;
+    let (picture_members, selected_range) = odp_media_payload_inventory(corpus)?;
+    let selected_media_path = odp_media_path(ODS_MEDIA_ENTRY_COUNT / 2);
+    let selected_media_payload = odp_media_payload(ODS_MEDIA_ENTRY_COUNT / 2);
+    let selected_media_uncompressed_bytes = u64::try_from(selected_media_payload.len())?;
+    let selected_media_compressed_range_bytes =
+        selected_range.end.saturating_sub(selected_range.start);
+    let pictures_compressed_range_bytes =
+        picture_members
+            .iter()
+            .try_fold(0_u64, |total, (_name, range)| {
+                total
+                    .checked_add(range.end.saturating_sub(range.start))
+                    .ok_or("ODP compressed Pictures byte count overflows u64")
+            })?;
+    let pictures_uncompressed_payload_bytes = u64::try_from(
+        ODS_MEDIA_ENTRY_COUNT
+            .checked_mul(ODS_MEDIA_ENTRY_BYTES)
+            .ok_or("ODP uncompressed Pictures byte count overflows usize")?,
+    )?;
+    let pictures_uncompressed_payload_sha256 = odp_media_payload_digest();
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut source_summary = OdpMediaSourceSummary {
+        implementation,
+        phase,
+        timing_scope: if query {
+            if implementation == "source_backed" {
+                "one_middle_slide_query_after_untimed_source_open"
+            } else {
+                "one_middle_slide_query_after_untimed_eager_open"
+            }
+        } else if implementation == "source_backed" {
+            "source_backed_presentation_open"
+        } else {
+            "eager_presentation_open"
+        },
+        timed_source_adapter: if implementation == "source_backed" {
+            "litchi_core::OwnedSource"
+        } else {
+            "std::io::Cursor<&[u8]>"
+        },
+        read_evidence_adapter: if implementation == "source_backed" {
+            "harness::InstrumentedSource"
+        } else {
+            "not_applicable"
+        },
+        read_evidence_scope: if implementation == "source_backed" {
+            "separate_untimed_replays_per_measured_sample"
+        } else {
+            "not_applicable"
+        },
+        target_slide,
+        selected_media_path: selected_media_path.clone(),
+        selected_media_compressed_range_bytes,
+        selected_media_uncompressed_bytes,
+        selected_media_uncompressed_payload_sha256: sha256_hex(&selected_media_payload),
+        pictures_count: picture_members.len(),
+        pictures_compressed_range_bytes,
+        pictures_uncompressed_payload_bytes,
+        pictures_uncompressed_payload_sha256,
+        canonical_semantic_sha256: canonical_semantic_sha256.clone(),
+        ..OdpMediaSourceSummary::default()
+    };
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let duration = if implementation == "source_backed" {
+            let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
+            if query {
+                let presentation = litchi_odp::SourceBackedPresentation::from_read_at(source)?;
+                let started = Instant::now();
+                let slide = presentation
+                    .slide(target_slide)?
+                    .ok_or("ODP source-backed target slide is missing")?;
+                let duration = started.elapsed();
+                verify_odp_media_selected_slide(&slide, target_slide)?;
+                verify_odp_media_source_semantics(
+                    &presentation,
+                    &expected_slides,
+                    &canonical_semantic_sha256,
+                )?;
+                duration
+            } else {
+                let started = Instant::now();
+                let presentation = litchi_odp::SourceBackedPresentation::from_read_at(source)?;
+                let duration = started.elapsed();
+                verify_odp_media_source_semantics(
+                    &presentation,
+                    &expected_slides,
+                    &canonical_semantic_sha256,
+                )?;
+                duration
+            }
+        } else if query {
+            let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+            let started = Instant::now();
+            let slide = presentation
+                .slide(target_slide)?
+                .ok_or("ODP eager target slide is missing")?;
+            let duration = started.elapsed();
+            verify_odp_media_selected_slide(&slide, target_slide)?;
+            verify_odp_media_eager_semantics_and_media(
+                &presentation,
+                &expected_slides,
+                &canonical_semantic_sha256,
+                &selected_media_path,
+                &selected_media_payload,
+            )?;
+            duration
+        } else {
+            let owned = corpus.archive.clone();
+            let started = Instant::now();
+            let presentation = litchi_odp::Presentation::from_bytes(owned)?;
+            let duration = started.elapsed();
+            verify_odp_media_eager_semantics_and_media(
+                &presentation,
+                &expected_slides,
+                &canonical_semantic_sha256,
+                &selected_media_path,
+                &selected_media_payload,
+            )?;
+            duration
+        };
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    if implementation == "source_backed" {
+        let selected_range_len = selected_range.end.saturating_sub(selected_range.start);
+        let mut exact_phase = None;
+        let mut exact_media = None;
+        for _ in 0..samples {
+            let snapshot = collect_odp_media_source_phase(
+                &corpus.archive,
+                &picture_members
+                    .iter()
+                    .map(|(_name, range)| range.clone())
+                    .collect::<Vec<_>>(),
+                target_slide,
+                query,
+            )?;
+            verify_odp_media_source_phase(snapshot, phase)?;
+            if let Some(expected) = exact_phase {
+                if expected != snapshot {
+                    return Err("ODP source phase counters are not deterministic".into());
+                }
+            } else {
+                exact_phase = Some(snapshot);
+            }
+            source_summary.source_read_calls.push(snapshot.read_calls);
+            source_summary.source_read_bytes.push(snapshot.read_bytes);
+            source_summary
+                .source_read_range_overlap_bytes
+                .push(snapshot.read_range_overlap_bytes);
+            source_summary
+                .pictures_read_calls
+                .push(snapshot.ordinary_payload_read_calls);
+            source_summary
+                .pictures_read_compressed_range_bytes
+                .push(snapshot.ordinary_payload_read_bytes);
+
+            let (all_snapshot, selected_snapshot) = collect_odp_media_selected_media(
+                &corpus.archive,
+                &picture_members
+                    .iter()
+                    .map(|(_name, range)| range.clone())
+                    .collect::<Vec<_>>(),
+                selected_range.clone(),
+                &selected_media_path,
+            )?;
+            if all_snapshot.ordinary_payload_read_bytes != selected_range_len
+                || selected_snapshot.ordinary_payload_read_bytes != selected_range_len
+                || all_snapshot.ordinary_payload_read_calls == 0
+                || selected_snapshot.ordinary_payload_read_calls == 0
+            {
+                return Err(
+                    "ODP selected media replay did not cover exactly one Pictures range".into(),
+                );
+            }
+            if let Some(expected) = exact_media {
+                if expected != (all_snapshot, selected_snapshot) {
+                    return Err("ODP selected media counters are not deterministic".into());
+                }
+            } else {
+                exact_media = Some((all_snapshot, selected_snapshot));
+            }
+            source_summary
+                .selected_media_read_calls
+                .push(all_snapshot.read_calls);
+            source_summary
+                .selected_media_read_bytes
+                .push(all_snapshot.read_bytes);
+            source_summary
+                .selected_media_read_prior_range_overlap_bytes
+                .push(all_snapshot.read_range_overlap_bytes);
+            source_summary
+                .selected_media_read_compressed_range_overlap_bytes
+                .push(all_snapshot.ordinary_payload_read_bytes);
+            source_summary
+                .selected_media_read_non_picture_overlap_bytes
+                .push(
+                    all_snapshot
+                        .read_bytes
+                        .saturating_sub(all_snapshot.ordinary_payload_read_bytes),
+                );
+        }
+    }
+
+    let source = SourceSummary {
+        odp_media: Some(source_summary),
+        ..SourceSummary::default()
+    };
+    Ok(result_with_source(case, corpus, elapsed, source))
 }
 
 fn odp_text_box_batch_models(
@@ -25892,6 +26382,144 @@ mod tests {
         for index in 0..super::ODS_MEDIA_ENTRY_COUNT {
             assert!(identical.contains(&super::odp_media_path(index)));
         }
+    }
+
+    #[test]
+    fn media_rich_odp_source_selectors_have_matched_semantic_and_media_evidence() {
+        assert_eq!(
+            parse_case("odp_media_eager_open"),
+            Some(Case::OdpMediaEagerOpen)
+        );
+        assert_eq!(
+            parse_case("odp_media_source_backed_open"),
+            Some(Case::OdpMediaSourceBackedOpen)
+        );
+        assert_eq!(
+            parse_case("odp_media_eager_one_slide"),
+            Some(Case::OdpMediaEagerOneSlide)
+        );
+        assert_eq!(
+            parse_case("odp_media_source_backed_one_slide"),
+            Some(Case::OdpMediaSourceBackedOneSlide)
+        );
+        assert_eq!(Case::DEFAULT.len(), 36);
+        assert!(!Case::DEFAULT.contains(&Case::OdpMediaEagerOpen));
+        assert!(!Case::DEFAULT.contains(&Case::OdpMediaSourceBackedOpen));
+        assert!(!Case::DEFAULT.contains(&Case::OdpMediaEagerOneSlide));
+        assert!(!Case::DEFAULT.contains(&Case::OdpMediaSourceBackedOneSlide));
+
+        let corpus = build_odp_media_corpus().unwrap();
+        let again = build_odp_media_corpus().unwrap();
+        assert_eq!(corpus.archive, again.archive);
+        let eager_open = run_case(Case::OdpMediaEagerOpen, &corpus, 0, 2).unwrap();
+        let source_open = run_case(Case::OdpMediaSourceBackedOpen, &corpus, 0, 2).unwrap();
+        let eager_slide = run_case(Case::OdpMediaEagerOneSlide, &corpus, 0, 2).unwrap();
+        let source_slide = run_case(Case::OdpMediaSourceBackedOneSlide, &corpus, 0, 2).unwrap();
+
+        let eager_open_evidence = eager_open.source.unwrap().odp_media.unwrap();
+        let source_open_evidence = source_open.source.unwrap().odp_media.unwrap();
+        let eager_slide_evidence = eager_slide.source.unwrap().odp_media.unwrap();
+        let source_slide_evidence = source_slide.source.unwrap().odp_media.unwrap();
+        assert_eq!(
+            eager_open_evidence.canonical_semantic_sha256,
+            source_open_evidence.canonical_semantic_sha256
+        );
+        assert_eq!(
+            eager_slide_evidence.canonical_semantic_sha256,
+            source_slide_evidence.canonical_semantic_sha256
+        );
+        assert_eq!(
+            source_open_evidence.canonical_semantic_sha256,
+            source_slide_evidence.canonical_semantic_sha256
+        );
+        assert_eq!(
+            eager_open_evidence.selected_media_uncompressed_payload_sha256,
+            source_open_evidence.selected_media_uncompressed_payload_sha256
+        );
+        assert_eq!(
+            eager_slide_evidence.selected_media_uncompressed_payload_sha256,
+            source_slide_evidence.selected_media_uncompressed_payload_sha256
+        );
+        assert_eq!(
+            eager_open_evidence.pictures_uncompressed_payload_sha256,
+            source_open_evidence.pictures_uncompressed_payload_sha256
+        );
+        assert_eq!(
+            eager_slide_evidence.pictures_uncompressed_payload_sha256,
+            source_slide_evidence.pictures_uncompressed_payload_sha256
+        );
+        assert_eq!(
+            eager_open_evidence.selected_media_uncompressed_bytes,
+            eager_slide_evidence.selected_media_uncompressed_bytes
+        );
+        assert_eq!(
+            eager_open_evidence.pictures_uncompressed_payload_bytes,
+            eager_slide_evidence.pictures_uncompressed_payload_bytes
+        );
+        assert_eq!(
+            eager_open_evidence.pictures_compressed_range_bytes,
+            source_open_evidence.pictures_compressed_range_bytes
+        );
+        assert_eq!(
+            eager_slide_evidence.pictures_compressed_range_bytes,
+            source_slide_evidence.pictures_compressed_range_bytes
+        );
+        assert_eq!(source_open_evidence.source_read_calls.len(), 2);
+        assert_eq!(source_open_evidence.source_read_bytes.len(), 2);
+        assert_eq!(source_slide_evidence.source_read_calls, vec![0, 0]);
+        assert_eq!(source_slide_evidence.source_read_bytes, vec![0, 0]);
+        assert_eq!(
+            source_slide_evidence.pictures_read_compressed_range_bytes,
+            vec![0, 0]
+        );
+        assert_eq!(source_slide_evidence.pictures_read_calls, vec![0, 0]);
+        assert!(
+            source_open_evidence
+                .pictures_read_compressed_range_bytes
+                .iter()
+                .all(|&bytes| bytes < source_open_evidence.selected_media_compressed_range_bytes)
+        );
+        let (_picture_members, selected_range) =
+            super::odp_media_payload_inventory(&corpus).unwrap();
+        let selected_compressed_bytes = selected_range.end - selected_range.start;
+        assert_eq!(
+            source_open_evidence.selected_media_compressed_range_bytes,
+            selected_compressed_bytes
+        );
+        assert_eq!(
+            source_slide_evidence.selected_media_compressed_range_bytes,
+            selected_compressed_bytes
+        );
+        for source in [source_open_evidence, source_slide_evidence] {
+            assert_eq!(source.selected_media_read_calls.len(), 2);
+            assert_eq!(source.selected_media_read_bytes.len(), 2);
+            assert_eq!(
+                source
+                    .selected_media_read_compressed_range_overlap_bytes
+                    .len(),
+                2
+            );
+            assert_eq!(
+                source.selected_media_read_compressed_range_overlap_bytes[0],
+                source.selected_media_read_compressed_range_overlap_bytes[1]
+            );
+            assert!(
+                source
+                    .selected_media_read_compressed_range_overlap_bytes
+                    .iter()
+                    .all(|&bytes| bytes == selected_compressed_bytes)
+            );
+            assert!(
+                source
+                    .selected_media_read_non_picture_overlap_bytes
+                    .iter()
+                    .all(|&bytes| bytes <= source.selected_media_read_bytes[0])
+            );
+        }
+        assert!(eager_open_evidence.source_read_calls.is_empty());
+        assert!(eager_open_evidence.selected_media_read_calls.is_empty());
+        assert!(eager_slide_evidence.source_read_calls.is_empty());
+        assert!(eager_slide_evidence.selected_media_read_calls.is_empty());
     }
 
     #[test]
