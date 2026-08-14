@@ -41,6 +41,12 @@ const MAX_SHEET_MOVE_SHEETS: usize = 1_024;
 const MAX_SHEET_COPY_NAME_BYTES: usize = 1_024;
 const MAX_SHEET_COPY_EVENTS: usize = 4_194_304;
 const MAX_SHEET_COPY_DEPTH: usize = 256;
+const MAX_SHEET_TRANSFER_FRAGMENT_BYTES: usize = 16 * 1024 * 1024;
+const MAX_SHEET_TRANSFER_ROWS: usize = 262_144;
+const MAX_SHEET_TRANSFER_CELLS: usize = 4_194_304;
+const MAX_SHEET_TRANSFER_REPETITION: usize = 1_048_576;
+const MAX_SHEET_TRANSFER_NAMESPACES: usize = 256;
+const MAX_SHEET_TRANSFER_DEPTH: usize = 256;
 
 /// One rich-text inline in a spreadsheet cell paragraph.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2093,11 +2099,1081 @@ pub(crate) fn copy_sheet(
     splice_content(source, insertion..insertion, replacement, max_output)
 }
 
+/// Transfer one worksheet whose complete selected owner is a bounded plain-scalar grid.
+///
+/// The source table is copied lexically, apart from its `table:name` value.  The
+/// closure intentionally excludes every style, formula, merge, range, drawing,
+/// extension, and package dependency so that the destination does not need any
+/// source-local owner remapping.
+pub(crate) fn transfer_plain_scalar_sheet(
+    destination: &[u8],
+    source: &[u8],
+    source_sheet: &str,
+    destination_name: &str,
+    position: crate::document::SheetPosition,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    if destination.len() > max_output {
+        return invalid(format!(
+            "ODS destination exceeds the {max_output} byte sheet-transfer output limit"
+        ));
+    }
+    if source.len() > max_output {
+        return invalid(format!(
+            "ODS source exceeds the {max_output} byte sheet-transfer work limit"
+        ));
+    }
+    if destination_name.len() > MAX_SHEET_COPY_NAME_BYTES {
+        return invalid(format!(
+            "ODS transferred sheet name exceeds the {MAX_SHEET_COPY_NAME_BYTES} byte limit"
+        ));
+    }
+    validate_transfer_sheet_name(destination_name)?;
+
+    let source_package = Package::from_bytes(copy_package_bytes(source, max_output, "source")?)?;
+    audit_plain_scalar_transfer_package(&source_package, "source")?;
+    let source_xml = source_package.content_xml();
+    let source_spans = scan(source_xml)?;
+    let source_spreadsheet = one(&source_spans, OFFICE, "spreadsheet")?;
+    let source_tables = bounded_children(
+        &source_spans,
+        source_spreadsheet,
+        TABLE,
+        "table",
+        MAX_SHEET_MOVE_SHEETS,
+    )?;
+    if source_tables.is_empty() || source_tables.len() >= MAX_SHEET_MOVE_SHEETS {
+        return invalid(format!(
+            "ODS sheet transfer requires 1..{} source worksheets",
+            MAX_SHEET_MOVE_SHEETS - 1
+        ));
+    }
+    let selected = select_sheet_bounded(source_xml, &source_spans, source_sheet)?;
+    let name_range =
+        audit_plain_scalar_sheet(source_xml, &source_spans, selected, source_spreadsheet)?;
+
+    let destination_package =
+        Package::from_bytes(copy_package_bytes(destination, max_output, "destination")?)?;
+    audit_plain_scalar_transfer_package(&destination_package, "destination")?;
+    let destination_xml = destination_package.content_xml();
+    let destination_spans = scan(destination_xml)?;
+    let destination_spreadsheet = one(&destination_spans, OFFICE, "spreadsheet")?;
+    if is_self_closing_span(destination_xml, &destination_spans[destination_spreadsheet])? {
+        return invalid(
+            "ODS scalar sheet transfer refuses a self-closing destination spreadsheet owner",
+        );
+    }
+    let destination_tables = bounded_children(
+        &destination_spans,
+        destination_spreadsheet,
+        TABLE,
+        "table",
+        MAX_SHEET_MOVE_SHEETS,
+    )?;
+    if destination_tables.len() >= MAX_SHEET_MOVE_SHEETS {
+        return invalid(format!(
+            "ODS sheet transfer destination has too many worksheets (limit {})",
+            MAX_SHEET_MOVE_SHEETS - 1
+        ));
+    }
+    let final_position = match position {
+        crate::document::SheetPosition::First => 0,
+        crate::document::SheetPosition::Last => destination_tables.len(),
+        crate::document::SheetPosition::Index(index) if index <= destination_tables.len() => index,
+        crate::document::SheetPosition::Index(index) => {
+            return invalid(format!(
+                "ODS sheet transfer destination {index} exceeds final sheet count {}",
+                destination_tables.len() + 1
+            ));
+        },
+    };
+    if final_position > destination_tables.len() {
+        return invalid(format!(
+            "ODS sheet transfer destination {final_position} exceeds final sheet count {}",
+            destination_tables.len() + 1
+        ));
+    }
+    let mut destination_names = Vec::new();
+    destination_names
+        .try_reserve_exact(destination_tables.len())
+        .map_err(|_error| invalid_error("ODS sheet transfer name inventory allocation failed"))?;
+    for table in &destination_tables {
+        let name = resolved_attribute(destination_xml, &destination_spans, *table, TABLE, "name")?
+            .ok_or_else(|| invalid_error("ODS sheet transfer destination has an unnamed sheet"))?;
+        if destination_names.iter().any(|candidate| candidate == &name) {
+            return invalid(format!(
+                "ODS sheet transfer destination sheet name '{name}' is ambiguous"
+            ));
+        }
+        validate_transfer_sheet_name(&name)?;
+        if name == destination_name {
+            return invalid(format!(
+                "ODS transferred sheet name '{destination_name}' already exists"
+            ));
+        }
+        destination_names.push(name);
+    }
+
+    let source_root = one(&source_spans, OFFICE, "document-content")?;
+    let destination_root = one(&destination_spans, OFFICE, "document-content")?;
+    ensure_transfer_namespace_compatibility(
+        source_xml,
+        &source_spans,
+        source_root,
+        selected,
+        destination_xml,
+        &destination_spans,
+        destination_root,
+        destination_spreadsheet,
+    )?;
+
+    let selected_span = source_spans
+        .get(selected)
+        .ok_or_else(|| invalid_error("ODS transferred sheet span is missing"))?;
+    let fragment = source_xml
+        .as_bytes()
+        .get(selected_span.start..selected_span.end)
+        .ok_or_else(|| invalid_error("ODS transferred sheet fragment is invalid"))?;
+    if fragment.len() > MAX_SHEET_TRANSFER_FRAGMENT_BYTES {
+        return invalid(format!(
+            "ODS transferred sheet fragment exceeds the {MAX_SHEET_TRANSFER_FRAGMENT_BYTES} byte limit"
+        ));
+    }
+    let relative_name = name_range
+        .start
+        .checked_sub(selected_span.start)
+        .and_then(|start| {
+            name_range
+                .end
+                .checked_sub(selected_span.start)
+                .map(|end| start..end)
+        })
+        .filter(|range| range.start <= range.end && range.end <= fragment.len())
+        .ok_or_else(|| invalid_error("ODS transferred sheet name span is invalid"))?;
+    let escaped_name = escape_sheet_name_attribute_bounded(destination_name)?;
+    let replacement_len = fragment
+        .len()
+        .checked_sub(relative_name.len())
+        .and_then(|length| length.checked_add(escaped_name.len()))
+        .ok_or_else(|| invalid_error("ODS transferred sheet fragment length overflows"))?;
+    let final_content_len = destination_xml
+        .len()
+        .checked_add(replacement_len)
+        .ok_or_else(|| invalid_error("ODS transferred content length overflows"))?;
+    if final_content_len > max_output {
+        return invalid(format!(
+            "ODS sheet transfer exceeds the {max_output} byte content/output limit"
+        ));
+    }
+
+    let mut replacement = Vec::new();
+    replacement
+        .try_reserve_exact(replacement_len)
+        .map_err(|_error| invalid_error("ODS sheet-transfer fragment allocation failed"))?;
+    replacement.extend_from_slice(&fragment[..relative_name.start]);
+    replacement.extend_from_slice(escaped_name.as_bytes());
+    replacement.extend_from_slice(&fragment[relative_name.end..]);
+
+    let insertion = if final_position == destination_tables.len() {
+        destination_tables.last().map_or(
+            destination_spans[destination_spreadsheet].close_start,
+            |table| destination_spans[*table].end,
+        )
+    } else {
+        destination_spans[destination_tables[final_position]].start
+    };
+    splice_content(destination, insertion..insertion, replacement, max_output)
+}
+
+#[derive(Clone, Debug, Default)]
+struct ScalarAttributes {
+    name_key: Option<Vec<u8>>,
+    rows_repeated: usize,
+    rows_repeated_seen: bool,
+    columns_repeated: usize,
+    columns_repeated_seen: bool,
+    value_type: Option<String>,
+    value: Option<String>,
+    boolean_value: Option<String>,
+    date_value: Option<String>,
+    time_value: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+struct ScalarCellState {
+    attributes: ScalarAttributes,
+    text_nonempty: bool,
+    text_bytes: usize,
+}
+
+fn audit_plain_scalar_transfer_package(package: &Package, label: &str) -> Result<()> {
+    let reader = package.package().package()?;
+    if reader.manifest().has_encrypted_entries() {
+        return invalid(format!(
+            "ODS {label} sheet transfer refuses encrypted package members"
+        ));
+    }
+    for path in reader.files()? {
+        let mut lower = copy_bounded_string(&path, "package member path")?;
+        lower.make_ascii_lowercase();
+        if lower.contains("signature")
+            || lower == "settings.xml"
+            || lower == "manifest.rdf"
+            || lower == "scripts.xml"
+            || lower.starts_with("scripts/")
+            || lower.starts_with("basic/")
+            || lower.starts_with("configurations2/")
+            || lower.starts_with("pictures/")
+            || lower.starts_with("object")
+            || lower.starts_with("links/")
+            || lower.ends_with("/content.xml")
+            || lower.contains("tracked")
+        {
+            return invalid(format!(
+                "ODS {label} sheet transfer refuses dependent package member '{path}'"
+            ));
+        }
+    }
+    let protection =
+        crate::protection::Snapshot::parse(package.content_xml(), package.styles_xml())?;
+    if protection.document().structure_protected == Some(true)
+        || protection
+            .sheets()
+            .iter()
+            .any(|sheet| sheet.is_protected() == Some(true))
+    {
+        return invalid(format!(
+            "ODS {label} sheet transfer refuses protected worksheets"
+        ));
+    }
+    Ok(())
+}
+
+fn copy_package_bytes(bytes: &[u8], limit: usize, label: &str) -> Result<Vec<u8>> {
+    if bytes.len() > limit {
+        return invalid(format!(
+            "ODS {label} package exceeds the {limit} byte transfer limit"
+        ));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(bytes.len())
+        .map_err(|_error| invalid_error(format!("ODS {label} package allocation failed")))?;
+    output.extend_from_slice(bytes);
+    Ok(output)
+}
+
+fn copy_bounded_string(value: &str, label: &str) -> Result<String> {
+    let mut output = String::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|_error| invalid_error(format!("ODS {label} allocation failed")))?;
+    output.push_str(value);
+    Ok(output)
+}
+
+fn validate_transfer_sheet_name(name: &str) -> Result<()> {
+    crate::worksheet::validation::validate_text(name, "ODS transferred sheet name")?;
+    if name.is_empty() {
+        return invalid("ODS transferred sheet name must be non-empty");
+    }
+    Ok(())
+}
+
+fn audit_plain_scalar_sheet(
+    xml: &str,
+    spans: &[Span],
+    selected: usize,
+    spreadsheet: usize,
+) -> Result<Range<usize>> {
+    let selected_span = spans
+        .get(selected)
+        .ok_or_else(|| invalid_error("ODS scalar sheet span is missing"))?;
+    if selected_span.parent != Some(spreadsheet) {
+        return invalid("ODS scalar sheet is not a direct spreadsheet child");
+    }
+    let fragment = xml
+        .as_bytes()
+        .get(selected_span.start..selected_span.end)
+        .ok_or_else(|| invalid_error("ODS scalar sheet fragment is invalid"))?;
+    if fragment.len() > MAX_SHEET_TRANSFER_FRAGMENT_BYTES {
+        return invalid(format!(
+            "ODS scalar sheet fragment exceeds the {MAX_SHEET_TRANSFER_FRAGMENT_BYTES} byte limit"
+        ));
+    }
+    let wrapped = wrap_selected_fragment(xml, spans, selected)?;
+    let mut reader = NsReader::from_str(&wrapped);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    buffer
+        .try_reserve_exact(wrapped.len())
+        .map_err(|_error| invalid_error("ODS scalar sheet XML buffer allocation failed"))?;
+    let mut stack = Vec::<OrdinaryElement>::new();
+    stack
+        .try_reserve_exact(MAX_SHEET_TRANSFER_DEPTH)
+        .map_err(|_error| invalid_error("ODS scalar sheet stack allocation failed"))?;
+    let mut events = 0usize;
+    let mut seen_table = false;
+    let mut table_name_key = None::<Vec<u8>>;
+    let mut current_row_repeat = None::<usize>;
+    let mut current_row_cells = 0usize;
+    let mut current_cell = None::<ScalarCellState>;
+    let mut logical_rows = 0usize;
+    let mut logical_cells = 0usize;
+
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid_error("ODS scalar sheet event count overflows"))?;
+        if events > MAX_SHEET_COPY_EVENTS {
+            return invalid(format!(
+                "ODS scalar sheet exceeds the {MAX_SHEET_COPY_EVENTS} XML event limit"
+            ));
+        }
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| invalid_error(format!("invalid ODS scalar sheet XML: {error}")))?;
+        match event {
+            Event::Start(element) => {
+                let kind = ordinary_element(&namespace, element.local_name().as_ref())?;
+                audit_ordinary_parent(stack.last().copied(), kind)?;
+                let attributes = audit_scalar_attributes(&element, &reader, kind)?;
+                match kind {
+                    OrdinaryElement::Table => {
+                        if seen_table {
+                            return invalid(
+                                "ODS scalar sheet contains a nested or duplicate table",
+                            );
+                        }
+                        seen_table = true;
+                        table_name_key = attributes.name_key;
+                    },
+                    OrdinaryElement::Row => {
+                        if current_row_repeat.is_some() {
+                            return invalid("ODS scalar sheet contains a nested row");
+                        }
+                        current_row_repeat = Some(attributes.rows_repeated);
+                        current_row_cells = 0;
+                    },
+                    OrdinaryElement::Cell => {
+                        if current_cell.is_some() {
+                            return invalid("ODS scalar sheet contains a nested cell");
+                        }
+                        current_row_cells = current_row_cells
+                            .checked_add(attributes.columns_repeated)
+                            .ok_or_else(|| {
+                                invalid_error("ODS scalar sheet column count overflows")
+                            })?;
+                        if current_row_cells > MAX_SHEET_TRANSFER_CELLS {
+                            return invalid(format!(
+                                "ODS scalar sheet row exceeds the {MAX_SHEET_TRANSFER_CELLS} cell limit"
+                            ));
+                        }
+                        current_cell = Some(ScalarCellState {
+                            attributes,
+                            text_nonempty: false,
+                            text_bytes: 0,
+                        });
+                    },
+                    OrdinaryElement::Paragraph => {
+                        if current_cell.is_none() {
+                            return invalid("ODS scalar sheet paragraph is outside a cell");
+                        }
+                    },
+                    _ => {},
+                }
+                if stack.len() >= MAX_SHEET_TRANSFER_DEPTH {
+                    return invalid(format!(
+                        "ODS scalar sheet exceeds the {MAX_SHEET_TRANSFER_DEPTH} XML depth limit"
+                    ));
+                }
+                stack.push(kind);
+            },
+            Event::Empty(element) => {
+                let kind = ordinary_element(&namespace, element.local_name().as_ref())?;
+                audit_ordinary_parent(stack.last().copied(), kind)?;
+                let attributes = audit_scalar_attributes(&element, &reader, kind)?;
+                match kind {
+                    OrdinaryElement::Table => {
+                        if seen_table {
+                            return invalid(
+                                "ODS scalar sheet contains a nested or duplicate table",
+                            );
+                        }
+                        seen_table = true;
+                        table_name_key = attributes.name_key;
+                    },
+                    OrdinaryElement::Row => {
+                        if current_row_repeat.is_some() {
+                            return invalid("ODS scalar sheet contains a nested row");
+                        }
+                        logical_rows = logical_rows
+                            .checked_add(attributes.rows_repeated)
+                            .ok_or_else(|| invalid_error("ODS scalar sheet row count overflows"))?;
+                        if logical_rows > MAX_SHEET_TRANSFER_ROWS {
+                            return invalid(format!(
+                                "ODS scalar sheet exceeds the {MAX_SHEET_TRANSFER_ROWS} row limit"
+                            ));
+                        }
+                    },
+                    OrdinaryElement::Cell => {
+                        current_row_cells = current_row_cells
+                            .checked_add(attributes.columns_repeated)
+                            .ok_or_else(|| {
+                                invalid_error("ODS scalar sheet column count overflows")
+                            })?;
+                        if current_row_cells > MAX_SHEET_TRANSFER_CELLS {
+                            return invalid(format!(
+                                "ODS scalar sheet row exceeds the {MAX_SHEET_TRANSFER_CELLS} cell limit"
+                            ));
+                        }
+                        validate_scalar_cell(&attributes, false)?;
+                    },
+                    OrdinaryElement::Paragraph => {
+                        if current_cell.is_none() {
+                            return invalid("ODS scalar sheet paragraph is outside a cell");
+                        }
+                    },
+                    _ => {},
+                }
+            },
+            Event::End(_) => {
+                let kind = stack
+                    .pop()
+                    .ok_or_else(|| invalid_error("ODS scalar sheet element stack underflow"))?;
+                match kind {
+                    OrdinaryElement::Cell => {
+                        let cell = current_cell.take().ok_or_else(|| {
+                            invalid_error("ODS scalar sheet cell state is missing")
+                        })?;
+                        validate_scalar_cell(&cell.attributes, cell.text_nonempty)?;
+                    },
+                    OrdinaryElement::Row => {
+                        let repeat = current_row_repeat.take().ok_or_else(|| {
+                            invalid_error("ODS scalar sheet row state is missing")
+                        })?;
+                        logical_rows = logical_rows
+                            .checked_add(repeat)
+                            .ok_or_else(|| invalid_error("ODS scalar sheet row count overflows"))?;
+                        if logical_rows > MAX_SHEET_TRANSFER_ROWS {
+                            return invalid(format!(
+                                "ODS scalar sheet exceeds the {MAX_SHEET_TRANSFER_ROWS} row limit"
+                            ));
+                        }
+                        let row_cells = current_row_cells;
+                        let row_footprint = row_cells.checked_mul(repeat).ok_or_else(|| {
+                            invalid_error("ODS scalar sheet logical cell count overflows")
+                        })?;
+                        logical_cells =
+                            logical_cells.checked_add(row_footprint).ok_or_else(|| {
+                                invalid_error("ODS scalar sheet logical cell count overflows")
+                            })?;
+                        if logical_cells > MAX_SHEET_TRANSFER_CELLS {
+                            return invalid(format!(
+                                "ODS scalar sheet exceeds the {MAX_SHEET_TRANSFER_CELLS} cell limit"
+                            ));
+                        }
+                        current_row_cells = 0;
+                    },
+                    _ => {},
+                }
+            },
+            Event::Text(text) => {
+                let raw_text: &[u8] = text.as_ref();
+                if stack.last().copied() == Some(OrdinaryElement::Paragraph) {
+                    let cell = current_cell.as_mut().ok_or_else(|| {
+                        invalid_error("ODS scalar sheet paragraph cell is missing")
+                    })?;
+                    cell.text_nonempty |= !raw_text.is_empty();
+                    cell.text_bytes = cell
+                        .text_bytes
+                        .checked_add(raw_text.len())
+                        .ok_or_else(|| invalid_error("ODS scalar sheet text length overflows"))?;
+                    if cell.text_bytes > MAX_SHEET_TRANSFER_FRAGMENT_BYTES {
+                        return invalid(format!(
+                            "ODS scalar sheet text exceeds the {MAX_SHEET_TRANSFER_FRAGMENT_BYTES} byte limit"
+                        ));
+                    }
+                } else if !raw_text.iter().all(u8::is_ascii_whitespace) {
+                    return invalid("ODS scalar sheet refuses text outside plain cell paragraphs");
+                }
+            },
+            Event::Decl(_) => {},
+            Event::Eof => break,
+            Event::DocType(_)
+            | Event::PI(_)
+            | Event::Comment(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {
+                return invalid("ODS scalar sheet refuses opaque XML events");
+            },
+        }
+        buffer.clear();
+    }
+    if !stack.is_empty() || current_cell.is_some() || current_row_repeat.is_some() {
+        return invalid("ODS scalar sheet content hierarchy is incomplete");
+    }
+    if !seen_table || table_name_key.is_none() {
+        return invalid("ODS scalar sheet name attribute is missing");
+    }
+    let name_key =
+        table_name_key.ok_or_else(|| invalid_error("ODS scalar sheet name key is missing"))?;
+    lexical_attribute_value_range(xml, selected_span.start..selected_span.tag_end, &name_key)
+}
+
+fn audit_scalar_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+    kind: OrdinaryElement,
+) -> Result<ScalarAttributes> {
+    let mut result = ScalarAttributes {
+        rows_repeated: 1,
+        columns_repeated: 1,
+        ..ScalarAttributes::default()
+    };
+    for raw in element.attributes().with_checks(true) {
+        let raw =
+            raw.map_err(|error| invalid_error(format!("invalid ODS scalar attribute: {error}")))?;
+        let qname = raw.key.as_ref();
+        if qname == b"xmlns" || qname.starts_with(b"xmlns:") {
+            continue;
+        }
+        let (namespace, local) = reader.resolver().resolve_attribute(raw.key);
+        let uri = match namespace {
+            ResolveResult::Bound(Namespace(uri)) => uri,
+            ResolveResult::Unbound => {
+                return invalid("ODS scalar sheet refuses unqualified attribute ownership");
+            },
+            ResolveResult::Unknown(prefix) => {
+                return invalid(format!(
+                    "ODS scalar sheet refuses unbound attribute prefix '{}'",
+                    String::from_utf8_lossy(prefix.as_ref())
+                ));
+            },
+        };
+        let decoded = raw
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, reader.decoder())
+            .map_err(|error| {
+                invalid_error(format!("invalid ODS scalar attribute value: {error}"))
+            })?;
+        let mut value = String::new();
+        value
+            .try_reserve_exact(decoded.len())
+            .map_err(|_error| invalid_error("ODS scalar attribute allocation failed"))?;
+        value.push_str(decoded.as_ref());
+        let local = local.as_ref();
+        let allowed = match kind {
+            OrdinaryElement::Root => uri == OFFICE.as_bytes() && local == b"version",
+            OrdinaryElement::Body | OrdinaryElement::Spreadsheet => false,
+            OrdinaryElement::Table => uri == TABLE.as_bytes() && local == b"name",
+            OrdinaryElement::Column => {
+                uri == TABLE.as_bytes() && local == b"number-columns-repeated"
+            },
+            OrdinaryElement::Row => uri == TABLE.as_bytes() && local == b"number-rows-repeated",
+            OrdinaryElement::Cell => {
+                uri == TABLE.as_bytes() && local == b"number-columns-repeated"
+                    || uri == OFFICE.as_bytes()
+                        && matches!(
+                            local,
+                            b"value-type"
+                                | b"value"
+                                | b"date-value"
+                                | b"time-value"
+                                | b"boolean-value"
+                        )
+            },
+            OrdinaryElement::Paragraph => false,
+        };
+        if !allowed {
+            return invalid(format!(
+                "ODS scalar sheet refuses attribute '{}'",
+                String::from_utf8_lossy(qname)
+            ));
+        }
+        if uri == TABLE.as_bytes() && local == b"name" {
+            if result.name_key.is_some() {
+                return invalid("ODS scalar sheet name attribute is duplicated");
+            }
+            let mut name_key = Vec::new();
+            name_key
+                .try_reserve_exact(qname.len())
+                .map_err(|_error| invalid_error("ODS scalar sheet name allocation failed"))?;
+            name_key.extend_from_slice(qname);
+            result.name_key = Some(name_key);
+        } else if uri == TABLE.as_bytes() && local == b"number-rows-repeated" {
+            if result.rows_repeated_seen {
+                return invalid("ODS scalar sheet row repetition is duplicated");
+            }
+            result.rows_repeated_seen = true;
+            result.rows_repeated = scalar_positive(&value, "number-rows-repeated")?;
+        } else if uri == TABLE.as_bytes() && local == b"number-columns-repeated" {
+            if result.columns_repeated_seen {
+                return invalid("ODS scalar sheet column repetition is duplicated");
+            }
+            result.columns_repeated_seen = true;
+            result.columns_repeated = scalar_positive(&value, "number-columns-repeated")?;
+        } else if uri == OFFICE.as_bytes() && local == b"value-type" {
+            if result.value_type.replace(value).is_some() {
+                return invalid("ODS scalar sheet value type is duplicated");
+            }
+        } else if uri == OFFICE.as_bytes() && local == b"value" {
+            if result.value.replace(value).is_some() {
+                return invalid("ODS scalar sheet value is duplicated");
+            }
+        } else if uri == OFFICE.as_bytes() && local == b"boolean-value" {
+            if result.boolean_value.replace(value).is_some() {
+                return invalid("ODS scalar sheet boolean value is duplicated");
+            }
+        } else if uri == OFFICE.as_bytes() && local == b"date-value" {
+            if result.date_value.replace(value).is_some() {
+                return invalid("ODS scalar sheet date value is duplicated");
+            }
+        } else if uri == OFFICE.as_bytes()
+            && local == b"time-value"
+            && result.time_value.replace(value).is_some()
+        {
+            return invalid("ODS scalar sheet time value is duplicated");
+        }
+    }
+    if kind == OrdinaryElement::Table && result.name_key.is_none() {
+        return invalid("ODS scalar sheet name attribute is missing");
+    }
+    Ok(result)
+}
+
+fn scalar_positive(value: &str, label: &str) -> Result<usize> {
+    let parsed = value
+        .parse::<usize>()
+        .map_err(|_error| invalid_error(format!("ODS scalar {label} is not positive")))?;
+    if parsed == 0 || parsed > MAX_SHEET_TRANSFER_REPETITION {
+        return invalid(format!(
+            "ODS scalar {label} exceeds the {MAX_SHEET_TRANSFER_REPETITION} bound"
+        ));
+    }
+    Ok(parsed)
+}
+
+fn validate_scalar_cell(attributes: &ScalarAttributes, _text_nonempty: bool) -> Result<()> {
+    let has_value = attributes.value.is_some();
+    let has_boolean = attributes.boolean_value.is_some();
+    let has_date = attributes.date_value.is_some();
+    let has_time = attributes.time_value.is_some();
+    match attributes.value_type.as_deref() {
+        None => {
+            if has_value || has_boolean || has_date || has_time {
+                return invalid("ODS scalar untyped cells cannot carry typed value attributes");
+            }
+        },
+        Some("string") => {
+            if has_value || has_boolean || has_date || has_time {
+                return invalid("ODS scalar string cells cannot carry non-string value attributes");
+            }
+        },
+        Some("float" | "double" | "decimal") => {
+            let value = attributes
+                .value
+                .as_deref()
+                .ok_or_else(|| invalid_error("ODS scalar number cell requires office:value"))?;
+            let valid_number = match value.parse::<f64>() {
+                Ok(number) => number.is_finite(),
+                Err(_error) => false,
+            };
+            if !valid_number || has_boolean || has_date || has_time {
+                return invalid("ODS scalar number cell value is invalid");
+            }
+        },
+        Some("boolean") => {
+            let value = attributes
+                .boolean_value
+                .as_deref()
+                .or(attributes.value.as_deref())
+                .ok_or_else(|| invalid_error("ODS scalar boolean cell requires a boolean value"))?;
+            if !matches!(value, "true" | "false")
+                || (has_boolean && has_value)
+                || has_date
+                || has_time
+            {
+                return invalid("ODS scalar boolean cell value is invalid");
+            }
+        },
+        Some("date") => {
+            let value = attributes
+                .date_value
+                .as_deref()
+                .or(attributes.value.as_deref())
+                .ok_or_else(|| invalid_error("ODS scalar date cell requires a date value"))?;
+            if value.is_empty() || has_boolean || has_time {
+                return invalid("ODS scalar date cell value is invalid");
+            }
+            litchi_odf_common::datatype::Date::decode(value)
+                .map_err(|_error| invalid_error("ODS scalar date cell lexical value is invalid"))?;
+        },
+        Some("time") => {
+            let value = attributes
+                .time_value
+                .as_deref()
+                .or(attributes.value.as_deref())
+                .ok_or_else(|| invalid_error("ODS scalar time cell requires a time value"))?;
+            if value.is_empty() || has_boolean || has_date {
+                return invalid("ODS scalar time cell value is invalid");
+            }
+            litchi_odf_common::datatype::Duration::decode(value)
+                .map_err(|_error| invalid_error("ODS scalar time cell lexical value is invalid"))?;
+        },
+        Some(kind) => {
+            return invalid(format!("ODS scalar sheet refuses cell value type '{kind}'"));
+        },
+    }
+    Ok(())
+}
+
+fn wrap_selected_fragment(xml: &str, spans: &[Span], selected: usize) -> Result<String> {
+    let selected_span = spans
+        .get(selected)
+        .ok_or_else(|| invalid_error("ODS scalar sheet span is missing"))?;
+    let mut ancestors = Vec::new();
+    let mut parent = selected_span.parent;
+    while let Some(index) = parent {
+        if ancestors.len() >= MAX_SHEET_TRANSFER_DEPTH {
+            return invalid(format!(
+                "ODS scalar sheet ancestor depth exceeds the {MAX_SHEET_TRANSFER_DEPTH} limit"
+            ));
+        }
+        ancestors
+            .try_reserve(1)
+            .map_err(|_error| invalid_error("ODS scalar sheet ancestor allocation failed"))?;
+        let ancestor = spans
+            .get(index)
+            .ok_or_else(|| invalid_error("ODS scalar sheet ancestor span is missing"))?;
+        ancestors.push(ancestor);
+        parent = ancestor.parent;
+    }
+    let mut output = String::new();
+    let capacity = selected_span
+        .end
+        .checked_sub(selected_span.start)
+        .and_then(|length| length.checked_add(ancestors.len().saturating_mul(128)))
+        .ok_or_else(|| invalid_error("ODS scalar sheet wrapper size overflows"))?;
+    if capacity > MAX_SHEET_TRANSFER_FRAGMENT_BYTES {
+        return invalid(format!(
+            "ODS scalar sheet wrapper exceeds the {MAX_SHEET_TRANSFER_FRAGMENT_BYTES} byte limit"
+        ));
+    }
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|_error| invalid_error("ODS scalar sheet wrapper allocation failed"))?;
+    for ancestor in ancestors.iter().rev() {
+        bounded_append(
+            &mut output,
+            xml.get(ancestor.start..ancestor.tag_end)
+                .ok_or_else(|| invalid_error("ODS scalar sheet ancestor tag is invalid"))?,
+            MAX_SHEET_TRANSFER_FRAGMENT_BYTES,
+        )?;
+    }
+    bounded_append(
+        &mut output,
+        xml.get(selected_span.start..selected_span.end)
+            .ok_or_else(|| invalid_error("ODS scalar sheet fragment is invalid"))?,
+        MAX_SHEET_TRANSFER_FRAGMENT_BYTES,
+    )?;
+    for ancestor in &ancestors {
+        bounded_append(&mut output, "</", MAX_SHEET_TRANSFER_FRAGMENT_BYTES)?;
+        bounded_append(
+            &mut output,
+            start_qname(xml, ancestor)?,
+            MAX_SHEET_TRANSFER_FRAGMENT_BYTES,
+        )?;
+        bounded_append(&mut output, ">", MAX_SHEET_TRANSFER_FRAGMENT_BYTES)?;
+    }
+    Ok(output)
+}
+
+fn ensure_transfer_namespace_compatibility(
+    source_xml: &str,
+    source_spans: &[Span],
+    source_root: usize,
+    selected: usize,
+    destination_xml: &str,
+    destination_spans: &[Span],
+    destination_root: usize,
+    destination_owner: usize,
+) -> Result<()> {
+    let source_bindings =
+        effective_namespace_bindings(source_xml, source_spans, source_root, selected, "source")?;
+    let destination_bindings = effective_namespace_bindings(
+        destination_xml,
+        destination_spans,
+        destination_root,
+        destination_owner,
+        "destination",
+    )?;
+    let selected_span = source_spans
+        .get(selected)
+        .ok_or_else(|| invalid_error("ODS scalar sheet namespace span is missing"))?;
+    let fragment = source_xml
+        .get(selected_span.start..selected_span.end)
+        .ok_or_else(|| invalid_error("ODS scalar sheet namespace fragment is invalid"))?;
+    let prefixes = fragment_prefixes(fragment)?;
+    for prefix in prefixes {
+        let source_uri = source_bindings
+            .iter()
+            .find_map(|(candidate, uri)| (candidate == &prefix).then_some(uri))
+            .ok_or_else(|| invalid_error("ODS scalar sheet namespace binding is missing"))?;
+        if !destination_bindings
+            .iter()
+            .any(|(candidate, uri)| candidate == &prefix && uri == source_uri)
+        {
+            return invalid(format!(
+                "ODS scalar sheet transfer refuses destination namespace collision for prefix '{prefix}'"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn effective_namespace_bindings(
+    xml: &str,
+    spans: &[Span],
+    root: usize,
+    owner: usize,
+    label: &str,
+) -> Result<Vec<(String, String)>> {
+    let mut chain = Vec::new();
+    let mut current = Some(owner);
+    while let Some(index) = current {
+        if chain.len() >= MAX_SHEET_TRANSFER_DEPTH {
+            return invalid(format!(
+                "ODS {label} namespace owner depth exceeds the {MAX_SHEET_TRANSFER_DEPTH} limit"
+            ));
+        }
+        chain.try_reserve(1).map_err(|_error| {
+            invalid_error(format!("ODS {label} namespace chain allocation failed"))
+        })?;
+        chain.push(index);
+        if index == root {
+            break;
+        }
+        current = spans
+            .get(index)
+            .ok_or_else(|| invalid_error(format!("ODS {label} namespace owner span is missing")))?
+            .parent;
+    }
+    if chain.last().copied() != Some(root) {
+        return invalid(format!(
+            "ODS {label} namespace owner is outside the document-content root"
+        ));
+    }
+    let bindings = root_namespace_bindings(xml, spans, root)?;
+    for index in chain.iter().rev().skip(1) {
+        let span = spans.get(*index).ok_or_else(|| {
+            invalid_error(format!("ODS {label} namespace ancestor span is missing"))
+        })?;
+        if has_namespace_declaration(xml, span)? {
+            return invalid(format!(
+                "ODS scalar sheet transfer refuses {label} namespace redeclaration on '{}:{}'",
+                span.namespace.as_deref().unwrap_or(""),
+                span.local
+            ));
+        }
+    }
+    Ok(bindings)
+}
+
+fn has_namespace_declaration(xml: &str, span: &Span) -> Result<bool> {
+    let tag = xml
+        .get(span.start..span.tag_end)
+        .ok_or_else(|| invalid_error("ODS namespace ancestor tag is invalid"))?;
+    let mut reader = quick_xml::Reader::from_str(tag);
+    let event = reader
+        .read_event()
+        .map_err(|error| invalid_error(format!("invalid ODS namespace ancestor: {error}")))?;
+    let element = match event {
+        Event::Start(element) | Event::Empty(element) => element,
+        _ => return invalid("ODS namespace ancestor start tag is missing"),
+    };
+    for raw in element.attributes().with_checks(true) {
+        let raw = raw.map_err(|error| {
+            invalid_error(format!("invalid ODS namespace ancestor attribute: {error}"))
+        })?;
+        let key = raw.key.as_ref();
+        if key == b"xmlns" || key.starts_with(b"xmlns:") {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn root_namespace_bindings(
+    xml: &str,
+    spans: &[Span],
+    root: usize,
+) -> Result<Vec<(String, String)>> {
+    let span = spans
+        .get(root)
+        .ok_or_else(|| invalid_error("ODS namespace root span is missing"))?;
+    let tag = xml
+        .get(span.start..span.tag_end)
+        .ok_or_else(|| invalid_error("ODS namespace root tag is invalid"))?;
+    let mut reader = quick_xml::Reader::from_str(tag);
+    let event = reader
+        .read_event()
+        .map_err(|error| invalid_error(format!("invalid ODS namespace root: {error}")))?;
+    let element = match event {
+        Event::Start(element) | Event::Empty(element) => element,
+        _ => return invalid("ODS namespace root start tag is missing"),
+    };
+    let mut bindings = Vec::new();
+    bindings
+        .try_reserve(1)
+        .map_err(|_error| invalid_error("ODS namespace binding allocation failed"))?;
+    bindings.push((
+        copy_bounded_string("xml", "namespace prefix")?,
+        copy_bounded_string("http://www.w3.org/XML/1998/namespace", "namespace URI")?,
+    ));
+    for raw in element.attributes().with_checks(true) {
+        let raw = raw.map_err(|error| {
+            invalid_error(format!("invalid ODS namespace declaration: {error}"))
+        })?;
+        let key = raw.key.as_ref();
+        let prefix = if key == b"xmlns" {
+            copy_bounded_string("", "namespace prefix")?
+        } else if let Some(prefix) = key.strip_prefix(b"xmlns:") {
+            decode(prefix, "namespace prefix")?
+        } else {
+            continue;
+        };
+        let decoded = raw
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, reader.decoder())
+            .map_err(|error| invalid_error(format!("invalid ODS namespace URI: {error}")))?;
+        let mut value = String::new();
+        value
+            .try_reserve_exact(decoded.len())
+            .map_err(|_error| invalid_error("ODS namespace URI allocation failed"))?;
+        value.push_str(decoded.as_ref());
+        if bindings.iter().any(|(candidate, _)| candidate == &prefix) {
+            return invalid(format!("ODS namespace prefix '{prefix}' is duplicated"));
+        }
+        if bindings.len() >= MAX_SHEET_TRANSFER_NAMESPACES {
+            return invalid("ODS namespace binding limit exceeded");
+        }
+        bindings
+            .try_reserve(1)
+            .map_err(|_error| invalid_error("ODS namespace binding allocation failed"))?;
+        bindings.push((prefix, value));
+    }
+    Ok(bindings)
+}
+
+fn fragment_prefixes(fragment: &str) -> Result<Vec<String>> {
+    let mut reader = quick_xml::Reader::from_str(fragment);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    buffer
+        .try_reserve_exact(fragment.len())
+        .map_err(|_error| invalid_error("ODS transfer fragment buffer allocation failed"))?;
+    let mut prefixes = Vec::new();
+    let mut events = 0usize;
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid_error("ODS transfer namespace event count overflows"))?;
+        if events > MAX_SHEET_COPY_EVENTS {
+            return invalid(format!(
+                "ODS transfer fragment exceeds the {MAX_SHEET_COPY_EVENTS} XML event limit"
+            ));
+        }
+        let event = reader
+            .read_event_into(&mut buffer)
+            .map_err(|error| invalid_error(format!("invalid ODS transfer fragment: {error}")))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                add_fragment_prefix(&mut prefixes, element.name().as_ref())?;
+                for raw in element.attributes().with_checks(true) {
+                    let raw = raw.map_err(|error| {
+                        invalid_error(format!("invalid ODS transfer fragment attribute: {error}"))
+                    })?;
+                    let key = raw.key.as_ref();
+                    if key == b"xmlns" || key.starts_with(b"xmlns:") {
+                        return invalid(
+                            "ODS scalar sheet transfer refuses local namespace declarations",
+                        );
+                    }
+                    add_fragment_prefix(&mut prefixes, key)?;
+                }
+            },
+            Event::Eof => break,
+            Event::Decl(_) | Event::Text(_) => {},
+            Event::End(_) => {},
+            Event::DocType(_)
+            | Event::PI(_)
+            | Event::Comment(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {
+                return invalid("ODS scalar sheet transfer refuses opaque fragment events");
+            },
+        }
+        buffer.clear();
+    }
+    Ok(prefixes)
+}
+
+fn add_fragment_prefix(prefixes: &mut Vec<String>, qname: &[u8]) -> Result<()> {
+    let Some(index) = qname.iter().position(|byte| *byte == b':') else {
+        if !prefixes.iter().any(String::is_empty) {
+            if prefixes.len() >= MAX_SHEET_TRANSFER_NAMESPACES {
+                return invalid("ODS transfer namespace prefix limit exceeded");
+            }
+            prefixes
+                .try_reserve(1)
+                .map_err(|_error| invalid_error("ODS transfer namespace allocation failed"))?;
+            prefixes.push(String::new());
+        }
+        return Ok(());
+    };
+    let prefix = decode(&qname[..index], "fragment namespace prefix")?;
+    if prefix != "xml" && !prefixes.iter().any(|candidate| candidate == &prefix) {
+        if prefixes.len() >= MAX_SHEET_TRANSFER_NAMESPACES {
+            return invalid("ODS transfer namespace prefix limit exceeded");
+        }
+        prefixes
+            .try_reserve(1)
+            .map_err(|_error| invalid_error("ODS transfer namespace allocation failed"))?;
+        prefixes.push(prefix);
+    }
+    Ok(())
+}
+
 fn escape_sheet_name_attribute(value: &str) -> String {
     escape_xml(value)
         .replace('\t', "&#x9;")
         .replace('\n', "&#xA;")
         .replace('\r', "&#xD;")
+}
+
+fn escape_sheet_name_attribute_bounded(value: &str) -> Result<String> {
+    let capacity = value
+        .len()
+        .checked_mul(6)
+        .ok_or_else(|| invalid_error("ODS sheet name escape size overflows"))?;
+    let mut output = String::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|_error| invalid_error("ODS sheet name escape allocation failed"))?;
+    for character in value.chars() {
+        match character {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            '"' => output.push_str("&quot;"),
+            '\'' => output.push_str("&apos;"),
+            '\t' => output.push_str("&#x9;"),
+            '\n' => output.push_str("&#xA;"),
+            '\r' => output.push_str("&#xD;"),
+            character => output.push(character),
+        }
+    }
+    Ok(output)
 }
 
 fn audit_sheet_copy(
@@ -4353,7 +5429,7 @@ fn splice_content(
     replacement: Vec<u8>,
     max_output: usize,
 ) -> Result<Vec<u8>> {
-    let package = Package::from_bytes(source.to_vec())?;
+    let package = Package::from_bytes(copy_package_bytes(source, max_output, "content splice")?)?;
     let part = XmlSourcePart::load(package.package(), CONTENT_PATH)?;
     let expected = part
         .bytes()
@@ -4432,6 +5508,9 @@ fn scan(xml: &str) -> Result<Vec<Span>> {
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
+    buffer
+        .try_reserve_exact(xml.len())
+        .map_err(|_error| invalid_error("ODS content XML buffer allocation failed"))?;
     let mut spans = Vec::new();
     let mut open = Vec::<usize>::new();
     loop {
@@ -4443,6 +5522,9 @@ fn scan(xml: &str) -> Result<Vec<Span>> {
                 if spans.len() >= MAX_ELEMENTS {
                     return invalid("ODS content element limit exceeded");
                 }
+                spans
+                    .try_reserve(1)
+                    .map_err(|_error| invalid_error("ODS content span allocation failed"))?;
                 let namespace = resolve_namespace(&namespace)?;
                 let element = element.into_owned();
                 let parent = open.last().copied();
@@ -4457,12 +5539,17 @@ fn scan(xml: &str) -> Result<Vec<Span>> {
                     end: tag_end,
                     parent,
                 });
+                open.try_reserve(1)
+                    .map_err(|_error| invalid_error("ODS content stack allocation failed"))?;
                 open.push(index);
             },
             Event::Empty(element) => {
                 if spans.len() >= MAX_ELEMENTS {
                     return invalid("ODS content element limit exceeded");
                 }
+                spans
+                    .try_reserve(1)
+                    .map_err(|_error| invalid_error("ODS content span allocation failed"))?;
                 let namespace = resolve_namespace(&namespace)?;
                 let element = element.into_owned();
                 let parent = open.last().copied();
@@ -4526,6 +5613,31 @@ fn select_sheet(xml: &str, spans: &[Span], name: &str) -> Result<usize> {
     Ok(result)
 }
 
+fn select_sheet_bounded(xml: &str, spans: &[Span], name: &str) -> Result<usize> {
+    let spreadsheet = one(spans, OFFICE, "spreadsheet")?;
+    let mut selected = None;
+    let mut count = 0usize;
+    for (index, span) in spans.iter().enumerate() {
+        if span.parent != Some(spreadsheet) || !is_element(span, TABLE, "table") {
+            continue;
+        }
+        count = count
+            .checked_add(1)
+            .ok_or_else(|| invalid_error("ODS sheet count overflows"))?;
+        if count >= MAX_SHEET_MOVE_SHEETS {
+            return invalid(format!(
+                "ODS sheet transfer requires fewer than {MAX_SHEET_MOVE_SHEETS} worksheets"
+            ));
+        }
+        if resolved_attribute(xml, spans, index, TABLE, "name")?.as_deref() == Some(name) {
+            if selected.replace(index).is_some() {
+                return invalid("ODS sheet selector is ambiguous");
+            }
+        }
+    }
+    selected.ok_or_else(|| invalid_error(format!("ODS sheet '{name}' was not found")))
+}
+
 fn resolved_attribute(
     xml: &str,
     spans: &[Span],
@@ -4539,6 +5651,14 @@ fn resolved_attribute(
     let mut ancestors = Vec::new();
     let mut parent = span.parent;
     while let Some(parent_index) = parent {
+        if ancestors.len() >= MAX_SHEET_COPY_DEPTH {
+            return invalid(format!(
+                "ODS resolved attribute ancestor depth exceeds the {MAX_SHEET_COPY_DEPTH} limit"
+            ));
+        }
+        ancestors
+            .try_reserve(1)
+            .map_err(|_error| invalid_error("ODS resolved attribute ancestor allocation failed"))?;
         let ancestor = spans
             .get(parent_index)
             .ok_or_else(|| invalid_error("ODS resolved attribute ancestor is missing"))?;
@@ -4627,11 +5747,14 @@ fn resolved_attribute(
                                 quick_xml::XmlVersion::Explicit1_0,
                                 reader.decoder(),
                             )
-                            .map(|value| Some(value.into_owned()))
                             .map_err(|error| {
                                 invalid_error(format!(
                                     "invalid ODS resolved attribute value: {error}"
                                 ))
+                            })
+                            .and_then(|value| {
+                                copy_bounded_string(value.as_ref(), "resolved ODS attribute value")
+                                    .map(Some)
                             });
                     }
                 }
@@ -4693,6 +5816,29 @@ fn children(spans: &[Span], parent: usize, namespace: &str, local: &str) -> Vec<
         .collect()
 }
 
+fn bounded_children(
+    spans: &[Span],
+    parent: usize,
+    namespace: &str,
+    local: &str,
+    limit: usize,
+) -> Result<Vec<usize>> {
+    let mut result = Vec::new();
+    for (index, span) in spans.iter().enumerate() {
+        if span.parent != Some(parent) || !is_element(span, namespace, local) {
+            continue;
+        }
+        if result.len() >= limit {
+            return invalid(format!("ODS {local} child count exceeds the {limit} limit"));
+        }
+        result
+            .try_reserve(1)
+            .map_err(|_error| invalid_error(format!("ODS {local} child allocation failed")))?;
+        result.push(index);
+    }
+    Ok(result)
+}
+
 fn children_any_local(
     spans: &[Span],
     parent: usize,
@@ -4749,6 +5895,13 @@ fn is_element(span: &Span, namespace: &str, local: &str) -> bool {
     span.namespace.as_deref() == Some(namespace) && span.local == local
 }
 
+fn is_self_closing_span(xml: &str, span: &Span) -> Result<bool> {
+    let tag = xml
+        .get(span.start..span.tag_end)
+        .ok_or_else(|| invalid_error("ODS element tag span is invalid"))?;
+    Ok(tag.trim_end().ends_with("/>"))
+}
+
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
         .map_err(|_error| invalid_error("ODS XML position overflows usize"))
@@ -4780,8 +5933,12 @@ fn resolve_namespace(namespace: &ResolveResult<'_>) -> Result<Option<String>> {
 }
 
 fn decode(bytes: &[u8], label: &str) -> Result<String> {
-    String::from_utf8(bytes.to_vec())
-        .map_err(|_error| invalid_error(format!("ODS {label} is not UTF-8")))
+    let mut owned = Vec::new();
+    owned
+        .try_reserve_exact(bytes.len())
+        .map_err(|_error| invalid_error(format!("ODS {label} allocation failed")))?;
+    owned.extend_from_slice(bytes);
+    String::from_utf8(owned).map_err(|_error| invalid_error(format!("ODS {label} is not UTF-8")))
 }
 
 fn validate_token(value: &str, label: &str) -> Result<()> {
@@ -4827,4 +5984,50 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 
 fn invalid_error(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
+}
+
+#[cfg(test)]
+mod scalar_transfer_tests {
+    use super::{TABLE, audit_plain_scalar_sheet, children, one, scan};
+    use litchi_core::Result;
+
+    const CONTENT_PREFIX: &str = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:x="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3"><office:body><office:spreadsheet>"#;
+    const CONTENT_SUFFIX: &str = r#"</office:spreadsheet></office:body></office:document-content>"#;
+
+    fn scalar_sheet_is_refused(table: &str) -> Result<()> {
+        let xml = format!("{CONTENT_PREFIX}{table}{CONTENT_SUFFIX}");
+        let spans = scan(&xml)?;
+        let spreadsheet = one(&spans, super::OFFICE, "spreadsheet")?;
+        let table = children(&spans, spreadsheet, TABLE, "table")
+            .into_iter()
+            .next()
+            .ok_or_else(|| super::invalid_error("test table is missing"))?;
+        assert!(audit_plain_scalar_sheet(&xml, &spans, table, spreadsheet).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn first_value_one_duplicate_row_repetition_is_refused() -> Result<()> {
+        scalar_sheet_is_refused(
+            r#"<t:table t:name="Source"><t:table-row t:number-rows-repeated="1" t:number-rows-repeated="1"><t:table-cell/></t:table-row></t:table>"#,
+        )
+    }
+
+    #[test]
+    fn first_value_one_duplicate_cell_repetition_is_refused() -> Result<()> {
+        scalar_sheet_is_refused(
+            r#"<t:table t:name="Source"><t:table-row><t:table-cell t:number-columns-repeated="1" t:number-columns-repeated="1"/></t:table-row></t:table>"#,
+        )
+    }
+
+    #[test]
+    fn malformed_date_and_time_lexicals_are_refused() -> Result<()> {
+        for table in [
+            r#"<t:table t:name="Source"><t:table-row><t:table-cell office:value-type="date" office:date-value="2026-02-30"/></t:table-row></t:table>"#,
+            r#"<t:table t:name="Source"><t:table-row><t:table-cell office:value-type="time" office:time-value="not-a-duration"/></t:table-row></t:table>"#,
+        ] {
+            scalar_sheet_is_refused(table)?;
+        }
+        Ok(())
+    }
 }
