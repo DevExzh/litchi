@@ -16,7 +16,8 @@ use litchi_iwa_common::{
 use litchi_iwa_protos::{
     numbers_table_cell_storage_codec::{
         DecodeError, DecodeOptions, DecodeReport, StorageVisitor, TableDataListEntrySnapshot,
-        decode_table_data_list_entry_with_report, decode_table_data_list_with_visitor,
+        decode_table_data_list_entry_with_report, decode_table_data_list_segment_with_visitor,
+        decode_table_data_list_with_visitor,
     },
     tst,
 };
@@ -111,6 +112,42 @@ pub(crate) struct AssignmentReport {
     peak_scratch_bytes: usize,
     allocations: usize,
     transaction_work: usize,
+}
+
+/// The bounded result of resolving one native string-list key.
+///
+/// The decoder report is retained so the parent transaction can charge the
+/// exact strict-read counters after the probe succeeds.  No text is copied;
+/// the comparison is performed while the codec's borrowed entry snapshot is
+/// live.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct StringKeyMatchReport {
+    matched: bool,
+    decode: DecodeReport,
+    entries_scanned: usize,
+    key_occurrences: usize,
+}
+
+impl StringKeyMatchReport {
+    #[must_use]
+    pub(crate) const fn matched(self) -> bool {
+        self.matched
+    }
+
+    #[must_use]
+    pub(crate) const fn decode(self) -> DecodeReport {
+        self.decode
+    }
+
+    #[must_use]
+    pub(crate) const fn entries_scanned(self) -> usize {
+        self.entries_scanned
+    }
+
+    #[must_use]
+    pub(crate) const fn key_occurrences(self) -> usize {
+        self.key_occurrences
+    }
 }
 
 impl AssignmentReport {
@@ -665,6 +702,96 @@ impl From<litchi_iwa_common::Error> for Failure {
     }
 }
 
+/// Resolve one native string-list key against its authoritative text.
+///
+/// This is intentionally a streaming probe rather than a call to the
+/// assignment planner: no entry/index vector is retained and no output list
+/// is constructed.  The strict decoder still validates the complete payload
+/// before the result is published.  A key occurring more than once is
+/// rejected because accepting either text would make a formula cache
+/// ambiguous.
+pub(crate) fn string_key_matches(
+    source_payload: &[u8],
+    key: u32,
+    expected: &str,
+    limits: ListLimits,
+) -> Result<StringKeyMatchReport, Failure> {
+    string_key_matches_in(source_payload, key, expected, limits, false)
+}
+
+/// Resolve one native string-list segment against its authoritative text.
+///
+/// Segments have a different wire envelope from the root list, so they must
+/// go through the segment decoder even though their entries use the same
+/// snapshot type.
+pub(crate) fn string_segment_key_matches(
+    source_payload: &[u8],
+    key: u32,
+    expected: &str,
+    limits: ListLimits,
+) -> Result<StringKeyMatchReport, Failure> {
+    string_key_matches_in(source_payload, key, expected, limits, true)
+}
+
+fn string_key_matches_in(
+    source_payload: &[u8],
+    key: u32,
+    expected: &str,
+    limits: ListLimits,
+    segment: bool,
+) -> Result<StringKeyMatchReport, Failure> {
+    if key == 0 {
+        return Err(Failure::InvalidSource("string cache key is zero"));
+    }
+
+    let mut matcher = StringKeyMatcher::new(key, expected);
+    let (list_type, key_range, decode) = if segment {
+        let (snapshot, report) = decode_table_data_list_segment_with_visitor(
+            source_payload,
+            limits.decode,
+            &mut matcher,
+        )?;
+        (
+            snapshot.list_type(),
+            Some((snapshot.key_range_location(), snapshot.key_range_length())),
+            report,
+        )
+    } else {
+        let (snapshot, report) =
+            decode_table_data_list_with_visitor(source_payload, limits.decode, &mut matcher)?;
+        (snapshot.list_type(), None, report)
+    };
+    if list_type != tst::table_data_list::ListType::String as i32 {
+        return Err(Failure::InvalidSource("TableDataList is not a string list"));
+    }
+    if matcher.seen > limits.max_entries {
+        return Err(Failure::LimitExceeded {
+            resource: "list entries",
+            observed: matcher.seen,
+            maximum: limits.max_entries,
+        });
+    }
+    if matcher.key_matches > 1 {
+        return Err(Failure::InvalidSource("duplicate string cache key"));
+    }
+    if let Some((location, length)) = key_range {
+        let end = location
+            .checked_add(length)
+            .ok_or(Failure::Overflow("string segment key range"))?;
+        if matcher.key_matches != 0 && (key < location || key >= end) {
+            return Err(Failure::InvalidSource(
+                "string cache key is outside its segment range",
+            ));
+        }
+    }
+    Ok(StringKeyMatchReport {
+        matched: matcher.key_matches == 1 && matcher.text_matches == 1,
+        decode,
+        entries_scanned: matcher.seen,
+        key_occurrences: matcher.key_matches,
+    })
+}
+
 /// Determine the final stable key of every requested string without encoding.
 ///
 /// This is the read-only first half of a grouped cell rewrite.  It exists for
@@ -1134,6 +1261,42 @@ impl StorageVisitor for StagedEntries {
         // post-decode equality check turns any codec/raw disagreement into our
         // typed source failure without manufacturing a private codec error.
         self.seen = self.seen.saturating_add(1);
+        Ok(())
+    }
+}
+
+struct StringKeyMatcher<'expected> {
+    key: u32,
+    expected: &'expected str,
+    seen: usize,
+    key_matches: usize,
+    text_matches: usize,
+}
+
+impl<'expected> StringKeyMatcher<'expected> {
+    const fn new(key: u32, expected: &'expected str) -> Self {
+        Self {
+            key,
+            expected,
+            seen: 0,
+            key_matches: 0,
+            text_matches: 0,
+        }
+    }
+}
+
+impl StorageVisitor for StringKeyMatcher<'_> {
+    fn visit_list_entry(
+        &mut self,
+        entry: TableDataListEntrySnapshot<'_>,
+    ) -> Result<(), DecodeError> {
+        self.seen = self.seen.saturating_add(1);
+        if entry.key() == self.key {
+            self.key_matches = self.key_matches.saturating_add(1);
+            if entry.string_value() == Some(self.expected) {
+                self.text_matches = self.text_matches.saturating_add(1);
+            }
+        }
         Ok(())
     }
 }
@@ -2106,9 +2269,10 @@ mod tests {
     use super::{
         Failure, ListLimits, StringAssignment, StringRequest, output_allocations,
         plan_allocation_phases, plan_string_list, preflight_string_assignments,
-        preparation_requirements, prepare_string_list,
+        preparation_requirements, prepare_string_list, string_key_matches,
+        string_segment_key_matches,
     };
-    use litchi_iwa_protos::{numbers_table_cell_storage_codec::DecodeOptions, tst};
+    use litchi_iwa_protos::{numbers_table_cell_storage_codec::DecodeOptions, tsp, tst};
 
     fn string_list(next: u32, entries: &[(u32, u32, &str)]) -> Vec<u8> {
         tst::TableDataList {
@@ -2124,6 +2288,23 @@ mod tests {
                 })
                 .collect(),
             ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    fn string_segment(location: u32, length: u32, entries: &[(u32, u32, &str)]) -> Vec<u8> {
+        tst::TableDataListSegment {
+            list_type: tst::table_data_list::ListType::String as i32,
+            key_range: tsp::Range { location, length },
+            entries: entries
+                .iter()
+                .map(|&(key, refcount, text)| tst::table_data_list::ListEntry {
+                    key,
+                    refcount,
+                    string: Some(text.to_owned()),
+                    ..Default::default()
+                })
+                .collect(),
         }
         .encode_to_vec()
     }
@@ -2154,6 +2335,52 @@ mod tests {
             .iter()
             .map(|assignment| assignment.key())
             .collect()
+    }
+
+    #[test]
+    fn string_key_probe_requires_authoritative_text() {
+        let payload = string_list(10, &[(7, 1, "alpha"), (8, 1, "beta")]);
+        let exact = string_key_matches(&payload, 7, "alpha", limits(&payload, 2, 0))
+            .expect("strict string key probe");
+        assert!(exact.matched());
+        assert_eq!(exact.entries_scanned(), 2);
+        assert_eq!(exact.key_occurrences(), 1);
+
+        let wrong_text = string_key_matches(&payload, 7, "beta", limits(&payload, 2, 0))
+            .expect("strict string key probe");
+        assert!(!wrong_text.matched());
+        assert_eq!(wrong_text.key_occurrences(), 1);
+
+        let missing_key = string_key_matches(&payload, 99, "alpha", limits(&payload, 2, 0))
+            .expect("strict string key probe");
+        assert!(!missing_key.matched());
+        assert_eq!(missing_key.key_occurrences(), 0);
+    }
+
+    #[test]
+    fn string_key_probe_rejects_ambiguous_native_key() {
+        let payload = string_list(10, &[(7, 1, "alpha"), (7, 1, "other")]);
+        assert!(matches!(
+            string_key_matches(&payload, 7, "alpha", limits(&payload, 2, 0)),
+            Err(Failure::InvalidSource("duplicate string cache key"))
+        ));
+    }
+
+    #[test]
+    fn string_segment_key_probe_checks_the_declared_key_range() {
+        let payload = string_segment(7, 2, &[(7, 1, "alpha"), (8, 1, "beta")]);
+        let exact = string_segment_key_matches(&payload, 7, "alpha", limits(&payload, 2, 0))
+            .expect("strict segmented string key probe");
+        assert!(exact.matched());
+        assert_eq!(exact.entries_scanned(), 2);
+
+        let outside = string_segment(8, 1, &[(7, 1, "alpha")]);
+        assert!(matches!(
+            string_segment_key_matches(&outside, 7, "alpha", limits(&outside, 1, 0)),
+            Err(Failure::InvalidSource(
+                "string cache key is outside its segment range"
+            ))
+        ));
     }
 
     #[test]

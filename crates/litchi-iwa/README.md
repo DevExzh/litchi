@@ -1248,7 +1248,6 @@ if let Some(text_box) = keynote
     )?;
     keynote.remove_slide_text_box(0, copy.drawable_object_id)?;
 }
-keynote.set_slide_name(0, Some("Opening"))?;
 let layout = keynote.default_slide_layout()?;
 keynote.add_slide(layout)?;
 if let Some(drawable) = keynote.slide_drawables(0)?.first() {

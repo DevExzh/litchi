@@ -1317,6 +1317,38 @@ fn all_typed_caches_commit_through_native_tiles_and_reopen() -> TestResult {
 }
 
 #[test]
+fn text_cache_exact_noop_resolves_native_string_key() -> TestResult {
+    let expression = || Expression::text("text cache exact");
+    let authored = Package::open(fixture_path())?
+        .edit_table_cells(0usize, 0usize)?
+        .set_formula_cached_a1("E3", expression()?, CachedValue::text("text cache exact")?)?
+        .commit()?
+        .into_package();
+    let authored_bytes = exact_bytes(&authored);
+    let reopened = Package::from_bytes(&authored_bytes)?;
+
+    let noop = reopened
+        .edit_table_cells(0usize, 0usize)?
+        .set_formula_cached_a1("E3", expression()?, CachedValue::text("text cache exact")?)?
+        .commit()?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.diagnostics().changed_cells(), 0);
+    assert_eq!(exact_bytes(noop.package()), authored_bytes);
+
+    let changed = reopened
+        .edit_table_cells(0usize, 0usize)?
+        .set_formula_cached_a1(
+            "E3",
+            expression()?,
+            CachedValue::text("text cache changed")?,
+        )?
+        .commit()?;
+    assert!(!changed.patch().is_noop());
+    assert_eq!(changed.diagnostics().changed_cells(), 1);
+    Ok(())
+}
+
+#[test]
 fn locked_table_allows_formula_noop_and_refuses_formula_change() -> TestResult {
     let expression = || {
         Expression::function(

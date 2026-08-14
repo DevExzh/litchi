@@ -33,7 +33,10 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_detect::{Format, PreparedSource};
-use litchi_iwa_protos::{keynote_document_codec, keynote_show_codec, kn, tswp};
+use litchi_iwa_protos::{
+    keynote_document_codec, keynote_placeholder_text_codec, keynote_show_codec,
+    keynote_speaker_notes_codec, kn, tswp,
+};
 use litchi_iwa_text::storage::Storage;
 use litchi_iwa_text_wire::{
     DEFAULT_MAX_FIELDS as DEFAULT_MAX_TEXT_FIELDS,
@@ -1137,10 +1140,7 @@ impl Package {
         }
 
         let storage_reference = if let Some(payload) = placeholder {
-            preflight_placeholder(payload, self.semantic_wire_limits()?, path)?;
-            let value: kn::PlaceholderArchive =
-                decode_message(payload, "Keynote drawable placeholder")?;
-            value.super_.owned_storage
+            decode_placeholder_storage_reference(payload, self.semantic_wire_limits()?, path)?
         } else if let Some(payload) = shape {
             preflight_required_length_delimited_field(
                 payload,
@@ -1150,7 +1150,7 @@ impl Package {
                 path,
             )?;
             let value: tswp::ShapeInfoArchive = decode_message(payload, "Keynote drawable shape")?;
-            value.owned_storage
+            value.owned_storage.map(|reference| reference.identifier)
         } else {
             None
         };
@@ -1164,7 +1164,7 @@ impl Package {
             return Ok(None);
         };
         budget.charge_references(1, path)?;
-        let storage = self.required_object(reference.identifier, "Keynote drawable storage")?;
+        let storage = self.required_object(reference, "Keynote drawable storage")?;
         self.required_text_storage(storage, budget, path).map(Some)
     }
 
@@ -1180,18 +1180,9 @@ impl Package {
             &[NOTE_MESSAGE_TYPE],
             "Keynote speaker note",
         )?;
-        preflight_required_length_delimited_field(
-            payload,
-            self.semantic_wire_limits()?,
-            1,
-            "Keynote speaker-note storage reference",
-            path,
-        )?;
-        let note: kn::NoteArchive = decode_message(payload, "Keynote speaker note")?;
-        let storage = self.required_object(
-            note.contained_storage.identifier,
-            "Keynote speaker-note storage",
-        )?;
+        let storage_identifier =
+            decode_note_storage_reference(payload, self.semantic_wire_limits()?, path)?;
+        let storage = self.required_object(storage_identifier, "Keynote speaker-note storage")?;
         budget.charge_references(1, path)?;
         Ok(self
             .required_text_storage(storage, budget, path)?
@@ -2163,42 +2154,120 @@ fn preflight_required_length_delimited_field(
     Ok(())
 }
 
-fn preflight_placeholder(
+fn decode_placeholder_storage_reference(
     payload: &[u8],
     wire_limits: WireLimits,
     path: SemanticPath,
-) -> ReadResult<()> {
-    let mut placeholder_super_fields = 0usize;
-    let mut shape_super_fields = 0usize;
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
-        let field = visit.field();
-        match (visit.path(), field.number()) {
-            ([], 1) => {
-                require_unique_length_delimited(
-                    field,
-                    &mut placeholder_super_fields,
-                    "Keynote placeholder shape owner",
-                )?;
-                Ok(WireDescent::Descend)
-            },
-            ([1], 1) => {
-                require_unique_length_delimited(
-                    field,
-                    &mut shape_super_fields,
-                    "Keynote placeholder base shape",
-                )?;
-                Ok(WireDescent::Skip)
-            },
-            _ => Ok(WireDescent::Skip),
+) -> ReadResult<Option<u64>> {
+    let recursion_limit = u32::try_from(wire_limits.max_nesting()).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote placeholder nesting limit does not fit u32".to_owned())
+    })?;
+    let options = keynote_placeholder_text_codec::DecodeOptions::new(
+        payload.len().min(wire_limits.max_input_bytes()),
+        wire_limits.max_fields(),
+        wire_limits.max_rewrite_work(),
+        recursion_limit,
+    );
+    keynote_placeholder_text_codec::decode_placeholder_storage_reference(payload, options)
+        .map_err(|error| map_placeholder_projection_error(error, path))
+}
+
+fn map_placeholder_projection_error(
+    error: keynote_placeholder_text_codec::DecodeError,
+    path: SemanticPath,
+) -> ReadError {
+    if let Some((observed, maximum)) = error.message_byte_limit_values() {
+        ReadError::PayloadLimit {
+            kind: PayloadLimitKind::Bytes,
+            observed,
+            maximum,
+            path,
         }
-    })
-    .map_err(|error| map_wire_preflight_error(error, "Keynote placeholder", path))?;
-    if placeholder_super_fields != 1 || shape_super_fields != 1 {
-        return Err(ReadError::InvalidFormat(
-            "Keynote placeholder is missing a unique required shape envelope".to_owned(),
-        ));
+    } else if let Some((observed, maximum)) = error.recursion_limit_values() {
+        ReadError::PayloadLimit {
+            kind: PayloadLimitKind::Nesting,
+            observed: usize::try_from(observed).unwrap_or(usize::MAX),
+            maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+            path,
+        }
+    } else if let Some((observed, maximum)) = error.field_limit_values() {
+        ReadError::PayloadLimit {
+            kind: PayloadLimitKind::Fields,
+            observed,
+            maximum,
+            path,
+        }
+    } else if let Some((observed, maximum)) = error.work_limit_values() {
+        ReadError::PayloadLimit {
+            kind: PayloadLimitKind::Work,
+            observed,
+            maximum,
+            path,
+        }
+    } else {
+        ReadError::InvalidFormat("Keynote placeholder projection is malformed".to_owned())
     }
-    Ok(())
+}
+
+fn decode_note_storage_reference(
+    payload: &[u8],
+    wire_limits: WireLimits,
+    path: SemanticPath,
+) -> ReadResult<u64> {
+    let recursion_limit = u32::try_from(wire_limits.max_nesting()).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote speaker-note nesting limit does not fit u32".to_owned())
+    })?;
+    let options = keynote_speaker_notes_codec::DecodeOptions::new(
+        payload.len().min(wire_limits.max_input_bytes()),
+        wire_limits.max_fields(),
+        wire_limits.max_rewrite_work(),
+        recursion_limit,
+    );
+    keynote_speaker_notes_codec::decode_note_storage_reference(payload, options)
+        .map_err(|error| map_speaker_notes_projection_error(error, path))
+}
+
+fn map_speaker_notes_projection_error(
+    error: keynote_speaker_notes_codec::DecodeError,
+    path: SemanticPath,
+) -> ReadError {
+    if let Some((observed, maximum)) = error.field_limit_values() {
+        return ReadError::PayloadLimit {
+            kind: PayloadLimitKind::Fields,
+            observed,
+            maximum,
+            path,
+        };
+    }
+    if let Some((observed, maximum)) = error.work_limit_values() {
+        return ReadError::PayloadLimit {
+            kind: PayloadLimitKind::Work,
+            observed,
+            maximum,
+            path,
+        };
+    }
+    match error.wire_resource_limit() {
+        Some(keynote_speaker_notes_codec::WireResourceLimit::Bytes {
+            observed: Some(observed),
+            maximum: Some(maximum),
+        }) => ReadError::PayloadLimit {
+            kind: PayloadLimitKind::Bytes,
+            observed,
+            maximum,
+            path,
+        },
+        Some(keynote_speaker_notes_codec::WireResourceLimit::Nesting {
+            observed: Some(observed),
+            maximum: Some(maximum),
+        }) => ReadError::PayloadLimit {
+            kind: PayloadLimitKind::Nesting,
+            observed: usize::try_from(observed).unwrap_or(usize::MAX),
+            maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+            path,
+        },
+        _ => ReadError::InvalidFormat("Keynote speaker-note projection is malformed".to_owned()),
+    }
 }
 
 fn require_length_delimited(

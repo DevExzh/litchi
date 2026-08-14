@@ -99,6 +99,7 @@ RETIRED_FACADE_DEPENDENCIES = frozenset({"litchi-iwa"})
 IWA_KEYNOTE_SOURCE_ROOT = Path("crates/litchi-iwa/src/keynote")
 IWA_KEYNOTE_EDITOR_SOURCE = IWA_KEYNOTE_SOURCE_ROOT / "editor.rs"
 RETIRED_IWA_KEYNOTE_METHODS = (
+    "set_slide_name",
     "set_slide_title",
     "replace_slide_title",
     "clear_slide_title",
@@ -127,6 +128,14 @@ RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_EXAMPLE = Path(
     "crates/litchi-iwa/examples/edit_keynote_show.rs"
 )
 IWA_KEYNOTE_README = Path("crates/litchi-iwa/README.md")
+RETIRED_IWA_KEYNOTE_SLIDE_NAME_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/rename_keynote_slide.rs"
+)
+IWA_KEYNOTE_README_SLIDE_NAME_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+    r"[ \t\r\n]*\.[ \t\r\n]*(?P<method>set_slide_name)"
+    r"\b[ \t\r\n]*\("
+)
 RETIRED_IWA_KEYNOTE_DOCUMENT_SOURCE = IWA_KEYNOTE_SOURCE_ROOT / "document.rs"
 RETIRED_IWA_KEYNOTE_DOCUMENT_TYPES = (
     "KeynoteDocument",
@@ -4351,21 +4360,36 @@ def _rust_canonical_exports(
 
 
 def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
-    """Prevent retired Keynote function declarations from returning to the host."""
+    """Prevent retired Keynote mutation surfaces from returning to the host."""
 
     source_root = root / IWA_KEYNOTE_SOURCE_ROOT
-    if not source_root.is_dir():
-        return []
-
     violations: list[str] = []
-    for path in sorted(source_root.rglob("*.rs")):
-        source = path.read_text(encoding="utf-8")
-        for name, line_number in _rust_function_declarations(source):
-            if name not in RETIRED_IWA_KEYNOTE_METHOD_SET:
-                continue
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_KEYNOTE_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Keynote method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    retired_example = root / RETIRED_IWA_KEYNOTE_SLIDE_NAME_EXAMPLE
+    if retired_example.exists():
+        violations.append(
+            "retired litchi-iwa Keynote slide-name example returned: "
+            + str(RETIRED_IWA_KEYNOTE_SLIDE_NAME_EXAMPLE)
+        )
+
+    readme_path = root / IWA_KEYNOTE_README
+    if readme_path.exists():
+        source = readme_path.read_text(encoding="utf-8")
+        for match in IWA_KEYNOTE_README_SLIDE_NAME_CALL.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
             violations.append(
-                "retired litchi-iwa Keynote method "
-                f"{name}: {path.relative_to(root)}:{line_number}"
+                "retired litchi-iwa Keynote slide-name README call "
+                f"{match.group('method')}: {IWA_KEYNOTE_README}:{line_number}"
             )
 
     return sorted(set(violations))

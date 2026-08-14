@@ -19,7 +19,7 @@ use crate::{
     },
 };
 
-use super::{budget, cache_commit, tile};
+use super::{budget, cache_commit, lists, resolve, tile};
 
 #[derive(Debug)]
 pub(super) struct AuthoredFormula {
@@ -108,25 +108,13 @@ impl PreparedFormulaBatch {
         Ok(true)
     }
 
-    pub(super) fn supplied_cache_match_work(
-        &self,
-        existing: &cache_commit::ExistingFormulaIndex<'_>,
-        path: Path,
-    ) -> Result<usize, Error> {
-        self.formulas
-            .len()
-            .checked_mul(
-                search_work(existing.caches.len())
-                    .checked_add(2)
-                    .ok_or(Error::InvalidSource { path })?,
-            )
-            .ok_or(Error::InvalidSource { path })
-    }
-
     pub(super) fn supplied_caches_match_existing(
         &self,
         changes: &[Change],
         existing: &cache_commit::ExistingFormulaIndex<'_>,
+        source_package: &Package,
+        string_list: &resolve::ListRoute,
+        budget: &mut budget::TransactionBudget,
         path: Path,
     ) -> Result<bool, Error> {
         for formula in &self.formulas {
@@ -139,6 +127,15 @@ impl PreparedFormulaBatch {
             let Some(supplied) = cached else {
                 continue;
             };
+            let cache_lookup_work = search_work(existing.caches.len())
+                .checked_add(2)
+                .ok_or(Error::InvalidSource { path })?;
+            let cache_lookup_usage = budget::Usage {
+                lookups: 1,
+                transaction_work: as_u64(cache_lookup_work),
+                ..budget::Usage::default()
+            };
+            budget.authorize(cache_lookup_usage)?;
             let coordinate = (formula.position.row(), formula.position.column());
             let source = existing
                 .caches
@@ -148,17 +145,131 @@ impl PreparedFormulaBatch {
                 )
                 .ok()
                 .and_then(|index| existing.caches.get(index));
+            budget.record_authorized(cache_lookup_usage)?;
             let Some(source) = source else {
                 return Ok(false);
             };
-            if source.formula_error.is_some()
-                || !cache_values_match(supplied.kind(), source.value.as_ref())
-            {
+            if source.formula_error.is_some() {
                 return Ok(false);
+            }
+            match supplied.kind() {
+                crate::formula::CachedKind::Text(expected) => {
+                    let Some(tile::FormulaCacheValue::TextKey(key)) = source.value.as_ref() else {
+                        return Ok(false);
+                    };
+                    if !string_cache_matches_existing(
+                        source_package,
+                        string_list,
+                        *key,
+                        expected,
+                        budget,
+                        path,
+                    )? {
+                        return Ok(false);
+                    }
+                },
+                supplied => {
+                    if !cache_values_match(supplied, source.value.as_ref()) {
+                        return Ok(false);
+                    }
+                },
             }
         }
         Ok(true)
     }
+}
+
+fn string_cache_matches_existing(
+    source_package: &Package,
+    route: &resolve::ListRoute,
+    key: u32,
+    expected: &str,
+    budget: &mut budget::TransactionBudget,
+    path: Path,
+) -> Result<bool, Error> {
+    let mut entries_scanned = 0usize;
+    let mut key_occurrences = 0usize;
+    let mut matched = false;
+    let routes = core::iter::once((false, route.message)).chain(
+        route
+            .segments
+            .iter()
+            .copied()
+            .map(|message| (true, message)),
+    );
+    for (segment, message) in routes {
+        let payload = super::message_payload(source_package, message, path)?;
+        let remaining = budget.remaining()?;
+        let limits = super::string_list_limits(source_package, 1, path, remaining)?;
+        budget.authorize(remaining)?;
+        let probe = if segment {
+            lists::string_segment_key_matches(payload, key, expected, limits)
+        } else {
+            lists::string_key_matches(payload, key, expected, limits)
+        };
+        let report = match probe {
+            Ok(report) => report,
+            Err(error) => {
+                budget.cancel_authorization();
+                return Err(super::map_list_error(error, path));
+            },
+        };
+        let usage = match string_key_match_usage(report, path) {
+            Ok(usage) => usage,
+            Err(error) => {
+                budget.cancel_authorization();
+                return Err(error);
+            },
+        };
+        if let Err(error) = budget.record_authorized(usage) {
+            budget.cancel_authorization();
+            return Err(error);
+        }
+        entries_scanned = entries_scanned
+            .checked_add(report.entries_scanned())
+            .ok_or(Error::InvalidSource { path })?;
+        key_occurrences = key_occurrences
+            .checked_add(report.key_occurrences())
+            .ok_or(Error::InvalidSource { path })?;
+        if key_occurrences > 1 {
+            return Err(Error::InvalidSource { path });
+        }
+        if report.matched() {
+            matched = true;
+        }
+    }
+    if entries_scanned != route.entries {
+        return Err(Error::Verification { path });
+    }
+    Ok(matched)
+}
+
+fn string_key_match_usage(
+    report: lists::StringKeyMatchReport,
+    path: Path,
+) -> Result<budget::Usage, Error> {
+    let decode = report.decode();
+    let transaction_work = decode
+        .work_bytes()
+        .checked_add(decode.fields())
+        .and_then(|work| work.checked_add(decode.references()))
+        .and_then(|work| work.checked_add(report.entries_scanned()))
+        .and_then(|work| work.checked_add(1))
+        .ok_or(Error::InvalidSource { path })?;
+    let string_work = report
+        .entries_scanned()
+        .checked_add(1)
+        .ok_or(Error::InvalidSource { path })?;
+    Ok(budget::Usage {
+        wire_bytes: as_u64(decode.source_bytes()),
+        wire_fields: as_u64(decode.fields()),
+        wire_work: as_u64(decode.work_bytes()),
+        references: as_u64(decode.references()),
+        list_reads: 1,
+        string_work: as_u64(string_work),
+        transaction_work: as_u64(transaction_work),
+        ..budget::Usage::default()
+    })
 }
 
 fn cache_values_match(

@@ -10628,3 +10628,37 @@ transaction and reopen suites, not extrapolated as separate UI observations.
 It does not claim other Numbers versions, visual fidelity outside the inspected
 cells, arbitrary formulas, array/spill/pivot support, host deletion, manifest
 edge removal, or closure of the broader IWA migration debt.
+
+## 2026-08-14 Native-negative regression and cached-text no-op gate
+
+The Keynote field-10 navigator-name mutation had reappeared in the migration
+host even though this ADR's earlier native rejection remained authoritative.
+The setter, direct example, README call, and internal mutation tests are removed
+again, and the boundary suite now rejects all three surface forms. This is an
+enforcement correction, not new evidence that field 10 is writable: the
+supported surface still reads navigator names and uses them as exact semantic
+selectors, while mutation remains unavailable.
+
+Focused Keynote verification passes 107/107 library cases and 127/127
+integration cases after replacing the eager placeholder and note owner decodes
+with their strict Buffa lazy projections. The Numbers public formula suite now
+passes 16/16, including a reopened-package cached-text exact no-op and a
+different-text rewrite. The string-list unit gate covers authoritative match,
+mismatch, missing/duplicate keys, and segmented key-range validation. Exact
+source sharing, zero changed cells for the equal-text case, failure atomicity,
+changed publication, and strict budget accounting come from Rust tests rather
+than native UI inference. The registered `numbers_formula_cells` target passes
+both its sanitizer build and a 16-input bounded smoke campaign with no crash,
+timeout, or out-of-memory failure.
+
+Computer Use opened only locked disposable copies. Numbers opened the
+136,929-byte accepted formula artifact with SHA-256
+`3edc581996d00a21493a89450aaea0bc51f8543a244fd03389ed506a31b9ef41`
+without repair or conversion UI and exposed one 22-by-7 table with B3=44 and
+formula-result cells C3=88 and D3=52. Keynote opened the 500,058-byte fixture
+copy with SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`
+without warning UI and exposed the expected title, body, date, and title/body
+placeholder visibility. Post-open hashes remained exact. These read-only gates
+confirm current native acceptance and visible semantics; they do not establish
+byte-inert saving, navigator-name mutation, or additional formula behaviors.

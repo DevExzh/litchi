@@ -2917,3 +2917,41 @@ mutation seams, manifest edge, and debt record together. It must rerun the
 retired-surface and raw-identity audits and preserve all still-required reader
 and cross-format behavior. Compatibility aliases, test-only reexports, or a
 hidden facade bridge are not an acceptable substitute for that deletion.
+
+## 2026-08-14 amendment: native-negative enforcement and lazy-owner hardening
+
+The migration host again conforms to the accepted negative Keynote evidence.
+`KeynoteEditor::set_slide_name`, its direct example, its README call, and the
+two self-read-only mutation tests are deleted. The field-10 splice had returned
+despite ADRs 0004 and 0008 recording that both focused and legacy prototypes
+failed the real Keynote navigator gate. The existing declaration audit now
+ratchets the setter, and additionally rejects restoration of the example or
+README call. Semantic name reads and selector resolution remain supported;
+name mutation remains blocked until the native-authoritative graph/cache
+closure is discovered and passes an app-authored set/clear gate.
+
+The concrete Keynote reader also stops eagerly materializing generated
+`KN.PlaceholderArchive` and `KN.NoteArchive` values. Placeholder-owned and
+speaker-note storage references now come from the existing strict, bounded
+Buffa lazy projections, with byte/field/nesting/work failures mapped into the
+format-owned semantic error model. The separate `TSWP.ShapeInfoArchive` path
+remains generated-Prost debt because no equivalent strict projection owns it
+yet. This is a two-owner decode cut, not a whole-graph Buffa or Keynote host
+exit claim.
+
+The focused Numbers formula transaction now recognizes an exact no-op when an
+existing cached text is represented by a native string-list key. It resolves
+that key against authoritative root and segmented string-list content through
+a strict streaming visitor, charges the complete decode/list/search work, and
+rejects duplicate keys or segment-range contradictions. Equal formula plus
+equal resolved text shares the exact source artifact; different text remains a
+real transactional rewrite. This is focused-owner correctness hardening only:
+the host formula setters, compiler, pivot behavior, manifest edge, and ordered
+debt remain exactly as recorded in the preceding amendment.
+
+The root facade fuzz suite now registers `numbers_formula_cells`. Its bounded
+native-seed command model exercises formula staging, changed/no-op commit,
+exact apply/inverse, duplicate operations, cycles, cache mismatches,
+foreign-source conflicts, constructor failures, redaction, and source
+atomicity. This extends adversarial coverage without adding a new public owner
+or changing the monolith-exit topology.
