@@ -5,6 +5,9 @@ use super::types::Result;
 
 /// Open a workbook from a file path.
 ///
+/// On Unix and Windows, validates the XLSX OPC catalog and relationship graph
+/// at open while deferring selected worksheet payload extraction and parsing
+/// until worksheet reads. Other targets retain the portable eager fallback.
 /// Uses the default XLSX OPC resource policy. Use
 /// [`open_workbook_with_limits`] when the input is untrusted.
 #[cfg(feature = "xlsx")]
@@ -13,16 +16,34 @@ pub fn open_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workb
 }
 
 /// Open an XLSX workbook from a file path with an explicit OPC resource policy.
+///
+/// On Unix and Windows, catalog validation happens at open and selected
+/// worksheet payloads are extracted and parsed on demand. Other targets use
+/// the portable eager fallback.
 #[cfg(feature = "xlsx")]
 pub fn open_workbook_with_limits<P: AsRef<std::path::Path>>(
     path: P,
     limits: crate::xlsx::ReadLimits,
 ) -> Result<Box<dyn WorkbookTrait>> {
-    let workbook = crate::xlsx::Package::open_with_limits(path, limits)
-        .map_err(crate::map_ooxml_error)?
-        .into_workbook()
-        .map_err(crate::map_ooxml_error)?;
-    Ok(Box::new(super::adapters::Workbook::new(workbook)))
+    // `SourceBackedWorkbook` is available on regular filesystem targets. Keep
+    // the historical eager path as the portable fallback for targets without
+    // a native filesystem-backed `FileSource`.
+    #[cfg(any(unix, windows))]
+    {
+        let workbook = crate::xlsx::SourceBackedWorkbook::from_path_with_limits(path, limits)
+            .map_err(crate::map_ooxml_error)?;
+        Ok(Box::new(super::adapters::Workbook::from_source_backed(
+            workbook,
+        )))
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let workbook = crate::xlsx::Package::open_with_limits(path, limits)
+            .map_err(crate::map_ooxml_error)?
+            .into_workbook()
+            .map_err(crate::map_ooxml_error)?;
+        Ok(Box::new(super::adapters::Workbook::new(workbook)))
+    }
 }
 
 /// Open a workbook from bytes.
