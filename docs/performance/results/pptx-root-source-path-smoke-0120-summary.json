@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "record_kind": "correctness-logical-read-smoke",
+  "date": "2026-08-15",
+  "claim_scope": "One-sample debug correctness and logical compressed-range evidence only; no latency, tail, allocation, RSS, decompression, physical-I/O, cold-cache, or ABBA claim.",
+  "build": {
+    "profile": "debug",
+    "base_git_revision": "a0b3bb497ed1974e9162c43a969070e5395043ad",
+    "worktree_dirty": true,
+    "source_input_manifest_sha256": "3a503f02b44c55a9994e9c4748c339d6b59e64f8b36ae8f7b3cd0f4c3b0c1f95",
+    "source_input_files": [
+      "crates/litchi-ooxml-common/src/properties.rs",
+      "crates/litchi-ooxml-common/src/properties/graph.rs",
+      "crates/litchi-ooxml-common/src/properties/read.rs",
+      "crates/litchi-pptx/src/parts/slide.rs",
+      "crates/litchi-pptx/src/presentation/source.rs",
+      "crates/litchi/src/detection_smart/detected.rs",
+      "crates/litchi/src/detection_smart/ooxml.rs",
+      "crates/litchi/src/presentation/prs.rs",
+      "crates/litchi/src/presentation/types.rs",
+      "tools/perf-baseline/Cargo.toml",
+      "tools/perf-baseline/Cargo.lock",
+      "tools/perf-baseline/src/main.rs",
+      "tools/perf-baseline/src/filesystem.rs"
+    ]
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "os": "linux",
+    "kernel": "Linux 6.8.0-101-generic",
+    "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+    "logical_cpus_available": 12,
+    "cpu_affinity": "0-127",
+    "total_memory_bytes": 33605935104,
+    "filesystem_type": "ext2/ext3"
+  },
+  "configuration": {
+    "samples_per_case": 1,
+    "warmup_iterations_per_case": 0,
+    "filesystem_cache_state": "warm",
+    "fresh_child_per_sample": true,
+    "process_isolated": true
+  },
+  "corpus": {
+    "generator": "litchi-pptx-source-edit-media-v1",
+    "slide_count": 200,
+    "media_entry_count": 8,
+    "archive_member_count": 445,
+    "archive_bytes": 17017139,
+    "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "selected_position": 100
+  },
+  "cases": [
+    {"case": "pptx_file_eager_open", "logical_read_counter_scope": "not_applicable_eager_pptx"},
+    {"case": "pptx_file_source_open", "classification": "catalog-only:zero-slide-and-media-overlap", "read_calls": 1088, "read_bytes": 87511, "slide_payload_covered_bytes": 0, "media_payload_covered_bytes": 0},
+    {"case": "pptx_file_eager_list_slides", "logical_read_counter_scope": "not_applicable_eager_pptx"},
+    {"case": "pptx_file_source_list_slides", "classification": "list-slides:all-slide-payloads-no-media-overlap", "read_calls": 2088, "read_bytes": 201753, "slide_payload_covered_bytes": 105042, "slide_payload_ranges_fully_covered": 200, "selected_slide_payload_covered_bytes": 522, "unselected_slide_payload_covered_bytes": 104520, "media_payload_covered_bytes": 0, "semantic_sha256": "96a5df26f8394f40f3193d2be3f02d50911598d6423459cc75fba2fff47ece5d"},
+    {"case": "pptx_file_eager_slide_count", "logical_read_counter_scope": "not_applicable_eager_pptx"},
+    {"case": "pptx_file_source_slide_count", "classification": "catalog-only:zero-slide-and-media-overlap", "read_calls": 1088, "read_bytes": 87511, "slide_payload_covered_bytes": 0, "media_payload_covered_bytes": 0},
+    {"case": "pptx_file_eager_selected_slide", "logical_read_counter_scope": "not_applicable_eager_pptx"},
+    {"case": "pptx_file_source_selected_slide", "classification": "selected-slide-only:target-slide-no-unselected-or-media-overlap", "read_calls": 1093, "read_bytes": 88079, "slide_payload_covered_bytes": 522, "slide_payload_ranges_fully_covered": 1, "selected_slide_payload_covered_bytes": 522, "selected_slide_payload_fully_covered": true, "unselected_slide_payload_covered_bytes": 0, "media_payload_covered_bytes": 0, "semantic_sha256": "f5f7db181150c00a4323a48c142721ead73aca3ad7c3b3594e8b1a18a686b257"}
+  ]
+}

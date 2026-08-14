@@ -7,7 +7,7 @@ use super::{
     time,
 };
 use crate::{Error, Result};
-use litchi_opc::OpcPackage;
+use litchi_opc::{OpcPackage, SourceBackedPackage};
 
 use crate::xml::decode_xml_reference;
 use quick_xml::{
@@ -87,6 +87,45 @@ pub fn read(package: &OpcPackage) -> Result<Option<Props>> {
             "core-properties XML namespace does not match its relationship dialect".to_owned(),
         ));
     }
+    Ok(Some(props))
+}
+
+/// Extract relationship-selected core metadata from a source-backed OPC
+/// package.
+///
+/// The catalog and relationship graph remain metadata-only until the
+/// relationship-selected core-properties part is read. This is the
+/// positional equivalent of [`read`]: it applies the same strict graph and
+/// dialect checks, while retaining the source package's version and
+/// execution-policy checks around the selected payload read.
+///
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a
+/// configured bound, the source changes, execution is cancelled, or an
+/// underlying source/package operation fails.
+pub fn read_source_backed(package: &SourceBackedPackage) -> Result<Option<Props>> {
+    package.check_execution()?;
+    package.source_version()?;
+    let graph = graph::inspect_source(package)?;
+    let Some(part_name) = graph.part else {
+        package.check_execution()?;
+        package.source_version()?;
+        return Ok(None);
+    };
+    let core_part = package.part(&part_name)?;
+    let data = core_part.data()?;
+    package.check_execution()?;
+    let xml = std::str::from_utf8(data.as_bytes())
+        .map_err(|error| Error::Xml(format!("invalid UTF-8 in core properties: {error}")))?;
+    let (props, dialect) = decode(xml)?;
+    if Some(dialect) != graph.dialect {
+        return Err(Error::Invalid(
+            "core-properties XML namespace does not match its relationship dialect".to_owned(),
+        ));
+    }
+    package.check_execution()?;
+    package.source_version()?;
     Ok(Some(props))
 }
 
@@ -666,9 +705,12 @@ fn bound_namespace<'a>(namespace: &'a ResolveResult<'a>) -> Option<&'a [u8]> {
 mod tests {
     use super::*;
     use crate::Props;
+    use crate::properties::STRICT_CORE_PROPERTIES_RELATIONSHIP;
     use chrono::{DateTime, Utc};
+    use litchi_core::OwnedSource;
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-    use litchi_opc::{PackURI, part::BlobPart};
+    use litchi_opc::{PackURI, SourceBackedPackage, part::BlobPart};
+    use std::sync::Arc;
 
     fn package_with_core(path: &str, content_type: &str, xml: &[u8]) -> OpcPackage {
         let mut package = OpcPackage::new();
@@ -688,6 +730,45 @@ mod tests {
         OpcPackage::from_bytes(&std::fs::read(path).unwrap()).unwrap()
     }
 
+    fn source_package_with_core(xml: &[u8], relationship: &str) -> SourceBackedPackage {
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/docProps/core.xml").unwrap(),
+            ct::OPC_CORE_PROPERTIES.to_owned(),
+            xml.to_vec(),
+        )));
+        package.relate_to("docProps/core.xml", relationship);
+        let mut bytes = Vec::new();
+        package.to_stream(&mut bytes).unwrap();
+        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap()
+    }
+
+    fn source_package(package: &OpcPackage) -> SourceBackedPackage {
+        let mut bytes = Vec::new();
+        package.to_stream(&mut bytes).unwrap();
+        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap()
+    }
+
+    fn error_family(error: &Error) -> &'static str {
+        match error {
+            Error::Opc(_) => "opc",
+            Error::Xml(_) => "xml",
+            Error::Missing(_) => "missing",
+            Error::ContentType { .. } => "content-type",
+            Error::Relationship(_) => "relationship",
+            Error::Invalid(_) => "invalid",
+            Error::Limit { .. } => "limit",
+            Error::Uri(_) => "uri",
+            #[cfg(feature = "vba-inspection")]
+            Error::Vba(_) => "vba",
+            Error::SpreadsheetXmlMaps(_) => "spreadsheet-xml-maps",
+            Error::Mce(_) => "mce",
+            Error::Decode(_) => "decode",
+            Error::Io(_) => "io",
+            Error::Fmt(_) => "fmt",
+        }
+    }
+
     #[test]
     fn selects_only_relationship_target_and_allows_absence() {
         let valid = br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Target</dc:title></cp:coreProperties>"#;
@@ -703,6 +784,55 @@ mod tests {
             Some("Target")
         );
         assert!(read(&OpcPackage::new()).unwrap().is_none());
+    }
+
+    #[test]
+    fn source_reader_matches_eager_for_present_absent_and_strict_properties() {
+        let valid = br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Target</dc:title></cp:coreProperties>"#;
+        let eager = package_with_core("/docProps/core.xml", ct::OPC_CORE_PROPERTIES, valid);
+        let mut bytes = Vec::new();
+        eager.to_stream(&mut bytes).unwrap();
+        let source = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+        assert_eq!(read_source_backed(&source).unwrap(), read(&eager).unwrap());
+
+        let empty = OpcPackage::new();
+        let mut bytes = Vec::new();
+        empty.to_stream(&mut bytes).unwrap();
+        let source = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+        assert_eq!(read_source_backed(&source).unwrap(), read(&empty).unwrap());
+
+        let strict_xml = br#"<cp:coreProperties xmlns:cp="http://purl.oclc.org/ooxml/package/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Strict</dc:title></cp:coreProperties>"#;
+        let source = source_package_with_core(strict_xml, STRICT_CORE_PROPERTIES_RELATIONSHIP);
+        assert_eq!(
+            read_source_backed(&source)
+                .unwrap()
+                .unwrap()
+                .title
+                .as_deref(),
+            Some("Strict")
+        );
+    }
+
+    #[test]
+    fn source_reader_matches_eager_graph_failures() {
+        let mut external = OpcPackage::new();
+        external.relate_to_external("https://example.test/core.xml", rt::CORE_PROPERTIES);
+
+        let mut dangling = OpcPackage::new();
+        dangling.relate_to("missing.xml", rt::CORE_PROPERTIES);
+
+        let wrong = package_with_core(
+            "/docProps/core.xml",
+            ct::WML_DOCUMENT,
+            br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"/>"#,
+        );
+
+        for package in [&external, &dangling, &wrong] {
+            let eager = read(package).unwrap_err();
+            let source = source_package(package);
+            let deferred = read_source_backed(&source).unwrap_err();
+            assert_eq!(error_family(&eager), error_family(&deferred));
+        }
     }
 
     #[test]

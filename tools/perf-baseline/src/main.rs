@@ -487,6 +487,14 @@ enum Case {
     OpcFileEagerOnePartAtomicSave,
     OpcFileSourceOnePartAtomicSave,
     CfbFileSameLengthOverlayAtomicSave,
+    PptxFileEagerOpen,
+    PptxFileSourceOpen,
+    PptxFileEagerListSlides,
+    PptxFileSourceListSlides,
+    PptxFileEagerSlideCount,
+    PptxFileSourceSlideCount,
+    PptxFileEagerSelectedSlide,
+    PptxFileSourceSelectedSlide,
     DocxSourceBackedOneEditSave,
     PptxSourceBackedOneEditSave,
     PptxEagerBatchEditSave,
@@ -750,6 +758,14 @@ impl Case {
             Self::OpcFileEagerOnePartAtomicSave => "opc_file_eager_one_part_atomic_save",
             Self::OpcFileSourceOnePartAtomicSave => "opc_file_source_one_part_atomic_save",
             Self::CfbFileSameLengthOverlayAtomicSave => "cfb_file_same_length_overlay_atomic_save",
+            Self::PptxFileEagerOpen => "pptx_file_eager_open",
+            Self::PptxFileSourceOpen => "pptx_file_source_open",
+            Self::PptxFileEagerListSlides => "pptx_file_eager_list_slides",
+            Self::PptxFileSourceListSlides => "pptx_file_source_list_slides",
+            Self::PptxFileEagerSlideCount => "pptx_file_eager_slide_count",
+            Self::PptxFileSourceSlideCount => "pptx_file_source_slide_count",
+            Self::PptxFileEagerSelectedSlide => "pptx_file_eager_selected_slide",
+            Self::PptxFileSourceSelectedSlide => "pptx_file_source_selected_slide",
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
             Self::PptxEagerBatchEditSave => "pptx_eager_batch_edit_save",
@@ -1374,6 +1390,14 @@ impl Case {
                 | Self::OpcFileEagerOnePartAtomicSave
                 | Self::OpcFileSourceOnePartAtomicSave
                 | Self::CfbFileSameLengthOverlayAtomicSave
+                | Self::PptxFileEagerOpen
+                | Self::PptxFileSourceOpen
+                | Self::PptxFileEagerListSlides
+                | Self::PptxFileSourceListSlides
+                | Self::PptxFileEagerSlideCount
+                | Self::PptxFileSourceSlideCount
+                | Self::PptxFileEagerSelectedSlide
+                | Self::PptxFileSourceSelectedSlide
         )
     }
 
@@ -5036,6 +5060,14 @@ fn parse_case(value: &str) -> Option<Case> {
         "cfb_file_same_length_overlay_atomic_save" => {
             Some(Case::CfbFileSameLengthOverlayAtomicSave)
         },
+        "pptx_file_eager_open" => Some(Case::PptxFileEagerOpen),
+        "pptx_file_source_open" => Some(Case::PptxFileSourceOpen),
+        "pptx_file_eager_list_slides" => Some(Case::PptxFileEagerListSlides),
+        "pptx_file_source_list_slides" => Some(Case::PptxFileSourceListSlides),
+        "pptx_file_eager_slide_count" => Some(Case::PptxFileEagerSlideCount),
+        "pptx_file_source_slide_count" => Some(Case::PptxFileSourceSlideCount),
+        "pptx_file_eager_selected_slide" => Some(Case::PptxFileEagerSelectedSlide),
+        "pptx_file_source_selected_slide" => Some(Case::PptxFileSourceSelectedSlide),
         "cfb_selective_mini_legacy_read" => Some(Case::CfbSelectiveMiniLegacyRead),
         "cfb_selective_mini_shared_read" => Some(Case::CfbSelectiveMiniSharedRead),
         "cfb_selective_fat_legacy_read" => Some(Case::CfbSelectiveFatLegacyRead),
@@ -5381,6 +5413,10 @@ fn print_usage() {
                                        opc_file_eager_one_part_atomic_save,\n\
                                        opc_file_source_one_part_atomic_save,\n\
                                        cfb_file_same_length_overlay_atomic_save,\n\
+                                       pptx_file_eager_open,pptx_file_source_open,\n\
+                                       pptx_file_eager_list_slides,pptx_file_source_list_slides,\n\
+                                       pptx_file_eager_slide_count,pptx_file_source_slide_count,\n\
+                                       pptx_file_eager_selected_slide,pptx_file_source_selected_slide,\n\
                                        docx_source_backed_one_edit_save,\n\
                                        pptx_source_backed_one_edit_save,\n\
                                        pptx_eager_batch_edit_save,\n\
@@ -9407,7 +9443,15 @@ fn run_case_with_config(
         | Case::OpcFileSourceOpen
         | Case::OpcFileEagerOnePartAtomicSave
         | Case::OpcFileSourceOnePartAtomicSave
-        | Case::CfbFileSameLengthOverlayAtomicSave => {
+        | Case::CfbFileSameLengthOverlayAtomicSave
+        | Case::PptxFileEagerOpen
+        | Case::PptxFileSourceOpen
+        | Case::PptxFileEagerListSlides
+        | Case::PptxFileSourceListSlides
+        | Case::PptxFileEagerSlideCount
+        | Case::PptxFileSourceSlideCount
+        | Case::PptxFileEagerSelectedSlide
+        | Case::PptxFileSourceSelectedSlide => {
             Err("filesystem cases are dispatched by the child-process evidence runner".into())
         },
         Case::DocxSourceBackedOneEditSave => {

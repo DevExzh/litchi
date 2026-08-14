@@ -2,8 +2,8 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0117`](changes/0117-ppt-pictures-release-evidence.md)
-(current-HEAD native PPT lazy-`Pictures` observation; the latest bounded CFB
+Evidence through: [`change 0120`](changes/0120-pptx-root-source-path-evidence.md)
+(current-HEAD PPTX ordinary-root logical-read observation; the latest bounded CFB
 substrate evidence remains [`0094`](changes/0094-cfb-selective-read-evidence.md),
 and release filesystem evidence is [`0089`](changes/0089-filesystem-release-repeated-evidence.md))
 
@@ -317,6 +317,18 @@ calls 39.80%, and retains the 229 -> 2 materialization reduction.
 These paths have strong preservation and atomicity tests plus generated-text
 timing/allocation evidence. Real-producer, media/dependency, malformed,
 security, copied-byte and cold-source matrices remain missing.
+
+Change 0120 adds eight filesystem-isolated ordinary-root PPTX controls over
+the 200-slide/eight-text-box/eight-2 MiB-media corpus. The source candidate
+uses `litchi::Presentation::open(path)` and the eager control uses a prepared
+byte root for query phases; `list_slides` materializes all owned slides and
+`selected_slide` uses the selector-first `Presentation::slide(100)` API. A
+separate untimed source replay classifies exact compressed ZIP payload-range
+overlap: open/count are catalog-only, selected reads only slide 100, and list
+reads all slides without media. This establishes a useful correctness and
+logical-read guard for the unified facade, but it is not a performance result:
+no latency, allocation, RSS, decompression, physical-I/O or cold-cache claim is
+accepted before release ABBA. Eager controls explicitly have no source replay.
 
 ## ODF paths
 
@@ -910,7 +922,7 @@ The order below is provisional until baseline measurements are recorded.
 | Rank | Candidate | Expected CRUD reach | Risk | ADR fit |
 |---:|---|---|---|---|
 | 1 | Extend source-backed OPC from selective reads and the bounded consuming publisher to broad query/edit/patch coverage. | All OOXML selective read/query/edit paths; offsets eager full-package work. | High | Positional source/descriptors, low-level one-Part/bounded multi-Part publication and managed cache charging across physical `InputBytes`, cumulative declared cold-load `Work`, retained `Objects`, and `Memory` are implemented and correctness-tested; broader semantic CRUD and controlled cache acceptance remain. |
-| 2 | Broaden the accepted source-backed DOCX/PPTX and XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation/auto-filter transactions only where complete semantic closures can be proved, with real media/signature/topology matrices. | Targeted OOXML save, especially media-heavy packages; avoids eager all-Part inflate/recompression where the same-topology proof applies. | High | DOCX is accepted in change 0039, guarded same-slide PPTX in 0044/0063 and bounded multi-slide PPTX in 0077, XLSX calculation metadata in 0046, page breaks in 0061, page margins in 0067, print options in 0070, relationship-free page setup in 0073, defined names in 0076, sheet protection in 0078, data validation in 0079, and auto filters in 0080. General XLSX cells/formulas/chains, table filters, printer settings and structural PPTX edits require wider closures; all accepted facades still need real-producer and broader topology/signature policy matrices. |
+| 2 | Broaden the accepted source-backed DOCX/PPTX and XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation/auto-filter transactions only where complete semantic closures can be proved, with real media/signature/topology matrices. | Targeted OOXML save, especially media-heavy packages; avoids eager all-Part inflate/recompression where the same-topology proof applies. | High | DOCX is accepted in change 0039, guarded same-slide PPTX in 0044/0063 and bounded multi-slide PPTX in 0077, XLSX calculation metadata in 0046, page breaks in 0061, page margins in 0067, print options in 0070, relationship-free page setup in 0073, defined names in 0076, sheet protection in 0078, data validation in 0079, and auto filters in 0080. Change 0120 adds ordinary-root PPTX open/list/count/selected-slide logical-read controls and complete parity gates, but no speedup/resource claim. General XLSX cells/formulas/chains, table filters, printer settings and structural PPTX edits require wider closures; all accepted facades still need real-producer and broader topology/signature policy matrices. |
 | 3 | Tune explicit bounded-session thresholds and complete remaining I/O budget policy. | Large multi-Part open/save/validation. | Medium-high | 1/2/4/8/12 evidence exists; large tasks scale, small tasks regress; no hidden Rayon path remains. |
 | 4 | Build one validated OPC publication plan and reuse its generated XML and Part order during emission. | Every rewritten OPC save. | Low-medium | Implemented; see `changes/0001-opc-publication-plan.md`. |
 | 5 | Exact owned-source OPC no-op publication. | Owned DOCX/PPTX/XLSX open/read/no-op save. | Medium | Implemented; same-topology mutations now use targeted preservation. See changes 0004 and 0008. |

@@ -203,6 +203,18 @@ fn text_from_part(part: &dyn Part) -> Result<Option<String>> {
     Ok((!value.is_empty()).then_some(value))
 }
 
+fn text_and_name_from_part(part: &dyn Part) -> Result<(String, String)> {
+    // Keep the established individual projections as the semantic source of
+    // truth. In particular, `text` intentionally uses a plain XML reader,
+    // while `name` preserves its early-return namespace behavior. This avoids
+    // making a combined convenience method stricter than either existing
+    // accessor. Source-backed callers still materialize the selected Part
+    // payload only once; only the processed XML projections are repeated.
+    let text = text_from_part(part)?.unwrap_or_default();
+    let name = c_sld_name(part)?.unwrap_or_else(|| part.partname().to_string());
+    Ok((text, name))
+}
+
 /// Borrowed view of a `PresentationML` slide part.
 #[derive(Clone, Copy)]
 pub struct SlidePart<'a> {
@@ -255,6 +267,17 @@ impl<'a> SlidePart<'a> {
     /// Returns an error if the operation fails.
     pub fn text(&self) -> Result<String> {
         Ok(text_from_part(self.part)?.unwrap_or_default())
+    }
+
+    /// Read the producer-visible name and flattened text while preserving the
+    /// exact semantics of [`Self::name`] and [`Self::text`].
+    ///
+    /// This combined projection is useful to source-backed callers that need
+    /// both values. Source-backed callers materialize the selected Part only
+    /// once; the two established processed-XML projections retain their
+    /// independent reader behavior.
+    pub fn text_and_name(&self) -> Result<(String, String)> {
+        text_and_name_from_part(self.part)
     }
 
     /// Build the bounded borrowed shape scene for this slide.
@@ -529,5 +552,92 @@ impl<'a> SlideMasterPart<'a> {
             layouts.push(SlideLayoutPart::from_part(part)?);
         }
         Ok(layouts)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "focused low-level part tests use literal XML fixtures"
+    )]
+
+    use super::SlidePart;
+    use litchi_opc::PackURI;
+    use litchi_opc::constants::content_type as ct;
+    use litchi_opc::part::BlobPart;
+
+    fn slide_part(xml: &[u8]) -> BlobPart {
+        BlobPart::new(
+            PackURI::new("/ppt/slides/slide1.xml").unwrap(),
+            ct::PML_SLIDE.to_owned(),
+            xml.to_vec(),
+        )
+    }
+
+    #[test]
+    fn combined_text_and_name_matches_separate_reads_through_mce_and_unusual_text() {
+        let xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:producer-future" mc:Ignorable="x">
+            <!-- producer formatting and an ignored extension are intentional -->
+            <p:cSld name="  Producer &amp; Name  " x:future="retained"><p:spTree>
+                <a:t> leading &amp; </a:t><x:future><a:t>ignored</a:t></x:future>
+                <a:t><![CDATA[tail]]></a:t><a:t>two</a:t>
+            </p:spTree></p:cSld>
+        </p:sld>"#;
+        let part = slide_part(xml);
+        let slide = SlidePart::from_part(&part).unwrap();
+        let separate = (slide.text().unwrap(), slide.name().unwrap());
+        assert_eq!(slide.text_and_name().unwrap(), separate);
+        assert_eq!(separate.0, " leading & \ntail\ntwo");
+        assert_eq!(separate.1, "  Producer & Name  ");
+    }
+
+    #[test]
+    fn combined_text_and_name_matches_separate_reads_before_late_reserved_prefix_rebinding() {
+        let xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld name="early"><p:spTree><a:t>text</a:t></p:spTree></p:cSld><p:extLst xmlns:xml="urn:invalid"/></p:sld>"#;
+        let part = slide_part(xml);
+        let slide = SlidePart::from_part(&part).unwrap();
+        let separate = (slide.text().unwrap(), slide.name().unwrap());
+        assert_eq!(separate, ("text".to_owned(), "early".to_owned()));
+        assert_eq!(slide.text_and_name().unwrap(), separate);
+    }
+
+    #[test]
+    fn combined_text_and_name_preserves_missing_and_empty_name_semantics() {
+        let fixtures = [
+            (
+                br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree/></p:cSld></p:sld>"#.as_slice(),
+                "",
+            ),
+            (
+                br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld name=""><p:spTree/></p:cSld></p:sld>"#.as_slice(),
+                "",
+            ),
+            (
+                br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:spTree/></p:sld>"#.as_slice(),
+                "/ppt/slides/slide1.xml",
+            ),
+        ];
+        for (xml, expected_name) in fixtures {
+            let part = slide_part(xml);
+            let slide = SlidePart::from_part(&part).unwrap();
+            let separate = (slide.text().unwrap(), slide.name().unwrap());
+            assert_eq!(slide.text_and_name().unwrap(), separate);
+            assert_eq!(separate, (String::new(), expected_name.to_owned()));
+        }
+    }
+
+    #[test]
+    fn combined_text_and_name_rejects_the_same_malformed_xml_as_separate_reads() {
+        let part = slide_part(
+            br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:broken></p:cSld></p:sld>"#,
+        );
+        let slide = SlidePart::from_part(&part).unwrap();
+        let name = slide.name();
+        assert_eq!(name.unwrap(), "");
+        let text_error = slide.text().unwrap_err().to_string();
+        let combined_error = slide.text_and_name().unwrap_err().to_string();
+        assert_eq!(combined_error, text_error);
     }
 }

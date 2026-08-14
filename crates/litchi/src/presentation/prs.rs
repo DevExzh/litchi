@@ -14,6 +14,7 @@ use litchi_ole_common::property_set::PropertySetReader;
 use std::path::Path;
 #[cfg(all(feature = "ppt", any(unix, windows)))]
 use std::sync::Arc;
+use std::sync::OnceLock;
 
 /// A PowerPoint presentation.
 ///
@@ -44,11 +45,10 @@ use std::sync::Arc;
 pub struct Presentation {
     /// The underlying format-specific implementation
     pub(super) inner: PresentationImpl,
-    /// Cached metadata extracted during presentation creation.
-    ///
-    /// Metadata is extracted once during `open()` or `from_bytes()` and cached here
-    /// for efficient access. This avoids needing mutable access during `metadata()` calls.
-    pub(super) cached_metadata: Option<litchi_core::Metadata>,
+    /// Metadata cache initialized eagerly for materialized owners and lazily
+    /// for the source-backed PPTX owner. A source read failure leaves the
+    /// cell unset so a later call can retry after the source is restored.
+    pub(super) cached_metadata: OnceLock<Option<litchi_core::Metadata>>,
 }
 
 #[cfg(all(test, feature = "odp"))]
@@ -180,6 +180,19 @@ mod ooxml_odf_polyglot_tests {
         assert_eq!(presentation.slide_count().unwrap(), 1);
     }
 
+    #[test]
+    fn path_ooxml_first_precedence_survives_an_odf_local_mimetype_marker() {
+        let temporary = tempfile::Builder::new()
+            .suffix(".pptx")
+            .tempfile()
+            .expect("temporary PPTX path");
+        std::fs::write(temporary.path(), dual_marker_pptx()).expect("write PPTX polyglot");
+        let presentation = Presentation::open(temporary.path())
+            .expect("path OOXML-first precedence should select PPTX");
+        assert_eq!(presentation.slide_count().unwrap(), 1);
+        assert!(presentation.slide(0).unwrap().is_some());
+    }
+
     #[cfg(not(feature = "docx"))]
     #[test]
     fn disabled_docx_owner_keeps_smart_precedence() {
@@ -281,6 +294,37 @@ impl Presentation {
         path: P,
         limits: crate::pptx::ReadLimits,
     ) -> Result<Self> {
+        #[cfg(any(unix, windows))]
+        if let Some(detected) =
+            crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+                path.as_ref(),
+                limits,
+            )
+            .map_err(|error| match error {
+                crate::detection_smart::detected::PptxSourcePathError::Opc(error) => error.into(),
+                crate::detection_smart::detected::PptxSourcePathError::Pptx(error) => {
+                    crate::map_ooxml_error(error)
+                },
+            })?
+        {
+            match detected {
+                crate::detection_smart::detected::PptxSourcePathDetection::Pptx(presentation) => {
+                    return Self::from_source_backed_pptx(presentation);
+                },
+                crate::detection_smart::detected::PptxSourcePathDetection::OtherOoxml(format) => {
+                    // Bind the classified family so the private detector
+                    // remains able to report it in future diagnostics while
+                    // preserving the established facade error text.
+                    let _ = format;
+                    return Err(Error::InvalidFormat(
+                        "Detected format is not a presentation format or feature not enabled"
+                            .to_owned(),
+                    ));
+                },
+            }
+        }
+
+        #[cfg(not(any(unix, windows)))]
         if let Some(detected) =
             crate::detection_smart::detected::detect_ooxml_path_with_limits(path.as_ref(), limits)
                 .map_err(crate::map_ooxml_error)?
@@ -333,7 +377,7 @@ impl Presentation {
                 let doc = litchi_odp::Presentation::from_prepared_package(prepared)?;
                 return Ok(Self {
                     inner: PresentationImpl::Odp(doc),
-                    cached_metadata: Some(litchi_core::Metadata::default()),
+                    cached_metadata: OnceLock::from(Some(litchi_core::Metadata::default())),
                 });
             },
             Err(bytes) => bytes,
@@ -385,7 +429,7 @@ impl Presentation {
         let pres = package.presentation().map_err(Error::from)?;
         Ok(Some(Self {
             inner: PresentationImpl::Ppt(pres),
-            cached_metadata,
+            cached_metadata: OnceLock::from(cached_metadata),
         }))
     }
 
@@ -396,6 +440,16 @@ impl Presentation {
         let detected = crate::detection_smart::detect_format_smart_with_limits(bytes, limits)
             .ok_or(Error::NotOfficeFile)?;
         Self::from_detected(detected)
+    }
+
+    #[cfg(all(feature = "pptx", any(unix, windows)))]
+    fn from_source_backed_pptx(
+        presentation: crate::pptx::SourceBackedPresentation,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: PresentationImpl::PptxSource(presentation),
+            cached_metadata: OnceLock::new(),
+        })
     }
 
     fn from_detected(detected: crate::detection_smart::DetectedFormat) -> Result<Self> {
@@ -421,7 +475,7 @@ impl Presentation {
 
                 Ok(Self {
                     inner: PresentationImpl::Ppt(pres),
-                    cached_metadata,
+                    cached_metadata: OnceLock::from(cached_metadata),
                 })
             },
             #[cfg(feature = "pptx")]
@@ -438,7 +492,7 @@ impl Presentation {
 
                 Ok(Self {
                     inner: PresentationImpl::Pptx(package),
-                    cached_metadata,
+                    cached_metadata: OnceLock::from(cached_metadata),
                 })
             },
             #[cfg(feature = "keynote")]
@@ -456,7 +510,7 @@ impl Presentation {
 
                 Ok(Self {
                     inner: PresentationImpl::Keynote(doc),
-                    cached_metadata,
+                    cached_metadata: OnceLock::from(cached_metadata),
                 })
             },
             #[cfg(feature = "odp")]
@@ -478,7 +532,7 @@ impl Presentation {
 
                 Ok(Self {
                     inner: PresentationImpl::Odp(doc),
-                    cached_metadata: Some(litchi_core::Metadata::default()),
+                    cached_metadata: OnceLock::from(Some(litchi_core::Metadata::default())),
                 })
             },
             // Handle mismatched formats
@@ -524,6 +578,20 @@ impl Presentation {
                 }
                 Ok(texts.join("\n\n"))
             },
+            #[cfg(all(feature = "pptx", any(unix, windows)))]
+            PresentationImpl::PptxSource(presentation) => {
+                presentation
+                    .check_source()
+                    .map_err(crate::map_ooxml_error)?;
+                let mut texts = Vec::new();
+                for slide in presentation.slides() {
+                    let text = slide.text().map_err(crate::map_ooxml_error)?;
+                    if !text.is_empty() {
+                        texts.push(text);
+                    }
+                }
+                Ok(texts.join("\n\n"))
+            },
             #[cfg(feature = "keynote")]
             PresentationImpl::Keynote(doc) => doc.text().map_err(|e| {
                 Error::ParseError(format!("Failed to extract text from Keynote: {}", e))
@@ -557,6 +625,13 @@ impl Presentation {
                 .map_err(crate::map_ooxml_error)?
                 .slide_count()
                 .map_err(crate::map_ooxml_error),
+            #[cfg(all(feature = "pptx", any(unix, windows)))]
+            PresentationImpl::PptxSource(presentation) => {
+                presentation
+                    .check_source()
+                    .map_err(crate::map_ooxml_error)?;
+                Ok(presentation.slide_count())
+            },
             #[cfg(feature = "keynote")]
             PresentationImpl::Keynote(doc) => {
                 let slides = doc
@@ -620,6 +695,23 @@ impl Presentation {
                     })
                     .collect()
             },
+            #[cfg(all(feature = "pptx", any(unix, windows)))]
+            PresentationImpl::PptxSource(presentation) => {
+                use super::types::SlideData;
+                presentation
+                    .check_source()
+                    .map_err(crate::map_ooxml_error)?;
+                presentation
+                    .slides()
+                    .map(|slide| {
+                        let (text, name) = slide.text_and_name().map_err(crate::map_ooxml_error)?;
+                        Ok(Slide::Pptx(SlideData {
+                            text,
+                            name: Some(name),
+                        }))
+                    })
+                    .collect()
+            },
             #[cfg(feature = "keynote")]
             PresentationImpl::Keynote(doc) => {
                 let keynote_slides = doc
@@ -651,6 +743,91 @@ impl Presentation {
         }
     }
 
+    /// Select one slide by its zero-based presentation position.
+    ///
+    /// The source-backed PPTX path reads only the selected slide XML and
+    /// returns `None` for an out-of-range position. Other format owners retain
+    /// their existing `slides()` projection as a compatibility fallback.
+    pub fn slide(&self, position: usize) -> Result<Option<Slide>> {
+        match &self.inner {
+            #[cfg(all(feature = "pptx", any(unix, windows)))]
+            PresentationImpl::PptxSource(presentation) => {
+                presentation
+                    .check_source()
+                    .map_err(crate::map_ooxml_error)?;
+                let Some(slide) = presentation.slide(position) else {
+                    return Ok(None);
+                };
+                let (text, name) = slide.text_and_name().map_err(crate::map_ooxml_error)?;
+                Ok(Some(Slide::Pptx(super::types::SlideData {
+                    text,
+                    name: Some(name),
+                })))
+            },
+            #[cfg(feature = "pptx")]
+            PresentationImpl::Pptx(package) => {
+                let presentation = package.presentation().map_err(crate::map_ooxml_error)?;
+                let Some(slide) = presentation
+                    .slide(position)
+                    .map_err(crate::map_ooxml_error)?
+                else {
+                    return Ok(None);
+                };
+                let text = slide.text().map_err(crate::map_ooxml_error)?;
+                let name = Some(slide.name().map_err(crate::map_ooxml_error)?);
+                Ok(Some(Slide::Pptx(super::types::SlideData { text, name })))
+            },
+            #[cfg(feature = "ppt")]
+            PresentationImpl::Ppt(presentation) => {
+                let Some(slide) = presentation
+                    .slides()
+                    .map_err(Error::from)?
+                    .into_iter()
+                    .nth(position)
+                else {
+                    return Ok(None);
+                };
+                let text = slide.text().map_err(Error::from)?.to_string();
+                let slide_number = slide.slide_number();
+                let shape_count = slide.shape_count().unwrap_or(0);
+                Ok(Some(Slide::Ppt(super::types::LegacySlideData {
+                    text,
+                    slide_number,
+                    shape_count,
+                })))
+            },
+            #[cfg(feature = "keynote")]
+            PresentationImpl::Keynote(document) => {
+                let Some(slide) = document
+                    .slides()
+                    .map_err(|error| Error::ParseError(format!("Failed to get slides: {error}")))?
+                    .get(position)
+                else {
+                    return Ok(None);
+                };
+                let title = slide.title().map(str::to_owned);
+                let content = slide.text_content().join("\n");
+                let text = match &title {
+                    Some(title) if !content.is_empty() => format!("{title}\n\n{content}"),
+                    Some(title) => title.clone(),
+                    None => content,
+                };
+                Ok(Some(Slide::Keynote {
+                    number: position + 1,
+                    title,
+                    text,
+                }))
+            },
+            #[cfg(feature = "odp")]
+            PresentationImpl::Odp(document) => {
+                let slide = document.slide(position).map_err(|error| {
+                    Error::ParseError(format!("Failed to get ODP slide: {error}"))
+                })?;
+                Ok(slide.map(Slide::Odp))
+            },
+        }
+    }
+
     /// Get the slide width in EMUs (English Metric Units).
     ///
     /// Only available for .pptx format. Returns None for .ppt files.
@@ -674,6 +851,11 @@ impl Presentation {
             PresentationImpl::Pptx(package) => package
                 .presentation()
                 .map_err(crate::map_ooxml_error)?
+                .slide_size()
+                .map(|(width, _)| Some(width))
+                .map_err(crate::map_ooxml_error),
+            #[cfg(all(feature = "pptx", any(unix, windows)))]
+            PresentationImpl::PptxSource(presentation) => presentation
                 .slide_size()
                 .map(|(width, _)| Some(width))
                 .map_err(crate::map_ooxml_error),
@@ -710,6 +892,11 @@ impl Presentation {
                 .slide_size()
                 .map(|(_, height)| Some(height))
                 .map_err(crate::map_ooxml_error),
+            #[cfg(all(feature = "pptx", any(unix, windows)))]
+            PresentationImpl::PptxSource(presentation) => presentation
+                .slide_size()
+                .map(|(_, height)| Some(height))
+                .map_err(crate::map_ooxml_error),
             #[cfg(feature = "keynote")]
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
             #[cfg(feature = "odp")]
@@ -740,8 +927,31 @@ impl Presentation {
     /// # Ok::<(), litchi::common::Error>(())
     /// ```
     pub fn metadata(&self) -> Result<Option<litchi_core::Metadata>> {
-        // Return cached metadata that was extracted during presentation creation
-        Ok(self.cached_metadata.clone())
+        #[cfg(all(feature = "pptx", any(unix, windows)))]
+        if let PresentationImpl::PptxSource(presentation) = &self.inner {
+            presentation
+                .check_source()
+                .map_err(crate::map_ooxml_error)?;
+        }
+
+        if let Some(cached) = self.cached_metadata.get() {
+            return Ok(cached.clone());
+        }
+
+        #[cfg(all(feature = "pptx", any(unix, windows)))]
+        if let PresentationImpl::PptxSource(presentation) = &self.inner {
+            // Do not publish a failed read into the OnceLock: a caller can
+            // retry after a transient source/version or XML failure.
+            let metadata = presentation
+                .properties()
+                .map_err(crate::map_ooxml_error)?
+                .map(litchi_core::Metadata::from)
+                .filter(litchi_core::Metadata::has_data);
+            let _ = self.cached_metadata.set(metadata.clone());
+            return Ok(metadata);
+        }
+
+        Ok(None)
     }
 
     /// Fast text extraction for markdown conversion (internal use).
@@ -1077,7 +1287,9 @@ mod tests {
 #[cfg(all(test, feature = "ppt", any(unix, windows)))]
 mod native_ppt_path_tests {
     use super::Presentation;
+    #[cfg(feature = "doc")]
     use litchi_cfb::{OleFile, OleWriter};
+    #[cfg(feature = "doc")]
     use std::io::Cursor;
     use std::path::PathBuf;
 
@@ -1214,5 +1426,362 @@ mod native_ppt_path_tests {
         };
 
         assert_eq!(path_error, bytes_error);
+    }
+}
+
+#[cfg(all(test, feature = "pptx", any(unix, windows)))]
+mod source_pptx_path_tests {
+    use super::super::types::PresentationImpl;
+    use super::Presentation;
+    use std::io::{Cursor, Write};
+    use std::num::{NonZeroU64, NonZeroUsize};
+
+    fn two_slide_package(slide1: &[u8], slide2: &[u8]) -> Vec<u8> {
+        let mut output = Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/><Override PartName="/ppt/slides/slide2.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>"#,
+            )
+            .unwrap();
+        writer.start_file("_rels/.rels", options).unwrap();
+        writer
+            .write_all(
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.start_file("ppt/presentation.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/><p:sldId id="257" r:id="rId2"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>"#,
+            )
+            .unwrap();
+        writer
+            .start_file("ppt/_rels/presentation.xml.rels", options)
+            .unwrap();
+        writer
+            .write_all(
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide2.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.start_file("ppt/slides/slide1.xml", options).unwrap();
+        writer.write_all(slide1).unwrap();
+        writer.start_file("ppt/slides/slide2.xml", options).unwrap();
+        writer.write_all(slide2).unwrap();
+        writer.start_file("docProps/core.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>source-backed</dc:title></cp:coreProperties>"#,
+            )
+            .unwrap();
+        writer.finish().unwrap();
+        output.into_inner()
+    }
+
+    fn corrupt_unselected_slide_package() -> Vec<u8> {
+        two_slide_package(
+            br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/></p:spTree></p:cSld></p:sld>"#,
+            b"not PresentationML",
+        )
+    }
+
+    fn late_reserved_namespace_slide_package() -> Vec<u8> {
+        two_slide_package(
+            br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:extLst xmlns:xml="urn:invalid"><p:ext uri="urn:hostile"/></p:extLst></p:sld>"#,
+            br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/></p:spTree></p:cSld></p:sld>"#,
+        )
+    }
+
+    #[test]
+    fn path_source_routes_to_private_owner_and_defers_corrupt_slide() {
+        let bytes = corrupt_unselected_slide_package();
+        let temporary = tempfile::Builder::new()
+            .suffix(".pptx")
+            .tempfile()
+            .expect("temporary PPTX path");
+        std::fs::write(temporary.path(), &bytes).expect("write PPTX fixture");
+
+        let direct = crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+            temporary.path(),
+            crate::pptx::ReadLimits::default(),
+        )
+        .expect("source-backed private detector")
+        .expect("PPTX source owner");
+        assert!(matches!(
+            direct,
+            crate::detection_smart::detected::PptxSourcePathDetection::Pptx(_)
+        ));
+
+        let presentation = Presentation::open(temporary.path()).expect("source-backed PPTX");
+        assert!(matches!(
+            &presentation.inner,
+            PresentationImpl::PptxSource(_)
+        ));
+        let before = match &presentation.inner {
+            PresentationImpl::PptxSource(source) => source.cache_diagnostics(),
+            _ => unreachable!("path PPTX must retain source owner"),
+        };
+        assert_eq!(presentation.slide_count().unwrap(), 2);
+        let after_count = match &presentation.inner {
+            PresentationImpl::PptxSource(source) => source.cache_diagnostics(),
+            _ => unreachable!("path PPTX must retain source owner"),
+        };
+        assert_eq!(after_count.cold_loads, before.cold_loads);
+
+        let metadata = presentation
+            .metadata()
+            .expect("lazy source-backed metadata")
+            .expect("core properties metadata");
+        assert_eq!(metadata.title.as_deref(), Some("source-backed"));
+        let after_metadata = match &presentation.inner {
+            PresentationImpl::PptxSource(source) => source.cache_diagnostics(),
+            _ => unreachable!("path PPTX must retain source owner"),
+        };
+        assert!(after_metadata.cold_loads > after_count.cold_loads);
+        let _ = presentation.metadata().expect("cached source metadata");
+        let after_cached_metadata = match &presentation.inner {
+            PresentationImpl::PptxSource(source) => source.cache_diagnostics(),
+            _ => unreachable!("path PPTX must retain source owner"),
+        };
+        assert_eq!(after_cached_metadata.cold_loads, after_metadata.cold_loads);
+        assert!(
+            presentation
+                .slide(2)
+                .expect("source out-of-range query")
+                .is_none()
+        );
+
+        let first = presentation
+            .slide(0)
+            .expect("select first source-backed slide")
+            .expect("first slide exists");
+        assert!(first.text().is_ok());
+        let after_first = match &presentation.inner {
+            PresentationImpl::PptxSource(source) => source.cache_diagnostics(),
+            _ => unreachable!("path PPTX must retain source owner"),
+        };
+        assert!(after_first.cold_loads > after_cached_metadata.cold_loads);
+
+        assert!(presentation.slide(1).is_err());
+        assert!(presentation.slides().is_err());
+
+        // Byte-backed callers keep their eager package owner and observable
+        // deferred semantic validation behavior; this test only changes the
+        // filesystem handoff, not `from_bytes` ownership.
+        let eager = Presentation::from_bytes(bytes).expect("eager PPTX control");
+        assert_eq!(eager.slide_count().unwrap(), 2);
+        assert!(eager.slide(2).expect("eager out-of-range query").is_none());
+        assert!(eager.slide(1).is_err());
+    }
+
+    #[test]
+    fn source_text_matches_eager_text_without_name_projection() {
+        let bytes = late_reserved_namespace_slide_package();
+        let temporary = tempfile::Builder::new()
+            .suffix(".pptx")
+            .tempfile()
+            .expect("temporary PPTX path");
+        std::fs::write(temporary.path(), &bytes).expect("write PPTX fixture");
+
+        let source = Presentation::open(temporary.path()).expect("source-backed PPTX");
+        assert!(matches!(&source.inner, PresentationImpl::PptxSource(_)));
+        let eager = Presentation::from_bytes(bytes).expect("eager PPTX control");
+
+        assert_eq!(
+            source.text().expect("source text"),
+            eager.text().expect("eager text")
+        );
+        assert!(source.slide(0).is_err());
+    }
+
+    #[test]
+    fn cached_source_metadata_rechecks_source_revision() {
+        let bytes = corrupt_unselected_slide_package();
+        let temporary = tempfile::Builder::new()
+            .suffix(".pptx")
+            .tempfile()
+            .expect("temporary PPTX path");
+        std::fs::write(temporary.path(), &bytes).expect("write PPTX fixture");
+
+        let presentation = Presentation::open(temporary.path()).expect("source-backed PPTX");
+        assert!(presentation.metadata().unwrap().is_some());
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(temporary.path())
+            .expect("reopen PPTX for mutation");
+        file.write_all(b"source mutation")
+            .expect("mutate PPTX source");
+
+        let error = presentation
+            .metadata()
+            .expect_err("cached metadata must not hide a source change");
+        assert!(error.to_string().contains("OPC source changed"));
+    }
+
+    #[test]
+    fn cached_source_metadata_rechecks_cancellation() {
+        let bytes = corrupt_unselected_slide_package();
+        let temporary = tempfile::Builder::new()
+            .suffix(".pptx")
+            .tempfile()
+            .expect("temporary PPTX path");
+        std::fs::write(temporary.path(), &bytes).expect("write PPTX fixture");
+
+        let budget = litchi_core::Budget::root(
+            "litchi-presentation-metadata-test",
+            litchi_core::Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (cancellation_source, cancellation) = litchi_core::CancellationSource::pair();
+        let execution_limits = litchi_core::ExecutionLimits::new(
+            NonZeroUsize::new(1).expect("non-zero worker count"),
+            NonZeroUsize::new(1).expect("non-zero task count"),
+            NonZeroU64::new(u64::MAX).expect("non-zero in-flight bytes"),
+            0,
+        )
+        .expect("valid execution limits");
+        let context = litchi_core::ExecutionContext::new(budget, cancellation, execution_limits);
+        let source =
+            crate::pptx::SourceBackedPresentation::from_path_with_limits_and_execution_context(
+                temporary.path(),
+                crate::pptx::ReadLimits::default(),
+                context,
+            )
+            .expect("managed source-backed PPTX");
+        let presentation =
+            Presentation::from_source_backed_pptx(source).expect("facade source-backed PPTX");
+        assert!(presentation.metadata().unwrap().is_some());
+
+        cancellation_source.cancel();
+        let error = presentation
+            .metadata()
+            .expect_err("cached metadata must honor cancellation");
+        assert!(error.to_string().contains("cancel"));
+    }
+
+    #[test]
+    fn oversized_arbitrary_non_zip_still_returns_none_before_limits() {
+        let temporary = tempfile::NamedTempFile::new().expect("temporary arbitrary input");
+        std::fs::write(temporary.path(), vec![b'x'; 4096]).expect("write arbitrary input");
+        let limits = crate::pptx::ReadLimits::builder()
+            .max_input_bytes(1)
+            .expect("positive input limit")
+            .build()
+            .expect("valid input limit");
+
+        let detected = crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+            temporary.path(),
+            limits,
+        )
+        .expect("arbitrary non-ZIP probe");
+        assert!(detected.is_none());
+
+        let error = match Presentation::open_with_limits(temporary.path(), limits) {
+            Ok(_) => panic!("arbitrary input must not become a presentation"),
+            Err(error) => error,
+        };
+        assert_eq!(error.to_string(), "Not a valid Office file");
+    }
+
+    #[test]
+    fn oversized_ooxml_suffix_non_zip_keeps_eager_limit_precedence() {
+        let temporary = tempfile::Builder::new()
+            .suffix(".pptx")
+            .tempfile()
+            .expect("temporary oversized OOXML-suffixed input");
+        std::fs::write(temporary.path(), vec![b'x'; 4096]).expect("write arbitrary input");
+        let limits = crate::pptx::ReadLimits::builder()
+            .max_input_bytes(1)
+            .expect("positive input limit")
+            .build()
+            .expect("valid input limit");
+
+        let eager = crate::detection_smart::detected::detect_ooxml_path_with_limits(
+            temporary.path(),
+            limits,
+        )
+        .expect_err("eager OOXML probe must enforce the input limit first");
+        assert!(matches!(
+            eager,
+            crate::opc::OpcError::ReadLimit {
+                resource: crate::opc::ReadResource::InputBytes,
+                ..
+            }
+        ));
+
+        let source = match crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+            temporary.path(),
+            limits,
+        ) {
+            Ok(_) => panic!("source-backed probe must preserve eager precedence"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            source,
+            crate::detection_smart::detected::PptxSourcePathError::Opc(
+                crate::opc::OpcError::ReadLimit {
+                    resource: crate::opc::ReadResource::InputBytes,
+                    ..
+                }
+            )
+        ));
+    }
+
+    #[cfg(feature = "odp")]
+    #[test]
+    fn source_probe_leaves_odp_and_non_opc_zip_to_existing_fallbacks() {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_PRESENTATION)
+            .unwrap();
+        writer
+            .add_file(
+                "content.xml",
+                br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:presentation/></office:body></office:document-content>"#,
+            )
+            .unwrap();
+        let odp = writer.finish_to_bytes().unwrap();
+        let odp_path = tempfile::Builder::new()
+            .suffix(".odp")
+            .tempfile()
+            .expect("temporary ODP path");
+        std::fs::write(odp_path.path(), odp).expect("write ODP");
+        assert!(
+            crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+                odp_path.path(),
+                crate::pptx::ReadLimits::default(),
+            )
+            .expect("ODP source probe")
+            .is_none()
+        );
+        assert!(Presentation::open(odp_path.path()).is_ok());
+
+        let mut output = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut output);
+        zip.start_file(
+            "plain.txt",
+            zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored),
+        )
+        .unwrap();
+        zip.write_all(b"not an Office package").unwrap();
+        zip.finish().unwrap();
+        let unknown_path = tempfile::Builder::new()
+            .suffix(".zip")
+            .tempfile()
+            .expect("temporary unknown ZIP path");
+        std::fs::write(unknown_path.path(), output.into_inner()).expect("write unknown ZIP");
+        let error = match Presentation::open(unknown_path.path()) {
+            Ok(_) => panic!("unknown ZIP must remain unsupported"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("ZIP input is not a supported Office package")
+        );
     }
 }
