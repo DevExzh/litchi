@@ -112,6 +112,9 @@ impl History {
 /// Default maximum number of operations staged in one edit.
 pub const DEFAULT_MAX_OPERATIONS: usize = 256;
 
+/// Exact bytes inserted for a raw ordinary-paragraph split.
+const PARAGRAPH_SPLIT_BYTES: &[u8] = br"\par ";
+
 /// Finite limits for one RTF edit plan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
@@ -676,6 +679,16 @@ pub enum Error {
     SpanNotOnCharacterBoundary { position: usize },
     /// A checked paragraph position does not exist in the source body story.
     ParagraphOutOfRange { position: usize, count: usize },
+    /// A paragraph split offset is outside the selected paragraph.
+    ParagraphSplitOffsetOutOfRange {
+        position: usize,
+        offset: usize,
+        length: usize,
+    },
+    /// A final paragraph split at its end has no exact terminal boundary.
+    ParagraphSplitAtEndRequiresBoundary { position: usize },
+    /// A paragraph merge must name two consecutive source paragraphs.
+    ParagraphMergeNonAdjacent { first: usize, second: usize },
     /// A checked retained-destination selector does not exist.
     DestinationOutOfRange(&'static str),
     /// A checked standalone picture selector does not exist.
@@ -776,6 +789,22 @@ impl fmt::Display for Error {
                 formatter,
                 "RTF body paragraph position {position} is outside 0..{count}"
             ),
+            Self::ParagraphSplitOffsetOutOfRange {
+                position,
+                offset,
+                length,
+            } => write!(
+                formatter,
+                "RTF paragraph {position} split offset {offset} is outside 0..{length}"
+            ),
+            Self::ParagraphSplitAtEndRequiresBoundary { position } => write!(
+                formatter,
+                "RTF paragraph {position} split at its end requires an exact terminal boundary"
+            ),
+            Self::ParagraphMergeNonAdjacent { first, second } => write!(
+                formatter,
+                "RTF paragraphs {first} and {second} are not adjacent source paragraphs"
+            ),
             Self::DestinationOutOfRange(destination) => {
                 write!(
                     formatter,
@@ -853,6 +882,7 @@ enum Operation {
         before: String,
         after: String,
         structural: bool,
+        raw_structure: Option<RawParagraphOperation>,
     },
     Alignment {
         position: usize,
@@ -928,9 +958,37 @@ enum Operation {
     },
 }
 
+/// A source-proven ordinary-paragraph boundary edit.
+///
+/// The semantic `Text` operation carrying this marker is deliberately kept
+/// separate from the normal writer-backed text path. Its source ranges are
+/// proven against the immutable snapshot before staging and checked again
+/// before publication, allowing the commit to splice only `\\par` bytes.
+#[derive(Debug, Clone)]
+enum RawParagraphOperation {
+    Split {
+        position: usize,
+        offset: usize,
+        source_offset: usize,
+        boundary: Vec<u8>,
+        before: String,
+    },
+    Merge {
+        position: usize,
+        boundary: Range<usize>,
+        boundary_bytes: Vec<u8>,
+        left: String,
+        right: String,
+    },
+}
+
 impl Operation {
     fn replacement_bytes(&self) -> usize {
         match self {
+            Self::Text {
+                raw_structure: Some(RawParagraphOperation::Split { boundary, .. }),
+                ..
+            } => boundary.len(),
             Self::Text { after, .. }
             | Self::TableCellText { after, .. }
             | Self::HeaderFooterText { after, .. }
@@ -1049,9 +1107,22 @@ impl Operation {
     const fn is_lifecycle(&self) -> bool {
         matches!(
             self,
-            Self::RemoveParagraph { .. }
+            Self::Text {
+                raw_structure: Some(_),
+                ..
+            } | Self::RemoveParagraph { .. }
                 | Self::RestoreParagraph { .. }
                 | Self::MoveParagraph { .. }
+        )
+    }
+
+    const fn is_raw_paragraph_structure(&self) -> bool {
+        matches!(
+            self,
+            Self::Text {
+                raw_structure: Some(_),
+                ..
+            }
         )
     }
 }
@@ -1238,6 +1309,7 @@ impl Edit {
                     before,
                     after: replacement.replacement.clone(),
                     structural,
+                    raw_structure: None,
                 });
             }
             paragraph_start = paragraph_end.checked_add(1).ok_or(Error::InputTooLarge {
@@ -1307,6 +1379,7 @@ impl Edit {
             before,
             after,
             structural,
+            raw_structure: None,
         });
         Ok(self)
     }
@@ -1533,6 +1606,247 @@ impl Edit {
             text,
         });
         Ok(self)
+    }
+
+    /// Splits one ordinary body paragraph at a checked UTF-8 byte offset.
+    ///
+    /// The offset is measured in the selected paragraph's semantic UTF-8
+    /// text, and must lie on a Unicode scalar boundary. This deliberately
+    /// narrow transaction accepts only an ASCII, ungrouped, ordinary source
+    /// with uniform formatting; publication inserts exactly one `\\par`
+    /// control sequence at the proven source boundary and preserves every
+    /// unrelated source byte.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid selector or offset, unsupported body
+    /// syntax, incompatible formatting, a protected source, or finite limits.
+    pub fn split_paragraph(&mut self, position: usize, offset: usize) -> Result<&mut Self, Error> {
+        self.split_paragraph_with_boundary(position, offset, PARAGRAPH_SPLIT_BYTES)
+    }
+
+    fn split_paragraph_with_boundary(
+        &mut self,
+        position: usize,
+        offset: usize,
+        boundary: &[u8],
+    ) -> Result<&mut Self, Error> {
+        self.ensure_lifecycle_room()?;
+        let semantic_range = paragraph_range(&self.source, position)?;
+        let semantic_text =
+            self.source
+                .text()
+                .get(semantic_range.clone())
+                .ok_or(Error::UnsupportedSource(
+                    "ordinary paragraph selector did not resolve to UTF-8 text",
+                ))?;
+        if offset > semantic_text.len() {
+            return Err(Error::ParagraphSplitOffsetOutOfRange {
+                position,
+                offset,
+                length: semantic_text.len(),
+            });
+        }
+        if !semantic_text.is_char_boundary(offset) {
+            return Err(Error::SpanNotOnCharacterBoundary {
+                position: semantic_range.start.saturating_add(offset),
+            });
+        }
+        let map = ordinary_paragraph_source_map(&self.source)?;
+        let paragraph = map
+            .paragraphs
+            .get(position)
+            .ok_or(Error::ParagraphOutOfRange {
+                position,
+                count: map.paragraphs.len(),
+            })?;
+        let text =
+            self.source
+                .text()
+                .get(paragraph.text.clone())
+                .ok_or(Error::UnsupportedSource(
+                    "ordinary paragraph source map has an invalid semantic range",
+                ))?;
+        if paragraph.text != semantic_range || text != semantic_text {
+            return Err(Error::StalePrecondition(
+                "ordinary paragraph source map does not match the semantic selector",
+            ));
+        }
+        if offset == semantic_text.len() && paragraph.boundary_after.is_none() {
+            return Err(Error::ParagraphSplitAtEndRequiresBoundary { position });
+        }
+        validate_paragraph_boundary_bytes(boundary)?;
+        let source_offset =
+            paragraph
+                .source
+                .start
+                .checked_add(offset)
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: self.source.limits().max_source_bytes(),
+                })?;
+        if source_offset > paragraph.source.end {
+            return Err(Error::UnsupportedSource(
+                "ordinary paragraph split escaped its proven source range",
+            ));
+        }
+        let before = clone_bounded_text(
+            text,
+            self.source.limits(),
+            "could not reserve ordinary paragraph text",
+        )?;
+        let after = clone_bounded_text(
+            "\n",
+            self.source.limits(),
+            "could not reserve ordinary paragraph break",
+        )?;
+        let boundary = clone_bounded_bytes(
+            boundary,
+            self.source.limits(),
+            "could not reserve ordinary paragraph boundary",
+        )?;
+        self.operations.try_reserve(1).map_err(|_error| {
+            Error::Write("could not reserve ordinary paragraph operation".to_string())
+        })?;
+        self.charge_replacement(boundary.len())?;
+        self.operations.push(Operation::Text {
+            span: TextSpan {
+                start: paragraph.text.start.saturating_add(offset),
+                end: paragraph.text.start.saturating_add(offset),
+            },
+            before: String::new(),
+            after,
+            structural: true,
+            raw_structure: Some(RawParagraphOperation::Split {
+                position,
+                offset,
+                source_offset,
+                boundary,
+                before,
+            }),
+        });
+        Ok(self)
+    }
+
+    /// Alias for [`Self::split_paragraph`] emphasizing the checked offset.
+    pub fn split_paragraph_at(
+        &mut self,
+        position: usize,
+        offset: usize,
+    ) -> Result<&mut Self, Error> {
+        self.split_paragraph(position, offset)
+    }
+
+    /// Merges two adjacent ordinary body paragraphs.
+    ///
+    /// `first` and `second` are zero-based positions in the immutable source
+    /// snapshot. Only the exact source span of their `\\par` boundary is
+    /// removed; all text, controls, and bytes outside that boundary remain
+    /// untouched.
+    ///
+    /// # Errors
+    /// Returns an error for invalid selectors, non-adjacent positions,
+    /// unsupported body syntax, incompatible formatting, a protected source,
+    /// or finite limits.
+    pub fn merge_paragraphs(&mut self, first: usize, second: usize) -> Result<&mut Self, Error> {
+        self.ensure_lifecycle_room()?;
+        let map = ordinary_paragraph_source_map(&self.source)?;
+        let left = map
+            .paragraphs
+            .get(first)
+            .ok_or(Error::ParagraphOutOfRange {
+                position: first,
+                count: map.paragraphs.len(),
+            })?;
+        let right = map
+            .paragraphs
+            .get(second)
+            .ok_or(Error::ParagraphOutOfRange {
+                position: second,
+                count: map.paragraphs.len(),
+            })?;
+        let expected_second = first
+            .checked_add(1)
+            .ok_or(Error::ParagraphMergeNonAdjacent { first, second })?;
+        if second != expected_second {
+            return Err(Error::ParagraphMergeNonAdjacent { first, second });
+        }
+        let boundary = left.boundary_after.clone().ok_or(Error::UnsupportedSource(
+            "ordinary paragraph has no exact source boundary",
+        ))?;
+        let source_bytes = self
+            .source
+            .source_bytes()
+            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        let boundary_bytes = source_bytes
+            .get(boundary.clone())
+            .ok_or(Error::UnsupportedSource(
+                "ordinary paragraph boundary is outside the source",
+            ))?;
+        let left_text =
+            self.source
+                .text()
+                .get(left.text.clone())
+                .ok_or(Error::UnsupportedSource(
+                    "ordinary paragraph source map has an invalid left range",
+                ))?;
+        let right_text =
+            self.source
+                .text()
+                .get(right.text.clone())
+                .ok_or(Error::UnsupportedSource(
+                    "ordinary paragraph source map has an invalid right range",
+                ))?;
+        // `ordinary_paragraph_source_map` has already proved uniform body
+        // formatting through `plain_body_text_editability`.
+        self.operations.try_reserve(1).map_err(|_error| {
+            Error::Write("could not reserve ordinary paragraph operation".to_string())
+        })?;
+        let left_owned = clone_bounded_text(
+            left_text,
+            self.source.limits(),
+            "could not reserve left ordinary paragraph text",
+        )?;
+        let right_owned = clone_bounded_text(
+            right_text,
+            self.source.limits(),
+            "could not reserve right ordinary paragraph text",
+        )?;
+        let before = clone_bounded_text(
+            "\n",
+            self.source.limits(),
+            "could not reserve ordinary paragraph boundary",
+        )?;
+        let boundary_bytes = clone_bounded_bytes(
+            boundary_bytes,
+            self.source.limits(),
+            "could not reserve ordinary paragraph boundary bytes",
+        )?;
+        self.operations.push(Operation::Text {
+            span: TextSpan {
+                start: left.text.end,
+                end: left.text.end.saturating_add(1),
+            },
+            before,
+            after: String::new(),
+            structural: true,
+            raw_structure: Some(RawParagraphOperation::Merge {
+                position: first,
+                boundary,
+                boundary_bytes,
+                left: left_owned,
+                right: right_owned,
+            }),
+        });
+        Ok(self)
+    }
+
+    /// Merges one ordinary paragraph with its immediate successor.
+    pub fn merge_paragraph_with_next(&mut self, position: usize) -> Result<&mut Self, Error> {
+        let second = position.checked_add(1).ok_or(Error::ParagraphOutOfRange {
+            position,
+            count: self.source.paragraph_count(),
+        })?;
+        self.merge_paragraphs(position, second)
     }
 
     fn restore_paragraph(&mut self, position: usize, text: &str) -> Result<&mut Self, Error> {
@@ -2039,6 +2353,17 @@ impl Edit {
             ));
         }
 
+        if self
+            .operations
+            .iter()
+            .any(Operation::is_raw_paragraph_structure)
+        {
+            if operation_count != 1 {
+                return Err(Error::BodyDestinationConflict);
+            }
+            return commit_raw_paragraph_structure(self, operation_count);
+        }
+
         let destination_count = self
             .operations
             .iter()
@@ -2333,6 +2658,243 @@ impl Edit {
             semantic_delta,
         ))
     }
+}
+
+fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    ensure_changed_publication_allowed(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let map = ordinary_paragraph_source_map(&edit.source)?;
+    let operation = edit.operations.first().ok_or(Error::UnsupportedSource(
+        "missing ordinary paragraph operation",
+    ))?;
+    let (snapshot, semantic_delta) =
+        match operation {
+            Operation::Text {
+                raw_structure:
+                    Some(RawParagraphOperation::Split {
+                        position,
+                        offset,
+                        source_offset,
+                        boundary,
+                        before,
+                    }),
+                ..
+            } => {
+                let paragraph =
+                    map.paragraphs
+                        .get(*position)
+                        .ok_or(Error::ParagraphOutOfRange {
+                            position: *position,
+                            count: map.paragraphs.len(),
+                        })?;
+                let actual = edit.source.text().get(paragraph.text.clone()).ok_or(
+                    Error::UnsupportedSource(
+                        "ordinary paragraph split selector lost its source text",
+                    ),
+                )?;
+                if actual != before {
+                    return Err(Error::StalePrecondition("ordinary paragraph text differs"));
+                }
+                if *offset > actual.len() || !actual.is_char_boundary(*offset) {
+                    return Err(Error::SpanNotOnCharacterBoundary {
+                        position: paragraph.text.start.saturating_add(*offset),
+                    });
+                }
+                let expected_source_offset =
+                    paragraph
+                        .source
+                        .start
+                        .checked_add(*offset)
+                        .ok_or(Error::InputTooLarge {
+                            observed: usize::MAX,
+                            limit: edit.source.limits().max_source_bytes(),
+                        })?;
+                if expected_source_offset != *source_offset
+                    || source_bytes.get(*source_offset..*source_offset) != Some(&[])
+                {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph split source boundary differs",
+                    ));
+                }
+                let bytes = splice_body(
+                    source_bytes,
+                    *source_offset..*source_offset,
+                    boundary,
+                    edit.source.limits(),
+                )?;
+                let snapshot = Snapshot::from_bytes_with_limits(&bytes, edit.source.limits())?;
+                ordinary_paragraph_source_map(&snapshot)?;
+                let (left, right) = actual.split_at(*offset);
+                if snapshot.paragraph_count() != edit.source.paragraph_count().saturating_add(1)
+                    || paragraph_text_at(&snapshot, *position)? != left
+                    || paragraph_text_at(&snapshot, position.saturating_add(1))? != right
+                {
+                    return Err(Error::UnsupportedSource(
+                        "split candidate failed ordinary paragraph readback",
+                    ));
+                }
+                let semantic_delta = vec![Change::SplitParagraph {
+                    position: *position,
+                    offset: *offset,
+                    before: before.clone(),
+                    boundary: boundary.clone(),
+                    left: left.to_string(),
+                    right: right.to_string(),
+                }];
+                (snapshot, semantic_delta)
+            },
+            Operation::Text {
+                raw_structure:
+                    Some(RawParagraphOperation::Merge {
+                        position,
+                        boundary,
+                        boundary_bytes,
+                        left,
+                        right,
+                    }),
+                ..
+            } => {
+                let paragraph =
+                    map.paragraphs
+                        .get(*position)
+                        .ok_or(Error::ParagraphOutOfRange {
+                            position: *position,
+                            count: map.paragraphs.len(),
+                        })?;
+                let next_position = position.saturating_add(1);
+                let next = map
+                    .paragraphs
+                    .get(next_position)
+                    .ok_or(Error::ParagraphOutOfRange {
+                        position: next_position,
+                        count: map.paragraphs.len(),
+                    })?;
+                if paragraph.boundary_after.as_ref() != Some(boundary)
+                    || boundary.start != paragraph.source.end
+                    || boundary.end > next.source.start
+                    || source_bytes.get(boundary.clone()) != Some(boundary_bytes.as_slice())
+                    || edit.source.text().get(paragraph.text.clone()) != Some(left.as_str())
+                    || edit.source.text().get(next.text.clone()) != Some(right.as_str())
+                {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph merge boundary or text differs",
+                    ));
+                }
+                let bytes = splice_body(source_bytes, boundary.clone(), &[], edit.source.limits())?;
+                let snapshot = Snapshot::from_bytes_with_limits(&bytes, edit.source.limits())?;
+                let merged = merged_paragraph_text(left, right, edit.source.limits())?;
+                if snapshot.paragraph_count() != edit.source.paragraph_count().saturating_sub(1)
+                    || paragraph_text_at(&snapshot, *position)? != merged
+                {
+                    return Err(Error::UnsupportedSource(
+                        "merge candidate failed ordinary paragraph readback",
+                    ));
+                }
+                let semantic_delta = vec![Change::MergeParagraph {
+                    position: *position,
+                    boundary: boundary_bytes.clone(),
+                    left: left.clone(),
+                    right: right.clone(),
+                }];
+                (snapshot, semantic_delta)
+            },
+            Operation::Text { .. } => return Err(Error::BodyDestinationConflict),
+            _ => return Err(Error::BodyDestinationConflict),
+        };
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        true,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+fn merged_paragraph_text(
+    left: &str,
+    right: &str,
+    limits: crate::ParseLimits,
+) -> Result<String, Error> {
+    let length = left
+        .len()
+        .checked_add(right.len())
+        .ok_or(Error::InputTooLarge {
+            observed: usize::MAX,
+            limit: limits.max_source_bytes(),
+        })?;
+    if length > limits.max_source_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: length,
+            limit: limits.max_source_bytes(),
+        });
+    }
+    let mut merged = String::new();
+    merged
+        .try_reserve_exact(length)
+        .map_err(|_error| Error::Write("could not reserve merged paragraph text".to_string()))?;
+    merged.push_str(left);
+    merged.push_str(right);
+    Ok(merged)
+}
+
+fn clone_bounded_text(
+    text: &str,
+    limits: crate::ParseLimits,
+    allocation_context: &'static str,
+) -> Result<String, Error> {
+    if text.len() > limits.max_source_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: text.len(),
+            limit: limits.max_source_bytes(),
+        });
+    }
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(text.len())
+        .map_err(|_error| Error::Write(allocation_context.to_string()))?;
+    owned.push_str(text);
+    Ok(owned)
+}
+
+fn clone_bounded_bytes(
+    bytes: &[u8],
+    limits: crate::ParseLimits,
+    allocation_context: &'static str,
+) -> Result<Vec<u8>, Error> {
+    if bytes.len() > limits.max_source_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: bytes.len(),
+            limit: limits.max_source_bytes(),
+        });
+    }
+    let mut owned = Vec::new();
+    owned
+        .try_reserve_exact(bytes.len())
+        .map_err(|_error| Error::Write(allocation_context.to_string()))?;
+    owned.extend_from_slice(bytes);
+    Ok(owned)
+}
+
+fn validate_paragraph_boundary_bytes(boundary: &[u8]) -> Result<(), Error> {
+    let keyword_is_par = match boundary.get(..4) {
+        Some([slash, p, a, r]) => {
+            *slash == b'\\'
+                && p.eq_ignore_ascii_case(&b'p')
+                && a.eq_ignore_ascii_case(&b'a')
+                && r.eq_ignore_ascii_case(&b'r')
+        },
+        _ => false,
+    };
+    let valid_delimiter = matches!(boundary.get(4..), Some([]) | Some([b' ']));
+    if !keyword_is_par || !valid_delimiter {
+        return Err(Error::UnsupportedSource(
+            "ordinary paragraph boundary is not an exact \\par control",
+        ));
+    }
+    Ok(())
 }
 
 fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
@@ -2733,6 +3295,325 @@ fn spans_conflict(left: TextSpan, right: TextSpan) -> bool {
     left.start < right.end && right.start < left.end
 }
 
+#[derive(Debug, Clone)]
+struct OrdinaryParagraphSource {
+    text: Range<usize>,
+    source: Range<usize>,
+    boundary_after: Option<Range<usize>>,
+}
+
+#[derive(Debug, Clone)]
+struct OrdinaryParagraphSourceMap {
+    paragraphs: Vec<OrdinaryParagraphSource>,
+}
+
+/// Proves the deliberately narrow source closure used by paragraph
+/// split/merge and maps semantic paragraph offsets to exact source offsets.
+///
+/// The source map accepts literal ASCII text and `\\par` controls only. This
+/// makes every retained semantic byte correspond to exactly one source byte;
+/// encoded characters, visible control symbols, nested groups, and all other
+/// controls fail closed rather than being guessed around.
+fn ordinary_paragraph_source_map(source: &Snapshot) -> Result<OrdinaryParagraphSourceMap, Error> {
+    let source_bytes = source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    if crate::compressed::is_compressed_rtf(source_bytes) {
+        return Err(Error::UnsupportedSource(
+            "ordinary paragraph structure editing refuses compressed RTF",
+        ));
+    }
+    if !source_bytes.is_ascii() {
+        return Err(Error::UnsupportedSource(
+            "ordinary paragraph structure editing requires an ASCII RTF transport",
+        ));
+    }
+    if !source.opaque().is_empty() || source.model().unknown_syntax_markers() != 0 {
+        return Err(Error::UnsupportedSource(
+            "ordinary paragraph structure editing refuses unknown RTF syntax",
+        ));
+    }
+    if !source.model().external_references().is_empty()
+        || source.model().mail_merge().is_some()
+        || source.model().xsl_transform().is_some()
+        || source.model().xsl_transform_usage().is_requested()
+    {
+        return Err(Error::UnsupportedSource(
+            "ordinary paragraph structure editing refuses external or transformation content",
+        ));
+    }
+    if !source.tables().is_empty()
+        || !source.fields().is_empty()
+        || !source.objects().is_empty()
+        || !source.pictures().is_empty()
+        || !source.shapes().is_empty()
+        || !source.model().form_fields().is_empty()
+        || !source.model().bookmarks().bookmarks().is_empty()
+        || !source.revisions().is_empty()
+        || !source.annotations().is_empty()
+        || !source.notes().is_empty()
+        || !source.model().math_zones().is_empty()
+        || !source.model().custom_xml_tags().is_empty()
+        || !source.model().protection_ranges().is_empty()
+        || !source.model().editable_regions().is_empty()
+        || !source.model().body_story_events().is_empty()
+    {
+        return Err(Error::UnsupportedSource(
+            "ordinary paragraph structure editing refuses dependent destinations or review content",
+        ));
+    }
+    source
+        .model()
+        .plain_body_text_editability()
+        .map_err(Error::UnsupportedSource)?;
+    let body_span = if !source.text().starts_with('\n') {
+        source
+            .model()
+            .ordinary_body_source_span()
+            .ok_or(Error::UnsupportedSource(
+                "ordinary paragraph source span is not losslessly proven",
+            ))?
+    } else {
+        ordinary_paragraph_body_source_span(source_bytes, source.text(), source.limits())?
+    };
+    if body_span.start >= body_span.end || body_span.end > source_bytes.len() {
+        return Err(Error::UnsupportedSource(
+            "ordinary paragraph source span is malformed",
+        ));
+    }
+    let body_bytes = source_bytes
+        .get(body_span.clone())
+        .ok_or(Error::UnsupportedSource(
+            "ordinary paragraph source span is outside the source",
+        ))?;
+    let starts_with_par = body_bytes.get(..4).is_some_and(|prefix| {
+        prefix.first() == Some(&b'\\')
+            && prefix
+                .get(1)
+                .is_some_and(|byte| byte.eq_ignore_ascii_case(&b'p'))
+            && prefix
+                .get(2)
+                .is_some_and(|byte| byte.eq_ignore_ascii_case(&b'a'))
+            && prefix
+                .get(3)
+                .is_some_and(|byte| byte.eq_ignore_ascii_case(&b'r'))
+    });
+    let has_preceding_delimiter = body_span.start == 0
+        || source_bytes
+            .get(body_span.start.saturating_sub(1))
+            .is_some_and(|byte| byte.is_ascii_whitespace());
+    if semantic_text_starts_with_empty_paragraph(source.text())
+        && starts_with_par
+        && !has_preceding_delimiter
+    {
+        return Err(Error::UnsupportedSource(
+            "leading empty paragraph has no safe control-word delimiter",
+        ));
+    }
+    let body_input = std::str::from_utf8(body_bytes)
+        .map_err(|_error| Error::UnsupportedSource("ordinary paragraph source is not UTF-8"))?;
+    let arena = Bump::new();
+    let mut lexer = crate::lexer::Lexer::new_with_limits(body_input, &arena, source.limits());
+    let (tokens, spans) = lexer.tokenize_with_spans()?;
+    let mut paragraphs = Vec::new();
+    paragraphs
+        .try_reserve_exact(source.paragraph_count())
+        .map_err(|_error| Error::Write("could not reserve paragraph source map".to_string()))?;
+    let semantic_text = source.text();
+    let mut semantic_position = 0usize;
+    let mut paragraph_start = 0usize;
+    let mut source_text_start = None;
+    let mut previous_boundary_end = body_span.start;
+
+    for (token, relative_span) in tokens.iter().zip(&spans) {
+        let absolute_span = relative_span
+            .start
+            .checked_add(body_span.start)
+            .and_then(|start| {
+                relative_span
+                    .end
+                    .checked_add(body_span.start)
+                    .map(|end| start..end)
+            })
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: source.limits().max_source_bytes(),
+            })?;
+        if absolute_span.start < previous_boundary_end {
+            return Err(Error::UnsupportedSource(
+                "ordinary paragraph source tokens overlap",
+            ));
+        }
+        match token {
+            crate::lexer::Token::Text(value) => {
+                let source_fragment =
+                    source_bytes
+                        .get(absolute_span.clone())
+                        .ok_or(Error::UnsupportedSource(
+                            "ordinary paragraph text token is outside the source",
+                        ))?;
+                if value.is_empty() {
+                    if !source_fragment.is_empty() {
+                        return Err(Error::UnsupportedSource(
+                            "ordinary paragraph source contains an unmodeled control boundary",
+                        ));
+                    }
+                    continue;
+                }
+                if !value.is_ascii() || source_fragment != value.as_bytes() {
+                    return Err(Error::UnsupportedSource(
+                        "ordinary paragraph source text is not one-to-one ASCII text",
+                    ));
+                }
+                if source_text_start.is_none() {
+                    source_text_start = Some(absolute_span.start);
+                }
+                semantic_position =
+                    semantic_position
+                        .checked_add(value.len())
+                        .ok_or(Error::InputTooLarge {
+                            observed: usize::MAX,
+                            limit: source.limits().max_source_bytes(),
+                        })?;
+            },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Par) => {
+                let source_start = source_text_start.unwrap_or(absolute_span.start);
+                let source_end = absolute_span.start;
+                let text_range = paragraph_start..semantic_position;
+                let source_range = source_start..source_end;
+                if source_range.len() != text_range.len()
+                    || source_bytes.get(source_range.clone())
+                        != semantic_text.as_bytes().get(text_range.clone())
+                {
+                    return Err(Error::UnsupportedSource(
+                        "ordinary paragraph boundary is not a literal source boundary",
+                    ));
+                }
+                paragraphs.push(OrdinaryParagraphSource {
+                    text: text_range,
+                    source: source_range,
+                    boundary_after: Some(absolute_span.clone()),
+                });
+                semantic_position =
+                    semantic_position
+                        .checked_add(1)
+                        .ok_or(Error::InputTooLarge {
+                            observed: usize::MAX,
+                            limit: source.limits().max_source_bytes(),
+                        })?;
+                paragraph_start = semantic_position;
+                source_text_start = None;
+                previous_boundary_end = absolute_span.end;
+            },
+            crate::lexer::Token::OpenBrace
+            | crate::lexer::Token::CloseBrace
+            | crate::lexer::Token::Control(_)
+            | crate::lexer::Token::Binary(_) => {
+                return Err(Error::UnsupportedSource(
+                    "ordinary paragraph source contains a group, binary payload, or non-paragraph control",
+                ));
+            },
+        }
+    }
+
+    if let Some(source_start) = source_text_start {
+        let text_range = paragraph_start..semantic_position;
+        let source_range = source_start..body_span.end;
+        if source_range.len() != text_range.len()
+            || source_bytes.get(source_range.clone())
+                != semantic_text.as_bytes().get(text_range.clone())
+        {
+            return Err(Error::UnsupportedSource(
+                "ordinary paragraph final source range is not literal text",
+            ));
+        }
+        paragraphs.push(OrdinaryParagraphSource {
+            text: text_range,
+            source: source_range,
+            boundary_after: None,
+        });
+    }
+    if semantic_position != semantic_text.len()
+        || paragraphs.len() != source.paragraph_count()
+        || paragraphs.is_empty()
+    {
+        return Err(Error::UnsupportedSource(
+            "ordinary paragraph source map does not cover the complete body story",
+        ));
+    }
+    Ok(OrdinaryParagraphSourceMap { paragraphs })
+}
+
+fn semantic_text_starts_with_empty_paragraph(text: &str) -> bool {
+    text.starts_with('\n')
+}
+
+/// Locates the contiguous root-level ordinary body span, including leading
+/// `\\par` controls that represent empty paragraphs. The retained parser span
+/// intentionally starts at the first literal text, which is insufficient for
+/// replaying a split at offset zero on the first paragraph.
+fn ordinary_paragraph_body_source_span(
+    source: &[u8],
+    semantic_text: &str,
+    limits: crate::ParseLimits,
+) -> Result<Range<usize>, Error> {
+    let lexical = std::str::from_utf8(source)
+        .map_err(|_error| Error::UnsupportedSource("ordinary paragraph source is not UTF-8"))?;
+    let arena = Bump::new();
+    let mut lexer = crate::lexer::Lexer::new_with_limits(lexical, &arena, limits);
+    let (tokens, spans) = lexer.tokenize_with_spans()?;
+    let mut depth = 0usize;
+    let mut start = None;
+    let mut end = None;
+    for (token, span) in tokens.iter().zip(&spans) {
+        match token {
+            crate::lexer::Token::OpenBrace => {
+                if depth == 1 && start.is_some() {
+                    return Err(Error::UnsupportedSource(
+                        "the ordinary paragraph body is not one contiguous root-level span",
+                    ));
+                }
+                depth = depth.checked_add(1).ok_or(Error::UnsupportedSource(
+                    "RTF group nesting overflowed while locating the ordinary body",
+                ))?;
+            },
+            crate::lexer::Token::CloseBrace => {
+                if depth == 1 {
+                    end = Some(span.start);
+                    break;
+                }
+                depth = depth.checked_sub(1).ok_or(Error::UnsupportedSource(
+                    "RTF group nesting underflowed while locating the ordinary body",
+                ))?;
+            },
+            crate::lexer::Token::Text(_)
+            | crate::lexer::Token::Control(crate::lexer::ControlWord::Par)
+                if depth == 1 && start.is_none() =>
+            {
+                start = Some(span.start);
+            },
+            crate::lexer::Token::Binary(_) if depth == 1 && start.is_some() => {
+                return Err(Error::UnsupportedSource(
+                    "the ordinary paragraph body contains binary data",
+                ));
+            },
+            crate::lexer::Token::Control(_)
+            | crate::lexer::Token::Text(_)
+            | crate::lexer::Token::Binary(_) => {},
+        }
+    }
+    let root_end = end.ok_or(Error::UnsupportedSource(
+        "RTF root group has no closing ordinary-body boundary",
+    ))?;
+    match start {
+        Some(start_offset) => Ok(start_offset..root_end),
+        None if semantic_text.is_empty() => Ok(root_end..root_end),
+        None => Err(Error::UnsupportedSource(
+            "the body has no literal source span for a lossless paragraph edit",
+        )),
+    }
+}
+
 fn paragraph_range(source: &Snapshot, position: usize) -> Result<Range<usize>, Error> {
     let mut start = 0usize;
     for (paragraph_position, paragraph) in source.body().paragraphs().enumerate() {
@@ -2782,7 +3663,12 @@ fn project_text(
                 after,
                 before: _,
                 structural: _,
+                raw_structure: None,
             } => Some((operation_index, *span, after.as_str(), false)),
+            Operation::Text {
+                raw_structure: Some(_),
+                ..
+            } => None,
             Operation::InsertParagraph { span, text, .. } => {
                 Some((operation_index, *span, text.as_str(), true))
             },
@@ -3943,6 +4829,20 @@ enum Change {
         final_position: usize,
         text: String,
     },
+    SplitParagraph {
+        position: usize,
+        offset: usize,
+        before: String,
+        boundary: Vec<u8>,
+        left: String,
+        right: String,
+    },
+    MergeParagraph {
+        position: usize,
+        boundary: Vec<u8>,
+        left: String,
+        right: String,
+    },
     TableCellText {
         path: TableCellPath,
         before: String,
@@ -4070,6 +4970,36 @@ impl Change {
                 final_position: *position,
                 text: text.clone(),
             },
+            Self::SplitParagraph {
+                position,
+                boundary,
+                left,
+                right,
+                ..
+            } => Self::MergeParagraph {
+                position: *position,
+                boundary: boundary.clone(),
+                left: left.clone(),
+                right: right.clone(),
+            },
+            Self::MergeParagraph {
+                position,
+                boundary,
+                left,
+                right,
+            } => Self::SplitParagraph {
+                position: *position,
+                offset: left.len(),
+                boundary: boundary.clone(),
+                before: {
+                    let mut before = String::new();
+                    before.push_str(left);
+                    before.push_str(right);
+                    before
+                },
+                left: left.clone(),
+                right: right.clone(),
+            },
             Self::TableCellText {
                 path,
                 before,
@@ -4155,6 +5085,7 @@ fn semantic_changes(
                 before,
                 after,
                 structural: _,
+                raw_structure: None,
             } if before != after => {
                 projected_spans
                     .iter()
@@ -4240,6 +5171,43 @@ fn semantic_changes(
                 position: *position,
                 final_position: *final_position,
                 text: text.clone(),
+            }),
+            Operation::Text {
+                raw_structure:
+                    Some(RawParagraphOperation::Split {
+                        position,
+                        offset,
+                        boundary,
+                        before,
+                        ..
+                    }),
+                ..
+            } => {
+                let (left, right) = (before.get(..*offset)?, before.get(*offset..)?);
+                Some(Change::SplitParagraph {
+                    position: *position,
+                    offset: *offset,
+                    before: before.clone(),
+                    boundary: boundary.clone(),
+                    left: left.to_string(),
+                    right: right.to_string(),
+                })
+            },
+            Operation::Text {
+                raw_structure:
+                    Some(RawParagraphOperation::Merge {
+                        position,
+                        boundary_bytes,
+                        left,
+                        right,
+                        ..
+                    }),
+                ..
+            } => Some(Change::MergeParagraph {
+                position: *position,
+                boundary: boundary_bytes.clone(),
+                left: left.clone(),
+                right: right.clone(),
             }),
             Operation::TableCellText {
                 path,
@@ -4402,8 +5370,9 @@ impl Patch {
             .changes
             .iter()
             .map(|change| {
-                let forward = durable_operation(limits, change, before)?;
-                let inverse = durable_operation(limits, &change.inverse(), after)?;
+                let forward = durable_operation(limits, change, before, after)?;
+                let inverse_change = change.inverse();
+                let inverse = durable_operation(limits, &inverse_change, after, before)?;
                 Ok(ReversibleOperation::new(forward, inverse))
             })
             .collect::<Result<Vec<_>, litchi_core::patch::PatchError>>()?;
@@ -4421,6 +5390,7 @@ fn durable_operation(
     limits: litchi_core::patch::PatchLimits,
     change: &Change,
     source: &[u8],
+    target: &[u8],
 ) -> Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
     let mut preconditions = BTreeMap::new();
     preconditions.insert(
@@ -4570,6 +5540,61 @@ fn durable_operation(
                 format!("body:paragraph:{position}"),
                 preconditions,
                 Value::String(final_position.to_string()),
+            )
+        },
+        Change::SplitParagraph {
+            position,
+            offset,
+            before,
+            boundary,
+            left: _,
+            right: _,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(before.clone()));
+            preconditions.insert("offset".to_string(), Value::from(*offset as u64));
+            preconditions.insert("boundary".to_string(), Value::String(hex_encode(boundary)));
+            preconditions.insert(
+                "result_artifact_sha256".to_string(),
+                Value::String(litchi_core::patch::BlobId::of(target).as_hex()),
+            );
+            preconditions.insert(
+                "boundary_mode".to_string(),
+                Value::String(
+                    if boundary == PARAGRAPH_SPLIT_BYTES {
+                        "canonical"
+                    } else {
+                        "exact"
+                    }
+                    .to_string(),
+                ),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "paragraph.split",
+                format!("body:paragraph:{position}"),
+                preconditions,
+                Value::Null,
+            )
+        },
+        Change::MergeParagraph {
+            position,
+            boundary,
+            left,
+            right,
+        } => {
+            preconditions.insert("left".to_string(), Value::String(left.clone()));
+            preconditions.insert("right".to_string(), Value::String(right.clone()));
+            preconditions.insert("boundary".to_string(), Value::String(hex_encode(boundary)));
+            preconditions.insert(
+                "result_artifact_sha256".to_string(),
+                Value::String(litchi_core::patch::BlobId::of(target).as_hex()),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "paragraph.merge",
+                format!("body:paragraph:{position}"),
+                preconditions,
+                Value::Null,
             )
         },
         Change::TableCellText {
@@ -4751,8 +5776,14 @@ pub(crate) fn apply_durable<Mode>(
         );
     }
     let mut edit = source.edit();
+    let mut expected_result_hash = None;
     for operation in patch.operations() {
-        if operation.preconditions.len() != 2 {
+        let expected_preconditions = match operation.op.as_str() {
+            "paragraph.split" => 6,
+            "paragraph.merge" => 5,
+            _ => 2,
+        };
+        if operation.preconditions.len() != expected_preconditions {
             return Err(Error::DurablePatch(
                 "operation has an invalid precondition count".to_string(),
             ));
@@ -4933,6 +5964,175 @@ pub(crate) fn apply_durable<Mode>(
                     })?;
                 edit.move_paragraph(position, final_position)?;
             },
+            "paragraph.split" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                if !operation.value.is_null() {
+                    return Err(Error::DurablePatch(
+                        "paragraph split value must be null".to_string(),
+                    ));
+                }
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing split paragraph text precondition".to_string())
+                    })?;
+                let offset = operation
+                    .preconditions
+                    .get("offset")
+                    .and_then(Value::as_u64)
+                    .and_then(|value| usize::try_from(value).ok())
+                    .ok_or_else(|| {
+                        Error::DurablePatch("invalid split paragraph offset".to_string())
+                    })?;
+                let encoded_boundary = operation
+                    .preconditions
+                    .get("boundary")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing split paragraph boundary".to_string())
+                    })?;
+                let boundary = hex_decode(encoded_boundary, source.limits().max_source_bytes())?;
+                let result_hash = operation
+                    .preconditions
+                    .get("result_artifact_sha256")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "missing split paragraph result artifact digest".to_string(),
+                        )
+                    })?;
+                if expected_result_hash.is_some() {
+                    return Err(Error::DurablePatch(
+                        "multiple structural durable results cannot compose".to_string(),
+                    ));
+                }
+                expected_result_hash = Some(result_hash);
+                let boundary_mode = operation
+                    .preconditions
+                    .get("boundary_mode")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing split paragraph boundary mode".to_string())
+                    })?;
+                let expected_boundary_mode = if boundary == PARAGRAPH_SPLIT_BYTES {
+                    "canonical"
+                } else {
+                    "exact"
+                };
+                if boundary_mode != expected_boundary_mode {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph split boundary mode differs",
+                    ));
+                }
+                if paragraph_text_at(source, position)? != expected {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph split text differs",
+                    ));
+                }
+                if boundary_mode == "canonical" {
+                    edit.split_paragraph(position, offset)?;
+                } else {
+                    edit.split_paragraph_with_boundary(position, offset, &boundary)?;
+                }
+                let generated_boundary =
+                    edit.operations
+                        .last()
+                        .and_then(|operation| match operation {
+                            Operation::Text {
+                                raw_structure:
+                                    Some(RawParagraphOperation::Split {
+                                        position: generated_position,
+                                        offset: generated_offset,
+                                        boundary: generated_boundary,
+                                        ..
+                                    }),
+                                ..
+                            } if *generated_position == position && *generated_offset == offset => {
+                                Some(generated_boundary.as_slice())
+                            },
+                            _ => None,
+                        });
+                if generated_boundary != Some(boundary.as_slice()) {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph split boundary differs",
+                    ));
+                }
+            },
+            "paragraph.merge" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                if !operation.value.is_null() {
+                    return Err(Error::DurablePatch(
+                        "paragraph merge value must be null".to_string(),
+                    ));
+                }
+                let expected_left = operation
+                    .preconditions
+                    .get("left")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing merge left paragraph precondition".to_string())
+                    })?;
+                let expected_right = operation
+                    .preconditions
+                    .get("right")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "missing merge right paragraph precondition".to_string(),
+                        )
+                    })?;
+                let encoded_boundary = operation
+                    .preconditions
+                    .get("boundary")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing merge paragraph boundary".to_string())
+                    })?;
+                let boundary = hex_decode(encoded_boundary, source.limits().max_source_bytes())?;
+                let result_hash = operation
+                    .preconditions
+                    .get("result_artifact_sha256")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "missing merge paragraph result artifact digest".to_string(),
+                        )
+                    })?;
+                if expected_result_hash.is_some() {
+                    return Err(Error::DurablePatch(
+                        "multiple structural durable results cannot compose".to_string(),
+                    ));
+                }
+                expected_result_hash = Some(result_hash);
+                let second = position.checked_add(1).ok_or(Error::ParagraphOutOfRange {
+                    position,
+                    count: source.paragraph_count(),
+                })?;
+                if paragraph_text_at(source, position)? != expected_left
+                    || paragraph_text_at(source, second)? != expected_right
+                {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph merge text differs",
+                    ));
+                }
+                let map = ordinary_paragraph_source_map(source)?;
+                let actual_boundary = map
+                    .paragraphs
+                    .get(position)
+                    .and_then(|paragraph| paragraph.boundary_after.as_ref())
+                    .and_then(|span| source.source_bytes()?.get(span.clone()))
+                    .ok_or(Error::UnsupportedSource(
+                        "ordinary paragraph merge has no exact source boundary",
+                    ))?;
+                if actual_boundary != boundary.as_slice() {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph merge boundary bytes differ",
+                    ));
+                }
+                edit.merge_paragraphs(position, second)?;
+            },
             "table-cell-text.replace" => {
                 let cell_path = parse_table_cell_target(&operation.target)?;
                 let expected = operation
@@ -5060,7 +6260,17 @@ pub(crate) fn apply_durable<Mode>(
             },
         }
     }
-    Ok(edit.commit()?.into_snapshot())
+    let snapshot = edit.commit()?.into_snapshot();
+    if let Some(expected_hash) = expected_result_hash {
+        let result_bytes = snapshot
+            .source_bytes()
+            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        let actual_hash = litchi_core::patch::BlobId::of(result_bytes).as_hex();
+        if actual_hash != expected_hash {
+            return Err(Error::StalePrecondition("durable paragraph result differs"));
+        }
+    }
+    Ok(snapshot)
 }
 
 fn is_root_transfer_vocabulary(vocabulary: &str) -> bool {
@@ -5108,7 +6318,10 @@ fn hex_decode(input: &str, limit: usize) -> Result<Vec<u8>, Error> {
     if observed > limit {
         return Err(Error::InputTooLarge { observed, limit });
     }
-    let mut output = Vec::with_capacity(observed);
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(observed)
+        .map_err(|_error| Error::Write("could not reserve hexadecimal bytes".to_string()))?;
     let mut digits = input.bytes();
     while let Some(high) = digits.next() {
         let low = digits.next().ok_or_else(|| {
