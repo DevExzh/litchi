@@ -14,6 +14,70 @@ The complete raw samples and corpus manifests are in
 The full-process resource result is in
 [`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
 
+## Current-HEAD resource probe (change 0115)
+
+The standard-library orchestrator and compact machine-readable result are in
+[`tools/perf_resource_profile.py`](../../tools/perf_resource_profile.py),
+[`tools/test_perf_resource_profile.py`](../../tools/test_perf_resource_profile.py),
+and [`results/resource-profile-current-head-0115.json`](results/resource-profile-current-head-0115.json).
+This is current-HEAD evidence, not a before/after comparison or an accepted
+optimization result.  It intentionally excludes iWork.
+
+The frozen revision is `be500459961471659f65c180de0e5fe98bc14e3a`; the release
+harness SHA-256 is
+`1cbb2340eae13f4ed49d5baa27532e1f9b31d5781036bb2a302837bcd2210f5c`.
+The aggregate was produced with three timed samples and one warm-up per
+workload.  External `/usr/bin/time`, perf, strace, and heaptrack probes use one
+sample and include process start-up and profiler overhead.  The worktree was
+dirty from unrelated concurrent edits.  The locked release build completed
+successfully and the result is `build_content_bound`; binary hash/size and
+captured source/content identity are bound to that build.  The recorded HEAD
+tree is `739ba8e610208d2528d580595106a88787143098`, with status-z SHA-256
+`94b0a8c2fdd8f508e18cbb3278b21abea36a535c270cf748e7a81a7fe1cc08ed` and
+head-to-worktree diff SHA-256
+`58a78363d20bd4db858f01a96f33735ac418ea0199a010367242780ad90a6f00` over
+49,538 bytes.
+
+| Workload / corpus | Harness p50 (ns) | Harness p95 (ns) | `/usr/bin/time` max RSS (KiB) | Heaptrack calls / allocated bytes / peak heap / peak RSS |
+|---|---:|---:|---:|---:|
+| OPC source one-Part / few-large incompressible | 59,684,605 | 59,822,185 | 118,176 | 1,576 / 306,633,284 / 132,791,664 / 126,573,608 |
+| Managed XLSX batch / cell-values medium | 33,260,724 | 33,895,459 | 66,132 | 6,130,956 / 1,026,348,498 / 63,239,618 / 75,801,559 |
+| RTF streaming / medium | 10,016,573 | 10,114,007 | 30,080 | 450,852 / 66,379,667 / 26,025,656 / 35,232,153 |
+| CFB selective MiniFAT / 36-byte target | 140,654 | 145,330 | 30,336 | 13,589 / 148,580,902 / 23,142,072 / 27,682,406 |
+| CFB selective FAT / 4 MiB target | 374,947 | 1,225,272 | 30,336 | same paired process profile as the selective run |
+| CFB same-length atomic save / few-large | 156,307,917 | 157,041,972 | 110,884 | 1,722 / 460,627,078 / 115,186,073 / 122,704,363 |
+
+The logical counters are separate from physical syscall observations.  The
+OPC source case recorded 549 source reads and 16,785,201 source bytes per
+sample, one ordinary payload materialization, and a 16,783,632-byte sink with
+461 writes.  Managed XLSX recorded 225 source reads and 4,230,793 source bytes
+per sample, six materializations, and a 4,226,645-byte sink with 163 writes.
+RTF retained zero output bytes and a 37-byte authoring window; its sink accepted
+630,819 bytes in 90,122 writes.  CFB selective returned 36 bytes from one
+MiniFAT range and 4,194,304 bytes from one FAT range.  The CFB save samples
+each reported 1,825 logical reads / 84,838,500 bytes, one changed span, and a
+16,913,408-byte publication; the filesystem wrapper's parent wall time is
+reported separately from the inner operation time.
+
+The host reported Linux `6.8.0-101-generic`, AMD EPYC 9575F, 12 logical CPUs,
+Rust `1.95.0`, `perf_event_paranoid=1`, heaptrack 1.5.0, perf 6.8.12, strace
+6.8, and GNU `/usr/bin/time`.  All six requested perf counters were available
+in the one-sample probes.  The strace distributions are whole-process
+`read`/`write` syscall return sizes; they are not decompressed, recompressed,
+or memory-copy byte measurements.
+
+The explicit execution-context scaling selectors covered 1, 2, 4, 8, and the
+host-capped available width (12).  On the many-small incompressible corpus,
+both OPC and CFB were classified `nonideal_or_measurement_noise`: their raw p50
+values showed no measured speedup and at least one derived Amdahl fraction was
+outside [0,1].  Invalid fractions are null in the estimate field and retained
+as raw values with validity flags.  These are descriptive calculations at the
+measured widths, not a claim about a hardware limit or general parallel
+behavior.
+
+The probe does not establish cold-cache, remote-range, allocation attribution,
+decompressed/recompressed bytes, memory-copy volume, or before/after change.
+
 ## Measurement environment
 
 | Item | Value |

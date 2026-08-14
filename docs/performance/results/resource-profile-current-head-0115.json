@@ -1,0 +1,4380 @@
+{
+  "binary_identity": {
+    "binary": "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+    "binary_bytes": 36646512,
+    "binary_sha256": "1cbb2340eae13f4ed49d5baa27532e1f9b31d5781036bb2a302837bcd2210f5c",
+    "build_command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/Cargo.toml"
+    ],
+    "build_result": {
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/Cargo.toml"
+      ],
+      "executed": true,
+      "provenance_status": "build_command_executed",
+      "returncode": 0,
+      "source_binding": "captured_after_build",
+      "stderr": {
+        "bytes": 759,
+        "present": true,
+        "retained": false,
+        "sha256": "5065b7767942d4a6dc8b11c09e8385e29cb3a74337a2e4e107f1cfa35f92d4a0"
+      },
+      "stderr_excerpt": "Compiling litchi-odf-common v0.0.1 (/home/zhuhe/CodeProjects/litchi/crates/litchi-odf-common)\nCompiling litchi-docx v0.0.1 (/home/zhuhe/CodeProjects/litchi/crates/litchi-docx)\nCompiling litchi-pptx v0.0.1 (/home/zhuhe/CodeProjects/litchi/crates/litchi-pptx)\nCompiling litchi-xlsx v0.0.1 (/home/zhuhe/CodeProjects/litchi/crates/litchi-xlsx)\nCompiling litchi-odp v0.0.1 (/home/zhuhe/CodeProjects/litchi/crates/litchi-odp)\nCompiling litchi-odt v0.0.1 (/home/zhuhe/CodeProjects/litchi/crates/litchi-odt)\nCompiling li",
+      "stdout": {
+        "bytes": 0,
+        "present": true,
+        "retained": false,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "timed_out": false,
+      "wall_ns": 56123096975
+    },
+    "provenance": {
+      "binary_hash_is_exact": true,
+      "rerun_after": null,
+      "rerun_command": null,
+      "rerun_required": false,
+      "source_binary_binding": "cargo build command completed in this invocation; source/content identity was captured",
+      "status": "build_content_bound"
+    },
+    "source_content_identity": {
+      "harness_lock": {
+        "bytes": 55508,
+        "path": "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/Cargo.lock",
+        "present": true,
+        "sha256": "14f1246f8ac9c810bfffd8beb3cd7b0feb0ba68c769a0695491b8f4b9de965f7"
+      },
+      "harness_manifest": {
+        "bytes": 1123,
+        "path": "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/Cargo.toml",
+        "present": true,
+        "sha256": "a86e3cd2aa6a93c5192ad22f958ec25b6cafae02430ee3bd731eb5b987e4d007"
+      },
+      "head_to_worktree_diff": {
+        "available": true,
+        "bytes": 49538,
+        "sha256": "58a78363d20bd4db858f01a96f33735ac418ea0199a010367242780ad90a6f00"
+      },
+      "head_tree": "739ba8e610208d2528d580595106a88787143098",
+      "revision": "be500459961471659f65c180de0e5fe98bc14e3a",
+      "scope": "HEAD tree plus exact tracked diffs and status path identity; combined with the binary provenance, this identifies the captured source/content snapshot",
+      "staged_diff": {
+        "available": true,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "status_z": {
+        "available": true,
+        "bytes": 625,
+        "sha256": "94b0a8c2fdd8f508e18cbb3278b21abea36a535c270cf748e7a81a7fe1cc08ed"
+      },
+      "unstaged_diff": {
+        "available": true,
+        "bytes": 49538,
+        "sha256": "58a78363d20bd4db858f01a96f33735ac418ea0199a010367242780ad90a6f00"
+      }
+    }
+  },
+  "configuration": {
+    "external_profile_samples": 1,
+    "samples": 3,
+    "timeout_seconds": 600.0,
+    "warmup_iterations": 1,
+    "workloads": [
+      "opc-source-one-part",
+      "xlsx-managed-batch",
+      "rtf-streaming",
+      "cfb-selective",
+      "cfb-save",
+      "opc-scaling",
+      "cfb-scaling"
+    ]
+  },
+  "environment": {
+    "cargo_version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "6.8.0-101-generic",
+    "logical_cpus_available": 12,
+    "machine": "x86_64",
+    "os": "Linux",
+    "page_size_bytes": 4096,
+    "perf_event_paranoid": "1",
+    "python": "3.12.3",
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)"
+  },
+  "limitations": [
+    "The selected synthetic corpora are generated inside the existing harness.",
+    "External tool runs use one sample and are process-total evidence with profiler overhead.",
+    "No cold-cache, remote-range, allocation attribution, decompressed-byte, recompressed-byte, or memory-copy claim is made.",
+    "Amdahl rows use harness p50 elapsed time and are descriptive at the measured widths only; fractions outside [0,1] remain raw but are null/invalidated in the estimate."
+  ],
+  "schema_version": 1,
+  "scope": {
+    "claim": "current-HEAD evidence only; no before/after optimization comparison",
+    "excluded_formats": [
+      "iWork"
+    ],
+    "git_status_sha256": "a32330d2f45dbe366894251ca8df3d821ecb71aaa80ab01f1fe8a16eb027e078",
+    "git_worktree_dirty": true,
+    "revision": "be500459961471659f65c180de0e5fe98bc14e3a"
+  },
+  "tool": {
+    "name": "litchi-resource-profile",
+    "python_standard_library_only": true,
+    "version": "0.1.1"
+  },
+  "tools": {
+    "heaptrack": {
+      "available": true,
+      "binary_sha256": "11ef8b89a93d43b63e4dec187f4c7dca2644f10254c5639e55a563fb5465b574",
+      "path": "/usr/bin/heaptrack",
+      "returncode": 0,
+      "version": "heaptrack 1.5.0"
+    },
+    "heaptrack_print": {
+      "available": true,
+      "binary_sha256": "518c7958efd5ef75781ad5eeed06fc017dbb1368699f1f3c4794321ac0ab8308",
+      "path": "/usr/bin/heaptrack_print",
+      "returncode": 0,
+      "version": "heaptrack_print 1.5.0"
+    },
+    "perf": {
+      "available": true,
+      "binary_sha256": "2d0953085bf720a25efbe24f853e97d27b1f12f18a398255ff82cbafde254dad",
+      "path": "/usr/bin/perf",
+      "returncode": 0,
+      "version": "perf version 6.8.12"
+    },
+    "strace": {
+      "available": true,
+      "binary_sha256": "28f957c227012de0b18d1bd7fff2d396cb693ea60ed8013be68de071e84b5001",
+      "path": "/usr/bin/strace",
+      "returncode": 0,
+      "version": "strace -- version 6.8"
+    },
+    "taskset": {
+      "available": true,
+      "binary_sha256": "a9c851792e54e91fba7b827019380abee54e715b6817899c835e4f221354b260",
+      "path": "/usr/bin/taskset",
+      "returncode": 0,
+      "version": "taskset from util-linux 2.39.3"
+    },
+    "time": {
+      "available": true,
+      "binary_sha256": "3b11dec50514a8473e9f6efa7a34d584d0657538c09988f61b72d38ad4991a10",
+      "path": "/usr/bin/time",
+      "returncode": 0,
+      "version": "time (GNU Time) UNKNOWN"
+    }
+  },
+  "workloads": [
+    {
+      "external_profiles": {
+        "heaptrack": {
+          "capture": {
+            "bytes": 32201,
+            "present": true,
+            "retained": false,
+            "sha256": "951a3f71e445054f6404515763a178cba96853f6770229c705fe991e6c54d302"
+          },
+          "command": [
+            "/usr/bin/heaptrack",
+            "--record-only",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/external/heaptrack-profile",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "opc_source_overlay_one_part_save",
+            "--shape",
+            "few-large",
+            "--payload",
+            "incompressible",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/external/profile-harness.json"
+          ],
+          "print": {
+            "command": [
+              "/usr/bin/heaptrack_print",
+              "-f",
+              "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/external/heaptrack-profile.zst",
+              "-H",
+              "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/external/heaptrack-histogram.tsv"
+            ],
+            "parsed": {
+              "allocated_bytes": 306633284,
+              "allocation_calls": 1576,
+              "artifact": {
+                "bytes": 244495,
+                "present": true,
+                "retained": false,
+                "sha256": "469e1e94dfebc073e8fe1a6850bea06ce066037afe918fead76a112a3e09d201"
+              },
+              "histogram_artifact": {
+                "bytes": 869,
+                "present": true,
+                "retained": false,
+                "sha256": "384646fc74d2429cd5d9ecd11771897f07301c34ea20ffa387b0456363a2db28"
+              },
+              "peak_heap_bytes": 132791664,
+              "peak_rss_bytes": 126573608,
+              "status": "ok",
+              "temporary_allocations": 56
+            },
+            "returncode": 0,
+            "stderr": {
+              "bytes": 0,
+              "present": true,
+              "retained": false,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "stderr_excerpt": null,
+            "stdout": {
+              "bytes": 244495,
+              "present": true,
+              "retained": false,
+              "sha256": "469e1e94dfebc073e8fe1a6850bea06ce066037afe918fead76a112a3e09d201"
+            },
+            "timed_out": false,
+            "wall_ns": 31831539
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 101,
+            "present": true,
+            "retained": false,
+            "sha256": "54caeab9f96cfed5266240a8325347b7b3eea180411c975752772a307abe1279"
+          },
+          "stderr_excerpt": "heaptrack stats:\nallocations:          \t1576\nleaked allocations:   \t10\ntemporary allocations:\t229",
+          "stdout": {
+            "bytes": 359,
+            "present": true,
+            "retained": false,
+            "sha256": "7e2e3364bc4723a61d6b9a8d52131e798cfd920608bafce75a3cb751c8bcc209"
+          },
+          "timed_out": false,
+          "wall_ns": 715837198
+        },
+        "perf": {
+          "command": [
+            "/usr/bin/perf",
+            "stat",
+            "-x,",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/external/perf-stat.txt",
+            "-e",
+            "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "opc_source_overlay_one_part_save",
+            "--shape",
+            "few-large",
+            "--payload",
+            "incompressible",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 320,
+              "present": true,
+              "retained": false,
+              "sha256": "f78767bdb80a09f91d47209a313c4d378afb8dacba5898779759a05e2243da37"
+            },
+            "counters": {
+              "branch-misses": {
+                "available": true,
+                "raw": [
+                  "28861034",
+                  "",
+                  "branch-misses"
+                ],
+                "unit": null,
+                "value": 28861034.0
+              },
+              "branches": {
+                "available": true,
+                "raw": [
+                  "1373558651",
+                  "",
+                  "branches"
+                ],
+                "unit": null,
+                "value": 1373558651.0
+              },
+              "cache-misses": {
+                "available": true,
+                "raw": [
+                  "5079053",
+                  "",
+                  "cache-misses"
+                ],
+                "unit": null,
+                "value": 5079053.0
+              },
+              "cycles": {
+                "available": true,
+                "raw": [
+                  "3382296533",
+                  "",
+                  "cycles"
+                ],
+                "unit": null,
+                "value": 3382296533.0
+              },
+              "instructions": {
+                "available": true,
+                "raw": [
+                  "8088159669",
+                  "",
+                  "instructions"
+                ],
+                "unit": null,
+                "value": 8088159669.0
+              },
+              "page-faults": {
+                "available": true,
+                "raw": [
+                  "53778",
+                  "",
+                  "page-faults"
+                ],
+                "unit": null,
+                "value": 53778.0
+              }
+            },
+            "returncode": 0,
+            "status": "ok",
+            "stderr_excerpt": null
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 765881950
+        },
+        "strace": {
+          "command": [
+            "/usr/bin/strace",
+            "-f",
+            "-qq",
+            "-e",
+            "trace=read,write",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/external/strace.log",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "opc_source_overlay_one_part_save",
+            "--shape",
+            "few-large",
+            "--payload",
+            "incompressible",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 71098,
+              "present": true,
+              "retained": false,
+              "sha256": "cdea4f25c11ba0e64e90a3666517b2f941595ba56c8bbcd056c586b0625b7efe"
+            },
+            "returncode": 0,
+            "scope": "whole process; read/write only; not logical/decompressed I/O",
+            "status": "ok",
+            "syscalls": {
+              "read": {
+                "calls": 203,
+                "failed_calls": 4,
+                "largest_returned_bytes": 6324,
+                "returned_bytes": 82897,
+                "size_buckets": {
+                  "0": 59,
+                  "1-511": 83,
+                  "1048576+": 0,
+                  "16384-65535": 0,
+                  "262144-1048575": 0,
+                  "4096-16383": 1,
+                  "512-4095": 60,
+                  "65536-262143": 0
+                }
+              },
+              "write": {
+                "calls": 1279,
+                "failed_calls": 0,
+                "largest_returned_bytes": 625,
+                "returned_bytes": 4777,
+                "size_buckets": {
+                  "0": 0,
+                  "1-511": 1278,
+                  "1048576+": 0,
+                  "16384-65535": 0,
+                  "262144-1048575": 0,
+                  "4096-16383": 0,
+                  "512-4095": 1,
+                  "65536-262143": 0
+                }
+              }
+            }
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 966636146
+        },
+        "time": {
+          "command": [
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/external/time-v.txt",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "opc_source_overlay_one_part_save",
+            "--shape",
+            "few-large",
+            "--payload",
+            "incompressible",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 1007,
+              "present": true,
+              "retained": false,
+              "sha256": "25b24e1b9967e514f4678034c1a1e97ce4af3ad45d304c98f413a9dae7ddaad7"
+            },
+            "elapsed_wall_seconds": 0.66,
+            "involuntary_context_switches": 6,
+            "major_page_faults": 0,
+            "max_rss_kib": 118176,
+            "minor_page_faults": 53842,
+            "status": "ok",
+            "system_seconds": 0.08,
+            "user_seconds": 0.59,
+            "voluntary_context_switches": 73
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 715754247
+        }
+      },
+      "harness": {
+        "command": [
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "opc_source_overlay_one_part_save",
+          "--shape",
+          "few-large",
+          "--payload",
+          "incompressible",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/harness.json"
+        ],
+        "logical_measurements": [
+          {
+            "case": "opc_source_overlay_one_part_save",
+            "corpus": {
+              "archive_bytes": 16783632,
+              "archive_member_count": 6,
+              "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+              "compression": "deflate",
+              "entry_bytes": 4194304,
+              "entry_count": 4,
+              "generator": "litchi-opc-synthetic-v2",
+              "name": "few-large-incompressible",
+              "package_format": "OPC/ZIP",
+              "payload_kind": "incompressible",
+              "shape": "few-large",
+              "target_entry": "benchmark/parts/00002.bin",
+              "target_payload_bytes": 4194304,
+              "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+              "uncompressed_payload_bytes": 16777216,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 59548844.666666664,
+              "p50": 59684605,
+              "p95": 59822185,
+              "p99": 59822185,
+              "standard_deviation": 360907.99478583713,
+              "unit": "ns"
+            },
+            "output_sha256": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009",
+            "sink": {
+              "accepted_bytes": 16783632,
+              "largest_write": 65536,
+              "write_calls": 461,
+              "write_size_buckets": {
+                "bytes_0": 0,
+                "bytes_16385_to_65536": 448,
+                "bytes_1_to_512": 9,
+                "bytes_4097_to_16384": 0,
+                "bytes_513_to_4096": 4,
+                "bytes_over_65536": 0
+              }
+            },
+            "source": {
+              "max_in_flight_reads": [
+                1,
+                1,
+                1
+              ],
+              "ordinary_payload_materializations": [
+                1,
+                1,
+                1
+              ],
+              "ordinary_payload_read_bytes": [
+                16782356,
+                16782356,
+                16782356
+              ],
+              "ordinary_payload_read_calls": [
+                516,
+                516,
+                516
+              ],
+              "read_bytes": [
+                16785201,
+                16785201,
+                16785201
+              ],
+              "read_calls": [
+                549,
+                549,
+                549
+              ]
+            }
+          }
+        ],
+        "report": {
+          "bytes": 4317,
+          "present": true,
+          "retained": false,
+          "sha256": "2993e27e3670541702857ad6a852002526a51271946d96151b4c3a5c810efe81"
+        },
+        "returncode": 0
+      },
+      "id": "opc-source-one-part",
+      "physical_io_claim_scope": "strace is a whole-process read/write syscall trace only; it is not a source-byte, decompressed-byte, recompressed-byte, or memory-copy measurement",
+      "purpose": "OPC source-backed one-Part publication",
+      "scaling": {
+        "classification": null,
+        "metric": "elapsed_ns.p50",
+        "rows": [],
+        "status": "not_applicable"
+      },
+      "time": {
+        "command": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/baseline.time.txt",
+          "--",
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "opc_source_overlay_one_part_save",
+          "--shape",
+          "few-large",
+          "--payload",
+          "incompressible",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/harness.json"
+        ],
+        "parsed": {
+          "artifact": {
+            "bytes": 998,
+            "present": true,
+            "retained": false,
+            "sha256": "0d453f4fb7b385ac5885891a68644e232062c075c2c46312b003444d93e8c1aa"
+          },
+          "elapsed_wall_seconds": 0.99,
+          "involuntary_context_switches": 32,
+          "major_page_faults": 70,
+          "max_rss_kib": 118176,
+          "minor_page_faults": 99834,
+          "status": "ok",
+          "system_seconds": 0.14,
+          "user_seconds": 0.84,
+          "voluntary_context_switches": 198
+        },
+        "run": {
+          "command": [
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/baseline.time.txt",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "1",
+            "--samples",
+            "3",
+            "--case",
+            "opc_source_overlay_one_part_save",
+            "--shape",
+            "few-large",
+            "--payload",
+            "incompressible",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/opc-source-one-part/harness.json"
+          ],
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 1016376207
+        }
+      }
+    },
+    {
+      "external_profiles": {
+        "heaptrack": {
+          "capture": {
+            "bytes": 460520,
+            "present": true,
+            "retained": false,
+            "sha256": "9e106b61eb4cceabcadcf7c0726297ac9dd0b19b22cc0f0638c9279b7a7960ca"
+          },
+          "command": [
+            "/usr/bin/heaptrack",
+            "--record-only",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/external/heaptrack-profile",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "xlsx_source_backed_managed_cell_values_batch_edit_save",
+            "--xlsx-cell-crud-shape",
+            "medium",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/external/profile-harness.json"
+          ],
+          "print": {
+            "command": [
+              "/usr/bin/heaptrack_print",
+              "-f",
+              "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/external/heaptrack-profile.zst",
+              "-H",
+              "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/external/heaptrack-histogram.tsv"
+            ],
+            "parsed": {
+              "allocated_bytes": 1026348498,
+              "allocation_calls": 6130956,
+              "artifact": {
+                "bytes": 282214,
+                "present": true,
+                "retained": false,
+                "sha256": "81a46a91a7349df0ed327c46026d7541ea84b655e365eb23e432f46de2192750"
+              },
+              "histogram_artifact": {
+                "bytes": 4021,
+                "present": true,
+                "retained": false,
+                "sha256": "4dceaf39fc07b2c5037f5456ef0b120985eb1767e0083c857302414e274a399c"
+              },
+              "peak_heap_bytes": 63239618,
+              "peak_rss_bytes": 75801559,
+              "status": "ok",
+              "temporary_allocations": 766199
+            },
+            "returncode": 0,
+            "stderr": {
+              "bytes": 0,
+              "present": true,
+              "retained": false,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "stderr_excerpt": null,
+            "stdout": {
+              "bytes": 282214,
+              "present": true,
+              "retained": false,
+              "sha256": "81a46a91a7349df0ed327c46026d7541ea84b655e365eb23e432f46de2192750"
+            },
+            "timed_out": false,
+            "wall_ns": 515112675
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 108,
+            "present": true,
+            "retained": false,
+            "sha256": "a2f1b8ba9f3dcbd12c77d48b2effe87be466d74544f33f9743ddd47b5c9dd980"
+          },
+          "stderr_excerpt": "heaptrack stats:\nallocations:          \t6130956\nleaked allocations:   \t10\ntemporary allocations:\t1077045",
+          "stdout": {
+            "bytes": 357,
+            "present": true,
+            "retained": false,
+            "sha256": "932e85c4c0abf7698137dbcf7f2776c4aed4dc455f41a7a66ecbba5713dc39cf"
+          },
+          "timed_out": false,
+          "wall_ns": 1869565930
+        },
+        "perf": {
+          "command": [
+            "/usr/bin/perf",
+            "stat",
+            "-x,",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/external/perf-stat.txt",
+            "-e",
+            "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "xlsx_source_backed_managed_cell_values_batch_edit_save",
+            "--xlsx-cell-crud-shape",
+            "medium",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 320,
+              "present": true,
+              "retained": false,
+              "sha256": "0c27d2b39f598a8fc6f19ff469d025654abde05263fc7f57d2ef0717ea9d78ae"
+            },
+            "counters": {
+              "branch-misses": {
+                "available": true,
+                "raw": [
+                  "17273317",
+                  "",
+                  "branch-misses"
+                ],
+                "unit": null,
+                "value": 17273317.0
+              },
+              "branches": {
+                "available": true,
+                "raw": [
+                  "1573224161",
+                  "",
+                  "branches"
+                ],
+                "unit": null,
+                "value": 1573224161.0
+              },
+              "cache-misses": {
+                "available": true,
+                "raw": [
+                  "6858270",
+                  "",
+                  "cache-misses"
+                ],
+                "unit": null,
+                "value": 6858270.0
+              },
+              "cycles": {
+                "available": true,
+                "raw": [
+                  "3030242818",
+                  "",
+                  "cycles"
+                ],
+                "unit": null,
+                "value": 3030242818.0
+              },
+              "instructions": {
+                "available": true,
+                "raw": [
+                  "8288693476",
+                  "",
+                  "instructions"
+                ],
+                "unit": null,
+                "value": 8288693476.0
+              },
+              "page-faults": {
+                "available": true,
+                "raw": [
+                  "36026",
+                  "",
+                  "page-faults"
+                ],
+                "unit": null,
+                "value": 36026.0
+              }
+            },
+            "returncode": 0,
+            "status": "ok",
+            "stderr_excerpt": null
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 665707688
+        },
+        "strace": {
+          "command": [
+            "/usr/bin/strace",
+            "-f",
+            "-qq",
+            "-e",
+            "trace=read,write",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/external/strace.log",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "xlsx_source_backed_managed_cell_values_batch_edit_save",
+            "--xlsx-cell-crud-shape",
+            "medium",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 124052,
+              "present": true,
+              "retained": false,
+              "sha256": "ed420ab3f3b2516c04ef9333fc8931218101c2fa66ec0b996b9ba401539ab2c9"
+            },
+            "returncode": 0,
+            "scope": "whole process; read/write only; not logical/decompressed I/O",
+            "status": "ok",
+            "syscalls": {
+              "read": {
+                "calls": 203,
+                "failed_calls": 4,
+                "largest_returned_bytes": 6324,
+                "returned_bytes": 82897,
+                "size_buckets": {
+                  "0": 59,
+                  "1-511": 83,
+                  "1048576+": 0,
+                  "16384-65535": 0,
+                  "262144-1048575": 0,
+                  "4096-16383": 1,
+                  "512-4095": 60,
+                  "65536-262143": 0
+                }
+              },
+              "write": {
+                "calls": 2472,
+                "failed_calls": 0,
+                "largest_returned_bytes": 625,
+                "returned_bytes": 8291,
+                "size_buckets": {
+                  "0": 0,
+                  "1-511": 2471,
+                  "1048576+": 0,
+                  "16384-65535": 0,
+                  "262144-1048575": 0,
+                  "4096-16383": 0,
+                  "512-4095": 1,
+                  "65536-262143": 0
+                }
+              }
+            }
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 916312863
+        },
+        "time": {
+          "command": [
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/external/time-v.txt",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "xlsx_source_backed_managed_cell_values_batch_edit_save",
+            "--xlsx-cell-crud-shape",
+            "medium",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 1015,
+              "present": true,
+              "retained": false,
+              "sha256": "9f3db9d9b5d687b2b5cbc008aac370a84ddfa9d57307c55be6b298d0177a7b8c"
+            },
+            "elapsed_wall_seconds": 0.59,
+            "involuntary_context_switches": 4,
+            "major_page_faults": 0,
+            "max_rss_kib": 66132,
+            "minor_page_faults": 35972,
+            "status": "ok",
+            "system_seconds": 0.06,
+            "user_seconds": 0.55,
+            "voluntary_context_switches": 78
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 615684299
+        }
+      },
+      "harness": {
+        "command": [
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "xlsx_source_backed_managed_cell_values_batch_edit_save",
+          "--xlsx-cell-crud-shape",
+          "medium",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/harness.json"
+        ],
+        "logical_measurements": [
+          {
+            "case": "xlsx_source_backed_managed_cell_values_batch_edit_save",
+            "corpus": {
+              "archive_bytes": 4226429,
+              "archive_member_count": 17,
+              "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+              "compression": "deflate",
+              "entry_bytes": 4,
+              "entry_count": 9216,
+              "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+              "name": "xlsx-cell-values-medium",
+              "package_format": "XLSX/OPC/ZIP",
+              "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+              "shape": "medium",
+              "target_entry": "Sheet1!A1",
+              "target_payload_bytes": 1,
+              "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+              "uncompressed_payload_bytes": 4231168,
+              "xlsx": {
+                "columns_per_sheet": 48,
+                "one_percent_update_count": 93,
+                "rows_per_sheet": 48,
+                "sheet_count": 4,
+                "source_members": {
+                  "shared_strings": null,
+                  "styles": "xl/styles.xml",
+                  "workbook": "xl/workbook.xml",
+                  "worksheets": [
+                    "xl/worksheets/sheet1.xml",
+                    "xl/worksheets/sheet2.xml",
+                    "xl/worksheets/sheet3.xml",
+                    "xl/worksheets/sheet4.xml"
+                  ]
+                }
+              }
+            },
+            "elapsed_ns": {
+              "mean": 33339926.333333332,
+              "p50": 33260724,
+              "p95": 33895459,
+              "p99": 33895459,
+              "standard_deviation": 520471.007738504,
+              "unit": "ns"
+            },
+            "output_sha256": "99ef583896aa201cebcc62e205ff9979bf08b4e21df15bcd04604a2ddd14a3fd",
+            "sink": {
+              "accepted_bytes": 4226645,
+              "largest_write": 32768,
+              "write_calls": 163,
+              "write_size_buckets": {
+                "bytes_0": 0,
+                "bytes_16385_to_65536": 128,
+                "bytes_1_to_512": 31,
+                "bytes_4097_to_16384": 4,
+                "bytes_513_to_4096": 0,
+                "bytes_over_65536": 0
+              }
+            },
+            "source": {
+              "max_in_flight_reads": [
+                1,
+                1,
+                1
+              ],
+              "ordinary_payload_materializations": [
+                6,
+                6,
+                6
+              ],
+              "ordinary_payload_read_bytes": [
+                4223777,
+                4223777,
+                4223777
+              ],
+              "ordinary_payload_read_calls": [
+                144,
+                144,
+                144
+              ],
+              "read_bytes": [
+                4230793,
+                4230793,
+                4230793
+              ],
+              "read_calls": [
+                225,
+                225,
+                225
+              ],
+              "xlsx_cell_values": {
+                "budget_used_after_handles_drop": [
+                  0,
+                  0,
+                  0
+                ],
+                "budget_used_after_package_drop": [
+                  269785,
+                  269785,
+                  269785
+                ],
+                "cache_allocation_bypasses": [
+                  0,
+                  0,
+                  0
+                ],
+                "cache_budget_managed": true,
+                "cache_budget_memory_limit": 269785,
+                "cache_budget_memory_used": [
+                  269785,
+                  269785,
+                  269785
+                ],
+                "cache_budget_reservation_failures": [
+                  0,
+                  0,
+                  0
+                ],
+                "cache_budget_reserved_bytes": [
+                  269785,
+                  269785,
+                  269785
+                ],
+                "cache_bypasses": [
+                  0,
+                  0,
+                  0
+                ],
+                "cache_cold_loads": [
+                  6,
+                  6,
+                  6
+                ],
+                "cache_evictions": [
+                  0,
+                  0,
+                  0
+                ],
+                "cache_failed_loads": [
+                  0,
+                  0,
+                  0
+                ],
+                "cache_hits": [
+                  0,
+                  0,
+                  0
+                ],
+                "cache_in_flight_loads": [
+                  0,
+                  0,
+                  0
+                ],
+                "cache_mode": "managed-budget",
+                "cache_oversized_bypasses": [
+                  0,
+                  0,
+                  0
+                ],
+                "cache_retained_bytes": [
+                  269785,
+                  269785,
+                  269785
+                ],
+                "cache_retained_entries": [
+                  6,
+                  6,
+                  6
+                ],
+                "cache_successful_loads": [
+                  6,
+                  6,
+                  6
+                ],
+                "cache_waiter_joins": [
+                  0,
+                  0,
+                  0
+                ],
+                "commit_ns": [
+                  16414549,
+                  16611019,
+                  16566238
+                ],
+                "implementation": "managed-source-backed",
+                "open_ns": [
+                  114789,
+                  117913,
+                  130509
+                ],
+                "output_sha256": [
+                  "99ef583896aa201cebcc62e205ff9979bf08b4e21df15bcd04604a2ddd14a3fd",
+                  "99ef583896aa201cebcc62e205ff9979bf08b4e21df15bcd04604a2ddd14a3fd",
+                  "99ef583896aa201cebcc62e205ff9979bf08b4e21df15bcd04604a2ddd14a3fd"
+                ],
+                "payload_materializations": [
+                  6,
+                  6,
+                  6
+                ],
+                "plan_ns": [
+                  9906761,
+                  10073773,
+                  10720665
+                ],
+                "publication_ns": [
+                  6427497,
+                  6458019,
+                  6478047
+                ],
+                "reopen_ns": [
+                  24734128,
+                  25312967,
+                  25538078
+                ],
+                "selected_worksheet_count": 4,
+                "selected_worksheet_read_bytes": [
+                  0,
+                  0,
+                  0
+                ],
+                "selected_worksheet_read_calls": [
+                  0,
+                  0,
+                  0
+                ],
+                "semantic_sha256": [
+                  "79e381042c358d26dc672bc0b5578cfbb14d339d97d77acebdb9edd4e70d7dec",
+                  "79e381042c358d26dc672bc0b5578cfbb14d339d97d77acebdb9edd4e70d7dec",
+                  "79e381042c358d26dc672bc0b5578cfbb14d339d97d77acebdb9edd4e70d7dec"
+                ],
+                "source_read_bytes": [
+                  4230793,
+                  4230793,
+                  4230793
+                ],
+                "source_read_calls": [
+                  225,
+                  225,
+                  225
+                ],
+                "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+                "unselected_worksheet_read_bytes": [
+                  0,
+                  0,
+                  0
+                ],
+                "unselected_worksheet_read_calls": [
+                  0,
+                  0,
+                  0
+                ],
+                "untouched_member_count": 13,
+                "untouched_member_sha256": [
+                  "12162b64be5866e2673a17f2845f05e1effdd71f6aba1ba99fad535ec6b66ea1",
+                  "12162b64be5866e2673a17f2845f05e1effdd71f6aba1ba99fad535ec6b66ea1",
+                  "12162b64be5866e2673a17f2845f05e1effdd71f6aba1ba99fad535ec6b66ea1"
+                ],
+                "update_count": 256,
+                "workbook_read_bytes": [
+                  0,
+                  0,
+                  0
+                ],
+                "workbook_read_calls": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            }
+          }
+        ],
+        "report": {
+          "bytes": 9353,
+          "present": true,
+          "retained": false,
+          "sha256": "c8cc611d819036f8610a52ef43bfaaf9cffb04d837b13ceedd0168cfdd1f6b7b"
+        },
+        "returncode": 0
+      },
+      "id": "xlsx-managed-batch",
+      "physical_io_claim_scope": "strace is a whole-process read/write syscall trace only; it is not a source-byte, decompressed-byte, recompressed-byte, or memory-copy measurement",
+      "purpose": "managed source-backed XLSX scalar batch edit/save",
+      "scaling": {
+        "classification": null,
+        "metric": "elapsed_ns.p50",
+        "rows": [],
+        "status": "not_applicable"
+      },
+      "time": {
+        "command": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/baseline.time.txt",
+          "--",
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "xlsx_source_backed_managed_cell_values_batch_edit_save",
+          "--xlsx-cell-crud-shape",
+          "medium",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/harness.json"
+        ],
+        "parsed": {
+          "artifact": {
+            "bytes": 999,
+            "present": true,
+            "retained": false,
+            "sha256": "4e92e7afc63e2d1fd152379711c69a810b113f2a04651b75508e2c3bf1f1bfa4"
+          },
+          "elapsed_wall_seconds": 0.79,
+          "involuntary_context_switches": 38,
+          "major_page_faults": 0,
+          "max_rss_kib": 66120,
+          "minor_page_faults": 36227,
+          "status": "ok",
+          "system_seconds": 0.08,
+          "user_seconds": 0.72,
+          "voluntary_context_switches": 71
+        },
+        "run": {
+          "command": [
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/baseline.time.txt",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "1",
+            "--samples",
+            "3",
+            "--case",
+            "xlsx_source_backed_managed_cell_values_batch_edit_save",
+            "--xlsx-cell-crud-shape",
+            "medium",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/xlsx-managed-batch/harness.json"
+          ],
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 816155422
+        }
+      }
+    },
+    {
+      "external_profiles": {
+        "heaptrack": {
+          "capture": {
+            "bytes": 12671,
+            "present": true,
+            "retained": false,
+            "sha256": "83c96dc8282c54d91fee2f75f6d7b250617fa8594c59aaa3231bdf4238653846"
+          },
+          "command": [
+            "/usr/bin/heaptrack",
+            "--record-only",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/external/heaptrack-profile",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "rtf_streaming_create",
+            "--semantic-shape",
+            "medium",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/external/profile-harness.json"
+          ],
+          "print": {
+            "command": [
+              "/usr/bin/heaptrack_print",
+              "-f",
+              "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/external/heaptrack-profile.zst",
+              "-H",
+              "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/external/heaptrack-histogram.tsv"
+            ],
+            "parsed": {
+              "allocated_bytes": 66379667,
+              "allocation_calls": 450852,
+              "artifact": {
+                "bytes": 132807,
+                "present": true,
+                "retained": false,
+                "sha256": "399c9e9ce533bf3e1f1b7ee6eccf638a8abcbacff764d003b498d14c0876373f"
+              },
+              "histogram_artifact": {
+                "bytes": 725,
+                "present": true,
+                "retained": false,
+                "sha256": "173797c2074966d3116aa7222fcfe284bd0855f0a2b9c5e84f4c9e2bce6dd1ee"
+              },
+              "peak_heap_bytes": 26025656,
+              "peak_rss_bytes": 35232153,
+              "status": "ok",
+              "temporary_allocations": 294923
+            },
+            "returncode": 0,
+            "stderr": {
+              "bytes": 0,
+              "present": true,
+              "retained": false,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "stderr_excerpt": null,
+            "stdout": {
+              "bytes": 132807,
+              "present": true,
+              "retained": false,
+              "sha256": "399c9e9ce533bf3e1f1b7ee6eccf638a8abcbacff764d003b498d14c0876373f"
+            },
+            "timed_out": false,
+            "wall_ns": 64001432
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 105,
+            "present": true,
+            "retained": false,
+            "sha256": "8dd0c921eccd784fb3894167792298b207af23b1242b6931ff838e10c2f49941"
+          },
+          "stderr_excerpt": "heaptrack stats:\nallocations:          \t450852\nleaked allocations:   \t1\ntemporary allocations:\t335898",
+          "stdout": {
+            "bytes": 347,
+            "present": true,
+            "retained": false,
+            "sha256": "131170aa110611adb0413848c6684dc87004ef6e0c8bb35678d000acb1b938f3"
+          },
+          "timed_out": false,
+          "wall_ns": 264443882
+        },
+        "perf": {
+          "command": [
+            "/usr/bin/perf",
+            "stat",
+            "-x,",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/external/perf-stat.txt",
+            "-e",
+            "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "rtf_streaming_create",
+            "--semantic-shape",
+            "medium",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 315,
+              "present": true,
+              "retained": false,
+              "sha256": "794ba07885ad1d63011984b23f7d73483f3c2e4f02666c048f0b23e23e648df3"
+            },
+            "counters": {
+              "branch-misses": {
+                "available": true,
+                "raw": [
+                  "813951",
+                  "",
+                  "branch-misses"
+                ],
+                "unit": null,
+                "value": 813951.0
+              },
+              "branches": {
+                "available": true,
+                "raw": [
+                  "143848320",
+                  "",
+                  "branches"
+                ],
+                "unit": null,
+                "value": 143848320.0
+              },
+              "cache-misses": {
+                "available": true,
+                "raw": [
+                  "1882967",
+                  "",
+                  "cache-misses"
+                ],
+                "unit": null,
+                "value": 1882967.0
+              },
+              "cycles": {
+                "available": true,
+                "raw": [
+                  "467473614",
+                  "",
+                  "cycles"
+                ],
+                "unit": null,
+                "value": 467473614.0
+              },
+              "instructions": {
+                "available": true,
+                "raw": [
+                  "774426183",
+                  "",
+                  "instructions"
+                ],
+                "unit": null,
+                "value": 774426183.0
+              },
+              "page-faults": {
+                "available": true,
+                "raw": [
+                  "14367",
+                  "",
+                  "page-faults"
+                ],
+                "unit": null,
+                "value": 14367.0
+              }
+            },
+            "returncode": 0,
+            "status": "ok",
+            "stderr_excerpt": null
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 164538740
+        },
+        "strace": {
+          "command": [
+            "/usr/bin/strace",
+            "-f",
+            "-qq",
+            "-e",
+            "trace=read,write",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/external/strace.log",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "rtf_streaming_create",
+            "--semantic-shape",
+            "medium",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 68169,
+              "present": true,
+              "retained": false,
+              "sha256": "597ae2c76a61f151dc771dd40183add57cd57dbbd7878625e0ee8ff87820ca64"
+            },
+            "returncode": 0,
+            "scope": "whole process; read/write only; not logical/decompressed I/O",
+            "status": "ok",
+            "syscalls": {
+              "read": {
+                "calls": 203,
+                "failed_calls": 4,
+                "largest_returned_bytes": 6324,
+                "returned_bytes": 82897,
+                "size_buckets": {
+                  "0": 59,
+                  "1-511": 83,
+                  "1048576+": 0,
+                  "16384-65535": 0,
+                  "262144-1048575": 0,
+                  "4096-16383": 1,
+                  "512-4095": 60,
+                  "65536-262143": 0
+                }
+              },
+              "write": {
+                "calls": 1213,
+                "failed_calls": 0,
+                "largest_returned_bytes": 625,
+                "returned_bytes": 4628,
+                "size_buckets": {
+                  "0": 0,
+                  "1-511": 1212,
+                  "1048576+": 0,
+                  "16384-65535": 0,
+                  "262144-1048575": 0,
+                  "4096-16383": 0,
+                  "512-4095": 1,
+                  "65536-262143": 0
+                }
+              }
+            }
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 314679846
+        },
+        "time": {
+          "command": [
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/external/time-v.txt",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "rtf_streaming_create",
+            "--semantic-shape",
+            "medium",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 969,
+              "present": true,
+              "retained": false,
+              "sha256": "132a12070d522a2400865084275194441ddfccda40fd42739b00fe899754d4b3"
+            },
+            "elapsed_wall_seconds": 0.07,
+            "involuntary_context_switches": 9,
+            "major_page_faults": 0,
+            "max_rss_kib": 30080,
+            "minor_page_faults": 14434,
+            "status": "ok",
+            "system_seconds": 0.04,
+            "user_seconds": 0.04,
+            "voluntary_context_switches": 89
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 114895374
+        }
+      },
+      "harness": {
+        "command": [
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "rtf_streaming_create",
+          "--semantic-shape",
+          "medium",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/harness.json"
+        ],
+        "logical_measurements": [
+          {
+            "case": "rtf_streaming_create",
+            "corpus": {
+              "archive_bytes": 630819,
+              "archive_member_count": 0,
+              "archive_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a",
+              "compression": "none",
+              "entry_bytes": 0,
+              "entry_count": 8192,
+              "generator": "litchi-rtf-streaming-create-v1",
+              "name": "rtf-streaming-create-medium",
+              "package_format": "rtf",
+              "payload_kind": "deterministic-scalar-text",
+              "rtf_variant": "plain-streaming",
+              "shape": "medium",
+              "target_entry": "document",
+              "target_payload_bytes": 630819,
+              "target_payload_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a",
+              "uncompressed_payload_bytes": 425984,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 9978136.0,
+              "p50": 10016573,
+              "p95": 10114007,
+              "p99": 10114007,
+              "standard_deviation": 158621.57872433373,
+              "unit": "ns"
+            },
+            "output_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a",
+            "sink": {
+              "accepted_bytes": 630819,
+              "authored_part_bytes": 630819,
+              "input_bytes": 425984,
+              "largest_write": 32,
+              "paragraphs": 8192,
+              "retained_authoring_window_bytes": 37,
+              "retained_output_bytes": 0,
+              "runs": 8192,
+              "write_calls": 90122,
+              "write_size_buckets": {
+                "bytes_0": 0,
+                "bytes_16385_to_65536": 0,
+                "bytes_1_to_512": 90122,
+                "bytes_4097_to_16384": 0,
+                "bytes_513_to_4096": 0,
+                "bytes_over_65536": 0
+              }
+            }
+          }
+        ],
+        "report": {
+          "bytes": 3971,
+          "present": true,
+          "retained": false,
+          "sha256": "380ae72371eb91e7c99ba427ad2e1fa55825fe16063080f294ebf920232e916b"
+        },
+        "returncode": 0
+      },
+      "id": "rtf-streaming",
+      "physical_io_claim_scope": "strace is a whole-process read/write syscall trace only; it is not a source-byte, decompressed-byte, recompressed-byte, or memory-copy measurement",
+      "purpose": "bounded RTF streaming creation",
+      "scaling": {
+        "classification": null,
+        "metric": "elapsed_ns.p50",
+        "rows": [],
+        "status": "not_applicable"
+      },
+      "time": {
+        "command": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/baseline.time.txt",
+          "--",
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "rtf_streaming_create",
+          "--semantic-shape",
+          "medium",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/harness.json"
+        ],
+        "parsed": {
+          "artifact": {
+            "bytes": 952,
+            "present": true,
+            "retained": false,
+            "sha256": "aef8b91d16333c34e6e091dd0ab4e2d17eadab8d5e3ff5adb25af9bc49928985"
+          },
+          "elapsed_wall_seconds": 0.11,
+          "involuntary_context_switches": 8,
+          "major_page_faults": 0,
+          "max_rss_kib": 30208,
+          "minor_page_faults": 14428,
+          "status": "ok",
+          "system_seconds": 0.05,
+          "user_seconds": 0.07,
+          "voluntary_context_switches": 87
+        },
+        "run": {
+          "command": [
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/baseline.time.txt",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "1",
+            "--samples",
+            "3",
+            "--case",
+            "rtf_streaming_create",
+            "--semantic-shape",
+            "medium",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/rtf-streaming/harness.json"
+          ],
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 114203919
+        }
+      }
+    },
+    {
+      "external_profiles": {
+        "heaptrack": {
+          "capture": {
+            "bytes": 23006,
+            "present": true,
+            "retained": false,
+            "sha256": "bb8763337aa8584ec8bab10b0fb9fac78fbe3dc7d6caa18139d26afafa6dd119"
+          },
+          "command": [
+            "/usr/bin/heaptrack",
+            "--record-only",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/external/heaptrack-profile",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "cfb_selective_mini_shared_read,cfb_selective_fat_shared_read",
+            "--shape",
+            "many-small",
+            "--payload",
+            "incompressible",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/external/profile-harness.json"
+          ],
+          "print": {
+            "command": [
+              "/usr/bin/heaptrack_print",
+              "-f",
+              "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/external/heaptrack-profile.zst",
+              "-H",
+              "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/external/heaptrack-histogram.tsv"
+            ],
+            "parsed": {
+              "allocated_bytes": 148580902,
+              "allocation_calls": 13589,
+              "artifact": {
+                "bytes": 133962,
+                "present": true,
+                "retained": false,
+                "sha256": "611e92282e6ca4c7bd09d1defcfbaba9348c8ffe4ad73cd6584281b19b0b0770"
+              },
+              "histogram_artifact": {
+                "bytes": 4508,
+                "present": true,
+                "retained": false,
+                "sha256": "f201e68cde27a9ff376d9376869691ae8448171c5687ca19796cf7992eebc2c2"
+              },
+              "peak_heap_bytes": 23142072,
+              "peak_rss_bytes": 27682406,
+              "status": "ok",
+              "temporary_allocations": 1358
+            },
+            "returncode": 0,
+            "stderr": {
+              "bytes": 0,
+              "present": true,
+              "retained": false,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "stderr_excerpt": null,
+            "stdout": {
+              "bytes": 133962,
+              "present": true,
+              "retained": false,
+              "sha256": "611e92282e6ca4c7bd09d1defcfbaba9348c8ffe4ad73cd6584281b19b0b0770"
+            },
+            "timed_out": false,
+            "wall_ns": 31709919
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 102,
+            "present": true,
+            "retained": false,
+            "sha256": "6eef50238b5f20649800f8d88ed7b787041330f7fa2aad671ce2086529b8b963"
+          },
+          "stderr_excerpt": "heaptrack stats:\nallocations:          \t13589\nleaked allocations:   \t1\ntemporary allocations:\t1429",
+          "stdout": {
+            "bytes": 347,
+            "present": true,
+            "retained": false,
+            "sha256": "b41d2adfd19286121abef534414675897af08f9ce433ca018b48e5a1d0b11ba5"
+          },
+          "timed_out": false,
+          "wall_ns": 164284837
+        },
+        "perf": {
+          "command": [
+            "/usr/bin/perf",
+            "stat",
+            "-x,",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/external/perf-stat.txt",
+            "-e",
+            "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "cfb_selective_mini_shared_read,cfb_selective_fat_shared_read",
+            "--shape",
+            "many-small",
+            "--payload",
+            "incompressible",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 309,
+              "present": true,
+              "retained": false,
+              "sha256": "3cbf6b6238db0caf338d8cd3cc7467727823fe875601c9c215d0d128bcb40828"
+            },
+            "counters": {
+              "branch-misses": {
+                "available": true,
+                "raw": [
+                  "798083",
+                  "",
+                  "branch-misses"
+                ],
+                "unit": null,
+                "value": 798083.0
+              },
+              "branches": {
+                "available": true,
+                "raw": [
+                  "101144573",
+                  "",
+                  "branches"
+                ],
+                "unit": null,
+                "value": 101144573.0
+              },
+              "cache-misses": {
+                "available": true,
+                "raw": [
+                  "1968647",
+                  "",
+                  "cache-misses"
+                ],
+                "unit": null,
+                "value": 1968647.0
+              },
+              "cycles": {
+                "available": true,
+                "raw": [
+                  "406022828",
+                  "",
+                  "cycles"
+                ],
+                "unit": null,
+                "value": 406022828.0
+              },
+              "instructions": {
+                "available": true,
+                "raw": [
+                  "609381715",
+                  "",
+                  "instructions"
+                ],
+                "unit": null,
+                "value": 609381715.0
+              },
+              "page-faults": {
+                "available": true,
+                "raw": [
+                  "15417",
+                  "",
+                  "page-faults"
+                ],
+                "unit": null,
+                "value": 15417.0
+              }
+            },
+            "returncode": 0,
+            "status": "ok",
+            "stderr_excerpt": null
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 114258253
+        },
+        "strace": {
+          "command": [
+            "/usr/bin/strace",
+            "-f",
+            "-qq",
+            "-e",
+            "trace=read,write",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/external/strace.log",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "cfb_selective_mini_shared_read,cfb_selective_fat_shared_read",
+            "--shape",
+            "many-small",
+            "--payload",
+            "incompressible",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 182493,
+              "present": true,
+              "retained": false,
+              "sha256": "509c1ec87354c7afdf939591f116b4b3610786e88e80c1b5b71390f312f0c0ab"
+            },
+            "returncode": 0,
+            "scope": "whole process; read/write only; not logical/decompressed I/O",
+            "status": "ok",
+            "syscalls": {
+              "read": {
+                "calls": 203,
+                "failed_calls": 4,
+                "largest_returned_bytes": 6324,
+                "returned_bytes": 82897,
+                "size_buckets": {
+                  "0": 59,
+                  "1-511": 83,
+                  "1048576+": 0,
+                  "16384-65535": 0,
+                  "262144-1048575": 0,
+                  "4096-16383": 1,
+                  "512-4095": 60,
+                  "65536-262143": 0
+                }
+              },
+              "write": {
+                "calls": 3802,
+                "failed_calls": 0,
+                "largest_returned_bytes": 625,
+                "returned_bytes": 11176,
+                "size_buckets": {
+                  "0": 0,
+                  "1-511": 3801,
+                  "1048576+": 0,
+                  "16384-65535": 0,
+                  "262144-1048575": 0,
+                  "4096-16383": 0,
+                  "512-4095": 1,
+                  "65536-262143": 0
+                }
+              }
+            }
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 364719064
+        },
+        "time": {
+          "command": [
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/external/time-v.txt",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "cfb_selective_mini_shared_read,cfb_selective_fat_shared_read",
+            "--shape",
+            "many-small",
+            "--payload",
+            "incompressible",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 1030,
+              "present": true,
+              "retained": false,
+              "sha256": "d3bc5c4c239f34bf85deadcc1595f31bfbccea6efd7d74e494b68e3c9aef25fd"
+            },
+            "elapsed_wall_seconds": 0.07,
+            "involuntary_context_switches": 6,
+            "major_page_faults": 0,
+            "max_rss_kib": 30336,
+            "minor_page_faults": 15468,
+            "status": "ok",
+            "system_seconds": 0.05,
+            "user_seconds": 0.03,
+            "voluntary_context_switches": 80
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 114123287
+        }
+      },
+      "harness": {
+        "command": [
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "cfb_selective_mini_shared_read,cfb_selective_fat_shared_read",
+          "--shape",
+          "many-small",
+          "--payload",
+          "incompressible",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/harness.json"
+        ],
+        "logical_measurements": [
+          {
+            "case": "cfb_selective_mini_shared_read",
+            "corpus": {
+              "archive_bytes": 314368,
+              "archive_member_count": 256,
+              "archive_sha256": "988be74585fe447a2695a8a584ce459181ab7a20b5bc4dd79d24ebf9e1d49557",
+              "compression": "none",
+              "entry_bytes": 1024,
+              "entry_count": 256,
+              "generator": "litchi-cfb-selective-read-v1",
+              "name": "cfb-selective-minifat-36-byte-many-small",
+              "package_format": "CFB/OLE2",
+              "payload_kind": "incompressible",
+              "shape": "many-small",
+              "target_entry": "benchmark_stream_00255.bin",
+              "target_payload_bytes": 36,
+              "target_payload_sha256": "bfef92407b49c20492ba3a6b991bbe6ada9678f50c4d7f241865239870e35fd7",
+              "uncompressed_payload_bytes": 261156,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 141892.33333333334,
+              "p50": 140654,
+              "p95": 145330,
+              "p99": 145330,
+              "standard_deviation": 3015.633322095594,
+              "unit": "ns"
+            },
+            "sink": null,
+            "source": {
+              "cfb_selective": {
+                "legacy_or_positional": {
+                  "implementation": "shared-positional-exact-range",
+                  "open_ns": [
+                    136208,
+                    135367,
+                    141074
+                  ],
+                  "open_range_sizes": [
+                    [
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      33280
+                    ],
+                    [
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      33280
+                    ],
+                    [
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      33280
+                    ]
+                  ],
+                  "open_read_bytes": [
+                    52736,
+                    52736,
+                    52736
+                  ],
+                  "open_read_calls": [
+                    39,
+                    39,
+                    39
+                  ],
+                  "read_bytes": [
+                    36,
+                    36,
+                    36
+                  ],
+                  "read_calls": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "read_ns": [
+                    641,
+                    530,
+                    631
+                  ],
+                  "read_range_sizes": [
+                    [
+                      36
+                    ],
+                    [
+                      36
+                    ],
+                    [
+                      36
+                    ]
+                  ],
+                  "returned_payload_bytes": [
+                    36,
+                    36,
+                    36
+                  ],
+                  "selected_payload_sha256": "bfef92407b49c20492ba3a6b991bbe6ada9678f50c4d7f241865239870e35fd7",
+                  "total_ns": [
+                    140654,
+                    139693,
+                    145330
+                  ]
+                },
+                "selected_target_kind": "minifat-36-byte",
+                "sink": "none",
+                "timing_scope": "open and selected read are separate stages; legacy materializes the full stream, while shared fills a newly allocated exact-length caller range; corpus construction and validation excluded"
+              },
+              "max_in_flight_reads": [],
+              "ordinary_payload_read_bytes": [],
+              "ordinary_payload_read_calls": [],
+              "read_bytes": [],
+              "read_calls": []
+            }
+          },
+          {
+            "case": "cfb_selective_fat_shared_read",
+            "corpus": {
+              "archive_bytes": 4541440,
+              "archive_member_count": 256,
+              "archive_sha256": "27ebd0a4280e068e93f915f6b58f3199a6e15eaf0d506990d046cbf2cd7f66b9",
+              "compression": "none",
+              "entry_bytes": 1024,
+              "entry_count": 256,
+              "generator": "litchi-cfb-selective-read-v1",
+              "name": "cfb-selective-fat-4mib-many-small",
+              "package_format": "CFB/OLE2",
+              "payload_kind": "incompressible",
+              "shape": "many-small",
+              "target_entry": "benchmark_stream_00255.bin",
+              "target_payload_bytes": 4194304,
+              "target_payload_sha256": "631416b01a32fc6ff0f57b7215b5665837891e217928d6de4b4dc9d3c8efbf49",
+              "uncompressed_payload_bytes": 4455424,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 654316.3333333333,
+              "p50": 374947,
+              "p95": 1225272,
+              "p99": 1225272,
+              "standard_deviation": 494499.8420084008,
+              "unit": "ns"
+            },
+            "sink": null,
+            "source": {
+              "cfb_selective": {
+                "legacy_or_positional": {
+                  "implementation": "shared-positional-exact-range",
+                  "open_ns": [
+                    223599,
+                    197082,
+                    186446
+                  ],
+                  "open_range_sizes": [
+                    [
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      33280
+                    ],
+                    [
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      33280
+                    ],
+                    [
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      512,
+                      33280
+                    ]
+                  ],
+                  "open_read_bytes": [
+                    86016,
+                    86016,
+                    86016
+                  ],
+                  "open_read_calls": [
+                    104,
+                    104,
+                    104
+                  ],
+                  "read_bytes": [
+                    4194304,
+                    4194304,
+                    4194304
+                  ],
+                  "read_calls": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "read_ns": [
+                    989576,
+                    169594,
+                    168433
+                  ],
+                  "read_range_sizes": [
+                    [
+                      4194304
+                    ],
+                    [
+                      4194304
+                    ],
+                    [
+                      4194304
+                    ]
+                  ],
+                  "returned_payload_bytes": [
+                    4194304,
+                    4194304,
+                    4194304
+                  ],
+                  "selected_payload_sha256": "631416b01a32fc6ff0f57b7215b5665837891e217928d6de4b4dc9d3c8efbf49",
+                  "total_ns": [
+                    1225272,
+                    374947,
+                    362730
+                  ]
+                },
+                "selected_target_kind": "fat-4mib",
+                "sink": "none",
+                "timing_scope": "open and selected read are separate stages; legacy materializes the full stream, while shared fills a newly allocated exact-length caller range; corpus construction and validation excluded"
+              },
+              "max_in_flight_reads": [],
+              "ordinary_payload_read_bytes": [],
+              "ordinary_payload_read_calls": [],
+              "read_bytes": [],
+              "read_calls": []
+            }
+          }
+        ],
+        "report": {
+          "bytes": 17591,
+          "present": true,
+          "retained": false,
+          "sha256": "47875441850b70a0e281b5348fcb7be18c58c520d6b7d40da99cabfab52e46a5"
+        },
+        "returncode": 0
+      },
+      "id": "cfb-selective",
+      "physical_io_claim_scope": "strace is a whole-process read/write syscall trace only; it is not a source-byte, decompressed-byte, recompressed-byte, or memory-copy measurement",
+      "purpose": "CFB selective MiniFAT/FAT reads",
+      "scaling": {
+        "classification": null,
+        "metric": "elapsed_ns.p50",
+        "rows": [],
+        "status": "not_applicable"
+      },
+      "time": {
+        "command": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/baseline.time.txt",
+          "--",
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "cfb_selective_mini_shared_read,cfb_selective_fat_shared_read",
+          "--shape",
+          "many-small",
+          "--payload",
+          "incompressible",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/harness.json"
+        ],
+        "parsed": {
+          "artifact": {
+            "bytes": 1013,
+            "present": true,
+            "retained": false,
+            "sha256": "41baafac3f715dd8f82d8b2e19f6ef9190a65ae5e7e6c974a29a234f34f0ae3e"
+          },
+          "elapsed_wall_seconds": 0.08,
+          "involuntary_context_switches": 8,
+          "major_page_faults": 0,
+          "max_rss_kib": 30208,
+          "minor_page_faults": 16581,
+          "status": "ok",
+          "system_seconds": 0.05,
+          "user_seconds": 0.04,
+          "voluntary_context_switches": 73
+        },
+        "run": {
+          "command": [
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/baseline.time.txt",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "1",
+            "--samples",
+            "3",
+            "--case",
+            "cfb_selective_mini_shared_read,cfb_selective_fat_shared_read",
+            "--shape",
+            "many-small",
+            "--payload",
+            "incompressible",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-selective/harness.json"
+          ],
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 114464919
+        }
+      }
+    },
+    {
+      "external_profiles": {
+        "heaptrack": {
+          "capture": {
+            "bytes": 35272,
+            "present": true,
+            "retained": false,
+            "sha256": "edc7eaa79b5087946870cd0aae8074ce60a95d417d44158fe405df8374279947"
+          },
+          "command": [
+            "/usr/bin/heaptrack",
+            "--record-only",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/external/heaptrack-profile",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "cfb_file_same_length_overlay_atomic_save",
+            "--filesystem-cache",
+            "warm",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/external/profile-harness.json"
+          ],
+          "print": {
+            "command": [
+              "/usr/bin/heaptrack_print",
+              "-f",
+              "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/external/heaptrack-profile.zst",
+              "-H",
+              "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/external/heaptrack-histogram.tsv"
+            ],
+            "parsed": {
+              "allocated_bytes": 460627078,
+              "allocation_calls": 1722,
+              "artifact": {
+                "bytes": 230352,
+                "present": true,
+                "retained": false,
+                "sha256": "374eba1aac2d826e856eb885548f229194a2eb31fdb29f2021b907830d2fd19b"
+              },
+              "histogram_artifact": {
+                "bytes": 1071,
+                "present": true,
+                "retained": false,
+                "sha256": "b33bb0560b0b6726bd93e566f52254056567c73d8a49270f432d71b050436bfa"
+              },
+              "peak_heap_bytes": 115186073,
+              "peak_rss_bytes": 122704363,
+              "status": "ok",
+              "temporary_allocations": 111
+            },
+            "returncode": 0,
+            "stderr": {
+              "bytes": 0,
+              "present": true,
+              "retained": false,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "stderr_excerpt": null,
+            "stdout": {
+              "bytes": 230352,
+              "present": true,
+              "retained": false,
+              "sha256": "374eba1aac2d826e856eb885548f229194a2eb31fdb29f2021b907830d2fd19b"
+            },
+            "timed_out": false,
+            "wall_ns": 64237312
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 101,
+            "present": true,
+            "retained": false,
+            "sha256": "2e877381d2199f4d9e4f9b97f4c85655cd82643532e5a7eceefb8d90fe49f377"
+          },
+          "stderr_excerpt": "heaptrack stats:\nallocations:          \t1722\nleaked allocations:   \t10\ntemporary allocations:\t330",
+          "stdout": {
+            "bytes": 337,
+            "present": true,
+            "retained": false,
+            "sha256": "dc6e0685312876262c0684472d6f67c575d9dd7cbfd7b50009686922fa1f587d"
+          },
+          "timed_out": false,
+          "wall_ns": 1970774973
+        },
+        "perf": {
+          "command": [
+            "/usr/bin/perf",
+            "stat",
+            "-x,",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/external/perf-stat.txt",
+            "-e",
+            "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "cfb_file_same_length_overlay_atomic_save",
+            "--filesystem-cache",
+            "warm",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 328,
+              "present": true,
+              "retained": false,
+              "sha256": "13014f8abc0abda03c48728bdf5988445ccec0fda6dc07dcddf02d7cb00e54b8"
+            },
+            "counters": {
+              "branch-misses": {
+                "available": true,
+                "raw": [
+                  "51173369",
+                  "",
+                  "branch-misses"
+                ],
+                "unit": null,
+                "value": 51173369.0
+              },
+              "branches": {
+                "available": true,
+                "raw": [
+                  "2651246773",
+                  "",
+                  "branches"
+                ],
+                "unit": null,
+                "value": 2651246773.0
+              },
+              "cache-misses": {
+                "available": true,
+                "raw": [
+                  "14843027",
+                  "",
+                  "cache-misses"
+                ],
+                "unit": null,
+                "value": 14843027.0
+              },
+              "cycles": {
+                "available": true,
+                "raw": [
+                  "8523765838",
+                  "",
+                  "cycles"
+                ],
+                "unit": null,
+                "value": 8523765838.0
+              },
+              "instructions": {
+                "available": true,
+                "raw": [
+                  "18189060019",
+                  "",
+                  "instructions"
+                ],
+                "unit": null,
+                "value": 18189060019.0
+              },
+              "page-faults": {
+                "available": true,
+                "raw": [
+                  "88005",
+                  "",
+                  "page-faults"
+                ],
+                "unit": null,
+                "value": 88005.0
+              }
+            },
+            "returncode": 0,
+            "status": "ok",
+            "stderr_excerpt": null
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 2069661462
+        },
+        "strace": {
+          "command": [
+            "/usr/bin/strace",
+            "-f",
+            "-qq",
+            "-e",
+            "trace=read,write",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/external/strace.log",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "cfb_file_same_length_overlay_atomic_save",
+            "--filesystem-cache",
+            "warm",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 899001,
+              "present": true,
+              "retained": false,
+              "sha256": "7e1cc2bf32f69cc6ee028efbc7759b8625a033b2ddaf2d0c7867f39bceb7990a"
+            },
+            "returncode": 0,
+            "scope": "whole process; read/write only; not logical/decompressed I/O",
+            "status": "ok",
+            "syscalls": {
+              "read": {
+                "calls": 1130,
+                "failed_calls": 8,
+                "largest_returned_bytes": 16913408,
+                "returned_bytes": 122851854,
+                "size_buckets": {
+                  "0": 84,
+                  "1-511": 147,
+                  "1048576+": 14,
+                  "16384-65535": 0,
+                  "262144-1048575": 0,
+                  "4096-16383": 3,
+                  "512-4095": 882,
+                  "65536-262143": 0
+                }
+              },
+              "write": {
+                "calls": 16885,
+                "failed_calls": 0,
+                "largest_returned_bytes": 16913408,
+                "returned_bytes": 79904360,
+                "size_buckets": {
+                  "0": 0,
+                  "1-511": 16419,
+                  "1048576+": 3,
+                  "16384-65535": 0,
+                  "262144-1048575": 0,
+                  "4096-16383": 2,
+                  "512-4095": 17,
+                  "65536-262143": 444
+                }
+              }
+            }
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 2670939577
+        },
+        "time": {
+          "command": [
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/external/time-v.txt",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "0",
+            "--samples",
+            "1",
+            "--case",
+            "cfb_file_same_length_overlay_atomic_save",
+            "--filesystem-cache",
+            "warm",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/external/profile-harness.json"
+          ],
+          "parsed": {
+            "artifact": {
+              "bytes": 993,
+              "present": true,
+              "retained": false,
+              "sha256": "a380c73bd8180602f9379fee29a9ec5cd74689f08ef3c3f7c7bb37f9bfef23b3"
+            },
+            "elapsed_wall_seconds": 1.93,
+            "involuntary_context_switches": 12,
+            "major_page_faults": 0,
+            "max_rss_kib": 110884,
+            "minor_page_faults": 88073,
+            "status": "ok",
+            "system_seconds": 0.24,
+            "user_seconds": 1.49,
+            "voluntary_context_switches": 434
+          },
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 1969276824
+        }
+      },
+      "harness": {
+        "command": [
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "cfb_file_same_length_overlay_atomic_save",
+          "--filesystem-cache",
+          "warm",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/harness.json"
+        ],
+        "logical_measurements": [
+          {
+            "cache_state": "warm",
+            "case": "cfb_file_same_length_overlay_atomic_save",
+            "corpus": {
+              "archive_bytes": 16913408,
+              "archive_member_count": 5,
+              "archive_sha256": "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d",
+              "compression": "none",
+              "entry_bytes": 4194304,
+              "entry_count": 5,
+              "generator": "litchi-ole-common-copy-elision-v1",
+              "name": "ole-common-few-large-incompressible",
+              "package_format": "CFB/OLE2",
+              "payload_kind": "incompressible",
+              "shape": "few-large",
+              "target_entry": "ole_common_edit_target.bin",
+              "target_payload_bytes": 36,
+              "target_payload_sha256": "3990bc3981e10c1664838dfc414cf68631cae7cb25581585590b068b374296d0",
+              "uncompressed_payload_bytes": 16777252,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 153310903.0,
+              "p50": 156307917,
+              "p95": 157041972,
+              "p99": 157041972,
+              "standard_deviation": 5838239.017625349,
+              "unit": "ns"
+            },
+            "output_sha256": "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc",
+            "sink": null
+          },
+          {
+            "filesystem_evidence": [
+              {
+                "cache_states": [
+                  "warm"
+                ],
+                "case": "cfb_file_same_length_overlay_atomic_save",
+                "corpus": {
+                  "archive_bytes": 16913408,
+                  "archive_member_count": 5,
+                  "archive_sha256": "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d",
+                  "compression": "none",
+                  "entry_bytes": 4194304,
+                  "entry_count": 5,
+                  "generator": "litchi-ole-common-copy-elision-v1",
+                  "name": "ole-common-few-large-incompressible",
+                  "package_format": "CFB/OLE2",
+                  "payload_kind": "incompressible",
+                  "shape": "few-large",
+                  "target_entry": "ole_common_edit_target.bin",
+                  "target_payload_bytes": 36,
+                  "target_payload_sha256": "3990bc3981e10c1664838dfc414cf68631cae7cb25581585590b068b374296d0",
+                  "uncompressed_payload_bytes": 16777252,
+                  "xlsx": null
+                },
+                "fresh_child_per_sample": true,
+                "sample_count": 3,
+                "samples": [
+                  {
+                    "cache_state": "warm",
+                    "cfb_changed_spans": 1,
+                    "cfb_published_bytes": 16913408,
+                    "cold_advice": "not_requested",
+                    "elapsed_ns": 146582820,
+                    "logical_read_bytes": 84838500,
+                    "logical_read_calls": 1825,
+                    "logical_read_request_size_buckets": {
+                      "bytes_0": 0,
+                      "bytes_16385_to_65536": 1290,
+                      "bytes_1_to_512": 528,
+                      "bytes_4097_to_16384": 5,
+                      "bytes_513_to_4096": 2,
+                      "bytes_over_65536": 0
+                    },
+                    "logical_read_requested_bytes": 84838500,
+                    "max_concurrent_reads": 1,
+                    "opc_materialized_parts": null,
+                    "output_bytes": 16913408,
+                    "output_sha256": "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc",
+                    "parent_wall_ns": 471354493,
+                    "process_metrics": {
+                      "cancelled_write_bytes": 0,
+                      "clock_ticks_per_second": 100,
+                      "major_faults": 0,
+                      "minor_faults": 130,
+                      "nonvoluntary_context_switches": 0,
+                      "peak_rss_bytes": 5898240,
+                      "rchar": 84840502,
+                      "read_bytes": 0,
+                      "rss_bytes": 1294336,
+                      "syscr": 1843,
+                      "syscw": 259,
+                      "system_cpu_ticks": 2,
+                      "user_cpu_ticks": 7,
+                      "voluntary_context_switches": 87,
+                      "wchar": 16913408,
+                      "write_bytes": 16916480
+                    },
+                    "sample_index": 0
+                  },
+                  {
+                    "cache_state": "warm",
+                    "cfb_changed_spans": 1,
+                    "cfb_published_bytes": 16913408,
+                    "cold_advice": "not_requested",
+                    "elapsed_ns": 157041972,
+                    "logical_read_bytes": 84838500,
+                    "logical_read_calls": 1825,
+                    "logical_read_request_size_buckets": {
+                      "bytes_0": 0,
+                      "bytes_16385_to_65536": 1290,
+                      "bytes_1_to_512": 528,
+                      "bytes_4097_to_16384": 5,
+                      "bytes_513_to_4096": 2,
+                      "bytes_over_65536": 0
+                    },
+                    "logical_read_requested_bytes": 84838500,
+                    "max_concurrent_reads": 1,
+                    "opc_materialized_parts": null,
+                    "output_bytes": 16913408,
+                    "output_sha256": "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc",
+                    "parent_wall_ns": 483877063,
+                    "process_metrics": {
+                      "cancelled_write_bytes": 0,
+                      "clock_ticks_per_second": 100,
+                      "major_faults": 0,
+                      "minor_faults": 131,
+                      "nonvoluntary_context_switches": 1,
+                      "peak_rss_bytes": 6029312,
+                      "rchar": 84840503,
+                      "read_bytes": 0,
+                      "rss_bytes": 1359872,
+                      "syscr": 1843,
+                      "syscw": 259,
+                      "system_cpu_ticks": 2,
+                      "user_cpu_ticks": 6,
+                      "voluntary_context_switches": 134,
+                      "wchar": 16913408,
+                      "write_bytes": 16916480
+                    },
+                    "sample_index": 1
+                  },
+                  {
+                    "cache_state": "warm",
+                    "cfb_changed_spans": 1,
+                    "cfb_published_bytes": 16913408,
+                    "cold_advice": "not_requested",
+                    "elapsed_ns": 156307917,
+                    "logical_read_bytes": 84838500,
+                    "logical_read_calls": 1825,
+                    "logical_read_request_size_buckets": {
+                      "bytes_0": 0,
+                      "bytes_16385_to_65536": 1290,
+                      "bytes_1_to_512": 528,
+                      "bytes_4097_to_16384": 5,
+                      "bytes_513_to_4096": 2,
+                      "bytes_over_65536": 0
+                    },
+                    "logical_read_requested_bytes": 84838500,
+                    "max_concurrent_reads": 1,
+                    "opc_materialized_parts": null,
+                    "output_bytes": 16913408,
+                    "output_sha256": "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc",
+                    "parent_wall_ns": 477297814,
+                    "process_metrics": {
+                      "cancelled_write_bytes": 0,
+                      "clock_ticks_per_second": 100,
+                      "major_faults": 0,
+                      "minor_faults": 131,
+                      "nonvoluntary_context_switches": 1,
+                      "peak_rss_bytes": 5898240,
+                      "rchar": 84840498,
+                      "read_bytes": 0,
+                      "rss_bytes": 1359872,
+                      "syscr": 1843,
+                      "syscw": 259,
+                      "system_cpu_ticks": 2,
+                      "user_cpu_ticks": 7,
+                      "voluntary_context_switches": 50,
+                      "wchar": 16913408,
+                      "write_bytes": 16916480
+                    },
+                    "sample_index": 2
+                  }
+                ],
+                "warmup_iterations": 1
+              }
+            ]
+          }
+        ],
+        "report": {
+          "bytes": 110025,
+          "present": true,
+          "retained": false,
+          "sha256": "c122e9311bf02602bad13fff13ed12f2746117fce71640a73f15f0966a45df56"
+        },
+        "returncode": 0
+      },
+      "id": "cfb-save",
+      "physical_io_claim_scope": "strace is a whole-process read/write syscall trace only; it is not a source-byte, decompressed-byte, recompressed-byte, or memory-copy measurement",
+      "purpose": "CFB same-length source-overlay atomic save",
+      "scaling": {
+        "classification": null,
+        "metric": "elapsed_ns.p50",
+        "rows": [],
+        "status": "not_applicable"
+      },
+      "time": {
+        "command": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/baseline.time.txt",
+          "--",
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "cfb_file_same_length_overlay_atomic_save",
+          "--filesystem-cache",
+          "warm",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/harness.json"
+        ],
+        "parsed": {
+          "artifact": {
+            "bytes": 978,
+            "present": true,
+            "retained": false,
+            "sha256": "67cd23f8bc6818f643702f6ae6a2b0a761d6bde2a7df369869a8c527e257a751"
+          },
+          "elapsed_wall_seconds": 4.58,
+          "involuntary_context_switches": 26,
+          "major_page_faults": 1,
+          "max_rss_kib": 111012,
+          "minor_page_faults": 176926,
+          "status": "ok",
+          "system_seconds": 0.5,
+          "user_seconds": 3.45,
+          "voluntary_context_switches": 1040
+        },
+        "run": {
+          "command": [
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/baseline.time.txt",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "1",
+            "--samples",
+            "3",
+            "--case",
+            "cfb_file_same_length_overlay_atomic_save",
+            "--filesystem-cache",
+            "warm",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-save/harness.json"
+          ],
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 4626142115
+        }
+      }
+    },
+    {
+      "external_profiles": {},
+      "harness": {
+        "command": [
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "opc_open_session_scaling",
+          "--shape",
+          "many-small",
+          "--payload",
+          "incompressible",
+          "--workers",
+          "1,2,4,8,available",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/opc-scaling/harness.json"
+        ],
+        "logical_measurements": [
+          {
+            "case": "opc_open_session_scaling",
+            "corpus": {
+              "archive_bytes": 303003,
+              "archive_member_count": 258,
+              "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+              "compression": "deflate",
+              "entry_bytes": 1024,
+              "entry_count": 256,
+              "generator": "litchi-opc-synthetic-v2",
+              "name": "many-small-incompressible",
+              "package_format": "OPC/ZIP",
+              "payload_kind": "incompressible",
+              "shape": "many-small",
+              "target_entry": "benchmark/parts/00128.bin",
+              "target_payload_bytes": 1024,
+              "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+              "uncompressed_payload_bytes": 262144,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 559502.0,
+              "p50": 567473,
+              "p95": 579450,
+              "p99": 579450,
+              "standard_deviation": 24909.135934431768,
+              "unit": "ns"
+            },
+            "execution": {
+              "logical_bytes": 285282,
+              "logical_tasks": 258,
+              "worker_count": 1
+            },
+            "sink": null
+          },
+          {
+            "case": "opc_open_session_scaling",
+            "corpus": {
+              "archive_bytes": 303003,
+              "archive_member_count": 258,
+              "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+              "compression": "deflate",
+              "entry_bytes": 1024,
+              "entry_count": 256,
+              "generator": "litchi-opc-synthetic-v2",
+              "name": "many-small-incompressible",
+              "package_format": "OPC/ZIP",
+              "payload_kind": "incompressible",
+              "shape": "many-small",
+              "target_entry": "benchmark/parts/00128.bin",
+              "target_payload_bytes": 1024,
+              "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+              "uncompressed_payload_bytes": 262144,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 929126.3333333334,
+              "p50": 908775,
+              "p95": 1040126,
+              "p99": 1040126,
+              "standard_deviation": 102352.87759674044,
+              "unit": "ns"
+            },
+            "execution": {
+              "logical_bytes": 285282,
+              "logical_tasks": 258,
+              "worker_count": 2
+            },
+            "sink": null
+          },
+          {
+            "case": "opc_open_session_scaling",
+            "corpus": {
+              "archive_bytes": 303003,
+              "archive_member_count": 258,
+              "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+              "compression": "deflate",
+              "entry_bytes": 1024,
+              "entry_count": 256,
+              "generator": "litchi-opc-synthetic-v2",
+              "name": "many-small-incompressible",
+              "package_format": "OPC/ZIP",
+              "payload_kind": "incompressible",
+              "shape": "many-small",
+              "target_entry": "benchmark/parts/00128.bin",
+              "target_payload_bytes": 1024,
+              "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+              "uncompressed_payload_bytes": 262144,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 930912.3333333334,
+              "p50": 952516,
+              "p95": 985761,
+              "p99": 985761,
+              "standard_deviation": 68264.39013375372,
+              "unit": "ns"
+            },
+            "execution": {
+              "logical_bytes": 285282,
+              "logical_tasks": 258,
+              "worker_count": 4
+            },
+            "sink": null
+          },
+          {
+            "case": "opc_open_session_scaling",
+            "corpus": {
+              "archive_bytes": 303003,
+              "archive_member_count": 258,
+              "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+              "compression": "deflate",
+              "entry_bytes": 1024,
+              "entry_count": 256,
+              "generator": "litchi-opc-synthetic-v2",
+              "name": "many-small-incompressible",
+              "package_format": "OPC/ZIP",
+              "payload_kind": "incompressible",
+              "shape": "many-small",
+              "target_entry": "benchmark/parts/00128.bin",
+              "target_payload_bytes": 1024,
+              "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+              "uncompressed_payload_bytes": 262144,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 785722.0,
+              "p50": 790562,
+              "p95": 821214,
+              "p99": 821214,
+              "standard_deviation": 38143.00648873919,
+              "unit": "ns"
+            },
+            "execution": {
+              "logical_bytes": 285282,
+              "logical_tasks": 258,
+              "worker_count": 8
+            },
+            "sink": null
+          },
+          {
+            "case": "opc_open_session_scaling",
+            "corpus": {
+              "archive_bytes": 303003,
+              "archive_member_count": 258,
+              "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+              "compression": "deflate",
+              "entry_bytes": 1024,
+              "entry_count": 256,
+              "generator": "litchi-opc-synthetic-v2",
+              "name": "many-small-incompressible",
+              "package_format": "OPC/ZIP",
+              "payload_kind": "incompressible",
+              "shape": "many-small",
+              "target_entry": "benchmark/parts/00128.bin",
+              "target_payload_bytes": 1024,
+              "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+              "uncompressed_payload_bytes": 262144,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 782841.6666666666,
+              "p50": 789610,
+              "p95": 795810,
+              "p99": 795810,
+              "standard_deviation": 17371.298406663034,
+              "unit": "ns"
+            },
+            "execution": {
+              "logical_bytes": 285282,
+              "logical_tasks": 258,
+              "worker_count": 12
+            },
+            "sink": null
+          }
+        ],
+        "report": {
+          "bytes": 9223,
+          "present": true,
+          "retained": false,
+          "sha256": "fac31b58b538d772a8395323c2f1cad0f2f5285e37880a8019ea8b264f727456"
+        },
+        "returncode": 0
+      },
+      "id": "opc-scaling",
+      "physical_io_claim_scope": "strace is a whole-process read/write syscall trace only; it is not a source-byte, decompressed-byte, recompressed-byte, or memory-copy measurement",
+      "purpose": "explicit OPC open-session scaling",
+      "scaling": {
+        "baseline_workers": 1,
+        "classification": "nonideal_or_measurement_noise",
+        "metric": "elapsed_ns.p50",
+        "model": "Amdahl estimate from p50 only; descriptive, not a physical limit",
+        "rows": [
+          {
+            "amdahl_serial_fraction": null,
+            "amdahl_serial_fraction_raw": null,
+            "amdahl_serial_fraction_reason": "baseline",
+            "amdahl_serial_fraction_valid": null,
+            "efficiency_vs_baseline": 1.0,
+            "logical_bytes": 285282,
+            "logical_tasks": 258,
+            "p50_ns": 567473,
+            "speedup_vs_baseline": 1.0,
+            "workers": 1
+          },
+          {
+            "amdahl_serial_fraction": null,
+            "amdahl_serial_fraction_raw": 2.2028836614253016,
+            "amdahl_serial_fraction_reason": "outside_0_1",
+            "amdahl_serial_fraction_valid": false,
+            "efficiency_vs_baseline": 0.31221864597947785,
+            "logical_bytes": 285282,
+            "logical_tasks": 258,
+            "p50_ns": 908775,
+            "speedup_vs_baseline": 0.6244372919589557,
+            "workers": 2
+          },
+          {
+            "amdahl_serial_fraction": null,
+            "amdahl_serial_fraction_raw": 1.9046961999366783,
+            "amdahl_serial_fraction_reason": "outside_0_1",
+            "amdahl_serial_fraction_valid": false,
+            "efficiency_vs_baseline": 0.14894054273104074,
+            "logical_bytes": 285282,
+            "logical_tasks": 258,
+            "p50_ns": 952516,
+            "speedup_vs_baseline": 0.595762170924163,
+            "workers": 4
+          },
+          {
+            "amdahl_serial_fraction": null,
+            "amdahl_serial_fraction_raw": 1.4492880844425322,
+            "amdahl_serial_fraction_reason": "outside_0_1",
+            "amdahl_serial_fraction_valid": false,
+            "efficiency_vs_baseline": 0.08972620110756652,
+            "logical_bytes": 285282,
+            "logical_tasks": 258,
+            "p50_ns": 790562,
+            "speedup_vs_baseline": 0.7178096088605321,
+            "workers": 8
+          },
+          {
+            "amdahl_serial_fraction": null,
+            "amdahl_serial_fraction_raw": 1.427035775670865,
+            "amdahl_serial_fraction_reason": "outside_0_1",
+            "amdahl_serial_fraction_valid": false,
+            "efficiency_vs_baseline": 0.05988958684244965,
+            "logical_bytes": 285282,
+            "logical_tasks": 258,
+            "p50_ns": 789610,
+            "speedup_vs_baseline": 0.7186750421093958,
+            "workers": 12
+          }
+        ],
+        "status": "observed"
+      },
+      "time": {
+        "command": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-resource-profile-p0kcdubc/opc-scaling/baseline.time.txt",
+          "--",
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "opc_open_session_scaling",
+          "--shape",
+          "many-small",
+          "--payload",
+          "incompressible",
+          "--workers",
+          "1,2,4,8,available",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/opc-scaling/harness.json"
+        ],
+        "parsed": {
+          "artifact": {
+            "bytes": 1005,
+            "present": true,
+            "retained": false,
+            "sha256": "9a52656fb868d584a586dea4358a1c1f562bb9c4b1bbcf53cc948e3dc53fcefd"
+          },
+          "elapsed_wall_seconds": 0.08,
+          "involuntary_context_switches": 609,
+          "major_page_faults": 0,
+          "max_rss_kib": 30336,
+          "minor_page_faults": 9846,
+          "status": "ok",
+          "system_seconds": 0.06,
+          "user_seconds": 0.06,
+          "voluntary_context_switches": 719
+        },
+        "run": {
+          "command": [
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/opc-scaling/baseline.time.txt",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "1",
+            "--samples",
+            "3",
+            "--case",
+            "opc_open_session_scaling",
+            "--shape",
+            "many-small",
+            "--payload",
+            "incompressible",
+            "--workers",
+            "1,2,4,8,available",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/opc-scaling/harness.json"
+          ],
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 114386921
+        }
+      }
+    },
+    {
+      "external_profiles": {},
+      "harness": {
+        "command": [
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "cfb_bulk_read_scaling",
+          "--shape",
+          "many-small",
+          "--payload",
+          "incompressible",
+          "--workers",
+          "1,2,4,8,available",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/cfb-scaling/harness.json"
+        ],
+        "logical_measurements": [
+          {
+            "case": "cfb_bulk_read_scaling",
+            "corpus": {
+              "archive_bytes": 314880,
+              "archive_member_count": 256,
+              "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+              "compression": "none",
+              "entry_bytes": 1024,
+              "entry_count": 256,
+              "generator": "litchi-cfb-synthetic-v1",
+              "name": "cfb-many-small-incompressible",
+              "package_format": "CFB/OLE2",
+              "payload_kind": "incompressible",
+              "shape": "many-small",
+              "target_entry": "benchmark_stream_00255.bin",
+              "target_payload_bytes": 1024,
+              "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+              "uncompressed_payload_bytes": 262144,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 218772.0,
+              "p50": 224090,
+              "p95": 232791,
+              "p99": 232791,
+              "standard_deviation": 17302.211621639588,
+              "unit": "ns"
+            },
+            "execution": {
+              "logical_bytes": 262144,
+              "logical_tasks": 256,
+              "worker_count": 1
+            },
+            "sink": null
+          },
+          {
+            "case": "cfb_bulk_read_scaling",
+            "corpus": {
+              "archive_bytes": 314880,
+              "archive_member_count": 256,
+              "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+              "compression": "none",
+              "entry_bytes": 1024,
+              "entry_count": 256,
+              "generator": "litchi-cfb-synthetic-v1",
+              "name": "cfb-many-small-incompressible",
+              "package_format": "CFB/OLE2",
+              "payload_kind": "incompressible",
+              "shape": "many-small",
+              "target_entry": "benchmark_stream_00255.bin",
+              "target_payload_bytes": 1024,
+              "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+              "uncompressed_payload_bytes": 262144,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 262996.6666666667,
+              "p50": 262152,
+              "p95": 299514,
+              "p99": 299514,
+              "standard_deviation": 36102.41157226665,
+              "unit": "ns"
+            },
+            "execution": {
+              "logical_bytes": 262144,
+              "logical_tasks": 256,
+              "worker_count": 2
+            },
+            "sink": null
+          },
+          {
+            "case": "cfb_bulk_read_scaling",
+            "corpus": {
+              "archive_bytes": 314880,
+              "archive_member_count": 256,
+              "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+              "compression": "none",
+              "entry_bytes": 1024,
+              "entry_count": 256,
+              "generator": "litchi-cfb-synthetic-v1",
+              "name": "cfb-many-small-incompressible",
+              "package_format": "CFB/OLE2",
+              "payload_kind": "incompressible",
+              "shape": "many-small",
+              "target_entry": "benchmark_stream_00255.bin",
+              "target_payload_bytes": 1024,
+              "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+              "uncompressed_payload_bytes": 262144,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 191892.0,
+              "p50": 194879,
+              "p95": 215028,
+              "p99": 215028,
+              "standard_deviation": 24764.973187952375,
+              "unit": "ns"
+            },
+            "execution": {
+              "logical_bytes": 262144,
+              "logical_tasks": 256,
+              "worker_count": 4
+            },
+            "sink": null
+          },
+          {
+            "case": "cfb_bulk_read_scaling",
+            "corpus": {
+              "archive_bytes": 314880,
+              "archive_member_count": 256,
+              "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+              "compression": "none",
+              "entry_bytes": 1024,
+              "entry_count": 256,
+              "generator": "litchi-cfb-synthetic-v1",
+              "name": "cfb-many-small-incompressible",
+              "package_format": "CFB/OLE2",
+              "payload_kind": "incompressible",
+              "shape": "many-small",
+              "target_entry": "benchmark_stream_00255.bin",
+              "target_payload_bytes": 1024,
+              "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+              "uncompressed_payload_bytes": 262144,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 323296.6666666667,
+              "p50": 285484,
+              "p95": 400944,
+              "p99": 400944,
+              "standard_deviation": 67252.16280041359,
+              "unit": "ns"
+            },
+            "execution": {
+              "logical_bytes": 262144,
+              "logical_tasks": 256,
+              "worker_count": 8
+            },
+            "sink": null
+          },
+          {
+            "case": "cfb_bulk_read_scaling",
+            "corpus": {
+              "archive_bytes": 314880,
+              "archive_member_count": 256,
+              "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+              "compression": "none",
+              "entry_bytes": 1024,
+              "entry_count": 256,
+              "generator": "litchi-cfb-synthetic-v1",
+              "name": "cfb-many-small-incompressible",
+              "package_format": "CFB/OLE2",
+              "payload_kind": "incompressible",
+              "shape": "many-small",
+              "target_entry": "benchmark_stream_00255.bin",
+              "target_payload_bytes": 1024,
+              "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+              "uncompressed_payload_bytes": 262144,
+              "xlsx": null
+            },
+            "elapsed_ns": {
+              "mean": 254194.33333333334,
+              "p50": 225201,
+              "p95": 317328,
+              "p99": 317328,
+              "standard_deviation": 54735.89135415018,
+              "unit": "ns"
+            },
+            "execution": {
+              "logical_bytes": 262144,
+              "logical_tasks": 256,
+              "worker_count": 12
+            },
+            "sink": null
+          }
+        ],
+        "report": {
+          "bytes": 9218,
+          "present": true,
+          "retained": false,
+          "sha256": "29d42c708edd005d67c2f7a68f87be0c28b783403d9aacb81e47d358172a6a08"
+        },
+        "returncode": 0
+      },
+      "id": "cfb-scaling",
+      "physical_io_claim_scope": "strace is a whole-process read/write syscall trace only; it is not a source-byte, decompressed-byte, recompressed-byte, or memory-copy measurement",
+      "purpose": "explicit CFB bulk-read scaling",
+      "scaling": {
+        "baseline_workers": 1,
+        "classification": "nonideal_or_measurement_noise",
+        "metric": "elapsed_ns.p50",
+        "model": "Amdahl estimate from p50 only; descriptive, not a physical limit",
+        "rows": [
+          {
+            "amdahl_serial_fraction": null,
+            "amdahl_serial_fraction_raw": null,
+            "amdahl_serial_fraction_reason": "baseline",
+            "amdahl_serial_fraction_valid": null,
+            "efficiency_vs_baseline": 1.0,
+            "logical_bytes": 262144,
+            "logical_tasks": 256,
+            "p50_ns": 224090,
+            "speedup_vs_baseline": 1.0,
+            "workers": 1
+          },
+          {
+            "amdahl_serial_fraction": null,
+            "amdahl_serial_fraction_raw": 1.3397027979829534,
+            "amdahl_serial_fraction_reason": "outside_0_1",
+            "amdahl_serial_fraction_valid": false,
+            "efficiency_vs_baseline": 0.4274047117702707,
+            "logical_bytes": 262144,
+            "logical_tasks": 256,
+            "p50_ns": 262152,
+            "speedup_vs_baseline": 0.8548094235405413,
+            "workers": 2
+          },
+          {
+            "amdahl_serial_fraction": 0.8261948324333974,
+            "amdahl_serial_fraction_raw": 0.8261948324333974,
+            "amdahl_serial_fraction_reason": null,
+            "amdahl_serial_fraction_valid": true,
+            "efficiency_vs_baseline": 0.2874732526336855,
+            "logical_bytes": 262144,
+            "logical_tasks": 256,
+            "p50_ns": 194879,
+            "speedup_vs_baseline": 1.149893010534742,
+            "workers": 4
+          },
+          {
+            "amdahl_serial_fraction": null,
+            "amdahl_serial_fraction_raw": 1.3131088911980517,
+            "amdahl_serial_fraction_reason": "outside_0_1",
+            "amdahl_serial_fraction_valid": false,
+            "efficiency_vs_baseline": 0.0981184584775329,
+            "logical_bytes": 262144,
+            "logical_tasks": 256,
+            "p50_ns": 285484,
+            "speedup_vs_baseline": 0.7849476678202632,
+            "workers": 8
+          },
+          {
+            "amdahl_serial_fraction": null,
+            "amdahl_serial_fraction_raw": 1.0054085412111204,
+            "amdahl_serial_fraction_reason": "outside_0_1",
+            "amdahl_serial_fraction_valid": false,
+            "efficiency_vs_baseline": 0.08292221911388789,
+            "logical_bytes": 262144,
+            "logical_tasks": 256,
+            "p50_ns": 225201,
+            "speedup_vs_baseline": 0.9950666293666547,
+            "workers": 12
+          }
+        ],
+        "status": "observed"
+      },
+      "time": {
+        "command": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-resource-profile-p0kcdubc/cfb-scaling/baseline.time.txt",
+          "--",
+          "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+          "--warmup",
+          "1",
+          "--samples",
+          "3",
+          "--case",
+          "cfb_bulk_read_scaling",
+          "--shape",
+          "many-small",
+          "--payload",
+          "incompressible",
+          "--workers",
+          "1,2,4,8,available",
+          "--json",
+          "/tmp/litchi-resource-profile-p0kcdubc/cfb-scaling/harness.json"
+        ],
+        "parsed": {
+          "artifact": {
+            "bytes": 1005,
+            "present": true,
+            "retained": false,
+            "sha256": "5fcb30660a3cd89ed758c48a672ad32cd2905fe69dd20eeba09b0d424b7ed3f2"
+          },
+          "elapsed_wall_seconds": 0.08,
+          "involuntary_context_switches": 2066,
+          "major_page_faults": 0,
+          "max_rss_kib": 30208,
+          "minor_page_faults": 11448,
+          "status": "ok",
+          "system_seconds": 0.05,
+          "user_seconds": 0.06,
+          "voluntary_context_switches": 1101
+        },
+        "run": {
+          "command": [
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-scaling/baseline.time.txt",
+            "--",
+            "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+            "--warmup",
+            "1",
+            "--samples",
+            "3",
+            "--case",
+            "cfb_bulk_read_scaling",
+            "--shape",
+            "many-small",
+            "--payload",
+            "incompressible",
+            "--workers",
+            "1,2,4,8,available",
+            "--json",
+            "/tmp/litchi-resource-profile-p0kcdubc/cfb-scaling/harness.json"
+          ],
+          "returncode": 0,
+          "stderr": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr_excerpt": null,
+          "stdout": {
+            "bytes": 0,
+            "present": true,
+            "retained": false,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "timed_out": false,
+          "wall_ns": 114171532
+        }
+      }
+    }
+  ]
+}

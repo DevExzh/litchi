@@ -11,6 +11,47 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## Current-HEAD resource evidence (change 0115)
+
+The [current-HEAD resource record](results/resource-profile-current-head-0115.json)
+adds process resource and physical-observation context for five representative
+CRUD paths plus the two existing explicit scaling selectors.  It measures
+revision `be500459961471659f65c180de0e5fe98bc14e3a` with the release harness
+identified by SHA-256
+`1cbb2340eae13f4ed49d5baa27532e1f9b31d5781036bb2a302837bcd2210f5c`.
+The result is deliberately current-HEAD evidence only; it does not compare two
+revisions or claim an optimization.  The dirty-worktree release build completed
+successfully and is explicitly `build_content_bound`; the binary hash/size and
+captured source/content identity are bound to that build.
+
+The three-sample harness p50s were 59.68 ms for OPC source one-Part
+publication, 33.26 ms for managed XLSX batch edit/save, 10.02 ms for medium RTF
+streaming, 0.141 ms / 0.375 ms for the paired CFB MiniFAT/FAT selective reads,
+and 156.31 ms for the CFB same-length atomic-save operation.  `/usr/bin/time`
+maximum RSS was respectively 118,176, 66,132, 30,080, 30,336, and 110,884
+KiB.  Heaptrack process totals are retained in the JSON; they include startup,
+corpus construction, and profiler overhead and are not per-operation allocator
+attribution.
+
+The harness counters confirm the measured logical scope: OPC used 549 source
+reads / 16,785,201 bytes and one ordinary payload materialization; managed
+XLSX used 225 reads / 4,230,793 bytes and six materializations; RTF retained
+zero output bytes with a 37-byte authoring window; CFB save used 1,825 logical
+reads / 84,838,500 bytes and published 16,913,408 bytes with one changed span.
+The aggregate also records all six perf counters, read/write syscall-size
+histograms, tool versions, artifact SHA references, commands, corpus hashes,
+and null/unsupported states where a tool is unavailable.
+
+The 1/2/4/8/available execution-context widths were classified
+`nonideal_or_measurement_noise` for both many-small OPC and CFB: raw p50 showed
+no measured speedup at the 12-worker endpoints (OPC 567,473 -> 789,610 ns;
+CFB 224,090 -> 225,201 ns), and out-of-range Amdahl fractions are represented
+as null estimates with validity flags.  This is a bounded host observation, not a
+conclusion about all documents or hardware.  Syscall counts are whole-process
+`strace` observations and must not be interpreted as logical source bytes,
+decompressed bytes, recompressed bytes, or memory-copy volume.  Cold-cache,
+remote-range, before/after, and allocation-attribution claims remain open.
+
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
