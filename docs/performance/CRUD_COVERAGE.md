@@ -701,9 +701,22 @@ from that sum. Untimed gates reopen the result, compare semantic cells and
 package topology/relationships, verify raw media identity and exact hashes; the
 source-backed pair additionally checks raw local/central ZIP identity for every
 unselected member, while eager checks retain semantic/topology/media-payload
-identity. The harness also
-exercise source-backed exact no-op, clear, and physical-remove behavior. Source
-read and successful materialization counters are reported outside timing.
+identity. The harness also exercises source-backed exact no-op, clear, and
+physical-remove behavior. Source read and successful materialization counters
+are reported outside timing.
+
+Change 0109 adds an opt-in managed source-backed tranche for the same committed
+XLSX value-only editor: one cell, deterministic `ceil(1%)`, exact-256, and a
+bounded two-worksheet two-cell transaction, plus an unmanaged source-backed
+two-worksheet control. These controls use matched finite cache policies and
+report separate open/plan/commit/publication/reopen vectors, source read bytes,
+payload materializations, cache/Budget diagnostics, output and canonical
+semantic hashes, exact untouched raw-member fingerprints, and release-to-zero
+gates. The managed Budget covers retained and in-flight OPC `PartData` payloads
+only; parsed stores, metadata, staging, rewritten candidates and output buffers
+remain outside that accounting. No controlled release ABBA has been run for
+this tranche, so it makes no speedup, allocation, RSS, hardware, cold-I/O,
+decompression or real-producer claim.
 Change 0096 retains a CPU-pinned balanced release ABBA comparison for those six
 source-backed selectors. The p50 geomean improves 21.66%/22.65% and p95 improves
 21.38%/22.70% in the two directions, with exact output hashes. Physical source
