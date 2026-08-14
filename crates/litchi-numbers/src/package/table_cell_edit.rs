@@ -1065,15 +1065,10 @@ fn commit_existing_scalar_tiles(
                     authored
                         .formulas
                         .len()
-                        .checked_mul(4)
+                        .checked_mul(3)
                         .ok_or(Error::InvalidSource { path })?,
                 ),
-                transaction_work: usize_u64(
-                    authored
-                        .canonical_match_work(&existing, path)?
-                        .checked_add(authored.supplied_cache_match_work(&existing, path)?)
-                        .ok_or(Error::InvalidSource { path })?,
-                ),
+                transaction_work: usize_u64(authored.canonical_match_work(&existing, path)?),
                 ..budget::Usage::default()
             };
             budget.authorize(canonical_match_usage)?;
@@ -1085,15 +1080,15 @@ fn commit_existing_scalar_tiles(
                         return Err(error);
                     },
                 };
-            let supplied_caches_unchanged =
-                match authored.supplied_caches_match_existing(&changes, &existing, path) {
-                    Ok(unchanged) => unchanged,
-                    Err(error) => {
-                        budget.cancel_authorization();
-                        return Err(error);
-                    },
-                };
             budget.record_authorized(canonical_match_usage)?;
+            let supplied_caches_unchanged = authored.supplied_caches_match_existing(
+                &changes,
+                &existing,
+                source,
+                &target.storage.lists.string,
+                &mut budget,
+                path,
+            )?;
             let _existing_cache_count = existing.caches.len();
             for formula in &authored.formulas {
                 if changes

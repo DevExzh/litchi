@@ -1122,6 +1122,7 @@ class BoundaryPolicyTests(unittest.TestCase):
         self.assertEqual(
             boundaries.RETIRED_IWA_KEYNOTE_METHODS,
             (
+                "set_slide_name",
                 "set_slide_title",
                 "replace_slide_title",
                 "clear_slide_title",
@@ -1142,6 +1143,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             path = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "legacy/editor.rs"
             path.parent.mkdir(parents=True)
             declarations = [
+                ("set_slide_name", "pub fn set_slide_name() {}"),
                 ("set_slide_title", "fn r#set_slide_title() {}"),
                 ("replace_slide_title", "pub fn replace_slide_title() {}"),
                 ("clear_slide_title", "pub(crate) const fn clear_slide_title() {}"),
@@ -1171,6 +1173,33 @@ class BoundaryPolicyTests(unittest.TestCase):
                     f"{name}: crates/litchi-iwa/src/keynote/legacy/editor.rs:{index}"
                     for index, (name, _) in enumerate(declarations, start=1)
                 ),
+            )
+
+    def test_retired_iwa_keynote_slide_name_example_and_readme_cannot_return(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / boundaries.IWA_KEYNOTE_SOURCE_ROOT).mkdir(parents=True)
+            example = root / boundaries.RETIRED_IWA_KEYNOTE_SLIDE_NAME_EXAMPLE
+            example.parent.mkdir(parents=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.write_text(
+                'keynote.set_slide_name(0, Some("Opening"))?;\n',
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_keynote_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "retired litchi-iwa Keynote slide-name README call "
+                    "set_slide_name: crates/litchi-iwa/README.md:1",
+                    "retired litchi-iwa Keynote slide-name example returned: "
+                    "crates/litchi-iwa/examples/rename_keynote_slide.rs",
+                ],
             )
 
     def test_iwa_keynote_method_policy_matches_only_exact_host_declarations(self) -> None:

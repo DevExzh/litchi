@@ -588,28 +588,13 @@ fn slide_background_rejects_invalid_inputs_transactionally() {
 }
 
 #[test]
-fn reads_placeholder_text_and_edits_navigator_name_by_slide_index() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+fn reads_placeholder_text_without_mutating_navigator_names() {
+    let editor = KeynoteEditor::from_package(test_package()).unwrap();
     let slides = editor.slides().unwrap();
     assert_eq!(slides.len(), 2);
     assert_eq!(slides[0].title.as_deref(), Some("Old title"));
     assert_eq!(slides[0].body.as_deref(), Some("Old body 🚀"));
     assert_eq!(slides[0].notes.as_deref(), Some("Speaker 🚀"));
-
-    editor.set_slide_name(0, Some("Agenda 🚀")).unwrap();
-    let slides = editor.slides().unwrap();
-    assert_eq!(slides[0].title.as_deref(), Some("Old title"));
-    assert_eq!(slides[0].body.as_deref(), Some("Old body 🚀"));
-    assert_eq!(slides[0].notes.as_deref(), Some("Speaker 🚀"));
-    assert_eq!(slides[0].name.as_deref(), Some("Agenda 🚀"));
-
-    let before = editor.to_bytes().unwrap();
-    assert!(editor.set_slide_name(2, Some("missing")).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
-    assert!(editor.set_slide_name(0, Some("bad\0name")).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
-    editor.set_slide_name(0, None).unwrap();
-    assert_eq!(editor.slides().unwrap()[0].name, None);
 }
 
 #[test]
@@ -3421,41 +3406,6 @@ fn transition_animation_parameters_reader_rejects_malformed_wire() {
         };
         assert!(rejected, "mutation {mutation}");
     }
-}
-
-#[test]
-fn slide_name_updates_preserve_unknown_wire_and_restore_exact_component() {
-    let mut package = test_package();
-    package
-        .update_archive("Index/Document.iwa", |archive| {
-            for (identifier, field_number) in [(2, 99), (3, 98)] {
-                let object = archive.object_mut(identifier).unwrap();
-                let mut message = object.messages[0].clone();
-                append_unknown_varint(&mut message.data, field_number, 900 + identifier);
-                object.replace_message(0, message)?;
-            }
-            Ok(())
-        })
-        .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
-    let document_before = editor
-        .package()
-        .archive("Index/Document.iwa")
-        .unwrap()
-        .to_bytes()
-        .unwrap();
-    editor.set_slide_name(0, Some("Temporary")).unwrap();
-    editor.set_slide_name(0, None).unwrap();
-
-    assert_eq!(
-        editor
-            .package()
-            .archive("Index/Document.iwa")
-            .unwrap()
-            .to_bytes()
-            .unwrap(),
-        document_before
-    );
 }
 
 #[test]
