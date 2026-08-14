@@ -8,12 +8,14 @@ claimed.
 
 ## Scope and corpus identity
 
-The standalone `tools/perf-baseline` harness now exposes six selectors:
+The standalone `tools/perf-baseline` harness now exposes eight selectors:
 
 * `ppt_pictures_eager_open` and `ppt_pictures_source_backed_open`
 * `ppt_pictures_eager_first_image` and `ppt_pictures_source_backed_first_image`
 * `ppt_pictures_eager_cached_repeat` and
   `ppt_pictures_source_backed_cached_repeat`
+* `ppt_pictures_eager_open_all_images` and
+  `ppt_pictures_source_backed_open_all_images`
 
 The default 36-case/198-record matrix is unchanged. iWork remains outside this
 tranche while the `iwa-*` crates are being changed separately.
@@ -48,21 +50,27 @@ the actual `Pictures` payload range.
 ## Timing and source evidence
 
 Open selectors time package construction plus presentation open, without an
-image query. First-query selectors construct/open outside the interval and
-time the first `images()` call. Repeated-query selectors perform one untimed
-verified query, then time the second query. The source-backed open interval
-includes `SourceBackedPackage::from_read_at_with_limits`; query intervals keep
-package/open work outside timing. Warm-up snapshots are excluded from result
-vectors.
+image query. Cold-query selectors construct/open outside the interval and time
+one `images()` call, which returns all 32 images. Repeated-query selectors
+perform one untimed verified query, then time the second query. The fresh
+open-all-images selectors directly time package open, presentation open, and
+one all-images query in the same interval, so no phase medians need to be
+added. Warm-up samples are excluded from result vectors.
 
-The source summary reports total instrumented `ReadAt` calls/bytes and calls/
-bytes whose requested ranges overlap the contiguous `Pictures` payload window
-in this generated fixture. The gates and runner require zero overlap during
-open, the full stream byte count during the first query, and zero additional
-overlap during the repeated source-backed query. These are fixture-scoped,
-observable source-read counters, not a general CFB sector-map or internal
-materialization count. Eager results intentionally leave source counter
-vectors empty because no instrumented source is involved.
+Source-backed latency samples use immutable, uninstrumented
+`litchi_core::OwnedSource`; construction of that prepared source is outside
+the intervals. Eager paths likewise construct their borrowed `Cursor` before
+the timer. Harness counter atomics therefore do not bias only one side of a
+latency comparison. The JSON identifies the timed and evidence adapters.
+
+After all elapsed samples finish, the source summary runs independent untimed
+`InstrumentedSource` replays and reports their total `ReadAt` calls/bytes plus
+calls/bytes overlapping the contiguous `Pictures` payload window in this
+generated fixture. The gates require zero overlap during open, the full stream
+byte count during a cold query, zero additional reads during a cached query,
+and one full stream overlap during fresh first use. These are not counters from
+the timed instances, a general CFB sector-map, or an internal materialization
+count. Eager results intentionally leave counter vectors empty.
 
 The harness verifies all queried images against the canonical semantic digest,
 but it does not infer a speedup or a private cache/materialization event from
@@ -72,6 +80,6 @@ samples and resource evidence is required for any performance claim.
 ## Verification
 
 The focused harness test builds the corpus twice, checks deterministic archive
-and manifest identity, runs all six selectors, and asserts the phase-specific
+and manifest identity, runs all eight selectors, and asserts the phase-specific
 source-range evidence. The locked harness check/test and formatting/diff checks
 are the tranche gates; no files are staged or committed by this change.
