@@ -21,9 +21,14 @@
         "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/Cargo.toml"
       ],
       "executed": true,
-      "provenance_status": "build_command_executed",
+      "build_succeeded": true,
+      "provenance_status": "build_succeeded_source_snapshot_only",
+      "pre_build_snapshot_captured": false,
+      "post_build_snapshot_captured": true,
+      "snapshot_complete": false,
+      "snapshot_match": null,
       "returncode": 0,
-      "source_binding": "captured_after_build",
+      "source_binding": "captured_post_build_only",
       "stderr": {
         "bytes": 759,
         "present": true,
@@ -42,13 +47,41 @@
     },
     "provenance": {
       "binary_hash_is_exact": true,
-      "rerun_after": null,
-      "rerun_command": null,
-      "rerun_required": false,
-      "source_binary_binding": "cargo build command completed in this invocation; source/content identity was captured",
-      "status": "build_content_bound"
+      "build_succeeded": true,
+      "cryptographic_source_binary_binding": false,
+      "post_build_worktree_dirty": true,
+      "rerun_after": "a clean run with pre-build snapshot capture",
+      "rerun_command": [
+        "python3",
+        "tools/perf_resource_profile.py",
+        "run",
+        "--build",
+        "--binary",
+        "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+        "--output",
+        "/home/zhuhe/CodeProjects/litchi/docs/performance/results/resource-profile-current-head-0115.json",
+        "--warmup",
+        "1",
+        "--samples",
+        "3",
+        "--timeout",
+        "600.0"
+      ],
+      "rerun_reasons": [
+        "pre-build source snapshot was not captured by the original run",
+        "post-build worktree was dirty",
+        "untracked content hashes were not retained by the original run"
+      ],
+      "rerun_required": true,
+      "snapshot_atomic": false,
+      "snapshots_captured": false,
+      "snapshots_complete": false,
+      "snapshots_match": null,
+      "source_binary_binding": "not established: the exact binary hash and successful build are recorded, but this post-build dirty snapshot is not a complete source-to-binary binding",
+      "status": "build_succeeded_source_snapshot_only"
     },
     "source_content_identity": {
+      "git_worktree_dirty": true,
       "harness_lock": {
         "bytes": 55508,
         "path": "/home/zhuhe/CodeProjects/litchi/tools/perf-baseline/Cargo.lock",
@@ -68,7 +101,7 @@
       },
       "head_tree": "739ba8e610208d2528d580595106a88787143098",
       "revision": "be500459961471659f65c180de0e5fe98bc14e3a",
-      "scope": "HEAD tree plus exact tracked diffs and status path identity; combined with the binary provenance, this identifies the captured source/content snapshot",
+      "scope": "Post-build HEAD tree plus exact tracked diffs and status path identity; the original run did not retain untracked-content hashes or a pre-build snapshot, and this dirty non-atomic snapshot is not cryptographic source-to-binary proof",
       "staged_diff": {
         "available": true,
         "bytes": 0,
@@ -83,7 +116,21 @@
         "available": true,
         "bytes": 49538,
         "sha256": "58a78363d20bd4db858f01a96f33735ac418ea0199a010367242780ad90a6f00"
-      }
+      },
+      "untracked_content": {
+        "status": "not_captured",
+        "error": "Original frozen run predates bounded untracked-content hashing; no pre-build data fabricated.",
+        "entries": null,
+        "total_bytes": null
+      },
+      "snapshot_atomic": false,
+      "snapshot_status": "incomplete"
+    },
+    "source_content_identity_pre_build": null,
+    "source_content_identity_post_build": {
+      "captured": true,
+      "reference": "source_content_identity",
+      "note": "Only the post-build source snapshot was retained by the original run."
     }
   },
   "configuration": {

@@ -30,13 +30,17 @@ The aggregate was produced with three timed samples and one warm-up per
 workload.  External `/usr/bin/time`, perf, strace, and heaptrack probes use one
 sample and include process start-up and profiler overhead.  The worktree was
 dirty from unrelated concurrent edits.  The locked release build completed
-successfully and the result is `build_content_bound`; binary hash/size and
-captured source/content identity are bound to that build.  The recorded HEAD
-tree is `739ba8e610208d2528d580595106a88787143098`, with status-z SHA-256
+successfully, so the exact binary hash/size and successful build are recorded.
+The original run retained only a post-build dirty source snapshot; it did not
+capture the pre-build identity or bounded untracked-file contents, so the
+result is `build_succeeded_source_snapshot_only`, not a complete or
+cryptographic source-to-binary binding.  The recorded HEAD tree is
+`739ba8e610208d2528d580595106a88787143098`, with status-z SHA-256
 `94b0a8c2fdd8f508e18cbb3278b21abea36a535c270cf748e7a81a7fe1cc08ed` and
 head-to-worktree diff SHA-256
 `58a78363d20bd4db858f01a96f33735ac418ea0199a010367242780ad90a6f00` over
-49,538 bytes.
+49,538 bytes.  A clean rerun with pre/post snapshots and untracked-content
+hashing is required before claiming source-to-binary binding.
 
 | Workload / corpus | Harness p50 (ns) | Harness p95 (ns) | `/usr/bin/time` max RSS (KiB) | Heaptrack calls / allocated bytes / peak heap / peak RSS |
 |---|---:|---:|---:|---:|

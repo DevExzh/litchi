@@ -18,17 +18,21 @@ The measured revision is `be500459961471659f65c180de0e5fe98bc14e3a` and the
 release binary is SHA-256
 `1cbb2340eae13f4ed49d5baa27532e1f9b31d5781036bb2a302837bcd2210f5c` with
 36,646,512 bytes.  The aggregate reports a dirty worktree because unrelated
-agent edits were present.  The locked release build completed successfully
-(`build_content_bound`), so the binary hash/size and captured source/content
-identity are bound to this recorded build.  The source identity includes HEAD
-tree `739ba8e610208d2528d580595106a88787143098`, status-z SHA-256
+agent edits were present.  The locked release build completed successfully,
+so the exact binary hash/size and successful build are recorded.  The original
+run retained only a post-build dirty source snapshot; it did not capture the
+pre-build identity or bounded untracked-file contents, so this is explicitly
+`build_succeeded_source_snapshot_only`, not a complete or cryptographic
+source-to-binary binding.  The source identity includes HEAD tree
+`739ba8e610208d2528d580595106a88787143098`, status-z SHA-256
 `94b0a8c2fdd8f508e18cbb3278b21abea36a535c270cf748e7a81a7fe1cc08ed`, and
 head-to-worktree diff SHA-256
 `58a78363d20bd4db858f01a96f33735ac418ea0199a010367242780ad90a6f00` over
 49,538 bytes; the harness manifest and lockfile are respectively SHA-256
 `a86e3cd2aa6a93c5192ad22f958ec25b6cafae02430ee3bd731eb5b987e4d007` and
-`14f1246f8ac9c810bfffd8beb3cd7b0feb0ba68c769a0695491b8f4b9de965f7`.  The
-recorded build command is:
+`14f1246f8ac9c810bfffd8beb3cd7b0feb0ba68c769a0695491b8f4b9de965f7`.  A clean
+rerun with pre/post snapshots and untracked-content hashing is required before
+claiming source-to-binary binding.  The recorded build command is:
 
 ```sh
 cargo build --release --locked --manifest-path tools/perf-baseline/Cargo.toml

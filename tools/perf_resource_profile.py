@@ -24,6 +24,7 @@ import os
 import platform
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -41,6 +42,9 @@ DEFAULT_BINARY = (
     REPO_ROOT / "tools" / "perf-baseline" / "target" / "release" / "litchi-perf-baseline"
 )
 DEFAULT_OUTPUT = REPO_ROOT / "docs" / "performance" / "results" / "resource-profile-current-head-0115.json"
+MAX_UNTRACKED_FILES = 4096
+MAX_UNTRACKED_FILE_BYTES = 16 * 1024 * 1024
+MAX_UNTRACKED_BYTES = 64 * 1024 * 1024
 
 DEFAULT_WORKLOADS: tuple[dict[str, Any], ...] = (
     {
@@ -344,26 +348,203 @@ def file_content_identity(path: Path) -> dict[str, Any]:
     }
 
 
-def source_content_identity() -> dict[str, Any]:
-    status_bytes = git_command_bytes("status", "--porcelain=v1", "-z")
+def _untracked_status_paths(status_bytes: bytes) -> list[str]:
+    paths: list[str] = []
+    for record in status_bytes.split(b"\0"):
+        if record.startswith(b"?? "):
+            paths.append(os.fsdecode(record[3:]))
+    return sorted(set(paths))
+
+
+def untracked_content_identity(
+    status_bytes: bytes | None,
+    *,
+    repo_root: Path = REPO_ROOT,
+) -> dict[str, Any]:
+    """Hash every untracked file named by ``git status -z`` within bounded limits.
+
+    The result is explicitly ``error`` when a path cannot be read, escapes the
+    repository, or exceeds a file/count/aggregate budget.  A partial list is
+    retained for diagnosis, but callers must not treat it as a complete source
+    snapshot unless the status is ``ok``.
+    """
+    limits = {
+        "max_files": MAX_UNTRACKED_FILES,
+        "max_file_bytes": MAX_UNTRACKED_FILE_BYTES,
+        "max_total_bytes": MAX_UNTRACKED_BYTES,
+    }
+    if status_bytes is None:
+        return {
+            "status": "error",
+            "error": "git status bytes unavailable",
+            "entries": [],
+            "total_bytes": 0,
+            "limits": limits,
+        }
+    entries: list[dict[str, Any]] = []
+    total_bytes = 0
+    error: str | None = None
+
+    def fail(message: str) -> None:
+        nonlocal error
+        if error is None:
+            error = message
+
+    def add_path(path: Path, relative: str) -> None:
+        nonlocal total_bytes
+        if error is not None:
+            return
+        try:
+            relative_path = Path(relative)
+            if relative_path.is_absolute() or ".." in relative_path.parts:
+                fail(f"untracked path escapes repository: {relative}")
+                return
+            path = repo_root.joinpath(*relative_path.parts)
+            path.relative_to(repo_root)
+            ancestor = repo_root
+            for component in relative_path.parts[:-1]:
+                ancestor /= component
+                ancestor_stat = ancestor.lstat()
+                if stat.S_ISLNK(ancestor_stat.st_mode):
+                    fail(f"untracked path crosses symlinked ancestor: {relative}")
+                    return
+                if not stat.S_ISDIR(ancestor_stat.st_mode):
+                    fail(f"untracked path ancestor is not a directory: {relative}")
+                    return
+            stat_result = path.lstat()
+        except (OSError, ValueError) as exc:
+            fail(f"cannot inspect untracked path {relative}: {exc}")
+            return
+        if stat.S_ISDIR(stat_result.st_mode):
+            try:
+                children = sorted(path.iterdir(), key=lambda child: child.name)
+            except OSError as exc:
+                fail(f"cannot enumerate untracked directory {relative}: {exc}")
+                return
+            for child in children:
+                child_relative = f"{relative.rstrip('/')}/{child.name}"
+                add_path(child, child_relative)
+            return
+        if len(entries) >= MAX_UNTRACKED_FILES:
+            fail(f"untracked file limit exceeded ({MAX_UNTRACKED_FILES})")
+            return
+        if stat.S_ISLNK(stat_result.st_mode):
+            try:
+                target = os.readlink(path)
+                target_bytes = os.fsencode(target)
+            except OSError as exc:
+                fail(f"cannot read untracked symlink {relative}: {exc}")
+                return
+            if len(target_bytes) > MAX_UNTRACKED_FILE_BYTES:
+                fail(f"untracked symlink target exceeds limit: {relative}")
+                return
+            if total_bytes + len(target_bytes) > MAX_UNTRACKED_BYTES:
+                fail(f"untracked file aggregate limit exceeded at symlink: {relative}")
+                return
+            total_bytes += len(target_bytes)
+            entries.append(
+                {
+                    "path": relative,
+                    "kind": "symlink",
+                    "target_sha256": sha256_bytes(target_bytes),
+                    "target_bytes": len(target_bytes),
+                }
+            )
+            return
+        if not stat.S_ISREG(stat_result.st_mode):
+            fail(f"unsupported untracked path kind: {relative}")
+            return
+        digest = hashlib.sha256()
+        file_bytes = 0
+        try:
+            with path.open("rb") as handle:
+                while True:
+                    block = handle.read(1024 * 1024)
+                    if not block:
+                        break
+                    file_bytes += len(block)
+                    if file_bytes > MAX_UNTRACKED_FILE_BYTES:
+                        fail(f"untracked file exceeds per-file limit: {relative}")
+                        return
+                    total_candidate = total_bytes + file_bytes
+                    if total_candidate > MAX_UNTRACKED_BYTES:
+                        fail(f"untracked file aggregate limit exceeded at: {relative}")
+                        return
+                    digest.update(block)
+        except OSError as exc:
+            fail(f"cannot read untracked file {relative}: {exc}")
+            return
+        total_bytes += file_bytes
+        entries.append(
+            {
+                "path": relative,
+                "kind": "file",
+                "sha256": digest.hexdigest(),
+                "bytes": file_bytes,
+            }
+        )
+
+    for relative in _untracked_status_paths(status_bytes):
+        add_path(repo_root / relative, relative)
+        if error is not None:
+            break
     return {
-        "revision": git_output("rev-parse", "HEAD"),
-        "head_tree": git_output("rev-parse", "HEAD^{tree}"),
+        "status": "error" if error is not None else "ok",
+        "error": error,
+        "entries": sorted(entries, key=lambda entry: entry["path"]),
+        "total_bytes": total_bytes,
+        "limits": limits,
+    }
+
+
+def source_content_identity() -> dict[str, Any]:
+    status_bytes = git_command_bytes(
+        "status", "--porcelain=v1", "-z", "--untracked-files=all"
+    )
+    revision = git_output("rev-parse", "HEAD")
+    head_tree = git_output("rev-parse", "HEAD^{tree}")
+    unstaged_diff = git_output_sha256("diff", "--binary", "--no-ext-diff")
+    staged_diff = git_output_sha256("diff", "--binary", "--no-ext-diff", "--cached")
+    head_to_worktree_diff = git_output_sha256(
+        "diff", "--binary", "--no-ext-diff", "HEAD"
+    )
+    harness_manifest = file_content_identity(HARNESS_MANIFEST)
+    harness_lock = file_content_identity(HARNESS_MANIFEST.with_name("Cargo.lock"))
+    untracked = untracked_content_identity(status_bytes)
+    snapshot_complete = all(
+        (
+            status_bytes is not None,
+            revision is not None,
+            head_tree is not None,
+            unstaged_diff["available"],
+            staged_diff["available"],
+            head_to_worktree_diff["available"],
+            harness_manifest["present"],
+            harness_lock["present"],
+            untracked["status"] == "ok",
+        )
+    )
+    return {
+        "revision": revision,
+        "head_tree": head_tree,
+        "git_worktree_dirty": bool(status_bytes),
+        "snapshot_status": "complete" if snapshot_complete else "incomplete",
         "status_z": {
             "available": status_bytes is not None,
             "sha256": sha256_bytes(status_bytes) if status_bytes is not None else None,
             "bytes": len(status_bytes) if status_bytes is not None else None,
         },
-        "unstaged_diff": git_output_sha256("diff", "--binary", "--no-ext-diff"),
-        "staged_diff": git_output_sha256("diff", "--binary", "--no-ext-diff", "--cached"),
-        "head_to_worktree_diff": git_output_sha256(
-            "diff", "--binary", "--no-ext-diff", "HEAD"
-        ),
-        "harness_manifest": file_content_identity(HARNESS_MANIFEST),
-        "harness_lock": file_content_identity(HARNESS_MANIFEST.with_name("Cargo.lock")),
+        "unstaged_diff": unstaged_diff,
+        "staged_diff": staged_diff,
+        "head_to_worktree_diff": head_to_worktree_diff,
+        "harness_manifest": harness_manifest,
+        "harness_lock": harness_lock,
+        "untracked_content": untracked,
+        "snapshot_atomic": False,
         "scope": (
-            "HEAD tree plus exact tracked diffs and status path identity; combined with the "
-            "binary provenance, this identifies the captured source/content snapshot"
+            "HEAD tree plus exact tracked diffs, status path identity, and bounded untracked "
+            "content; pre/post snapshots are non-atomic and are not cryptographic "
+            "source-to-binary proof"
         ),
     }
 
@@ -996,27 +1177,89 @@ def build_identity(
     build_command: Sequence[str] | None,
     build_result: dict[str, Any] | None,
     source_identity: dict[str, Any],
+    pre_build_source_identity: dict[str, Any] | None,
     rerun_command: Sequence[str],
 ) -> dict[str, Any]:
-    build_executed = bool(build_result and build_result.get("executed"))
+    build_executed = build_result is not None and build_result.get("executed") is True
+    build_succeeded = (
+        build_executed
+        and build_result.get("returncode") == 0
+        and build_result.get("timed_out") is False
+    )
+    snapshots_captured = pre_build_source_identity is not None
+    snapshots_complete = (
+        snapshots_captured
+        and source_identity.get("snapshot_status") == "complete"
+        and pre_build_source_identity.get("snapshot_status") == "complete"
+    )
+    snapshots_match = (
+        pre_build_source_identity == source_identity if snapshots_captured else None
+    )
+    post_build_dirty = source_identity.get("git_worktree_dirty") is True
+    if not build_executed:
+        provenance_status = "prebuilt_binary_hash_only"
+    elif not build_succeeded:
+        provenance_status = "build_failed"
+    elif not snapshots_captured or not snapshots_complete or not snapshots_match or post_build_dirty:
+        provenance_status = "build_succeeded_source_snapshot_only"
+    else:
+        provenance_status = "build_succeeded_matching_source_snapshots"
+    normalized_build_result = dict(build_result or {})
+    normalized_build_result.update(
+        {
+            "build_succeeded": build_succeeded,
+            "provenance_status": provenance_status,
+            "pre_build_snapshot_captured": snapshots_captured,
+            "post_build_snapshot_captured": True,
+            "snapshot_complete": snapshots_complete,
+            "snapshot_match": snapshots_match,
+        }
+    )
+    rerun_reasons: list[str] = []
+    if not build_executed:
+        rerun_reasons.append("binary was prebuilt and not built in this invocation")
+    elif not build_succeeded:
+        rerun_reasons.append("build did not complete successfully without timeout")
+    if build_succeeded and not snapshots_captured:
+        rerun_reasons.append("pre-build source snapshot was not captured")
+    if build_succeeded and not snapshots_complete:
+        rerun_reasons.append("source snapshot was incomplete")
+    if build_succeeded and snapshots_captured and not snapshots_match:
+        rerun_reasons.append("pre-build and post-build source snapshots differ")
+    if build_succeeded and post_build_dirty:
+        rerun_reasons.append("post-build worktree is dirty")
+    rerun_required = provenance_status in {
+        "prebuilt_binary_hash_only",
+        "build_failed",
+        "build_succeeded_source_snapshot_only",
+    }
     identity = {
         "binary": str(binary),
         "binary_sha256": sha256_file(binary) if binary.is_file() else None,
         "binary_bytes": binary.stat().st_size if binary.is_file() else None,
         "build_command": command_record(build_command) if build_command else None,
-        "build_result": build_result,
+        "build_result": normalized_build_result,
         "source_content_identity": source_identity,
+        "source_content_identity_pre_build": pre_build_source_identity,
+        "source_content_identity_post_build": source_identity,
         "provenance": {
-            "status": "build_content_bound" if build_executed else "prebuilt_binary_hash_only",
+            "status": provenance_status,
             "binary_hash_is_exact": binary.is_file(),
+            "build_succeeded": build_succeeded,
+            "snapshots_captured": snapshots_captured,
+            "snapshots_complete": snapshots_complete,
+            "snapshots_match": snapshots_match,
+            "post_build_worktree_dirty": post_build_dirty,
             "source_binary_binding": (
-                "cargo build command completed in this invocation; source/content identity was captured"
-                if build_executed
-                else "not established: this invocation profiled a prebuilt binary"
+                "non-atomic matching source snapshots only; no cryptographic source-to-binary proof"
+                if provenance_status == "build_succeeded_matching_source_snapshots"
+                else "not established: binary hash is exact, but the build/source binding conditions were not all met"
             ),
-            "rerun_required": not build_executed,
-            "rerun_after": "current production batches settle" if not build_executed else None,
-            "rerun_command": command_record(rerun_command) if not build_executed else None,
+            "snapshot_atomic": False,
+            "cryptographic_source_binary_binding": False,
+            "rerun_required": rerun_required,
+            "rerun_reasons": rerun_reasons,
+            "rerun_command": command_record(rerun_command) if rerun_required else None,
         },
     }
     return identity
@@ -1040,6 +1283,7 @@ def run_profile(arguments: argparse.Namespace) -> int:
         "rerun_required": True,
         "rerun_after": "current production batches settle",
     }
+    pre_build_source_identity = source_content_identity()
     if arguments.build:
         build_stdout_fd, build_stdout_name = tempfile.mkstemp(
             prefix="litchi-resource-build-", suffix=".stdout"
@@ -1063,8 +1307,8 @@ def run_profile(arguments: argparse.Namespace) -> int:
             build_stderr.unlink(missing_ok=True)
         build_result = {
             "executed": True,
-            "provenance_status": "build_command_executed",
-            "source_binding": "captured_after_build",
+            "provenance_status": "build_succeeded",
+            "source_binding": "captured_pre_and_post_build",
             **build_run,
         }
         if build_run["returncode"] != 0:
@@ -1139,6 +1383,7 @@ def run_profile(arguments: argparse.Namespace) -> int:
                 build_command=build_command,
                 build_result=build_result,
                 source_identity=source_identity,
+                pre_build_source_identity=pre_build_source_identity,
                 rerun_command=rerun_command,
             ),
             "configuration": {
