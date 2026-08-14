@@ -24,6 +24,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"
 soapberry-zip = { path = "../../crates/soapberry-zip" }
-rustix = { version = "1.1.4", features = ["fs"] }
+rustix = { version = "1.1.4", features = ["fs", "param"] }
 
 [workspace]
