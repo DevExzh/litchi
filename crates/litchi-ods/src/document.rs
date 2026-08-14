@@ -1154,6 +1154,52 @@ impl Edit {
         )
     }
 
+    /// Transfer one bounded plain-scalar worksheet from another immutable ODS snapshot.
+    ///
+    /// The source closure accepts only scalar/string/boolean/number/date/time cells, bounded
+    /// repeated rows/cells, and direct plain text paragraphs. Formulas, styles, ranges, merges,
+    /// validations, drawings, charts, images, scripts/events, external references, unknown XML,
+    /// encryption, signatures, protection, and ambiguous destination names are refused before
+    /// the destination candidate is staged. The source table fragment is copied lexically apart
+    /// from its destination `table:name`; the source snapshot is never changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or ambiguous source selector, invalid/colliding destination
+    /// name, invalid position, unsupported dependency owner, namespace collision, finite work or
+    /// output bound, or provenance splice failure. Every refusal leaves this edit unchanged.
+    pub fn transfer_plain_scalar_sheet_from(
+        &mut self,
+        source: &Snapshot,
+        source_sheet: &str,
+        destination_name: &str,
+        position: SheetPosition,
+    ) -> Result<()> {
+        let bytes = crate::advanced::transfer_plain_scalar_sheet(
+            &self.candidate,
+            source.as_bytes(),
+            source_sheet,
+            destination_name,
+            position,
+            self.before.limits.package_bytes,
+        )?;
+        let source_id = source.fingerprint().as_hex();
+        let source_sheet_id = DiagnosticFingerprint::of(source_sheet.as_bytes()).as_hex();
+        let destination_id = DiagnosticFingerprint::of(destination_name.as_bytes()).as_hex();
+        let position_id = match position {
+            SheetPosition::First => "first".to_string(),
+            SheetPosition::Last => "last".to_string(),
+            SheetPosition::Index(index) => format!("index:{index}"),
+        };
+        self.stage_spliced(
+            "sheet.transfer",
+            &format!(
+                "source:{source_id}/sheet:{source_sheet_id}->sha256:{destination_id}@{position_id}"
+            ),
+            bytes,
+        )
+    }
+
     /// Add one compact automatic table-cell style to `content.xml`.
     ///
     /// # Errors
@@ -2791,6 +2837,7 @@ fn known_operation(operation: &str) -> bool {
             | "sheet.remove"
             | "sheet.move"
             | "sheet.copy"
+            | "sheet.transfer"
             | "style.put"
             | "style-graph.put"
             | "style-graph.replace"
