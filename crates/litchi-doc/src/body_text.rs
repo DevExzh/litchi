@@ -19,6 +19,9 @@
     reason = "the ordinary immutable DOC root uses checked conversions and propagated typed errors"
 )]
 
+/// Positional, source-backed same-length Unicode paragraph edits.
+pub mod source;
+
 use crate::DateTime;
 use crate::package::Error as PackageError;
 use crate::tracked_revision::{Limits, Revision, RevisionEditor, RevisionKind, RevisionMetadata};
