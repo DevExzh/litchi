@@ -965,6 +965,20 @@ are correctness/coverage evidence only. Change 0094 has a pinned 30-warmup,
 and only modest total-p50 movement; FAT retains one 4 MiB read request/call.
 No p99, cold-filesystem, simulated high-latency range, allocation, peak-RSS,
 or DOC/XLS/PPT semantic claim is accepted. See the [compact ABBA summary](results/cfb-selective-range-abba-0106-summary.json).
+
+Change 0103 adds a separate pinned release ABBA capture for
+`cfb_file_same_length_overlay_atomic_save` on CPU 2 (five warm-ups and 30
+fresh-child samples per leg). The atomic save's duplicate post-emission scan
+was removed mechanically, taking its scan shape from `4N` to `3N`; direct
+`write_to` retains its scan. Before legs report 2,084 logical calls and
+101,751,908 requested/returned bytes; after legs report 1,825 calls and
+84,838,500 bytes. The exact reductions are 259 calls (12.4280%) and
+16,913,408 bytes (16.6222%), with the same 16,913,408-byte output SHA-256 on
+all legs. The paired p50 directions disagree (+3.7963% and -10.0141%), so
+this is logical source-work and correctness evidence only; no latency,
+allocation, RSS, peak-memory, physical-cold, high-latency, or storage claim is
+accepted. The four raw reports and compact summary are in
+[`change 0103`](changes/0103-cfb-atomic-save-scan-evidence.md).
 The previously measured
 default matrix remains 198 records across deterministic ZIP/OPC, positional
 CFB/OPC, source-backed XLSX,
@@ -1082,9 +1096,13 @@ the required selected-Part/compressor buffer remains to be attributed and
 reduced independently.
 
 CFB now has a public bounded exact-range read with release ABBA evidence for a
-MiniFAT target, but that result is still substrate-only: no DOC/XLS/PPT
-semantic owner consumes the seam, FAT tail behavior is withheld, and p99,
-cold/high-latency range, allocation, and peak-RSS evidence remain open.
+MiniFAT target and exact logical source-work evidence for the atomic overlay
+save scan reduction. Both results remain substrate-only: no DOC/XLS/PPT
+semantic owner consumes the exact-range seam, FAT tail behavior is withheld,
+and p99, cold/high-latency range, allocation, peak-RSS, and storage-device
+evidence remain open. The atomic-save latency directions disagree, so its
+16.6222% logical-byte and 12.4280% logical-call reductions must not be read as
+a speedup.
 
 Other high-priority gaps are physical cold-filesystem and real range-source
 matrices beyond the debug smoke and repeated tmpfs release capture, threshold

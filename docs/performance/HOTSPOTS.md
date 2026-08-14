@@ -579,6 +579,16 @@ Confirmed source facts:
   topology-changing render. No DOC/XLS/PPT end-to-end consumer or speed claim
   is adopted yet; generic CFB substrate correctness is not semantic format
   coverage.
+- Atomic CFB overlay save now skips only the duplicate post-emission complete
+  fingerprint scan. The saved path is mechanically `4N -> 3N`; direct
+  `write_to` retains its post-emission scan. A pinned warm release ABBA run on
+  the four-megabyte/five-entry corpus reduces exact logical source reads from
+  101,751,908 bytes and 2,084 calls to 84,838,500 bytes and 1,825 calls:
+  16,913,408 bytes (16.6222%) and 259 calls (12.4280%). All four legs publish
+  the same 16,913,408-byte digest. The paired p50 directions are +3.7963% and
+  -10.0141%, so no latency/speedup, RSS/allocation, physical-cold, or storage
+  claim is accepted. Parent-wall and warm process-I/O counters remain
+  descriptive only; see [change 0103](changes/0103-cfb-atomic-save-scan-evidence.md).
 - PPT root slide-order capture now passes its package-owned validated
   `OleFile` to independent live-document inspection instead of rebuilding the
   CFB index. Large root-open p50 improves 8.78% and allocation calls fall
