@@ -2,9 +2,10 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through:
-[`change 0094`](changes/0094-cfb-selective-read-evidence.md) (the latest
-bounded CFB substrate evidence; release filesystem evidence is [`0089`](changes/0089-filesystem-release-repeated-evidence.md))
+Evidence through: [`change 0117`](changes/0117-ppt-pictures-release-evidence.md)
+(current-HEAD native PPT lazy-`Pictures` observation; the latest bounded CFB
+substrate evidence remains [`0094`](changes/0094-cfb-selective-read-evidence.md),
+and release filesystem evidence is [`0089`](changes/0089-filesystem-release-repeated-evidence.md))
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -723,6 +724,17 @@ Measured large-corpus priorities:
    37.522 to 34.227 us p50, the direct text-edit transaction improves from
    206.209 to 177.089 us, and checked root adoption reduces the full operation
    from 352.306 to 286.805 us p50.
+
+Change 0117 adds pinned balanced release probes for native PPT lazy `Pictures`.
+On the generated eight-slide/32-image corpus, independent untimed replay proves
+that source-backed open reads 79,265 metadata/mandatory-stream bytes with zero
+`Pictures` overlap, the cold all-images query reads the complete 8,389,408-byte
+stream once, and a cached query adds no reads. A directly timed fresh
+open-plus-all-images pair prevents misleading sums of phase medians. Both the
+100-sample preflight and 200-sample/cooldown attempt failed the fixed
+same-implementation drift gates, so no latency result is accepted. Allocation,
+RSS attribution, cold-cache, producer-breadth, and save-path evidence remain
+open.
 
 An additive source-backed DOC owner now covers one ordinary Word97+ main-story
 paragraph when its text and terminating mark are contained in one uncompressed

@@ -342,10 +342,24 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**201 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
-repair-plan selector was added. The
+**216 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
+
+Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
+balanced release attempts. The matched corpus has eight slides and 32
+deterministic 256 KiB PNG records. Source-backed timed samples use
+uninstrumented `OwnedSource`; separate untimed replays prove that open overlaps
+zero `Pictures` bytes, the cold query reads the complete stream once, and a
+cached query reads nothing further. Both latency attempts were rejected:
+same-implementation p50 or p95 drift exceeded the predeclared 5%/10% limits in
+every phase, including the directly timed fresh open-plus-all-images case.
+The raw distributions and whole-process RSS observations are retained, but no
+latency, allocation, RSS-attribution, cold-cache, or save-path result is
+accepted. See
+[`0117`](changes/0117-ppt-pictures-release-evidence.md) and the
+[raw report](results/ppt-pictures-release-0117.json).
 
 Five filesystem cases now exercise eager/source-backed OPC open, eager/source-
 backed one-Part atomic save, and same-length CFB atomic overlay save. A
