@@ -333,7 +333,7 @@ struct State {
     semantic: OnceCell<Document>,
     #[cfg(test)]
     semantic_decode_attempts: AtomicUsize,
-    #[cfg(test)]
+    #[cfg(all(test, feature = "internal-iwork-source"))]
     source_classification_attempts: usize,
 }
 
@@ -484,6 +484,7 @@ impl Package {
     ///
     /// Returns [`ReadError`] when the source belongs to another application or
     /// the Keynote root/index cannot be validated.
+    #[cfg(feature = "internal-iwork-source")]
     #[doc(hidden)]
     pub fn __from_prepared_source(
         source: PreparedSource,
@@ -536,7 +537,7 @@ impl Package {
                 semantic: OnceCell::new(),
                 #[cfg(test)]
                 semantic_decode_attempts: AtomicUsize::new(0),
-                #[cfg(test)]
+                #[cfg(all(test, feature = "internal-iwork-source"))]
                 source_classification_attempts,
             }),
         };
@@ -560,7 +561,7 @@ impl Package {
                 semantic: OnceCell::new(),
                 #[cfg(test)]
                 semantic_decode_attempts: AtomicUsize::new(0),
-                #[cfg(test)]
+                #[cfg(all(test, feature = "internal-iwork-source"))]
                 source_classification_attempts: 0,
             }),
         };
@@ -1281,6 +1282,7 @@ impl Package {
 ///
 /// Returns [`ReadError`] when the source belongs to another application or
 /// its Keynote graph is malformed or exceeds the supplied semantic limits.
+#[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub fn __semantic_document_from_prepared_source(
     source: PreparedSource,
@@ -3279,6 +3281,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn prepared_source_skips_redundant_keynote_classification()
     -> Result<(), Box<dyn std::error::Error>> {

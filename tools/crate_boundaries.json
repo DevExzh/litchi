@@ -174,15 +174,18 @@
     ],
     "litchi-odf-common": [
       "litchi-core",
-      "soapberry-zip"
+      "soapberry-zip",
+      "xml-minifier"
     ],
     "litchi-odf-formula": [
       "litchi-core",
-      "litchi-odf-common"
+      "litchi-odf-common",
+      "soapberry-zip"
     ],
     "litchi-odg": [
       "litchi-core",
-      "litchi-odf-common"
+      "litchi-odf-common",
+      "soapberry-zip"
     ],
     "litchi-odi": [
       "litchi-core",
@@ -228,11 +231,13 @@
     "litchi-opc": [
       "litchi-core",
       "litchi-sign",
-      "soapberry-zip"
+      "soapberry-zip",
+      "xml-minifier"
     ],
     "litchi-oth": [
       "litchi-core",
-      "litchi-odf-common"
+      "litchi-odf-common",
+      "soapberry-zip"
     ],
     "litchi-pages": [
       "litchi-core",
@@ -256,7 +261,8 @@
       "litchi-ole-common",
       "litchi-opc",
       "litchi-sign",
-      "litchi-vba"
+      "litchi-vba",
+      "soapberry-zip"
     ],
     "litchi-pptx": [
       "litchi-core",
@@ -264,7 +270,8 @@
       "litchi-drawingml",
       "litchi-fonts",
       "litchi-ooxml-common",
-      "litchi-opc"
+      "litchi-opc",
+      "soapberry-zip"
     ],
     "litchi-py": [
       "litchi"
@@ -326,7 +333,8 @@
       "litchi-opc",
       "litchi-sheet",
       "litchi-spreadsheet-drawing",
-      "litchi-vba"
+      "litchi-vba",
+      "soapberry-zip"
     ],
     "soapberry-zip": [],
     "xml-minifier": [
@@ -348,7 +356,31 @@
       "dependency": "soapberry-zip"
     },
     {
+      "dependent": "litchi-odf-formula",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-odg",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-oth",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-ppt",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-pptx",
+      "dependency": "soapberry-zip"
+    },
+    {
       "dependent": "litchi-sign",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-xlsx",
       "dependency": "soapberry-zip"
     }
   ],

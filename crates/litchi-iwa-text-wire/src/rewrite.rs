@@ -20,6 +20,7 @@ use litchi_iwa_common::varint::{
     decode_varint_from_bytes, encode_varint_into, encoded_len as varint_len,
 };
 use litchi_iwa_protos::text_storage_codec;
+use litchi_iwa_text::storage::{Error as StorageError, Run, Storage};
 
 const ROOT_TEXT_FIELD: u32 = 3;
 const TABLE_ENTRY_FIELD: u32 = 1;
@@ -265,6 +266,36 @@ impl StorageValidation {
     #[must_use]
     pub const fn has_unknown_wire_fields(self) -> bool {
         self.has_unknown_wire_fields
+    }
+}
+
+/// A fully validated storage payload and its archive-free semantic projection.
+///
+/// The projection owns one UTF-8 text buffer and the validated runs that refer
+/// to it. No generated protobuf message or native storage archive is retained.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValidatedStorage {
+    validation: StorageValidation,
+    storage: Storage,
+}
+
+impl ValidatedStorage {
+    /// Return the resource and text facts proven while decoding this value.
+    #[must_use]
+    pub const fn validation(&self) -> StorageValidation {
+        self.validation
+    }
+
+    /// Borrow the archive-free semantic storage projection.
+    #[must_use]
+    pub fn storage(&self) -> &Storage {
+        &self.storage
+    }
+
+    /// Consume the validated value and return its archive-free storage.
+    #[must_use]
+    pub fn into_storage(self) -> Storage {
+        self.storage
     }
 }
 
@@ -2407,6 +2438,144 @@ pub fn validate_storage_with_limits(
     })
 }
 
+/// Decode one storage payload with strict full-tree validation and materialize
+/// its archive-free semantic text projection in one pass over the borrowed
+/// Buffa fragments.
+///
+/// The complete known storage tree is validated before the borrowed text view
+/// is entered. The returned value owns only semantic UTF-8 text and runs;
+/// native protobuf/archive fields are not retained. Empty field-3 occurrences
+/// remain as zero-length runs, preserving the source fragment cardinality.
+///
+/// # Errors
+///
+/// Returns a typed bounded validation, projection, allocation, or semantic
+/// storage error. Unknown fields remain opaque and are reported in the
+/// returned [`StorageValidation`].
+pub fn decode_storage_with_limits(
+    source: &[u8],
+    limits: RewriteLimits,
+) -> RewriteResult<ValidatedStorage> {
+    let text_preflight = preflight_root_text(source, limits)?;
+    let counters = validate_full_storage_tree(source, text_preflight.utf16_len, limits)?;
+    let validation_work =
+        preflight_validation_work(source.len(), text_preflight, &counters, limits)?;
+
+    let element_memory = checked_mul(
+        text_preflight.fragments,
+        size_of::<&str>(),
+        "Buffa fragment metadata",
+    )?;
+    let options =
+        text_storage_codec::DecodeOptions::new(limits.max_message_bytes(), 0, element_memory, 1);
+    let view = text_storage_codec::decode_storage_text(source, options)
+        .map_err(|error| RewriteError::Projection(error.to_string()))?;
+    if view.len() != text_preflight.fragments {
+        return Err(invalid_owned(format!(
+            "Buffa returned {} fragments after raw preflight counted {}",
+            view.len(),
+            text_preflight.fragments
+        )));
+    }
+
+    let storage = materialize_validated_storage(view.fragments(), text_preflight, limits)?;
+    let validation = StorageValidation {
+        utf8_len: text_preflight.text_bytes,
+        utf16_len: text_preflight.utf16_len,
+        fragments: text_preflight.fragments,
+        fields: counters.fields,
+        table_entries: counters.table_entries,
+        reference_occurrences: counters.references,
+        validation_work,
+        has_unknown_wire_fields: counters.unknown_fields != 0,
+    };
+    Ok(ValidatedStorage {
+        validation,
+        storage,
+    })
+}
+
+fn materialize_validated_storage<'source>(
+    fragments: impl ExactSizeIterator<Item = &'source str>,
+    preflight: TextPreflight,
+    limits: RewriteLimits,
+) -> RewriteResult<Storage> {
+    if fragments.len() != preflight.fragments {
+        return Err(invalid_owned(format!(
+            "Buffa returned {} fragments after raw preflight counted {}",
+            fragments.len(),
+            preflight.fragments
+        )));
+    }
+
+    let mut text = String::new();
+    text.try_reserve_exact(preflight.text_bytes)
+        .map_err(|_allocation| RewriteError::Allocation {
+            resource: "semantic storage text",
+            amount: preflight.text_bytes,
+        })?;
+    let mut runs = Vec::new();
+    runs.try_reserve_exact(preflight.fragments)
+        .map_err(|_allocation| RewriteError::Allocation {
+            resource: "semantic storage runs",
+            amount: preflight.fragments,
+        })?;
+
+    let mut observed_fragments = 0usize;
+    let mut observed_text_bytes = 0usize;
+    let mut observed_utf16_len = 0usize;
+    for fragment in fragments {
+        observed_fragments = checked_add(observed_fragments, 1, "materialized fragment count")?;
+        observed_text_bytes = checked_add(
+            observed_text_bytes,
+            fragment.len(),
+            "materialized UTF-8 length",
+        )?;
+        enforce_limit("text bytes", observed_text_bytes, limits.max_text_bytes())?;
+        for character in fragment.chars() {
+            observed_utf16_len = checked_add(
+                observed_utf16_len,
+                character.len_utf16(),
+                "materialized UTF-16 length",
+            )?;
+        }
+
+        let start = text.len();
+        let length = fragment.len();
+        text.push_str(fragment);
+        runs.push(Run::new(start, length));
+    }
+
+    if observed_fragments != preflight.fragments {
+        return Err(invalid(
+            "materialized fragment count disagrees with raw preflight",
+        ));
+    }
+    if observed_text_bytes != preflight.text_bytes || text.len() != preflight.text_bytes {
+        return Err(invalid(
+            "materialized UTF-8 length disagrees with raw preflight",
+        ));
+    }
+    if observed_utf16_len != preflight.utf16_len {
+        return Err(invalid(
+            "materialized UTF-16 length disagrees with raw preflight",
+        ));
+    }
+
+    Storage::try_from_parts(text, runs).map_err(|error| match error {
+        StorageError::TooManyRuns { actual, limit } => invalid_owned(format!(
+            "materialized storage contains {actual} runs; maximum is {limit}"
+        )),
+        StorageError::RunOutOfBounds { index } => {
+            invalid_owned(format!("materialized storage run {index} is out of bounds"))
+        },
+        StorageError::RunNotOnBoundary { index } => invalid_owned(format!(
+            "materialized storage run {index} is not on a UTF-8 boundary"
+        )),
+        _ => invalid("materialized storage rejected the semantic runs"),
+    })
+}
+
 fn validate_full_storage_tree(
     source: &[u8],
     text_len: usize,
@@ -4024,6 +4193,194 @@ mod tests {
         assert!(matches!(
             validate_storage_with_limits(&malformed, RewriteLimits::default()),
             Err(RewriteError::InvalidFormat(_))
+        ));
+    }
+
+    #[test]
+    fn validated_storage_matches_the_prost_semantic_oracle() {
+        let archive = StorageArchive {
+            text: vec!["first".to_owned(), String::new(), "最後".to_owned()],
+            ..StorageArchive::default()
+        };
+        let source = archive.encode_to_vec();
+        let oracle = crate::from_archive(
+            StorageArchive::decode(source.as_slice())
+                .unwrap_or_else(|error| panic!("Prost should decode test storage: {error}")),
+        )
+        .unwrap_or_else(|error| panic!("Prost semantic oracle should convert: {error}"));
+        let decoded = decode_storage_with_limits(&source, RewriteLimits::default())
+            .unwrap_or_else(|error| panic!("strict storage decode should succeed: {error}"));
+
+        assert_eq!(decoded.storage(), &oracle);
+        assert_eq!(decoded.storage().text(), "first最後");
+        assert_eq!(
+            decoded.storage().runs(),
+            [Run::new(0, 5), Run::new(5, 0), Run::new(5, 6)]
+        );
+    }
+
+    #[test]
+    fn validated_storage_retains_empty_runs_and_matches_validation_facts() {
+        let source = [
+            raw_length_delimited(3, &[]),
+            raw_length_delimited(3, b"A"),
+            raw_length_delimited(3, &[]),
+            raw_length_delimited(3, "😀".as_bytes()),
+        ]
+        .concat();
+        let decoded = decode_storage_with_limits(&source, RewriteLimits::default())
+            .unwrap_or_else(|error| panic!("strict storage decode should succeed: {error}"));
+        let validation = decoded.validation();
+        let storage = decoded.storage();
+
+        assert_eq!(storage.text(), "A😀");
+        assert_eq!(
+            storage.runs(),
+            [
+                Run::new(0, 0),
+                Run::new(0, 1),
+                Run::new(1, 0),
+                Run::new(1, 4)
+            ]
+        );
+        assert_eq!(validation.utf8_len(), storage.text().len());
+        assert_eq!(
+            validation.utf16_len(),
+            storage.text().encode_utf16().count()
+        );
+        assert_eq!(validation.fragments(), storage.runs().len());
+        assert_eq!(
+            validation,
+            validate_storage_with_limits(&source, RewriteLimits::default())
+                .unwrap_or_else(|error| panic!("validation should succeed: {error}"))
+        );
+    }
+
+    #[test]
+    fn validated_storage_rejects_malformed_known_tables_before_projection() {
+        let malformed_entry = [raw_varint(1, 0), raw_length_delimited(2, &[])].concat();
+        let source = [
+            raw_length_delimited(3, b"safe"),
+            raw_length_delimited(8, &raw_length_delimited(1, &malformed_entry)),
+        ]
+        .concat();
+
+        assert!(matches!(
+            decode_storage_with_limits(&source, RewriteLimits::default()),
+            Err(RewriteError::InvalidFormat(_))
+        ));
+    }
+
+    #[test]
+    fn validated_storage_accepts_exact_limits_and_rejects_each_minus_one_boundary() {
+        let source = [
+            raw_length_delimited(3, b"ab"),
+            raw_length_delimited(3, "😀".as_bytes()),
+        ]
+        .concat();
+        let baseline_limits = RewriteLimits::new(1_024, 64, 4, 2, 6, 8, 8, 1_024, 16_384)
+            .unwrap_or_else(|error| panic!("baseline limits should be valid: {error}"));
+        let baseline = decode_storage_with_limits(&source, baseline_limits)
+            .unwrap_or_else(|error| panic!("baseline strict decode should succeed: {error}"));
+        let validation = baseline.validation();
+
+        let exact_work_limits = RewriteLimits::new(
+            1_024,
+            64,
+            4,
+            validation.fragments(),
+            validation.utf8_len(),
+            8,
+            8,
+            1_024,
+            validation.validation_work(),
+        )
+        .unwrap_or_else(|error| panic!("exact work limits should be valid: {error}"));
+        assert!(decode_storage_with_limits(&source, exact_work_limits).is_ok());
+        let almost_work_limits = RewriteLimits::new(
+            1_024,
+            64,
+            4,
+            validation.fragments(),
+            validation.utf8_len(),
+            8,
+            8,
+            1_024,
+            validation.validation_work() - 1,
+        )
+        .unwrap_or_else(|error| panic!("minus-one work limits should be valid: {error}"));
+        assert!(matches!(
+            decode_storage_with_limits(&source, almost_work_limits),
+            Err(RewriteError::LimitExceeded {
+                resource: "rewrite work",
+                ..
+            })
+        ));
+
+        let exact_text_limits = RewriteLimits::new(
+            1_024,
+            64,
+            4,
+            validation.fragments(),
+            validation.utf8_len(),
+            8,
+            8,
+            1_024,
+            16_384,
+        )
+        .unwrap_or_else(|error| panic!("exact text limits should be valid: {error}"));
+        assert!(decode_storage_with_limits(&source, exact_text_limits).is_ok());
+        let almost_text_limits = RewriteLimits::new(
+            1_024,
+            64,
+            4,
+            validation.fragments(),
+            validation.utf8_len() - 1,
+            8,
+            8,
+            1_024,
+            16_384,
+        )
+        .unwrap_or_else(|error| panic!("minus-one text limits should be valid: {error}"));
+        assert!(matches!(
+            decode_storage_with_limits(&source, almost_text_limits),
+            Err(RewriteError::LimitExceeded {
+                resource: "text bytes",
+                ..
+            })
+        ));
+
+        let exact_fragment_limits = RewriteLimits::new(
+            1_024,
+            64,
+            4,
+            validation.fragments(),
+            validation.utf8_len(),
+            8,
+            8,
+            1_024,
+            16_384,
+        )
+        .unwrap_or_else(|error| panic!("exact fragment limits should be valid: {error}"));
+        assert!(decode_storage_with_limits(&source, exact_fragment_limits).is_ok());
+        let almost_fragment_limits = RewriteLimits::new(
+            1_024,
+            64,
+            4,
+            validation.fragments() - 1,
+            validation.utf8_len(),
+            8,
+            8,
+            1_024,
+            16_384,
+        )
+        .unwrap_or_else(|error| panic!("minus-one fragment limits should be valid: {error}"));
+        assert!(matches!(
+            decode_storage_with_limits(&source, almost_fragment_limits),
+            Err(RewriteError::LimitExceeded {
+                resource: "text fragments",
+                ..
+            })
         ));
     }
 

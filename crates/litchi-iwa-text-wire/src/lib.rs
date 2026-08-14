@@ -12,8 +12,8 @@ mod rewrite;
 pub use rewrite::{
     PreparedStorageRewrite, RemovedObjectReference, RewriteBehavior, RewriteError, RewriteLimits,
     RewriteResult, StorageRewrite, StorageRewriteExecutionLimits, StorageRewriteExecutionReport,
-    StorageRewriteExecutionRequirements, StorageValidation,
-    prepare_storage_text_rewrite_with_behavior_and_limits,
+    StorageRewriteExecutionRequirements, StorageValidation, ValidatedStorage,
+    decode_storage_with_limits, prepare_storage_text_rewrite_with_behavior_and_limits,
     rewrite_storage_text_with_behavior_and_limits, rewrite_storage_text_with_limits,
     validate_storage_with_limits,
 };

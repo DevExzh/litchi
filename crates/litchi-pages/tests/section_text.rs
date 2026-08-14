@@ -1,4 +1,5 @@
 use std::io;
+use std::sync::{Arc, Barrier};
 
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::WireView};
@@ -708,6 +709,83 @@ fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> Te
 }
 
 #[test]
+fn concurrent_section_text_commits_are_isolated_and_source_remains_immutable() -> TestResult<()> {
+    let bytes = synthetic_package()?;
+    let package = Arc::new(Package::from_bytes(&bytes)?);
+    let source_pointer = package.source_bytes().as_ptr();
+    let barrier = Arc::new(Barrier::new(3));
+
+    let first_package = Arc::clone(&package);
+    let first_barrier = Arc::clone(&barrier);
+    let first = std::thread::spawn(move || {
+        first_barrier.wait();
+        let mut edit = first_package.edit_section_text(SectionSelector::index(0))?;
+        edit.set("parallel first")?;
+        edit.commit()
+    });
+
+    let last_package = Arc::clone(&package);
+    let last_barrier = Arc::clone(&barrier);
+    let last = std::thread::spawn(move || {
+        last_barrier.wait();
+        let mut edit = last_package.edit_section_text(SectionSelector::index(2))?;
+        edit.set("parallel last")?;
+        edit.commit()
+    });
+
+    barrier.wait();
+    let first = first
+        .join()
+        .map_err(|_| io::Error::other("first section editor panicked"))??;
+    let last = last
+        .join()
+        .map_err(|_| io::Error::other("last section editor panicked"))??;
+
+    assert_eq!(
+        first.package().section_text(SectionSelector::index(0))?,
+        "parallel first"
+    );
+    assert_eq!(
+        first.package().section_text(SectionSelector::index(1))?,
+        "Second東京"
+    );
+    assert_eq!(
+        first.package().section_text(SectionSelector::index(2))?,
+        "Third"
+    );
+    assert_eq!(
+        last.package().section_text(SectionSelector::index(0))?,
+        "First😀"
+    );
+    assert_eq!(
+        last.package().section_text(SectionSelector::index(1))?,
+        "Second東京"
+    );
+    assert_eq!(
+        last.package().section_text(SectionSelector::index(2))?,
+        "parallel last"
+    );
+    assert_ne!(
+        first.package().source_bytes(),
+        last.package().source_bytes()
+    );
+    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+
+    let first_restored = first
+        .package()
+        .apply_section_text(&first.patch().inverse())?;
+    assert_eq!(first_restored.package().source_bytes(), bytes);
+    let last_restored = last.package().apply_section_text(&last.patch().inverse())?;
+    assert_eq!(last_restored.package().source_bytes(), bytes);
+    assert!(matches!(
+        first.package().apply_section_text(last.patch()),
+        Err(SectionTextError::PatchConflict)
+    ));
+    Ok(())
+}
+
+#[test]
 fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestResult<()> {
     let bytes = synthetic_package()?;
     let package = Package::from_bytes(&bytes)?;
@@ -893,7 +971,7 @@ fn changed_text_respects_retained_output_limit() -> TestResult<()> {
 }
 
 #[test]
-fn malformed_known_text_tables_fail_closed_before_prost_projection() -> TestResult<()> {
+fn malformed_known_text_tables_fail_closed_before_lazy_projection() -> TestResult<()> {
     let bytes = package_with_duplicate_known_table()?;
     let error = Package::from_bytes(&bytes)
         .err()

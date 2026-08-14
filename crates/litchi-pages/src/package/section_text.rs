@@ -15,7 +15,6 @@ use super::{
     MAX_SECTIONS, NativeSectionReference, Package, PackageError, StorageWireLimitsError,
     decode_body_storage, effective_text_limit, find_object, is_body_text_message_type,
     native_section_references, root_references_with_limits, storage_rewrite_limits,
-    validate_section_table_wire_with_limits,
 };
 use crate::SectionSelector;
 
@@ -726,7 +725,7 @@ fn native_body(package: &Package) -> Result<NativeBodySnapshot, SectionTextError
     let object =
         find_object(components, identifier.get()).ok_or(SectionTextError::InvalidSource)?;
     let max_text_bytes = effective_text_limit(limits);
-    let (native, payload) = decode_body_storage(
+    let (storage, table_references) = decode_body_storage(
         &object.messages,
         identifier,
         MAX_SECTIONS,
@@ -734,17 +733,10 @@ fn native_body(package: &Package) -> Result<NativeBodySnapshot, SectionTextError
         limits,
     )
     .map_err(map_package_error)?;
-    validate_section_table_wire_with_limits(payload, &native, identifier, limits)
-        .map_err(map_package_error)?;
-    let references = native_section_references(&native, root.initial_section, MAX_SECTIONS)
-        .map_err(map_package_error)?;
-    let utf16_len = native
-        .text
-        .iter()
-        .try_fold(0usize, |length, fragment| {
-            length.checked_add(fragment.encode_utf16().count())
-        })
-        .ok_or(SectionTextError::InvalidSource)?;
+    let references =
+        native_section_references(table_references, root.initial_section, MAX_SECTIONS)
+            .map_err(map_package_error)?;
+    let utf16_len = storage.text().encode_utf16().count();
     Ok(NativeBodySnapshot {
         identifier,
         references,

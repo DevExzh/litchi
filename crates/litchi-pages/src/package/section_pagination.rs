@@ -18,7 +18,7 @@ use thiserror::Error;
 use super::{
     MAX_SECTIONS, NativeSectionReference, Package, PackageError, SECTION_MESSAGE_TYPE,
     decode_body_storage, effective_text_limit, find_object, native_section_references,
-    root_references_with_limits, validate_section_table_wire_with_limits,
+    root_references_with_limits,
 };
 use crate::{SectionSelector, section};
 
@@ -672,7 +672,7 @@ fn section_identifier_at(
     let body = find_object(components, body_identifier.get())
         .ok_or(SectionPaginationError::InvalidSource)?;
     let max_text_bytes = effective_text_limit(limits);
-    let (native, payload) = decode_body_storage(
+    let (_storage, table_references) = decode_body_storage(
         &body.messages,
         body_identifier,
         MAX_SECTIONS,
@@ -680,10 +680,9 @@ fn section_identifier_at(
         limits,
     )
     .map_err(map_package_error)?;
-    validate_section_table_wire_with_limits(payload, &native, body_identifier, limits)
-        .map_err(map_package_error)?;
-    let references = native_section_references(&native, root.initial_section, MAX_SECTIONS)
-        .map_err(map_package_error)?;
+    let references =
+        native_section_references(table_references, root.initial_section, MAX_SECTIONS)
+            .map_err(map_package_error)?;
     references
         .get(position.get())
         .copied()

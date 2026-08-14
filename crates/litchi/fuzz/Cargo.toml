@@ -81,6 +81,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "pages_section_text"
+path = "fuzz_targets/pages_section_text.rs"
+test = false
+doc = false
+bench = false
+
 [dependencies]
 libfuzzer-sys = "0.4"
 litchi = { path = "..", default-features = false, features = ["iwork"] }
