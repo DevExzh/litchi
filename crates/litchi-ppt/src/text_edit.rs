@@ -26,6 +26,8 @@ use litchi_cfb::{
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 
+mod source_range;
+
 const PPT_HEADER_LEN: usize = 8;
 const OFFICEART_SP_CONTAINER: u16 = 0xF004;
 const OFFICEART_SP: u16 = 0xF00A;
@@ -331,14 +333,12 @@ pub struct SourceBackedOptions {
 /// Immutable, source-backed legacy PPT snapshot.
 ///
 /// The source allocation is retained behind `Arc<dyn ReadAt>` and is never
-/// converted into an owned replacement artifact. Semantic reads materialize
-/// bounded copies of the `PowerPoint Document` and `Current User` streams
-/// because the existing live persist/slide resolver requires those complete
-/// streams; the common publisher still performs its full-artifact validation
-/// and fingerprint checks. Publication is a checked same-length splice in the
-/// existing `PowerPoint Document` stream. Embedded OLE storages are refused;
-/// the only accepted storage is the canonical `PP97_DUALSTORAGE` wrapper for
-/// the two selected streams.
+/// converted into an owned replacement artifact. Semantic reads fetch bounded
+/// selector metadata ranges and one selected slide; the common publisher still
+/// performs its full-artifact validation and fingerprint checks. Publication
+/// is a checked same-length splice in the existing `PowerPoint Document`
+/// stream. Embedded OLE storages are refused; the only accepted storage is the
+/// canonical `PP97_DUALSTORAGE` wrapper for the two selected streams.
 #[derive(Clone)]
 pub struct SourceSnapshot {
     inner: Arc<SourceInner>,
@@ -473,7 +473,7 @@ impl SourceSnapshot {
         let document_path = select_stream_path(&shared, &DOCUMENT_PATHS, "PowerPoint Document")?;
         let current_user_path = select_stream_path(&shared, &CURRENT_USER_PATHS, "Current User")?;
         ensure_matching_stream_topology(&document_path, &current_user_path)?;
-        let resolved = resolve_source_target(
+        let resolved = source_range::resolve_source_target(
             &shared,
             &document_path,
             &current_user_path,
@@ -958,7 +958,7 @@ fn publish_source_operation(
     let candidate_shared = SharedOleFile::open_with_limits(Arc::clone(&candidate), shared_limits)
         .map_err(map_ole_error)?;
     reject_macro_components(&candidate_shared)?;
-    let candidate_resolved = resolve_source_target(
+    let candidate_resolved = source_range::resolve_source_target(
         &candidate_shared,
         &operation.document_path,
         &operation.current_user_path,
@@ -1117,6 +1117,8 @@ fn ensure_matching_stream_topology(document: &[String], current_user: &[String])
     Ok(())
 }
 
+#[cfg(test)]
+#[allow(dead_code, reason = "retained as the owned differential oracle")]
 fn read_bounded_stream(
     shared: &SharedOleFile,
     path: &[String],
@@ -1176,6 +1178,7 @@ fn is_macro_storage_name(name: &str) -> bool {
         .any(|marker| name.eq_ignore_ascii_case(marker))
 }
 
+#[cfg(test)]
 fn reject_macro_records(
     document: &[u8],
     document_offset: usize,
@@ -1312,7 +1315,9 @@ struct SourceResolved {
     text: String,
 }
 
-fn resolve_source_target(
+#[cfg(test)]
+#[allow(dead_code, reason = "retained as the owned differential oracle")]
+fn resolve_source_target_owned(
     shared: &SharedOleFile,
     document_path: &[String],
     current_user_path: &[String],
@@ -1394,6 +1399,8 @@ struct SourceTextAtom {
     text: String,
 }
 
+#[cfg(test)]
+#[allow(dead_code, reason = "retained as the owned differential oracle")]
 fn inspect_source_text_atom(
     document: &[u8],
     slide_offset: usize,
@@ -1408,6 +1415,16 @@ fn inspect_source_text_atom(
     let slide_bytes = document
         .get(slide_offset..slide_end)
         .ok_or_else(|| PackageError::Corrupted("PPT slide range exceeds Document".into()))?;
+
+    inspect_source_text_atom_parts(slide_bytes, slide_offset, &slide, shape_id)
+}
+
+fn inspect_source_text_atom_parts(
+    slide_bytes: &[u8],
+    slide_offset: usize,
+    slide: &crate::Record,
+    shape_id: u32,
+) -> Result<SourceTextAtom> {
     if slide.record_type != RecordType::Slide {
         return Err(
             PackageError::Corrupted("selected persist record is not a Slide".into()).into(),
@@ -3278,10 +3295,10 @@ mod tests {
     use super::{Error, Position, Refusal, Snapshot, Target};
     use crate::Package;
     use crate::writer::Writer;
-    use litchi_cfb::{OleFile, OutputProgress, OverlayError, StreamSpliceLimits};
-    use litchi_core::OwnedSource;
+    use litchi_cfb::{OleFile, OutputProgress, OverlayError, SharedOleFile, StreamSpliceLimits};
+    use litchi_core::{OwnedSource, ReadAt, SourceVersion};
     use std::io::{self, Cursor, Write};
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     fn fixture(text: &str) -> Vec<u8> {
         let mut writer = Writer::new();
@@ -3296,6 +3313,177 @@ mod tests {
         Target::new(Position::new(0), Position::new(0))
     }
 
+    fn generated_fixture(slide_count: usize, shapes_per_slide: usize) -> Vec<u8> {
+        let mut writer = Writer::new();
+        for slide_index in 0..slide_count {
+            let slide = writer.add_slide().unwrap();
+            for shape_index in 0..shapes_per_slide {
+                let x = 10 + i32::try_from(shape_index).unwrap() * 260;
+                let text = format!("slide-{slide_index:02}-shape-{shape_index:02}");
+                writer.add_textbox(slide, x, 10, 240, 40, &text).unwrap();
+            }
+        }
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    }
+
+    #[derive(Debug, Default)]
+    struct ReadMetrics {
+        calls: usize,
+        bytes: usize,
+        max_request: usize,
+    }
+
+    struct CountingSource {
+        bytes: Arc<Vec<u8>>,
+        metrics: Arc<Mutex<ReadMetrics>>,
+        version: SourceVersion,
+    }
+
+    impl CountingSource {
+        fn new(bytes: Vec<u8>) -> (Self, Arc<Mutex<ReadMetrics>>) {
+            let metrics = Arc::new(Mutex::new(ReadMetrics::default()));
+            let source = Self {
+                bytes: Arc::new(bytes),
+                metrics: Arc::clone(&metrics),
+                version: SourceVersion::new(0x5050_5443, 0),
+            };
+            (source, metrics)
+        }
+
+        fn reset(metrics: &Arc<Mutex<ReadMetrics>>) {
+            *metrics.lock().unwrap() = ReadMetrics::default();
+        }
+    }
+
+    impl ReadAt for CountingSource {
+        fn len(&self) -> io::Result<u64> {
+            u64::try_from(self.bytes.len())
+                .map_err(|_error| io::Error::other("counting source length overflow"))
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let start = usize::try_from(offset).unwrap_or(usize::MAX);
+            let available = self.bytes.get(start..).unwrap_or_default();
+            let count = available.len().min(output.len());
+            output[..count].copy_from_slice(&available[..count]);
+            let mut metrics = self.metrics.lock().unwrap();
+            metrics.calls = metrics.calls.saturating_add(1);
+            metrics.bytes = metrics.bytes.saturating_add(count);
+            metrics.max_request = metrics.max_request.max(output.len());
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(self.version)
+        }
+    }
+
+    fn resolve_owned_and_range(
+        bytes: Vec<u8>,
+        target: Target,
+    ) -> (
+        super::SourceResolved,
+        super::SourceResolved,
+        Arc<Mutex<ReadMetrics>>,
+    ) {
+        let (counting, metrics) = CountingSource::new(bytes);
+        let source: Arc<dyn ReadAt> = Arc::new(counting);
+        let shared = SharedOleFile::open(Arc::clone(&source)).unwrap();
+        let document_path =
+            super::select_stream_path(&shared, &super::DOCUMENT_PATHS, "PowerPoint Document")
+                .unwrap();
+        let current_user_path =
+            super::select_stream_path(&shared, &super::CURRENT_USER_PATHS, "Current User").unwrap();
+        let limits = crate::RecordLimits::default();
+        let owned = super::resolve_source_target_owned(
+            &shared,
+            &document_path,
+            &current_user_path,
+            target,
+            limits,
+        )
+        .unwrap();
+        CountingSource::reset(&metrics);
+        let ranged = super::source_range::resolve_source_target(
+            &shared,
+            &document_path,
+            &current_user_path,
+            target,
+            limits,
+        )
+        .unwrap();
+        (owned, ranged, metrics)
+    }
+
+    fn live_document_bounds(source: &[u8]) -> (Vec<u8>, usize, usize) {
+        let mut ole = OleFile::open(Cursor::new(source.to_vec())).unwrap();
+        let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
+        let current_user = ole.open_stream(&["Current User"]).unwrap();
+        let directory = crate::slide::SlideDirectory::build(
+            &document,
+            &current_user,
+            &crate::embedded::object::Editor::inspect_live_mapping(&document, &current_user)
+                .unwrap(),
+        )
+        .unwrap();
+        let offset = directory.document_offset();
+        let (_record, consumed) = crate::Record::parse_strict_with_limits(
+            &document,
+            offset,
+            crate::RecordLimits::default(),
+        )
+        .unwrap();
+        (document, offset, offset + consumed)
+    }
+
+    fn record_children_offsets(data: &[u8], record_offset: usize) -> Vec<usize> {
+        let payload_len = u32::from_le_bytes(
+            data[record_offset + 4..record_offset + 8]
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        let payload_start = record_offset + 8;
+        let payload_end = payload_start + payload_len;
+        let mut children = Vec::new();
+        let mut offset = payload_start;
+        while offset < payload_end {
+            children.push(offset);
+            let child_len =
+                u32::from_le_bytes(data[offset + 4..offset + 8].try_into().unwrap()) as usize;
+            offset += 8 + child_len;
+        }
+        assert_eq!(offset, payload_end);
+        children
+    }
+
+    fn record_type_at(data: &[u8], offset: usize) -> u16 {
+        u16::from_le_bytes(data[offset + 2..offset + 4].try_into().unwrap())
+    }
+
+    fn mutate_document_stream(
+        source: Vec<u8>,
+        mutate: impl FnOnce(&mut Vec<u8>, usize, usize),
+    ) -> Vec<u8> {
+        let (mut document, document_offset, document_end) = live_document_bounds(&source);
+        mutate(&mut document, document_offset, document_end);
+        with_stream(source, &["PowerPoint Document"], &document)
+    }
+
+    fn find_nested_record_offset(data: &[u8], record_offset: usize, wanted: u16) -> Option<usize> {
+        if record_type_at(data, record_offset) == wanted {
+            return Some(record_offset);
+        }
+        let record_type = crate::RecordType::from(record_type_at(data, record_offset));
+        if !crate::Record::is_container_record(record_type) {
+            return None;
+        }
+        record_children_offsets(data, record_offset)
+            .into_iter()
+            .find_map(|child| find_nested_record_offset(data, child, wanted))
+    }
+
     fn raw_record(version: u16, instance: u16, record_type: u16, payload: &[u8]) -> Vec<u8> {
         let packed = (version & 0x000F) | ((instance & 0x0FFF) << 4);
         let length = u32::try_from(payload.len()).unwrap();
@@ -3305,6 +3493,93 @@ mod tests {
         bytes.extend_from_slice(&length.to_le_bytes());
         bytes.extend_from_slice(payload);
         bytes
+    }
+
+    fn current_user_stream(edit_offset: u32) -> Vec<u8> {
+        let mut stream = Vec::with_capacity(32);
+        stream.extend_from_slice(&[0, 0, 0xF6, 0x0F]);
+        stream.extend_from_slice(&24_u32.to_le_bytes());
+        stream.extend_from_slice(&20_u32.to_le_bytes());
+        stream.extend_from_slice(&0xE391_C05F_u32.to_le_bytes());
+        stream.extend_from_slice(&edit_offset.to_le_bytes());
+        stream.extend_from_slice(&0_u16.to_le_bytes());
+        stream.extend_from_slice(&0x03F4_u16.to_le_bytes());
+        stream.extend_from_slice(&[3, 0, 0, 0]);
+        stream.extend_from_slice(&8_u32.to_le_bytes());
+        stream
+    }
+
+    fn synthetic_history_source(
+        historical_version: u16,
+        historical_instance: u16,
+        historical_payload_len: usize,
+        historical_directory_offset: Option<u32>,
+    ) -> Vec<u8> {
+        use litchi_cfb::OleWriter;
+
+        let historical_directory = raw_record(0, 0, 6002, &[]);
+        let historical_offset = historical_directory.len();
+        let mut historical_payload = vec![0_u8; historical_payload_len];
+        if historical_payload_len >= 16 {
+            historical_payload[12..16].copy_from_slice(
+                &historical_directory_offset
+                    .unwrap_or_else(|| u32::try_from(historical_offset).unwrap())
+                    .to_le_bytes(),
+            );
+        }
+        let historical = raw_record(
+            historical_version,
+            historical_instance,
+            4085,
+            &historical_payload,
+        );
+        let current_directory_offset = historical_offset + historical.len();
+        let current_directory = raw_record(0, 0, 6002, &[]);
+        let current_edit_offset = current_directory_offset + current_directory.len();
+        let mut current_payload = vec![0_u8; 28];
+        current_payload[12..16].copy_from_slice(
+            &u32::try_from(current_directory_offset)
+                .unwrap()
+                .to_le_bytes(),
+        );
+        current_payload[16..20].copy_from_slice(&1_u32.to_le_bytes());
+        current_payload[20..24].copy_from_slice(&1_u32.to_le_bytes());
+        current_payload[8..12]
+            .copy_from_slice(&u32::try_from(historical_offset).unwrap().to_le_bytes());
+        let current_edit = raw_record(0, 0, 4085, &current_payload);
+        let document = [
+            historical_directory,
+            historical,
+            current_directory,
+            current_edit,
+        ]
+        .concat();
+
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["PowerPoint Document"], &document)
+            .unwrap();
+        writer
+            .create_stream(
+                &["Current User"],
+                &current_user_stream(u32::try_from(current_edit_offset).unwrap()),
+            )
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    }
+
+    fn resolve_synthetic_history(source: Vec<u8>) -> Result<(), Error> {
+        let shared = SharedOleFile::open(Arc::new(OwnedSource::new(source))).unwrap();
+        super::source_range::resolve_source_target(
+            &shared,
+            &["PowerPoint Document".to_string()],
+            &["Current User".to_string()],
+            target(),
+            crate::RecordLimits::default(),
+        )
+        .map(|_| ())
     }
 
     fn with_storage(source: Vec<u8>, path: &[&str]) -> Vec<u8> {
@@ -3625,6 +3900,186 @@ mod tests {
         assert!(matches!(
             limited.edit_text(target()),
             Err(Error::Package(crate::package::Error::ResourceLimit(_)))
+        ));
+    }
+
+    #[test]
+    fn source_range_resolver_matches_owned_oracle_and_reads_selected_slide_ranges() {
+        let bytes = generated_fixture(6, 4);
+        let target = Target::new(Position::new(5), Position::new(3));
+        let (owned, ranged, metrics) = resolve_owned_and_range(bytes.clone(), target);
+
+        assert_eq!(owned.target, ranged.target);
+        assert_eq!(owned.slide_persist_id, ranged.slide_persist_id);
+        assert_eq!(owned.atom_offset, ranged.atom_offset);
+        assert_eq!(owned.kind, ranged.kind);
+        assert_eq!(owned.payload, ranged.payload);
+        assert_eq!(owned.text, ranged.text);
+
+        let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+        let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
+        let metrics = metrics.lock().unwrap();
+        assert!(metrics.calls > 0);
+        assert!(metrics.bytes < document.len());
+        assert!(metrics.max_request < document.len());
+    }
+
+    #[test]
+    fn source_range_rejects_hostile_macro_duplicate_trailing_and_cycle_inputs() {
+        let macro_source = mutate_document_stream(fixture("abc"), |document, root, _end| {
+            let doc_info = record_children_offsets(document, root)
+                .into_iter()
+                .find(|&offset| record_type_at(document, offset) == 2000)
+                .unwrap();
+            let vba_info = record_children_offsets(document, doc_info)
+                .into_iter()
+                .find(|&offset| record_type_at(document, offset) == 1023)
+                .unwrap();
+            let atom = record_children_offsets(document, vba_info)
+                .into_iter()
+                .find(|&offset| record_type_at(document, offset) == 1024)
+                .unwrap();
+            document[atom + 8..atom + 12].copy_from_slice(&41_u32.to_le_bytes());
+            document[atom + 12..atom + 16].copy_from_slice(&1_u32.to_le_bytes());
+        });
+        let macro_snapshot =
+            super::SourceSnapshot::open(Arc::new(OwnedSource::new(macro_source))).unwrap();
+        assert!(matches!(
+            macro_snapshot.edit_text(target()),
+            Err(Error::Refused(Refusal::UnsupportedSource))
+        ));
+
+        let duplicate_source = mutate_document_stream(fixture("abc"), |document, root, _end| {
+            let doc_info = record_children_offsets(document, root)
+                .into_iter()
+                .find(|&offset| record_type_at(document, offset) == 2000)
+                .unwrap();
+            let vba_info = record_children_offsets(document, doc_info)
+                .into_iter()
+                .find(|&offset| record_type_at(document, offset) == 1023)
+                .unwrap();
+            document[doc_info + 2..doc_info + 4]
+                .copy_from_slice(&(crate::RecordType::SlideListWithText as u16).to_le_bytes());
+            document[vba_info + 2..vba_info + 4]
+                .copy_from_slice(&(crate::RecordType::SlideViewInfo as u16).to_le_bytes());
+        });
+        let duplicate_snapshot =
+            super::SourceSnapshot::open(Arc::new(OwnedSource::new(duplicate_source))).unwrap();
+        let duplicate_result = duplicate_snapshot.edit_text(target());
+        assert!(matches!(
+            duplicate_result,
+            Err(Error::Package(crate::package::Error::Corrupted(message)))
+                if message.contains("duplicate presentation SlideListWithTextContainer")
+        ));
+
+        let trailing_source = mutate_document_stream(fixture("abc"), |document, _root, _end| {
+            let slide = (0..document.len().saturating_sub(8))
+                .find(|&offset| record_type_at(document, offset) == crate::RecordType::Slide as u16)
+                .unwrap();
+            let drawing =
+                find_nested_record_offset(document, slide, crate::RecordType::PPDrawing as u16)
+                    .unwrap();
+            let payload_len =
+                u32::from_le_bytes(document[drawing + 4..drawing + 8].try_into().unwrap()) as usize;
+            assert!(payload_len > 8);
+            document[drawing + 4..drawing + 8]
+                .copy_from_slice(&(u32::try_from(payload_len - 1).unwrap()).to_le_bytes());
+        });
+        let trailing_snapshot =
+            super::SourceSnapshot::open(Arc::new(OwnedSource::new(trailing_source))).unwrap();
+        let trailing_result = trailing_snapshot.edit_text(target());
+        assert!(matches!(
+            trailing_result,
+            Err(Error::Package(crate::package::Error::Corrupted(message)))
+                if message.contains("truncated")
+                    || message.contains("trailing")
+                    || message.contains("extends beyond")
+        ));
+
+        let source = fixture("abc");
+        let mut ole = OleFile::open(Cursor::new(source.clone())).unwrap();
+        let current_user = ole.open_stream(&["Current User"]).unwrap();
+        let edit_offset = usize::try_from(
+            crate::CurrentUser::parse(&current_user)
+                .unwrap()
+                .current_edit_offset(),
+        )
+        .unwrap();
+        let cycle_source = mutate_document_stream(source, move |document, _root, _end| {
+            document[edit_offset + 16..edit_offset + 20]
+                .copy_from_slice(&(u32::try_from(edit_offset).unwrap()).to_le_bytes());
+        });
+        let cycle_snapshot =
+            super::SourceSnapshot::open(Arc::new(OwnedSource::new(cycle_source))).unwrap();
+        let cycle_result = cycle_snapshot.edit_text(target());
+        assert!(matches!(
+            cycle_result,
+            Err(Error::Package(crate::package::Error::Corrupted(message)))
+                if message.contains("cyclic or excessive UserEdit chain")
+        ));
+    }
+
+    #[test]
+    fn source_range_rejects_forged_historical_headers_and_directory_topology() {
+        for (version, instance, payload_len) in [(1, 0, 28), (0, 1, 28), (0, 0, 27), (0, 0, 33)] {
+            let result = resolve_synthetic_history(synthetic_history_source(
+                version,
+                instance,
+                payload_len,
+                None,
+            ));
+            assert!(matches!(
+                result,
+                Err(Error::Package(crate::package::Error::Corrupted(message)))
+                    if message.contains("historical UserEditAtom header")
+            ));
+        }
+
+        let result = resolve_synthetic_history(synthetic_history_source(0, 0, 28, Some(8)));
+        assert!(matches!(
+            result,
+            Err(Error::Package(crate::package::Error::Corrupted(message)))
+                if message.contains("PersistDirectoryAtom does not precede")
+        ));
+
+        let source = fixture("abc");
+        let mut ole = OleFile::open(Cursor::new(source.clone())).unwrap();
+        let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
+        let current_user = ole.open_stream(&["Current User"]).unwrap();
+        let edit_offset = usize::try_from(
+            crate::CurrentUser::parse(&current_user)
+                .unwrap()
+                .current_edit_offset(),
+        )
+        .unwrap();
+        let directory_offset = usize::try_from(u32::from_le_bytes(
+            document[edit_offset + 20..edit_offset + 24]
+                .try_into()
+                .unwrap(),
+        ))
+        .unwrap();
+        for packed_header in [1_u16, 0x0010_u16] {
+            let mut forged = document.clone();
+            forged[directory_offset..directory_offset + 2]
+                .copy_from_slice(&packed_header.to_le_bytes());
+            let forged_source = with_stream(source.clone(), &["PowerPoint Document"], &forged);
+            let snapshot =
+                super::SourceSnapshot::open(Arc::new(OwnedSource::new(forged_source))).unwrap();
+            assert!(matches!(
+                snapshot.edit_text(target()),
+                Err(Error::Package(crate::package::Error::Corrupted(message)))
+                    if message.contains("invalid PersistDirectoryAtom header or shape")
+            ));
+        }
+        let mut forged = document;
+        forged[directory_offset + 4..directory_offset + 8].copy_from_slice(&2_u32.to_le_bytes());
+        let forged_source = with_stream(source, &["PowerPoint Document"], &forged);
+        let snapshot =
+            super::SourceSnapshot::open(Arc::new(OwnedSource::new(forged_source))).unwrap();
+        assert!(matches!(
+            snapshot.edit_text(target()),
+            Err(Error::Package(crate::package::Error::Corrupted(message)))
+                if message.contains("invalid PersistDirectoryAtom header or shape")
         ));
     }
 

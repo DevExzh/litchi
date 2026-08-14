@@ -54,8 +54,16 @@ impl Slide<'_> {
             return Ok(Vec::new());
         };
 
+        Self::parse_shape_enums(&ppdrawing.data)
+    }
+
+    /// Parse the source-order shape values from one complete PPDrawing
+    /// payload. Source-backed selector paths use this helper after reading
+    /// exactly one selected Slide record, avoiding a full Document/NotesIndex
+    /// materialization while retaining the ordinary shape ordering rules.
+    pub(crate) fn parse_shape_enums(ppdrawing_data: &[u8]) -> Result<Vec<ShapeEnum<'static>>> {
         // Extract Escher shapes from PPDrawing data
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
+        let escher_shapes = crate::odraw::parse(ppdrawing_data)?;
 
         // Convert Escher shapes to ShapeEnum with full property extraction
         let mut shapes = Vec::with_capacity(escher_shapes.len());

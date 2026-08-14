@@ -30,6 +30,34 @@ pub struct CurrentUser {
 }
 
 impl CurrentUser {
+    /// Return the smallest prefix that preserves the complete CurrentUser
+    /// parser semantics for a positional source.
+    ///
+    /// The parser only consults the fixed header, the ANSI username/release
+    /// fields, and the optional UTF-16 username. A source-backed reader can
+    /// therefore avoid materializing unrelated trailing bytes while still
+    /// choosing the same Unicode-versus-ANSI representation as the owned
+    /// parser.
+    pub(crate) fn source_prefix_len(data: &[u8], stream_len: usize) -> Result<usize> {
+        if data.len() < CURRENT_USER_MIN_SIZE {
+            return Err(Error::Corrupted("CurrentUser stream too short".to_string()));
+        }
+        let username_len = u16::from_le_bytes([data[20], data[21]]) as usize;
+        if username_len > 255 {
+            return Err(Error::InvalidFormat(format!(
+                "Invalid CurrentUser username length: {username_len}"
+            )));
+        }
+        let release_end = CURRENT_USER_MIN_SIZE
+            .checked_add(username_len)
+            .and_then(|offset| offset.checked_add(4))
+            .ok_or_else(|| Error::Corrupted("CurrentUser release offset overflow".to_string()))?;
+        let unicode_end = release_end
+            .checked_add(username_len.saturating_mul(2))
+            .ok_or_else(|| Error::Corrupted("CurrentUser Unicode range overflow".to_string()))?;
+        Ok(stream_len.min(unicode_end.max(release_end)))
+    }
+
     /// Parse a `CurrentUser` stream from binary data.
     ///
     /// # Arguments
