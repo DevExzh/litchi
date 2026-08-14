@@ -10662,3 +10662,29 @@ without warning UI and exposed the expected title, body, date, and title/body
 placeholder visibility. Post-open hashes remained exact. These read-only gates
 confirm current native acceptance and visible semantics; they do not establish
 byte-inert saving, navigator-name mutation, or additional formula behaviors.
+
+## 2026-08-14 Pages rooted-body lazy-projection acceptance
+
+The shared text-wire gate passes 38/38 unit cases, including Prost-oracle
+agreement confined to tests, empty-fragment retention, exact and minus-one
+resource boundaries, malformed known-table refusal, UTF-8/UTF-16 agreement,
+and full-tree validation before semantic projection. The focused Pages library
+and integration suites preserve rooted/fallback reads, section names and
+UTF-16 boundaries, exact no-op and inverse transactions, unknown bytes,
+malformed-table refusal, and independent concurrent section-text commits.
+Strict all-target Clippy and rustdoc pass for text-wire, Pages, and Keynote.
+The boundary suite passes 254/254 and the live graph accepts 64 packages, 239
+internal declarations, and the unchanged 14-item ordered migration debt. The
+new `pages_section_text` target passes its sanitizer build and a 50-run bounded
+smoke campaign without crash, timeout, or out-of-memory failure.
+
+Computer Use opened a mode-0444 isolated copy of
+`test-data/iwork/pages/basic.pages` in Apple Pages 14.4 build 7043.0.93. Pages
+showed the document as locked, presented no repair, recovery, conversion, or
+warning UI, and exposed exactly `Litchi native Pages fixture`,
+`Buffa lazy-view migration verification`, and `2026-08-07`. The 96,417-byte
+copy remained SHA-256
+`21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42`
+after open and close. This is read-only native compatibility evidence for the
+fixture and focused semantic projection; it is not a save/reopen, byte-inert
+save, general rendering, or host-editor retirement claim.

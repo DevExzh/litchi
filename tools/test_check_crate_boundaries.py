@@ -500,7 +500,13 @@ class BoundaryPolicyTests(unittest.TestCase):
                     boundaries.Edge("litchi-iwa-detect", "litchi-iwa-protos"),
                     boundaries.Edge("litchi-iwa-structured", "litchi-iwa-text"),
                     boundaries.Edge("litchi-odc", "soapberry-zip"),
+                    boundaries.Edge("litchi-odf-formula", "soapberry-zip"),
+                    boundaries.Edge("litchi-odg", "soapberry-zip"),
+                    boundaries.Edge("litchi-oth", "soapberry-zip"),
+                    boundaries.Edge("litchi-ppt", "soapberry-zip"),
+                    boundaries.Edge("litchi-pptx", "soapberry-zip"),
                     boundaries.Edge("litchi-sign", "soapberry-zip"),
+                    boundaries.Edge("litchi-xlsx", "soapberry-zip"),
                 }
             ),
         )
@@ -735,6 +741,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             {
                 boundaries.Edge("litchi-odf-common", "litchi-core"),
                 boundaries.Edge("litchi-odf-common", "soapberry-zip"),
+                boundaries.Edge("litchi-odf-common", "xml-minifier"),
             },
         )
 
@@ -8693,6 +8700,146 @@ class BoundaryPolicyTests(unittest.TestCase):
             )
 
             self.assertEqual(boundaries.audit_pages_document_public_api(root), [])
+
+    def test_focused_pages_package_no_eager_prost_allows_test_only_usage(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.PAGES_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection() {}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tswp::StorageArchive;\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = StorageArchive::decode(bytes);\n"
+                "        let _ = litchi_iwa_text_wire::from_archive(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            manifest = root / boundaries.PAGES_PACKAGE_MANIFEST
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                "[dependencies]\n"
+                "thiserror = { workspace = true }\n"
+                "prost-types = { workspace = true }\n"
+                "# prost = { workspace = true }\n"
+                "\n"
+                "[dev-dependencies]\n"
+                "prost = { workspace = true }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_package_no_eager_prost_source_topology(root),
+                [],
+            )
+
+    def test_focused_pages_package_no_eager_prost_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "prost::Message": "use prost::Message;\n",
+            "direct generated tswp": (
+                "use litchi_iwa_protos::tswp::StorageArchive;\n"
+            ),
+            "StorageArchive::decode": "let _ = StorageArchive::decode(bytes);\n",
+            "litchi_iwa_text_wire::from_archive": (
+                "let _ = litchi_iwa_text_wire::from_archive(bytes);\n"
+            ),
+        }
+        for label, marker in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.PAGES_PACKAGE_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {\n"
+                        "    use prost::Message;\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+                    manifest = root / boundaries.PAGES_PACKAGE_MANIFEST
+                    manifest.parent.mkdir(parents=True, exist_ok=True)
+                    manifest.write_text(
+                        "[dependencies]\n"
+                        "thiserror = { workspace = true }\n"
+                        "[dev-dependencies]\n"
+                        "prost = { workspace = true }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_pages_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    self.assertTrue(
+                        any(f"uses {label}:" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_pages_package_no_eager_prost_rejects_normal_manifest_dependency(
+        self,
+    ) -> None:
+        for section in ("[dependencies]", "[target.'cfg(unix)'.dependencies]"):
+            with self.subTest(section=section):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    manifest = root / boundaries.PAGES_PACKAGE_MANIFEST
+                    manifest.parent.mkdir(parents=True, exist_ok=True)
+                    manifest.write_text(
+                        f"{section}\nprost = {{ workspace = true }}\n\n"
+                        "[dev-dependencies]\nprost = { workspace = true }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_pages_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "focused litchi-pages Cargo manifest retains normal prost "
+                        "dependency: crates/litchi-pages/Cargo.toml:2",
+                        violations,
+                    )
+
+    def test_focused_pages_package_no_eager_prost_ignores_non_code_near_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.PAGES_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// prost::Message\n"
+                "const NOTE: &str = \"StorageArchive::decode\";\n"
+                "/* litchi_iwa_text_wire::from_archive */\n"
+                "fn production_projection() {}\n",
+                encoding="utf-8",
+            )
+            manifest = root / boundaries.PAGES_PACKAGE_MANIFEST
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                "[dependencies]\n"
+                "prost-types = { workspace = true }\n"
+                "# prost = { workspace = true }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_package_no_eager_prost_source_topology(root),
+                [],
+            )
 
     def test_retired_iwa_pages_page_layout_method_inventory_is_exact(self) -> None:
         self.assertEqual(

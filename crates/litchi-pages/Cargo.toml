@@ -22,13 +22,13 @@ litchi-iwa-protos = { workspace = true }
 litchi-iwa-text = { workspace = true }
 litchi-iwa-text-wire = { workspace = true }
 plist           = { workspace = true }
-prost           = { workspace = true }
 thiserror       = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [dev-dependencies]
+prost    = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

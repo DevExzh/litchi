@@ -2046,6 +2046,46 @@ PAGES_DOCUMENT_PUBLIC_MARKERS = frozenset(
         "SemanticLimitsError",
     }
 )
+PAGES_PACKAGE_SOURCE = PAGES_SOURCE_ROOT / "package.rs"
+PAGES_PACKAGE_MANIFEST = Path("crates/litchi-pages/Cargo.toml")
+PAGES_PACKAGE_TEST_MODULE = re.compile(
+    r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]",
+    re.MULTILINE,
+)
+PAGES_PACKAGE_NO_EAGER_PROST_SOURCE_PATTERNS = (
+    (
+        "prost::Message",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])prost[ \t\r\n]*::[ \t\r\n]*Message\b"
+        ),
+    ),
+    (
+        "direct generated tswp",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])"
+            r"(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*"
+            r"(?:tswp\b|\{[^;]*\btswp\b)|tswp[ \t\r\n]*::)"
+        ),
+    ),
+    (
+        "StorageArchive::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])StorageArchive[ \t\r\n]*::"
+            r"[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "litchi_iwa_text_wire::from_archive",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])litchi_iwa_text_wire[ \t\r\n]*::"
+            r"[ \t\r\n]*from_archive\b"
+        ),
+    ),
+)
+CARGO_SECTION_HEADER = re.compile(r"^[ \t]*\[([^\]]+)\][ \t]*(?:#.*)?$")
+CARGO_PROST_DEPENDENCY = re.compile(
+    r"^[ \t]*(?:prost|\"prost\")(?:[ \t]*\.[ \t]*workspace)?[ \t]*="
+)
 PAGES_PAGE_LAYOUT_IMPLEMENTATION_SOURCE = (
     PAGES_SOURCE_ROOT / "package" / "page_layout.rs"
 )
@@ -8443,6 +8483,55 @@ def audit_pages_document_public_api(root: Path = ROOT) -> list[str]:
     return sorted(set(violations))
 
 
+def audit_pages_package_no_eager_prost_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep focused Pages production ingress archive-free and Prost-free."""
+
+    violations: list[str] = []
+
+    source_path = root / PAGES_PACKAGE_SOURCE
+    if source_path.is_file():
+        raw_source = source_path.read_text(encoding="utf-8")
+        masked_source = _mask_rust_non_code(raw_source)
+        test_module = PAGES_PACKAGE_TEST_MODULE.search(masked_source)
+        production_source = (
+            raw_source[: test_module.start()] if test_module is not None else raw_source
+        )
+        production_code = _mask_rust_non_code(production_source)
+        for label, pattern in PAGES_PACKAGE_NO_EAGER_PROST_SOURCE_PATTERNS:
+            for match in pattern.finditer(production_code):
+                line_number = production_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "focused litchi-pages package production source uses "
+                    f"{label}: {PAGES_PACKAGE_SOURCE}:{line_number}"
+                )
+
+    manifest_path = root / PAGES_PACKAGE_MANIFEST
+    if manifest_path.is_file():
+        section: str | None = None
+        for line_number, line in enumerate(
+            manifest_path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            header = CARGO_SECTION_HEADER.match(line)
+            if header is not None:
+                section = header.group(1).strip()
+                continue
+            normal_dependencies = section == "dependencies" or (
+                section is not None
+                and section.endswith(".dependencies")
+                and not section.endswith(".dev-dependencies")
+            )
+            if not normal_dependencies or CARGO_PROST_DEPENDENCY.match(line) is None:
+                continue
+            violations.append(
+                "focused litchi-pages Cargo manifest retains normal prost "
+                f"dependency: {PAGES_PACKAGE_MANIFEST}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_pages_page_layout_facade_source_topology(root: Path = ROOT) -> list[str]:
     """Reject physical identifiers and implementation types from the layout facade."""
 
@@ -9480,6 +9569,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_document_public_api()
         + audit_iwa_pages_document_source_topology()
         + audit_pages_document_public_api()
+        + audit_pages_package_no_eager_prost_source_topology()
         + audit_iwa_pages_page_layout_source_topology()
         + audit_pages_page_layout_facade_source_topology()
         + audit_iwa_pages_document_settings_source_topology()

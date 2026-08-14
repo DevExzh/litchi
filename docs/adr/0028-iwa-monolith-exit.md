@@ -2955,3 +2955,44 @@ exact apply/inverse, duplicate operations, cycles, cache mismatches,
 foreign-source conflicts, constructor failures, redaction, and source
 atomicity. This extends adversarial coverage without adding a new public owner
 or changing the monolith-exit topology.
+
+## 2026-08-14 amendment: Pages rooted-body lazy projection
+
+The focused Pages rooted-body reader no longer decodes
+`TSWP.StorageArchive` through Prost. The shared text-wire owner now exposes a
+fully validated archive-free `ValidatedStorage`: it performs the existing
+strict full known-tree preflight, enters exactly one bounded Buffa fragment
+view, and fallibly materializes one semantic UTF-8 buffer plus checked runs.
+Empty field-3 fragments remain zero-length runs, and UTF-8 length, UTF-16
+length, fragment count, and semantic coverage must agree before publication.
+Pages streams the field-17 section entries through the existing strict Buffa
+boundary codec, retains only a bounded vector of semantic section references,
+and projects names and section spans without a generated storage object. The
+ordinary Pages dependency on `prost` moves to test-only oracle/fixture scope.
+
+The cut is ratcheted at the production seam. Boundary policy rejects
+`prost::Message`, direct generated `tswp` use, `StorageArchive::decode`, and
+`litchi_iwa_text_wire::from_archive` in the production portion of the focused
+Pages package, and rejects `prost` as a normal or target-normal Pages
+dependency. Malformed known storage tables still fail before Buffa projection;
+strict validation reasons remain observable through the established Pages
+invalid-format envelope. Aggregate section-name bytes are now checked before
+owned-string allocation. Concurrency coverage exercises independent
+selector-first section-text commits, and the registered `pages_section_text`
+sanitizer target covers commit/apply/inverse, selectors, spans, malformed
+inputs, conflicts, redaction, and source atomicity.
+
+This is a focused read-path and boundary-hardening cut, not a Pages host exit.
+The migration host's body/section-text editor remains necessary for dependent
+footnote and inline-object cleanup and for changed legacy nested packages that
+the focused preservation-safe API intentionally refuses. Removing it now
+would discard supported behavior. `PagesEditor`, creation, tables, media,
+formatting, lifecycle work, ordered debt 017, and the
+`litchi-iwa -> litchi-pages` edge therefore remain open.
+
+The Keynote prepared-source coordination bridge now matches Pages and Numbers:
+its hidden public entry points and their classification counter exist only
+with `internal-iwork-source`. The boundary-policy snapshot also records eight
+previously unclassified current manifest edges—two normal `xml-minifier`
+edges and six dev-only `soapberry-zip` edges—without changing migration-debt
+ordering. No hidden compatibility alias or new host dependency is introduced.

@@ -27,13 +27,9 @@ use litchi_iwa_common::{
     wire::{WireFieldView, WireView},
 };
 use litchi_iwa_detect::{Format, PreparedSource};
-use litchi_iwa_protos::{
-    pages_body_codec::{self, DecodeOptions as PagesBodyDecodeOptions},
-    tswp,
-};
+use litchi_iwa_protos::pages_body_codec::{self, DecodeOptions as PagesBodyDecodeOptions};
 use litchi_iwa_text::storage::{Run, Storage};
 use plist::Value;
-use prost::Message;
 use thiserror::Error;
 
 use crate::{
@@ -183,6 +179,13 @@ struct RootReferences {
 struct NativeSectionReference {
     character_index: u32,
     identifier: NonZeroU64,
+}
+
+#[derive(Debug)]
+struct BodyPreflight {
+    section_references: Vec<NativeSectionReference>,
+    fragment_count: usize,
+    text_bytes: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -998,16 +1001,18 @@ fn decode_document(
                 "Pages body storage object {identifier} is missing"
             ))
         })?;
-        let (native, payload) = decode_body_storage(
+        let (storage, table_references) = decode_body_storage(
             &object.messages,
             identifier,
             max_sections,
             max_text_bytes,
             limits,
         )?;
-        validate_section_table_wire_with_limits(payload, &native, identifier, limits)?;
-        let section_references =
-            native_section_references(&native, root_references.initial_section, max_sections)?;
+        let section_references = native_section_references(
+            table_references,
+            root_references.initial_section,
+            max_sections,
+        )?;
         if section_references.is_empty() && max_sections == 0 {
             return Err(SemanticError::TooManySections {
                 actual: 1,
@@ -1017,7 +1022,7 @@ fn decode_document(
         }
         return project_native_body(
             components,
-            native,
+            storage,
             section_references,
             max_text_bytes,
             identifier,
@@ -1055,7 +1060,7 @@ fn decode_body_storage(
     max_sections: usize,
     max_text_bytes: usize,
     limits: Limits,
-) -> PackageResult<(tswp::StorageArchive, &[u8])> {
+) -> PackageResult<(Storage, Vec<NativeSectionReference>)> {
     let payload = unique_text_payload(messages, identifier)?;
     let wire_limits = storage_rewrite_limits(limits).map_err(|limit_error| match limit_error {
         StorageWireLimitsError::Physical(physical_error) => PackageError::Archive(physical_error),
@@ -1063,19 +1068,43 @@ fn decode_body_storage(
             "Pages body object {identifier} text validation limits are invalid: {wire_error}"
         )),
     })?;
-    litchi_iwa_text_wire::validate_storage_with_limits(payload, wire_limits).map_err(|error| {
-        PackageError::InvalidFormat(format!(
-            "Pages body object {identifier} text payload failed bounded validation: {error}"
-        ))
-    })?;
-    preflight_body_wire(payload, identifier, max_sections, max_text_bytes, limits)?;
-    let native = tswp::StorageArchive::decode(payload).map_err(|error| {
-        PackageError::InvalidFormat(format!(
-            "Pages body object {identifier} text payload is invalid: {error}"
-        ))
-    })?;
-    ensure_text_size(&native, 0, max_text_bytes, identifier)?;
-    Ok((native, payload))
+    let preflight = preflight_body_wire(payload, identifier, max_sections, max_text_bytes, limits)?;
+    let decoded = litchi_iwa_text_wire::decode_storage_with_limits(payload, wire_limits)
+        .map_err(map_rooted_storage_decode_error)?;
+    let validation = decoded.validation();
+    let storage = decoded.into_storage();
+    let materialized_utf16 = storage.text().encode_utf16().count();
+    if validation.fragments() != preflight.fragment_count
+        || validation.utf8_len() != preflight.text_bytes
+        || storage.runs().len() != preflight.fragment_count
+        || storage.len() != preflight.text_bytes
+        || materialized_utf16 != validation.utf16_len()
+    {
+        return Err(PackageError::InvalidFormat(format!(
+            "Pages body object {identifier} lazy text projection disagreed with strict preflight"
+        )));
+    }
+    Ok((storage, preflight.section_references))
+}
+
+fn map_rooted_storage_decode_error(error: litchi_iwa_text_wire::RewriteError) -> PackageError {
+    match error {
+        litchi_iwa_text_wire::RewriteError::Allocation { amount, .. } => {
+            PackageError::Allocation { amount }
+        },
+        litchi_iwa_text_wire::RewriteError::LimitExceeded {
+            observed, limit, ..
+        } => PackageError::PayloadLimit { observed, limit },
+        litchi_iwa_text_wire::RewriteError::InvalidFormat(reason) => PackageError::InvalidFormat(
+            format!("Pages body text payload failed bounded validation: {reason}"),
+        ),
+        litchi_iwa_text_wire::RewriteError::Projection(_) => PackageError::InvalidFormat(
+            "Pages body lazy text projection disagreed with validated input".to_owned(),
+        ),
+        _ => {
+            PackageError::InvalidFormat("Pages body text validation could not complete".to_owned())
+        },
+    }
 }
 
 fn preflight_body_wire(
@@ -1084,7 +1113,7 @@ fn preflight_body_wire(
     max_sections: usize,
     max_text_bytes: usize,
     limits: Limits,
-) -> PackageResult<()> {
+) -> PackageResult<BodyPreflight> {
     let context = format!("Pages body object {body_identifier}");
     let view = parse_wire(payload, &context)?;
     let mut fragment_count = 0usize;
@@ -1131,10 +1160,15 @@ fn preflight_body_wire(
 
     let optional_table_field = unique_wire_field(&view, 17, 2, false, &context)?;
     let Some(wire_table_field) = optional_table_field else {
-        return Ok(());
+        return Ok(BodyPreflight {
+            section_references: Vec::new(),
+            fragment_count,
+            text_bytes,
+        });
     };
     let table_view = parse_wire(wire_table_field.payload(), &context)?;
     let mut entry_count = 0usize;
+    let mut section_references = Vec::new();
     let boundary_options = pages_body_options(limits)?;
     for field in table_view.fields().filter(|field| field.number() == 1) {
         validate_wire_field(field, 2, &context)?;
@@ -1148,14 +1182,24 @@ fn preflight_body_wire(
             }
             .into());
         }
-        preflight_section_table_entry(
+        let reference = preflight_section_table_entry(
             field.payload(),
             entry_count - 1,
             body_identifier,
             boundary_options,
         )?;
+        section_references
+            .try_reserve(1)
+            .map_err(|_allocation| PackageError::Allocation {
+                amount: entry_count,
+            })?;
+        section_references.push(reference);
     }
-    Ok(())
+    Ok(BodyPreflight {
+        section_references,
+        fragment_count,
+        text_bytes,
+    })
 }
 
 fn preflight_section_table_entry(
@@ -1163,98 +1207,17 @@ fn preflight_section_table_entry(
     entry_index: usize,
     body_identifier: NonZeroU64,
     options: PagesBodyDecodeOptions,
-) -> PackageResult<()> {
+) -> PackageResult<NativeSectionReference> {
     let context = format!("Pages body object {body_identifier} section table entry {entry_index}");
     let boundary = pages_body_codec::decode_section_boundary(payload, options)
         .map_err(|error| PackageError::InvalidFormat(format!("{context} is invalid: {error}")))?;
-    boundary.section().ok_or_else(|| {
+    let section = boundary.section().ok_or_else(|| {
         PackageError::InvalidFormat(format!("{context} has no section reference"))
     })?;
-    Ok(())
-}
-
-fn validate_section_table_wire_with_limits(
-    payload: &[u8],
-    decoded: &tswp::StorageArchive,
-    body_identifier: NonZeroU64,
-    limits: Limits,
-) -> PackageResult<()> {
-    let context = format!("Pages body object {body_identifier} section table");
-    let view = parse_wire(payload, &context)?;
-    let optional_field = unique_wire_field(&view, 17, 2, false, &context)?;
-    let optional_decoded_table = decoded.table_section.as_ref();
-    let (Some(wire_field), Some(native_table)) = (optional_field, optional_decoded_table) else {
-        if optional_field.is_none() && optional_decoded_table.is_none() {
-            return Ok(());
-        }
-        return Err(PackageError::InvalidFormat(format!(
-            "{context} presence changed while decoding"
-        )));
-    };
-
-    let table_view = parse_wire(wire_field.payload(), &context)?;
-    let mut decoded_entries = native_table.entries.iter();
-    let mut entry_index = 0usize;
-    let boundary_options = pages_body_options(limits)?;
-    for entry_field in table_view
-        .fields()
-        .filter(|candidate| candidate.number() == 1)
-    {
-        validate_wire_field(entry_field, 2, &context)?;
-        let decoded_entry = decoded_entries.next().ok_or_else(|| {
-            PackageError::InvalidFormat(format!("{context} gained an entry while decoding"))
-        })?;
-        validate_section_table_entry_wire(
-            entry_field.payload(),
-            decoded_entry,
-            entry_index,
-            body_identifier,
-            boundary_options,
-        )?;
-        entry_index = entry_index.checked_add(1).ok_or_else(|| {
-            PackageError::InvalidFormat("Pages section entry count overflows usize".to_owned())
-        })?;
-    }
-    if decoded_entries.next().is_some() {
-        return Err(PackageError::InvalidFormat(format!(
-            "{context} lost an entry while decoding"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_section_table_entry_wire(
-    payload: &[u8],
-    decoded: &tswp::object_attribute_table::ObjectAttribute,
-    entry_index: usize,
-    body_identifier: NonZeroU64,
-    options: PagesBodyDecodeOptions,
-) -> PackageResult<()> {
-    let context = format!("Pages body object {body_identifier} section table entry {entry_index}");
-    let boundary = pages_body_codec::decode_section_boundary(payload, options)
-        .map_err(|error| PackageError::InvalidFormat(format!("{context} is invalid: {error}")))?;
-    if boundary.character_index() != decoded.character_index {
-        return Err(PackageError::InvalidFormat(format!(
-            "{context} character index changed while decoding"
-        )));
-    }
-
-    match (boundary.section(), decoded.object.as_ref()) {
-        (Some(reference), Some(decoded_reference)) => {
-            if reference.identifier().get() != decoded_reference.identifier {
-                return Err(PackageError::InvalidFormat(format!(
-                    "{context} section reference changed while decoding"
-                )));
-            }
-        },
-        (None, None) => {},
-        _ => {
-            return Err(PackageError::InvalidFormat(format!(
-                "{context} section-reference presence changed while decoding"
-            )));
-        },
-    }
-    Ok(())
+    Ok(NativeSectionReference {
+        character_index: boundary.character_index(),
+        identifier: section.identifier(),
+    })
 }
 
 fn parse_wire<'a>(payload: &'a [u8], context: &str) -> PackageResult<WireView<'a>> {
@@ -1308,15 +1271,11 @@ fn validate_wire_field(
 }
 
 fn native_section_references(
-    body: &tswp::StorageArchive,
+    mut references: Vec<NativeSectionReference>,
     initial_section: Option<NonZeroU64>,
     max_sections: usize,
 ) -> PackageResult<Vec<NativeSectionReference>> {
-    let table_entries = body
-        .table_section
-        .as_ref()
-        .map_or(&[][..], |table| table.entries.as_slice());
-    let maximum_count = table_entries
+    let maximum_count = references
         .len()
         .checked_add(usize::from(initial_section.is_some()))
         .ok_or_else(|| {
@@ -1328,29 +1287,6 @@ fn native_section_references(
             limit: max_sections,
         }
         .into());
-    }
-
-    let mut references = Vec::new();
-    references
-        .try_reserve_exact(maximum_count)
-        .map_err(|_error| {
-            PackageError::InvalidFormat("could not allocate Pages section references".to_owned())
-        })?;
-    for (entry_index, entry) in table_entries.iter().enumerate() {
-        let reference = entry.object.as_ref().ok_or_else(|| {
-            PackageError::InvalidFormat(format!(
-                "Pages section table entry {entry_index} has no section reference"
-            ))
-        })?;
-        let identifier = NonZeroU64::new(reference.identifier).ok_or_else(|| {
-            PackageError::InvalidFormat(format!(
-                "Pages section table entry {entry_index} has a zero section reference"
-            ))
-        })?;
-        references.push(NativeSectionReference {
-            character_index: entry.character_index,
-            identifier,
-        });
     }
 
     references.sort_unstable_by_key(|reference| reference.character_index);
@@ -1376,6 +1312,11 @@ fn native_section_references(
                 )));
             }
         } else {
+            references
+                .try_reserve(1)
+                .map_err(|_allocation| PackageError::Allocation {
+                    amount: maximum_count,
+                })?;
             references.push(NativeSectionReference {
                 character_index: 0,
                 identifier,
@@ -1423,24 +1364,19 @@ fn native_section_references(
 
 fn project_native_body(
     components: &ComponentCatalog,
-    native: tswp::StorageArchive,
+    storage: Storage,
     section_references: Vec<NativeSectionReference>,
     max_text_bytes: usize,
     body_identifier: NonZeroU64,
 ) -> PackageResult<Document> {
     if section_references.is_empty() {
-        let storage = litchi_iwa_text_wire::from_archive(native).map_err(|error| {
-            PackageError::InvalidFormat(format!(
-                "Pages body object {body_identifier} text payload is invalid: {error}"
-            ))
-        })?;
         let body = Body::with_max_text_bytes(vec![storage], max_text_bytes)?;
         return Document::from_root_with_max_text_bytes(Root::with_body(body), max_text_bytes)
             .map_err(Into::into);
     }
 
-    let ranges = section_text_ranges(&native.text, &section_references, body_identifier)?;
-    let storages = split_native_text(&native.text, &ranges, body_identifier)?;
+    let ranges = section_text_ranges(storage.text(), &section_references, body_identifier)?;
+    let storages = split_native_text(&storage, &ranges, body_identifier)?;
     let names = decode_section_names(components, &section_references, max_text_bytes)?;
     let mut sections = Vec::new();
     sections
@@ -1515,19 +1451,13 @@ fn decode_section_names(
                 continue;
             };
             let destination = requested[request_index].1;
-            let name = decode_section_name(object, references[destination].identifier)?;
-            retained_bytes = retained_bytes
-                .checked_add(name.as_deref().map_or(0, str::len))
-                .ok_or(PackageError::SectionNamesTooLarge {
-                    observed: usize::MAX,
-                    limit: max_name_text_bytes,
-                })?;
-            if retained_bytes > max_name_text_bytes {
-                return Err(PackageError::SectionNamesTooLarge {
-                    observed: retained_bytes,
-                    limit: max_name_text_bytes,
-                });
-            }
+            let (name, next_retained_bytes) = decode_section_name(
+                object,
+                references[destination].identifier,
+                retained_bytes,
+                max_name_text_bytes,
+            )?;
+            retained_bytes = next_retained_bytes;
             names[destination] = name;
             found[destination] = true;
         }
@@ -1545,30 +1475,43 @@ fn decode_section_names(
 fn decode_section_name(
     object: &litchi_iwa_core::ArchiveObject,
     identifier: NonZeroU64,
-) -> PackageResult<Option<Box<str>>> {
+    retained_bytes: usize,
+    max_retained_bytes: usize,
+) -> PackageResult<(Option<Box<str>>, usize)> {
     let context = format!("Pages section object {identifier}");
     let payload = unique_message_payload(&object.messages, SECTION_MESSAGE_TYPE, &context)?;
     let view = parse_wire(payload, &context)?;
     let Some(field) = unique_wire_field(&view, 26, 2, false, &context)? else {
-        return Ok(None);
+        return Ok((None, retained_bytes));
     };
     let name = std::str::from_utf8(field.payload()).map_err(|error| {
         PackageError::InvalidFormat(format!(
             "Pages section object {identifier} name is not valid UTF-8: {error}"
         ))
     })?;
+    let next_retained_bytes =
+        retained_bytes
+            .checked_add(name.len())
+            .ok_or(PackageError::SectionNamesTooLarge {
+                observed: usize::MAX,
+                limit: max_retained_bytes,
+            })?;
+    if next_retained_bytes > max_retained_bytes {
+        return Err(PackageError::SectionNamesTooLarge {
+            observed: next_retained_bytes,
+            limit: max_retained_bytes,
+        });
+    }
     let mut owned = String::new();
-    owned.try_reserve_exact(name.len()).map_err(|_error| {
-        PackageError::InvalidFormat(format!(
-            "could not allocate Pages section object {identifier} name"
-        ))
-    })?;
+    owned
+        .try_reserve_exact(name.len())
+        .map_err(|_error| PackageError::Allocation { amount: name.len() })?;
     owned.push_str(name);
-    Ok(Some(owned.into_boxed_str()))
+    Ok((Some(owned.into_boxed_str()), next_retained_bytes))
 }
 
 fn section_text_ranges(
-    fragments: &[String],
+    text: &str,
     references: &[NativeSectionReference],
     body_identifier: NonZeroU64,
 ) -> PackageResult<Vec<TextRange>> {
@@ -1583,43 +1526,40 @@ fn section_text_ranges(
     let mut byte_offset = 0usize;
     let mut preceding_character = None;
 
-    for fragment in fragments {
-        for character in fragment.chars() {
-            capture_section_boundary(
-                references,
-                &mut reference_index,
-                utf16_offset,
-                byte_offset,
-                preceding_character,
-                &mut points,
-            )?;
-            let next_utf16 = utf16_offset
-                .checked_add(character.len_utf16())
-                .ok_or_else(|| {
-                    PackageError::InvalidFormat(format!(
-                        "Pages body object {body_identifier} UTF-16 length overflows usize"
-                    ))
-                })?;
-            if references.get(reference_index).is_some_and(|reference| {
-                let target = reference.character_index as usize;
-                target > utf16_offset && target < next_utf16
-            }) {
-                return Err(PackageError::InvalidFormat(format!(
-                    "Pages section {} boundary {} splits a UTF-16 surrogate pair",
-                    references[reference_index].identifier,
-                    references[reference_index].character_index
-                )));
-            }
-            utf16_offset = next_utf16;
-            byte_offset = byte_offset
-                .checked_add(character.len_utf8())
-                .ok_or_else(|| {
-                    PackageError::InvalidFormat(format!(
-                        "Pages body object {body_identifier} UTF-8 length overflows usize"
-                    ))
-                })?;
-            preceding_character = Some(character);
+    for character in text.chars() {
+        capture_section_boundary(
+            references,
+            &mut reference_index,
+            utf16_offset,
+            byte_offset,
+            preceding_character,
+            &mut points,
+        )?;
+        let next_utf16 = utf16_offset
+            .checked_add(character.len_utf16())
+            .ok_or_else(|| {
+                PackageError::InvalidFormat(format!(
+                    "Pages body object {body_identifier} UTF-16 length overflows usize"
+                ))
+            })?;
+        if references.get(reference_index).is_some_and(|reference| {
+            let target = reference.character_index as usize;
+            target > utf16_offset && target < next_utf16
+        }) {
+            return Err(PackageError::InvalidFormat(format!(
+                "Pages section {} boundary {} splits a UTF-16 surrogate pair",
+                references[reference_index].identifier, references[reference_index].character_index
+            )));
         }
+        utf16_offset = next_utf16;
+        byte_offset = byte_offset
+            .checked_add(character.len_utf8())
+            .ok_or_else(|| {
+                PackageError::InvalidFormat(format!(
+                    "Pages body object {body_identifier} UTF-8 length overflows usize"
+                ))
+            })?;
+        preceding_character = Some(character);
     }
     capture_section_boundary(
         references,
@@ -1701,14 +1641,14 @@ fn capture_section_boundary(
 }
 
 fn split_native_text(
-    fragments: &[String],
+    storage: &Storage,
     ranges: &[TextRange],
     body_identifier: NonZeroU64,
 ) -> PackageResult<Vec<Storage>> {
-    if fragments.len() > litchi_iwa_text_wire::MAX_FRAGMENTS {
+    if storage.runs().len() > litchi_iwa_text_wire::MAX_FRAGMENTS {
         return Err(PackageError::InvalidFormat(format!(
             "Pages body object {body_identifier} contains {} text fragments; maximum is {}",
-            fragments.len(),
+            storage.runs().len(),
             litchi_iwa_text_wire::MAX_FRAGMENTS
         )));
     }
@@ -1723,19 +1663,33 @@ fn split_native_text(
         accumulators.push(StorageAccumulator::with_capacity(range.end - range.start)?);
     }
 
-    let mut global_start = 0usize;
+    let mut expected_start = 0usize;
     let mut section_index = 0usize;
-    for fragment in fragments {
-        let global_end = global_start.checked_add(fragment.len()).ok_or_else(|| {
+    for run in storage.runs().iter().copied() {
+        if run.start() != expected_start {
+            return Err(PackageError::InvalidFormat(format!(
+                "Pages body object {body_identifier} lazy text runs are not contiguous"
+            )));
+        }
+        let global_start = run.start();
+        let global_end = run.end().ok_or_else(|| {
             PackageError::InvalidFormat(format!(
                 "Pages body object {body_identifier} UTF-8 length overflows usize"
             ))
         })?;
-        if fragment.is_empty() {
+        let fragment = storage
+            .text()
+            .get(global_start..global_end)
+            .ok_or_else(|| {
+                PackageError::InvalidFormat(format!(
+                    "Pages body object {body_identifier} lazy text run is invalid"
+                ))
+            })?;
+        if run.is_empty() {
             if let Some(index) = range_containing_empty_offset(ranges, global_start) {
                 accumulators[index].push_empty()?;
             }
-            global_start = global_end;
+            expected_start = global_end;
             continue;
         }
 
@@ -1763,7 +1717,12 @@ fn split_native_text(
                 cursor = overlap_end;
             }
         }
-        global_start = global_end;
+        expected_start = global_end;
+    }
+    if expected_start != storage.len() {
+        return Err(PackageError::InvalidFormat(format!(
+            "Pages body object {body_identifier} lazy text runs do not cover the materialized text"
+        )));
     }
 
     let mut storages = Vec::new();
@@ -2112,28 +2071,6 @@ fn unique_text_payload(
     })
 }
 
-fn ensure_text_size(
-    storage: &tswp::StorageArchive,
-    initial: usize,
-    max_text_bytes: usize,
-    identifier: NonZeroU64,
-) -> PackageResult<()> {
-    let text_len = storage.text.iter().try_fold(initial, |length, fragment| {
-        length.checked_add(fragment.len()).ok_or_else(|| {
-            PackageError::InvalidFormat(format!(
-                "Pages body object {identifier} text length overflows usize"
-            ))
-        })
-    })?;
-    if text_len > max_text_bytes {
-        return Err(PackageError::Semantic(SemanticError::TextTooLarge {
-            observed: text_len,
-            limit: max_text_bytes,
-        }));
-    }
-    Ok(())
-}
-
 fn effective_text_limit(limits: Limits) -> usize {
     limits.max_iwa_stream_bytes().min(DEFAULT_MAX_TEXT_BYTES)
 }
@@ -2189,8 +2126,11 @@ mod tests {
 
     use super::*;
     use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
-    use litchi_iwa_protos::tswp::{ObjectAttributeTable, object_attribute_table::ObjectAttribute};
+    use litchi_iwa_protos::tswp::{
+        self, ObjectAttributeTable, object_attribute_table::ObjectAttribute,
+    };
     use litchi_iwa_protos::{tp, tsp::Reference};
+    use prost::Message;
 
     struct InterruptedOnce<R> {
         inner: R,
@@ -2707,17 +2647,9 @@ mod tests {
 
     #[test]
     fn section_boundary_projection_rejects_ambiguous_references() -> PackageResult<()> {
-        let decoded = ObjectAttribute {
-            character_index: 0,
-            object: Some(Reference {
-                identifier: 42,
-                ..Reference::default()
-            }),
-        };
         let duplicate_reference = [0x08, 0x00, 0x12, 0x02, 0x08, 0x2a, 0x12, 0x02, 0x08, 0x2b];
-        let error = validate_section_table_entry_wire(
+        let error = preflight_section_table_entry(
             &duplicate_reference,
-            &decoded,
             0,
             NonZeroU64::MIN,
             pages_body_options(Limits::default())?,
@@ -3050,7 +2982,8 @@ mod tests {
         assert!(
             duplicate_boundary
                 .to_string()
-                .contains("duplicate or unsorted")
+                .contains("duplicate or unsorted"),
+            "unexpected duplicate-boundary error: {duplicate_boundary}"
         );
 
         let missing_break = sectioned_package_bytes(
@@ -3118,6 +3051,24 @@ mod tests {
         .err()
         .unwrap_or_else(|| panic!("duplicate section name field should fail"));
         assert!(error.to_string().contains("duplicate protobuf field 26"));
+        Ok(())
+    }
+
+    #[test]
+    fn section_name_budget_is_charged_before_owned_materialization() -> PackageResult<()> {
+        let object = ArchiveObject::new(43, vec![section_payload(Some("oversized"))])
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        let error = decode_section_name(&object, NonZeroU64::MIN, 2, 4)
+            .err()
+            .unwrap_or_else(|| panic!("an over-budget section name should fail"));
+
+        assert!(matches!(
+            error,
+            PackageError::SectionNamesTooLarge {
+                observed: 11,
+                limit: 4,
+            }
+        ));
         Ok(())
     }
 
