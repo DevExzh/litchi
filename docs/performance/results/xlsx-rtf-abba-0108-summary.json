@@ -1,0 +1,876 @@
+{
+  "schema_version": 1,
+  "record": "xlsx-rtf-abba-0108",
+  "date": "2026-08-14",
+  "protocol": {
+    "order": [
+      "before-a",
+      "after-a",
+      "after-b",
+      "before-b"
+    ],
+    "build": "release",
+    "cpu_affinity": "2",
+    "warmups_per_case": 10,
+    "samples_per_case": 100,
+    "timed_scope": "harness-defined complete case interval",
+    "filesystem_scope": "in-memory; no cold-filesystem claim"
+  },
+  "production_commits": {
+    "xlsx": "85ec86106",
+    "rtf": "d38cd455d"
+  },
+  "binaries": {
+    "before_sha256": "04326ec7296a8c9270cfbfc19b3789966a2f89bc70f381def7dd438fc6a56d43",
+    "after_sha256": "0b604c3872bc9c559f39bff2916525e5efbe8d19939f20f28e37b58277c2d8a5",
+    "embedded_git_revision": "3aded967da920922761ff77f446ddc1d56ad946c",
+    "embedded_dirty": true,
+    "note": "Binaries were frozen from the shared tree before the two production commits; hashes bind their exact contents. Unrelated dirty test/document/lockfile paths do not enter these production cases."
+  },
+  "reports": [
+    {
+      "leg": "before-a",
+      "sha256": "e760110d68e971c9dd1ef4e327676f7d6226d66e5f315835de51cc844e9355e4"
+    },
+    {
+      "leg": "after-a",
+      "sha256": "62c16c1a0d687af690b14c001759d598a296e5e944c9ba2f0df56c468e6aba6b"
+    },
+    {
+      "leg": "after-b",
+      "sha256": "9548c03bf50f595c63d1a5ed80d059859fe501409166f36dc8f8d9b987f36458"
+    },
+    {
+      "leg": "before-b",
+      "sha256": "9041b4e4b481b3c59eb7298531e5dae853c46f0742061751b5a4a9cf85249d16"
+    }
+  ],
+  "accepted_summary": {
+    "xlsx_source_p50_geomean_delta_percent": {
+      "a": -21.664228,
+      "b": -22.653447
+    },
+    "xlsx_source_p95_geomean_delta_percent": {
+      "a": -21.380354,
+      "b": -22.701955
+    },
+    "rtf_p50_geomean_delta_percent": {
+      "a": -76.411385,
+      "b": -76.467699
+    },
+    "rtf_p95_geomean_delta_percent": {
+      "a": -75.226439,
+      "b": -75.763711
+    },
+    "xlsx_counter_claim": "No physical source-read or materialization reduction; the removed work is the publication-time semantic worksheet reload/reparse.",
+    "rtf_counter_claim": "Exact output bytes and SHA-256 are unchanged; sink requests are capped at 32 bytes and write-call counts fall materially.",
+    "excluded_claims": [
+      "allocation",
+      "peak heap",
+      "RSS",
+      "physical cold I/O",
+      "decompression bytes",
+      "recompression bytes"
+    ]
+  },
+  "disclosed_outlier": {
+    "case": "xlsx_eager_cell_values_batch_edit_save",
+    "shape": "medium",
+    "leg": "after-a",
+    "p50_delta_percent": 30.585342,
+    "p95_delta_percent": 105.277149,
+    "paired_source_p50_delta_percent": -21.452922,
+    "normalized_after_b_eager_p50_delta_percent": 1.627715,
+    "interpretation": "The eager control moved opposite the source improvement and normalized in the second direction; no eager-path claim is accepted."
+  },
+  "metric_order": [
+    "p50",
+    "p95",
+    "p99"
+  ],
+  "cells": [
+    {
+      "case": "rtf_streaming_create",
+      "shape": "large",
+      "metrics_ns": {
+        "before_a": [
+          612058511,
+          622866564,
+          639449758
+        ],
+        "after_a": [
+          144686549,
+          147748737,
+          149554514
+        ],
+        "after_b": [
+          143305409,
+          144969442,
+          145820224
+        ],
+        "before_b": [
+          612955614,
+          620299024,
+          624956931
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          -76.360667,
+          -76.279231,
+          -76.611999
+        ],
+        "after_b_vs_before_b": [
+          -76.62059,
+          -76.629104,
+          -76.667156
+        ]
+      },
+      "output": {
+        "sha256": "001ee0ac2250f12cf841779fac699445567aad28d94af0c9be002ea616297435",
+        "identical_across_legs": true,
+        "accepted_bytes": 10092579
+      },
+      "sink": {
+        "before_write_calls": 7208970,
+        "after_write_calls": 1441802,
+        "before_largest_write": 13,
+        "after_largest_write": 32
+      }
+    },
+    {
+      "case": "rtf_streaming_create",
+      "shape": "medium",
+      "metrics_ns": {
+        "before_a": [
+          38194616,
+          38957481,
+          39494300
+        ],
+        "after_a": [
+          9067912,
+          9455075,
+          9600975
+        ],
+        "after_b": [
+          8959081,
+          9153709,
+          9205802
+        ],
+        "before_b": [
+          38486600,
+          39529352,
+          39739431
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          -76.258664,
+          -75.729758,
+          -75.690226
+        ],
+        "after_b_vs_before_b": [
+          -76.721558,
+          -76.843261,
+          -76.83459
+        ]
+      },
+      "output": {
+        "sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a",
+        "identical_across_legs": true,
+        "accepted_bytes": 630819
+      },
+      "sink": {
+        "before_write_calls": 450570,
+        "after_write_calls": 90122,
+        "before_largest_write": 13,
+        "after_largest_write": 32
+      }
+    },
+    {
+      "case": "rtf_streaming_create",
+      "shape": "tiny",
+      "metrics_ns": {
+        "before_a": [
+          301660,
+          320171,
+          334440
+        ],
+        "after_a": [
+          70548,
+          84556,
+          88302
+        ],
+        "after_b": [
+          70302,
+          82945,
+          94210
+        ],
+        "before_b": [
+          293604,
+          315315,
+          321974
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          -76.613406,
+          -73.590363,
+          -73.597058
+        ],
+        "after_b_vs_before_b": [
+          -76.055503,
+          -73.694559,
+          -70.739873
+        ]
+      },
+      "output": {
+        "sha256": "aad91510c339788e1f9de0481853099fe5c5c1988a800ff915d14288dde0719a",
+        "identical_across_legs": true,
+        "accepted_bytes": 4963
+      },
+      "sink": {
+        "before_write_calls": 3530,
+        "after_write_calls": 714,
+        "before_largest_write": 13,
+        "after_largest_write": 32
+      }
+    },
+    {
+      "case": "xlsx_eager_cell_values_batch_edit_save",
+      "shape": "dense-sparse",
+      "metrics_ns": {
+        "before_a": [
+          59399877,
+          62039472,
+          64140973
+        ],
+        "after_a": [
+          59364145,
+          61581094,
+          62636018
+        ],
+        "after_b": [
+          60369427,
+          62295355,
+          63342988
+        ],
+        "before_b": [
+          59570419,
+          61875974,
+          62957935
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          -0.060155,
+          -0.738849,
+          -2.346324
+        ],
+        "after_b_vs_before_b": [
+          1.341283,
+          0.677777,
+          0.611604
+        ]
+      },
+      "output": {
+        "sha256": "244bfeb2acc1aa9c9ddb174de05c5f8aa9d615437b8fadcd4f8328b21568e76b",
+        "identical_across_legs": true,
+        "accepted_bytes": 4252021
+      },
+      "sink": {
+        "before_write_calls": 163,
+        "after_write_calls": 163,
+        "before_largest_write": 46713,
+        "after_largest_write": 46713
+      }
+    },
+    {
+      "case": "xlsx_eager_cell_values_batch_edit_save",
+      "shape": "medium",
+      "metrics_ns": {
+        "before_a": [
+          31092325,
+          32270758,
+          32707699
+        ],
+        "after_a": [
+          40602019,
+          66244492,
+          77085765
+        ],
+        "after_b": [
+          31678740,
+          33820982,
+          34282838
+        ],
+        "before_b": [
+          31171359,
+          32442620,
+          33110510
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          30.585342,
+          105.277149,
+          135.680795
+        ],
+        "after_b_vs_before_b": [
+          1.627715,
+          4.248615,
+          3.540652
+        ]
+      },
+      "output": {
+        "sha256": "92dc696caa7f83b16d680b8694a3152fe5807614e6e320a1f56c605e13d05a66",
+        "identical_across_legs": true,
+        "accepted_bytes": 4226698
+      },
+      "sink": {
+        "before_write_calls": 163,
+        "after_write_calls": 163,
+        "before_largest_write": 32768,
+        "after_largest_write": 32768
+      }
+    },
+    {
+      "case": "xlsx_eager_cell_values_one_edit_save",
+      "shape": "dense-sparse",
+      "metrics_ns": {
+        "before_a": [
+          54395615,
+          56793099,
+          57378505
+        ],
+        "after_a": [
+          55584975,
+          58195832,
+          59387684
+        ],
+        "after_b": [
+          55034157,
+          57834811,
+          58458050
+        ],
+        "before_b": [
+          54599731,
+          56725590,
+          58329971
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          2.1865,
+          2.4699,
+          3.501623
+        ],
+        "after_b_vs_before_b": [
+          0.795656,
+          1.955416,
+          0.219577
+        ]
+      },
+      "output": {
+        "sha256": "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+        "identical_across_legs": true,
+        "accepted_bytes": 4251913
+      },
+      "sink": {
+        "before_write_calls": 163,
+        "after_write_calls": 163,
+        "before_largest_write": 46677,
+        "after_largest_write": 46677
+      }
+    },
+    {
+      "case": "xlsx_eager_cell_values_one_edit_save",
+      "shape": "medium",
+      "metrics_ns": {
+        "before_a": [
+          8956637,
+          9343010,
+          9835428
+        ],
+        "after_a": [
+          9123168,
+          9802665,
+          11003828
+        ],
+        "after_b": [
+          9225995,
+          10387570,
+          10649199
+        ],
+        "before_b": [
+          9354061,
+          9971395,
+          10322949
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          1.859303,
+          4.919774,
+          11.879503
+        ],
+        "after_b_vs_before_b": [
+          -1.369095,
+          4.173689,
+          3.160434
+        ]
+      },
+      "output": {
+        "sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+        "identical_across_legs": true,
+        "accepted_bytes": 4226480
+      },
+      "sink": {
+        "before_write_calls": 163,
+        "after_write_calls": 163,
+        "before_largest_write": 32768,
+        "after_largest_write": 32768
+      }
+    },
+    {
+      "case": "xlsx_eager_cell_values_one_percent_edit_save",
+      "shape": "dense-sparse",
+      "metrics_ns": {
+        "before_a": [
+          59412390,
+          61154163,
+          62677119
+        ],
+        "after_a": [
+          60018132,
+          61803481,
+          63182382
+        ],
+        "after_b": [
+          60495405,
+          62621235,
+          64716880
+        ],
+        "before_b": [
+          60409329,
+          62479445,
+          64590315
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          1.019555,
+          1.061772,
+          0.806136
+        ],
+        "after_b_vs_before_b": [
+          0.142488,
+          0.226939,
+          0.19595
+        ]
+      },
+      "output": {
+        "sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "identical_across_legs": true,
+        "accepted_bytes": 4252436
+      },
+      "sink": {
+        "before_write_calls": 163,
+        "after_write_calls": 163,
+        "before_largest_write": 47171,
+        "after_largest_write": 47171
+      }
+    },
+    {
+      "case": "xlsx_eager_cell_values_one_percent_edit_save",
+      "shape": "medium",
+      "metrics_ns": {
+        "before_a": [
+          30778852,
+          33005147,
+          34092573
+        ],
+        "after_a": [
+          31239893,
+          32928643,
+          33322776
+        ],
+        "after_b": [
+          31332418,
+          33114318,
+          40276474
+        ],
+        "before_b": [
+          31356609,
+          33472458,
+          36674430
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          1.497915,
+          -0.231794,
+          -2.257961
+        ],
+        "after_b_vs_before_b": [
+          -0.077148,
+          -1.069954,
+          9.821677
+        ]
+      },
+      "output": {
+        "sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "identical_across_legs": true,
+        "accepted_bytes": 4226788
+      },
+      "sink": {
+        "before_write_calls": 163,
+        "after_write_calls": 163,
+        "before_largest_write": 32768,
+        "after_largest_write": 32768
+      }
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_batch_edit_save",
+      "shape": "dense-sparse",
+      "metrics_ns": {
+        "before_a": [
+          85008736,
+          89347679,
+          93546058
+        ],
+        "after_a": [
+          66465088,
+          68765001,
+          70376520
+        ],
+        "after_b": [
+          66855477,
+          70183472,
+          71965876
+        ],
+        "before_b": [
+          86833518,
+          90760522,
+          92711712
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          -21.813815,
+          -23.036612,
+          -24.768054
+        ],
+        "after_b_vs_before_b": [
+          -23.007292,
+          -22.671807,
+          -22.376715
+        ]
+      },
+      "output": {
+        "sha256": "484b3370ee54f2264ec8c4b4939fc0ea02e5ab3431761e9ca627dc82cfc1ca46",
+        "identical_across_legs": true,
+        "accepted_bytes": 4251968
+      },
+      "sink": {
+        "before_write_calls": 163,
+        "after_write_calls": 163,
+        "before_largest_write": 46713,
+        "after_largest_write": 46713
+      },
+      "source": {
+        "before_materializations": 6,
+        "after_materializations": 6,
+        "before_read_calls": 226,
+        "after_read_calls": 226,
+        "before_read_bytes": 4256227,
+        "after_read_bytes": 4256227
+      }
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_batch_edit_save",
+      "shape": "medium",
+      "metrics_ns": {
+        "before_a": [
+          44129154,
+          45622053,
+          47420770
+        ],
+        "after_a": [
+          34662161,
+          36497739,
+          41630221
+        ],
+        "after_b": [
+          34360237,
+          36170647,
+          36565791
+        ],
+        "before_b": [
+          44660796,
+          47444586,
+          48407724
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          -21.452922,
+          -19.999788,
+          -12.210997
+        ],
+        "after_b_vs_before_b": [
+          -23.063984,
+          -23.76233,
+          -24.4629
+        ]
+      },
+      "output": {
+        "sha256": "99ef583896aa201cebcc62e205ff9979bf08b4e21df15bcd04604a2ddd14a3fd",
+        "identical_across_legs": true,
+        "accepted_bytes": 4226645
+      },
+      "sink": {
+        "before_write_calls": 163,
+        "after_write_calls": 163,
+        "before_largest_write": 32768,
+        "after_largest_write": 32768
+      },
+      "source": {
+        "before_materializations": 6,
+        "after_materializations": 6,
+        "before_read_calls": 225,
+        "after_read_calls": 225,
+        "before_read_bytes": 4230793,
+        "after_read_bytes": 4230793
+      }
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "shape": "dense-sparse",
+      "metrics_ns": {
+        "before_a": [
+          78237360,
+          80744768,
+          86274938
+        ],
+        "after_a": [
+          62176926,
+          64231528,
+          70887325
+        ],
+        "after_b": [
+          61238194,
+          64180974,
+          73901924
+        ],
+        "before_b": [
+          79376598,
+          84536991,
+          88698355
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          -20.527832,
+          -20.451158,
+          -17.835554
+        ],
+        "after_b_vs_before_b": [
+          -22.851073,
+          -24.07942,
+          -16.681742
+        ]
+      },
+      "output": {
+        "sha256": "b971704c02b8fc89295bbe987d0991ba4e4ebd5f159f101a1747ec62af199e44",
+        "identical_across_legs": true,
+        "accepted_bytes": 4251860
+      },
+      "sink": {
+        "before_write_calls": 163,
+        "after_write_calls": 163,
+        "before_largest_write": 46677,
+        "after_largest_write": 46677
+      },
+      "source": {
+        "before_materializations": 3,
+        "after_materializations": 3,
+        "before_read_calls": 214,
+        "after_read_calls": 214,
+        "before_read_bytes": 4256299,
+        "after_read_bytes": 4256299
+      }
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "shape": "medium",
+      "metrics_ns": {
+        "before_a": [
+          11678749,
+          12265432,
+          13119237
+        ],
+        "after_a": [
+          8956133,
+          9496583,
+          9674257
+        ],
+        "after_b": [
+          9055790,
+          9737473,
+          9805597
+        ],
+        "before_b": [
+          11752649,
+          12497445,
+          12998756
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          -23.312565,
+          -22.574411,
+          -26.258997
+        ],
+        "after_b_vs_before_b": [
+          -22.946818,
+          -22.08429,
+          -24.565112
+        ]
+      },
+      "output": {
+        "sha256": "d376faa785c99b2e294196c5c6cf6226f8b57e5c59b9c6c5c5a37155a3066700",
+        "identical_across_legs": true,
+        "accepted_bytes": 4226427
+      },
+      "sink": {
+        "before_write_calls": 163,
+        "after_write_calls": 163,
+        "before_largest_write": 32768,
+        "after_largest_write": 32768
+      },
+      "source": {
+        "before_materializations": 3,
+        "after_materializations": 3,
+        "before_read_calls": 213,
+        "after_read_calls": 213,
+        "before_read_bytes": 4230865,
+        "after_read_bytes": 4230865
+      }
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shape": "dense-sparse",
+      "metrics_ns": {
+        "before_a": [
+          84691264,
+          86743333,
+          87860009
+        ],
+        "after_a": [
+          66555762,
+          69966726,
+          70932257
+        ],
+        "after_b": [
+          66944970,
+          69556929,
+          70110312
+        ],
+        "before_b": [
+          86668937,
+          89975061,
+          94887478
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          -21.413663,
+          -19.340515,
+          -19.266731
+        ],
+        "after_b_vs_before_b": [
+          -22.757827,
+          -22.693102,
+          -26.112156
+        ]
+      },
+      "output": {
+        "sha256": "254877f86b62c0a2065a773e327d5565b5acf2e73b96360ab8dd7114feefdef4",
+        "identical_across_legs": true,
+        "accepted_bytes": 4252383
+      },
+      "sink": {
+        "before_write_calls": 163,
+        "after_write_calls": 163,
+        "before_largest_write": 47171,
+        "after_largest_write": 47171
+      },
+      "source": {
+        "before_materializations": 6,
+        "after_materializations": 6,
+        "before_read_calls": 226,
+        "after_read_calls": 226,
+        "before_read_bytes": 4256227,
+        "after_read_bytes": 4256227
+      }
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shape": "medium",
+      "metrics_ns": {
+        "before_a": [
+          43670112,
+          45759543,
+          47273999
+        ],
+        "after_a": [
+          34308260,
+          35328000,
+          35609157
+        ],
+        "after_b": [
+          34202301,
+          35729882,
+          36724841
+        ],
+        "before_b": [
+          43447399,
+          45157596,
+          47778136
+        ]
+      },
+      "delta_percent": {
+        "after_a_vs_before_a": [
+          -21.437664,
+          -22.796432,
+          -24.674964
+        ],
+        "after_b_vs_before_b": [
+          -21.27883,
+          -20.87736,
+          -23.13463
+        ]
+      },
+      "output": {
+        "sha256": "601093f54a77d51bac22260fb75541f1c040e0251fa1ad58832d39dbb659b149",
+        "identical_across_legs": true,
+        "accepted_bytes": 4226735
+      },
+      "sink": {
+        "before_write_calls": 163,
+        "after_write_calls": 163,
+        "before_largest_write": 32768,
+        "after_largest_write": 32768
+      },
+      "source": {
+        "before_materializations": 6,
+        "after_materializations": 6,
+        "before_read_calls": 225,
+        "after_read_calls": 225,
+        "before_read_bytes": 4230793,
+        "after_read_bytes": 4230793
+      }
+    }
+  ]
+}

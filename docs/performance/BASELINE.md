@@ -159,9 +159,11 @@ evidence; it does not certify DOC/XLS/PPT semantic CRUD adoption. See the
 
 ## Parallel scaling observation
 
-`opc_open` currently uses Rayon through the global pool. Separate processes set
-`RAYON_NUM_THREADS` to 1, 2, 4, 8, and 12; each cell used 10 warm-ups and 50
-samples. Raw reports are the
+This historical `opc_open` experiment used `RAYON_NUM_THREADS` in separate
+processes. Current production bulk execution uses caller-sized local pools and
+has no hidden global Rayon path; the figures below remain historical rather
+than current-HEAD scaling evidence. Each cell used 10 warm-ups and 50 samples.
+Raw reports are the
 [`results/baseline-opc-open-workers-*.json`](results/) files.
 
 | Corpus | 1 worker p50 | 2 workers | 4 workers | 8 workers | 12 workers | Best observed speedup |
@@ -204,8 +206,8 @@ and source-backed range-I/O scenarios remain required.
 2. Design source-backed lazy OPC and raw-copy unchanged ZIP entries. The full
    16.8 MB no-op rewrite shows their potential, but both require a larger
    preservation/security change and must not be folded into the small plan.
-3. Replace hidden global scheduling only with an explicit bounded execution
-   contract. The current scaling knee is four large-entry tasks on this host.
+3. Refresh current-HEAD explicit local-pool scaling with task-size thresholds;
+   the historical knee was four large-entry tasks on this host.
 4. Add format-owner and CFB matrices before choosing XLSX/DOCX/PPTX/legacy
    semantic optimizations.
 
@@ -901,6 +903,26 @@ accepted speedup. Allocation/peak-memory/RSS, hardware, copied/decompressed-
 byte, CPU-utilization, and production-latency evidence remain pending. The
 release filesystem evidence is likewise descriptive tmpfs data, not physical
 cold-cache proof.
+
+## XLSX provenance and RTF streaming ABBA (2026-08-14)
+
+A CPU-2 release `before-A / after-A / after-B / before-B` run used 10 warm-ups
+and 100 samples for six matched XLSX scalar-cell pairs and three RTF streaming
+shapes. XLSX source-backed p50 geomean improves **21.66%/22.65%** and p95
+**21.38%/22.70%** after eliminating a redundant publication-time semantic
+worksheet reload. Physical read/materialization counters stay unchanged, so
+this is not an I/O claim. RTF streaming p50 geomean improves
+**76.41%/76.47%** and p95 **75.23%/75.76%** after batching escape-free ASCII
+into at most 32-byte sink requests; the large case drops from 7,208,970 to
+1,441,802 writes. Exact output hashes match every leg.
+
+The medium eager XLSX exact-256 after-A control outlier (+30.59% p50,
++105.28% p95) moved opposite the paired source improvement and normalized in
+after-B (+1.63%/+4.25%); no eager-path claim is accepted. Allocation, peak
+heap/RSS, physical cold I/O and compression-byte conclusions remain pending.
+See [change 0096](changes/0096-xlsx-source-provenance-publication.md),
+[change 0097](changes/0097-rtf-bounded-ascii-streaming.md), and the
+[compact summary](results/xlsx-rtf-abba-0108-summary.json).
 
 Consolidated changed-crate tests, formatter checks, warning-denied production
 Clippy and rustdoc gates passed. The current ODS all-target Clippy gate retains
