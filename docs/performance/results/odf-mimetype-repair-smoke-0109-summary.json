@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "kind": "correctness_counter_smoke",
+  "date": "2026-08-14",
+  "case": "odf_mimetype_repair_plan",
+  "build": {
+    "profile": "debug",
+    "dirty_worktree": true,
+    "binary_sha256": "134d587b45995f47e57d3409e7d7dd4700e11da40c5eeb21cdf12c93e1338b75"
+  },
+  "run": {
+    "warmup": 0,
+    "samples": 1,
+    "raw_report_sha256": "dc3f025986273323ff45584b476cda8e53aa91f48af54cb6b5c8ffbe4cedc26c",
+    "raw_report_committed": false
+  },
+  "records": [
+    {
+      "shape": "tiny",
+      "source_bytes": 2157,
+      "output_bytes": 2148,
+      "source_sha256": "28793e827372c6866401ae04f559eb8d2a98e2a3bd0fd01112c1e76ae9025ab5",
+      "output_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
+      "plan_json_sha256": "016ee331ecc7b7665479a88149aab231ffca638222582192aca599e70d8f9508",
+      "accepted_bytes": 2148,
+      "write_calls": 16,
+      "largest_write": 629,
+      "retained_output_bytes": 0,
+      "retained_authoring_window_bytes": null
+    },
+    {
+      "shape": "medium",
+      "source_bytes": 2657,
+      "output_bytes": 2648,
+      "source_sha256": "b9855948556cc781b2bd79f3ed80e17f43ac5eecd13aa62b79a01a14d5312f8a",
+      "output_sha256": "1d175098a7ffa42066bafb19e9a3e5ea44b73c646561227c0bde5bca30ac37ce",
+      "plan_json_sha256": "3f4023a6e73b9419d59a55941146a4f6bf5f52c066e065fb2e9d69042bf768aa",
+      "accepted_bytes": 2648,
+      "write_calls": 16,
+      "largest_write": 1106,
+      "retained_output_bytes": 0,
+      "retained_authoring_window_bytes": null
+    },
+    {
+      "shape": "large",
+      "source_bytes": 28429,
+      "output_bytes": 28420,
+      "source_sha256": "7be26d9d054ca83adb441ca2a23cc1b2b72faf4c3ba9dfd4c997e0f8438dc1a5",
+      "output_sha256": "9d724c649cb5e4b4adce30c4ede2059ff9efc26109c1b84ac8460df00ecf89a9",
+      "plan_json_sha256": "5afb825236ee7caf913cbe4c2d741eefe6737c5a4412a1809715faf39cfd27ef",
+      "accepted_bytes": 28420,
+      "write_calls": 16,
+      "largest_write": 26878,
+      "retained_output_bytes": 0,
+      "retained_authoring_window_bytes": null
+    }
+  ],
+  "repair_contract": {
+    "schema": "odf-repair/mimetype-local-extra/v1",
+    "repair_id": "odf.repair.mimetype_local_extra",
+    "intent": "non_destructive",
+    "extra_field_id": 21589,
+    "extra_field_bytes": 9,
+    "changed_members": ["mimetype"],
+    "changed_regions": [
+      "mimetype_local_header",
+      "central_directory_offsets",
+      "end_of_central_directory"
+    ],
+    "member_payloads_preserved": true,
+    "reversible": true,
+    "exact_canonical_recovery_verified": true,
+    "patch_verified": true,
+    "inverse_verified": true,
+    "stale_source_refusal_verified": true,
+    "canonical_no_plan_verified": true,
+    "partial_sink_progress_verified": true
+  },
+  "claims": {
+    "selectable_correctness_evidence": true,
+    "latency_claim": false,
+    "allocation_claim": false,
+    "peak_memory_claim": false,
+    "cold_io_claim": false,
+    "note": "The timed path includes validation, bounded full-candidate plan preflight, and sequential publication. Zero retained output and bounded sink requests are not a total-memory bound."
+  }
+}

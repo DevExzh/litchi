@@ -93,6 +93,9 @@ const XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1";
 const XLSX_MERGE_EDIT_CORPUS_GENERATOR: &str = "litchi-xlsx-merge-edit-sparse-a1-b2-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
+const ODF_REPAIR_CORPUS_GENERATOR: &str = "litchi-odf-mimetype-repair-v1";
+const ODF_REPAIR_LOCAL_EXTRA: &[u8] = &[0x55, 0x54, 0x05, 0x00, 0x01, 0, 0, 0, 0];
+const ODF_REPAIR_PUBLICATION_SCRATCH_BYTES: u64 = 64 * 1024;
 const ODT_MEDIA_CORPUS_GENERATOR: &str = "litchi-odt-media-paragraph-publication-v1";
 const ODT_RESOURCE_BATCH_CORPUS_GENERATOR: &str =
     "litchi-odt-embedded-resource-batch-publication-v1";
@@ -634,6 +637,7 @@ enum Case {
     OdtSemanticOneEditSave,
     OdtSemanticOnePercentEditSave,
     OdfValidationReport,
+    OdfMimetypeRepairPlan,
     OdtMediaParagraphEditSave,
     OdtMediaLineBreakEditSave,
     OdtMediaAppendRunEditSave,
@@ -910,6 +914,7 @@ impl Case {
             Self::OdtSemanticOneEditSave => "odt_semantic_one_edit_save",
             Self::OdtSemanticOnePercentEditSave => "odt_semantic_one_percent_edit_save",
             Self::OdfValidationReport => "odf_validation_report",
+            Self::OdfMimetypeRepairPlan => "odf_mimetype_repair_plan",
             Self::OdtMediaParagraphEditSave => "odt_media_paragraph_edit_save",
             Self::OdtMediaLineBreakEditSave => "odt_media_line_break_edit_save",
             Self::OdtMediaAppendRunEditSave => "odt_media_append_run_edit_save",
@@ -1241,6 +1246,10 @@ impl Case {
 
     const fn uses_validation_odf(self) -> bool {
         matches!(self, Self::OdfValidationReport)
+    }
+
+    const fn uses_odf_repair(self) -> bool {
+        matches!(self, Self::OdfMimetypeRepairPlan)
     }
 
     const fn uses_ods_media(self) -> bool {
@@ -1704,7 +1713,35 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     validation: Option<ValidationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    odf_repair: Option<OdfRepairSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     cfb_selective: Option<CfbSelectiveEvidence>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct OdfRepairSummary {
+    schema: &'static str,
+    repair_id: &'static str,
+    intent: &'static str,
+    validation_issue_id: String,
+    plan_json_sha256: String,
+    source_bytes: u64,
+    output_bytes: u64,
+    source_sha256: String,
+    output_sha256: String,
+    member_count: usize,
+    extra_field_id: u16,
+    extra_field_bytes: u16,
+    changed_members: Vec<&'static str>,
+    changed_regions: Vec<&'static str>,
+    member_payloads_preserved: bool,
+    reversible: bool,
+    exact_canonical_recovery_verified: bool,
+    patch_verified: bool,
+    inverse_verified: bool,
+    stale_source_refusal_verified: bool,
+    canonical_no_plan_verified: bool,
+    partial_sink_progress_verified: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -2270,6 +2307,37 @@ impl Write for CountingSink {
     }
 }
 
+#[derive(Debug)]
+struct PrefixFailSink {
+    accepted: u64,
+    fail_after: u64,
+}
+
+impl Write for PrefixFailSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.accepted >= self.fail_after {
+            return Err(io::Error::other("intentional repair sink failure"));
+        }
+        let remaining = self.fail_after - self.accepted;
+        let accepted =
+            usize::try_from(remaining.min(u64::try_from(bytes.len()).map_err(|_error| {
+                io::Error::other("repair sink write length does not fit u64")
+            })?))
+            .map_err(|_error| io::Error::other("repair sink accepted length does not fit usize"))?;
+        self.accepted = self
+            .accepted
+            .checked_add(u64::try_from(accepted).map_err(|_error| {
+                io::Error::other("repair sink accepted length does not fit u64")
+            })?)
+            .ok_or_else(|| io::Error::other("repair sink progress overflows u64"))?;
+        Ok(accepted)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
 /// A fixed-memory, non-seek sink for streaming-creation timings.
 ///
 /// Only SHA-256 state and scalar counters are retained. The complete artifact
@@ -2287,6 +2355,17 @@ impl HashingDiscardSink {
             summary: SinkSummary {
                 retained_output_bytes: Some(0),
                 retained_authoring_window_bytes: Some(retained_authoring_window_bytes),
+                ..SinkSummary::default()
+            },
+            maximum,
+            digest: Sha256::new(),
+        }
+    }
+
+    fn without_authoring_window(maximum: u64) -> Self {
+        Self {
+            summary: SinkSummary {
+                retained_output_bytes: Some(0),
                 ..SinkSummary::default()
             },
             maximum,
@@ -3320,6 +3399,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_validation_docx()
                     && !case.uses_validation_pptx()
                     && !case.uses_validation_odf()
+                    && !case.uses_odf_repair()
                     && !case.is_cfb_selective()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
@@ -4170,6 +4250,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options.cases.iter().any(|case| case.uses_odf_repair()) {
+        for shape in &options.semantic_shapes {
+            let corpus = build_odf_repair_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_odf_repair())
+            {
+                results.push(run_case_with_config(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
     let report = Report {
         schema_version: SCHEMA_VERSION,
         tool: Tool {
@@ -4636,6 +4736,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_semantic_one_edit_save" => Some(Case::OdtSemanticOneEditSave),
         "odt_semantic_one_percent_edit_save" => Some(Case::OdtSemanticOnePercentEditSave),
         "odf_validation_report" => Some(Case::OdfValidationReport),
+        "odf_mimetype_repair_plan" => Some(Case::OdfMimetypeRepairPlan),
         "odt_media_paragraph_edit_save" => Some(Case::OdtMediaParagraphEditSave),
         "odt_media_line_break_edit_save" => Some(Case::OdtMediaLineBreakEditSave),
         "odt_media_append_run_edit_save" => Some(Case::OdtMediaAppendRunEditSave),
@@ -6710,6 +6811,121 @@ fn build_semantic_odt_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
     })
 }
 
+fn build_odf_repair_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let canonical = build_semantic_odt_corpus(shape)?;
+    let archive = inject_mimetype_local_timestamp_extra(canonical.archive.clone())?;
+    let report = litchi_odf_common::validate_package(&archive)?;
+    if !report.is_complete()
+        || report.issues().len() != 1
+        || report.issues()[0].code() != litchi_odf_common::MIMETYPE_LOCAL_EXTRA_ISSUE
+        || report.issues()[0].repair().repair_id()
+            != Some(litchi_odf_common::MIMETYPE_LOCAL_EXTRA_REPAIR)
+    {
+        return Err("ODF repair corpus did not produce the sole supported repair issue".into());
+    }
+
+    let mut manifest = canonical.manifest;
+    manifest.name = format!("odf-mimetype-repair-{}", shape.name());
+    manifest.generator = ODF_REPAIR_CORPUS_GENERATOR;
+    manifest.archive_bytes = archive.len();
+    manifest.archive_sha256 = sha256_hex(&archive);
+    manifest.target_entry = "mimetype:local-extra:0x5455".to_owned();
+    manifest.target_payload_bytes = ODF_REPAIR_LOCAL_EXTRA.len();
+    manifest.target_payload_sha256 = sha256_hex(ODF_REPAIR_LOCAL_EXTRA);
+    Ok(Corpus {
+        manifest,
+        archive,
+        target_name: "mimetype:local-extra:0x5455".to_owned(),
+        target_payload: ODF_REPAIR_LOCAL_EXTRA.to_vec(),
+        xlsx: None,
+    })
+}
+
+fn inject_mimetype_local_timestamp_extra(mut source: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
+    const LOCAL_FIXED: usize = 30;
+    const CENTRAL_LOCAL_OFFSET: std::ops::Range<usize> = 42..46;
+    const EOCD_DIRECTORY_OFFSET: std::ops::Range<usize> = 16..20;
+
+    let archive = ZipArchive::from_slice(&source)?;
+    let central_start = usize::try_from(archive.directory_offset())?;
+    let eocd = usize::try_from(archive.eocd_offset())?;
+    let records = archive
+        .entries()
+        .map(|entry| {
+            let entry = entry?;
+            Ok((
+                usize::try_from(entry.central_directory_offset())?,
+                usize::try_from(entry.local_header_offset())?,
+            ))
+        })
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+    let first_local = records.first().ok_or("ODF repair corpus is empty")?.1;
+    if first_local != 0 || source.get(..4) != Some(&0x0403_4b50_u32.to_le_bytes()) {
+        return Err("ODF repair corpus does not begin with a local ZIP header".into());
+    }
+    let name_len = usize::from(u16::from_le_bytes(
+        source
+            .get(first_local + 26..first_local + 28)
+            .ok_or("ODF repair local name length is truncated")?
+            .try_into()?,
+    ));
+    let extra_len = usize::from(u16::from_le_bytes(
+        source
+            .get(first_local + 28..first_local + 30)
+            .ok_or("ODF repair local extra length is truncated")?
+            .try_into()?,
+    ));
+    let name_start = first_local
+        .checked_add(LOCAL_FIXED)
+        .ok_or("ODF repair local name offset overflows usize")?;
+    let insert_at = name_start
+        .checked_add(name_len)
+        .ok_or("ODF repair local extra offset overflows usize")?;
+    if source.get(name_start..insert_at) != Some(b"mimetype") || extra_len != 0 {
+        return Err("ODF repair corpus has a non-canonical first mimetype header".into());
+    }
+    let shift = ODF_REPAIR_LOCAL_EXTRA.len();
+    let shift_u32 = u32::try_from(shift)?;
+    source.splice(insert_at..insert_at, ODF_REPAIR_LOCAL_EXTRA.iter().copied());
+    source[first_local + 28..first_local + 30]
+        .copy_from_slice(&u16::try_from(shift)?.to_le_bytes());
+
+    for (central, local) in records {
+        let shifted_central = central
+            .checked_add(shift)
+            .ok_or("ODF repair central offset overflows usize")?;
+        let shifted_local = if local > first_local {
+            u32::try_from(local)?
+                .checked_add(shift_u32)
+                .ok_or("ODF repair shifted local-header offset overflows classic ZIP")?
+        } else {
+            u32::try_from(local)?
+        };
+        let range = shifted_central + CENTRAL_LOCAL_OFFSET.start
+            ..shifted_central + CENTRAL_LOCAL_OFFSET.end;
+        source
+            .get_mut(range)
+            .ok_or("ODF repair central record is truncated")?
+            .copy_from_slice(&shifted_local.to_le_bytes());
+    }
+
+    let shifted_eocd = eocd
+        .checked_add(shift)
+        .ok_or("ODF repair EOCD offset overflows usize")?;
+    let shifted_directory = u32::try_from(central_start)?
+        .checked_add(shift_u32)
+        .ok_or("ODF repair central directory offset overflows classic ZIP")?;
+    let range =
+        shifted_eocd + EOCD_DIRECTORY_OFFSET.start..shifted_eocd + EOCD_DIRECTORY_OFFSET.end;
+    source
+        .get_mut(range)
+        .ok_or("ODF repair EOCD is truncated")?
+        .copy_from_slice(&shifted_directory.to_le_bytes());
+
+    ZipArchive::from_slice(&source)?;
+    Ok(source)
+}
+
 fn build_odt_media_corpus() -> Result<Corpus, Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let archive = odt_media_archive()?;
@@ -8134,6 +8350,9 @@ fn run_case_with_config(
             run_semantic_odt(case, corpus, warmup_iterations, samples)
         },
         Case::OdfValidationReport => run_odf_validation_report(corpus, warmup_iterations, samples),
+        Case::OdfMimetypeRepairPlan => {
+            run_odf_mimetype_repair_plan(corpus, warmup_iterations, samples)
+        },
         Case::OdtMediaParagraphEditSave => {
             run_odt_media_paragraph_edit_save(corpus, warmup_iterations, samples)
         },
@@ -11865,6 +12084,187 @@ fn run_odf_validation_report(
         |bytes| Ok(litchi_odf_common::validate_package(bytes)?),
         |report, bytes| generic_validation_summary(report, bytes, None, None),
     )
+}
+
+fn verify_odf_mimetype_repair(
+    corpus: &Corpus,
+) -> Result<(OdfRepairSummary, Vec<u8>), Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let canonical = semantic_odt_bytes(shape)?;
+    let report = litchi_odf_common::validate_package(&corpus.archive)?;
+    let plan = litchi_odf_common::plan_odf_repair(
+        &corpus.archive,
+        &report,
+        litchi_odf_common::OdfRepairLimits::default(),
+    )?;
+    let preview = plan.preview();
+    let plan_json = plan.to_json()?;
+    if preview.repair_id() != litchi_odf_common::MIMETYPE_LOCAL_EXTRA_REPAIR
+        || preview.schema() != litchi_odf_common::MIMETYPE_REPAIR_PLAN_SCHEMA
+        || preview.intent() != litchi_odf_common::RepairIntentKind::NonDestructive
+        || preview.is_noop()
+        || preview.source_len() != u64::try_from(corpus.archive.len())?
+        || preview.output_len() != u64::try_from(canonical.len())?
+        || preview.source_fingerprint().as_hex() != corpus.manifest.archive_sha256
+        || preview.output_fingerprint().as_hex() != sha256_hex(&canonical)
+    {
+        return Err("ODF repair preview differs from the deterministic corpus".into());
+    }
+
+    let patch = plan.apply()?;
+    if patch.target_bytes() != canonical {
+        return Err("ODF repair patch did not recover the canonical ODT bytes".into());
+    }
+    let mut applied = Vec::new();
+    patch.write_to(&mut applied)?;
+    if applied != canonical {
+        return Err("ODF repair patch publication differs from the canonical ODT".into());
+    }
+    let mut restored = Vec::new();
+    patch.inverse().write_to(&mut restored)?;
+    if restored != corpus.archive {
+        return Err("ODF repair inverse did not restore the exact source".into());
+    }
+
+    let mut stale = corpus.archive.clone();
+    let last = stale
+        .last_mut()
+        .ok_or("ODF repair corpus is unexpectedly empty")?;
+    *last ^= 1;
+    let mut stale_output = Vec::new();
+    if !matches!(
+        patch.apply_to(&stale, &mut stale_output),
+        Err(litchi_odf_common::RepairError::SourceChanged { .. })
+    ) || !stale_output.is_empty()
+    {
+        return Err("ODF repair patch did not refuse a stale source before output".into());
+    }
+
+    let canonical_report = litchi_odf_common::validate_package(&canonical)?;
+    if !canonical_report.is_complete()
+        || canonical_report.has_errors()
+        || !matches!(
+            litchi_odf_common::plan_odf_repair(
+                &canonical,
+                &canonical_report,
+                litchi_odf_common::OdfRepairLimits::default(),
+            ),
+            Err(litchi_odf_common::RepairError::ReportMismatch)
+        )
+    {
+        return Err("canonical ODT did not produce an exact repair no-plan refusal".into());
+    }
+
+    let mut partial = PrefixFailSink {
+        accepted: 0,
+        fail_after: 1,
+    };
+    let partial_verified = matches!(
+        plan.write_to(&mut partial),
+        Err(litchi_odf_common::RepairError::IncompleteOutput {
+            progress: litchi_odf_common::RepairOutputProgress::Prefix {
+                accepted: 1,
+                expected,
+            },
+            ..
+        }) if expected == preview.output_len()
+    );
+    if !partial_verified {
+        return Err("ODF repair did not report exact partial-sink progress".into());
+    }
+
+    let effects = preview.effects();
+    Ok((
+        OdfRepairSummary {
+            schema: preview.schema(),
+            repair_id: preview.repair_id(),
+            intent: preview.intent().as_str(),
+            validation_issue_id: preview.validation_issue_id().to_string(),
+            plan_json_sha256: sha256_hex(plan_json.as_bytes()),
+            source_bytes: preview.source_len(),
+            output_bytes: preview.output_len(),
+            source_sha256: preview.source_fingerprint().as_hex(),
+            output_sha256: preview.output_fingerprint().as_hex(),
+            member_count: preview.member_count(),
+            extra_field_id: plan.action().field_id(),
+            extra_field_bytes: plan.action().field_bytes(),
+            changed_members: effects.changed_members().to_vec(),
+            changed_regions: effects
+                .changed_regions()
+                .iter()
+                .map(|region| region.as_str())
+                .collect(),
+            member_payloads_preserved: effects.member_payloads_preserved(),
+            reversible: effects.reversible(),
+            exact_canonical_recovery_verified: true,
+            patch_verified: true,
+            inverse_verified: true,
+            stale_source_refusal_verified: true,
+            canonical_no_plan_verified: true,
+            partial_sink_progress_verified: true,
+        },
+        canonical,
+    ))
+}
+
+fn run_odf_mimetype_repair_plan(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let case = Case::OdfMimetypeRepairPlan;
+    let (repair_summary, expected) = verify_odf_mimetype_repair(corpus)?;
+    let expected_digest = sha256_hex(&expected);
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sinks = Vec::with_capacity(samples);
+    let mut digests = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // The sink retains only hash state, but repair planning deliberately
+        // performs a bounded full-candidate preflight. Do not present the
+        // publisher's 64 KiB write request ceiling as a total memory bound.
+        let mut sink = HashingDiscardSink::without_authoring_window(u64::try_from(expected.len())?);
+        let started = Instant::now();
+        let report = litchi_odf_common::validate_package(&corpus.archive)?;
+        let plan = litchi_odf_common::plan_odf_repair(
+            &corpus.archive,
+            &report,
+            litchi_odf_common::OdfRepairLimits::default(),
+        )?;
+        let publication = plan.write_to(&mut sink)?;
+        let duration = started.elapsed();
+        let (summary, digest) = sink.finish();
+        if publication.bytes() != u64::try_from(expected.len())?
+            || publication.source_fingerprint().as_hex() != corpus.manifest.archive_sha256
+            || publication.target_fingerprint().as_hex() != expected_digest
+            || summary.accepted_bytes != u64::try_from(expected.len())?
+            || summary.largest_write > ODF_REPAIR_PUBLICATION_SCRATCH_BYTES
+            || digest != expected_digest
+        {
+            return Err("ODF repair publication evidence changed across iterations".into());
+        }
+        if iteration >= warmup_iterations {
+            sinks.push(summary);
+            digests.push(digest);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let sink = deterministic_sink_summary(&sinks, case.name())?;
+    if digests.iter().any(|digest| digest != &expected_digest) {
+        return Err("ODF repair output digest changed across samples".into());
+    }
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(SourceSummary {
+            odf_repair: Some(repair_summary),
+            ..SourceSummary::default()
+        }),
+        execution: None,
+        output_sha256: Some(expected_digest),
+    })
 }
 
 fn run_docx_section_inventory(
@@ -20915,33 +21315,33 @@ mod tests {
 
     use super::{
         Case, CfbSelectiveTarget, CorpusShape, CountingSink, InstrumentedSource,
-        ODP_TEXT_BOX_BATCH_COUNT, ODT_RESOURCE_BATCH_COUNT, OpcCacheMode,
-        PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
-        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
-        SimulatedRangeSource, SourceBackedPackage, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
-        XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape, XlsxShape,
-        build_cfb_corpus, build_cfb_selective_corpus, build_docx_source_edit_corpus,
-        build_odp_media_corpus, build_odp_text_box_batch_corpus, build_ods_media_corpus,
-        build_odt_media_corpus, build_odt_resource_batch_corpus, build_ole_common_corpus,
-        build_opc_corpus, build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus,
-        build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
-        build_semantic_odt_corpus, build_semantic_pptx_corpus, build_semantic_rtf_corpus,
-        build_streaming_corpus, build_writer_corpus, build_xls_comments_edit_corpus,
-        build_xls_visibility_edit_corpus, build_xlsx_auto_filter_edit_corpus,
-        build_xlsx_calculation_metadata_edit_corpus, build_xlsx_cell_crud_corpus,
-        build_xlsx_conditional_formatting_edit_corpus, build_xlsx_corpus,
-        build_xlsx_data_validation_edit_corpus, build_xlsx_defined_names_edit_corpus,
-        build_xlsx_merge_edit_corpus, build_xlsx_page_break_edit_corpus,
-        build_xlsx_page_margin_edit_corpus, build_xlsx_page_setup_edit_corpus,
-        build_xlsx_print_options_edit_corpus, build_xlsx_sheet_protection_edit_corpus,
-        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
-        payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
-        run_cfb_selective_read, run_docx_source_backed_one_edit_save,
-        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
-        run_opc_source_overlay_one_part_save, run_pptx_batch_edit_save,
-        run_pptx_multi_slide_batch_edit_save, run_pptx_source_backed_one_edit_save,
-        run_scaling_case, run_streaming_creation, run_xls_comments_edit_save,
-        run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
+        ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES, ODP_TEXT_BOX_BATCH_COUNT,
+        ODT_RESOURCE_BATCH_COUNT, OpcCacheMode, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind,
+        RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
+        RtfSemanticVariant, SemanticShape, SimulatedRangeSource, SourceBackedPackage, WriterShape,
+        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
+        XlsxCellCrudShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
+        build_docx_source_edit_corpus, build_odf_repair_corpus, build_odp_media_corpus,
+        build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
+        build_odt_resource_batch_corpus, build_ole_common_corpus, build_opc_corpus,
+        build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_semantic_docx_corpus,
+        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
+        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
+        build_writer_corpus, build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
+        build_xlsx_auto_filter_edit_corpus, build_xlsx_calculation_metadata_edit_corpus,
+        build_xlsx_cell_crud_corpus, build_xlsx_conditional_formatting_edit_corpus,
+        build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
+        build_xlsx_defined_names_edit_corpus, build_xlsx_merge_edit_corpus,
+        build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
+        build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
+        build_xlsx_sheet_protection_edit_corpus, expected_opc_overlay_output,
+        ole_common_changed_output, opc_overlay_replacement_payload, payload_bytes,
+        resolve_execution_workers, run_case, run_case_with_config, run_cfb_selective_read,
+        run_docx_source_backed_one_edit_save, run_opc_source_cache_budget_boundary,
+        run_opc_source_cache_contention, run_opc_source_overlay_one_part_save,
+        run_pptx_batch_edit_save, run_pptx_multi_slide_batch_edit_save,
+        run_pptx_source_backed_one_edit_save, run_scaling_case, run_streaming_creation,
+        run_xls_comments_edit_save, run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
         run_xlsx_data_validation_edit_save, run_xlsx_defined_names_edit_save,
         run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
@@ -21086,6 +21486,50 @@ mod tests {
         assert!(!Case::DEFAULT.contains(&Case::DocxSectionInventory));
         assert!(!Case::DEFAULT.contains(&Case::PptxValidationReport));
         assert!(!Case::DEFAULT.contains(&Case::OdfValidationReport));
+        assert!(!Case::DEFAULT.contains(&Case::OdfMimetypeRepairPlan));
+    }
+
+    #[test]
+    fn odf_repair_case_is_deterministic_reversible_and_forward_only() {
+        let first = build_odf_repair_corpus(SemanticShape::Tiny).unwrap();
+        let second = build_odf_repair_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(first.archive, second.archive);
+        assert_eq!(
+            first.manifest.archive_sha256,
+            second.manifest.archive_sha256
+        );
+        assert_eq!(first.target_payload, ODF_REPAIR_LOCAL_EXTRA);
+
+        let measured = run_case(Case::OdfMimetypeRepairPlan, &first, 1, 2).unwrap();
+        assert_eq!(measured.elapsed_ns.samples.len(), 2);
+        let sink = measured.sink.expect("ODF repair sink summary");
+        assert_eq!(sink.retained_output_bytes, Some(0));
+        assert_eq!(sink.retained_authoring_window_bytes, None);
+        assert!(sink.write_calls > 1);
+        assert!(sink.largest_write <= ODF_REPAIR_PUBLICATION_SCRATCH_BYTES);
+        let repair = measured
+            .source
+            .expect("ODF repair source summary")
+            .odf_repair
+            .expect("ODF repair evidence");
+        assert_eq!(
+            repair.repair_id,
+            litchi_odf_common::MIMETYPE_LOCAL_EXTRA_REPAIR
+        );
+        assert_eq!(repair.extra_field_id, 0x5455);
+        assert_eq!(repair.extra_field_bytes, 9);
+        assert!(repair.member_payloads_preserved);
+        assert!(repair.reversible);
+        assert!(repair.exact_canonical_recovery_verified);
+        assert!(repair.patch_verified);
+        assert!(repair.inverse_verified);
+        assert!(repair.stale_source_refusal_verified);
+        assert!(repair.canonical_no_plan_verified);
+        assert!(repair.partial_sink_progress_verified);
+        assert_eq!(
+            measured.output_sha256.as_deref(),
+            Some(repair.output_sha256.as_str())
+        );
     }
 
     #[test]

@@ -248,8 +248,8 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**200 selectable cases**; 196 was the count before the four CFB selective-range
-selectors were added. The
+**201 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+repair-plan selector was added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
 
@@ -311,9 +311,11 @@ Bounded semantic validation reports are now implemented for DOCX, PPTX, RTF,
 and XLS, alongside the existing CFB, OPC, and ODF validation reports. They
 retain finite limits, typed failure attribution, and format-specific
 preservation/security checks, but are correctness APIs rather than measured
-performance cases. ODF's repair surface remains deliberately narrow: the typed
-non-destructive plan removes only one recognized local-header extra from a
-first, stored `mimetype` member after source/provenance and full reopen checks;
+performance cases. The opt-in ODF repair selector now exercises the deliberately
+narrow typed non-destructive plan that removes one recognized local-header extra
+from a first, stored `mimetype` member after source/provenance and full reopen
+checks. Its retained-output-free sink and bounded write requests do not imply a
+total memory bound because planning performs a bounded full-candidate preflight;
 structural, encrypted, signed, macro, and semantic repairs remain unsupported.
 
 Existing-document RTF logical-tail append now has two opt-in harness selectors
