@@ -11,6 +11,40 @@ performance-results report. A path is called a bottleneck only after the
 process benchmark and profiler evidence in `BASELINE.md` confirms its effect
 on a named corpus and scenario.
 
+## Current resource observations (change 0115)
+
+The [current-HEAD resource profile](results/resource-profile-current-head-0115.json)
+adds process-total evidence for a narrow set of named paths.  It does not
+promote any observation to a production bottleneck because heaptrack includes
+startup and synthetic corpus construction, while `strace` covers the whole
+process.
+
+- The managed XLSX batch run recorded 6,130,956 allocation calls and
+  1,026,348,498 allocated bytes in one heaptrack process profile.  This is a
+  strong candidate for operation-attribution work, not proof that the timed
+  edit itself owns all those allocations.
+- The OPC source one-Part profile recorded 549 logical source reads and
+  16,785,201 logical source bytes, while the CFB save profile recorded 1,825
+  logical reads and 84,838,500 bytes before publishing 16,913,408 bytes.  The
+  CFB read/output ratio is a concrete measurement target; it is not a physical
+  disk-I/O claim.
+- The existing bounded RTF stream retained zero output bytes and a 37-byte
+  authoring window in the harness.  Heaptrack still observed 450,852 process
+  allocation calls, so any further RTF work should separate authoring from
+  corpus setup before changing the streaming path.
+- Explicit 1/2/4/8/available execution-context runs on many-small OPC and CFB
+  corpora were classified `nonideal_or_measurement_noise`: raw p50 showed no
+  measured speedup and out-of-range Amdahl fractions are invalidated rather
+  than treated as serial-fraction estimates.  The result supports investigating
+  task granularity and serial work, but does not justify adding parallelism or
+  changing the execution API.
+
+The next evidence-oriented priorities are operation-scoped allocation/RSS
+profiles for managed XLSX, a CFB save read-amplification breakdown, and a
+CPU-pinned repeated scaling run with uncertainty.  None should be treated as
+an optimization acceptance gate until matched controls and preservation gates
+exist.
+
 ## Shared OOXML data path
 
 ```text
