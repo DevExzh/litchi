@@ -44,11 +44,11 @@ const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 /// One raw part in a dependency-closed whole-slide copy plan.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SlideCopyPart {
-    source: PackURI,
-    target: PackURI,
-    content_type: String,
-    bytes: usize,
-    relationships: usize,
+    pub(super) source: PackURI,
+    pub(super) target: PackURI,
+    pub(super) content_type: String,
+    pub(super) bytes: usize,
+    pub(super) relationships: usize,
 }
 
 impl SlideCopyPart {
@@ -202,6 +202,7 @@ impl Snapshot {
                 "digital-signature infrastructure must be handled by an explicit signature policy",
             );
         }
+        reject_unknown_non_part_members(self.package.as_ref(), "slide-copy source")?;
         let presentation = self.package.get_part(&self.presentation_name)?;
         reject_mce(presentation.blob(), "presentation owner")?;
         let presentation_text = std::str::from_utf8(presentation.blob())
@@ -243,7 +244,14 @@ impl Snapshot {
             });
         }
 
-        let mut names: Vec<_> = owned.into_iter().collect();
+        let mut names = Vec::new();
+        names
+            .try_reserve_exact(owned.len())
+            .map_err(|source| Error::Allocation {
+                resource: "slide-copy source closure names",
+                source,
+            })?;
+        names.extend(owned);
         names.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
         let mut parts = Vec::new();
         parts
@@ -473,7 +481,7 @@ fn build_copy_candidate(
     Ok(candidate)
 }
 
-type Closure = (
+pub(super) type Closure = (
     HashSet<PackURI>,
     HashMap<PackURI, Vec<PackURI>>,
     PackURI,
@@ -481,16 +489,18 @@ type Closure = (
     usize,
 );
 
-fn collect_owned_closure(
+pub(super) fn collect_owned_closure(
     package: &OpcPackage,
     slide: &PackURI,
     limits: super::Limits,
 ) -> Result<Closure> {
     let mut queue = VecDeque::new();
-    queue.try_reserve(1).map_err(|source| Error::Allocation {
-        resource: "slide-copy dependency queue",
-        source,
-    })?;
+    queue
+        .try_reserve(limits.max_parts().min(package.part_count()).max(1))
+        .map_err(|source| Error::Allocation {
+            resource: "slide-copy dependency queue",
+            source,
+        })?;
     queue.push_back(slide.clone());
     let mut owned = HashSet::new();
     owned
@@ -509,6 +519,11 @@ fn collect_owned_closure(
     let mut reused_layout = None;
     let mut external_relationships = 0usize;
     let mut planned_bytes = 0usize;
+    let relationship_limit = limits
+        .max_parts()
+        .checked_mul(64)
+        .ok_or_else(|| invalid("slide-copy relationship limit overflow"))?;
+    let mut traversed_relationships = 0usize;
 
     while let Some(name) = queue.pop_front() {
         if !owned.insert(name.clone()) {
@@ -536,6 +551,15 @@ fn collect_owned_closure(
                 source,
             })?;
         for relationship in part.rels().iter() {
+            traversed_relationships = traversed_relationships
+                .checked_add(1)
+                .ok_or_else(|| invalid("slide-copy relationship count overflow"))?;
+            if traversed_relationships > relationship_limit {
+                return Err(Error::Limit {
+                    resource: "slide-copy dependency relationships",
+                    limit: relationship_limit,
+                });
+            }
             if relationship.target_ref().is_empty() {
                 return refusal(
                     SlideCopyRefusal::AmbiguousTopology,
@@ -606,6 +630,10 @@ fn collect_owned_closure(
             validate_owned_target(role, target_part)?;
             validate_owned_surface(role, target_part)?;
             outgoing.push(target.clone());
+            queue.try_reserve(1).map_err(|source| Error::Allocation {
+                resource: "slide-copy dependency queue",
+                source,
+            })?;
             queue.push_back(target);
         }
         edges.insert(name, outgoing);
@@ -801,7 +829,10 @@ fn office_relationship(value: &str, local: &str) -> bool {
             .is_some_and(|actual| actual == local)
 }
 
-fn reject_cycles(owned: &HashSet<PackURI>, edges: &HashMap<PackURI, Vec<PackURI>>) -> Result<()> {
+pub(super) fn reject_cycles(
+    owned: &HashSet<PackURI>,
+    edges: &HashMap<PackURI, Vec<PackURI>>,
+) -> Result<()> {
     let mut indegree = HashMap::new();
     indegree
         .try_reserve(owned.len())
@@ -1108,6 +1139,21 @@ pub(super) fn reject_mce(xml: &[u8], context: &'static str) -> Result<()> {
     }
 }
 
+pub(super) fn reject_unknown_non_part_members(
+    package: &OpcPackage,
+    context: &'static str,
+) -> Result<()> {
+    if package.non_part_members().is_empty() {
+        return Ok(());
+    }
+    refusal(
+        SlideCopyRefusal::UnknownPhysicalMember,
+        format!(
+            "{context} contains ZIP members outside the OPC Part model that this topology-changing operation cannot preserve",
+        ),
+    )
+}
+
 pub(super) fn has_signature_infrastructure(package: &OpcPackage) -> bool {
     package
         .rels()
@@ -1152,10 +1198,19 @@ fn is_xml_content_type(value: &str) -> bool {
             .is_some_and(|suffix| suffix.eq_ignore_ascii_case("+xml"))
 }
 
-fn available_copy_name(
+pub(super) fn available_copy_name(
     package: &OpcPackage,
     source: &PackURI,
     max_candidates: usize,
+) -> Result<PackURI> {
+    available_copy_name_avoiding(package, source, max_candidates, &HashSet::new())
+}
+
+pub(super) fn available_copy_name_avoiding(
+    package: &OpcPackage,
+    source: &PackURI,
+    max_candidates: usize,
+    reserved: &HashSet<PackURI>,
 ) -> Result<PackURI> {
     let value = source.as_str();
     let (stem, extension) = value
@@ -1192,7 +1247,7 @@ fn available_copy_name(
         write!(&mut value, "{stem}-copy{index}{extension}")
             .map_err(|error| invalid(format!("cannot format slide-copy part name: {error}")))?;
         let candidate = PackURI::new(value).map_err(Error::Invalid)?;
-        if package.validate_new_part_name(&candidate).is_ok() {
+        if package.validate_new_part_name(&candidate).is_ok() && !reserved.contains(&candidate) {
             return Ok(candidate);
         }
     }

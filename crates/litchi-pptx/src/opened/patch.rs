@@ -19,18 +19,22 @@ struct RelationshipState {
 }
 
 impl RelationshipState {
-    fn capture(relationships: &litchi_opc::Relationships) -> Vec<Self> {
-        let mut states: Vec<_> = relationships
-            .iter()
-            .map(|relationship| Self {
-                id: relationship.r_id().to_owned(),
-                kind: relationship.reltype().to_owned(),
-                target: relationship.target_ref().to_owned(),
-                external: relationship.is_external(),
-            })
-            .collect();
-        states.sort_unstable_by(|left, right| left.id.cmp(&right.id));
+    fn capture_bounded(relationships: &litchi_opc::Relationships) -> Result<Vec<Self>> {
+        let mut states = Vec::new();
         states
+            .try_reserve_exact(relationships.len())
+            .map_err(|source| Error::Allocation {
+                resource: "opened-presentation patch relationships",
+                source,
+            })?;
+        states.extend(relationships.iter().map(|relationship| Self {
+            id: relationship.r_id().to_owned(),
+            kind: relationship.reltype().to_owned(),
+            target: relationship.target_ref().to_owned(),
+            external: relationship.is_external(),
+        }));
+        states.sort_unstable_by(|left, right| left.id.cmp(&right.id));
+        Ok(states)
     }
 }
 
@@ -42,12 +46,12 @@ struct ResourceState {
 }
 
 impl ResourceState {
-    fn capture(part: &dyn Part) -> Self {
-        Self {
+    fn capture_bounded(part: &dyn Part) -> Result<Self> {
+        Ok(Self {
             content_type: part.content_type().to_owned(),
             blob: part.blob_arc(),
-            relationships: RelationshipState::capture(part.rels()),
-        }
+            relationships: RelationshipState::capture_bounded(part.rels())?,
+        })
     }
 
     fn to_part(&self, name: PackURI) -> Result<BlobPart> {
@@ -209,17 +213,43 @@ impl Patch {
         presentation_name: PackURI,
         limits: Limits,
     ) -> Result<Self> {
-        let mut names: Vec<_> = source
-            .iter_parts()
-            .chain(target.iter_parts())
-            .map(|part| part.partname().clone())
-            .collect();
+        let mut names = Vec::new();
+        let name_count = source
+            .part_count()
+            .checked_add(target.part_count())
+            .ok_or_else(|| invalid("opened-presentation patch part count overflow"))?;
+        names
+            .try_reserve_exact(name_count)
+            .map_err(|source| Error::Allocation {
+                resource: "opened-presentation patch part names",
+                source,
+            })?;
+        names.extend(
+            source
+                .iter_parts()
+                .chain(target.iter_parts())
+                .map(|part| part.partname().clone()),
+        );
         names.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
         names.dedup();
         let mut deltas = Vec::new();
+        deltas
+            .try_reserve_exact(names.len())
+            .map_err(|source| Error::Allocation {
+                resource: "opened-presentation patch deltas",
+                source,
+            })?;
         for name in names {
-            let before = source.get_part(&name).ok().map(ResourceState::capture);
-            let after = target.get_part(&name).ok().map(ResourceState::capture);
+            let before = source
+                .get_part(&name)
+                .ok()
+                .map(ResourceState::capture_bounded)
+                .transpose()?;
+            let after = target
+                .get_part(&name)
+                .ok()
+                .map(ResourceState::capture_bounded)
+                .transpose()?;
             if before != after {
                 deltas.push(Delta {
                     name,
@@ -228,8 +258,8 @@ impl Patch {
                 });
             }
         }
-        let before_root = RelationshipState::capture(source.rels());
-        let after_root = RelationshipState::capture(target.rels());
+        let before_root = RelationshipState::capture_bounded(source.rels())?;
+        let after_root = RelationshipState::capture_bounded(target.rels())?;
         let root = (before_root != after_root).then_some((before_root, after_root));
         Self::new(presentation_name, deltas, root, limits)
     }
@@ -800,7 +830,7 @@ fn apply_with_revision(
 
 fn validate_before(package: &OpcPackage, patch: &Patch) -> Result<()> {
     if let Some((before, _after)) = &patch.root
-        && RelationshipState::capture(package.rels()) != *before
+        && RelationshipState::capture_bounded(package.rels())? != *before
     {
         return Err(stale());
     }
@@ -808,7 +838,8 @@ fn validate_before(package: &OpcPackage, patch: &Patch) -> Result<()> {
         let current = package
             .get_part(&delta.name)
             .ok()
-            .map(ResourceState::capture);
+            .map(ResourceState::capture_bounded)
+            .transpose()?;
         if current != delta.before {
             return Err(stale());
         }
@@ -818,7 +849,7 @@ fn validate_before(package: &OpcPackage, patch: &Patch) -> Result<()> {
 
 fn validate_after(package: &OpcPackage, patch: &Patch) -> Result<()> {
     if let Some((_before, after)) = &patch.root
-        && RelationshipState::capture(package.rels()) != *after
+        && RelationshipState::capture_bounded(package.rels())? != *after
     {
         return Err(invalid(
             "opened-presentation published root relationships differ from the patch target",
@@ -828,7 +859,8 @@ fn validate_after(package: &OpcPackage, patch: &Patch) -> Result<()> {
         let current = package
             .get_part(&delta.name)
             .ok()
-            .map(ResourceState::capture);
+            .map(ResourceState::capture_bounded)
+            .transpose()?;
         if current != delta.after {
             return Err(invalid(
                 "opened-presentation published resource differs from its patch target",

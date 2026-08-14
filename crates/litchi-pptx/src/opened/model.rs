@@ -173,6 +173,7 @@ pub struct Snapshot {
     pub(crate) slides: Vec<Slide>,
     pub(crate) revision: [u8; 32],
     pub(crate) limits: Limits,
+    pub(crate) physical_source_provenance: bool,
 }
 
 impl fmt::Debug for Snapshot {
@@ -214,6 +215,14 @@ impl Snapshot {
 }
 
 pub(crate) fn capture(package: &OpcPackage, limits: Limits) -> Result<Snapshot> {
+    capture_with_provenance(package, limits, true)
+}
+
+pub(crate) fn capture_with_provenance(
+    package: &OpcPackage,
+    limits: Limits,
+    physical_source_provenance: bool,
+) -> Result<Snapshot> {
     let presentation = PresentationPart::from_package(package)?;
     let presentation_name = presentation.part().partname().clone();
     let references = presentation.slide_references()?;
@@ -283,22 +292,52 @@ pub(crate) fn capture(package: &OpcPackage, limits: Limits) -> Result<Snapshot> 
         slides,
         revision,
         limits,
+        physical_source_provenance,
     })
 }
 
 pub(crate) fn package_fingerprint(package: &OpcPackage) -> Result<[u8; 32]> {
-    let mut parts: Vec<_> = package.iter_parts().collect();
+    let mut parts = Vec::new();
+    parts
+        .try_reserve_exact(package.part_count())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation fingerprint parts",
+            source,
+        })?;
+    parts.extend(package.iter_parts());
     parts.sort_unstable_by(|left, right| left.partname().as_str().cmp(right.partname().as_str()));
     let mut digest = Sha256::new();
     feed(&mut digest, b"litchi-pptx-opened-v1");
-    let mut root_relationships: Vec<_> = package.rels().iter().collect();
+    let mut root_relationships = Vec::new();
+    root_relationships
+        .try_reserve_exact(package.rels().len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation fingerprint root relationships",
+            source,
+        })?;
+    root_relationships.extend(package.rels().iter());
     root_relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
     feed_relationships(&mut digest, &root_relationships)?;
+    let non_part_count = u32::try_from(package.non_part_members().len())
+        .map_err(|_error| invalid("opened-presentation non-part member count exceeds u32"))?;
+    feed(&mut digest, b"non-part-members");
+    feed(&mut digest, &non_part_count.to_le_bytes());
+    for member in package.non_part_members() {
+        feed(&mut digest, member.name().as_bytes());
+        feed(&mut digest, member.reason().as_str().as_bytes());
+    }
     for part in parts {
         feed(&mut digest, part.partname().as_str().as_bytes());
         feed(&mut digest, part.content_type().as_bytes());
         feed(&mut digest, part.blob());
-        let mut relationships: Vec<_> = part.rels().iter().collect();
+        let mut relationships = Vec::new();
+        relationships
+            .try_reserve_exact(part.rels().len())
+            .map_err(|source| Error::Allocation {
+                resource: "opened-presentation fingerprint relationships",
+                source,
+            })?;
+        relationships.extend(part.rels().iter());
         relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
         feed_relationships(&mut digest, &relationships)?;
     }
