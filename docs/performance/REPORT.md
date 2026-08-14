@@ -487,6 +487,17 @@ guards, CPU/allocation/RSS attribution, durable replay, media preservation,
 over-limit fallback and frozen binary hashes are summarized in
 [`change 0045`](changes/0045-odt-coalesced-paragraph-publication.md).
 
+The matched ODT mixed model-content publication evidence is
+[`scalar A`](results/odt-mixed-model-scalar-a-0112.json),
+[`batch A`](results/odt-mixed-model-batch-a-0112.json),
+[`batch B`](results/odt-mixed-model-batch-b-0112.json), and
+[`scalar B`](results/odt-mixed-model-scalar-b-0112.json). The medium and
+large shapes preserve their logical/output hashes while reducing the measured
+publication count from 49/193 to one. The exact p50 extraction, binary and
+raw-report hashes, and exclusions are in
+[`change 0104`](changes/0104-odt-mixed-model-publication-evidence.md) and its
+[`compact summary`](results/odt-mixed-model-publication-0112-summary.json).
+
 The ODT compact-audit package-sharing evidence is
 [`before A`](results/abba-odt-compact-audit-final-before-a.json),
 [`after A`](results/abba-odt-compact-audit-final-after-a.json),
@@ -698,6 +709,7 @@ counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
 | ODT envelope-classification sharing, 200 paragraphs + 16 MiB media | 5.555 ms | 4.921 ms | **-11.40% p50 / -11.95% mean** | One archive-sized envelope copy and two allocations/commit removed; p95 -12.19%; peak heap/RSS flat; large exact no-op +152 ns disclosed |
 | ODT final changed-result byte handoff, 200 paragraphs + 16 MiB media | 5.216 ms | 4.030 ms | **-22.74% p50 / -22.56% mean** | One 16.79 MB result copy and redundant parse removed; p95 -21.48%; allocation calls -3.46%; independent final reopen and peak heap/RSS retained |
 | ODT 1% paragraph edit/save, 10,000 paragraphs / 100 replacements | 906.439 ms | 15.615 ms | **-98.28% p50 (58.05x) / -98.27% mean** | One mutable candidate/publication/reopen/audit replaces 100; allocations -96.13%; peak heap and uninstrumented RSS flat; tool-inclusive RSS +9.93% disclosed |
+| ODT mixed model-content publication, medium/large 80/320 operations | 25.640/25.052 ms scalar vs 0.803/0.785 ms batch; **31.93x–31.94x p50** | 2.759/2.756 s scalar vs 21.276/20.998 ms batch; **129.69x–131.24x p50** | One staged publication vs 49/193 scalar publications; per-shape output and logical hashes equal | Narrow repeated-publication comparison only; preparation, reopen/lifecycle/security/limits, I/O, serialization, allocation/RSS, and physical cold behavior excluded; see [change 0104](changes/0104-odt-mixed-model-publication-evidence.md) |
 | Native XLS one-cell edit/save, 8,192 cells | 1.777 ms | 1.639 ms | **-7.72% p50 / -7.90% mean** | Allocation calls -1.19%; peak heap and uninstrumented RSS flat |
 | Native XLS fixed-width numeric edit/save, 8,192 cells | 1.582 ms | 1.458 ms | **-7.83% p50 / -7.37% mean** | Complete public Workbook validation retained; peak heap -5.54%, RSS flat |
 | Native DOC one-paragraph edit/save, 512 paragraphs | 1.506 ms | 1.348 ms | **-10.52% p50 / -10.48% mean** | Duplicate publication-site allocations nearly halved; peak heap and uninstrumented RSS flat |
