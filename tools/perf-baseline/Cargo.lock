@@ -916,6 +916,8 @@ version = "0.0.1"
 dependencies = [
  "litchi-core",
  "litchi-drawingml",
+ "litchi-odf-common",
+ "litchi-odp",
  "litchi-ooxml-common",
  "litchi-opc",
  "litchi-pptx",
@@ -1082,6 +1084,7 @@ dependencies = [
  "quick-xml",
  "soapberry-zip",
  "xml-minifier",
+ "zeroize",
 ]
 
 [[package]]

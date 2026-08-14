@@ -70,7 +70,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 use an uninstrumented `litchi_core::OwnedSource`; independent untimed
 `InstrumentedSource` replays provide the source-read counters. The current
-`Case` matrix exposes 233 selectable case names in total. Eight additional
+`Case` matrix exposes 237 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
 default 36 cases / 198 records. Two repeated native-PPT selected-shape query
@@ -79,8 +79,11 @@ selectors (`ppt_semantic_repeated_shape_text` and
 eight-query eager/source-backed controls;
 four matched ODP media-rich read selectors (`odp_media_eager_open`,
 `odp_media_source_backed_open`, `odp_media_eager_one_slide`, and
-`odp_media_source_backed_one_slide`) are also opt-in. The four ODP selectors
-bring the selectable matrix to 233 names while leaving the default 36 cases /
+`odp_media_source_backed_one_slide`) are also opt-in;
+four unified-root ODP filesystem selectors (`odp_file_{eager,source}_{open,
+selected_slide}`) are also opt-in and compare eager byte ownership with the
+filesystem source-root handoff over the same media-rich corpus. Together they
+bring the selectable matrix to 237 names while leaving the default 36 cases /
 198 records unchanged;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
@@ -1207,6 +1210,20 @@ bytes from uncompressed payload bytes/digest. The eager records retain the
 same semantic/media digests but intentionally have no source vectors. These
 selectors provide correctness/logical-read evidence only; they make no
 latency, physical-I/O, decompression, allocation, RSS, or release ABBA claim.
+
+`odp_file_eager_open` and `odp_file_source_open` are matched unified-root
+controls over the existing 12-slide/eight-2 MiB `Pictures/` corpus;
+`odp_file_eager_selected_slide` and `odp_file_source_selected_slide` prepare
+the corresponding owner before timing and time only the deterministic middle
+slide query. The eager control uses `litchi::Presentation::from_bytes` and the
+source control uses `litchi::Presentation::open` on one prepared temporary
+file. Corpus creation, writing, owner preparation for query controls, complete
+semantic/metadata/media/member/hash parity, and selected-media verification
+are outside timing. Source records pair each measured sample with an
+independent direct `litchi_odp::SourceBackedPresentation` replay through an
+instrumented positional source; open/query counters and selected-media range
+overlap are kept separate from root timing. These selectors make no latency,
+physical-I/O, decompression, allocation, RSS, or release-ABBA claim.
 
 Each ODP batch uses `Builder`, `Presentation::from_bytes`, `slides()`,
 `Presentation::text`, source snapshots, and public presentation transactions.

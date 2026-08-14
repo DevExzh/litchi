@@ -19,6 +19,10 @@
 /// iWork leaf detectors may scan a container before a later document parser
 /// reads the retained bytes again. Packaged ODT detection retains its bounded
 /// index and makes that handoff parsing-once at the archive-structure layer.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "public detection results retain parsed format owners so the consuming facade can avoid reparsing; boxing a source-compatible variant is a separate API decision"
+)]
 pub enum DetectedFormat {
     // OOXML formats with parsed OPC package
     #[cfg(feature = "docx")]
@@ -496,6 +500,11 @@ pub(crate) enum PptxSourcePathDetection {
     Pptx(crate::pptx::SourceBackedPresentation),
     /// A recognized OOXML family whose facade is not a presentation.
     OtherOoxml(litchi_core::detection::FileFormat),
+    /// A recognized non-presentation OOXML family whose facade feature is
+    /// disabled.  Retaining this result prevents a lower-precedence ODF
+    /// marker in the same ZIP from taking ownership while preserving the
+    /// byte detector's `NotOfficeFile` result.
+    DisabledOtherOoxml(litchi_core::detection::FileFormat),
 }
 
 /// Error from the private source-backed PPTX path probe.
@@ -513,10 +522,10 @@ pub(crate) enum PptxSourcePathError {
 /// This is intentionally a private facade handoff rather than an additional
 /// `DetectedFormat` variant: byte-backed smart detection keeps its established
 /// eager owner, while the presentation path can retain the source identity
-/// and defer ordinary slide/media payloads.  A valid non-PPTX OPC package is
-/// classified privately when its owner is enabled; disabled owners and
-/// non-OPC packages return `None` so the existing facade fallback remains in
-/// control.
+/// and defer ordinary slide/media payloads. A valid non-PPTX OPC package is
+/// classified privately even when its leaf owner is disabled, so a lower-
+/// precedence ODF marker cannot take ownership. Non-OPC packages return
+/// `None` so the existing facade fallback remains in control.
 #[cfg(all(feature = "pptx", any(unix, windows)))]
 pub(crate) fn detect_pptx_source_path_with_limits(
     path: &std::path::Path,
@@ -589,9 +598,10 @@ pub(crate) fn detect_pptx_source_path_with_limits(
         return Ok(None);
     };
     if format != litchi_core::detection::FileFormat::Pptx {
-        // Match the old eager detector's feature-gated handoff: when the
-        // corresponding non-presentation owner is disabled, leave the path
-        // to the ordinary fallback so it still reports NotOfficeFile.
+        // Match the eager detector's feature-gated result: retain the
+        // classification even when its leaf owner is disabled, while telling
+        // the caller to report `NotOfficeFile` instead of falling through to
+        // a lower-precedence package family.
         let enabled_other_owner = match format {
             #[cfg(feature = "docx")]
             litchi_core::detection::FileFormat::Docx => true,
@@ -601,11 +611,11 @@ pub(crate) fn detect_pptx_source_path_with_limits(
             litchi_core::detection::FileFormat::Xlsb => true,
             _ => false,
         };
-        return if enabled_other_owner {
-            Ok(Some(PptxSourcePathDetection::OtherOoxml(format)))
+        return Ok(Some(if enabled_other_owner {
+            PptxSourcePathDetection::OtherOoxml(format)
         } else {
-            Ok(None)
-        };
+            PptxSourcePathDetection::DisabledOtherOoxml(format)
+        }));
     }
 
     crate::pptx::SourceBackedPresentation::from_source_backed_package(package)

@@ -12,8 +12,6 @@ use crate::ppt;
 use litchi_ole_common::property_set::PropertySetReader;
 
 use std::path::Path;
-#[cfg(all(feature = "ppt", any(unix, windows)))]
-use std::sync::Arc;
 use std::sync::OnceLock;
 
 /// A PowerPoint presentation.
@@ -51,6 +49,14 @@ pub struct Presentation {
     pub(super) cached_metadata: OnceLock<Option<litchi_core::Metadata>>,
 }
 
+#[cfg(feature = "odp")]
+fn map_odp_error(error: Error, operation: &str) -> Error {
+    match error {
+        source_changed @ Error::SourceChanged { .. } => source_changed,
+        other => Error::ParseError(format!("Failed to {operation}: {other}")),
+    }
+}
+
 #[cfg(all(test, feature = "odp"))]
 mod flat_odp_tests {
     use super::Presentation;
@@ -78,6 +84,144 @@ mod flat_odp_tests {
         assert!(matches!(
             Presentation::from_bytes(FLAT_ODP.to_vec()),
             Err(litchi_core::Error::Unsupported(_))
+        ));
+    }
+}
+
+#[cfg(all(
+    test,
+    feature = "odp",
+    any(unix, windows),
+    any(
+        feature = "pptx",
+        not(any(feature = "docx", feature = "xlsx", feature = "xlsb"))
+    )
+))]
+mod source_odp_path_tests {
+    use super::{Presentation, PresentationImpl};
+    use litchi_core::Error;
+
+    const MIME: &str = "application/vnd.oasis.opendocument.presentation";
+    const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+    const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
+    const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+
+    fn package() -> Vec<u8> {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:text="{TEXT}"><office:body><office:presentation><draw:page draw:name="one"><draw:frame><draw:text-box><text:p>root source</text:p></draw:text-box></draw:frame></draw:page><draw:page draw:name="two"><draw:frame><draw:text-box><text:p>second slide</text:p></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#
+        );
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer.set_mimetype(MIME).expect("ODP MIME");
+        writer
+            .add_file("content.xml", content.as_bytes())
+            .expect("ODP content");
+        writer.finish_to_bytes().expect("ODP package")
+    }
+
+    #[test]
+    fn path_uses_odp_source_owner_and_matches_eager_projection() {
+        let bytes = package();
+        let temporary = tempfile::NamedTempFile::new().expect("temporary ODP path");
+        std::fs::write(temporary.path(), &bytes).expect("write ODP fixture");
+
+        let source = Presentation::open(temporary.path()).expect("source-backed ODP");
+        assert!(matches!(&source.inner, PresentationImpl::OdpSource(_)));
+        let eager = Presentation::from_bytes(bytes).expect("eager ODP control");
+
+        assert_eq!(source.slide_count().unwrap(), eager.slide_count().unwrap());
+        assert_eq!(source.text().unwrap(), eager.text().unwrap());
+        let source_slide_text = source
+            .slides()
+            .unwrap()
+            .into_iter()
+            .map(|slide| slide.text().unwrap())
+            .collect::<Vec<_>>();
+        let eager_slide_text = eager
+            .slides()
+            .unwrap()
+            .into_iter()
+            .map(|slide| slide.text().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(source_slide_text, eager_slide_text);
+        assert!(source.metadata().unwrap().is_some());
+        assert_eq!(
+            source.slide(0).unwrap().unwrap().text().unwrap(),
+            eager.slide(0).unwrap().unwrap().text().unwrap()
+        );
+        assert_eq!(source.slide_width().unwrap(), eager.slide_width().unwrap());
+        assert_eq!(
+            source.slide_height().unwrap(),
+            eager.slide_height().unwrap()
+        );
+    }
+
+    #[test]
+    fn path_source_metadata_and_dimensions_report_stale_source() {
+        let temporary = tempfile::NamedTempFile::new().expect("temporary ODP path");
+        std::fs::write(temporary.path(), package()).expect("write ODP fixture");
+        let presentation = Presentation::open(temporary.path()).expect("source-backed ODP");
+        assert!(presentation.metadata().unwrap().is_some());
+
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(temporary.path())
+            .expect("reopen ODP for mutation");
+        use std::io::Write;
+        file.write_all(b"source mutation")
+            .expect("mutate ODP source");
+
+        assert!(matches!(
+            presentation.metadata(),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            presentation.slide_width(),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            presentation.slide_height(),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            presentation.slide_count(),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            presentation.slides(),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            presentation.slide(0),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            presentation.text(),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            presentation.extract_text_for_markdown(),
+            Err(Error::SourceChanged { .. })
+        ));
+    }
+
+    #[test]
+    fn valid_mime_with_malformed_odp_body_stays_with_odp_owner_error() {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer.set_mimetype(MIME).expect("ODP MIME");
+        writer
+            .add_file("content.xml", b"<not-an-odp-document/>")
+            .expect("malformed content");
+        let bytes = writer.finish_to_bytes().expect("ODP package");
+        let temporary = tempfile::NamedTempFile::new().expect("temporary ODP path");
+        std::fs::write(temporary.path(), bytes).expect("write ODP fixture");
+
+        let error = match Presentation::open(temporary.path()) {
+            Ok(_) => panic!("malformed ODP must fail at the source owner"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            Error::InvalidFormat(_) | Error::ParseError(_)
         ));
     }
 }
@@ -164,6 +308,18 @@ mod ooxml_odf_polyglot_tests {
                 br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
             )
             .unwrap();
+        writer.start_file("META-INF/manifest.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.presentation"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/></m:manifest>"#,
+            )
+            .unwrap();
+        writer.start_file("content.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:presentation/></office:body></office:document-content>"#,
+            )
+            .unwrap();
         writer.finish().unwrap();
         output.into_inner()
     }
@@ -204,6 +360,21 @@ mod ooxml_odf_polyglot_tests {
             .err()
             .expect("disabled DOCX owner must not fall through to ODP");
         assert_eq!(error.to_string(), "Not a valid Office file");
+    }
+
+    #[cfg(all(not(feature = "docx"), any(unix, windows)))]
+    #[test]
+    fn path_disabled_docx_owner_cannot_fall_through_to_valid_odp_marker() {
+        let temporary = tempfile::Builder::new()
+            .suffix(".odp")
+            .tempfile()
+            .expect("temporary OOXML/ODP polyglot path");
+        std::fs::write(temporary.path(), dual_marker_docx()).expect("write OOXML/ODP polyglot");
+
+        let error = Presentation::open(temporary.path())
+            .err()
+            .expect("disabled DOCX owner must retain OOXML precedence");
+        assert!(matches!(error, litchi_core::Error::NotOfficeFile));
     }
 
     #[test]
@@ -279,6 +450,15 @@ impl Presentation {
 
         #[cfg(not(feature = "pptx"))]
         {
+            #[cfg(all(
+                feature = "odp",
+                any(unix, windows),
+                not(any(feature = "docx", feature = "xlsx", feature = "xlsb"))
+            ))]
+            if let Some(presentation) = Self::open_source_backed_odp_path(path.as_ref())? {
+                return Ok(presentation);
+            }
+
             let bytes = std::fs::read(path.as_ref())?;
             Self::from_bytes(bytes)
         }
@@ -321,6 +501,12 @@ impl Presentation {
                             .to_owned(),
                     ));
                 },
+                crate::detection_smart::detected::PptxSourcePathDetection::DisabledOtherOoxml(
+                    format,
+                ) => {
+                    let _ = format;
+                    return Err(Error::NotOfficeFile);
+                },
             }
         }
 
@@ -334,6 +520,11 @@ impl Presentation {
 
         #[cfg(all(feature = "ppt", any(unix, windows)))]
         if let Some(presentation) = Self::open_native_ppt_path(path.as_ref())? {
+            return Ok(presentation);
+        }
+
+        #[cfg(all(feature = "odp", any(unix, windows)))]
+        if let Some(presentation) = Self::open_source_backed_odp_path(path.as_ref())? {
             return Ok(presentation);
         }
 
@@ -398,7 +589,7 @@ impl Presentation {
 
     #[cfg(all(feature = "ppt", any(unix, windows)))]
     fn open_native_ppt_path(path: &Path) -> Result<Option<Self>> {
-        let source = Arc::new(litchi_core::FileSource::open(path)?);
+        let source = std::sync::Arc::new(litchi_core::FileSource::open(path)?);
         let shared = match litchi_cfb::SharedOleFile::open(source) {
             Ok(shared) => shared,
             // Classification failures precede PPT ownership. Preserve the
@@ -430,6 +621,32 @@ impl Presentation {
         Ok(Some(Self {
             inner: PresentationImpl::Ppt(pres),
             cached_metadata: OnceLock::from(cached_metadata),
+        }))
+    }
+
+    #[cfg(all(
+        feature = "odp",
+        any(unix, windows),
+        any(
+            feature = "pptx",
+            not(any(feature = "docx", feature = "xlsx", feature = "xlsb"))
+        )
+    ))]
+    fn open_source_backed_odp_path(path: &Path) -> Result<Option<Self>> {
+        let source: std::sync::Arc<dyn litchi_core::ReadAt> =
+            std::sync::Arc::new(litchi_core::FileSource::open(path)?);
+        let detected = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?;
+        if detected != Some(litchi_core::FileFormat::Odp) {
+            return Ok(None);
+        }
+
+        let presentation = litchi_odp::SourceBackedPresentation::from_read_at(source)?;
+        Ok(Some(Self {
+            inner: PresentationImpl::OdpSource(presentation),
+            // Preserve the established unified ODP contract.  The typed ODP
+            // owner validates `meta.xml`, but the root facade has always
+            // projected a present, empty metadata value for this family.
+            cached_metadata: OnceLock::from(Some(litchi_core::Metadata::default())),
         }))
     }
 
@@ -600,6 +817,10 @@ impl Presentation {
             PresentationImpl::Odp(doc) => doc
                 .text()
                 .map_err(|e| Error::ParseError(format!("Failed to extract ODP text: {}", e))),
+            #[cfg(all(feature = "odp", any(unix, windows)))]
+            PresentationImpl::OdpSource(presentation) => presentation
+                .text()
+                .map_err(|error| map_odp_error(error, "extract ODP text")),
         }
     }
 
@@ -643,6 +864,10 @@ impl Presentation {
             PresentationImpl::Odp(doc) => doc
                 .slide_count()
                 .map_err(|e| Error::ParseError(format!("Failed to get ODP slide count: {}", e))),
+            #[cfg(all(feature = "odp", any(unix, windows)))]
+            PresentationImpl::OdpSource(presentation) => presentation
+                .slide_count()
+                .map_err(|error| map_odp_error(error, "get ODP slide count")),
         }
     }
 
@@ -740,6 +965,11 @@ impl Presentation {
                     .map_err(|e| Error::ParseError(format!("Failed to get ODP slides: {}", e)))?;
                 Ok(odp_slides.into_iter().map(Slide::Odp).collect())
             },
+            #[cfg(all(feature = "odp", any(unix, windows)))]
+            PresentationImpl::OdpSource(presentation) => presentation
+                .slides()
+                .map(|slides| slides.into_iter().map(Slide::Odp).collect())
+                .map_err(|error| map_odp_error(error, "get ODP slides")),
         }
     }
 
@@ -825,6 +1055,11 @@ impl Presentation {
                 })?;
                 Ok(slide.map(Slide::Odp))
             },
+            #[cfg(all(feature = "odp", any(unix, windows)))]
+            PresentationImpl::OdpSource(presentation) => presentation
+                .slide(position)
+                .map(|slide| slide.map(Slide::Odp))
+                .map_err(|error| map_odp_error(error, "get ODP slide")),
         }
     }
 
@@ -863,6 +1098,13 @@ impl Presentation {
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
             #[cfg(feature = "odp")]
             PresentationImpl::Odp(_) => Ok(None), // ODP doesn't expose slide dimensions in unified API yet
+            #[cfg(all(feature = "odp", any(unix, windows)))]
+            PresentationImpl::OdpSource(presentation) => {
+                presentation
+                    .check_source()
+                    .map_err(|error| map_odp_error(error, "check ODP source"))?;
+                Ok(None)
+            },
         }
     }
 
@@ -901,6 +1143,13 @@ impl Presentation {
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
             #[cfg(feature = "odp")]
             PresentationImpl::Odp(_) => Ok(None), // ODP doesn't expose slide dimensions in unified API yet
+            #[cfg(all(feature = "odp", any(unix, windows)))]
+            PresentationImpl::OdpSource(presentation) => {
+                presentation
+                    .check_source()
+                    .map_err(|error| map_odp_error(error, "check ODP source"))?;
+                Ok(None)
+            },
         }
     }
 
@@ -932,6 +1181,13 @@ impl Presentation {
             presentation
                 .check_source()
                 .map_err(crate::map_ooxml_error)?;
+        }
+
+        #[cfg(all(feature = "odp", any(unix, windows)))]
+        if let PresentationImpl::OdpSource(presentation) = &self.inner {
+            presentation
+                .check_source()
+                .map_err(|error| map_odp_error(error, "check ODP source"))?;
         }
 
         if let Some(cached) = self.cached_metadata.get() {

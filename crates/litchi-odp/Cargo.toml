@@ -16,6 +16,7 @@ litchi-odf-common = { workspace = true }
 quick-xml = { workspace = true }
 soapberry-zip = { workspace = true }
 xml-minifier = { workspace = true }
+zeroize = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

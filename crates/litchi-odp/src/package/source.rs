@@ -17,6 +17,7 @@ use litchi_core::{Error, ReadAt, Result, SourceVersion};
 use litchi_odf_common::core::{
     Meta, SourceBackedPackage, SourcePackageLimits, validate_content_part,
 };
+use zeroize::Zeroizing;
 
 use crate::codec::Parser;
 use crate::model::{Reference, Slide};
@@ -72,7 +73,9 @@ impl SourceBackedPresentation {
         path: impl AsRef<Path>,
         password: impl Into<String>,
     ) -> Result<Self> {
-        Self::from_read_at_with_password(file_source(path)?, password)
+        let mut password = Zeroizing::new(password.into());
+        let source = file_source(path)?;
+        Self::from_read_at_with_password(source, std::mem::take(&mut *password))
     }
 
     /// Open a password-protected ODP from a regular filesystem file with
@@ -83,7 +86,9 @@ impl SourceBackedPresentation {
         limits: ReadLimits,
         password: impl Into<String>,
     ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_password(file_source(path)?, limits, password)
+        let mut password = Zeroizing::new(password.into());
+        let source = file_source(path)?;
+        Self::from_read_at_with_limits_and_password(source, limits, std::mem::take(&mut *password))
     }
 
     /// Alias for [`Self::from_path`].
@@ -129,7 +134,7 @@ impl SourceBackedPresentation {
         source: Arc<dyn ReadAt>,
         password: impl Into<String>,
     ) -> Result<Self> {
-        Self::from_read_at_inner(source, ReadLimits::default(), Some(password.into()))
+        Self::from_read_at_inner_with_password(source, ReadLimits::default(), password)
     }
 
     /// Open an ODP from a positional source with explicit bounded ZIP limits.
@@ -137,7 +142,7 @@ impl SourceBackedPresentation {
     /// The archive index is retained by the common ODF owner.  Payloads not
     /// needed for mandatory family validation are not read by this constructor.
     pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_inner(source, limits, None)
+        Self::from_read_at_inner(source, limits)
     }
 
     /// Open a password-protected ODP from a positional source with explicit
@@ -147,23 +152,32 @@ impl SourceBackedPresentation {
         limits: ReadLimits,
         password: impl Into<String>,
     ) -> Result<Self> {
-        Self::from_read_at_inner(source, limits, Some(password.into()))
+        Self::from_read_at_inner_with_password(source, limits, password)
     }
 
-    fn from_read_at_inner(
+    fn from_read_at_inner(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
+        let package = SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits)?;
+        Self::from_read_at_package(source, package)
+    }
+
+    fn from_read_at_inner_with_password(
         source: Arc<dyn ReadAt>,
         limits: ReadLimits,
-        password: Option<String>,
+        password: impl Into<String>,
     ) -> Result<Self> {
-        let source_version = source.version()?;
-        let package = match password {
-            Some(password) => SourceBackedPackage::from_read_at_with_limits_and_password(
-                Arc::clone(&source),
-                limits,
-                password,
-            )?,
-            None => SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits)?,
-        };
+        let package = SourceBackedPackage::from_read_at_with_limits_and_password(
+            Arc::clone(&source),
+            limits,
+            password,
+        )?;
+        Self::from_read_at_package(source, package)
+    }
+
+    fn from_read_at_package(source: Arc<dyn ReadAt>, package: SourceBackedPackage) -> Result<Self> {
+        // Reuse the common owner's captured revision.  This both preserves
+        // its archive/source consistency window and avoids a plaintext
+        // password surviving any facade-side probe before zeroization.
+        let source_version = package.source_version()?;
         let mimetype = package.mimetype()?;
         if mimetype != ODF_PRESENTATION {
             return Err(Error::InvalidFormat(format!(
