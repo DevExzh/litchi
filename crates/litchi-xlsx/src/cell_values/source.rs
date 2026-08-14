@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::sync::Arc;
 
-use litchi_core::ReadAt;
-use litchi_opc::{ReadLimits, SourceBackedPackage};
+use litchi_core::{ExecutionContext, ReadAt};
+use litchi_opc::{ReadLimits, SourceBackedPackage, SourceCacheLimits};
 use litchi_sheet::Cell as Address;
 
 use super::snapshot::SourceProvenance;
@@ -115,6 +115,13 @@ enum StagedValueEdit {
 }
 
 /// Owning source-backed editor for one exact XLSX artifact.
+///
+/// On managed opens, the caller-provided [`Budget`](litchi_core::Budget)
+/// accounts for retained and in-flight OPC [`PartData`](litchi_opc::PartData)
+/// payload reservations. Parsed cell stores, graph and relationship metadata,
+/// staging allocations, rewritten XML, candidate package clones, and output
+/// buffers remain governed by this facade's separate bounds and are not
+/// charged to that payload budget.
 pub struct SourceBackedEditor {
     package: SourceBackedPackage,
 }
@@ -140,18 +147,98 @@ impl SourceBackedEditor {
 
     /// Open with explicit OPC ingress limits.
     pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Ok(Self {
-            package: SourceBackedPackage::from_read_at_with_limits(source, limits)?,
-        })
+        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
+            source, limits,
+        )?)
+    }
+
+    /// Open with an explicit finite payload-cache policy. This compatibility
+    /// path is bounded but unmanaged; use an execution-context constructor to
+    /// charge retained [`PartData`](litchi_opc::PartData) handles to a caller
+    /// budget.
+    pub fn from_read_at_with_cache_limits(
+        source: Arc<dyn ReadAt>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
+            source,
+            cache_limits,
+        )?)
+    }
+
+    /// Open with explicit read and finite payload-cache policies.
+    pub fn from_read_at_with_limits_and_cache_limits(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+                source,
+                limits,
+                cache_limits,
+            )?,
+        )
+    }
+
+    /// Open with an explicit caller-owned execution context and the default
+    /// finite source cache. The context charges retained and in-flight OPC
+    /// `PartData` payloads; parsed semantic state and rewritten/output buffers
+    /// remain outside that payload accounting and use separate bounds.
+    pub fn from_read_at_with_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
+            source, limits, context,
+        )?)
+    }
+
+    /// Open with explicit read and execution policies.
+    pub fn from_read_at_with_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_execution_context(source, limits, context)
+    }
+
+    /// Open with explicit read, cache, and caller-owned execution policies.
+    /// The managed budget covers retained and in-flight OPC `PartData` payload
+    /// reservations only; parsed stores, metadata, rewritten candidates, and
+    /// output buffers are not charged to it.
+    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                limits,
+                cache_limits,
+                context,
+            )?,
+        )
+    }
+
+    /// Build an editor from a validated deferred OPC package.
+    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
+        package.check_execution()?;
+        Ok(Self { package })
     }
 
     /// Capture the exact safe value-only closure for one selected worksheet.
     pub fn snapshot<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Snapshot> {
+        self.package.check_execution()?;
         Snapshot::load_source_backed(&self.package, selector)
     }
 
     /// Begin one atomic value-only edit.
     pub fn edit<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<SourceEdit> {
+        self.package.check_execution()?;
         let mut staged = Vec::new();
         staged
             .try_reserve_exact(MAX_BATCH_EDITS)
@@ -170,6 +257,7 @@ impl SourceBackedEditor {
     where
         I: IntoIterator<Item = Selector<'a>>,
     {
+        self.package.check_execution()?;
         MultiSourceEdit::new(MultiSnapshot::load_source_backed(&self.package, selectors)?)
     }
 
@@ -178,10 +266,12 @@ impl SourceBackedEditor {
     where
         I: IntoIterator<Item = SheetCellValueEdit<'a>>,
     {
+        self.package.check_execution()?;
         let mut requests = edits.into_iter();
-        let first = requests
-            .next()
-            .ok_or_else(|| invalid("multi-sheet value edits require one cell edit"))?;
+        let first = requests.next();
+        self.package.check_execution()?;
+        let first =
+            first.ok_or_else(|| invalid("multi-sheet value edits require one cell edit"))?;
         let mut selectors = Vec::new();
         selectors
             .try_reserve_exact(MAX_SHEET_OWNERS)
@@ -199,6 +289,7 @@ impl SourceBackedEditor {
             })?;
         pending.push(first);
         for request in requests {
+            self.package.check_execution()?;
             if pending.len() >= MAX_BATCH_EDITS {
                 return Err(invalid(format!(
                     "multi-sheet value-only batch exceeds {MAX_BATCH_EDITS} unique cells"
@@ -234,6 +325,7 @@ impl SourceBackedEditor {
         writer: W,
         commit: &Commit,
     ) -> Result<Snapshot> {
+        self.package.check_execution()?;
         let before = commit.patch().before();
         let current = match before.matches_source_backed(&self.package)? {
             SourceProvenance::Matched => None,
@@ -268,6 +360,7 @@ impl SourceBackedEditor {
         writer: W,
         target: &Snapshot,
     ) -> Result<()> {
+        self.package.check_execution()?;
         self.package.write_part_overlay_to_stream(
             writer,
             target.worksheet_part_name(),
@@ -282,6 +375,7 @@ impl SourceBackedEditor {
         writer: W,
         commit: &MultiCommit,
     ) -> Result<MultiSnapshot> {
+        self.package.check_execution()?;
         let before = commit.patch().before();
         let current = match before.matches_source_backed(&self.package)? {
             SourceProvenance::Matched => None,
@@ -377,6 +471,7 @@ impl SourceEdit {
 
     /// Stage a bounded batch atomically.
     pub fn apply_batch(&mut self, edits: impl IntoIterator<Item = CellValueEdit>) -> Result<()> {
+        self.before.check_execution()?;
         let mut pending = Vec::new();
         pending
             .try_reserve_exact(MAX_BATCH_EDITS.saturating_sub(self.staged.len()))
@@ -385,6 +480,7 @@ impl SourceEdit {
                 source,
             })?;
         for edit in edits {
+            self.before.check_execution()?;
             if self.staged.len() + pending.len() >= MAX_BATCH_EDITS {
                 return Err(invalid(format!(
                     "value-only batch exceeds {MAX_BATCH_EDITS} unique cells"
@@ -420,14 +516,22 @@ impl SourceEdit {
             if matches!(source, Value::Date(_)) {
                 return Err(invalid("value-only batches currently refuse date cells"));
             }
+            self.before.check_execution()?;
             pending.push((address, value));
         }
+        self.before.check_execution()?;
+        let original_len = self.staged.len();
         self.staged.extend(pending);
+        if let Err(error) = self.before.check_execution() {
+            self.staged.truncate(original_len);
+            return Err(error);
+        }
         Ok(())
     }
 
     /// Validate, rewrite once, and freeze an exact reversible commit.
     pub fn commit(self) -> Result<Commit> {
+        self.before.check_execution()?;
         let mut actions = BTreeMap::new();
         for (address, value) in &self.staged {
             let action = match value {
@@ -444,6 +548,7 @@ impl SourceEdit {
         }
         if actions.is_empty() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
+            self.before.check_execution()?;
             return Ok(Commit::new(self.before, patch, 0));
         }
         let changed = actions.len();
@@ -463,6 +568,7 @@ impl SourceEdit {
                 ));
             }
         }
+        self.before.check_execution()?;
         let patch = Patch::new(self.before, snapshot.clone());
         Ok(Commit::new(snapshot, patch, changed))
     }
@@ -530,6 +636,7 @@ impl MultiSourceEdit {
     where
         I: IntoIterator<Item = SheetCellValueEdit<'a>>,
     {
+        self.before.check_execution()?;
         let remaining = MAX_BATCH_EDITS.saturating_sub(self.staged_cells);
         let mut pending = Vec::new();
         pending
@@ -539,6 +646,7 @@ impl MultiSourceEdit {
                 source,
             })?;
         for request in edits {
+            self.before.check_execution()?;
             if pending.len() >= remaining {
                 return Err(invalid(format!(
                     "multi-sheet value-only batch exceeds {MAX_BATCH_EDITS} unique cells"
@@ -586,20 +694,55 @@ impl MultiSourceEdit {
             if matches!(source, Value::Date(_)) {
                 return Err(invalid("value-only batches currently refuse date cells"));
             }
+            self.before.check_execution()?;
             pending.push((position, address, value));
         }
+        self.before.check_execution()?;
+        let original_staged_cells = self.staged_cells;
+        let pending_len = pending.len();
+        let mut rollback = Vec::new();
+        rollback
+            .try_reserve_exact(pending.len())
+            .map_err(|source| Error::Allocation {
+                resource: "multi-sheet staging rollback metadata",
+                source,
+            })?;
+        for (position, _, _) in &pending {
+            if !rollback
+                .iter()
+                .any(|(stored_position, _)| stored_position == position)
+            {
+                let original_len = self.staged.get(position).map_or(0, |entries| entries.len());
+                rollback.push((*position, original_len));
+            }
+        }
+        self.before.check_execution()?;
         for (position, address, value) in pending {
             self.staged
                 .entry(position)
                 .or_default()
                 .push((address, value));
-            self.staged_cells += 1;
+        }
+        self.staged_cells = original_staged_cells + pending_len;
+        if let Err(error) = self.before.check_execution() {
+            for (position, original_len) in rollback {
+                let remove_position = self.staged.get_mut(&position).is_some_and(|entries| {
+                    entries.truncate(original_len);
+                    entries.is_empty()
+                });
+                if remove_position {
+                    self.staged.remove(&position);
+                }
+            }
+            self.staged_cells = original_staged_cells;
+            return Err(error);
         }
         Ok(())
     }
 
     /// Validate, rewrite, and freeze one atomic multi-worksheet commit.
     pub fn commit(self) -> Result<MultiCommit> {
+        self.before.check_execution()?;
         let mut after = Vec::new();
         after
             .try_reserve_exact(self.before.len())
@@ -611,6 +754,7 @@ impl MultiSourceEdit {
         let mut touched_worksheets = 0usize;
         let mut aggregate_bytes = 0usize;
         for snapshot in self.before.sheets() {
+            snapshot.check_execution()?;
             let Some(staged) = self.staged.get(&snapshot.sheet_position()) else {
                 aggregate_bytes = super::snapshot::checked_multi_bytes(
                     aggregate_bytes,
@@ -668,6 +812,7 @@ impl MultiSourceEdit {
             }
             after.push(candidate);
         }
+        self.before.check_execution()?;
         let after = MultiSnapshot::from_sheets(after)?;
         let patch = MultiPatch::new(self.before, after.clone());
         Ok(MultiCommit::new(

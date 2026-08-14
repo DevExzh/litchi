@@ -3,11 +3,11 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use litchi_core::{Selector as CoreSelector, SourceVersion};
+use litchi_core::{ExecutionContext, ExecutionError, Selector as CoreSelector, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    OpcPackage, PackURI, Part, Relationship, Relationships, SourceBackedPackage, SourceLineage,
-    TargetMode,
+    OpcError, OpcPackage, PackURI, Part, PartData, Relationship, Relationships,
+    SourceBackedPackage, SourceLineage, TargetMode,
 };
 
 use crate::cell::{Cell, Store, Value};
@@ -28,6 +28,95 @@ const INTL_MACROSHEET_REL: &str =
     "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet";
 const CHARTSHEET_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
+
+/// Payload ownership used by source-backed value snapshots.
+///
+/// Managed OPC payloads remain attached to their [`PartData`] reservation for
+/// as long as a snapshot, patch, or commit retains them. Compatibility source
+/// opens use the existing unmanaged `Arc<Vec<u8>>` allocation because the old
+/// owning-package patch API needs a detached target; managed handles remain
+/// attached because the OPC `PartData` handle intentionally does not expose
+/// its allocation directly on managed packages.
+#[derive(Clone, Debug)]
+enum SourcePayload {
+    Managed(PartData),
+    Owned(Arc<Vec<u8>>),
+}
+
+impl SourcePayload {
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Managed(data) => data.as_bytes(),
+            Self::Owned(bytes) => bytes.as_slice(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.as_bytes().len()
+    }
+
+    fn from_part_data(package: &SourceBackedPackage, data: PartData) -> Result<Self> {
+        if package.cache_diagnostics().budget_managed {
+            return Ok(Self::Managed(data));
+        }
+        // `PartData::into_arc` is reachable only on the compatibility,
+        // explicitly unmanaged cache path. Managed handles take the branch
+        // above and retain their reservation instead of detaching it.
+        Ok(Self::Owned(data.into_arc().map_err(Error::Package)?))
+    }
+
+    /// Return an already-owned payload for the legacy owning-package patch
+    /// path. Managed handles intentionally refuse this implicit escape.
+    fn detached_arc(&self) -> Result<Arc<Vec<u8>>> {
+        match self {
+            Self::Managed(_) => Err(Error::Package(OpcError::ManagedPartDataArcEscape)),
+            Self::Owned(bytes) => Ok(Arc::clone(bytes)),
+        }
+    }
+
+    /// Explicitly copy a managed payload into an owning-package allocation.
+    /// The caller supplies the aggregate bound before this operation can
+    /// allocate, so this handoff cannot silently bypass the managed budget.
+    fn materialized_arc(&self, maximum: usize, resource: &'static str) -> Result<Arc<Vec<u8>>> {
+        if self.as_bytes().len() > maximum {
+            return Err(invalid(format!(
+                "{resource} exceeds the explicit materialization bound {maximum} bytes"
+            )));
+        }
+        match self {
+            Self::Managed(data) => Ok(copy_bytes(data.as_bytes(), resource)?),
+            Self::Owned(bytes) => Ok(Arc::clone(bytes)),
+        }
+    }
+}
+
+impl PartialEq for SourcePayload {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_bytes() == other.as_bytes()
+    }
+}
+
+impl Eq for SourcePayload {}
+
+fn copy_bytes(bytes: &[u8], resource: &'static str) -> Result<Arc<Vec<u8>>> {
+    let mut copy = Vec::new();
+    copy.try_reserve_exact(bytes.len())
+        .map_err(|source| allocation(resource, source))?;
+    copy.extend_from_slice(bytes);
+    Ok(Arc::new(copy))
+}
+
+fn check_execution(context: Option<&ExecutionContext>) -> Result<()> {
+    let Some(context) = context else {
+        return Ok(());
+    };
+    context.check().map_err(|error| {
+        Error::Package(match error {
+            ExecutionError::Cancelled => OpcError::Cancelled,
+            error => OpcError::Execution(error),
+        })
+    })
+}
 
 /// Exact worksheet values plus the complete package owner state required to
 /// publish a one-Part overlay safely.
@@ -57,7 +146,7 @@ struct SourceCatalogCapture {
     parts: Vec<crate::workbook::source::SheetPart>,
     workbook_uri: PackURI,
     workbook_content_type: Box<str>,
-    workbook_xml: Arc<Vec<u8>>,
+    workbook_xml: SourcePayload,
     owner_relationship: SourceRelationship,
     package_relationships: Arc<[SourceRelationship]>,
     workbook_relationships: Arc<[SourceRelationship]>,
@@ -73,7 +162,7 @@ struct OwnedCatalogCapture {
     parts: Vec<crate::workbook::source::SheetPart>,
     workbook_uri: PackURI,
     workbook_content_type: Box<str>,
-    workbook_xml: Arc<Vec<u8>>,
+    workbook_xml: SourcePayload,
     owner_relationship: SourceRelationship,
     package_relationships: Arc<[SourceRelationship]>,
     workbook_relationships: Arc<[SourceRelationship]>,
@@ -157,11 +246,14 @@ impl MultiSnapshot {
     where
         I: IntoIterator<Item = Selector<'a>>,
     {
+        package.check_execution()?;
+        let source_version = package.source_version()?;
         let mut selected = Vec::new();
         selected
             .try_reserve_exact(MAX_SHEET_OWNERS)
             .map_err(|source| allocation("multi-sheet selector snapshot", source))?;
         for selector in selectors {
+            package.check_execution()?;
             if selected.len() >= MAX_SHEET_OWNERS {
                 return Err(invalid(format!(
                     "multi-sheet value edits exceed {MAX_SHEET_OWNERS} worksheet owners"
@@ -192,7 +284,15 @@ impl MultiSnapshot {
             )?;
             sheets.push(snapshot);
         }
-        Self::from_sheets(sheets)
+        let snapshot = Self::from_sheets(sheets)?;
+        package.check_execution()?;
+        let final_version = package.source_version()?;
+        if final_version != source_version {
+            return Err(invalid(
+                "source-backed multi-sheet snapshot source version changed",
+            ));
+        }
+        Ok(snapshot)
     }
 
     pub(crate) fn load_owned<I>(package: &OpcPackage, positions: I) -> Result<Self>
@@ -292,6 +392,13 @@ impl MultiSnapshot {
                 .all(|(left, right)| left.same_source(right))
     }
 
+    pub(crate) fn check_execution(&self) -> Result<()> {
+        for snapshot in &self.sheets {
+            snapshot.check_execution()?;
+        }
+        Ok(())
+    }
+
     /// Check that this source-backed closure still belongs to the exact
     /// opened package and source revision without reloading any Part body.
     pub(crate) fn matches_source_backed(
@@ -351,12 +458,12 @@ impl Snapshot {
                 workbook: PartState::new(
                     capture.workbook_uri.clone(),
                     capture.workbook_content_type.as_ref(),
-                    Arc::clone(&capture.workbook_xml),
+                    capture.workbook_xml.clone(),
                 )?,
                 worksheet: PartState::new(
                     worksheet.partname().clone(),
                     worksheet.content_type(),
-                    worksheet_xml,
+                    SourcePayload::Owned(worksheet_xml),
                 )?,
                 owner_relationship: capture.owner_relationship.clone(),
                 sheet_relationship: graph.relationship.clone(),
@@ -364,6 +471,7 @@ impl Snapshot {
                 workbook_relationships: Arc::clone(&capture.workbook_relationships),
                 auxiliary: Arc::clone(&capture.auxiliary),
                 graph: Arc::clone(&capture.graph),
+                context: None,
                 source_lineage: None,
                 source_version: None,
             },
@@ -376,6 +484,7 @@ impl Snapshot {
         capture: &SourceCatalogCapture,
         remaining_bytes: usize,
     ) -> Result<Self> {
+        package.check_execution()?;
         let sheet = &capture.sheets[position];
         let sheet_part = &capture.parts[position];
         if sheet_part.kind != WorksheetKind::Worksheet {
@@ -387,10 +496,11 @@ impl Snapshot {
         if !worksheet.rels().is_empty() {
             return Err(invalid("value-only edits refuse worksheet relationships"));
         }
-        let worksheet_xml = worksheet.data()?.into_arc()?;
+        let worksheet_xml = SourcePayload::from_part_data(package, worksheet.data()?)?;
         checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
-        validation::worksheet_xml(worksheet_xml.as_slice())?;
-        let cells = raw::worksheet::parse(worksheet_xml.as_slice(), || Ok(None))?;
+        validation::worksheet_xml(worksheet_xml.as_bytes())?;
+        let cells = raw::worksheet::parse(worksheet_xml.as_bytes(), || Ok(None))?;
+        package.check_execution()?;
         validate_style_references(&cells, capture.style_count)?;
         validate_scalar_cells(&cells)?;
         let graph = &capture.graph[position];
@@ -402,7 +512,7 @@ impl Snapshot {
                 workbook: PartState::new(
                     capture.workbook_uri.clone(),
                     capture.workbook_content_type.as_ref(),
-                    Arc::clone(&capture.workbook_xml),
+                    capture.workbook_xml.clone(),
                 )?,
                 worksheet: PartState::new(
                     worksheet.partname().clone(),
@@ -415,6 +525,7 @@ impl Snapshot {
                 workbook_relationships: Arc::clone(&capture.workbook_relationships),
                 auxiliary: Arc::clone(&capture.auxiliary),
                 graph: Arc::clone(&capture.graph),
+                context: package.execution_context(),
                 source_lineage: Some(capture.source_lineage.clone()),
                 source_version: Some(capture.source_version),
             },
@@ -433,6 +544,8 @@ impl Snapshot {
         selector: impl Into<Selector<'a>>,
         require_single_sheet: bool,
     ) -> Result<Self> {
+        package.check_execution()?;
+        let source_version = package.source_version()?;
         let workbook = package.main_document_part()?;
         validate_package_relationships(package.rels())?;
         if workbook.content_type() != ct::SML_SHEET_MAIN {
@@ -440,9 +553,9 @@ impl Snapshot {
                 "value-only edits require an ordinary XLSX workbook",
             ));
         }
-        let workbook_xml = workbook.data()?.into_arc()?;
-        validation::workbook_xml(workbook_xml.as_slice())?;
-        let catalog = raw::parse_catalog(workbook_xml.as_slice())?;
+        let workbook_xml = SourcePayload::from_part_data(package, workbook.data()?)?;
+        validation::workbook_xml(workbook_xml.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
         if require_single_sheet && catalog.sheets.len() != 1 {
             return Err(invalid(
@@ -467,11 +580,11 @@ impl Snapshot {
             .rels()
             .get(&sheet.relationship_id)
             .ok_or_else(|| invalid("selected worksheet relationship is missing"))?;
-        let worksheet_xml = worksheet.data()?.into_arc()?;
-        validation::worksheet_xml(worksheet_xml.as_slice())?;
+        let worksheet_xml = SourcePayload::from_part_data(package, worksheet.data()?)?;
+        validation::worksheet_xml(worksheet_xml.as_bytes())?;
         let (style_count, auxiliary) = capture_auxiliary_source(package, &workbook)?;
         let owner = unique_owner(package.rels())?;
-        Self::from_parts(
+        let snapshot = Self::from_parts(
             &sheet.name,
             position,
             workbook.partname().clone(),
@@ -487,9 +600,18 @@ impl Snapshot {
             style_count,
             auxiliary,
             capture_sheet_graph_source(package, &workbook, &catalog.sheets, &sheet_parts)?,
+            package.execution_context(),
             Some(package.source_lineage()),
-            Some(package.source_version()?),
-        )
+            Some(source_version),
+        )?;
+        package.check_execution()?;
+        let final_version = package.source_version()?;
+        if final_version != source_version {
+            return Err(invalid(
+                "source-backed worksheet snapshot source version changed",
+            ));
+        }
+        Ok(snapshot)
     }
 
     /// Load and validate one value-only closure from an owning OPC package.
@@ -514,9 +636,9 @@ impl Snapshot {
                 "value-only edits require an ordinary XLSX workbook",
             ));
         }
-        let workbook_xml = workbook.blob_arc();
-        validation::workbook_xml(workbook_xml.as_slice())?;
-        let catalog = raw::parse_catalog(workbook_xml.as_slice())?;
+        let workbook_xml = SourcePayload::Owned(workbook.blob_arc());
+        validation::workbook_xml(workbook_xml.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
         let sheet_parts = validate_sheet_graph_owned(package, workbook, &catalog.sheets)?;
         if require_single_sheet && catalog.sheets.len() != 1 {
             return Err(invalid(
@@ -540,8 +662,8 @@ impl Snapshot {
         if !worksheet.rels().is_empty() {
             return Err(invalid("value-only edits refuse worksheet relationships"));
         }
-        let worksheet_xml = worksheet.blob_arc();
-        validation::worksheet_xml(worksheet_xml.as_slice())?;
+        let worksheet_xml = SourcePayload::Owned(worksheet.blob_arc());
+        validation::worksheet_xml(worksheet_xml.as_bytes())?;
         let (style_count, auxiliary) = capture_auxiliary(package, workbook)?;
         let owner = unique_owner(package.rels())?;
         Self::from_parts(
@@ -562,6 +684,7 @@ impl Snapshot {
             capture_sheet_graph_owned(package, workbook, &catalog.sheets, &sheet_parts)?,
             None,
             None,
+            None,
         )
     }
 
@@ -571,17 +694,18 @@ impl Snapshot {
         sheet_position: usize,
         workbook_uri: PackURI,
         workbook_content_type: &str,
-        workbook_xml: Arc<Vec<u8>>,
+        workbook_xml: SourcePayload,
         owner_relationship: &Relationship,
         package_relationships: &Relationships,
         workbook_relationships: &Relationships,
         worksheet_uri: PackURI,
         worksheet_content_type: &str,
-        worksheet_xml: Arc<Vec<u8>>,
+        worksheet_xml: SourcePayload,
         sheet_relationship: &Relationship,
         style_count: u32,
         auxiliary: Box<[PartState]>,
         graph: Box<[SheetGraphState]>,
+        context: Option<ExecutionContext>,
         source_lineage: Option<SourceLineage>,
         source_version: Option<SourceVersion>,
     ) -> Result<Self> {
@@ -591,7 +715,7 @@ impl Snapshot {
                 "selected worksheet relationship does not target its captured Part",
             ));
         }
-        let cells = raw::worksheet::parse(worksheet_xml.as_slice(), || Ok(None))?;
+        let cells = raw::worksheet::parse(worksheet_xml.as_bytes(), || Ok(None))?;
         validate_style_references(&cells, style_count)?;
         validate_scalar_cells(&cells)?;
         Ok(Self {
@@ -607,6 +731,7 @@ impl Snapshot {
                 workbook_relationships: Arc::from(capture_relationships(workbook_relationships)?),
                 auxiliary: Arc::from(auxiliary),
                 graph: Arc::from(graph),
+                context,
                 source_lineage,
                 source_version,
             },
@@ -614,11 +739,13 @@ impl Snapshot {
     }
 
     pub(crate) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
+        source.source.check_execution()?;
         validation::worksheet_xml(&bytes)?;
         let cells = raw::worksheet::parse(&bytes, || Ok(None))?;
         let mut result = source.clone();
         result.cells = Arc::new(cells);
-        result.source.worksheet.bytes = Arc::new(bytes);
+        result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
+        result.source.check_execution()?;
         Ok(result)
     }
 
@@ -654,7 +781,7 @@ impl Snapshot {
     /// Exact source worksheet XML.
     #[must_use]
     pub fn source_xml(&self) -> &[u8] {
-        self.source.worksheet.bytes.as_slice()
+        self.source.worksheet.bytes.as_bytes()
     }
 
     /// Selected worksheet Part URI.
@@ -663,14 +790,25 @@ impl Snapshot {
         &self.source.worksheet.uri
     }
 
-    pub(super) fn source_arc(&self) -> Arc<Vec<u8>> {
-        Arc::clone(&self.source.worksheet.bytes)
+    pub(super) fn source_arc(&self) -> Result<Arc<Vec<u8>>> {
+        self.source.worksheet.bytes.detached_arc()
+    }
+
+    pub(super) fn materialized_source_arc(&self, maximum: usize) -> Result<Arc<Vec<u8>>> {
+        self.source
+            .worksheet
+            .bytes
+            .materialized_arc(maximum, "value-only worksheet materialization")
     }
 
     pub(crate) fn same_source(&self, other: &Self) -> bool {
         self.sheet_name == other.sheet_name
             && self.sheet_position == other.sheet_position
             && self.source.same_owner(&other.source)
+    }
+
+    pub(crate) fn check_execution(&self) -> Result<()> {
+        self.source.check_execution()
     }
 
     fn source_provenance(
@@ -818,11 +956,16 @@ struct SourceState {
     workbook_relationships: Arc<[SourceRelationship]>,
     auxiliary: Arc<[PartState]>,
     graph: Arc<[SheetGraphState]>,
+    context: Option<ExecutionContext>,
     source_lineage: Option<SourceLineage>,
     source_version: Option<SourceVersion>,
 }
 
 impl SourceState {
+    fn check_execution(&self) -> Result<()> {
+        check_execution(self.context.as_ref())
+    }
+
     fn same_owner(&self, other: &Self) -> bool {
         self.workbook == other.workbook
             && self.worksheet == other.worksheet
@@ -843,15 +986,15 @@ impl SourceState {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 struct PartState {
     uri: PackURI,
     content_type: Box<str>,
-    bytes: Arc<Vec<u8>>,
+    bytes: SourcePayload,
 }
 
 impl PartState {
-    fn new(uri: PackURI, content_type: &str, bytes: Arc<Vec<u8>>) -> Result<Self> {
+    fn new(uri: PackURI, content_type: &str, bytes: SourcePayload) -> Result<Self> {
         Ok(Self {
             uri,
             content_type: copy_boxed(content_type, "value-only content type")?,
@@ -861,9 +1004,19 @@ impl PartState {
     fn matches_part(&self, part: &dyn Part) -> bool {
         part.partname() == &self.uri
             && part.content_type() == self.content_type.as_ref()
-            && part.blob() == self.bytes.as_slice()
+            && part.blob() == self.bytes.as_bytes()
     }
 }
+
+impl PartialEq for PartState {
+    fn eq(&self, other: &Self) -> bool {
+        self.uri == other.uri
+            && self.content_type == other.content_type
+            && self.bytes == other.bytes
+    }
+}
+
+impl Eq for PartState {}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct SourceRelationship {
@@ -1030,6 +1183,7 @@ fn capture_sheet_graph_owned(
 }
 
 fn load_source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalogCapture> {
+    package.check_execution()?;
     let workbook = package.main_document_part()?;
     validate_package_relationships(package.rels())?;
     if workbook.content_type() != ct::SML_SHEET_MAIN {
@@ -1037,14 +1191,15 @@ fn load_source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalogCap
             "value-only edits require an ordinary XLSX workbook",
         ));
     }
-    let workbook_xml = workbook.data()?.into_arc()?;
-    validation::workbook_xml(workbook_xml.as_slice())?;
-    let catalog = raw::parse_catalog(workbook_xml.as_slice())?;
+    let workbook_xml = SourcePayload::from_part_data(package, workbook.data()?)?;
+    validation::workbook_xml(workbook_xml.as_bytes())?;
+    let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
     let parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
     validate_workbook_relationships(workbook.rels(), false)?;
     let owner = unique_owner(package.rels())?;
     let (style_count, auxiliary) = capture_auxiliary_source(package, &workbook)?;
     let graph = capture_sheet_graph_source(package, &workbook, &catalog.sheets, &parts)?;
+    package.check_execution()?;
     Ok(SourceCatalogCapture {
         sheets: catalog.sheets.clone(),
         parts,
@@ -1073,9 +1228,9 @@ fn load_owned_catalog(package: &OpcPackage) -> Result<OwnedCatalogCapture> {
             "value-only edits require an ordinary XLSX workbook",
         ));
     }
-    let workbook_xml = Arc::new(workbook.blob().to_vec());
-    validation::workbook_xml(workbook_xml.as_slice())?;
-    let catalog = raw::parse_catalog(workbook_xml.as_slice())?;
+    let workbook_xml = SourcePayload::Owned(workbook.blob_arc());
+    validation::workbook_xml(workbook_xml.as_bytes())?;
+    let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
     let parts = validate_sheet_graph_owned(package, workbook, &catalog.sheets)?;
     validate_workbook_relationships(workbook.rels(), false)?;
     let owner = unique_owner(package.rels())?;
@@ -1143,16 +1298,17 @@ fn capture_auxiliary_source(
             rt::STYLES | rt::STRICT_STYLES | rt::THEME
         )
     }) {
+        package.check_execution()?;
         let part = package.part(&relationship.target_partname()?)?;
         if !part.rels().is_empty() {
             return Err(invalid(
                 "value-only edits refuse styles and theme relationships",
             ));
         }
-        let data = part.data()?.into_arc()?;
+        let data = SourcePayload::from_part_data(package, part.data()?)?;
         match relationship.reltype() {
             rt::STYLES | rt::STRICT_STYLES if part.content_type() == ct::SML_STYLES => {
-                style_count = raw::styles::parse(data.as_slice())?.len();
+                style_count = raw::styles::parse(data.as_bytes())?.len();
             },
             rt::THEME if part.content_type() == ct::OFC_THEME => {},
             rt::STYLES | rt::STRICT_STYLES => {
@@ -1167,6 +1323,7 @@ fn capture_auxiliary_source(
             data,
         )?);
     }
+    package.check_execution()?;
     Ok((style_count, auxiliary.into_boxed_slice()))
 }
 
@@ -1202,7 +1359,7 @@ fn capture_auxiliary(package: &OpcPackage, workbook: &dyn Part) -> Result<(u32, 
         auxiliary.push(PartState::new(
             part.partname().clone(),
             part.content_type(),
-            part.blob_arc(),
+            SourcePayload::Owned(part.blob_arc()),
         )?);
     }
     Ok((style_count, auxiliary.into_boxed_slice()))

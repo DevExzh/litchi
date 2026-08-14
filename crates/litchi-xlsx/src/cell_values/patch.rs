@@ -58,7 +58,24 @@ impl MultiPatch {
     }
 
     /// Apply all worksheet replacements atomically after exact source checks.
+    ///
+    /// A patch whose target still carries a managed source payload returns a
+    /// typed `ManagedPartDataArcEscape` error. Use
+    /// [`Self::apply_materialized`] when an owning [`OpcPackage`] handoff is
+    /// explicitly desired.
     pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply_inner(package, None)
+    }
+
+    /// Apply after explicitly copying managed target payloads into the owning
+    /// package, bounded by `maximum_bytes` across this patch's replacements.
+    pub fn apply_materialized(&self, package: &mut OpcPackage, maximum_bytes: usize) -> Result<()> {
+        self.apply_inner(package, Some(maximum_bytes))
+    }
+
+    fn apply_inner(&self, package: &mut OpcPackage, maximum_bytes: Option<usize>) -> Result<()> {
+        self.before.check_execution()?;
+        self.after.check_execution()?;
         let current = MultiSnapshot::load_owned(
             package,
             self.before.sheets().iter().map(Snapshot::sheet_position),
@@ -84,12 +101,21 @@ impl MultiPatch {
             });
         }
         if self.is_empty() {
+            self.before.check_execution()?;
+            self.after.check_execution()?;
             return Ok(());
         }
         if package.is_signed() {
             return Err(Error::Signed);
         }
-        let mut candidate = package.clone();
+        let mut replacements = Vec::new();
+        replacements
+            .try_reserve_exact(self.after.len())
+            .map_err(|source| Error::Allocation {
+                resource: "multi-sheet patch replacement preflight",
+                source,
+            })?;
+        let mut materialized_bytes = 0usize;
         for (_before, snapshot) in self
             .before
             .sheets()
@@ -97,9 +123,29 @@ impl MultiPatch {
             .zip(self.after.sheets())
             .filter(|(before, after)| before.source_xml() != after.source_xml())
         {
-            candidate
-                .get_part_mut(snapshot.worksheet_part_name())?
-                .set_blob_shared(snapshot.source_arc());
+            let blob = match maximum_bytes {
+                Some(maximum) => {
+                    let prior = materialized_bytes;
+                    materialized_bytes = prior
+                        .checked_add(snapshot.source_xml().len())
+                        .ok_or_else(|| {
+                            invalid("multi-sheet materialization size overflows usize")
+                        })?;
+                    if materialized_bytes > maximum {
+                        return Err(invalid(format!(
+                            "multi-sheet materialization exceeds the explicit bound {maximum} bytes"
+                        )));
+                    }
+                    snapshot.materialized_source_arc(maximum - prior)?
+                },
+                None => snapshot.source_arc()?,
+            };
+            replacements.push((snapshot.worksheet_part_name().clone(), blob));
+        }
+        self.after.check_execution()?;
+        let mut candidate = package.clone();
+        for (partname, blob) in replacements {
+            candidate.get_part_mut(&partname)?.set_blob_shared(blob);
         }
         let readback = MultiSnapshot::load_owned(
             &candidate,
@@ -110,6 +156,7 @@ impl MultiPatch {
                 "multi-sheet value-only patch readback differs from its target",
             ));
         }
+        self.after.check_execution()?;
         *package = candidate;
         Ok(())
     }
@@ -148,26 +195,49 @@ impl Patch {
     }
 
     /// Apply atomically to an owning OPC package after exact source validation.
+    ///
+    /// A managed source target is refused unless the caller uses
+    /// [`Self::apply_materialized`] explicitly.
     pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply_inner(package, None)
+    }
+
+    /// Apply after explicitly copying a managed target payload into the owning
+    /// package, bounded by `maximum_bytes`.
+    pub fn apply_materialized(&self, package: &mut OpcPackage, maximum_bytes: usize) -> Result<()> {
+        self.apply_inner(package, Some(maximum_bytes))
+    }
+
+    fn apply_inner(&self, package: &mut OpcPackage, maximum_bytes: Option<usize>) -> Result<()> {
+        self.before.check_execution()?;
+        self.after.check_execution()?;
         if !self.before.matches_current_source(package) {
             return Err(Error::PatchConflict {
                 part: self.before.worksheet_part_name().to_string(),
             });
         }
         if self.is_empty() {
+            self.before.check_execution()?;
+            self.after.check_execution()?;
             return Ok(());
         }
         if package.is_signed() {
             return Err(Error::Signed);
         }
+        let blob = match maximum_bytes {
+            Some(maximum) => self.after.materialized_source_arc(maximum)?,
+            None => self.after.source_arc()?,
+        };
+        self.after.check_execution()?;
         let mut candidate = package.clone();
         candidate
             .get_part_mut(self.before.worksheet_part_name())?
-            .set_blob_shared(self.after.source_arc());
+            .set_blob_shared(blob);
         let result = Snapshot::load(&candidate, self.after.sheet_position())?;
         if !result.same_source(&self.after) {
             return Err(invalid("value-only patch readback differs from its target"));
         }
+        self.after.check_execution()?;
         *package = candidate;
         Ok(())
     }
