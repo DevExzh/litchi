@@ -98,7 +98,11 @@ fn corpus_xxe_probe_is_rejected_without_resolution() -> Result<(), Error> {
             ("meta.xml", META.as_bytes()),
         ],
     );
-    let document = Document::from_bytes(raw)?;
+    let document = match Document::from_bytes(raw) {
+        Ok(document) => document,
+        Err(Error::InvalidFormat(_)) => return Ok(()),
+        Err(error) => panic!("open produced a non-format error: {error:?}"),
+    };
     match document.text() {
         Err(Error::InvalidFormat(_)) => {},
         Err(error) => panic!("text produced a non-format error: {error:?}"),

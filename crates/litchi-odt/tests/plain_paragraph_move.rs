@@ -200,13 +200,15 @@ fn refuses_duplicate_or_stray_empty_body_ownership() {
             r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TEXT}"><o:text/><o:body><o:text><t:p>one</t:p><t:p>two</t:p></o:text></o:body></o:document-content>"#
         ),
     ] {
-        let source = Document::from_bytes(support::package(
+        let document = match Document::from_bytes(support::package(
             MIMETYPE,
             &[("content.xml", xml.as_bytes())],
-        ))
-        .unwrap()
-        .snapshot()
-        .unwrap();
+        )) {
+            Ok(document) => document,
+            Err(litchi_core::Error::InvalidFormat(_)) => continue,
+            Err(error) => panic!("open produced a non-format error: {error:?}"),
+        };
+        let source = document.snapshot().unwrap();
         assert_move_refused(&source);
     }
 }

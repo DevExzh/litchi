@@ -109,7 +109,11 @@ fn genuine_formatted_metadata_survives_a_public_paragraph_transaction_exactly() 
 #[test]
 fn real_xxe_package_is_rejected_without_resolution() -> Result<(), Error> {
     let file = "writer-minimal-nasty.odt";
-    let document = Document::open(corpus().join(file))?;
+    let document = match Document::open(corpus().join(file)) {
+        Ok(document) => document,
+        Err(Error::InvalidFormat(_)) => return Ok(()),
+        Err(error) => panic!("open produced a non-format error for {file}: {error:?}"),
+    };
     assert_invalid(document.text(), file, "text");
     assert_invalid(document.paragraphs(), file, "paragraphs");
     assert_invalid(document.forms(), file, "forms");
