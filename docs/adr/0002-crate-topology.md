@@ -3398,3 +3398,29 @@ Host all-target/all-feature check and no-run, retained-axis 2/2, Pages-layout
 1/1, generated-roundtrip 1/1, scoped boundary 6/6, strict library Clippy,
 formatting, and diff checks pass. Broad host all-target Clippy remains blocked
 by nine unrelated existing lints.
+
+## 2026-08-14 Numbers formula ownership
+
+`litchi-numbers` now owns selector-first semantic formula-cell authoring. Its
+public formula vocabulary is the archive-free
+`formula::{Expression, CachedValue, CellReference, AxisReference,
+BinaryOperator, Table, Error, LimitKind}` API. `table::cells::{Input, Change,
+Edit}` supplies the formula constructors and setters; a cross-table reference
+uses an opaque `formula::Table` selected from the exact package snapshot by
+`Edit::formula_table`. Raw table identifiers, formula keys, UUIDs, protobuf or
+Buffa values, IWA objects, and source bytes do not cross this boundary.
+
+The focused package owns formula-list interning, BNC formula cells, dependency
+metadata, cache validation/evaluation, string-list coordination, dependency
+tile allocation, package metadata, and atomic publication. The raw wire remains
+the preservation and splice authority. Private generated projections are
+forced agreement checks after schema-directed preflight; they do not become
+the save representation and do not own unknown fields.
+
+The focused facade no longer reexports the legacy host formula vocabulary, and
+the formula-specific source-topology audit reports no focused-to-host or raw
+identity leak. This is not deletion of `litchi-iwa`: production host readers,
+setters, examples, pivot compatibility vocabulary, tests, and its manifest edge
+remain migration debt. The host imports the legacy `Formula*` names directly
+from neutral `litchi-iwa-common` so pivot compatibility does not force the
+focused semantic API to retain `PivotCategory` or raw identity aliases.

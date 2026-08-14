@@ -21,9 +21,21 @@ const SCRATCH_BYTES_PER_OUTPUT_BYTE: u64 = 8;
 const ALLOCATIONS_PER_UPDATE: u64 = 4;
 const WIRE_WORK_MULTIPLIER: u64 = 32;
 const WIRE_FIELD_MULTIPLIER: u64 = 16;
-const REFERENCE_MULTIPLIER: u64 = 16;
-const FORMULA_WORK_PER_UPDATE: u64 = 64;
+const WIRE_WORK_PER_UPDATE: u64 = 64;
+// Formula publication strictly visits the same bounded ArchiveInfo graph in
+// resolver, list, metadata-plan, cache-plan, metadata-execute, and reopen
+// phases. Keep those cumulative visits finite and independently governed.
+const REFERENCE_MULTIPLIER: u64 = 64;
+// Formula authoring runs strict list, dependency, evaluator, tile and reopen
+// phases. Each cell may contribute both an AST node/edge visit and a physical
+// cache transition in those independently reported phases.
+const FORMULA_WORK_PER_UPDATE: u64 = 128;
 const REOPEN_WORK_MULTIPLIER: u64 = 64;
+// The allocation-free locality proof may compare the complete source and
+// candidate artifacts through sixteen bounded ZIP/topology views. Both are
+// individually bounded by `max_input_bytes`, so the transaction-wide ceiling
+// must admit 16 * (source + candidate) = 32 work units per output byte.
+const LOCALITY_WORK_PER_OUTPUT_BYTE: u64 = 32;
 
 /// Finite independent ceilings for one changed transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,7 +161,11 @@ impl TransactionLimits {
         let max_wire_bytes = checked_mul_limit(wire, WIRE_WORK_MULTIPLIER, LimitKind::WireWork)?;
         let max_wire_fields =
             checked_mul_limit(wire, WIRE_FIELD_MULTIPLIER, LimitKind::WireFields)?;
-        let max_wire_work = checked_mul_limit(wire, WIRE_WORK_MULTIPLIER, LimitKind::WireWork)?;
+        let max_wire_work = checked_add_limit(
+            checked_mul_limit(wire, WIRE_WORK_MULTIPLIER, LimitKind::WireWork)?,
+            checked_mul_limit(updates, WIRE_WORK_PER_UPDATE, LimitKind::WireWork)?,
+            LimitKind::WireWork,
+        )?;
         let max_references =
             checked_mul_limit(references, REFERENCE_MULTIPLIER, LimitKind::References)?;
         let max_formula_work = checked_add_limit(
@@ -176,6 +192,11 @@ impl TransactionLimits {
             max_formula_work,
             output,
             max_reopen_work,
+            checked_mul_limit(
+                output,
+                LOCALITY_WORK_PER_OUTPUT_BYTE,
+                LimitKind::TransactionWork,
+            )?,
         ]
         .into_iter()
         .try_fold(0u64, |total, value| {
@@ -233,6 +254,7 @@ pub(super) struct Usage {
     pub(super) formula_edges: u64,
     pub(super) range_candidates: u64,
     pub(super) cache_hosts: u64,
+    pub(super) authored_formula_writes: u64,
     pub(super) formula_work: u64,
     pub(super) component_encodes: u64,
     pub(super) components_reassembled: u64,
@@ -353,6 +375,85 @@ impl TransactionBudget {
         self.limits
     }
 
+    #[cfg(test)]
+    pub(super) fn required_limits_for(&self, envelope: Usage) -> Result<TransactionLimits, Error> {
+        // This helper is an observation hook: it reports the exact ceiling
+        // required by the current usage plus a prepared envelope.  Deriving
+        // that ceiling must not itself be constrained by the deliberately
+        // reduced test limit, otherwise a max-minus-one run cannot observe
+        // the same requirement that it is meant to refuse.
+        let unlimited = TransactionLimits {
+            max_updates: u64::MAX,
+            max_owned_value_bytes: u64::MAX,
+            max_retained_elements: u64::MAX,
+            max_retained_bytes: u64::MAX,
+            max_scratch_bytes: u64::MAX,
+            max_allocation_events: u64::MAX,
+            max_wire_bytes: u64::MAX,
+            max_wire_fields: u64::MAX,
+            max_wire_work: u64::MAX,
+            max_objects: u64::MAX,
+            max_references: u64::MAX,
+            max_formula_work: u64::MAX,
+            max_output_bytes: u64::MAX,
+            max_reopen_work: u64::MAX,
+            max_transaction_work: u64::MAX,
+        };
+        let candidate = add_usage(self.usage, envelope, unlimited)?;
+        let max_formula_work = [
+            candidate.formula_graph_builds,
+            candidate.formula_nodes,
+            candidate.formula_edges,
+            candidate.range_candidates,
+            candidate.cache_hosts,
+            candidate.authored_formula_writes,
+            candidate.formula_work,
+        ]
+        .into_iter()
+        .max()
+        .unwrap_or(0);
+        let max_transaction_work = [
+            candidate.lookups,
+            candidate.tile_reads,
+            candidate.tile_writes,
+            candidate.header_reads,
+            candidate.header_writes,
+            candidate.row_reads,
+            candidate.row_writes,
+            candidate.list_reads,
+            candidate.list_writes,
+            candidate.string_work,
+            candidate.rich_text_work,
+            candidate.components_reassembled,
+            candidate.reassembly_bytes,
+            candidate.preview_bytes_deleted,
+            candidate.output_artifact_allocations,
+            candidate.candidate_reopens,
+            candidate.locality_bytes,
+            candidate.transaction_work,
+        ]
+        .into_iter()
+        .max()
+        .unwrap_or(0);
+        Ok(TransactionLimits {
+            max_updates: candidate.updates,
+            max_owned_value_bytes: candidate.input_value_bytes,
+            max_retained_elements: candidate.retained_elements,
+            max_retained_bytes: candidate.retained_bytes,
+            max_scratch_bytes: candidate.peak_scratch_bytes.max(candidate.scratch_bytes),
+            max_allocation_events: candidate.allocation_events,
+            max_wire_bytes: candidate.wire_bytes,
+            max_wire_fields: candidate.wire_fields,
+            max_wire_work: candidate.wire_work,
+            max_objects: candidate.objects.max(candidate.component_encodes),
+            max_references: candidate.references.max(candidate.reopen_references),
+            max_formula_work,
+            max_output_bytes: candidate.output_bytes,
+            max_reopen_work: candidate.reopen_work,
+            max_transaction_work,
+        })
+    }
+
     /// Return exact per-counter capacity after observed and privately pending
     /// reservations.  A caller must snapshot this value, authorize an
     /// envelope no larger than it, and bind the same retained/scratch/wire/
@@ -377,6 +478,26 @@ impl TransactionBudget {
     pub(super) fn authorize(&mut self, envelope: UsageDelta) -> Result<(), Error> {
         self.ensure_no_pending_authorization()?;
         let _candidate = add_usage(self.usage, envelope, self.limits)?;
+        self.pending_authorization = Some(PendingAuthorization {
+            baseline: self.usage,
+            reserved: envelope,
+            available: envelope,
+        });
+        Ok(())
+    }
+
+    /// Exercise one aggregate authorization against an independently
+    /// selected exact ceiling without changing any earlier planning limits.
+    /// This lets rooted tests prove max-minus-one preemption at the aggregate
+    /// barrier itself instead of accidentally steering an earlier planner.
+    #[cfg(test)]
+    pub(super) fn authorize_under_limits(
+        &mut self,
+        envelope: UsageDelta,
+        limits: TransactionLimits,
+    ) -> Result<(), Error> {
+        self.ensure_no_pending_authorization()?;
+        let _candidate = add_usage(self.usage, envelope, limits)?;
         self.pending_authorization = Some(PendingAuthorization {
             baseline: self.usage,
             reserved: envelope,
@@ -462,6 +583,28 @@ impl TransactionBudget {
             allocation_events,
             ..Usage::default()
         })
+    }
+
+    /// Release transaction-local retained plan storage after it has been
+    /// consumed or abandoned. Allocation, work, and peak counters remain
+    /// cumulative; only the live retained footprint is returned.
+    pub(super) fn release_retained(&mut self, elements: u64, bytes: u64) -> Result<(), Error> {
+        if self.pending_authorization.is_some() || self.pending_publication.is_some() {
+            return Err(pending_error(self.limits));
+        }
+        let retained_elements = self
+            .usage
+            .retained_elements
+            .checked_sub(elements)
+            .ok_or_else(|| pending_error(self.limits))?;
+        let retained_bytes = self
+            .usage
+            .retained_bytes
+            .checked_sub(bytes)
+            .ok_or_else(|| pending_error(self.limits))?;
+        self.usage.retained_elements = retained_elements;
+        self.usage.retained_bytes = retained_bytes;
+        Ok(())
     }
 
     /// Enter a temporary allocation only after its peak and allocation event
@@ -681,6 +824,11 @@ fn remaining_usage(used: Usage, limits: TransactionLimits) -> Result<Remaining, 
             limits.max_formula_work
         ),
         cache_hosts: remaining!(cache_hosts, LimitKind::FormulaWork, limits.max_formula_work),
+        authored_formula_writes: remaining!(
+            authored_formula_writes,
+            LimitKind::FormulaWork,
+            limits.max_formula_work
+        ),
         formula_work: remaining!(
             formula_work,
             LimitKind::FormulaWork,
@@ -760,6 +908,7 @@ fn subtract_usage_envelope(envelope: Usage, nested: Usage) -> Result<Usage, Erro
         formula_edges: subtract!(formula_edges, LimitKind::FormulaWork),
         range_candidates: subtract!(range_candidates, LimitKind::FormulaWork),
         cache_hosts: subtract!(cache_hosts, LimitKind::FormulaWork),
+        authored_formula_writes: subtract!(authored_formula_writes, LimitKind::FormulaWork),
         formula_work: subtract!(formula_work, LimitKind::FormulaWork),
         component_encodes: subtract!(component_encodes, LimitKind::Objects),
         components_reassembled: activity!(components_reassembled),
@@ -775,7 +924,7 @@ fn subtract_usage_envelope(envelope: Usage, nested: Usage) -> Result<Usage, Erro
     })
 }
 
-fn publication_usage_reservation(value: PublicationReservation) -> Result<Usage, Error> {
+pub(super) fn publication_usage_reservation(value: PublicationReservation) -> Result<Usage, Error> {
     publication_usage(
         value.components_reassembled,
         value.reassembly_bytes,
@@ -992,6 +1141,11 @@ fn add_usage(base: Usage, delta: Usage, limits: TransactionLimits) -> Result<Usa
             limits.max_formula_work
         ),
         cache_hosts: add!(cache_hosts, LimitKind::FormulaWork, limits.max_formula_work),
+        authored_formula_writes: add!(
+            authored_formula_writes,
+            LimitKind::FormulaWork,
+            limits.max_formula_work
+        ),
         formula_work: add!(
             formula_work,
             LimitKind::FormulaWork,
@@ -1088,6 +1242,7 @@ fn validate_actual_le(actual: Usage, reserved: Usage) -> Result<(), Error> {
     check!(formula_edges, LimitKind::FormulaWork);
     check!(range_candidates, LimitKind::FormulaWork);
     check!(cache_hosts, LimitKind::FormulaWork);
+    check!(authored_formula_writes, LimitKind::FormulaWork);
     check!(formula_work, LimitKind::FormulaWork);
     check!(component_encodes, LimitKind::Objects);
     activity!(components_reassembled);
@@ -1228,6 +1383,33 @@ mod tests {
         };
         assert!(budget.reserve(delta).is_err());
         assert_eq!(budget.usage, before);
+    }
+
+    #[test]
+    fn retained_plan_release_restores_capacity_but_not_allocations() {
+        let mut budget = TransactionBudget::from_limits(limits(1_000_000)).unwrap();
+        budget.reserve_retained(4, 80, 1).unwrap();
+        let after_reserve = budget.remaining().unwrap();
+        budget.release_retained(4, 80).unwrap();
+        let after_release = budget.remaining().unwrap();
+        assert_eq!(
+            after_release.retained_elements,
+            after_reserve.retained_elements + 4
+        );
+        assert_eq!(
+            after_release.retained_bytes,
+            after_reserve.retained_bytes + 80
+        );
+        assert_eq!(
+            after_release.allocation_events,
+            after_reserve.allocation_events
+        );
+        assert!(budget.release_retained(1, 0).is_err());
+
+        budget.reserve_retained(2, 10, 1).unwrap();
+        let before_failed_release = budget.usage;
+        assert!(budget.release_retained(1, 11).is_err());
+        assert_eq!(budget.usage, before_failed_release);
     }
 
     #[test]
@@ -1446,6 +1628,7 @@ mod tests {
                 formula_edges: updates * 2,
                 range_candidates: updates,
                 cache_hosts: updates,
+                authored_formula_writes: updates,
                 formula_work: updates * 8,
                 component_encodes: 1,
                 components_reassembled: 1,
@@ -1465,6 +1648,7 @@ mod tests {
             (small.formula_edges, large.formula_edges),
             (small.range_candidates, large.range_candidates),
             (small.cache_hosts, large.cache_hosts),
+            (small.authored_formula_writes, large.authored_formula_writes),
             (small.formula_work, large.formula_work),
         ] {
             assert!(right * 10 <= left * 22);

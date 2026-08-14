@@ -505,7 +505,7 @@ mod tests {
         ])
         .unwrap();
         editor
-            .set_table_sort_order(selector.clone(), initial.clone())
+            .set_table_sort_order(selector, initial.clone())
             .unwrap();
 
         editor
@@ -520,10 +520,7 @@ mod tests {
                 ColumnInsertion::body(0),
             )
             .unwrap();
-        assert_eq!(
-            editor.table_sort_order(selector.clone()).unwrap(),
-            Some(initial)
-        );
+        assert_eq!(editor.table_sort_order(selector).unwrap(), Some(initial));
 
         editor
             .remove_table_row(test_table_selector(&editor, table_id), RowDeletion::body(0))
@@ -539,10 +536,7 @@ mod tests {
             Direction::Descending,
         )])
         .unwrap();
-        assert_eq!(
-            editor.table_sort_order(selector.clone()).unwrap(),
-            Some(remaining)
-        );
+        assert_eq!(editor.table_sort_order(selector).unwrap(), Some(remaining));
 
         editor
             .remove_table_column(

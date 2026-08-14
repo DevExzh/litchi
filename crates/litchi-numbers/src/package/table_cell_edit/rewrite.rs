@@ -265,6 +265,300 @@ pub(super) struct ComponentReservation {
     pub(super) work: u64,
 }
 
+/// Allocation-free conservative reservation formed from output-free writer
+/// plans. It is intentionally content-independent: component serialization
+/// and Snappy output use the validated archive maxima, while staged payload
+/// and reference storage use the exact aggregate plan bounds supplied by the
+/// caller.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct FuturePublicationReservation {
+    pub(super) component: ComponentReservation,
+    pub(super) publication: PublicationReservation,
+    pub(super) planning_work: u64,
+    pub(super) planning_lookups: u64,
+}
+
+pub(super) fn future_publication_reservation(
+    source: &Package,
+    component_indices: &[usize],
+    message_count: usize,
+    staged_payload_bytes: usize,
+    transition_reference_items: usize,
+    appended_objects: usize,
+) -> Result<FuturePublicationReservation, RewriteError> {
+    if component_indices.is_empty() || component_indices.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(RewriteError::InvalidSource);
+    }
+    let catalog = physical_source(source)?;
+    let archive_limits = catalog
+        .limits()
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let component_count = component_indices.len();
+    let mut compressed_input_bytes = 0usize;
+    let mut decoded_input_bytes = 0usize;
+    let mut maximum_source_component_bytes = 0usize;
+    let mut source_allocation_bytes = 0usize;
+    let mut source_allocation_events = 0usize;
+    let mut selected_references = 0usize;
+    let mut planning_work = 0usize;
+    let mut planning_lookups = 0usize;
+    for &component_index in component_indices {
+        let component = source
+            .state
+            .components
+            .catalog()
+            .get_index(component_index)
+            .ok_or(RewriteError::InvalidSource)?;
+        planning_lookups = checked_add(planning_lookups, 1)?;
+        let mut selected_entry = None;
+        for entry in catalog.package().iter() {
+            planning_work = checked_add(planning_work, 1)?;
+            if entry.name() == component.name() {
+                if selected_entry.replace(entry).is_some() {
+                    return Err(RewriteError::InvalidSource);
+                }
+            }
+        }
+        let entry = selected_entry.ok_or(RewriteError::InvalidSource)?;
+        if entry.is_opaque() || entry.metadata().local().compression_method() != 0 {
+            return Err(RewriteError::UnsupportedSource);
+        }
+        compressed_input_bytes = checked_add(compressed_input_bytes, entry.data().len())?;
+        let component_bytes = archive_extent(component.archive())?;
+        decoded_input_bytes = checked_add(decoded_input_bytes, component_bytes)?;
+        maximum_source_component_bytes = maximum_source_component_bytes.max(component_bytes);
+        source_allocation_bytes = checked_add(
+            source_allocation_bytes,
+            archive_allocation_cost(component.archive())?,
+        )?;
+        source_allocation_events = checked_add(
+            source_allocation_events,
+            archive_allocation_event_bound(component.archive())?,
+        )?;
+        selected_references = checked_add(
+            selected_references,
+            archive_reference_count(component.archive())?,
+        )?;
+    }
+    let reference_items = checked_add(
+        checked_add(
+            checked_mul(selected_references, 2)?,
+            transition_reference_items,
+        )?,
+        appended_objects,
+    )?;
+    // Replacing a message cannot retain more than the complete source
+    // component plus every staged payload. Existing source references are
+    // already represented in that complete component and must not be charged
+    // as output growth a second time. Each transition reference can add at
+    // most one ten-byte identifier and one ten-byte packed-length prefix.
+    // Appended objects are independently bounded by the validated
+    // conventional one-message object has one identifier plus one nested
+    // MessageInfo containing exactly five scalar occurrences (type, three
+    // versions, length). Charging a one-byte tag and ten-byte varint for each,
+    // plus ten-byte nested/framing length prefixes, is a hard wire upper.
+    // Assign the complete aggregate growth to every selected component so
+    // this remains conservative without charging the 512 MiB format maximum
+    // for ordinary small transactions.
+    const MAX_VARINT_BYTES: usize = 10;
+    const FIELD_TAG_BYTES: usize = 1;
+    const CONVENTIONAL_MESSAGE_SCALARS: usize = 5;
+    const NEW_OBJECT_HEADER_UPPER: usize = MAX_VARINT_BYTES
+        + (FIELD_TAG_BYTES + MAX_VARINT_BYTES)
+        + (FIELD_TAG_BYTES
+            + MAX_VARINT_BYTES
+            + CONVENTIONAL_MESSAGE_SCALARS * (FIELD_TAG_BYTES + MAX_VARINT_BYTES));
+    let per_component_growth = staged_payload_bytes
+        .checked_add(checked_mul(transition_reference_items, 20)?)
+        .and_then(|bytes| {
+            appended_objects
+                .checked_mul(NEW_OBJECT_HEADER_UPPER)
+                .and_then(|headers| bytes.checked_add(headers))
+        })
+        .ok_or(RewriteError::InvalidSource)?;
+    let maximum_component_output_bytes = maximum_source_component_bytes
+        .checked_add(per_component_growth)
+        .ok_or(RewriteError::InvalidSource)?
+        .min(archive_limits.max_archive_bytes());
+    let maximum_serialized_output_bytes =
+        checked_mul(component_count, maximum_component_output_bytes)?;
+    let maximum_compressed_output_bytes = checked_mul(
+        component_count,
+        maximum_snappy_output(maximum_component_output_bytes)?,
+    )?;
+    let maximum_retained_elements = component_count
+        .checked_add(message_count)
+        .and_then(|value| value.checked_add(appended_objects))
+        .ok_or(RewriteError::InvalidSource)?;
+    let maximum_peak_bytes = [
+        decoded_input_bytes,
+        source_allocation_bytes,
+        staged_payload_bytes,
+        maximum_serialized_output_bytes,
+        maximum_compressed_output_bytes,
+    ]
+    .into_iter()
+    .try_fold(0usize, checked_add)?;
+    let maximum_output_frames = checked_mul(
+        component_count,
+        maximum_component_output_bytes.div_ceil(SnappyStream::WRITE_CHUNK_SIZE),
+    )?;
+    let maximum_allocation_events = [
+        source_allocation_events,
+        checked_mul(component_count, 20)?,
+        checked_mul(message_count, 6)?,
+        checked_mul(appended_objects, 6)?,
+        reference_items,
+        checked_mul(maximum_output_frames, 2)?,
+        3,
+    ]
+    .into_iter()
+    .try_fold(0usize, checked_add)?;
+    let work = [
+        compressed_input_bytes,
+        checked_mul(maximum_peak_bytes, 2)?,
+        maximum_allocation_events,
+        maximum_retained_elements,
+        reference_items,
+        component_count,
+        planning_work,
+    ]
+    .into_iter()
+    .try_fold(0usize, checked_add)?;
+    let component = ComponentReservation {
+        components: as_u64(component_count)?,
+        compressed_input_bytes: as_u64(compressed_input_bytes)?,
+        decoded_input_bytes: as_u64(decoded_input_bytes)?,
+        staged_payload_bytes: as_u64(staged_payload_bytes)?,
+        maximum_serialized_output_bytes: as_u64(maximum_serialized_output_bytes)?,
+        maximum_compressed_output_bytes: as_u64(maximum_compressed_output_bytes)?,
+        maximum_retained_evidence_bytes: as_u64(staged_payload_bytes)?,
+        maximum_retained_elements: as_u64(maximum_retained_elements)?,
+        maximum_peak_bytes: as_u64(maximum_peak_bytes)?,
+        maximum_allocation_events: as_u64(maximum_allocation_events)?,
+        reference_items: as_u64(reference_items)?,
+        appended_objects: as_u64(appended_objects)?,
+        deleted_objects: 0,
+        work: as_u64(work)?,
+    };
+
+    let source_bytes = catalog.source_bytes().len();
+    let output_upper = checked_add(source_bytes, maximum_compressed_output_bytes)?;
+    let mut preview_bytes_deleted = 0usize;
+    let mut logical_source_bytes = 0usize;
+    for entry in catalog.package().iter() {
+        planning_work = checked_add(planning_work, 1)?;
+        logical_source_bytes = checked_add(logical_source_bytes, entry.data().len())?;
+        if ROOT_PREVIEWS.contains(&entry.name()) {
+            preview_bytes_deleted = checked_add(preview_bytes_deleted, entry.data().len())?;
+        }
+    }
+    let mut all_decoded_bytes = 0usize;
+    let mut all_structure_bytes = 0usize;
+    let mut all_references = 0usize;
+    for component in catalog.components().iter() {
+        planning_work = checked_add(planning_work, 1)?;
+        all_decoded_bytes = checked_add(all_decoded_bytes, archive_extent(component.archive())?)?;
+        all_structure_bytes = checked_add(
+            all_structure_bytes,
+            archive_allocation_cost(component.archive())?,
+        )?;
+        all_references = checked_add(
+            all_references,
+            archive_reference_count(component.archive())?,
+        )?;
+    }
+    let source_reopen = reopen_cost(catalog, source_bytes, &[], &[])?;
+    let target_logical_bytes = checked_add(logical_source_bytes, maximum_compressed_output_bytes)?;
+    let target_decoded_bytes = checked_add(all_decoded_bytes, maximum_serialized_output_bytes)?;
+    let target_structure_bytes = checked_add(all_structure_bytes, maximum_serialized_output_bytes)?;
+    let target_reopen = ReopenCost {
+        work: as_u64(checked_add(
+            checked_add(output_upper, checked_mul(target_logical_bytes, 2)?)?,
+            checked_add(
+                checked_mul(target_decoded_bytes, 2)?,
+                target_structure_bytes,
+            )?,
+        )?)?,
+        references: as_u64(checked_add(all_references, transition_reference_items)?)?,
+    };
+    let locality_bytes = checked_add(
+        checked_add(source_bytes, output_upper)?,
+        checked_add(decoded_input_bytes, maximum_serialized_output_bytes)?,
+    )?;
+    let publication = PublicationReservation {
+        components_reassembled: as_u64(component_count)?,
+        reassembly_bytes: as_u64(output_upper)?,
+        preview_bytes_deleted: as_u64(preview_bytes_deleted)?,
+        locality_bytes: as_u64(locality_bytes)?,
+        locality_work: locality_work_envelope(catalog, output_upper)?,
+        output_artifact_allocations: 2,
+        output_bytes: as_u64(output_upper)?,
+        candidate_reopens: 1,
+        source_reopen,
+        target_reopen,
+    };
+    Ok(FuturePublicationReservation {
+        component,
+        publication,
+        planning_work: as_u64(planning_work)?,
+        planning_lookups: as_u64(planning_lookups)?,
+    })
+}
+
+pub(super) const fn component_admission_shape_fits(
+    actual: ComponentReservation,
+    upper: ComponentReservation,
+) -> bool {
+    actual.components <= upper.components
+        && actual.compressed_input_bytes <= upper.compressed_input_bytes
+        && actual.decoded_input_bytes <= upper.decoded_input_bytes
+        && actual.staged_payload_bytes <= upper.staged_payload_bytes
+        && actual.maximum_retained_evidence_bytes <= upper.maximum_retained_evidence_bytes
+        && actual.maximum_retained_elements <= upper.maximum_retained_elements
+        && actual.reference_items <= upper.reference_items
+        && actual.appended_objects <= upper.appended_objects
+        && actual.deleted_objects <= upper.deleted_objects
+}
+
+pub(super) const fn component_cost_fits(
+    actual: ComponentCost,
+    upper: ComponentReservation,
+) -> bool {
+    actual.components <= upper.components
+        && actual.compressed_input_bytes <= upper.compressed_input_bytes
+        && actual.decoded_input_bytes <= upper.decoded_input_bytes
+        && actual.serialized_output_bytes <= upper.maximum_serialized_output_bytes
+        && actual.compressed_output_bytes <= upper.maximum_compressed_output_bytes
+        && actual.retained_evidence_bytes <= upper.maximum_retained_evidence_bytes
+        && actual.retained_elements <= upper.maximum_retained_elements
+        && actual.peak_scratch_bytes <= upper.maximum_peak_bytes
+        && actual.allocation_events <= upper.maximum_allocation_events
+        && actual.reference_items <= upper.reference_items
+        && actual.appended_objects <= upper.appended_objects
+        && actual.deleted_objects <= upper.deleted_objects
+        && actual.work <= upper.work
+}
+
+pub(super) const fn publication_reservation_fits(
+    actual: PublicationReservation,
+    upper: PublicationReservation,
+) -> bool {
+    actual.components_reassembled <= upper.components_reassembled
+        && actual.reassembly_bytes <= upper.reassembly_bytes
+        && actual.preview_bytes_deleted <= upper.preview_bytes_deleted
+        && actual.locality_bytes <= upper.locality_bytes
+        && actual.locality_work <= upper.locality_work
+        && actual.output_artifact_allocations <= upper.output_artifact_allocations
+        && actual.output_bytes <= upper.output_bytes
+        && actual.candidate_reopens <= upper.candidate_reopens
+        && actual.source_reopen.work <= upper.source_reopen.work
+        && actual.source_reopen.references <= upper.source_reopen.references
+        && actual.target_reopen.work <= upper.target_reopen.work
+        && actual.target_reopen.references <= upper.target_reopen.references
+}
+
 /// Final result of the one grouped physical publication.
 pub(super) struct RewriteOutcome {
     pub(super) package: Package,

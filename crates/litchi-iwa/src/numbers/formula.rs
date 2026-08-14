@@ -13,7 +13,7 @@ use crate::{Error, Result};
 use tsce::ast_node_array_archive::AstNodeArchive;
 use tsce::ast_node_array_archive::AstNodeType;
 
-pub use litchi_numbers::formula::{
+pub use litchi_iwa_common::formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
 };

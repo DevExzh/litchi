@@ -56,6 +56,23 @@ impl MessageRoute {
     }
 }
 
+fn message_payload_at_route(
+    source: &Package,
+    route: MessageRoute,
+    path: Path,
+) -> Result<&[u8], Error> {
+    source
+        .state
+        .components
+        .catalog()
+        .get_index(route.component_index)
+        .and_then(|component| component.archive().objects.get(route.object_index))
+        .and_then(|object| object.messages.get(route.message_index))
+        .filter(|message| message.type_ == route.message_type)
+        .map(|message| message.data.as_slice())
+        .ok_or(Error::InvalidSource { path })
+}
+
 /// One source tile keyed by its table-local row-strip number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct TileRoute {
@@ -162,13 +179,35 @@ pub(super) struct StorageRoutes {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub(super) struct DependencyRoutes {
     pub(super) engine: Option<MessageRoute>,
+    /// Exact global formula-family count from the calculation-engine tracker.
+    /// This includes opaque non-table formula families as well as table cells.
+    pub(super) formula_count: u64,
     pub(super) engine_sidecars: Vec<MessageRoute>,
-    pub(super) formula_owners: Vec<MessageRoute>,
+    pub(super) formula_owners: Vec<FormulaOwnerRoute>,
     pub(super) selected_formula_owner: Option<SelectedFormulaOwnerRoute>,
     pub(super) inert_marker_tiles: Vec<MessageRoute>,
     pub(super) cell_record_tiles: Vec<MessageRoute>,
     pub(super) range_precedent_tiles: Vec<MessageRoute>,
     pub(super) header_name_manager: Option<MessageRoute>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct FormulaOwnerRoute {
+    pub(super) message: MessageRoute,
+    /// Source-bound table/drawable object referenced by this owner, or `None`
+    /// for non-table engine owners such as deferred marker owners.
+    pub(super) formula_owner_object_id: Option<u64>,
+    pub(super) internal_owner_id: u32,
+    pub(super) uid_lower: u64,
+    pub(super) uid_upper: u64,
+    pub(super) cell_record_tiles: Vec<MessageRoute>,
+    pub(super) range_precedent_tiles: Vec<RangePrecedentRoute>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct RangePrecedentRoute {
+    pub(super) message: MessageRoute,
+    pub(super) target_owner: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -237,6 +276,7 @@ pub(super) fn resolve_changed_target(
     )
 }
 
+#[cfg(test)]
 pub(super) fn resolve_changed_target_with_remaining(
     source: &Package,
     sheet_position: usize,
@@ -244,12 +284,47 @@ pub(super) fn resolve_changed_target_with_remaining(
     positions: &[CellPosition],
     remaining: super::budget::Remaining,
 ) -> Result<(Target, ResolveReport), Error> {
+    resolve_target_with_remaining(
+        source,
+        sheet_position,
+        table_position,
+        positions,
+        remaining,
+        false,
+    )
+}
+
+pub(super) fn resolve_formula_read_target_with_remaining(
+    source: &Package,
+    sheet_position: usize,
+    table_position: usize,
+    positions: &[CellPosition],
+    remaining: super::budget::Remaining,
+) -> Result<(Target, ResolveReport), Error> {
+    resolve_target_with_remaining(
+        source,
+        sheet_position,
+        table_position,
+        positions,
+        remaining,
+        true,
+    )
+}
+
+fn resolve_target_with_remaining(
+    source: &Package,
+    sheet_position: usize,
+    table_position: usize,
+    positions: &[CellPosition],
+    remaining: super::budget::Remaining,
+    permit_locked_read: bool,
+) -> Result<(Target, ResolveReport), Error> {
     let native = table_headers::resolve::resolve_target(source, sheet_position, table_position)
         .map_err(map_header_failure)?;
     let path = selected_path(native);
     validate_positions(positions, native.rows, native.columns, path)?;
     validate_header_counts(native, path)?;
-    if native.locked == LockState::Locked {
+    if native.locked == LockState::Locked && !permit_locked_read {
         return Err(Error::TableLocked { path });
     }
 
@@ -1288,7 +1363,10 @@ fn validate_selected_formula_owner_closure(
     let envelope = owner.owner_kind() == Some(1)
         && owner.base_owner_uid().is_none()
         && owner.formula_owner().is_some()
-        && owner.range_dependencies().is_none_or(empty_message)
+        // Inline range records are a supported part of the selected table's
+        // formula graph. The strict dependency decoder has already validated
+        // their wire/Buffa shape; cache planning later binds their target
+        // owner and rectangle against the complete table registry.
         && owner
             .volatile_dependencies()
             .is_none_or(empty_volatile_dependencies)
@@ -1369,44 +1447,51 @@ fn validate_selected_cell_graph(
             expected_start = record.component_end;
             continue;
         };
-        if edges.external() != 0
-            || components.len()
-                != edges
-                    .local()
-                    .checked_mul(2)
-                    .ok_or(Error::InvalidSource { path })?
-        {
-            return Err(Error::UnsupportedDependency {
-                path,
-                kind: DependencyKind::FormulaCache,
-            });
+        let local = edges.local();
+        let external = edges.external();
+        let expected_components = local
+            .checked_mul(2)
+            .and_then(|count| {
+                external
+                    .checked_mul(3)
+                    .and_then(|external| count.checked_add(external))
+            })
+            .ok_or(Error::InvalidSource { path })?;
+        if components.len() != expected_components {
+            return Err(Error::InvalidSource { path });
         }
-        let rows = components
-            .iter()
-            .filter(|component| component.kind() == dependency_codec::ExpandedEdgeKind::LocalRow);
-        let columns = components.iter().filter(|component| {
-            component.kind() == dependency_codec::ExpandedEdgeKind::LocalColumn
-        });
-        for (index, (row, column)) in rows.zip(columns).enumerate() {
-            if row.index() != index
-                || column.index() != index
-                || row.value() >= native.rows
-                || column.value() >= native.columns
-            {
-                return Err(Error::InvalidSource { path });
+        let mut offset = 0usize;
+        for (kind, count) in [
+            (dependency_codec::ExpandedEdgeKind::LocalRow, local),
+            (dependency_codec::ExpandedEdgeKind::LocalColumn, local),
+            (dependency_codec::ExpandedEdgeKind::ExternalRow, external),
+            (dependency_codec::ExpandedEdgeKind::ExternalColumn, external),
+            (dependency_codec::ExpandedEdgeKind::InternalOwner, external),
+        ] {
+            for index in 0..count {
+                let component = components
+                    .get(offset)
+                    .ok_or(Error::InvalidSource { path })?;
+                if component.kind() != kind
+                    || component.index() != index
+                    || matches!(
+                        kind,
+                        dependency_codec::ExpandedEdgeKind::LocalRow
+                            if component.value() >= native.rows
+                    )
+                    || matches!(
+                        kind,
+                        dependency_codec::ExpandedEdgeKind::LocalColumn
+                            if component.value() >= native.columns
+                    )
+                {
+                    return Err(Error::InvalidSource { path });
+                }
+                offset = offset.checked_add(1).ok_or(Error::InvalidSource { path })?;
             }
         }
-        if components.iter().any(|component| {
-            !matches!(
-                component.kind(),
-                dependency_codec::ExpandedEdgeKind::LocalRow
-                    | dependency_codec::ExpandedEdgeKind::LocalColumn
-            )
-        }) {
-            return Err(Error::UnsupportedDependency {
-                path,
-                kind: DependencyKind::FormulaCache,
-            });
+        if offset != components.len() {
+            return Err(Error::InvalidSource { path });
         }
         expected_start = record.component_end;
     }
@@ -1472,7 +1557,7 @@ fn selected_expanded_edges_wire(payload: &[u8]) -> bool {
         return false;
     };
     view.fields().all(|field| {
-        matches!(field.number(), 1 | 2)
+        matches!(field.number(), 1..=5)
             && field.validate_canonical_key().is_ok()
             && match field.wire_type() {
                 0 => canonical_varint_bytes(field.payload()),
@@ -3331,7 +3416,7 @@ fn resolve_dependencies(
     )
     .map_err(|error| map_codec_failure(error, path))?;
     budget.charge(report)?;
-    let _formula_count = tracker
+    let formula_count = tracker
         .number_of_formulas()
         .ok_or(Error::InvalidSource { path })?;
     let owner_map_payload = tracker
@@ -3485,6 +3570,7 @@ fn resolve_dependencies(
                 active_spill_owner = true;
             }
         }
+        let inert_marker_start = inert_marker_tiles.len();
         if owner_markers.haunted == Some(owner_key) {
             haunted_owner_matches = haunted_owner_matches
                 .checked_add(1)
@@ -3549,6 +3635,16 @@ fn resolve_dependencies(
             budget,
             path,
         )?;
+        let mut owner_cell_routes = Vec::new();
+        let mut owner_range_routes = Vec::new();
+        if owner_markers.haunted == Some(owner_key) {
+            budget.reserve_retained_growth(
+                &mut owner_cell_routes,
+                inert_marker_tiles.len() - inert_marker_start,
+                LimitKind::Objects,
+            )?;
+            owner_cell_routes.extend_from_slice(&inert_marker_tiles[inert_marker_start..]);
+        }
         if selected_owner {
             resolve_selected_cell_dependency_tiles(
                 source,
@@ -3559,7 +3655,7 @@ fn resolve_dependencies(
                 native,
                 identities,
                 budget,
-                &mut cell_routes,
+                &mut owner_cell_routes,
                 path,
             )?;
             resolve_dependency_tiles(
@@ -3572,9 +3668,68 @@ fn resolve_dependencies(
                 Role::RangeDependencyTile,
                 identities,
                 budget,
-                &mut range_routes,
+                &mut owner_range_routes,
                 path,
             )?;
+        } else if owner_markers.conditional_style != Some(owner_key)
+            && owner_markers.spill != Some(owner_key)
+            && owner_markers.haunted != Some(owner_key)
+        {
+            resolve_dependency_tiles(
+                source,
+                owner_object,
+                index,
+                &owner_stage.cell_tiles,
+                &[13, 1],
+                CELL_RECORD_TILE_MESSAGE_TYPE,
+                Role::CellDependencyTile,
+                identities,
+                budget,
+                &mut owner_cell_routes,
+                path,
+            )?;
+            resolve_dependency_tiles(
+                source,
+                owner_object,
+                index,
+                &owner_stage.range_tiles,
+                &[15, 1],
+                RANGE_PRECEDENTS_TILE_MESSAGE_TYPE,
+                Role::RangeDependencyTile,
+                identities,
+                budget,
+                &mut owner_range_routes,
+                path,
+            )?;
+        }
+        let mut owner_range_routes_with_targets =
+            budget.reserve_retained(owner_range_routes.len(), LimitKind::Objects)?;
+        for message in &owner_range_routes {
+            let payload = message_payload_at_route(source, *message, path)?;
+            let (snapshot, report) = dependency_codec::decode_range_precedents_tile_with_report(
+                payload,
+                budget.options(payload.len())?,
+            )
+            .map_err(|error| map_codec_failure(error, path))?;
+            budget.charge(report)?;
+            owner_range_routes_with_targets.push(RangePrecedentRoute {
+                message: *message,
+                target_owner: snapshot.to_owner_id(),
+            });
+        }
+        if selected_owner {
+            budget.reserve_retained_growth(
+                &mut cell_routes,
+                owner_cell_routes.len(),
+                LimitKind::Objects,
+            )?;
+            cell_routes.extend_from_slice(&owner_cell_routes);
+            budget.reserve_retained_growth(
+                &mut range_routes,
+                owner_range_routes.len(),
+                LimitKind::Objects,
+            )?;
+            range_routes.extend_from_slice(&owner_range_routes);
         }
         let owner_route = MessageRoute::new(resolved, index, FORMULA_OWNER_MESSAGE_TYPE);
         if selected_owner {
@@ -3585,7 +3740,17 @@ fn resolve_dependencies(
                 uid_upper: owner_key.upper,
             });
         }
-        owner_routes.push(owner_route);
+        owner_routes.push(FormulaOwnerRoute {
+            message: owner_route,
+            formula_owner_object_id: owner_snapshot
+                .formula_owner()
+                .map(|reference| reference.identifier()),
+            internal_owner_id: owner_snapshot.internal_formula_owner_id(),
+            uid_lower: owner_key.lower,
+            uid_upper: owner_key.upper,
+            cell_record_tiles: owner_cell_routes,
+            range_precedent_tiles: owner_range_routes_with_targets,
+        });
         owner_stage.release_scratch(budget)?;
     }
     validate_deferred_owner_closure(
@@ -3610,6 +3775,7 @@ fn resolve_dependencies(
             engine_index,
             CALCULATION_ENGINE_MESSAGE_TYPE,
         )),
+        formula_count,
         engine_sidecars,
         formula_owners: owner_routes,
         selected_formula_owner,

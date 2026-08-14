@@ -1476,11 +1476,34 @@ fn enforce_formula_projection_provenance(
         "optional uint32 AST_function_node_index = 2;",
         "optional uint32 AST_function_node_numArgs = 3;",
         "optional double AST_number_node_number = 4;",
+        "optional uint64 AST_number_node_decimal_low = 42;",
+        "optional uint64 AST_number_node_decimal_high = 43;",
         "optional bool AST_boolean_node_boolean = 5;",
+        "optional string AST_string_node_string = 6;",
         "optional bool AST_token_node_boolean = 10;",
         "optional .TSCE.ASTNodeArrayArchive.ASTLocalCellReferenceNodeArchive AST_local_cell_reference_node_reference = 15;",
         "optional .TSCE.ASTNodeArrayArchive.ASTColumnCoordinateArchive AST_column = 26;",
         "optional .TSCE.ASTNodeArrayArchive.ASTRowCoordinateArchive AST_row = 27;",
+        "optional .TSCE.ASTNodeArrayArchive.ASTCrossTableReferenceExtraInfoArchive AST_cross_table_reference_extra_info = 28;",
+        "optional .TSCE.ASTNodeArrayArchive.ASTStickyBits AST_sticky_bits = 33;",
+        "optional .TSCE.ASTNodeArrayArchive.ASTColonTractArchive AST_colon_tract = 40;",
+        "message ASTCrossTableReferenceExtraInfoArchive {",
+        "required .TSP.CFUUIDArchive table_id = 1;",
+        "message ASTStickyBits {",
+        "required bool begin_row_is_absolute = 1;",
+        "required bool begin_column_is_absolute = 2;",
+        "required bool end_row_is_absolute = 3;",
+        "required bool end_column_is_absolute = 4;",
+        "message ASTColonTractArchive {",
+        "required int32 range_begin = 1;",
+        "optional int32 range_end = 2;",
+        "required uint32 range_begin = 1;",
+        "optional uint32 range_end = 2;",
+        "repeated .TSCE.ASTNodeArrayArchive.ASTColonTractArchive.ASTColonTractRelativeRangeArchive relative_column = 1;",
+        "repeated .TSCE.ASTNodeArrayArchive.ASTColonTractArchive.ASTColonTractRelativeRangeArchive relative_row = 2;",
+        "repeated .TSCE.ASTNodeArrayArchive.ASTColonTractArchive.ASTColonTractAbsoluteRangeArchive absolute_column = 3;",
+        "repeated .TSCE.ASTNodeArrayArchive.ASTColonTractArchive.ASTColonTractAbsoluteRangeArchive absolute_row = 4;",
+        "optional bool preserve_rectangular = 5 [default = true];",
         "message ASTLocalCellReferenceNodeArchive {",
         "required uint32 row_handle = 1;",
         "required uint32 column_handle = 2;",
@@ -1501,6 +1524,11 @@ fn enforce_formula_projection_provenance(
         "pub fn inspect_formula_archive",
         "pub fn inspect_formula_dependencies_with_visitor",
         "pub fn decode_formula_archive_with_visitor",
+        "pub enum FormulaWriteNode",
+        "pub struct FormulaWritePlan",
+        "pub struct FormulaWriteRequirements",
+        "pub fn plan_formula_archive",
+        "pub fn execute_formula_archive_plan",
         "preflight_callback_pass",
     ];
     let canonical = fs::read_to_string(proto_directory.join("TSCEArchives.proto"))?;
@@ -1530,6 +1558,7 @@ optional uint32 function_index = 2;
 optional uint32 function_num_args = 3;
 optional double number = 4;
 optional bool boolean = 5;
+optional string string = 6;
 optional bool token_boolean = 10;
 optional bytes thunk_array = 14;
 optional bytes local_cell_reference = 15;
@@ -1539,7 +1568,11 @@ optional bytes column = 26;
 optional bytes row = 27;
 optional bytes cross_table_extra = 28;
 optional bytes uid_coordinate = 30;
+optional bytes sticky_bits = 33;
 optional bytes tract_list = 38;
+optional bytes colon_tract = 40;
+optional uint64 decimal_low = 42;
+optional uint64 decimal_high = 43;
 }
 message LocalCellReferenceArchive {
 required uint32 row_handle = 1;
@@ -1554,6 +1587,29 @@ optional bool absolute = 2 [default = false];
 message RowCoordinateArchive {
 required sint32 row = 1;
 optional bool absolute = 2 [default = false];
+}
+message CFUUIDArchive {
+optional uint32 word0 = 2;
+optional uint32 word1 = 3;
+optional uint32 word2 = 4;
+optional uint32 word3 = 5;
+}
+message CrossTableExtraArchive {
+required bytes table_id = 1;
+}
+message StickyBitsArchive {
+required bool begin_row_absolute = 1;
+required bool begin_column_absolute = 2;
+required bool end_row_absolute = 3;
+required bool end_column_absolute = 4;
+}
+message RelativeRangeArchive {
+required int32 begin = 1;
+optional int32 end = 2;
+}
+message AbsoluteRangeArchive {
+required uint32 begin = 1;
+optional uint32 end = 2;
 }"#;
     let codec = fs::read_to_string("src/numbers_formula_codec.rs")?;
     let lib = fs::read_to_string("src/lib.rs")?;
@@ -2746,8 +2802,8 @@ fn enforce_formula_projection_budget(directory: &Path) -> Result<(), Box<dyn Err
         directory,
         "FormulaArchive",
         EXPECTED_FILES,
-        201_539,
-        "ccd972b3dcd76b6142342d36435f2f76a305c029265853ced04d64c1e2bf1752",
+        360_069,
+        "e94549480102d09d181f89cdf82197c6d873959ac07446d7a67ec7bba9c06091",
     )
 }
 

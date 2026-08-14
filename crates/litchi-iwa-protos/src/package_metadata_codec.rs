@@ -12,9 +12,6 @@
 
 use core::{fmt, mem::size_of, str};
 
-#[cfg(test)]
-use core::sync::atomic::{AtomicUsize, Ordering};
-
 use buffa::DecodeOptions as BuffaDecodeOptions;
 
 use crate::buffa_package_metadata_generated::LitchiIwaPackageMetadataProjection as projection;
@@ -23,7 +20,19 @@ const MAX_RECURSION: u32 = 64;
 const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;
 
 #[cfg(test)]
-static OUTPUT_ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
+std::thread_local! {
+    static OUTPUT_ALLOCATIONS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn record_output_allocation() {
+    OUTPUT_ALLOCATIONS.set(OUTPUT_ALLOCATIONS.get() + 1);
+}
+
+#[cfg(test)]
+fn output_allocations() -> usize {
+    OUTPUT_ALLOCATIONS.get()
+}
 
 /// Finite aggregate policy for one decode, rewrite, and verification cycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -474,6 +483,130 @@ pub struct RewriteOutput {
     report: RewriteReport,
 }
 
+/// Exact resources required by the allocation-bearing PackageMetadata phase.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RewriteExecutionRequirements {
+    output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    components: usize,
+    references: usize,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
+}
+
+macro_rules! execution_requirement_accessors {
+    ($(($name:ident, $ty:ty)),+ $(,)?) => {$(
+        #[must_use]
+        pub const fn $name(self) -> $ty { self.$name }
+    )+};
+}
+
+impl RewriteExecutionRequirements {
+    execution_requirement_accessors!(
+        (output_bytes, usize),
+        (fields, usize),
+        (work_bytes, usize),
+        (components, usize),
+        (references, usize),
+        (allocations, usize),
+        (retained_bytes, usize),
+        (scratch_bytes, usize)
+    );
+
+    #[must_use]
+    pub const fn exact_limits(self) -> RewriteExecutionLimits {
+        RewriteExecutionLimits {
+            max_output_bytes: self.output_bytes,
+            max_fields: self.fields,
+            max_work_bytes: self.work_bytes,
+            max_components: self.components,
+            max_references: self.references,
+            max_allocations: self.allocations,
+            max_retained_bytes: self.retained_bytes,
+            max_scratch_bytes: self.scratch_bytes,
+        }
+    }
+}
+
+/// Independent finite limits for executing a prepared rewrite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RewriteExecutionLimits {
+    pub max_output_bytes: usize,
+    pub max_fields: usize,
+    pub max_work_bytes: usize,
+    pub max_components: usize,
+    pub max_references: usize,
+    pub max_allocations: usize,
+    pub max_retained_bytes: usize,
+    pub max_scratch_bytes: usize,
+}
+
+/// Output-free, semantically validated PackageMetadata rewrite.
+pub struct PreparedPackageMetadataRewrite<'source, 'batch> {
+    source: &'source [u8],
+    batch: Batch<'batch>,
+    budget: Budget,
+    prepare_report: RewriteReport,
+    requirements: RewriteExecutionRequirements,
+    output_size: usize,
+}
+
+impl PreparedPackageMetadataRewrite<'_, '_> {
+    #[must_use]
+    pub const fn prepare_report(&self) -> RewriteReport {
+        self.prepare_report
+    }
+
+    #[must_use]
+    pub const fn execution_requirements(&self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub fn execute(
+        mut self,
+        limits: RewriteExecutionLimits,
+    ) -> Result<RewriteOutput, RewriteError> {
+        preflight_execution(self.requirements, limits)?;
+        let before = self.budget.report();
+        let mut candidate = Vec::new();
+        #[cfg(test)]
+        record_output_allocation();
+        candidate
+            .try_reserve_exact(self.output_size)
+            .map_err(|_error| RewriteError::allocation(self.output_size))?;
+        if candidate.capacity() != self.output_size {
+            return Err(RewriteError::allocation(self.output_size));
+        }
+        self.budget.allocation(0)?;
+        rewrite_into(self.source, self.batch, &mut candidate, &mut self.budget)?;
+        if candidate.len() != self.output_size {
+            return Err(RewriteError::invalid(InvalidReason::Verification));
+        }
+
+        self.budget.source_phase = false;
+        let mut verified_state = ScanState::new(self.batch, &mut self.budget)?;
+        scan_metadata(
+            &candidate,
+            self.batch,
+            ScanMode::Verification,
+            &mut verified_state,
+            &mut self.budget,
+            false,
+        )?;
+        verified_state.validate_verification()?;
+        self.budget.output_bytes = candidate.len();
+        self.budget.retained_bytes = candidate.len();
+        let report = subtract_report(self.budget.report(), before)?;
+        validate_execution_report(report, self.requirements)?;
+        Ok(RewriteOutput {
+            bytes: candidate,
+            report,
+        })
+    }
+}
+
 impl RewriteOutput {
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
@@ -793,6 +926,9 @@ fn zeroed_vec<T: Default + Clone>(
         output
             .try_reserve_exact(amount)
             .map_err(|_error| RewriteError::allocation(amount))?;
+        if size_of::<T>() != 0 && output.capacity() != amount {
+            return Err(RewriteError::allocation(amount));
+        }
         budget.allocation(
             amount
                 .checked_mul(size_of::<T>())
@@ -1324,15 +1460,75 @@ mod tests {
             ),
         ];
         for (limited, label) in limits {
-            let allocations_before = OUTPUT_ALLOCATIONS.load(Ordering::Relaxed);
+            let allocations_before = output_allocations();
             let error = rewrite_package_metadata(&source, batch, limited).unwrap_err();
             assert!(error.resource_limit().is_some(), "missing {label} limit");
             assert_eq!(
-                OUTPUT_ALLOCATIONS.load(Ordering::Relaxed),
+                output_allocations(),
                 allocations_before,
                 "{label} limit reached the output allocation"
             );
         }
+    }
+
+    #[test]
+    fn prepared_rewrite_is_output_free_and_execute_limits_precede_candidate() {
+        let source = metadata(
+            10,
+            &[
+                component(1, "a.iwa", None, &[], &[]),
+                component(2, "b.iwa", None, &[], &[]),
+            ],
+            &[],
+        );
+        let additions = [ObjectUuidAddition::new(
+            ComponentSelector::new(1, "a.iwa"),
+            11,
+            UuidBits::new(5, 6),
+        )];
+        let batch = Batch::new(10, 11, &additions, &[]);
+        let allocations_before = output_allocations();
+        let prepared = prepare_package_metadata_rewrite(&source, batch, options(&source)).unwrap();
+        assert_eq!(prepared.prepare_report().output_bytes(), 0);
+        assert_eq!(prepared.prepare_report().retained_bytes(), 0);
+        assert_eq!(output_allocations(), allocations_before);
+        let requirements = prepared.execution_requirements();
+        assert!(requirements.output_bytes() != 0);
+        assert!(requirements.allocations() != 0);
+
+        let mut limited = requirements.exact_limits();
+        limited.max_output_bytes -= 1;
+        assert!(
+            prepared
+                .execute(limited)
+                .unwrap_err()
+                .resource_limit()
+                .is_some()
+        );
+        assert_eq!(output_allocations(), allocations_before);
+
+        for axis in 0..4 {
+            let prepared =
+                prepare_package_metadata_rewrite(&source, batch, options(&source)).unwrap();
+            let requirements = prepared.execution_requirements();
+            let mut limited = requirements.exact_limits();
+            match axis {
+                0 => limited.max_allocations -= 1,
+                1 => limited.max_retained_bytes -= 1,
+                2 => limited.max_scratch_bytes -= 1,
+                _ => limited.max_work_bytes -= 1,
+            }
+            let before = output_allocations();
+            assert!(prepared.execute(limited).is_err());
+            assert_eq!(output_allocations(), before);
+        }
+
+        let prepared = prepare_package_metadata_rewrite(&source, batch, options(&source)).unwrap();
+        let requirements = prepared.execution_requirements();
+        let output = prepared.execute(requirements.exact_limits()).unwrap();
+        assert_eq!(output.report().output_bytes(), output.bytes().len());
+        assert_eq!(output.report().retained_bytes(), output.bytes().len());
+        assert_eq!(output.report().allocations(), requirements.allocations());
     }
 
     #[derive(Default)]
@@ -1672,13 +1868,13 @@ mod tests {
             report.references_scanned(),
             report.removals(),
         );
-        let allocations = OUTPUT_ALLOCATIONS.load(Ordering::Relaxed);
+        let allocations = output_allocations();
         let error = remove_package_metadata(&source, batch, limited).unwrap_err();
         assert!(matches!(
             error.resource_limit(),
             Some(RewriteLimit::OutputBytes { .. })
         ));
-        assert_eq!(OUTPUT_ALLOCATIONS.load(Ordering::Relaxed), allocations);
+        assert_eq!(output_allocations(), allocations);
 
         let work_limited = RewriteOptions::new(
             source.len(),
@@ -1835,6 +2031,20 @@ pub fn rewrite_package_metadata(
     batch: Batch<'_>,
     options: RewriteOptions,
 ) -> Result<RewriteOutput, RewriteError> {
+    let prepared = prepare_package_metadata_rewrite(source, batch, options)?;
+    let prepare_report = prepared.prepare_report();
+    let limits = prepared.execution_requirements().exact_limits();
+    let mut output = prepared.execute(limits)?;
+    output.report = add_reports(prepare_report, output.report)?;
+    Ok(output)
+}
+
+/// Validate and size one rewrite without allocating candidate output.
+pub fn prepare_package_metadata_rewrite<'source, 'batch>(
+    source: &'source [u8],
+    batch: Batch<'batch>,
+    options: RewriteOptions,
+) -> Result<PreparedPackageMetadataRewrite<'source, 'batch>, RewriteError> {
     validate_batch(batch, options)?;
     let mut budget = Budget::new(source, batch, options)?;
 
@@ -1848,39 +2058,169 @@ pub fn rewrite_package_metadata(
         true,
     )?;
     source_state.validate_selectors()?;
+    drop(source_state);
 
     let output_size = exact_output_size(source, batch, &mut budget)?;
     budget.output_size(output_size)?;
+    let before_execution = budget.report();
     precharge_rewrite_and_verification(source, batch, output_size, &mut budget)?;
-    let mut candidate = Vec::new();
-    #[cfg(test)]
-    OUTPUT_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-    candidate
-        .try_reserve_exact(output_size)
-        .map_err(|_error| RewriteError::allocation(output_size))?;
-    budget.allocation(0)?;
-    rewrite_into(source, batch, &mut candidate, &mut budget)?;
-    if candidate.len() != output_size {
+    let predicted = subtract_report(budget.report(), before_execution)?;
+    let verification_scratch = scan_state_scratch_bytes(batch)?;
+    let verification_allocations = scan_state_allocations(batch)?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes: output_size,
+        fields: predicted.fields,
+        work_bytes: predicted.work_bytes,
+        components: predicted.components_scanned,
+        references: predicted.references_scanned,
+        allocations: verification_allocations
+            .checked_add(1)
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+        retained_bytes: output_size,
+        scratch_bytes: output_size
+            .checked_add(verification_scratch)
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+    };
+    let prepare_report = budget.report();
+    Ok(PreparedPackageMetadataRewrite {
+        source,
+        batch,
+        budget,
+        prepare_report,
+        requirements,
+        output_size,
+    })
+}
+
+fn scan_state_scratch_bytes(batch: Batch<'_>) -> Result<usize, RewriteError> {
+    selector_count(batch)
+        .checked_mul(size_of::<SelectorCount>())
+        .and_then(|bytes| {
+            batch
+                .object_uuids
+                .len()
+                .checked_add(batch.external_references.len())
+                .and_then(|matches| matches.checked_mul(size_of::<usize>()))
+                .and_then(|matches| bytes.checked_add(matches))
+        })
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))
+}
+
+fn scan_state_allocations(batch: Batch<'_>) -> Result<usize, RewriteError> {
+    [
+        selector_count(batch),
+        batch.object_uuids.len(),
+        batch.external_references.len(),
+    ]
+    .into_iter()
+    .try_fold(0usize, |total, amount| {
+        total
+            .checked_add(usize::from(amount != 0))
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))
+    })
+}
+
+fn preflight_execution(
+    requirements: RewriteExecutionRequirements,
+    limits: RewriteExecutionLimits,
+) -> Result<(), RewriteError> {
+    macro_rules! limited {
+        ($field:ident, $maximum:ident, $variant:ident) => {
+            if requirements.$field > limits.$maximum {
+                return Err(RewriteError::limited(RewriteLimit::$variant {
+                    observed: requirements.$field,
+                    maximum: limits.$maximum,
+                }));
+            }
+        };
+    }
+    limited!(output_bytes, max_output_bytes, OutputBytes);
+    limited!(fields, max_fields, Fields);
+    limited!(work_bytes, max_work_bytes, Work);
+    limited!(components, max_components, Components);
+    limited!(references, max_references, References);
+    if requirements.allocations > limits.max_allocations
+        || requirements.retained_bytes > limits.max_retained_bytes
+        || requirements.scratch_bytes > limits.max_scratch_bytes
+    {
+        return Err(RewriteError::allocation(
+            requirements.retained_bytes.max(requirements.scratch_bytes),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_execution_report(
+    report: RewriteReport,
+    requirements: RewriteExecutionRequirements,
+) -> Result<(), RewriteError> {
+    if report.output_bytes != requirements.output_bytes
+        || report.fields != requirements.fields
+        || report.work_bytes != requirements.work_bytes
+        || report.components_scanned != requirements.components
+        || report.references_scanned != requirements.references
+        || report.allocations != requirements.allocations
+        || report.retained_bytes != requirements.retained_bytes
+        || report.scratch_bytes > requirements.scratch_bytes
+    {
         return Err(RewriteError::invalid(InvalidReason::Verification));
     }
+    Ok(())
+}
 
-    budget.source_phase = false;
-    let mut verified_state = ScanState::new(batch, &mut budget)?;
-    scan_metadata(
-        &candidate,
-        batch,
-        ScanMode::Verification,
-        &mut verified_state,
-        &mut budget,
-        false,
-    )?;
-    verified_state.validate_verification()?;
-    budget.output_bytes = candidate.len();
-    budget.retained_bytes = candidate.len();
-    let report = budget.report();
-    Ok(RewriteOutput {
-        bytes: candidate,
-        report,
+fn subtract_report(
+    total: RewriteReport,
+    baseline: RewriteReport,
+) -> Result<RewriteReport, RewriteError> {
+    macro_rules! sub {
+        ($field:ident) => {
+            total
+                .$field
+                .checked_sub(baseline.$field)
+                .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?
+        };
+    }
+    Ok(RewriteReport {
+        input_bytes: 0,
+        output_bytes: sub!(output_bytes),
+        fields: sub!(fields),
+        work_bytes: sub!(work_bytes),
+        max_depth: total.max_depth,
+        components_scanned: sub!(components_scanned),
+        components_changed: sub!(components_changed),
+        references_scanned: sub!(references_scanned),
+        source_references_scanned: sub!(source_references_scanned),
+        additions: 0,
+        removals: 0,
+        allocations: sub!(allocations),
+        retained_bytes: sub!(retained_bytes),
+        scratch_bytes: sub!(scratch_bytes),
+    })
+}
+
+fn add_reports(left: RewriteReport, right: RewriteReport) -> Result<RewriteReport, RewriteError> {
+    macro_rules! add {
+        ($field:ident) => {
+            left.$field
+                .checked_add(right.$field)
+                .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?
+        };
+    }
+    Ok(RewriteReport {
+        input_bytes: left.input_bytes.max(right.input_bytes),
+        output_bytes: add!(output_bytes),
+        fields: add!(fields),
+        work_bytes: add!(work_bytes),
+        max_depth: left.max_depth.max(right.max_depth),
+        components_scanned: add!(components_scanned),
+        components_changed: add!(components_changed),
+        references_scanned: add!(references_scanned),
+        source_references_scanned: add!(source_references_scanned),
+        additions: left.additions.max(right.additions),
+        removals: left.removals.max(right.removals),
+        allocations: add!(allocations),
+        retained_bytes: add!(retained_bytes),
+        scratch_bytes: add!(scratch_bytes),
     })
 }
 
@@ -1995,7 +2335,7 @@ pub fn remove_package_metadata(
 
     let mut candidate = Vec::new();
     #[cfg(test)]
-    OUTPUT_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+    record_output_allocation();
     candidate
         .try_reserve_exact(output_size)
         .map_err(|_error| RewriteError::allocation(output_size))?;

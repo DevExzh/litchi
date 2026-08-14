@@ -634,12 +634,10 @@ impl IWorkPackage {
     #[cfg(test)]
     fn entry_mut(&mut self, name: &str) -> Option<&mut Vec<u8>> {
         let name = normalize_entry_name(name);
-        if self.entry_position(name).is_none() {
-            return None;
-        }
+        self.entry_position(name)?;
         self.mark_mutated();
         let state = Arc::make_mut(&mut self.state);
-        Some(state.entry_data_mut(name)?)
+        state.entry_data_mut(name)
     }
 
     /// Create or replace a package member.

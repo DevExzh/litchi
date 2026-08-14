@@ -1134,25 +1134,30 @@ fn message_info_matches_reference_transition(
         && source.object_references == transition.source()
         && candidate.object_references == transition.target()
         && source.field_infos.len() == candidate.field_infos.len()
-        && transition.fields().len() == source.field_infos.len()
-        && source
-            .field_infos
-            .iter()
-            .zip(&candidate.field_infos)
-            .zip(transition.fields())
-            .enumerate()
-            .all(|(index, ((left, right), expected))| {
-                expected.field_index() == index
-                    && left.object_references == expected.source()
-                    && right.object_references == expected.target()
-                    && left.data_references == right.data_references
-                    && left.path == right.path
-                    && left.r#type == right.r#type
-                    && left.unknown_field_rule == right.unknown_field_rule
-                    && left.known_field_rule == right.known_field_rule
-                    && left.known_field_version == right.known_field_version
-                    && left.known_field_feature_identifier == right.known_field_feature_identifier
-            })
+        && if transition.fields().len() == 0 {
+            source.field_infos == candidate.field_infos
+        } else {
+            transition.fields().len() == source.field_infos.len()
+                && source
+                    .field_infos
+                    .iter()
+                    .zip(&candidate.field_infos)
+                    .zip(transition.fields())
+                    .enumerate()
+                    .all(|(index, ((left, right), expected))| {
+                        expected.field_index() == index
+                            && left.object_references == expected.source()
+                            && right.object_references == expected.target()
+                            && left.data_references == right.data_references
+                            && left.path == right.path
+                            && left.r#type == right.r#type
+                            && left.unknown_field_rule == right.unknown_field_rule
+                            && left.known_field_rule == right.known_field_rule
+                            && left.known_field_version == right.known_field_version
+                            && left.known_field_feature_identifier
+                                == right.known_field_feature_identifier
+                    })
+        }
 }
 
 fn equal_bytes(
@@ -1509,6 +1514,43 @@ mod tests {
         )
         .with_reference_transition(reference_transition(&evidence))];
         verify_archives(source, target, &messages).expect("exact reference transition");
+    }
+
+    #[test]
+    fn aggregate_reference_transition_preserves_unmentioned_field_infos_exactly() {
+        let mut source_object = object(2, 20, b"before");
+        let mut field = FieldInfo::new(vec![11]);
+        field.object_references.push(10);
+        source_object.archive_info.message_infos[0]
+            .field_infos
+            .push(field);
+        let source = Archive {
+            objects: vec![source_object],
+        };
+        let mut target = source.clone();
+        target.objects[0].messages[0].data = b"after".to_vec();
+        target.objects[0].archive_info.message_infos[0].length = 5;
+        target.objects[0].archive_info.message_infos[0]
+            .object_references
+            .push(77);
+        let evidence = reference_evidence(
+            vec![77],
+            ReferenceSpan::new(0, 0),
+            ReferenceSpan::new(0, 1),
+            vec![],
+        );
+        let messages = [DirectionalMessage::new(
+            Some(location(0)),
+            Some(location(0)),
+            2,
+            20,
+            DirectionalChange::Replace,
+            Some(b"after"),
+        )
+        .with_reference_transition(reference_transition(&evidence))];
+
+        verify_archives(source, target, &messages)
+            .expect("aggregate transition preserves unrelated field metadata");
     }
 
     #[test]

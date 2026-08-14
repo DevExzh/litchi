@@ -1214,7 +1214,7 @@ mod tests {
         let table_data = TableDataList {
             list_type: tst::table_data_list::ListType::RichTextPayload as i32,
             entries: Vec::new(),
-            segments: vec![repeated.clone(), repeated],
+            segments: vec![repeated, repeated],
             ..Default::default()
         };
         let object = ArchiveObject::new(

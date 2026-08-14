@@ -2207,3 +2207,35 @@ pass. Boundary units pass 243/243 and both live retirement/API audits report
 zero findings. Host all-target/all-feature check and no-run, retained-axis 2/2,
 Pages-layout 1/1, generated-roundtrip 1/1, scoped boundary 6/6, and strict
 library Clippy pass; broad host all-target Clippy retains nine unrelated lints.
+
+## 2026-08-14 Selector-first formula-cell semantics
+
+The public authoring surface is
+`litchi_numbers::formula::{Expression, CachedValue, CellReference,
+AxisReference, BinaryOperator, Table, Error, LimitKind}` together with
+`table::cells::Input::{formula, formula_cached}`,
+`Change::{set_formula, set_formula_a1, set_formula_cached,
+set_formula_cached_a1}`, and the corresponding `Edit` methods. `Edit` also
+provides `formula_table` for an opaque handle bound to the same immutable
+source. A1 strings select destination cells only; formula bodies are semantic
+values, never unparsed formula text.
+
+Expressions support finite number, bounded text, and Boolean literals; mixed
+absolute/relative cell endpoints; local and distinct-owner cell, rectangular
+range, whole-row, and whole-column references; unary negate and percent; all
+arithmetic, concatenation, and comparison `BinaryOperator` variants; and the
+checked functions `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `COUNTA`, `AND`,
+`OR`, `IF`, `IFERROR`, `NOT`, `ABS`, and `ROUND`. Function arity is checked.
+One expression is limited to 1 MiB owned UTF-8, 65,536 nodes, depth 64, and 256
+arguments per call. Non-finite numbers and reversed or out-of-bounds ranges are
+rejected before package planning.
+
+Typed caches support finite Number, bounded Text, Boolean, finite Apple-epoch
+Date, and finite Duration. A supplied cache is only a claim: the independent
+strict evaluator recompiles the authored AST, exact-compares dependency facts,
+rejects cycles and poisoned direct scalar reads, applies the complete final
+scalar overlay, and requires the typed result to agree. Aggregate reads ignore
+Text and Boolean where Numbers semantics require it; direct Text remains a
+typed formula error. Arrays, spills, deferred or volatile state, pivots, raw
+formula identities, ambiguous owners, and unsupported native host shapes fail
+closed rather than entering the public model.

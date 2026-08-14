@@ -146,6 +146,19 @@ impl std::error::Error for Error {}
 /// Result type for BNC decoding and mutation.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Allocation-free exact output requirement for one BNC mutation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RewritePlan {
+    output_len: Option<usize>,
+}
+
+impl RewritePlan {
+    #[must_use]
+    pub const fn output_len(self) -> Option<usize> {
+        self.output_len
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CellDataFormatKind {
     NumberOrPercentage,
@@ -189,6 +202,23 @@ struct EncodedScalar {
     flag: u32,
     bytes: [u8; 16],
     length: usize,
+}
+
+fn encoded_cache_matches(value: ScalarValue, encoded: &EncodedScalar) -> Result<bool> {
+    let decoded = cached_scalar_from(
+        encoded.cell_type,
+        decode_scalar_fields(|flag| {
+            (flag == encoded.flag).then_some(&encoded.bytes[..encoded.length])
+        })?,
+    );
+    Ok(match value {
+        ScalarValue::String(_) => encoded.cell_type == CELL_TYPE_TEXT,
+        ScalarValue::Number(value) => decoded == Some(CachedScalar::Number(value)),
+        ScalarValue::Boolean(value) => decoded == Some(CachedScalar::Boolean(value)),
+        ScalarValue::Date(value) => decoded == Some(CachedScalar::Date(value)),
+        ScalarValue::Duration(value) => decoded == Some(CachedScalar::Duration(value)),
+        ScalarValue::RichText(_) => false,
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -904,6 +934,11 @@ impl BncCell {
             .map_err(|_error| Error::Allocation {
                 requested: output_len,
             })?;
+        if output.capacity() != output_len {
+            return Err(Error::Allocation {
+                requested: output_len,
+            });
+        }
         output.extend_from_slice(&self.prefix);
         output.extend_from_slice(&flags.to_le_bytes());
         for (flag, _) in FIELD_LAYOUT {
@@ -941,6 +976,129 @@ impl BncCell {
 }
 
 impl<'a> BncCellView<'a> {
+    fn selected_fields_length(
+        &self,
+        removed_flags: u32,
+        replacements: &[(u32, usize)],
+    ) -> Result<usize> {
+        let retained_flags = self.flags & !removed_flags;
+        let mut output_flags = retained_flags;
+        for (flag, length) in replacements {
+            if output_flags & flag != 0
+                || replacements
+                    .iter()
+                    .filter(|(candidate, _)| candidate == flag)
+                    .count()
+                    != 1
+                || FIELD_LAYOUT
+                    .iter()
+                    .find(|(candidate, _)| candidate == flag)
+                    .is_none_or(|(_, size)| size != length)
+            {
+                return Err(Error::ParseError(
+                    "Numbers BNC replacement fields are invalid".to_owned(),
+                ));
+            }
+            output_flags |= flag;
+        }
+        let fields = FIELD_LAYOUT
+            .iter()
+            .try_fold(0usize, |total, (flag, size)| {
+                if output_flags & flag == 0 {
+                    Ok(total)
+                } else {
+                    total.checked_add(*size).ok_or_else(|| {
+                        Error::ParseError("Numbers BNC encoded length overflow".to_owned())
+                    })
+                }
+            })?;
+        BNC_HEADER_LEN
+            .checked_add(fields)
+            .and_then(|v| v.checked_add(self.tail.len()))
+            .ok_or_else(|| Error::ParseError("Numbers BNC encoded length overflow".to_owned()))
+    }
+
+    /// Plan one scalar rewrite without allocating output.
+    pub fn plan_scalar_rewrite(&self, value: ScalarValue) -> Result<RewritePlan> {
+        let encoded = self.encode_scalar(value)?;
+        Ok(RewritePlan {
+            output_len: Some(
+                self.selected_fields_length(VALUE_FLAGS, &[(encoded.flag, encoded.length)])?,
+            ),
+        })
+    }
+
+    /// Plan one formula rewrite without allocating output.
+    pub fn plan_formula_rewrite(
+        &self,
+        identifier: u32,
+        cache: Option<ScalarValue>,
+    ) -> Result<RewritePlan> {
+        if identifier == 0 {
+            return Err(Error::InvalidFormat(
+                "Numbers formula key is invalid".to_owned(),
+            ));
+        }
+        let mut replacements = [(FORMULA_FLAG, 4usize), (0, 0)];
+        let count = if let Some(cache) = cache {
+            let encoded = self.encode_scalar(cache)?;
+            replacements[1] = (encoded.flag, encoded.length);
+            2
+        } else {
+            1
+        };
+        Ok(RewritePlan {
+            output_len: Some(self.selected_fields_length(VALUE_FLAGS, &replacements[..count])?),
+        })
+    }
+
+    /// Plan a supported formula cache-only rewrite without allocating output.
+    pub fn plan_formula_cache_rewrite(&self, cache: CachedScalar) -> Result<RewritePlan> {
+        if !matches!(self.stored_value(), StoredValue::Formula(_)) {
+            return Err(Error::InvalidFormat(
+                "Numbers formula cache update targeted a cell without a formula".to_owned(),
+            ));
+        }
+        let scalar = match cache {
+            CachedScalar::Number(value) => ScalarValue::Number(value),
+            CachedScalar::Boolean(value) => ScalarValue::Boolean(value),
+            CachedScalar::Date(_) | CachedScalar::Duration(_) | CachedScalar::Unsupported(_) => {
+                return Err(Error::InvalidFormat(
+                    "Numbers formula cache update supports only number and Boolean values"
+                        .to_owned(),
+                ));
+            },
+        };
+        let encoded = self.encode_scalar(scalar)?;
+        Ok(RewritePlan {
+            output_len: Some(
+                self.selected_fields_length(
+                    FORMULA_CACHE_FLAGS,
+                    &[(encoded.flag, encoded.length)],
+                )?,
+            ),
+        })
+    }
+
+    /// Plan a clear without allocating output.
+    pub fn plan_clear_value(&self, retain_empty: bool) -> Result<RewritePlan> {
+        let retained_flags = self.flags & !VALUE_FLAGS;
+        let minimal = retained_flags == 0
+            && self.tail.is_empty()
+            && self.prefix[0] == BNC_VERSION
+            && self.prefix[2..].iter().all(|byte| *byte == 0);
+        if minimal && !retain_empty {
+            return Ok(RewritePlan { output_len: None });
+        }
+        if minimal {
+            return Ok(RewritePlan {
+                output_len: Some(BNC_HEADER_LEN),
+            });
+        }
+        Ok(RewritePlan {
+            output_len: Some(self.selected_fields_length(VALUE_FLAGS, &[])?),
+        })
+    }
     /// Parses the value-bearing portion of a BNC cell without allocating.
     ///
     /// # Errors
@@ -1008,6 +1166,14 @@ impl<'a> BncCellView<'a> {
     #[must_use]
     pub fn cached_scalar(&self) -> Option<CachedScalar> {
         self.cached_scalar
+    }
+
+    /// Return the interned string key used as a formula display cache.
+    #[must_use]
+    pub fn formula_text_key(&self) -> Option<u32> {
+        matches!(self.stored_value(), StoredValue::Formula(_))
+            .then(|| self.u32_field(STRING_FLAG))
+            .flatten()
     }
 
     /// Return whether applying one scalar replacement would leave the public
@@ -1113,6 +1279,13 @@ impl<'a> BncCellView<'a> {
             && self.cached_scalar == Some(expected)
     }
 
+    /// Return whether this cell carries exactly the requested formula key and
+    /// typed cached scalar, including finite floating-point bit equality.
+    pub fn formula_value_equals(&self, identifier: u32, expected: ScalarValue) -> Result<bool> {
+        Ok(self.stored_value() == StoredValue::Formula(identifier)
+            && self.formula_cache_matches_scalar(expected)?)
+    }
+
     /// Replace only a formula cell's supported display-cache fields.
     ///
     /// The formula and formula-error identifiers, format/style/comment fields,
@@ -1165,6 +1338,85 @@ impl<'a> BncCellView<'a> {
             Some((encoded.flag, &encoded.bytes[..encoded.length])),
             max_output_bytes,
         )
+    }
+
+    /// Replace the value fields with one typed cache and attach a formula key
+    /// in the same bounded raw rewrite.
+    ///
+    /// The encoded cache is independently checked for exact kind and finite
+    /// bits before any result is returned. In particular, a duration-formatted
+    /// source cannot coerce a requested number into a duration cache.
+    pub fn rewrite_formula_with_limit(
+        &self,
+        identifier: u32,
+        cache: ScalarValue,
+        max_output_bytes: usize,
+    ) -> Result<Vec<u8>> {
+        if identifier == 0 || matches!(cache, ScalarValue::RichText(_)) {
+            return Err(Error::InvalidFormat(
+                "Numbers formula key/cache is invalid".to_owned(),
+            ));
+        }
+        let encoded = self.encode_scalar(cache)?;
+        if !encoded_cache_matches(cache, &encoded)? {
+            return Err(Error::InvalidFormat(
+                "Numbers formula cache encoding changed the requested kind".to_owned(),
+            ));
+        }
+        let formula = identifier.to_le_bytes();
+        let replacements = [
+            (encoded.flag, &encoded.bytes[..encoded.length]),
+            (FORMULA_FLAG, formula.as_slice()),
+        ];
+        let output = self.rewrite_selected_fields_many(
+            encoded.cell_type,
+            VALUE_FLAGS,
+            &replacements,
+            max_output_bytes,
+        )?;
+        let view = BncCellView::parse(&output)?;
+        if view.stored_value() != StoredValue::Formula(identifier)
+            || !view.formula_cache_matches_scalar(cache)?
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers formula cache readback differs from the request".to_owned(),
+            ));
+        }
+        Ok(output)
+    }
+
+    /// Replace all value fields with a formula reference and no display cache.
+    pub fn rewrite_formula_without_cache_with_limit(
+        &self,
+        identifier: u32,
+        max_output_bytes: usize,
+    ) -> Result<Vec<u8>> {
+        if identifier == 0 {
+            return Err(Error::InvalidFormat(
+                "Numbers formula key is invalid".to_owned(),
+            ));
+        }
+        let formula = identifier.to_le_bytes();
+        let output = self.rewrite_selected_fields_many(
+            CELL_TYPE_EMPTY,
+            VALUE_FLAGS,
+            &[(FORMULA_FLAG, formula.as_slice())],
+            max_output_bytes,
+        )?;
+        let view = BncCellView::parse(&output)?;
+        if view.stored_value() != StoredValue::Formula(identifier) || view.cached_scalar().is_some()
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers formula readback differs from the request".to_owned(),
+            ));
+        }
+        Ok(output)
+    }
+
+    /// Return whether the formula key and typed cache exactly match.
+    pub fn formula_and_cache_equal(&self, identifier: u32, cache: ScalarValue) -> Result<bool> {
+        Ok(self.stored_value() == StoredValue::Formula(identifier)
+            && self.formula_cache_matches_scalar(cache)?)
     }
 
     /// Returns the native formula-error table identifier when present.
@@ -1260,16 +1512,54 @@ impl<'a> BncCellView<'a> {
         replacement: Option<(u32, &[u8])>,
         max_output_bytes: usize,
     ) -> Result<Vec<u8>> {
+        match replacement {
+            Some(replacement) => self.rewrite_selected_fields_many(
+                cell_type,
+                removed_flags,
+                &[replacement],
+                max_output_bytes,
+            ),
+            None => {
+                self.rewrite_selected_fields_many(cell_type, removed_flags, &[], max_output_bytes)
+            },
+        }
+    }
+
+    fn rewrite_selected_fields_many(
+        &self,
+        cell_type: u8,
+        removed_flags: u32,
+        replacements: &[(u32, &[u8])],
+        max_output_bytes: usize,
+    ) -> Result<Vec<u8>> {
         let retained_flags = self.flags & !removed_flags;
-        let output_flags =
-            replacement.map_or(retained_flags, |(flag, _bytes)| retained_flags | flag);
+        let mut output_flags = retained_flags;
+        for (flag, bytes) in replacements {
+            if output_flags & flag != 0
+                || replacements
+                    .iter()
+                    .filter(|(candidate, _)| candidate == flag)
+                    .count()
+                    != 1
+                || FIELD_LAYOUT
+                    .iter()
+                    .find(|(candidate, _)| candidate == flag)
+                    .is_none_or(|(_, size)| *size != bytes.len())
+            {
+                return Err(Error::ParseError(
+                    "Numbers BNC replacement fields are invalid".to_owned(),
+                ));
+            }
+            output_flags |= flag;
+        }
         let mut output_len = BNC_HEADER_LEN;
         for (flag, size) in FIELD_LAYOUT {
             if output_flags & flag == 0 {
                 continue;
             }
-            let field_len = replacement
-                .filter(|(replacement_flag, _bytes)| replacement_flag == flag)
+            let field_len = replacements
+                .iter()
+                .find(|(replacement_flag, _bytes)| replacement_flag == flag)
                 .map_or(*size, |(_replacement_flag, bytes)| bytes.len());
             if field_len != *size {
                 return Err(Error::ParseError(
@@ -1291,12 +1581,18 @@ impl<'a> BncCellView<'a> {
             .map_err(|_error| Error::Allocation {
                 requested: output_len,
             })?;
+        if output.capacity() != output_len {
+            return Err(Error::Allocation {
+                requested: output_len,
+            });
+        }
         output.extend_from_slice(self.prefix);
         output[1] = cell_type;
         output.extend_from_slice(&output_flags.to_le_bytes());
         for (flag, _size) in FIELD_LAYOUT {
-            if let Some((_replacement_flag, bytes)) =
-                replacement.filter(|(replacement_flag, _bytes)| replacement_flag == flag)
+            if let Some((_replacement_flag, bytes)) = replacements
+                .iter()
+                .find(|(replacement_flag, _bytes)| replacement_flag == flag)
             {
                 output.extend_from_slice(bytes);
             } else if retained_flags & flag != 0 {
@@ -1312,6 +1608,21 @@ impl<'a> BncCellView<'a> {
             ));
         }
         Ok(output)
+    }
+
+    fn formula_cache_matches_scalar(&self, expected: ScalarValue) -> Result<bool> {
+        Ok(match expected {
+            ScalarValue::String(identifier) => {
+                self.prefix[1] == CELL_TYPE_TEXT && self.u32_field(STRING_FLAG) == Some(identifier)
+            },
+            ScalarValue::Number(value) => self.cached_scalar == Some(CachedScalar::Number(value)),
+            ScalarValue::Boolean(value) => self.cached_scalar == Some(CachedScalar::Boolean(value)),
+            ScalarValue::Date(value) => self.cached_scalar == Some(CachedScalar::Date(value)),
+            ScalarValue::Duration(value) => {
+                self.cached_scalar == Some(CachedScalar::Duration(value))
+            },
+            ScalarValue::RichText(_) => false,
+        })
     }
 
     fn field(&self, requested_flag: u32) -> Option<&'a [u8]> {
@@ -1832,9 +2143,12 @@ mod tests {
         let expected = CachedScalar::Number(finite(324.0));
         assert!(!view.formula_cache_equals(expected));
 
+        let plan = view.plan_formula_cache_rewrite(expected).unwrap();
+
         let rewritten = view
             .rewrite_formula_cache_with_limit(expected, usize::MAX)
             .unwrap();
+        assert_eq!(plan.output_len(), Some(rewritten.len()));
         let reparsed = BncCellView::parse(&rewritten).unwrap();
         assert!(reparsed.formula_cache_equals(expected));
         assert_eq!(reparsed.stored_value(), StoredValue::Formula(17));
@@ -1866,6 +2180,84 @@ mod tests {
         assert_eq!(boolean.stored_value(), StoredValue::Formula(17));
         assert_eq!(boolean.formula_error_identifier(), Some(23));
         assert_eq!(boolean.comment_identifier(), Some(9));
+    }
+
+    #[test]
+    fn raw_formula_rewrite_preserves_unknown_bytes_and_all_typed_caches() {
+        let mut cell = BncCell::minimal();
+        cell.prefix[2] = 0x6a;
+        cell.set_comment_identifier(Some(9));
+        cell.fields.insert(STYLE_FLAG, 5u32.to_le_bytes().to_vec());
+        cell.tail.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
+        let source = cell.encode();
+
+        for cache in [
+            ScalarValue::String(27),
+            ScalarValue::Number(finite(-0.0)),
+            ScalarValue::Boolean(true),
+            ScalarValue::Date(finite(789_332_889.25)),
+            ScalarValue::Duration(finite(3_723.5)),
+        ] {
+            let source_view = BncCellView::parse(&source).unwrap();
+            let plan = source_view.plan_formula_rewrite(41, Some(cache)).unwrap();
+            let rewritten = source_view
+                .rewrite_formula_with_limit(41, cache, usize::MAX)
+                .unwrap();
+            assert_eq!(plan.output_len(), Some(rewritten.len()));
+            let view = BncCellView::parse(&rewritten).unwrap();
+            assert!(view.formula_and_cache_equal(41, cache).unwrap());
+            assert_eq!(view.comment_identifier(), Some(9));
+
+            let before = BncCell::parse(&source).unwrap();
+            let after = BncCell::parse(&rewritten).unwrap();
+            assert_eq!(before.prefix[0], after.prefix[0]);
+            assert_eq!(&before.prefix[2..], &after.prefix[2..]);
+            assert_eq!(before.tail, after.tail);
+            for (flag, bytes) in &before.fields {
+                if VALUE_FLAGS & flag == 0 {
+                    assert_eq!(after.fields.get(flag), Some(bytes));
+                }
+            }
+
+            assert!(matches!(
+                BncCellView::parse(&source)
+                    .unwrap()
+                    .rewrite_formula_with_limit(41, cache, rewritten.len() - 1),
+                Err(Error::OutputLimitExceeded { observed, maximum })
+                    if observed == rewritten.len() && maximum == rewritten.len() - 1
+            ));
+        }
+
+        let view = BncCellView::parse(&source).unwrap();
+        let plan = view.plan_formula_rewrite(41, None).unwrap();
+        let rewritten = view
+            .rewrite_formula_without_cache_with_limit(41, usize::MAX)
+            .unwrap();
+        assert_eq!(plan.output_len(), Some(rewritten.len()));
+        assert!(matches!(
+            view.rewrite_formula_without_cache_with_limit(41, rewritten.len() - 1),
+            Err(Error::OutputLimitExceeded { observed, maximum })
+                if observed == rewritten.len() && maximum == rewritten.len() - 1
+        ));
+    }
+
+    #[test]
+    fn raw_formula_number_refuses_duration_format_coercion() {
+        let mut duration = BncCell::minimal();
+        duration
+            .set_data_format_identifier(9, CellDataFormatKind::Duration, None)
+            .unwrap();
+        let source = duration.encode();
+        assert!(matches!(
+            BncCellView::parse(&source)
+                .unwrap()
+                .rewrite_formula_with_limit(41, ScalarValue::Number(finite(1.0)), usize::MAX),
+            Err(Error::InvalidFormat(_))
+        ));
+        assert_eq!(
+            BncCell::parse(&source).unwrap().stored_value(),
+            StoredValue::Empty
+        );
     }
 
     #[test]

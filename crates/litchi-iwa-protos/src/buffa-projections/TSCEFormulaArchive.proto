@@ -21,6 +21,7 @@ message ASTNodeArchive {
   optional uint32 function_num_args = 3;
   optional double number = 4;
   optional bool boolean = 5;
+  optional string string = 6;
   optional bool token_boolean = 10;
   optional bytes thunk_array = 14;
   optional bytes local_cell_reference = 15;
@@ -30,7 +31,11 @@ message ASTNodeArchive {
   optional bytes row = 27;
   optional bytes cross_table_extra = 28;
   optional bytes uid_coordinate = 30;
+  optional bytes sticky_bits = 33;
   optional bytes tract_list = 38;
+  optional bytes colon_tract = 40;
+  optional uint64 decimal_low = 42;
+  optional uint64 decimal_high = 43;
 }
 
 message LocalCellReferenceArchive {
@@ -48,4 +53,32 @@ message ColumnCoordinateArchive {
 message RowCoordinateArchive {
   required sint32 row = 1;
   optional bool absolute = 2 [default = false];
+}
+
+message CFUUIDArchive {
+  optional uint32 word0 = 2;
+  optional uint32 word1 = 3;
+  optional uint32 word2 = 4;
+  optional uint32 word3 = 5;
+}
+
+message CrossTableExtraArchive {
+  required bytes table_id = 1;
+}
+
+message StickyBitsArchive {
+  required bool begin_row_absolute = 1;
+  required bool begin_column_absolute = 2;
+  required bool end_row_absolute = 3;
+  required bool end_column_absolute = 4;
+}
+
+message RelativeRangeArchive {
+  required int32 begin = 1;
+  optional int32 end = 2;
+}
+
+message AbsoluteRangeArchive {
+  required uint32 begin = 1;
+  optional uint32 end = 2;
 }
