@@ -5,5 +5,6 @@ pub mod charts;
 pub mod embedded;
 pub mod forms;
 pub(crate) mod paragraph_move;
+pub mod paragraph_transfer;
 pub mod resource_gc;
 pub mod scripts;
