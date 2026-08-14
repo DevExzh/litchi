@@ -5,8 +5,12 @@
 //! metadata. A slide body is loaded when a selected [`SourceSlide`] is read.
 
 use std::io::Write;
+#[cfg(any(unix, windows))]
+use std::path::Path;
 use std::sync::Arc;
 
+#[cfg(any(unix, windows))]
+use litchi_core::FileSource;
 use litchi_core::{ExecutionContext, ExecutionError, ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
@@ -160,6 +164,11 @@ fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
             error => litchi_opc::OpcError::Execution(error),
         })
     })
+}
+
+#[cfg(any(unix, windows))]
+fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
+    Ok(Arc::new(FileSource::open(path)?))
 }
 
 /// Read-only PPTX catalog and selected-slide access over a positional source.
@@ -411,6 +420,150 @@ pub struct SourceBackedSlideBatchCommit {
 }
 
 impl SourceBackedPresentation {
+    /// Open a PPTX from a regular filesystem path without slurping its bytes.
+    ///
+    /// The path is adapted to the same immutable positional source used by
+    /// [`Self::from_read_at`]. The open file handle, rather than the pathname,
+    /// remains the source identity for the lifetime of this snapshot.
+    #[cfg(any(unix, windows))]
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_path_with_limits(path, ReadLimits::default())
+    }
+
+    /// Open a filesystem-backed PPTX with explicit OPC resource limits.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_read_at_with_limits(file_source(path)?, limits)
+    }
+
+    /// Open a filesystem-backed PPTX with an explicit finite payload cache.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_cache_limits(
+        path: impl AsRef<Path>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_read_at_with_cache_limits(file_source(path)?, cache_limits)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read and cache policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_cache_limits(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read and execution
+    /// policies while retaining the default finite source cache.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read and execution
+    /// policies while retaining the default finite source cache.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read, cache, and
+    /// hierarchical execution policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_cache_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            file_source(path)?,
+            limits,
+            cache_limits,
+            context,
+        )
+    }
+
+    /// Open a PPTX from a regular filesystem path.
+    #[cfg(any(unix, windows))]
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_path(path)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit OPC resource limits.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_path_with_limits(path, limits)
+    }
+
+    /// Open a filesystem-backed PPTX with an explicit finite payload cache.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_cache_limits(
+        path: impl AsRef<Path>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_path_with_cache_limits(path, cache_limits)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read and cache policies.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits_and_cache_limits(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read and execution
+    /// policies while retaining the default finite source cache.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_path_with_execution_context(path, limits, context)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read and execution
+    /// policies while retaining the default finite source cache.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_path_with_limits_and_execution_context(path, limits, context)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read, cache, and
+    /// hierarchical execution policies.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits_and_cache_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_path_with_limits_and_cache_limits_and_execution_context(
+            path,
+            limits,
+            cache_limits,
+            context,
+        )
+    }
+
     /// Open an ordinary PPTX package from a caller-provided positional source.
     ///
     /// # Errors
@@ -559,6 +712,150 @@ impl SourceBackedPresentation {
 }
 
 impl SourceBackedPresentationEditor {
+    /// Open a PPTX from a regular filesystem path without slurping its bytes.
+    ///
+    /// The path is adapted to the same immutable positional source used by
+    /// [`Self::from_read_at`]. The open file handle remains the source
+    /// identity for the lifetime of this owning editor.
+    #[cfg(any(unix, windows))]
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_path_with_limits(path, ReadLimits::default())
+    }
+
+    /// Open a filesystem-backed PPTX with explicit OPC resource limits.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_read_at_with_limits(file_source(path)?, limits)
+    }
+
+    /// Open a filesystem-backed PPTX with an explicit finite payload cache.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_cache_limits(
+        path: impl AsRef<Path>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_read_at_with_cache_limits(file_source(path)?, cache_limits)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read and cache policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_cache_limits(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read and execution
+    /// policies while retaining the default finite source cache.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read and execution
+    /// policies while retaining the default finite source cache.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read, cache, and
+    /// hierarchical execution policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_cache_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            file_source(path)?,
+            limits,
+            cache_limits,
+            context,
+        )
+    }
+
+    /// Open a PPTX from a regular filesystem path.
+    #[cfg(any(unix, windows))]
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_path(path)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit OPC resource limits.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_path_with_limits(path, limits)
+    }
+
+    /// Open a filesystem-backed PPTX with an explicit finite payload cache.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_cache_limits(
+        path: impl AsRef<Path>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_path_with_cache_limits(path, cache_limits)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read and cache policies.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits_and_cache_limits(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read and execution
+    /// policies while retaining the default finite source cache.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_path_with_execution_context(path, limits, context)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read and execution
+    /// policies while retaining the default finite source cache.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_path_with_limits_and_execution_context(path, limits, context)
+    }
+
+    /// Open a filesystem-backed PPTX with explicit read, cache, and
+    /// hierarchical execution policies.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits_and_cache_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_path_with_limits_and_cache_limits_and_execution_context(
+            path,
+            limits,
+            cache_limits,
+            context,
+        )
+    }
+
     /// Open an ordinary PPTX source for a bounded one-slide edit.
     ///
     /// Opening validates the OPC catalog, presentation root, and slide graph
@@ -2069,6 +2366,8 @@ fn relationship_binding(relationship: &litchi_opc::Relationship) -> Relationship
 
 #[cfg(test)]
 mod tests {
+    #[cfg(any(unix, windows))]
+    use std::fs;
     use std::io;
     use std::num::{NonZeroU64, NonZeroUsize};
     use std::sync::Arc;
@@ -2080,6 +2379,8 @@ mod tests {
     };
     use litchi_opc::{PackURI, ReadLimits, ReadResource, SourceBackedPackage};
     use soapberry_zip::office::StreamingArchiveWriter;
+    #[cfg(any(unix, windows))]
+    use tempfile::NamedTempFile;
 
     use super::{SourceBackedPresentation, SourceBackedPresentationEditor, SourceImageTarget};
     use crate::Error;
@@ -2334,6 +2635,13 @@ mod tests {
         .unwrap();
         let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
         (budget, cancellation_source, context)
+    }
+
+    #[cfg(any(unix, windows))]
+    fn temporary_source(bytes: &[u8]) -> NamedTempFile {
+        let file = NamedTempFile::with_suffix(".pptx").unwrap();
+        fs::write(file.path(), bytes).unwrap();
+        file
     }
 
     fn source_backed_root_and_second_slide_bytes() -> (u64, u64) {
@@ -2992,5 +3300,307 @@ mod tests {
             }))
         ));
         assert_eq!(source.second_payload_reads.load(Ordering::SeqCst), 0);
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn filesystem_path_constructors_keep_the_source_positional() {
+        let archive = source_backed_pptx();
+        let file = temporary_source(&archive);
+        let cache = litchi_opc::SourceCacheLimits::new(archive.len(), 8).unwrap();
+
+        assert_eq!(
+            SourceBackedPresentation::from_path(file.path())
+                .unwrap()
+                .slide_count(),
+            2
+        );
+        assert_eq!(
+            SourceBackedPresentation::open(file.path())
+                .unwrap()
+                .slide_count(),
+            2
+        );
+        assert_eq!(
+            SourceBackedPresentation::from_path_with_limits(file.path(), ReadLimits::default())
+                .unwrap()
+                .slide_count(),
+            2
+        );
+        assert_eq!(
+            SourceBackedPresentation::from_path_with_cache_limits(file.path(), cache)
+                .unwrap()
+                .slide_count(),
+            2
+        );
+        assert_eq!(
+            SourceBackedPresentation::from_path_with_limits_and_cache_limits(
+                file.path(),
+                ReadLimits::default(),
+                cache,
+            )
+            .unwrap()
+            .slide_count(),
+            2
+        );
+        assert_eq!(
+            SourceBackedPresentation::open_with_limits_and_cache_limits(
+                file.path(),
+                ReadLimits::default(),
+                cache,
+            )
+            .unwrap()
+            .slide_count(),
+            2
+        );
+
+        let (_budget, _cancellation_source, context) = source_backed_context(u64::MAX);
+        assert_eq!(
+            SourceBackedPresentation::from_path_with_execution_context(
+                file.path(),
+                ReadLimits::default(),
+                context,
+            )
+            .unwrap()
+            .slide_count(),
+            2
+        );
+
+        let (_budget, _cancellation_source, context) = source_backed_context(u64::MAX);
+        assert_eq!(
+            SourceBackedPresentation::from_path_with_limits_and_execution_context(
+                file.path(),
+                ReadLimits::default(),
+                context,
+            )
+            .unwrap()
+            .slide_count(),
+            2
+        );
+
+        let (_budget, _cancellation_source, context) = source_backed_context(u64::MAX);
+        assert_eq!(
+            SourceBackedPresentation::open_with_limits_and_cache_limits_and_execution_context(
+                file.path(),
+                ReadLimits::default(),
+                cache,
+                context,
+            )
+            .unwrap()
+            .slide_count(),
+            2
+        );
+
+        assert_eq!(
+            SourceBackedPresentationEditor::from_path(file.path())
+                .unwrap()
+                .slide_count(),
+            2
+        );
+        assert_eq!(
+            SourceBackedPresentationEditor::open(file.path())
+                .unwrap()
+                .slide_count(),
+            2
+        );
+        assert_eq!(
+            SourceBackedPresentationEditor::from_path_with_limits_and_cache_limits(
+                file.path(),
+                ReadLimits::default(),
+                cache,
+            )
+            .unwrap()
+            .slide_count(),
+            2
+        );
+        let (_budget, _cancellation_source, context) = source_backed_context(u64::MAX);
+        assert_eq!(
+            SourceBackedPresentationEditor::open_with_limits_and_cache_limits_and_execution_context(
+                file.path(),
+                ReadLimits::default(),
+                cache,
+                context,
+            )
+            .unwrap()
+            .slide_count(),
+            2
+        );
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn filesystem_listing_keeps_slide_payloads_cold() {
+        let file = temporary_source(&source_backed_pptx());
+        let presentation = SourceBackedPresentation::from_path(file.path()).unwrap();
+        let opening = presentation.cache_diagnostics();
+        assert_eq!(opening.retained_entries, 1);
+
+        let slides = presentation.slides().collect::<Vec<_>>();
+        assert_eq!(slides.len(), 2);
+        assert_eq!(presentation.cache_diagnostics().retained_entries, 1);
+        assert_eq!(presentation.cache_diagnostics().successful_loads, 1);
+
+        assert_eq!(slides[0].text().unwrap(), "First slide");
+        let selected = presentation.cache_diagnostics();
+        assert_eq!(selected.retained_entries, 2);
+        assert_eq!(selected.successful_loads, 2);
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn filesystem_selected_image_loads_only_the_slide_and_media_closure() {
+        let file = temporary_source(&embedded_picture_pptx());
+        let presentation = SourceBackedPresentation::from_path(file.path()).unwrap();
+        let slide = presentation.slide(0).unwrap();
+        assert_eq!(presentation.cache_diagnostics().retained_entries, 1);
+
+        let images = slide.images().unwrap();
+        assert_eq!(images.len(), 1);
+        let after_inventory = presentation.cache_diagnostics();
+        assert_eq!(after_inventory.retained_entries, 2);
+        assert_eq!(after_inventory.successful_loads, 2);
+
+        let image = slide.read_image(0).unwrap();
+        assert!(image.bytes().starts_with(MEDIA_MARKER));
+        let after_read = presentation.cache_diagnostics();
+        assert_eq!(after_read.retained_entries, 3);
+        assert_eq!(after_read.successful_loads, 3);
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn filesystem_managed_cache_releases_after_presentation_drop() {
+        let archive = source_backed_pptx();
+        let file = temporary_source(&archive);
+        let (budget, _cancellation_source, context) = source_backed_context(u64::MAX);
+        let cache = litchi_opc::SourceCacheLimits::new(archive.len(), 8).unwrap();
+        let presentation =
+            SourceBackedPresentation::from_path_with_limits_and_cache_limits_and_execution_context(
+                file.path(),
+                ReadLimits::default(),
+                cache,
+                context,
+            )
+            .unwrap();
+        assert!(presentation.cache_diagnostics().budget_managed);
+        assert!(budget.used(Resource::Memory) > 0);
+        assert_eq!(
+            presentation.slide(0).unwrap().text().unwrap(),
+            "First slide"
+        );
+        assert!(budget.used(Resource::Memory) > 0);
+        drop(presentation);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn filesystem_editor_preserves_exact_noop_and_one_slide_overlay() {
+        let archive = source_backed_pptx();
+        let file = temporary_source(&archive);
+        let editor = SourceBackedPresentationEditor::from_path(file.path()).unwrap();
+        let mut noop = editor.edit_slide(0).unwrap();
+        assert!(!noop.clear_transition().unwrap());
+        let noop = noop.commit();
+        let mut exact = Vec::new();
+        editor
+            .publish_slide_commit_to_stream(&mut exact, &noop)
+            .unwrap();
+        assert_eq!(exact, archive);
+
+        let editor = SourceBackedPresentationEditor::open(file.path()).unwrap();
+        let mut edit = editor.edit_slide(0).unwrap();
+        assert!(
+            edit.set_transition(&crate::transition::Transition::new(
+                crate::transition::Kind::Fade { black: None }
+            ))
+            .unwrap()
+        );
+        let commit = edit.commit();
+        let mut output = Vec::new();
+        editor
+            .publish_slide_commit_to_stream(&mut output, &commit)
+            .unwrap();
+        assert_ne!(output, archive);
+
+        let source = litchi_opc::OpcPackage::from_bytes(&archive).unwrap();
+        let candidate = litchi_opc::OpcPackage::from_bytes(&output).unwrap();
+        for part in source.iter_parts() {
+            let counterpart = candidate.get_part(part.partname()).unwrap();
+            if part.partname().as_str() != "/ppt/slides/slide1.xml" {
+                assert_eq!(counterpart.blob(), part.blob(), "{}", part.partname());
+            }
+        }
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn filesystem_editor_reports_path_limits_and_version_conflicts() {
+        let directory = tempfile::tempdir().unwrap();
+        let missing = directory.path().join("missing.pptx");
+        assert!(matches!(
+            SourceBackedPresentation::from_path(&missing),
+            Err(Error::Io(error)) if error.kind() == io::ErrorKind::NotFound
+        ));
+        assert!(matches!(
+            SourceBackedPresentationEditor::from_path(directory.path()),
+            Err(Error::Io(error))
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::InvalidInput
+                        | io::ErrorKind::PermissionDenied
+                        | io::ErrorKind::IsADirectory
+                )
+        ));
+
+        let archive = source_backed_pptx();
+        let file = temporary_source(&archive);
+        let limits = ReadLimits::builder()
+            .max_part_bytes(1024)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            SourceBackedPresentation::from_path_with_limits(file.path(), limits),
+            Err(Error::Opc(litchi_opc::OpcError::ReadLimit { .. }))
+        ));
+
+        let editor = SourceBackedPresentationEditor::from_path(file.path()).unwrap();
+        let mut edit = editor.edit_slide(0).unwrap();
+        assert!(
+            edit.set_transition(&crate::transition::Transition::new(
+                crate::transition::Kind::Fade { black: None }
+            ))
+            .unwrap()
+        );
+        let commit = edit.commit();
+        let mut replacement = archive.clone();
+        replacement.extend_from_slice(b"replacement");
+        fs::write(file.path(), replacement).unwrap();
+        let mut output = Vec::new();
+        assert!(matches!(
+            editor.publish_slide_commit_to_stream(&mut output, &commit),
+            Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn filesystem_path_replacement_reports_source_change_without_retargeting() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("source.pptx");
+        let replacement = directory.path().join("replacement.pptx");
+        fs::write(&path, source_backed_pptx()).unwrap();
+        let presentation = SourceBackedPresentation::from_path(&path).unwrap();
+        let first_slide = presentation.slide(0).unwrap();
+        fs::write(&replacement, b"not a PPTX").unwrap();
+        fs::rename(&replacement, &path).unwrap();
+
+        assert!(matches!(
+            first_slide.text(),
+            Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+        ));
+        assert!(SourceBackedPresentation::from_path(&path).is_err());
     }
 }
