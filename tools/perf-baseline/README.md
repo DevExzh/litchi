@@ -3,7 +3,7 @@
 `litchi-perf-baseline` is an isolated, reproducible measurement tool for the
 ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
 public-API XLSX snapshot/edit/save flows, matched opt-in XLSX scalar-cell
-eager/source-backed publication controls, and opt-in DOC/XLS/PPT,
+eager/source-backed and managed source-backed publication controls, and opt-in DOC/XLS/PPT,
 DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows, including the opt-in RTF logical-tail
 append transaction, bounded RTF/XLS/DOCX/PPTX/ODF validation reports, and a
 source-backed DOCX section inventory. It creates every corpus in memory; it also exercises
@@ -11,9 +11,11 @@ source-backed XLSX catalog, worksheet reads, and guarded calculation-metadata,
 defined-name, page-break/page-margin/page-setup/print-options/sheet-protection/data-validation/auto-filter
 publication over positional I/O. The scalar-cell controls use deterministic
 medium and dense/sparse four-sheet corpora with untouched media Parts. Their
-timed interval covers open, staging, commit, and sequential publication;
-reopen, semantic equality, exact hashes, raw media identity, lifecycle gates,
-and source/materialization counter sampling remain outside the reported timing.
+timed interval covers open, selector planning, commit, and sequential
+publication; reopen, semantic equality, exact hashes, raw media identity,
+lifecycle gates, and source/materialization counter sampling remain outside the
+reported timing. Source-backed JSON also records those stages separately,
+including managed Budget/cache diagnostics and release-to-zero checks.
 The reported duration is the sum of open/stage/commit and sequential
 publication segments; source cache diagnostics are sampled between those
 segments and are excluded. They are evidence for later release ABBA work, not
@@ -50,9 +52,11 @@ two matched XLSX sheet-protection publication cases,
 two matched XLSX data-validation publication cases,
 two matched XLSX auto-filter/sort-state publication cases,
 two matched XLSX conditional-formatting publication cases,
-two XLSX merge/unmerge commit-plus-save cases, six matched XLSX scalar-cell
-publication cases (one cell, `ceil(1%)`, and the exact 256-cell bound, each
-eager/source-backed),
+two XLSX merge/unmerge commit-plus-save cases, six matched eager/source-backed
+XLSX scalar-cell publication cases (one cell, `ceil(1%)`, and the exact 256-cell
+bound), one bounded unmanaged source-backed two-worksheet case, and four
+managed source-backed scalar-cell cases (one cell, `ceil(1%)`, exact 256, and
+two worksheets),
 two bounded XLSX/RTF streaming-creation cases,
 four matched CFB selective-read cases,
 four matched native XLS existing-comment publication cases,
@@ -61,7 +65,7 @@ four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cas
 DOCX/PPTX semantic cases, 15 RTF semantic cases (13 transport/read/edit
 cases plus two logical-tail publication cases), 38 ODF semantic cases, and one
 ODF `mimetype` repair-plan case are opt-in. The current `Case` matrix exposes
-203 selectable case names in total;
+208 selectable case names in total;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 
@@ -127,13 +131,22 @@ xlsx_source_backed_cell_values_one_edit_save,\
 xlsx_eager_cell_values_one_percent_edit_save,\
 xlsx_source_backed_cell_values_one_percent_edit_save,\
 xlsx_eager_cell_values_batch_edit_save,\
-xlsx_source_backed_cell_values_batch_edit_save \
+xlsx_source_backed_cell_values_batch_edit_save,\
+xlsx_source_backed_cell_values_multi_sheet_edit_save,\
+xlsx_source_backed_managed_cell_values_one_edit_save,\
+xlsx_source_backed_managed_cell_values_one_percent_edit_save,\
+xlsx_source_backed_managed_cell_values_batch_edit_save,\
+xlsx_source_backed_managed_cell_values_multi_sheet_edit_save \
   --xlsx-cell-crud-shape medium,dense-sparse \
   --json target/perf/xlsx-cell-values-crud.json
 ```
 
 The one-cell, deterministic `ceil(1%)`, and exact-256 selectors are matched
-eager/source-backed pairs. The source-backed path uses one selector-first
+eager/source-backed pairs. The additional source-backed two-worksheet control
+is bounded to one existing cell per selected worksheet. Managed controls use
+the same explicit finite cache policy as their unmanaged source-backed
+controls, with an execution-context Budget for retained/in-flight OPC
+`PartData` payloads. The source-backed path uses one selector-first
 multi-sheet transaction and a sequential overlay publisher; the harness also
 checks exact no-op, clear, and remove lifecycle behavior as untimed gates.
 Every output is reopened and checked for semantic cell state, package topology,
@@ -148,6 +161,13 @@ accepts removal of the redundant publication-time semantic worksheet reparse:
 source-backed p50 geomean improves 21.66%/22.65% in the two directions, while
 physical read/materialization counters remain unchanged. No allocation, RSS,
 cold-I/O or decompression claim is attached to that result.
+
+Change 0109's managed tranche has no controlled release ABBA comparison and
+therefore makes no speedup or throughput claim. Its Budget covers only retained
+and in-flight OPC `PartData` payload reservations; parsed stores, metadata,
+staging, rewritten candidates, and output buffers are outside that accounting.
+The tranche also does not claim allocations, RSS/peak memory, hardware/CPU
+pinning, cold I/O, decompression, or real-producer breadth.
 
 Measure the opt-in OPC source-cache Budget boundary and controlled contention
 matrix on one fixed many-small incompressible corpus:

@@ -518,6 +518,11 @@ enum Case {
     XlsxSourceBackedCellValuesOnePercentEditSave,
     XlsxEagerCellValuesBatchEditSave,
     XlsxSourceBackedCellValuesBatchEditSave,
+    XlsxSourceBackedCellValuesMultiSheetEditSave,
+    XlsxSourceBackedManagedCellValuesOneEditSave,
+    XlsxSourceBackedManagedCellValuesOnePercentEditSave,
+    XlsxSourceBackedManagedCellValuesBatchEditSave,
+    XlsxSourceBackedManagedCellValuesMultiSheetEditSave,
     CfbOpen,
     CfbListStreams,
     CfbReadOne,
@@ -790,6 +795,21 @@ impl Case {
             Self::XlsxEagerCellValuesBatchEditSave => "xlsx_eager_cell_values_batch_edit_save",
             Self::XlsxSourceBackedCellValuesBatchEditSave => {
                 "xlsx_source_backed_cell_values_batch_edit_save"
+            },
+            Self::XlsxSourceBackedCellValuesMultiSheetEditSave => {
+                "xlsx_source_backed_cell_values_multi_sheet_edit_save"
+            },
+            Self::XlsxSourceBackedManagedCellValuesOneEditSave => {
+                "xlsx_source_backed_managed_cell_values_one_edit_save"
+            },
+            Self::XlsxSourceBackedManagedCellValuesOnePercentEditSave => {
+                "xlsx_source_backed_managed_cell_values_one_percent_edit_save"
+            },
+            Self::XlsxSourceBackedManagedCellValuesBatchEditSave => {
+                "xlsx_source_backed_managed_cell_values_batch_edit_save"
+            },
+            Self::XlsxSourceBackedManagedCellValuesMultiSheetEditSave => {
+                "xlsx_source_backed_managed_cell_values_multi_sheet_edit_save"
             },
             Self::CfbOpen => "cfb_open",
             Self::CfbListStreams => "cfb_list_streams",
@@ -1414,6 +1434,35 @@ impl Case {
                 | Self::XlsxSourceBackedCellValuesOnePercentEditSave
                 | Self::XlsxEagerCellValuesBatchEditSave
                 | Self::XlsxSourceBackedCellValuesBatchEditSave
+                | Self::XlsxSourceBackedCellValuesMultiSheetEditSave
+                | Self::XlsxSourceBackedManagedCellValuesOneEditSave
+                | Self::XlsxSourceBackedManagedCellValuesOnePercentEditSave
+                | Self::XlsxSourceBackedManagedCellValuesBatchEditSave
+                | Self::XlsxSourceBackedManagedCellValuesMultiSheetEditSave
+        )
+    }
+
+    const fn is_xlsx_cell_values_source_backed(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxSourceBackedCellValuesOneEditSave
+                | Self::XlsxSourceBackedCellValuesOnePercentEditSave
+                | Self::XlsxSourceBackedCellValuesBatchEditSave
+                | Self::XlsxSourceBackedCellValuesMultiSheetEditSave
+                | Self::XlsxSourceBackedManagedCellValuesOneEditSave
+                | Self::XlsxSourceBackedManagedCellValuesOnePercentEditSave
+                | Self::XlsxSourceBackedManagedCellValuesBatchEditSave
+                | Self::XlsxSourceBackedManagedCellValuesMultiSheetEditSave
+        )
+    }
+
+    const fn is_xlsx_cell_values_managed(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxSourceBackedManagedCellValuesOneEditSave
+                | Self::XlsxSourceBackedManagedCellValuesOnePercentEditSave
+                | Self::XlsxSourceBackedManagedCellValuesBatchEditSave
+                | Self::XlsxSourceBackedManagedCellValuesMultiSheetEditSave
         )
     }
 }
@@ -1494,7 +1543,7 @@ struct XlsxCorpus {
     cell_inventory: Option<Vec<Vec<XlsxCoordinate>>>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct XlsxCoordinate {
     sheet: usize,
     row: usize,
@@ -1708,6 +1757,8 @@ struct SourceSummary {
     ordinary_payload_materializations: Option<Vec<u64>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx: Option<XlsxSourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xlsx_cell_values: Option<XlsxCellValuesSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xls_comments: Option<XlsCommentsSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1950,6 +2001,79 @@ struct XlsxSourceSummary {
     shared_strings_read_bytes: Vec<u64>,
     styles_read_calls: Vec<u64>,
     styles_read_bytes: Vec<u64>,
+}
+
+/// Evidence specific to the matched source-backed scalar-cell controls.
+/// Timing segments are intentionally kept separate from the generic source
+/// counters so publication and verification cannot be mistaken for one
+/// monolithic latency interval.
+#[derive(Clone, Debug, Default, Serialize)]
+struct XlsxCellValuesSourceSummary {
+    implementation: &'static str,
+    cache_mode: &'static str,
+    timing_scope: &'static str,
+    update_count: usize,
+    selected_worksheet_count: usize,
+    open_ns: Vec<u64>,
+    plan_ns: Vec<u64>,
+    commit_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    reopen_ns: Vec<u64>,
+    source_read_calls: Vec<u64>,
+    source_read_bytes: Vec<u64>,
+    workbook_read_calls: Vec<u64>,
+    workbook_read_bytes: Vec<u64>,
+    selected_worksheet_read_calls: Vec<u64>,
+    selected_worksheet_read_bytes: Vec<u64>,
+    unselected_worksheet_read_calls: Vec<u64>,
+    unselected_worksheet_read_bytes: Vec<u64>,
+    payload_materializations: Vec<u64>,
+    cache_hits: Vec<u64>,
+    cache_cold_loads: Vec<u64>,
+    cache_waiter_joins: Vec<u64>,
+    cache_successful_loads: Vec<u64>,
+    cache_failed_loads: Vec<u64>,
+    cache_evictions: Vec<u64>,
+    cache_bypasses: Vec<u64>,
+    cache_oversized_bypasses: Vec<u64>,
+    cache_allocation_bypasses: Vec<u64>,
+    cache_in_flight_loads: Vec<usize>,
+    cache_retained_entries: Vec<usize>,
+    cache_retained_bytes: Vec<usize>,
+    cache_budget_managed: bool,
+    cache_budget_memory_limit: Option<u64>,
+    cache_budget_memory_used: Vec<u64>,
+    cache_budget_reserved_bytes: Vec<u64>,
+    cache_budget_reservation_failures: Vec<u64>,
+    budget_used_after_package_drop: Vec<u64>,
+    budget_used_after_handles_drop: Vec<u64>,
+    output_sha256: Vec<String>,
+    semantic_sha256: Vec<String>,
+    untouched_member_count: usize,
+    untouched_member_sha256: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+struct XlsxCellValuesIterationEvidence {
+    implementation: &'static str,
+    cache_mode: &'static str,
+    timing_scope: &'static str,
+    update_count: usize,
+    selected_worksheet_count: usize,
+    open_ns: u64,
+    plan_ns: u64,
+    commit_ns: u64,
+    publication_ns: u64,
+    reopen_ns: u64,
+    source: SourceSnapshot,
+    diagnostics: SourceCacheDiagnostics,
+    payload_materializations: u64,
+    budget_used_after_package_drop: u64,
+    budget_used_after_handles_drop: u64,
+    output_sha256: String,
+    semantic_sha256: String,
+    untouched_member_count: usize,
+    untouched_member_sha256: String,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -3019,6 +3143,117 @@ impl SourceSummary {
         summary
             .styles_read_bytes
             .push(snapshot.xlsx.styles.read_bytes);
+    }
+
+    fn record_xlsx_cell_values(
+        &mut self,
+        evidence: XlsxCellValuesIterationEvidence,
+    ) -> Result<(), Box<dyn Error>> {
+        self.record_opc(evidence.source, evidence.payload_materializations);
+        let summary = self
+            .xlsx_cell_values
+            .get_or_insert_with(|| XlsxCellValuesSourceSummary {
+                implementation: evidence.implementation,
+                cache_mode: evidence.cache_mode,
+                timing_scope: evidence.timing_scope,
+                update_count: evidence.update_count,
+                selected_worksheet_count: evidence.selected_worksheet_count,
+                cache_budget_managed: evidence.diagnostics.budget_managed,
+                cache_budget_memory_limit: evidence.diagnostics.budget_memory_limit,
+                untouched_member_count: evidence.untouched_member_count,
+                ..XlsxCellValuesSourceSummary::default()
+            });
+        if summary.implementation != evidence.implementation
+            || summary.cache_mode != evidence.cache_mode
+            || summary.timing_scope != evidence.timing_scope
+            || summary.update_count != evidence.update_count
+            || summary.selected_worksheet_count != evidence.selected_worksheet_count
+            || summary.cache_budget_managed != evidence.diagnostics.budget_managed
+            || summary.cache_budget_memory_limit != evidence.diagnostics.budget_memory_limit
+            || summary.untouched_member_count != evidence.untouched_member_count
+        {
+            return Err("XLSX cell-values source evidence mixed incompatible controls".into());
+        }
+        let source = evidence.source;
+        summary.open_ns.push(evidence.open_ns);
+        summary.plan_ns.push(evidence.plan_ns);
+        summary.commit_ns.push(evidence.commit_ns);
+        summary.publication_ns.push(evidence.publication_ns);
+        summary.reopen_ns.push(evidence.reopen_ns);
+        summary.source_read_calls.push(source.read_calls);
+        summary.source_read_bytes.push(source.read_bytes);
+        summary
+            .workbook_read_calls
+            .push(source.xlsx.workbook.read_calls);
+        summary
+            .workbook_read_bytes
+            .push(source.xlsx.workbook.read_bytes);
+        summary
+            .selected_worksheet_read_calls
+            .push(source.xlsx.selected_worksheet.read_calls);
+        summary
+            .selected_worksheet_read_bytes
+            .push(source.xlsx.selected_worksheet.read_bytes);
+        summary
+            .unselected_worksheet_read_calls
+            .push(source.xlsx.unselected_worksheets.read_calls);
+        summary
+            .unselected_worksheet_read_bytes
+            .push(source.xlsx.unselected_worksheets.read_bytes);
+        summary
+            .payload_materializations
+            .push(evidence.payload_materializations);
+        summary.cache_hits.push(evidence.diagnostics.hits);
+        summary
+            .cache_cold_loads
+            .push(evidence.diagnostics.cold_loads);
+        summary
+            .cache_waiter_joins
+            .push(evidence.diagnostics.waiter_joins);
+        summary
+            .cache_successful_loads
+            .push(evidence.diagnostics.successful_loads);
+        summary
+            .cache_failed_loads
+            .push(evidence.diagnostics.failed_loads);
+        summary.cache_evictions.push(evidence.diagnostics.evictions);
+        summary.cache_bypasses.push(evidence.diagnostics.bypasses);
+        summary
+            .cache_oversized_bypasses
+            .push(evidence.diagnostics.oversized_bypasses);
+        summary
+            .cache_allocation_bypasses
+            .push(evidence.diagnostics.allocation_bypasses);
+        summary
+            .cache_in_flight_loads
+            .push(evidence.diagnostics.in_flight_loads);
+        summary
+            .cache_retained_entries
+            .push(evidence.diagnostics.retained_entries);
+        summary
+            .cache_retained_bytes
+            .push(evidence.diagnostics.retained_bytes);
+        summary
+            .cache_budget_memory_used
+            .push(evidence.diagnostics.budget_memory_used);
+        summary
+            .cache_budget_reserved_bytes
+            .push(evidence.diagnostics.budget_cache_reserved_bytes);
+        summary
+            .cache_budget_reservation_failures
+            .push(evidence.diagnostics.budget_reservation_failures);
+        summary
+            .budget_used_after_package_drop
+            .push(evidence.budget_used_after_package_drop);
+        summary
+            .budget_used_after_handles_drop
+            .push(evidence.budget_used_after_handles_drop);
+        summary.output_sha256.push(evidence.output_sha256);
+        summary.semantic_sha256.push(evidence.semantic_sha256);
+        summary
+            .untouched_member_sha256
+            .push(evidence.untouched_member_sha256);
+        Ok(())
     }
 
     fn record_xls_comments(
@@ -4763,6 +4998,21 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_backed_cell_values_batch_edit_save" => {
             Some(Case::XlsxSourceBackedCellValuesBatchEditSave)
         },
+        "xlsx_source_backed_cell_values_multi_sheet_edit_save" => {
+            Some(Case::XlsxSourceBackedCellValuesMultiSheetEditSave)
+        },
+        "xlsx_source_backed_managed_cell_values_one_edit_save" => {
+            Some(Case::XlsxSourceBackedManagedCellValuesOneEditSave)
+        },
+        "xlsx_source_backed_managed_cell_values_one_percent_edit_save" => {
+            Some(Case::XlsxSourceBackedManagedCellValuesOnePercentEditSave)
+        },
+        "xlsx_source_backed_managed_cell_values_batch_edit_save" => {
+            Some(Case::XlsxSourceBackedManagedCellValuesBatchEditSave)
+        },
+        "xlsx_source_backed_managed_cell_values_multi_sheet_edit_save" => {
+            Some(Case::XlsxSourceBackedManagedCellValuesMultiSheetEditSave)
+        },
         "cfb_open" => Some(Case::CfbOpen),
         "cfb_list_streams" => Some(Case::CfbListStreams),
         "cfb_read_one" => Some(Case::CfbReadOne),
@@ -5080,6 +5330,11 @@ fn print_usage() {
                                        xlsx_source_backed_cell_values_one_percent_edit_save,\n\
                                        xlsx_eager_cell_values_batch_edit_save,\n\
                                        xlsx_source_backed_cell_values_batch_edit_save,\n\
+                                       xlsx_source_backed_cell_values_multi_sheet_edit_save,\n\
+                                       xlsx_source_backed_managed_cell_values_one_edit_save,\n\
+                                       xlsx_source_backed_managed_cell_values_one_percent_edit_save,\n\
+                                       xlsx_source_backed_managed_cell_values_batch_edit_save,\n\
+                                       xlsx_source_backed_managed_cell_values_multi_sheet_edit_save,\n\
                                        xlsx_source_open,xlsx_source_list_sheets,\n\
                                        xlsx_source_first_cell,\n\
                                        xlsx_source_narrow_column_range_scan,\n\
@@ -7987,12 +8242,19 @@ fn xlsx_cell_crud_updates_for_case(
         .ok_or("XLSX cell CRUD case has no cell inventory")?;
     let total = inventory.iter().map(Vec::len).sum::<usize>();
     let count = match case {
-        Case::XlsxEagerCellValuesOneEditSave | Case::XlsxSourceBackedCellValuesOneEditSave => 1,
+        Case::XlsxEagerCellValuesOneEditSave
+        | Case::XlsxSourceBackedCellValuesOneEditSave
+        | Case::XlsxSourceBackedManagedCellValuesOneEditSave => 1,
         Case::XlsxEagerCellValuesOnePercentEditSave
-        | Case::XlsxSourceBackedCellValuesOnePercentEditSave => total.div_ceil(100),
-        Case::XlsxEagerCellValuesBatchEditSave | Case::XlsxSourceBackedCellValuesBatchEditSave => {
+        | Case::XlsxSourceBackedCellValuesOnePercentEditSave
+        | Case::XlsxSourceBackedManagedCellValuesOnePercentEditSave => total.div_ceil(100),
+        Case::XlsxEagerCellValuesBatchEditSave
+        | Case::XlsxSourceBackedCellValuesBatchEditSave
+        | Case::XlsxSourceBackedManagedCellValuesBatchEditSave => {
             litchi_xlsx::cell_values::MAX_BATCH_EDITS
         },
+        Case::XlsxSourceBackedCellValuesMultiSheetEditSave
+        | Case::XlsxSourceBackedManagedCellValuesMultiSheetEditSave => 2,
         _ => return Err("invalid XLSX cell CRUD case".into()),
     };
     if count == 0 || count > total {
@@ -8002,6 +8264,7 @@ fn xlsx_cell_crud_updates_for_case(
         case,
         Case::XlsxEagerCellValuesOnePercentEditSave
             | Case::XlsxSourceBackedCellValuesOnePercentEditSave
+            | Case::XlsxSourceBackedManagedCellValuesOnePercentEditSave
     ) {
         if spec.one_percent_updates.len() != count {
             return Err("XLSX CRUD 1% manifest count differs from selected updates".into());
@@ -8015,6 +8278,21 @@ fn xlsx_cell_crud_updates_for_case(
                 .and_then(|cells| cells.first())
                 .ok_or("XLSX cell CRUD corpus has no first cell")?,
         ]);
+    }
+    if matches!(
+        case,
+        Case::XlsxSourceBackedCellValuesMultiSheetEditSave
+            | Case::XlsxSourceBackedManagedCellValuesMultiSheetEditSave
+    ) {
+        let first = inventory
+            .first()
+            .and_then(|cells| cells.first())
+            .ok_or("XLSX cell CRUD corpus has no first sheet cell")?;
+        let second = inventory
+            .get(1)
+            .and_then(|cells| cells.first())
+            .ok_or("XLSX cell CRUD corpus has no second sheet cell")?;
+        return Ok(vec![*first, *second]);
     }
     let mut updates = Vec::with_capacity(count);
     for index in 0..count {
@@ -8082,11 +8360,11 @@ fn verify_xlsx_cell_crud_package_identity(
     Ok(())
 }
 
-fn verify_xlsx_cell_crud_raw_source_output(
+fn xlsx_cell_crud_untouched_member_evidence(
     corpus: &Corpus,
     output: &[u8],
     updated: &[XlsxCoordinate],
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(usize, String), Box<dyn Error>> {
     let source = raw_zip_members(&corpus.archive)?;
     let candidate = raw_zip_members(output)?;
     if source.keys().ne(candidate.keys()) {
@@ -8096,14 +8374,69 @@ fn verify_xlsx_cell_crud_raw_source_output(
         .iter()
         .map(|coordinate| format!("xl/worksheets/sheet{}.xml", coordinate.sheet + 1))
         .collect::<BTreeSet<_>>();
+    let mut hasher = Sha256::new();
+    let mut untouched_count = 0usize;
     for (name, source_member) in source {
         if !touched.contains(&name) && candidate.get(&name) != Some(&source_member) {
             return Err(
                 format!("XLSX source CRUD changed raw unselected ZIP member {name}").into(),
             );
         }
+        if !touched.contains(&name) {
+            untouched_count += 1;
+            hasher.update(name.as_bytes());
+            hasher.update([0]);
+            hasher.update(&source_member.local);
+            hasher.update([0]);
+            hasher.update(&source_member.central_without_offset);
+        }
     }
-    Ok(())
+    let digest = hasher.finalize();
+    let mut untouched_sha256 = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(untouched_sha256, "{byte:02x}");
+    }
+    Ok((untouched_count, untouched_sha256))
+}
+
+fn xlsx_cell_values_semantic_hash_from_workbook(
+    workbook: &Workbook,
+    spec: &XlsxCorpus,
+) -> Result<String, Box<dyn Error>> {
+    let inventory = spec
+        .cell_inventory
+        .as_ref()
+        .ok_or("XLSX semantic hash requires the CRUD cell inventory")?;
+    let mut semantic = Vec::new();
+    for coordinate in inventory.iter().flatten() {
+        let sheet = workbook
+            .sheet(xlsx_sheet_name(coordinate.sheet).as_str())?
+            .ok_or("XLSX semantic hash target sheet is missing")?;
+        let address = xlsx_address(coordinate.row, coordinate.column)?;
+        let stored = sheet
+            .cell(address.as_str())?
+            .stored()
+            .ok_or("XLSX semantic hash target cell is missing")?;
+        let XlsxCell::Value(XlsxValue::Number(value)) = stored else {
+            return Err("XLSX semantic hash target cell is not numeric".into());
+        };
+        semantic.push(format!(
+            "{}!{}={}",
+            xlsx_sheet_name(coordinate.sheet),
+            address,
+            value.as_str(),
+        ));
+    }
+    Ok(sha256_hex(semantic.join("\n").as_bytes()))
+}
+
+fn xlsx_cell_values_output_semantic_hash(
+    output: &[u8],
+    spec: &XlsxCorpus,
+) -> Result<String, Box<dyn Error>> {
+    let workbook = Workbook::from_bytes(output.to_vec())?;
+    xlsx_cell_values_semantic_hash_from_workbook(&workbook, spec)
 }
 
 fn run_xlsx_cell_value_lifecycle_gates(
@@ -8553,7 +8886,12 @@ fn run_case_with_config(
         | Case::XlsxEagerCellValuesOnePercentEditSave
         | Case::XlsxSourceBackedCellValuesOnePercentEditSave
         | Case::XlsxEagerCellValuesBatchEditSave
-        | Case::XlsxSourceBackedCellValuesBatchEditSave => {
+        | Case::XlsxSourceBackedCellValuesBatchEditSave
+        | Case::XlsxSourceBackedCellValuesMultiSheetEditSave
+        | Case::XlsxSourceBackedManagedCellValuesOneEditSave
+        | Case::XlsxSourceBackedManagedCellValuesOnePercentEditSave
+        | Case::XlsxSourceBackedManagedCellValuesBatchEditSave
+        | Case::XlsxSourceBackedManagedCellValuesMultiSheetEditSave => {
             run_xlsx_cell_values_edit_save(case, corpus, warmup_iterations, samples)
         },
         Case::XlsxSourceOpen => run_xlsx_source_open(corpus, warmup_iterations, samples),
@@ -15329,16 +15667,28 @@ fn run_xlsx_cell_values_edit_save(
     run_xlsx_cell_value_lifecycle_gates(corpus, spec)?;
     let expected = xlsx_cell_crud_eager_output(corpus, &updates)?;
     let expected_digest = sha256_hex(&expected);
-    let source_backed = matches!(
-        case,
-        Case::XlsxSourceBackedCellValuesOneEditSave
-            | Case::XlsxSourceBackedCellValuesOnePercentEditSave
-            | Case::XlsxSourceBackedCellValuesBatchEditSave
-    );
+    let source_backed = case.is_xlsx_cell_values_source_backed();
+    let managed = case.is_xlsx_cell_values_managed();
     let expected_touched = xlsx_update_sheet_selectors(&updates).len();
     let maximum = xlsx_output_ceiling(expected.len())?;
     let payload_ranges = source_backed
         .then(|| xlsx_cell_crud_payload_ranges(corpus))
+        .transpose()?;
+    let payload_budget = source_backed
+        .then(|| xlsx_cell_values_payload_budget(corpus, &updates))
+        .transpose()?;
+    let payload_budget_u64 = payload_budget.map(u64::try_from).transpose()?;
+    let cache_limits = if source_backed {
+        let payload_budget = payload_budget.ok_or("XLSX source CRUD payload budget is missing")?;
+        let max_entries = expected_touched
+            .checked_add(4)
+            .ok_or("XLSX source CRUD cache entry bound overflows usize")?;
+        Some(SourceCacheLimits::new(payload_budget.max(1), max_entries)?)
+    } else {
+        None
+    };
+    let expected_budget_limit = managed
+        .then(|| payload_budget_u64.ok_or("XLSX managed cell CRUD payload budget is missing"))
         .transpose()?;
     let mut elapsed = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
@@ -15358,41 +15708,145 @@ fn run_xlsx_cell_values_edit_save(
         let eager_source = (!source_backed).then(|| corpus.archive.clone());
         let mut duration = Duration::ZERO;
         let mut source_metrics = None;
-        let mut materializations = 0u64;
+        let mut source_evidence = None;
+        let mut untouched_member_evidence = None;
         if source_backed {
             let read_at: Arc<dyn ReadAt> = backing.clone().expect("source CRUD backing exists");
-            let started = Instant::now();
-            let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(read_at)?;
-            let selectors = xlsx_update_sheet_selectors(&updates);
-            let mut edit = editor.edit_sheets(selectors)?;
-            for coordinate in &updates {
-                edit.set(
-                    coordinate.sheet,
-                    litchi_xlsx::Address::at(
-                        u32::try_from(coordinate.row)?,
-                        u32::try_from(coordinate.column)?,
-                    )?,
-                    xlsx_value(*coordinate) + 1,
+            let cache_limits = cache_limits
+                .as_ref()
+                .copied()
+                .ok_or("XLSX source CRUD cache limits are missing")?;
+            let open_started = Instant::now();
+            let (editor, budget) = if managed {
+                let payload_budget =
+                    payload_budget.ok_or("XLSX managed cell CRUD payload budget is missing")?;
+                let (budget, context) = xlsx_cell_values_managed_context(payload_budget)?;
+                let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                    read_at,
+                    ReadLimits::default(),
+                    cache_limits,
+                    context,
                 )?;
+                (editor, Some(budget))
+            } else {
+                let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits(
+                    read_at,
+                    ReadLimits::default(),
+                    cache_limits,
+                )?;
+                (editor, None)
+            };
+            let open_duration = open_started.elapsed();
+            let open_ns = elapsed_ns(open_duration)?;
+            duration += open_duration;
+            let selectors = xlsx_update_sheet_selectors(&updates);
+            let plan_started = Instant::now();
+            let mut edit = editor.edit_sheets(selectors)?;
+            let plan_duration = plan_started.elapsed();
+            let plan_ns = elapsed_ns(plan_duration)?;
+            duration += plan_duration;
+            let (diagnostics, commit_ns, publication_ns, budget_used_after_package_drop) = {
+                let commit_started = Instant::now();
+                for coordinate in &updates {
+                    edit.set(
+                        coordinate.sheet,
+                        litchi_xlsx::Address::at(
+                            u32::try_from(coordinate.row)?,
+                            u32::try_from(coordinate.column)?,
+                        )?,
+                        xlsx_value(*coordinate) + 1,
+                    )?;
+                }
+                let commit = edit.commit()?;
+                let commit_duration = commit_started.elapsed();
+                let commit_ns = elapsed_ns(commit_duration)?;
+                duration += commit_duration;
+                if commit.diagnostics().touched_worksheets() != expected_touched {
+                    return Err("XLSX source CRUD touched an unexpected worksheet count".into());
+                }
+                let diagnostics = editor.cache_diagnostics();
+                if diagnostics.budget_managed != managed
+                    || diagnostics.budget_memory_limit != expected_budget_limit
+                {
+                    return Err("XLSX cell CRUD cache diagnostics disagree with cache mode".into());
+                }
+                if !managed
+                    && (diagnostics.budget_memory_used != 0
+                        || diagnostics.budget_cache_reserved_bytes != 0
+                        || diagnostics.budget_reservation_failures != 0)
+                {
+                    return Err("XLSX unmanaged cell CRUD cache charged its budget".into());
+                }
+                if diagnostics.successful_loads < expected_touched as u64 {
+                    return Err(
+                        "XLSX source CRUD materialized fewer worksheets than touched".into(),
+                    );
+                }
+                let publication_started = Instant::now();
+                {
+                    let _published = editor.publish_multi_commit_to_stream(&mut sink, &commit)?;
+                }
+                let publication_duration = publication_started.elapsed();
+                let publication_ns = elapsed_ns(publication_duration)?;
+                duration += publication_duration;
+                let budget_used_after_package_drop = opc_cache_budget_used(budget.as_ref());
+                (
+                    diagnostics,
+                    commit_ns,
+                    publication_ns,
+                    budget_used_after_package_drop,
+                )
+            };
+            if managed && budget_used_after_package_drop == 0 {
+                return Err("XLSX managed cell CRUD retained no payload reservation".into());
             }
-            let commit = edit.commit()?;
-            duration += started.elapsed();
-            if commit.diagnostics().touched_worksheets() != expected_touched {
-                return Err("XLSX source CRUD touched an unexpected worksheet count".into());
+            let budget_used_after_handles_drop = opc_cache_budget_used(budget.as_ref());
+            if managed && budget_used_after_handles_drop != 0 {
+                return Err("XLSX managed cell CRUD Budget did not release to zero".into());
             }
-            materializations = editor.cache_diagnostics().successful_loads;
-            let publish_started = Instant::now();
-            editor.publish_multi_commit_to_stream(&mut sink, &commit)?;
-            duration += publish_started.elapsed();
             source_metrics = Some(
                 backing
                     .clone()
                     .expect("source CRUD backing exists")
                     .snapshot(),
             );
+            source_evidence = Some(XlsxCellValuesIterationEvidence {
+                implementation: if managed {
+                    "managed-source-backed"
+                } else {
+                    "source-backed"
+                },
+                cache_mode: if managed {
+                    "managed-budget"
+                } else {
+                    "unmanaged-control"
+                },
+                timing_scope: "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+                update_count: updates.len(),
+                selected_worksheet_count: expected_touched,
+                open_ns,
+                plan_ns,
+                commit_ns,
+                publication_ns,
+                reopen_ns: 0,
+                source: source_metrics
+                    .as_ref()
+                    .copied()
+                    .expect("source metrics captured"),
+                diagnostics,
+                payload_materializations: diagnostics.successful_loads,
+                budget_used_after_package_drop,
+                budget_used_after_handles_drop,
+                output_sha256: String::new(),
+                semantic_sha256: String::new(),
+                untouched_member_count: 0,
+                untouched_member_sha256: String::new(),
+            });
         } else {
-            let started = Instant::now();
+            let open_started = Instant::now();
             let workbook = Workbook::from_bytes(eager_source.expect("eager source exists"))?;
+            duration += open_started.elapsed();
+            let plan_started = Instant::now();
             let mut edit = workbook.edit()?;
             for coordinate in &updates {
                 edit.sheet(xlsx_sheet_name(coordinate.sheet))?
@@ -15402,29 +15856,52 @@ fn run_xlsx_cell_values_edit_save(
                         xlsx_value(*coordinate) + 1,
                     )?;
             }
+            duration += plan_started.elapsed();
+            let commit_started = Instant::now();
             let commit = edit.commit()?;
-            duration += started.elapsed();
-            let started = Instant::now();
+            duration += commit_started.elapsed();
+            let publication_started = Instant::now();
             commit.workbook().write_to(&mut sink)?;
-            duration += started.elapsed();
-        }
-        if source_backed && materializations < expected_touched as u64 {
-            return Err("XLSX source CRUD materialized fewer worksheets than touched".into());
+            duration += publication_started.elapsed();
         }
         if sink.bytes.is_empty() {
             return Err("XLSX cell CRUD publication emitted no bytes".into());
         }
+        let reopen_started = Instant::now();
         verify_xlsx_cell_crud_output(corpus, &sink.bytes, &updates)?;
         if source_backed {
-            verify_xlsx_cell_crud_raw_source_output(corpus, &sink.bytes, &updates)?;
+            untouched_member_evidence = Some(xlsx_cell_crud_untouched_member_evidence(
+                corpus,
+                &sink.bytes,
+                &updates,
+            )?);
         }
+        let semantic_digest = if source_backed {
+            Some(xlsx_cell_values_output_semantic_hash(&sink.bytes, spec)?)
+        } else {
+            None
+        };
+        let reopen_ns = elapsed_ns(reopen_started.elapsed())?;
         if sink.summary().largest_write > 64 * 1024 {
             return Err("XLSX cell CRUD publication exceeded sequential sink bound".into());
         }
         let digest = sha256_hex(&sink.bytes);
+        if let Some(evidence) = source_evidence.as_mut() {
+            let (untouched_member_count, untouched_member_sha256) = untouched_member_evidence
+                .take()
+                .ok_or("XLSX source CRUD untouched-member evidence is missing")?;
+            evidence.reopen_ns = reopen_ns;
+            evidence.output_sha256 = digest.clone();
+            evidence.semantic_sha256 =
+                semantic_digest.ok_or("XLSX source CRUD semantic digest is missing")?;
+            evidence.untouched_member_count = untouched_member_count;
+            evidence.untouched_member_sha256 = untouched_member_sha256;
+        }
         if iteration >= warmup_iterations {
-            if let Some(metrics) = source_metrics {
-                source_summary.record_opc(metrics, materializations);
+            if let Some(evidence) = source_evidence {
+                source_summary.record_xlsx_cell_values(evidence)?;
+            } else if let Some(metrics) = source_metrics {
+                source_summary.record_opc(metrics, 0);
             }
             sink_summaries.push(sink.summary());
             output_digests.push(digest);
@@ -15775,6 +16252,53 @@ fn xlsx_cell_crud_payload_ranges(corpus: &Corpus) -> Result<Vec<Range<u64>>, Box
             (name != "[Content_Types].xml" && !name.ends_with(".rels")).then_some(range)
         })
         .collect())
+}
+
+fn xlsx_cell_values_payload_budget(
+    corpus: &Corpus,
+    updates: &[XlsxCoordinate],
+) -> Result<usize, Box<dyn Error>> {
+    let package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut names = BTreeSet::new();
+    names.insert("/xl/workbook.xml".to_owned());
+    for coordinate in updates {
+        names.insert(format!("/xl/worksheets/sheet{}.xml", coordinate.sheet + 1));
+    }
+    let workbook = package.get_part(&PackURI::new("/xl/workbook.xml")?)?;
+    for relationship in workbook.rels().iter() {
+        if matches!(
+            relationship.reltype(),
+            relationship_type::STYLES | relationship_type::STRICT_STYLES | relationship_type::THEME
+        ) {
+            names.insert(relationship.target_partname()?.to_string());
+        }
+    }
+    names.into_iter().try_fold(0usize, |total, name| {
+        let bytes = package.get_part(&PackURI::new(name)?)?.blob().len();
+        total
+            .checked_add(bytes)
+            .ok_or_else(|| "XLSX managed payload budget overflows usize".into())
+    })
+}
+
+fn xlsx_cell_values_managed_context(
+    payload_budget: usize,
+) -> Result<(Budget, ExecutionContext), Box<dyn Error>> {
+    let memory = u64::try_from(payload_budget.max(1))?;
+    let workers = NonZeroUsize::new(1).ok_or("XLSX managed worker count is zero")?;
+    let execution_limits = ExecutionLimits::new(
+        workers,
+        workers,
+        NonZeroU64::new(memory).ok_or("XLSX managed byte bound is zero")?,
+        0,
+    )?;
+    let budget = Budget::root(
+        "litchi-perf-xlsx-cell-values-managed",
+        Limits::new(memory, u64::MAX, u64::MAX, 1_000_000, 256, u64::MAX),
+    );
+    let (_cancellation_source, cancellation) = CancellationSource::pair();
+    let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+    Ok((budget, context))
 }
 
 fn xlsx_source_layout(
@@ -22027,7 +22551,7 @@ fn write_report(report: &Report, output: Option<&PathBuf>) -> Result<(), Box<dyn
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Write, sync::Arc, time::Duration};
+    use std::{collections::BTreeMap, io::Write, sync::Arc, time::Duration};
 
     use litchi_core::ReadAt;
 
@@ -24188,6 +24712,7 @@ mod tests {
         assert_eq!(xlsx_cell_count(spec).unwrap(), 9_216);
         assert_eq!(spec.one_percent_updates.len(), 93);
         assert_eq!(XlsxCellCrudShape::ALL.len(), 2);
+        let mut semantic_hashes = BTreeMap::new();
 
         for case in [
             Case::XlsxEagerCellValuesOneEditSave,
@@ -24196,6 +24721,11 @@ mod tests {
             Case::XlsxSourceBackedCellValuesOnePercentEditSave,
             Case::XlsxEagerCellValuesBatchEditSave,
             Case::XlsxSourceBackedCellValuesBatchEditSave,
+            Case::XlsxSourceBackedCellValuesMultiSheetEditSave,
+            Case::XlsxSourceBackedManagedCellValuesOneEditSave,
+            Case::XlsxSourceBackedManagedCellValuesOnePercentEditSave,
+            Case::XlsxSourceBackedManagedCellValuesBatchEditSave,
+            Case::XlsxSourceBackedManagedCellValuesMultiSheetEditSave,
         ] {
             let measured = run_case(case, &first, 0, 1).unwrap();
             assert_eq!(measured.case, case.name());
@@ -24209,7 +24739,44 @@ mod tests {
                     XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
                 );
             }
+            if case.is_xlsx_cell_values_source_backed() {
+                let source = measured.source.as_ref().expect("source evidence");
+                let evidence = source
+                    .xlsx_cell_values
+                    .as_ref()
+                    .expect("cell-values source evidence");
+                assert_eq!(evidence.open_ns.len(), 1, "{}", case.name());
+                assert_eq!(evidence.plan_ns.len(), 1, "{}", case.name());
+                assert_eq!(evidence.commit_ns.len(), 1, "{}", case.name());
+                assert_eq!(evidence.publication_ns.len(), 1, "{}", case.name());
+                assert_eq!(evidence.reopen_ns.len(), 1, "{}", case.name());
+                assert_eq!(
+                    evidence.cache_budget_managed,
+                    case.is_xlsx_cell_values_managed(),
+                    "{}",
+                    case.name()
+                );
+                if case.is_xlsx_cell_values_managed() {
+                    assert!(
+                        evidence.budget_used_after_package_drop[0] > 0,
+                        "{} did not retain a managed payload reservation",
+                        case.name()
+                    );
+                }
+                assert_eq!(evidence.budget_used_after_handles_drop, vec![0]);
+                assert_eq!(evidence.cache_budget_reservation_failures, vec![0]);
+                assert!(evidence.untouched_member_count > 0);
+                assert_eq!(evidence.output_sha256.len(), 1);
+                assert_eq!(evidence.semantic_sha256.len(), 1);
+                assert_eq!(evidence.source_read_bytes.len(), 1);
+                let key = (evidence.update_count, evidence.selected_worksheet_count);
+                let semantic = evidence.semantic_sha256[0].clone();
+                if let Some(previous) = semantic_hashes.insert(key, semantic.clone()) {
+                    assert_eq!(previous, semantic, "{} semantic mismatch", case.name());
+                }
+            }
         }
+        assert_eq!(semantic_hashes.len(), 4);
 
         let dense_first = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::DenseSparse).unwrap();
         let dense_second = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::DenseSparse).unwrap();
