@@ -1,0 +1,150 @@
+{
+  "schema": "litchi.ppt-pictures.release-abba.v1",
+  "status": "latency_rejected_stability_gate",
+  "claim": "correctness_and_source_read_evidence_only",
+  "revision": "56ba4a0962c398b8e66f6a466074a2504657aeb4",
+  "binary": {
+    "path": "tools/perf-baseline/target/release/litchi-perf-baseline",
+    "sha256": "d9dcb380aae9d8222269a7d1407f8612601aac825521d8e5892c179f0f454209",
+    "bytes": 36735408,
+    "profile": "release",
+    "locked": true
+  },
+  "environment": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "os": "Linux 6.8.0-101-generic",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "logical_cpus_available": 12,
+    "allocator": "Rust system allocator",
+    "perf_event_paranoid": "1",
+    "worktree_dirty": true,
+    "preexisting_user_dirty_paths": [
+      "crates/litchi-docx/src/package/tests/graph.rs",
+      "docs/FORMAT_IMPLEMENTATION_REVIEW.md",
+      "tools/native-resave/Cargo.lock"
+    ],
+    "measurement_owned_dirty_paths_at_build": [
+      "docs/performance/BASELINE.md",
+      "docs/performance/HOTSPOTS.md",
+      "docs/performance/REPORT.md",
+      "docs/performance/changes/0117-ppt-pictures-release-evidence.md",
+      "docs/performance/results/ppt-pictures-release-0117.json"
+    ]
+  },
+  "corpus": {
+    "generator": "litchi-ppt-pictures-lazy-v1",
+    "slides": 8,
+    "pictures": 32,
+    "picture_payload_bytes_each": 262144,
+    "archive_bytes": 8469504,
+    "archive_sha256": "4aeab2d71b21ed721a8638e1f483d87f548cdc690bc1f0998b400eb9df52edbf",
+    "pictures_stream_bytes": 8389408,
+    "pictures_stream_sha256": "fe505e1229365db20385c55df519fcc4f5e8d8d628e82fd6dbdb1c135ac9705a",
+    "semantic_sha256": "259a62ebab9639393fe73710c1c838c02416d221ed49c4b88399544f80b06516"
+  },
+  "source_read_evidence": {
+    "timed_source_adapter": "litchi_core::OwnedSource",
+    "read_evidence_adapter": "harness::InstrumentedSource",
+    "read_evidence_scope": "separate_untimed_replay_per_measured_sample",
+    "generated_fixture_window_only": true,
+    "open": {
+      "source_read_calls": 136,
+      "source_read_bytes": 79265,
+      "pictures_read_calls": 0,
+      "pictures_read_bytes": 0
+    },
+    "cold_all_images_query": {
+      "source_read_calls": 1,
+      "source_read_bytes": 8389408,
+      "pictures_read_calls": 1,
+      "pictures_read_bytes": 8389408
+    },
+    "cached_all_images_query": {
+      "source_read_calls": 0,
+      "source_read_bytes": 0,
+      "pictures_read_calls": 0,
+      "pictures_read_bytes": 0
+    },
+    "fresh_open_plus_cold_all_images_query": {
+      "source_read_calls": 137,
+      "source_read_bytes": 8468673,
+      "pictures_read_calls": 1,
+      "pictures_read_bytes": 8389408
+    }
+  },
+  "acceptance_policy": {
+    "one_selector_per_fresh_child": true,
+    "balanced_orders": ["eager-source-source-eager", "source-eager-eager-source"],
+    "minimum_material_p50_percent": 5.0,
+    "maximum_same_implementation_p50_drift_percent": 5.0,
+    "maximum_same_implementation_p95_drift_percent": 10.0,
+    "both_directions_must_agree": true,
+    "p99_claimed": false,
+    "phase_results_may_not_be_added_or_geomeaned": true
+  },
+  "attempts": [
+    {
+      "name": "preflight",
+      "raw_directory": "ppt-pictures-0117",
+      "raw_tree_content_sha256": "b662fbb93c9280fc5a6ec443a1d8364e64715b7d6c6e71999d47365a1e0225b3",
+      "cpu": 2,
+      "warmups_per_child": 10,
+      "samples_per_child": 100,
+      "children_per_phase": 8,
+      "cooldown_seconds": 0,
+      "maximum_rss_kib": {"min": 91324, "median": 91390, "max": 91456},
+      "accepted": false,
+      "reason": "same-implementation drift exceeded the acceptance limits"
+    },
+    {
+      "name": "extended_with_cooldown",
+      "raw_directory": "ppt-pictures-0117-stable",
+      "raw_tree_content_sha256": "924974d017f16aae57b7789e9c2109387beda2ce74c70e6aef9f7c1de34ae93c",
+      "cpu": 8,
+      "warmups_per_child": 20,
+      "samples_per_child": 200,
+      "children_per_phase": 8,
+      "cooldown_seconds": 1,
+      "maximum_rss_kib": {"min": 91136, "median": 91452, "max": 91584},
+      "accepted": false,
+      "reason": "same-implementation drift still exceeded the acceptance limits",
+      "phases": {
+        "open_without_image_query": {
+          "forward": {"eager_p50_ns": 330876, "source_p50_ns": 77587, "p50_delta_percent": -76.5510, "eager_p95_ns": 385931, "source_p95_ns": 100998, "p95_delta_percent": -73.8300, "bootstrap_p50_delta_95_percent": [-76.8018, -76.3788]},
+          "reverse": {"eager_p50_ns": 332547.5, "source_p50_ns": 77557, "p50_delta_percent": -76.6779, "eager_p95_ns": 389366, "source_p95_ns": 94471, "p95_delta_percent": -75.7372, "bootstrap_p50_delta_95_percent": [-76.8883, -76.0643]},
+          "eager_leg_drift_percent": {"p50": 9.9103, "p95": 13.5673},
+          "source_leg_drift_percent": {"p50": 3.3134, "p95": 14.7807},
+          "accepted": false
+        },
+        "cold_all_images_query_after_open": {
+          "forward": {"eager_p50_ns": 24399, "source_p50_ns": 969941, "p50_delta_percent": 3875.3310, "eager_p95_ns": 31303, "source_p95_ns": 1071656, "p95_delta_percent": 3323.4930, "bootstrap_p50_delta_95_percent": [3815.5192, 3960.1852]},
+          "reverse": {"eager_p50_ns": 24323.5, "source_p50_ns": 948021, "p50_delta_percent": 3797.5518, "eager_p95_ns": 29682, "source_p95_ns": 1046432, "p95_delta_percent": 3425.4767, "bootstrap_p50_delta_95_percent": [3733.6728, 3871.0351]},
+          "eager_leg_drift_percent": {"p50": 8.4199, "p95": 15.5859},
+          "source_leg_drift_percent": {"p50": 3.8370, "p95": 4.3732},
+          "accepted": false
+        },
+        "cached_all_images_query": {
+          "forward": {"eager_p50_ns": 24593.5, "source_p50_ns": 28994.5, "p50_delta_percent": 17.8950, "eager_p95_ns": 33156, "source_p95_ns": 37211, "p95_delta_percent": 12.2301, "bootstrap_p50_delta_95_percent": [14.6506, 20.6054]},
+          "reverse": {"eager_p50_ns": 24282.5, "source_p50_ns": 29695.5, "p50_delta_percent": 22.2918, "eager_p95_ns": 32054, "source_p95_ns": 38462, "p95_delta_percent": 19.9913, "bootstrap_p50_delta_95_percent": [19.7355, 25.1370]},
+          "eager_leg_drift_percent": {"p50": 4.7449, "p95": 7.6217},
+          "source_leg_drift_percent": {"p50": 10.8565, "p95": 12.8924},
+          "accepted": false
+        },
+        "fresh_open_plus_cold_all_images_query": {
+          "forward": {"eager_p50_ns": 770299.5, "source_p50_ns": 1107175.5, "p50_delta_percent": 43.7331, "eager_p95_ns": 902035, "source_p95_ns": 1312677, "p95_delta_percent": 45.5240, "bootstrap_p50_delta_95_percent": [41.4539, 46.3225]},
+          "reverse": {"eager_p50_ns": 717182.5, "source_p50_ns": 1105324, "p50_delta_percent": 54.1203, "eager_p95_ns": 854600, "source_p95_ns": 1258514, "p95_delta_percent": 47.2635, "bootstrap_p50_delta_95_percent": [52.2908, 55.4814]},
+          "eager_leg_drift_percent": {"p50": 8.3598, "p95": 10.3231},
+          "source_leg_drift_percent": {"p50": 13.5284, "p95": 27.1176},
+          "accepted": false
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "No latency comparison is accepted because every phase failed at least one same-implementation stability gate.",
+    "Maximum RSS is a whole-process observation and is not per-operation allocation or peak-live-byte attribution.",
+    "The input is generated in memory; this is not cold-filesystem, remote-range, or producer-breadth evidence.",
+    "No decompressed, recompressed, memory-copy, hardware-counter, or save-path conclusion is supported.",
+    "The dirty worktree is explicitly qualified and is not a cryptographic source-to-binary binding."
+  ]
+}

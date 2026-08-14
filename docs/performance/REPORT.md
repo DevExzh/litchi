@@ -1,6 +1,6 @@
 # Performance program phase report
 
-Date: 2026-08-14
+Date: 2026-08-15
 Branch: `feat/office-format-completeness`
 Historical production base for the original measured tranche:
 `6df5d4a1fbe53a8216e63f24cc1392be60b714a8`
@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **201 selectable cases**; 200 was the count before the
+HEAD harness contains **216 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -1013,7 +1013,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 201 selectable cases. Change
+The committed HEAD standalone harness provides 216 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1037,6 +1037,22 @@ this is logical source-work and correctness evidence only; no latency,
 allocation, RSS, peak-memory, physical-cold, high-latency, or storage claim is
 accepted. The four raw reports and compact summary are in
 [`change 0103`](changes/0103-cfb-atomic-save-scan-evidence.md).
+
+Change 0117 records two CPU-pinned balanced release attempts for eight native
+PPT `Pictures` selectors. Timed source-backed samples use uninstrumented
+`OwnedSource`, while separate untimed replays confirm zero `Pictures` overlap
+at open, one complete stream read at a cold all-images query, and zero
+additional reads at a cached query. The longer attempt used 20 warmups and 200
+samples in each of eight fresh children per phase, including a directly timed
+fresh open-plus-all-images pair. Every phase failed at least one fixed
+same-implementation 5% p50 / 10% p95 drift gate, so the raw timing distributions
+are retained but no latency result is accepted. Whole-process RSS was
+91,136--91,584 KiB and is not per-operation memory attribution. No allocation,
+cold-cache, hardware-counter, producer-breadth, or save-path claim is accepted.
+See
+[`change 0117`](changes/0117-ppt-pictures-release-evidence.md) and its
+[raw report](results/ppt-pictures-release-0117.json).
+
 The previously measured
 default matrix remains 198 records across deterministic ZIP/OPC, positional
 CFB/OPC, source-backed XLSX,
