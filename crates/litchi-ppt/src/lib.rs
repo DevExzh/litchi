@@ -176,7 +176,7 @@ pub use encryption::EncryptionProfile;
 pub use non_zoom_view::{
     NoZoomViewInfo, NonZoomViewKind, OutlineSorterViewInfo, OutlineSorterViewInformation,
 };
-pub use package::{EncryptionKind, Error, OpenOptions, Package, RecordLimits};
+pub use package::{EncryptionKind, Error, OpenOptions, Package, RecordLimits, SourceBackedPackage};
 pub use presentation::{ParsedCustomShow, ParsedSlideComments, Presentation};
 pub use presentation_advisor::{AdvisorRule, PresentationAdvisorSettings};
 pub use slide::{
