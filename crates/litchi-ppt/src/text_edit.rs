@@ -346,6 +346,7 @@ pub struct SourceSnapshot {
 
 struct SourceInner {
     source: Arc<dyn ReadAt>,
+    shared: Arc<SharedOleFile>,
     version: SourceVersion,
     length: u64,
     fingerprint: ArtifactFingerprint,
@@ -416,6 +417,7 @@ impl SourceSnapshot {
             .plan_splices(Vec::new(), options.splice_limits)
             .map_err(Error::Source)?;
         let fingerprint = identity_plan.source_fingerprint();
+        let shared = publisher.shared();
         ensure_version(&source, version)?;
         let observed_length = source
             .len()
@@ -430,6 +432,7 @@ impl SourceSnapshot {
         Ok(Self {
             inner: Arc::new(SourceInner {
                 source,
+                shared,
                 version,
                 length,
                 fingerprint,
@@ -987,6 +990,7 @@ fn publish_source_operation(
     let target = SourceSnapshot {
         inner: Arc::new(SourceInner {
             source: candidate,
+            shared: Arc::new(candidate_shared),
             version: target_version,
             length: source.len(),
             fingerprint: plan.target_fingerprint(),
@@ -1057,9 +1061,8 @@ fn ensure_version(source: &Arc<dyn ReadAt>, expected: SourceVersion) -> Result<(
     Ok(())
 }
 
-fn open_shared_source(source: &SourceSnapshot) -> Result<SharedOleFile> {
-    let limits = shared_limits(source.inner.options.record_limits)?;
-    SharedOleFile::open_with_limits(Arc::clone(&source.inner.source), limits).map_err(map_ole_error)
+fn open_shared_source(source: &SourceSnapshot) -> Result<Arc<SharedOleFile>> {
+    Ok(Arc::clone(&source.inner.shared))
 }
 
 impl SourceSnapshot {
@@ -3800,6 +3803,8 @@ mod tests {
         let commit = transaction.commit().unwrap();
 
         assert_eq!(commit.snapshot().edit_text(target()).unwrap().text(), "xyz");
+        assert_eq!(commit.snapshot().read_text(target()).unwrap(), "xyz");
+        assert_eq!(commit.snapshot().read_text(target()).unwrap(), "xyz");
         assert_eq!(commit.diagnostics().replacement_bytes(), 3);
         assert!(!commit.is_noop());
 
@@ -3964,6 +3969,93 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn repeated_source_reads_reuse_validated_cfb_index_and_reject_mutation() {
+        let bytes = generated_fixture(6, 4);
+        let (legacy_counting, legacy_metrics) = CountingSource::new(bytes.clone());
+        let legacy_source: Arc<dyn ReadAt> = Arc::new(legacy_counting);
+        let legacy_snapshot = super::SourceSnapshot::open(Arc::clone(&legacy_source)).unwrap();
+
+        // This is the former per-query ownership shape: every selector opens
+        // and validates a new SharedOleFile before resolving its bounded
+        // ranges. Keep it in the regression so the I/O reduction remains
+        // auditable without relying on a second worktree or a benchmark.
+        CountingSource::reset(&legacy_metrics);
+        let mut legacy_text = None;
+        for _ in 0..2 {
+            legacy_snapshot.ensure_current().unwrap();
+            let shared = SharedOleFile::open_with_limits(
+                Arc::clone(&legacy_source),
+                super::shared_limits(crate::RecordLimits::default()).unwrap(),
+            )
+            .unwrap();
+            super::reject_macro_components(&shared).unwrap();
+            let document_path =
+                super::select_stream_path(&shared, &super::DOCUMENT_PATHS, "PowerPoint Document")
+                    .unwrap();
+            let current_user_path =
+                super::select_stream_path(&shared, &super::CURRENT_USER_PATHS, "Current User")
+                    .unwrap();
+            super::ensure_matching_stream_topology(&document_path, &current_user_path).unwrap();
+            let resolved = super::source_range::resolve_source_target(
+                &shared,
+                &document_path,
+                &current_user_path,
+                Target::new(Position::new(5), Position::new(3)),
+                crate::RecordLimits::default(),
+            )
+            .unwrap();
+            if let Some(expected) = &legacy_text {
+                assert_eq!(&resolved.text, expected);
+            } else {
+                legacy_text = Some(resolved.text);
+            }
+            legacy_snapshot.ensure_current().unwrap();
+        }
+        let legacy_metrics = {
+            let metrics = legacy_metrics.lock().unwrap();
+            (metrics.calls, metrics.bytes)
+        };
+
+        let (counting, metrics) = CountingSource::new(bytes);
+        let revision = Arc::clone(&counting.revision);
+        let source = super::SourceSnapshot::open(Arc::new(counting)).unwrap();
+
+        // Opening performs the one-time CFB catalog/FAT validation. The
+        // semantic selector should then issue only its bounded stream-range
+        // reads, with no second CFB index parse on a repeated query.
+        CountingSource::reset(&metrics);
+        let first = source
+            .read_text(Target::new(Position::new(5), Position::new(3)))
+            .unwrap();
+        let first_metrics = {
+            let metrics = metrics.lock().unwrap();
+            (metrics.calls, metrics.bytes)
+        };
+        let second = source
+            .read_text(Target::new(Position::new(5), Position::new(3)))
+            .unwrap();
+        let second_metrics = {
+            let metrics = metrics.lock().unwrap();
+            (metrics.calls, metrics.bytes)
+        };
+        assert_eq!(first, second);
+        assert!(first_metrics.0 > 0);
+        assert_eq!(second_metrics.0, first_metrics.0.saturating_mul(2));
+        assert_eq!(second_metrics.1, first_metrics.1.saturating_mul(2));
+        assert_eq!(legacy_text.as_deref(), Some(first.as_str()));
+        assert_eq!(legacy_metrics, (74, 8_310));
+        assert_eq!(second_metrics, (66, 3_190));
+        assert!(legacy_metrics.0 > second_metrics.0);
+        assert!(legacy_metrics.1 > second_metrics.1);
+
+        revision.fetch_add(1, Ordering::AcqRel);
+        assert!(matches!(
+            source.read_text(Target::new(Position::new(5), Position::new(3))),
+            Err(Error::Source(OverlayError::SourceChanged { .. }))
+        ));
     }
 
     #[test]

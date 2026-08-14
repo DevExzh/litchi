@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **227 selectable cases**; 200 was the count before the
+HEAD harness contains **229 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -1013,7 +1013,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 227 selectable cases. Change
+The committed HEAD standalone harness provides 229 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1030,6 +1030,16 @@ eager/source-backed pairs use the same deterministic target; separate untimed
 source replays retain exact logical counters and selected-text hashes. They are
 correctness and fixture-scoped logical-read evidence only, with no accepted
 latency, physical-I/O, allocation/RSS, cold-cache, or publication claim.
+
+Change 0121 adds two opt-in native PPT repeated selected-shape selectors,
+bringing the current matrix to 229 names while preserving the default 36-case
+/ 198-record tranche. The matched eager/source-backed controls retain one
+prepared owner for eight identical queries; source timing uses an
+uninstrumented source and independent replays report exact logical calls,
+bytes, prior-covered range bytes, and a canonical semantic digest. The frozen
+production two-query regression binds 74 calls / 8,310 bytes for legacy CFB
+reconstruction and 66 calls / 3,190 bytes with a retained parsed CFB index.
+This is logical-I/O/correctness evidence, not a latency or resource claim.
 
 Change 0103 adds a separate pinned release ABBA capture for
 `cfb_file_same_length_overlay_atomic_save` on CPU 2 (five warm-ups and 30

@@ -150,6 +150,7 @@ const OLE_COMMON_TARGET: &str = "ole_common_edit_target.bin";
 const OLE_COMMON_ORIGINAL: &[u8] = b"litchi-ole-common-original-stream-v1";
 const OLE_COMMON_REPLACEMENT: &[u8] = b"litchi-ole-common-edited-stream-v1";
 static NEXT_INSTRUMENTED_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
+const MAX_TRACKED_READ_RANGES: usize = 4096;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CorpusShape {
@@ -579,6 +580,8 @@ enum Case {
     PptSemanticListSlides,
     PptSemanticOneShapeText,
     PptSourceBackedOneShapeText,
+    PptSemanticRepeatedShapeText,
+    PptSourceBackedRepeatedShapeText,
     PptSemanticFreshOpenOneShapeText,
     PptSourceBackedFreshOpenOneShapeText,
     PptSemanticFullText,
@@ -890,6 +893,8 @@ impl Case {
             Self::PptSemanticListSlides => "ppt_semantic_list_slides",
             Self::PptSemanticOneShapeText => "ppt_semantic_one_shape_text",
             Self::PptSourceBackedOneShapeText => "ppt_source_backed_one_shape_text",
+            Self::PptSemanticRepeatedShapeText => "ppt_semantic_repeated_shape_text",
+            Self::PptSourceBackedRepeatedShapeText => "ppt_source_backed_repeated_shape_text",
             Self::PptSemanticFreshOpenOneShapeText => "ppt_semantic_fresh_open_one_shape_text",
             Self::PptSourceBackedFreshOpenOneShapeText => {
                 "ppt_source_backed_fresh_open_one_shape_text"
@@ -1118,6 +1123,8 @@ impl Case {
                 | Self::PptSemanticListSlides
                 | Self::PptSemanticOneShapeText
                 | Self::PptSourceBackedOneShapeText
+                | Self::PptSemanticRepeatedShapeText
+                | Self::PptSourceBackedRepeatedShapeText
                 | Self::PptSemanticFreshOpenOneShapeText
                 | Self::PptSourceBackedFreshOpenOneShapeText
                 | Self::PptSemanticFullText
@@ -1885,8 +1892,11 @@ struct PptShapeTextSourceSummary {
     target_slide: usize,
     target_shape: usize,
     canonical_text_sha256: String,
+    repeated_query_count: usize,
+    repeated_semantic_sha256: String,
     source_read_calls: Vec<u64>,
     source_read_bytes: Vec<u64>,
+    source_read_range_overlap_bytes: Vec<u64>,
 }
 
 /// Untimed correctness counters paired with the ODT mixed model-content
@@ -2207,6 +2217,10 @@ struct XlsxSourceSnapshot {
 struct SourceSnapshot {
     read_calls: u64,
     read_bytes: u64,
+    /// Bytes whose logical source ranges overlapped an earlier read in this
+    /// replay. This is useful for repeated-query evidence: it distinguishes
+    /// a stable positional read from re-reading the same source bytes.
+    read_range_overlap_bytes: u64,
     ordinary_payload_read_calls: u64,
     ordinary_payload_read_bytes: u64,
     max_in_flight_reads: u64,
@@ -2234,8 +2248,11 @@ struct InstrumentedSource {
     version: SourceVersion,
     ordinary_payload_ranges: Vec<Range<u64>>,
     xlsx_ranges: XlsxTrackedRanges,
+    track_read_ranges: bool,
     read_calls: AtomicU64,
     read_bytes: AtomicU64,
+    read_range_overlap_bytes: AtomicU64,
+    read_ranges: Mutex<Vec<Range<u64>>>,
     ordinary_payload_read_calls: AtomicU64,
     ordinary_payload_read_bytes: AtomicU64,
     in_flight_reads: AtomicU64,
@@ -2943,8 +2960,11 @@ impl InstrumentedSource {
             ),
             ordinary_payload_ranges,
             xlsx_ranges,
+            track_read_ranges: false,
             read_calls: AtomicU64::new(0),
             read_bytes: AtomicU64::new(0),
+            read_range_overlap_bytes: AtomicU64::new(0),
+            read_ranges: Mutex::new(Vec::new()),
             ordinary_payload_read_calls: AtomicU64::new(0),
             ordinary_payload_read_bytes: AtomicU64::new(0),
             in_flight_reads: AtomicU64::new(0),
@@ -2957,10 +2977,17 @@ impl InstrumentedSource {
         }
     }
 
+    fn new_with_range_tracking(bytes: Vec<u8>) -> Self {
+        let mut source = Self::new(bytes, Vec::new());
+        source.track_read_ranges = true;
+        source
+    }
+
     fn snapshot(&self) -> SourceSnapshot {
         SourceSnapshot {
             read_calls: self.read_calls.load(Ordering::SeqCst),
             read_bytes: self.read_bytes.load(Ordering::SeqCst),
+            read_range_overlap_bytes: self.read_range_overlap_bytes.load(Ordering::SeqCst),
             ordinary_payload_read_calls: self.ordinary_payload_read_calls.load(Ordering::SeqCst),
             ordinary_payload_read_bytes: self.ordinary_payload_read_bytes.load(Ordering::SeqCst),
             max_in_flight_reads: self.max_in_flight_reads.load(Ordering::SeqCst),
@@ -2978,6 +3005,10 @@ impl InstrumentedSource {
         debug_assert_eq!(self.in_flight_reads.load(Ordering::SeqCst), 0);
         self.read_calls.store(0, Ordering::SeqCst);
         self.read_bytes.store(0, Ordering::SeqCst);
+        self.read_range_overlap_bytes.store(0, Ordering::SeqCst);
+        if let Ok(mut ranges) = self.read_ranges.lock() {
+            ranges.clear();
+        }
         self.ordinary_payload_read_calls.store(0, Ordering::SeqCst);
         self.ordinary_payload_read_bytes.store(0, Ordering::SeqCst);
         self.max_in_flight_reads.store(0, Ordering::SeqCst);
@@ -3043,8 +3074,62 @@ impl ReadAt for InstrumentedSource {
         let count_u64 = u64::try_from(count)
             .map_err(|_error| io::Error::other("instrumented read length does not fit u64"))?;
         self.read_bytes.fetch_add(count_u64, Ordering::SeqCst);
-
         let end = offset.saturating_add(count_u64);
+
+        if self.track_read_ranges && count_u64 != 0 {
+            let mut range = offset..end;
+            let mut ranges = self
+                .read_ranges
+                .lock()
+                .map_err(|_| io::Error::other("instrumented source range metrics are poisoned"))?;
+            // Keep a sorted, coalesced union so each current-read byte is
+            // counted at most once even when earlier reads overlap.
+            let mut overlap = 0_u64;
+            let mut cursor = range.start;
+            for previous in ranges.iter() {
+                if previous.end <= cursor {
+                    continue;
+                }
+                if previous.start >= range.end {
+                    break;
+                }
+                let covered_start = cursor.max(previous.start);
+                let covered_end = range.end.min(previous.end);
+                if covered_end > covered_start {
+                    overlap = overlap.saturating_add(covered_end - covered_start);
+                    cursor = covered_end;
+                }
+            }
+            self.read_range_overlap_bytes
+                .fetch_add(overlap, Ordering::SeqCst);
+
+            let mut merged = Vec::with_capacity(ranges.len().saturating_add(1));
+            let mut inserted = false;
+            for previous in ranges.drain(..) {
+                if previous.end < range.start {
+                    merged.push(previous);
+                } else if range.end < previous.start {
+                    if !inserted {
+                        merged.push(range.clone());
+                        inserted = true;
+                    }
+                    merged.push(previous);
+                } else {
+                    range.start = range.start.min(previous.start);
+                    range.end = range.end.max(previous.end);
+                }
+            }
+            if !inserted {
+                merged.push(range);
+            }
+            if merged.len() > MAX_TRACKED_READ_RANGES {
+                return Err(io::Error::other(
+                    "instrumented source read-range evidence exceeded its bounded interval budget",
+                ));
+            }
+            *ranges = merged;
+        }
+
         let ordinary_bytes = range_overlap_bytes(&self.ordinary_payload_ranges, offset, end);
         if ordinary_bytes != 0 {
             self.ordinary_payload_read_calls
@@ -5196,6 +5281,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_semantic_list_slides" => Some(Case::PptSemanticListSlides),
         "ppt_semantic_one_shape_text" => Some(Case::PptSemanticOneShapeText),
         "ppt_source_backed_one_shape_text" => Some(Case::PptSourceBackedOneShapeText),
+        "ppt_semantic_repeated_shape_text" => Some(Case::PptSemanticRepeatedShapeText),
+        "ppt_source_backed_repeated_shape_text" => Some(Case::PptSourceBackedRepeatedShapeText),
         "ppt_semantic_fresh_open_one_shape_text" => Some(Case::PptSemanticFreshOpenOneShapeText),
         "ppt_source_backed_fresh_open_one_shape_text" => {
             Some(Case::PptSourceBackedFreshOpenOneShapeText)
@@ -5474,7 +5561,9 @@ fn print_usage() {
                                        xls_visibility_source_backed_batch_edit_save,\n\
                                        ppt_semantic_open,ppt_semantic_list_slides,\n\
                                        ppt_semantic_one_shape_text,ppt_semantic_full_text,\n\
+                                       ppt_semantic_repeated_shape_text,\n\
                                        ppt_source_backed_one_shape_text,\n\
+                                       ppt_source_backed_repeated_shape_text,\n\
                                        ppt_semantic_fresh_open_one_shape_text,\n\
                                        ppt_source_backed_fresh_open_one_shape_text,\n\
                                        ppt_slide_order_snapshot_open,\n\
@@ -9580,6 +9669,9 @@ fn run_case_with_config(
         | Case::PptSourceBackedFreshOpenOneShapeText => {
             run_ppt_selected_shape_text(case, corpus, warmup_iterations, samples)
         },
+        Case::PptSemanticRepeatedShapeText | Case::PptSourceBackedRepeatedShapeText => {
+            run_ppt_repeated_shape_text(case, corpus, warmup_iterations, samples)
+        },
         Case::PptTextEditOneEditSave => {
             run_ppt_text_edit_one_edit_save(corpus, warmup_iterations, samples)
         },
@@ -12824,6 +12916,172 @@ fn run_ppt_selected_shape_text(
     } else {
         Ok(result(case, corpus, elapsed, None))
     }
+}
+
+const PPT_REPEATED_QUERY_COUNT: usize = 8;
+
+fn repeated_ppt_text_digest(text: &str) -> String {
+    let mut digest = Sha256::new();
+    for _ in 0..PPT_REPEATED_QUERY_COUNT {
+        digest.update(text.as_bytes());
+    }
+    let digest = digest.finalize();
+    let mut output = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(output, "{byte:02x}");
+    }
+    output
+}
+
+fn replay_ppt_repeated_shape_source(
+    archive: &[u8],
+    target: litchi_ppt::text_edit::Target,
+    expected: &str,
+) -> Result<SourceSnapshot, Box<dyn Error>> {
+    let source = Arc::new(InstrumentedSource::new_with_range_tracking(
+        archive.to_vec(),
+    ));
+    let snapshot = litchi_ppt::text_edit::SourceSnapshot::open(source.clone())?;
+    source.reset();
+    let mut digest = Sha256::new();
+    for _ in 0..PPT_REPEATED_QUERY_COUNT {
+        let text = snapshot.read_text(target)?;
+        if text != expected {
+            return Err("repeated PPT source replay differs from specification".into());
+        }
+        digest.update(text.as_bytes());
+    }
+    let actual = digest.finalize();
+    let mut actual_hex = String::with_capacity(actual.len() * 2);
+    for byte in actual {
+        use std::fmt::Write as _;
+        let _ = write!(actual_hex, "{byte:02x}");
+    }
+    if actual_hex != repeated_ppt_text_digest(expected) {
+        return Err("repeated PPT source replay digest is unstable".into());
+    }
+    Ok(source.snapshot())
+}
+
+/// Matched repeated selected-shape queries. Corpus construction and semantic
+/// owner/source setup are outside the timed interval; only the repeated query
+/// loop is measured. The source-backed arm independently replays its logical
+/// reads through an instrumented immutable source, so the timing remains free
+/// of counter locking and digest work.
+fn run_ppt_repeated_shape_text(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    use litchi_ppt::text_edit::Target;
+
+    let shape = writer_shape(corpus)?;
+    if shape == WriterShape::PayloadHeavy {
+        return Err("payload-heavy PPT corpus is excluded from repeated semantic cases".into());
+    }
+    let (slide_count, boxes_per_slide) = shape.ppt_dimensions();
+    let linear = slide_count * boxes_per_slide / 2;
+    let selected = (linear / boxes_per_slide, linear % boxes_per_slide);
+    let target = Target::new(Position::new(selected.0), Position::new(selected.1));
+    let expected = writer_text("ppt", selected.0, selected.1, 0);
+    let expected_digest = repeated_ppt_text_digest(&expected);
+    let source_backed = case == Case::PptSourceBackedRepeatedShapeText;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut shape_source_summary = PptShapeTextSourceSummary {
+        implementation: if source_backed {
+            "source-backed"
+        } else {
+            "eager"
+        },
+        phase: "repeated-selected-shape-query",
+        timing_scope: if source_backed {
+            "prepared-source-and-semantic-owner-outside-timing"
+        } else {
+            "prepared-semantic-owner-outside-timing"
+        },
+        target_slide: selected.0,
+        target_shape: selected.1,
+        canonical_text_sha256: sha256_hex(expected.as_bytes()),
+        repeated_query_count: PPT_REPEATED_QUERY_COUNT,
+        repeated_semantic_sha256: expected_digest.clone(),
+        ..PptShapeTextSourceSummary::default()
+    };
+    let mut exact_source_counter_gate = None;
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let duration = if source_backed {
+            let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
+            let snapshot = litchi_ppt::text_edit::SourceSnapshot::open(source)?;
+            // Validation and source-owner construction are setup, not query
+            // work. Retain the same snapshot for all repeated queries in this
+            // iteration.
+            let started = Instant::now();
+            for _ in 0..PPT_REPEATED_QUERY_COUNT {
+                let text = snapshot.read_text(target)?;
+                if text != expected {
+                    return Err("repeated PPT source-backed text differs from specification".into());
+                }
+            }
+            started.elapsed()
+        } else {
+            let mut package =
+                litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+            let presentation = package.presentation()?;
+            let started = Instant::now();
+            for _ in 0..PPT_REPEATED_QUERY_COUNT {
+                let text = presentation
+                    .slides()?
+                    .into_iter()
+                    .nth(selected.0)
+                    .ok_or("repeated PPT selected slide is missing")?
+                    .shapes()?
+                    .get(selected.1)
+                    .ok_or("repeated PPT selected shape is missing")?
+                    .text()?;
+                if text != expected {
+                    return Err("repeated PPT eager text differs from specification".into());
+                }
+            }
+            started.elapsed()
+        };
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+
+        if iteration >= warmup_iterations && source_backed {
+            let snapshot = replay_ppt_repeated_shape_source(&corpus.archive, target, &expected)?;
+            if snapshot.read_calls == 0
+                || snapshot.read_bytes == 0
+                || snapshot.max_in_flight_reads != 1
+            {
+                return Err("repeated PPT source read evidence is incomplete".into());
+            }
+            if let Some(expected_snapshot) = exact_source_counter_gate {
+                if expected_snapshot != snapshot {
+                    return Err(
+                        "repeated PPT source-read counters changed across deterministic samples"
+                            .into(),
+                    );
+                }
+            } else {
+                exact_source_counter_gate = Some(snapshot);
+            }
+            source_summary.record(snapshot);
+            shape_source_summary
+                .source_read_calls
+                .push(snapshot.read_calls);
+            shape_source_summary
+                .source_read_bytes
+                .push(snapshot.read_bytes);
+            shape_source_summary
+                .source_read_range_overlap_bytes
+                .push(snapshot.read_range_overlap_bytes);
+        }
+    }
+
+    source_summary.ppt_shape_text = Some(shape_source_summary);
+    Ok(result_with_source(case, corpus, elapsed, source_summary))
 }
 
 fn run_semantic_ppt(
@@ -23490,10 +23748,11 @@ mod tests {
         Case, CfbSelectiveTarget, CorpusShape, CountingSeekSink, CountingSink, HashingDiscardSink,
         InstrumentedSource, ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES,
         ODP_TEXT_BOX_BATCH_COUNT, ODT_RESOURCE_BATCH_COUNT, OpcCacheMode, PPT_PICTURE_BYTES,
-        PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR, PPTX_MULTI_SLIDE_BATCH_COUNT,
-        PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
-        RtfSemanticVariant, SemanticShape, SimulatedRangeSource, SinkSummary, SourceBackedPackage,
-        WindowedHashingSink, WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
+        PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR, PPT_REPEATED_QUERY_COUNT,
+        PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
+        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
+        SimulatedRangeSource, SinkSummary, SourceBackedPackage, WindowedHashingSink,
+        WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
         XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape, XlsxShape,
         build_cfb_corpus, build_cfb_selective_corpus, build_docx_source_edit_corpus,
         build_odf_repair_corpus, build_odp_media_corpus, build_odp_text_box_batch_corpus,
@@ -23510,7 +23769,7 @@ mod tests {
         build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
         build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
         build_xlsx_sheet_protection_edit_corpus, expected_opc_overlay_output,
-        ole_common_changed_output, opc_overlay_replacement_payload, payload_bytes,
+        ole_common_changed_output, opc_overlay_replacement_payload, parse_case, payload_bytes,
         resolve_execution_workers, run_case, run_case_with_config, run_cfb_selective_read,
         run_docx_source_backed_one_edit_save, run_opc_source_cache_budget_boundary,
         run_opc_source_cache_contention, run_opc_source_overlay_one_part_save, run_ppt_pictures,
@@ -24736,6 +24995,79 @@ mod tests {
                 assert!(measured.source.is_none());
             }
         }
+    }
+
+    #[test]
+    fn native_ppt_repeated_selected_queries_have_matched_semantic_evidence() {
+        assert_eq!(
+            parse_case("ppt_semantic_repeated_shape_text"),
+            Some(Case::PptSemanticRepeatedShapeText)
+        );
+        assert_eq!(
+            parse_case("ppt_source_backed_repeated_shape_text"),
+            Some(Case::PptSourceBackedRepeatedShapeText)
+        );
+        assert_eq!(
+            Case::PptSemanticRepeatedShapeText.name(),
+            "ppt_semantic_repeated_shape_text"
+        );
+        assert_eq!(
+            Case::PptSourceBackedRepeatedShapeText.name(),
+            "ppt_source_backed_repeated_shape_text"
+        );
+        let corpus = build_writer_corpus(Case::PptFreshWriteTo, WriterShape::Tiny).unwrap();
+        let eager = run_case(Case::PptSemanticRepeatedShapeText, &corpus, 1, 2).unwrap();
+        let source = run_case(Case::PptSourceBackedRepeatedShapeText, &corpus, 1, 2).unwrap();
+        let eager_shape = eager
+            .source
+            .expect("eager repeated-query evidence")
+            .ppt_shape_text
+            .expect("eager repeated-query summary");
+        let source_shape = source
+            .source
+            .expect("source repeated-query evidence")
+            .ppt_shape_text
+            .expect("source repeated-query summary");
+        assert_eq!(eager_shape.repeated_query_count, PPT_REPEATED_QUERY_COUNT);
+        assert_eq!(source_shape.repeated_query_count, PPT_REPEATED_QUERY_COUNT);
+        assert_eq!(
+            eager_shape.repeated_semantic_sha256,
+            source_shape.repeated_semantic_sha256
+        );
+        assert_eq!(source_shape.source_read_calls.len(), 2);
+        assert_eq!(source_shape.source_read_bytes.len(), 2);
+        assert_eq!(source_shape.source_read_range_overlap_bytes.len(), 2);
+        assert_eq!(
+            source_shape.source_read_calls[0],
+            source_shape.source_read_calls[1]
+        );
+        assert_eq!(
+            source_shape.source_read_bytes[0],
+            source_shape.source_read_bytes[1]
+        );
+        assert_eq!(
+            source_shape.source_read_range_overlap_bytes[0],
+            source_shape.source_read_range_overlap_bytes[1]
+        );
+        assert!(
+            source_shape
+                .source_read_calls
+                .iter()
+                .all(|&count| count > 0)
+        );
+        assert!(
+            source_shape
+                .source_read_bytes
+                .iter()
+                .all(|&bytes| bytes > 0)
+        );
+        assert!(
+            source_shape
+                .source_read_range_overlap_bytes
+                .iter()
+                .zip(&source_shape.source_read_bytes)
+                .all(|(&overlap, &bytes)| overlap > 0 && overlap <= bytes)
+        );
     }
 
     #[test]
