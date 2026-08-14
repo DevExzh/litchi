@@ -2,8 +2,12 @@
 
 use std::collections::BTreeMap;
 use std::io::Write;
+#[cfg(any(unix, windows))]
+use std::path::Path;
 use std::sync::Arc;
 
+#[cfg(any(unix, windows))]
+use litchi_core::FileSource;
 use litchi_core::{ExecutionContext, ReadAt};
 use litchi_opc::{ReadLimits, SourceBackedPackage, SourceCacheLimits};
 use litchi_sheet::Cell as Address;
@@ -140,6 +144,155 @@ pub struct MultiSourceEdit {
 }
 
 impl SourceBackedEditor {
+    /// Open an ordinary XLSX package from a regular filesystem path.
+    ///
+    /// The path is represented by an open positional [`FileSource`], so
+    /// opening does not read the complete artifact into memory. Deferred
+    /// worksheet payloads retain the same lazy behavior as the `ReadAt`
+    /// constructors below.
+    #[cfg(any(unix, windows))]
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_path_with_limits(path, ReadLimits::default())
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit OPC ingress
+    /// limits.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_read_at_with_limits(file_source(path)?, limits)
+    }
+
+    /// Open a filesystem-backed XLSX package with an explicit finite
+    /// deferred-payload cache policy.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_cache_limits(
+        path: impl AsRef<Path>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_read_at_with_cache_limits(file_source(path)?, cache_limits)
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit read and cache
+    /// policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_cache_limits(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit read and
+    /// execution policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit read and
+    /// execution policies (the cache uses its default bounded policy).
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
+    }
+
+    /// Open a filesystem-backed XLSX package with explicit read, cache, and
+    /// caller-owned execution policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits_and_cache_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            file_source(path)?,
+            limits,
+            cache_limits,
+            context,
+        )
+    }
+
+    /// Open a filesystem-backed XLSX editor from a regular path.
+    #[cfg(any(unix, windows))]
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_path(path)
+    }
+
+    /// Open a filesystem-backed XLSX editor with explicit OPC limits.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_path_with_limits(path, limits)
+    }
+
+    /// Open a filesystem-backed XLSX editor with an explicit finite cache.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_cache_limits(
+        path: impl AsRef<Path>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_path_with_cache_limits(path, cache_limits)
+    }
+
+    /// Open a filesystem-backed XLSX editor with explicit read and cache
+    /// policies.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits_and_cache_limits(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
+    }
+
+    /// Open a filesystem-backed XLSX editor with explicit read and execution
+    /// policies while retaining the default finite cache.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_path_with_execution_context(path, limits, context)
+    }
+
+    /// Open a filesystem-backed XLSX editor with explicit read and execution
+    /// policies while retaining the default finite cache.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_path_with_limits_and_execution_context(path, limits, context)
+    }
+
+    /// Open a filesystem-backed XLSX editor with explicit read, cache, and
+    /// execution policies.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_limits_and_cache_limits_and_execution_context(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_path_with_limits_and_cache_limits_and_execution_context(
+            path,
+            limits,
+            cache_limits,
+            context,
+        )
+    }
+
     /// Open with the standard bounded OPC policy.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
         Self::from_read_at_with_limits(source, ReadLimits::default())
@@ -430,6 +583,13 @@ impl SourceBackedEditor {
             .write_part_overlays_to_stream(writer, replacements)?;
         Ok(target)
     }
+}
+
+#[cfg(any(unix, windows))]
+fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
+    Ok(Arc::new(FileSource::open(path).map_err(|error| {
+        Error::Package(litchi_opc::OpcError::from(error))
+    })?))
 }
 
 impl SourceEdit {
