@@ -113,6 +113,7 @@ Minor (reclaiming a frame) page faults: 34
                 build_command=["cargo", "build", "--locked"],
                 build_result={"executed": False},
                 source_identity={"revision": "head", "head_tree": "tree"},
+                pre_build_source_identity=None,
                 rerun_command=["python3", "tools/perf_resource_profile.py", "run", "--build"],
             )
         self.assertEqual(identity["provenance"]["status"], "prebuilt_binary_hash_only")
@@ -120,6 +121,95 @@ Minor (reclaiming a frame) page faults: 34
         self.assertEqual(identity["source_content_identity"]["revision"], "head")
         self.assertEqual(identity["build_result"]["executed"], False)
         json.dumps(identity, allow_nan=False)
+
+    def test_untracked_content_identity_changes_with_file_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "scratch.txt"
+            path.write_text("first", encoding="utf-8")
+            link = root / "scratch.link"
+            try:
+                link.symlink_to("scratch.txt")
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks unavailable")
+            status = b"?? scratch.txt\0?? scratch.link\0"
+            first = perf_resource_profile.untracked_content_identity(status, repo_root=root)
+            path.write_text("second", encoding="utf-8")
+            second = perf_resource_profile.untracked_content_identity(status, repo_root=root)
+        self.assertEqual(first["status"], "ok")
+        first_entries = {entry["path"]: entry for entry in first["entries"]}
+        second_entries = {entry["path"]: entry for entry in second["entries"]}
+        self.assertEqual(first_entries["scratch.txt"]["kind"], "file")
+        self.assertEqual(first_entries["scratch.link"]["kind"], "symlink")
+        self.assertEqual(first["total_bytes"], len(b"first") + len(b"scratch.txt"))
+        self.assertNotEqual(first_entries["scratch.txt"]["sha256"], second_entries["scratch.txt"]["sha256"])
+
+    def test_untracked_content_identity_refuses_symlinked_ancestor(self):
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
+            root = Path(directory)
+            secret = Path(outside) / "secret.txt"
+            secret.write_text("outside", encoding="utf-8")
+            try:
+                (root / "linkdir").symlink_to(Path(outside), target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("directory symlinks unavailable")
+            result = perf_resource_profile.untracked_content_identity(
+                b"?? linkdir/secret.txt\0",
+                repo_root=root,
+            )
+        self.assertEqual(result["status"], "error")
+        self.assertIn("symlinked ancestor", result["error"])
+        self.assertEqual(result["entries"], [])
+
+    def test_build_status_requires_success_and_complete_clean_matching_snapshots(self):
+        snapshot = {
+            "revision": "head",
+            "snapshot_status": "complete",
+            "git_worktree_dirty": False,
+            "untracked_content": {"status": "ok"},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "litchi-perf-baseline"
+            binary.write_bytes(b"built")
+            common = {
+                "build_command": ["cargo", "build"],
+                "source_identity": snapshot,
+                "pre_build_source_identity": snapshot.copy(),
+                "rerun_command": ["python3", "tools/perf_resource_profile.py", "run", "--build"],
+            }
+            success = perf_resource_profile.build_identity(
+                binary,
+                build_result={"executed": True, "returncode": 0, "timed_out": False},
+                **common,
+            )
+            failed = perf_resource_profile.build_identity(
+                binary,
+                build_result={"executed": True, "returncode": 1, "timed_out": False},
+                **common,
+            )
+            timed_out = perf_resource_profile.build_identity(
+                binary,
+                build_result={"executed": True, "returncode": 0, "timed_out": True},
+                **common,
+            )
+            dirty = dict(snapshot, git_worktree_dirty=True)
+            dirty_identity = perf_resource_profile.build_identity(
+                binary,
+                build_result={"executed": True, "returncode": 0, "timed_out": False},
+                build_command=["cargo", "build"],
+                source_identity=dirty,
+                pre_build_source_identity=snapshot,
+                rerun_command=common["rerun_command"],
+            )
+        self.assertEqual(success["provenance"]["status"], "build_succeeded_matching_source_snapshots")
+        self.assertEqual(failed["provenance"]["status"], "build_failed")
+        self.assertEqual(timed_out["provenance"]["status"], "build_failed")
+        self.assertEqual(dirty_identity["provenance"]["status"], "build_succeeded_source_snapshot_only")
+        self.assertTrue(failed["provenance"]["rerun_required"])
+        self.assertTrue(dirty_identity["provenance"]["rerun_required"])
+        json.dumps(success, allow_nan=False)
+        json.dumps(failed, allow_nan=False)
+        json.dumps(dirty_identity, allow_nan=False)
 
     def test_logical_measurements_retain_identity_and_counters(self):
         report = {

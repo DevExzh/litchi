@@ -21,8 +21,11 @@ identified by SHA-256
 `1cbb2340eae13f4ed49d5baa27532e1f9b31d5781036bb2a302837bcd2210f5c`.
 The result is deliberately current-HEAD evidence only; it does not compare two
 revisions or claim an optimization.  The dirty-worktree release build completed
-successfully and is explicitly `build_content_bound`; the binary hash/size and
-captured source/content identity are bound to that build.
+successfully, so the exact binary hash/size and successful build are recorded.
+Because the original run retained only a post-build dirty snapshot and no
+pre-build or bounded untracked-content identity, it is explicitly
+`build_succeeded_source_snapshot_only`, not a complete or cryptographic
+source-to-binary binding; a clean pre/post-snapshot rerun is required.
 
 The three-sample harness p50s were 59.68 ms for OPC source one-Part
 publication, 33.26 ms for managed XLSX batch edit/save, 10.02 ms for medium RTF
