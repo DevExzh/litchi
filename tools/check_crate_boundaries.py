@@ -1544,6 +1544,64 @@ NUMBERS_TABLE_CELLS_WIRE_TYPES = frozenset(
         "WireView",
     }
 )
+NUMBERS_FORMULA_SEMANTIC_SOURCE = Path("crates/litchi-numbers/src/formula.rs")
+NUMBERS_FORMULA_PUBLIC_API_SOURCES = (
+    NUMBERS_FORMULA_SEMANTIC_SOURCE,
+    Path("crates/litchi-numbers/src/lib.rs"),
+    Path("crates/litchi-numbers/src/package.rs"),
+    Path("crates/litchi-numbers/src/package/table_cells.rs"),
+    Path("crates/litchi-numbers/src/table/cells.rs"),
+    Path("crates/litchi-numbers/src/package/table_cell_edit.rs"),
+)
+NUMBERS_FORMULA_CANONICAL_TYPES = (
+    "Expression",
+    "CachedValue",
+    "CellReference",
+    "AxisReference",
+    "BinaryOperator",
+    "Table",
+    "Error",
+    "LimitKind",
+)
+NUMBERS_FORMULA_CANONICAL_TYPE_SET = frozenset(NUMBERS_FORMULA_CANONICAL_TYPES)
+NUMBERS_FORMULA_TRANSACTION_LIMIT_SOURCE = Path(
+    "crates/litchi-numbers/src/package/table_cells.rs"
+)
+NUMBERS_FORMULA_TRANSACTION_LIMIT_VARIANTS = ("WireBytes", "AllocationEvents")
+RETIRED_NUMBERS_FORMULA_FACADE_TYPES = frozenset(
+    {
+        "FormulaExpression",
+        "FormulaCachedValue",
+        "FormulaCellReference",
+        "FormulaAxisReference",
+        "FormulaBinaryOperator",
+        "FormulaPivotCategoryReference",
+        "FormulaUuid",
+    }
+)
+NUMBERS_FORMULA_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tn", "tsp", "tst", "tswp"}
+)
+NUMBERS_FORMULA_WIRE_TYPES = frozenset(
+    {
+        "BncCell",
+        "BncCellView",
+        "DecodeOptions",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+NUMBERS_FORMULA_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?formula[ \t\r\n]*::"
+)
+PUBLIC_NUMBERS_FORMULA_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?formula\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
 NUMBERS_TABLE_CELLS_MUTATION_TYPES = (
     "Input",
     "Change",
@@ -3856,6 +3914,53 @@ def _is_numbers_table_cells_mutation_public_declaration(
     }
     return bool(identifiers & NUMBERS_TABLE_CELLS_FULL_FLAT_ALIASES) or (
         _numbers_table_cells_mutation_owner_declaration(declaration)
+    )
+
+
+def _numbers_formula_public_leak(identifier: str) -> str | None:
+    """Classify vocabulary forbidden in the focused Numbers formula API."""
+
+    if identifier in RETIRED_NUMBERS_FORMULA_FACADE_TYPES:
+        return "retired formula facade type"
+    if identifier in {"litchi_iwa", "litchi_iwa_common"}:
+        return "litchi-iwa formula facade"
+    if identifier in NUMBERS_FORMULA_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier == "wire" or identifier in NUMBERS_FORMULA_WIRE_TYPES:
+        return "wire/BNC type"
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"bnc", "buffa", "codec", "prost"} for word in words):
+        return "protobuf type"
+    return _iwork_public_leak(identifier)
+
+
+def _numbers_formula_owner_declaration(declaration: str) -> bool:
+    """Return whether a declaration routes through the canonical formula module."""
+
+    return NUMBERS_FORMULA_OWNER_PATH.search(declaration) is not None
+
+
+def _is_numbers_formula_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    """Limit non-formula owner scans to declarations that expose formula API."""
+
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    words = {
+        word.lower()
+        for identifier in identifiers
+        for part in identifier.split("_")
+        for word in CAMEL_CASE_WORD.findall(part)
+    }
+    return (
+        "formula" in words
+        or bool(identifiers & RETIRED_NUMBERS_FORMULA_FACADE_TYPES)
     )
 
 
@@ -7014,6 +7119,110 @@ def audit_numbers_table_dimension_facade_source_topology(
     return sorted(set(violations))
 
 
+def audit_numbers_formula_facade_source_topology(root: Path = ROOT) -> list[str]:
+    """Enforce contextual, archive-free Numbers formula authoring vocabulary.
+
+    Formula construction belongs at ``litchi_numbers::formula`` and is consumed
+    by the existing selector-first table-cell transaction.  In particular, the
+    public focused boundary must never route callers through the old shared-IWA
+    formula facade or expose its UUID/table-ID based reference vocabulary.
+    """
+
+    semantic_path = root / NUMBERS_FORMULA_SEMANTIC_SOURCE
+    semantic_source = (
+        semantic_path.read_text(encoding="utf-8")
+        if semantic_path.is_file()
+        else ""
+    )
+    violations: list[str] = []
+
+    canonical_exports = _rust_canonical_exports(
+        semantic_source, NUMBERS_FORMULA_CANONICAL_TYPE_SET
+    )
+    for name in NUMBERS_FORMULA_CANONICAL_TYPES:
+        if name in canonical_exports:
+            continue
+        violations.append(
+            "focused litchi-numbers formula API is missing canonical "
+            f"formula type {name}: {NUMBERS_FORMULA_SEMANTIC_SOURCE}"
+        )
+
+    transaction_limit_path = root / NUMBERS_FORMULA_TRANSACTION_LIMIT_SOURCE
+    transaction_limit_source = (
+        transaction_limit_path.read_text(encoding="utf-8")
+        if transaction_limit_path.is_file()
+        else ""
+    )
+    limit_variants = _rust_public_enum_variants(transaction_limit_source, "LimitKind")
+    for variant in NUMBERS_FORMULA_TRANSACTION_LIMIT_VARIANTS:
+        if variant in limit_variants:
+            continue
+        violations.append(
+            "focused litchi-numbers formula transaction API is missing typed "
+            f"LimitKind::{variant}: {NUMBERS_FORMULA_TRANSACTION_LIMIT_SOURCE}"
+        )
+
+    lib_path = root / NUMBERS_SOURCE_ROOT / "lib.rs"
+    lib_source = (
+        _mask_rust_non_code(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    if PUBLIC_NUMBERS_FORMULA_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-numbers formula API is missing canonical root "
+            f"formula module: {NUMBERS_SOURCE_ROOT / 'lib.rs'}"
+        )
+
+    for relative_path in NUMBERS_FORMULA_PUBLIC_API_SOURCES:
+        path = root / relative_path
+        if not path.is_file():
+            continue
+        source = path.read_text(encoding="utf-8")
+        for declaration, line_number in _rust_public_declarations(source):
+            if not _is_numbers_formula_public_declaration(
+                declaration,
+                dedicated_source=relative_path == NUMBERS_FORMULA_SEMANTIC_SOURCE,
+            ):
+                continue
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            owner_declaration = _numbers_formula_owner_declaration(declaration)
+            public_use_or_type = identifiers[:2] in (["pub", "use"], ["pub", "type"])
+            if (
+                relative_path != NUMBERS_FORMULA_SEMANTIC_SOURCE
+                and owner_declaration
+                and public_use_or_type
+                and bool(set(identifiers) & NUMBERS_FORMULA_CANONICAL_TYPE_SET)
+            ):
+                violations.append(
+                    "focused litchi-numbers formula API retains root formula alias: "
+                    f"{relative_path}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                reason = _numbers_formula_public_leak(identifier)
+                if reason is None:
+                    continue
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                violations.append(
+                    "focused litchi-numbers formula API exposes "
+                    f"{reason} {identifier}: {relative_path}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count("\n", 0, match.start())
+                violations.append(
+                    "focused litchi-numbers formula API exposes raw byte slice "
+                    f"{byte_slice}: {relative_path}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_table_cells_facade_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -9237,6 +9446,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_table_title_settings_facade_source_topology()
         + audit_iwa_numbers_table_dimension_source_topology()
         + audit_numbers_table_dimension_facade_source_topology()
+        + audit_numbers_formula_facade_source_topology()
         + audit_numbers_table_cells_facade_source_topology()
         + audit_numbers_table_cells_mutation_facade_source_topology()
         + audit_iwa_numbers_table_cell_mutation_source_topology()

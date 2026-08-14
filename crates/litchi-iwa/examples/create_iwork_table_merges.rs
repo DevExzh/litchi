@@ -39,7 +39,7 @@ fn create_numbers(output: &Path, region: Region) -> Result<(), Box<dyn std::erro
         table_id,
         region.row() as usize,
         region.column() as usize,
-        FormulaExpression::Number(MERGED_FORMULA_RESULT.try_into()?),
+        FormulaExpression::Number(MERGED_FORMULA_RESULT),
         FormulaCachedValue::Number(MERGED_FORMULA_RESULT.try_into()?),
     )?;
     editor.merge_cells(table_id, region)?;
@@ -66,7 +66,7 @@ fn create_pages(output: &Path, region: Region) -> Result<(), Box<dyn std::error:
         table_id,
         region.row() as usize,
         region.column() as usize,
-        FormulaExpression::Number(MERGED_FORMULA_RESULT.try_into()?),
+        FormulaExpression::Number(MERGED_FORMULA_RESULT),
         FormulaCachedValue::Number(MERGED_FORMULA_RESULT.try_into()?),
     )?;
     editor.merge_table_cells(table_id, region)?;
@@ -103,7 +103,7 @@ fn create_keynote(output: &Path, region: Region) -> Result<(), Box<dyn std::erro
         table.model_object_id,
         region.row() as usize,
         region.column() as usize,
-        FormulaExpression::Number(MERGED_FORMULA_RESULT.try_into()?),
+        FormulaExpression::Number(MERGED_FORMULA_RESULT),
         FormulaCachedValue::Number(MERGED_FORMULA_RESULT.try_into()?),
     )?;
     editor.merge_slide_table_cells(0, table.model_object_id, region)?;

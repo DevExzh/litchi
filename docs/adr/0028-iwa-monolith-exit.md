@@ -2894,3 +2894,26 @@ Host all-target/all-feature check/no-run, retained-axis 2/2, Pages-layout 1/1,
 generated-roundtrip 1/1, scoped boundary 6/6, strict library Clippy,
 formatting, and diff gates pass. Broad host all-target Clippy retains nine
 unrelated existing lints.
+
+## 2026-08-14 Numbers formula decoupling, not host exit
+
+The focused Numbers facade now owns bounded semantic formula authoring and its
+transaction, and the formula-specific boundary audit finds no focused import or
+reexport of host formula identities. The root aliases previously exposed by
+`litchi-numbers` are removed rather than redirected. Native and performance
+evidence for the focused replacement is accepted in ADR 0008.
+
+This cut deliberately does not declare a `litchi-iwa` host exit. The host still
+contains production formula readers and setters, compatibility examples and
+tests, raw formula vocabulary, and pivot-category behavior. Its Numbers formula
+adapter imports the legacy `Formula*` vocabulary from neutral
+`litchi-iwa-common`, preserving pivot compatibility without restoring
+`PivotCategory` or raw identities in the focused API. No manifest dependency or
+ordered debt entry is removed here.
+
+A later host-exit cut must inventory and delete the remaining production
+setters, raw exports, pivot vocabulary, dependent examples/tests, compiler and
+mutation seams, manifest edge, and debt record together. It must rerun the
+retired-surface and raw-identity audits and preserve all still-required reader
+and cross-format behavior. Compatibility aliases, test-only reexports, or a
+hidden facade bridge are not an acceptable substitute for that deletion.

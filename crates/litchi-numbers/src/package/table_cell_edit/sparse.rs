@@ -10,6 +10,29 @@
 
 use core::{fmt, mem::size_of};
 
+#[cfg(test)]
+use std::cell::Cell as TestCell;
+
+#[cfg(test)]
+thread_local! {
+    static PREPARED_HEADER_EXECUTION_ALLOCATIONS: TestCell<usize> = const { TestCell::new(0) };
+}
+
+#[cfg(test)]
+fn reset_prepared_header_execution_allocations() {
+    PREPARED_HEADER_EXECUTION_ALLOCATIONS.set(0);
+}
+
+#[cfg(test)]
+fn prepared_header_execution_allocations() -> usize {
+    PREPARED_HEADER_EXECUTION_ALLOCATIONS.get()
+}
+
+#[cfg(test)]
+fn record_prepared_header_execution_allocation() {
+    PREPARED_HEADER_EXECUTION_ALLOCATIONS.set(PREPARED_HEADER_EXECUTION_ALLOCATIONS.get() + 1);
+}
+
 /// Logical rows represented by one positional row-header bucket.
 pub(super) const HEADER_BUCKET_ROWS: u32 = 65_536;
 
@@ -1108,6 +1131,180 @@ pub(super) fn rewrite_header_bucket_with_report(
     Ok((output, report))
 }
 
+/// Output-free evidence retained by one prepared existing-bucket rewrite.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) struct HeaderBucketPrepareReport {
+    report: SparseReport,
+}
+
+impl HeaderBucketPrepareReport {
+    #[must_use]
+    pub(super) const fn report(self) -> SparseReport {
+        self.report
+    }
+
+    #[must_use]
+    pub(super) const fn output_bytes(self) -> usize {
+        self.report.output_bytes
+    }
+}
+
+/// Exact independent limits needed after an existing header bucket is planned.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) struct HeaderBucketExecutionRequirements {
+    pub(super) input_bytes: usize,
+    pub(super) output_bytes: usize,
+    pub(super) retained_bytes: usize,
+    pub(super) retained_elements: usize,
+    pub(super) peak_scratch_bytes: usize,
+    pub(super) allocation_events: usize,
+    pub(super) fields: usize,
+    pub(super) work: usize,
+    pub(super) headers: usize,
+    pub(super) header_reads: usize,
+    pub(super) header_writes: usize,
+}
+
+impl HeaderBucketExecutionRequirements {
+    #[must_use]
+    pub(super) const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+
+    #[must_use]
+    pub(super) const fn exact_limits(self) -> HeaderBucketExecutionLimits {
+        HeaderBucketExecutionLimits {
+            max_input_bytes: self.input_bytes,
+            max_output_bytes: self.output_bytes,
+            max_retained_bytes: self.retained_bytes,
+            max_retained_elements: self.retained_elements,
+            max_peak_scratch_bytes: self.peak_scratch_bytes,
+            max_allocation_events: self.allocation_events,
+            max_fields: self.fields,
+            max_work: self.work,
+            max_headers: self.headers,
+        }
+    }
+}
+
+/// Execution-only ceilings. Every axis is checked before the candidate Vec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct HeaderBucketExecutionLimits {
+    pub(super) max_input_bytes: usize,
+    pub(super) max_output_bytes: usize,
+    pub(super) max_retained_bytes: usize,
+    pub(super) max_retained_elements: usize,
+    pub(super) max_peak_scratch_bytes: usize,
+    pub(super) max_allocation_events: usize,
+    pub(super) max_fields: usize,
+    pub(super) max_work: usize,
+    pub(super) max_headers: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum PreparedHeaderField<'source> {
+    Preserve(&'source [u8]),
+    HeaderPreserve {
+        raw: &'source [u8],
+        row: u32,
+        count: u32,
+        payload_len: usize,
+        nested_fields: usize,
+    },
+    HeaderDelete,
+    HeaderReplace {
+        source: &'source [u8],
+        row: u32,
+        count: u32,
+        encoded_len: usize,
+        payload_len: usize,
+        nested_fields: usize,
+    },
+}
+
+impl PreparedHeaderField<'_> {
+    const fn retained_source_bytes(self) -> usize {
+        match self {
+            Self::Preserve(raw) | Self::HeaderPreserve { raw, .. } => raw.len(),
+            Self::HeaderDelete => 0,
+            Self::HeaderReplace { source, .. } => source.len(),
+        }
+    }
+}
+
+/// A complete logical rewrite for an already materialized header bucket.
+///
+/// It borrows raw source fields and owns only exact-capacity field actions and
+/// appended row facts. No candidate or per-header replacement bytes exist
+/// until [`PreparedExistingHeaderBucketRewrite::execute`].
+pub(super) struct PreparedExistingHeaderBucketRewrite<'source> {
+    bucket_index: u32,
+    hash: u32,
+    fields: Vec<PreparedHeaderField<'source>>,
+    appended: Vec<NewRowHeader>,
+    output_len: usize,
+    output_headers: usize,
+    prepare_report: HeaderBucketPrepareReport,
+    requirements: HeaderBucketExecutionRequirements,
+}
+
+impl PreparedExistingHeaderBucketRewrite<'_> {
+    #[must_use]
+    pub(super) const fn prepare_report(&self) -> HeaderBucketPrepareReport {
+        self.prepare_report
+    }
+
+    #[must_use]
+    pub(super) const fn execution_requirements(&self) -> HeaderBucketExecutionRequirements {
+        self.requirements
+    }
+
+    pub(super) fn execute(
+        self,
+        limits: HeaderBucketExecutionLimits,
+    ) -> Result<(Option<Vec<u8>>, SparseReport), SparseError> {
+        ensure_header_execution_limits(self.requirements, limits)?;
+        if self.prepare_report.output_bytes() != 0 {
+            return Err(SparseError::InconsistentSource);
+        }
+        if self.output_len == 0 {
+            return Ok((None, header_execution_report(self.requirements)));
+        }
+
+        #[cfg(test)]
+        record_prepared_header_execution_allocation();
+        let mut output = Vec::new();
+        reserve_exact_capacity(&mut output, self.output_len)?;
+        for field in &self.fields {
+            match *field {
+                PreparedHeaderField::Preserve(raw)
+                | PreparedHeaderField::HeaderPreserve { raw, .. } => {
+                    output.extend_from_slice(raw);
+                },
+                PreparedHeaderField::HeaderDelete => {},
+                PreparedHeaderField::HeaderReplace {
+                    source,
+                    count,
+                    payload_len,
+                    ..
+                } => {
+                    append_length_prefix(&mut output, 2, payload_len)?;
+                    append_rewritten_header(&mut output, source, count)?;
+                },
+            }
+        }
+        for header in &self.appended {
+            append_length_prefix(&mut output, 2, header_wire_len(*header)?)?;
+            append_header(&mut output, *header)?;
+        }
+        if output.len() != self.output_len || output.capacity() != self.output_len {
+            return Err(SparseError::InconsistentSource);
+        }
+        reopen_prepared_header_bucket(&output, &self)?;
+        Ok((Some(output), header_execution_report(self.requirements)))
+    }
+}
+
 #[derive(Debug)]
 enum HeaderAction {
     Preserve,
@@ -1371,6 +1568,7 @@ pub(super) fn rewrite_header_bucket_final_rows_with_report(
 /// nonzero missing row is appended. All unselected bucket and header fields
 /// remain byte-exact. Unlike the sparse-allocation path, no [`SparsePlan`] is
 /// required because every tile and row header object already exists.
+#[cfg(test)]
 pub(super) fn rewrite_existing_header_bucket_final_rows_with_report(
     source: &[u8],
     bucket_index: u32,
@@ -1378,7 +1576,355 @@ pub(super) fn rewrite_existing_header_bucket_final_rows_with_report(
     final_rows: &[FinalRowCount],
     limits: SparseLimits,
 ) -> Result<(Option<Vec<u8>>, SparseReport), SparseError> {
-    rewrite_header_bucket_rows_with_report(source, bucket_index, columns, final_rows, None, limits)
+    let prepared = prepare_existing_header_bucket_final_rows(
+        source,
+        bucket_index,
+        columns,
+        final_rows,
+        limits,
+    )?;
+    let prepare = prepared.prepare_report().report();
+    let requirements = prepared.execution_requirements();
+    let mut legacy_execution_limits = requirements.exact_limits();
+    legacy_execution_limits.max_input_bytes = limits.max_work;
+    legacy_execution_limits.max_output_bytes = limits.max_output_bytes;
+    legacy_execution_limits.max_retained_bytes = limits.max_retained_bytes;
+    legacy_execution_limits.max_retained_elements = limits.max_retained_elements;
+    legacy_execution_limits.max_peak_scratch_bytes = limits.max_scratch_bytes;
+    legacy_execution_limits.max_allocation_events = limits.max_allocation_events;
+    legacy_execution_limits.max_fields = limits.max_fields;
+    legacy_execution_limits.max_work = limits.max_work;
+    legacy_execution_limits.max_headers = limits.max_records;
+    let mut admitted = prepare;
+    admitted.merge(header_execution_report(requirements))?;
+    validate_report(admitted, limits)?;
+    let (output, execution) = prepared.execute(legacy_execution_limits)?;
+    let mut report = prepare;
+    report.merge(execution)?;
+    if report != admitted {
+        return Err(SparseError::InconsistentSource);
+    }
+    if requirements.output_bytes() != output.as_ref().map_or(0, Vec::len) {
+        return Err(SparseError::InconsistentSource);
+    }
+    Ok((output, report))
+}
+
+#[derive(Clone, Copy)]
+struct SourceHeader<'source> {
+    row: u32,
+    count: u32,
+    raw: &'source [u8],
+    nested_fields: usize,
+}
+
+/// Build the logical existing-bucket rewrite without allocating output bytes.
+pub(super) fn prepare_existing_header_bucket_final_rows<'source>(
+    source: &'source [u8],
+    bucket_index: u32,
+    columns: u32,
+    final_rows: &[FinalRowCount],
+    limits: SparseLimits,
+) -> Result<PreparedExistingHeaderBucketRewrite<'source>, SparseError> {
+    limit(final_rows.len(), limits.max_records)?;
+    if final_rows.windows(2).any(|pair| pair[0].row >= pair[1].row)
+        || final_rows.iter().any(|row| {
+            row.row / HEADER_BUCKET_ROWS != bucket_index || row.number_of_cells > columns
+        })
+    {
+        return Err(SparseError::InvalidAssignments);
+    }
+    preflight_input(source.len(), limits)?;
+
+    let top_count = count_fields(source, limits.max_fields)?;
+    let source_count = count_numbered_fields(source, 2, limits.max_fields)?;
+    limit(source_count, limits.max_records)?;
+    let mut source_headers = exact_vec::<SourceHeader<'source>>(source_count)?;
+    let mut hash = None;
+    let mut top_position = 0usize;
+    let mut fields_read = top_count;
+    visit_fields(source, limits.max_fields, |field| {
+        top_position = top_position.checked_add(1).ok_or(SparseError::Overflow)?;
+        if field.number == 1 {
+            if field.wire != 0 || hash.replace(decode_whole_varint(field.value)?).is_some() {
+                return Err(SparseError::AmbiguousSource);
+            }
+        }
+        if field.number != 2 {
+            return Ok(());
+        }
+        if field.wire != 2 {
+            return Err(SparseError::InvalidSource);
+        }
+        let (row, count, nested_fields) = scan_header_facts(field.value, limits.max_fields)?;
+        fields_read = fields_read
+            .checked_add(nested_fields)
+            .ok_or(SparseError::Overflow)?;
+        if row / HEADER_BUCKET_ROWS != bucket_index || count > columns {
+            return Err(SparseError::InconsistentSource);
+        }
+        source_headers.push(SourceHeader {
+            row,
+            count,
+            raw: field.value,
+            nested_fields,
+        });
+        Ok(())
+    })?;
+    let hash = u32::try_from(hash.ok_or(SparseError::InvalidSource)?)
+        .map_err(|_| SparseError::InvalidSource)?;
+    if top_position != top_count || source_headers.len() != source_count {
+        return Err(SparseError::InconsistentSource);
+    }
+
+    let mut sorted_rows = exact_vec::<u32>(source_count)?;
+    sorted_rows.extend(source_headers.iter().map(|header| header.row));
+    sorted_rows.sort_unstable();
+    if sorted_rows.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(SparseError::AmbiguousSource);
+    }
+
+    let appended_count = final_rows
+        .iter()
+        .filter(|row| row.number_of_cells != 0 && sorted_rows.binary_search(&row.row).is_err())
+        .count();
+    let mut appended = exact_vec::<NewRowHeader>(appended_count)?;
+    for row in final_rows
+        .iter()
+        .filter(|row| row.number_of_cells != 0 && sorted_rows.binary_search(&row.row).is_err())
+    {
+        appended.push(NewRowHeader {
+            row: row.row,
+            bucket_index,
+            number_of_cells: row.number_of_cells,
+        });
+    }
+
+    let mut fields = exact_vec::<PreparedHeaderField<'source>>(top_count)?;
+    let mut source_header_position = 0usize;
+    let mut header_writes = appended.len();
+    let mut output_len = 0usize;
+    visit_fields(source, limits.max_fields, |field| {
+        if field.number != 2 {
+            output_len = output_len
+                .checked_add(field.raw.len())
+                .ok_or(SparseError::Overflow)?;
+            fields.push(PreparedHeaderField::Preserve(field.raw));
+            return Ok(());
+        }
+        let header = *source_headers
+            .get(source_header_position)
+            .ok_or(SparseError::InconsistentSource)?;
+        source_header_position = source_header_position
+            .checked_add(1)
+            .ok_or(SparseError::Overflow)?;
+        let desired = final_rows
+            .binary_search_by_key(&header.row, |candidate| candidate.row)
+            .ok()
+            .and_then(|index| final_rows.get(index));
+        match desired {
+            Some(desired) if desired.number_of_cells == 0 => {
+                header_writes = header_writes.checked_add(1).ok_or(SparseError::Overflow)?;
+                fields.push(PreparedHeaderField::HeaderDelete);
+            },
+            Some(desired) if desired.number_of_cells != header.count => {
+                let nested_len = rewritten_header_length(header.raw, desired.number_of_cells)?;
+                let encoded_len = length_field_len(2, nested_len)?;
+                output_len = output_len
+                    .checked_add(encoded_len)
+                    .ok_or(SparseError::Overflow)?;
+                header_writes = header_writes.checked_add(1).ok_or(SparseError::Overflow)?;
+                fields.push(PreparedHeaderField::HeaderReplace {
+                    source: header.raw,
+                    row: header.row,
+                    count: desired.number_of_cells,
+                    encoded_len,
+                    payload_len: nested_len,
+                    nested_fields: header.nested_fields,
+                });
+            },
+            Some(_) | None => {
+                output_len = output_len
+                    .checked_add(field.raw.len())
+                    .ok_or(SparseError::Overflow)?;
+                fields.push(PreparedHeaderField::HeaderPreserve {
+                    raw: field.raw,
+                    row: header.row,
+                    count: header.count,
+                    payload_len: header.raw.len(),
+                    nested_fields: header.nested_fields,
+                });
+            },
+        }
+        Ok(())
+    })?;
+    if source_header_position != source_headers.len() {
+        return Err(SparseError::InconsistentSource);
+    }
+    for header in &appended {
+        output_len = output_len
+            .checked_add(length_field_len(2, header_wire_len(*header)?)?)
+            .ok_or(SparseError::Overflow)?;
+    }
+    if header_writes == 0 {
+        output_len = 0;
+    }
+
+    let retained_elements = fields
+        .len()
+        .checked_add(appended.len())
+        .ok_or(SparseError::Overflow)?;
+    let retained_bytes = fields
+        .len()
+        .checked_mul(size_of::<PreparedHeaderField<'_>>())
+        .and_then(|value| value.checked_add(appended.len().checked_mul(size_of::<NewRowHeader>())?))
+        .ok_or(SparseError::Overflow)?;
+    let temporary_bytes = source_headers
+        .len()
+        .checked_mul(size_of::<SourceHeader<'_>>())
+        .and_then(|value| value.checked_add(sorted_rows.len().checked_mul(size_of::<u32>())?))
+        .ok_or(SparseError::Overflow)?;
+    let prepare_work = source
+        .len()
+        .checked_mul(6)
+        .and_then(|value| value.checked_add(fields_read))
+        .and_then(|value| value.checked_add(final_rows.len()))
+        .and_then(|value| value.checked_add(source_count))
+        .ok_or(SparseError::Overflow)?;
+    let prepare_report = HeaderBucketPrepareReport {
+        report: SparseReport {
+            input_bytes: source.len(),
+            fields: fields_read,
+            work: prepare_work,
+            retained_elements,
+            retained_bytes,
+            peak_scratch_bytes: retained_bytes
+                .checked_add(temporary_bytes)
+                .ok_or(SparseError::Overflow)?,
+            allocation_events: 2usize
+                .checked_mul(usize::from(source_count != 0))
+                .and_then(|value| value.checked_add(usize::from(appended_count != 0)))
+                .and_then(|value| value.checked_add(usize::from(top_count != 0)))
+                .ok_or(SparseError::Overflow)?,
+            records: source_count,
+            header_reads: source_count,
+            headers: source_count,
+            ..SparseReport::default()
+        },
+    };
+    validate_report(prepare_report.report(), limits)?;
+
+    let output_headers = source_count
+        .checked_sub(
+            fields
+                .iter()
+                .filter(|field| matches!(field, PreparedHeaderField::HeaderDelete))
+                .count(),
+        )
+        .and_then(|value| value.checked_add(appended.len()))
+        .ok_or(SparseError::Overflow)?;
+    let candidate_fields = if output_len == 0 {
+        0
+    } else {
+        fields
+            .len()
+            .checked_sub(
+                fields
+                    .iter()
+                    .filter(|field| matches!(field, PreparedHeaderField::HeaderDelete))
+                    .count(),
+            )
+            .and_then(|value| value.checked_add(appended.len()))
+            .and_then(|value| {
+                fields
+                    .iter()
+                    .try_fold(value, |total, field| match field {
+                        PreparedHeaderField::HeaderPreserve { nested_fields, .. }
+                        | PreparedHeaderField::HeaderReplace { nested_fields, .. } => total
+                            .checked_add(*nested_fields)
+                            .ok_or(SparseError::Overflow),
+                        PreparedHeaderField::Preserve(_) | PreparedHeaderField::HeaderDelete => {
+                            Ok(total)
+                        },
+                    })
+                    .ok()
+            })
+            .and_then(|value| value.checked_add(appended.len().checked_mul(4)?))
+            .ok_or(SparseError::Overflow)?
+    };
+    let replacement_fields = fields.iter().try_fold(0usize, |total, field| match field {
+        PreparedHeaderField::HeaderReplace { nested_fields, .. } => total
+            .checked_add(*nested_fields)
+            .ok_or(SparseError::Overflow),
+        PreparedHeaderField::Preserve(_)
+        | PreparedHeaderField::HeaderPreserve { .. }
+        | PreparedHeaderField::HeaderDelete => Ok(total),
+    })?;
+    let execution_fields = candidate_fields
+        .checked_add(replacement_fields)
+        .ok_or(SparseError::Overflow)?;
+    let candidate_nested_bytes = fields
+        .iter()
+        .try_fold(0usize, |total, field| match field {
+            PreparedHeaderField::HeaderPreserve { payload_len, .. }
+            | PreparedHeaderField::HeaderReplace { payload_len, .. } => {
+                total.checked_add(*payload_len).ok_or(SparseError::Overflow)
+            },
+            PreparedHeaderField::Preserve(_) | PreparedHeaderField::HeaderDelete => Ok(total),
+        })?
+        .checked_add(appended.iter().try_fold(0usize, |total, header| {
+            total
+                .checked_add(header_wire_len(*header)?)
+                .ok_or(SparseError::Overflow)
+        })?)
+        .ok_or(SparseError::Overflow)?;
+    let input_bytes = if output_len == 0 {
+        0
+    } else {
+        fields
+            .iter()
+            .try_fold(0usize, |total, field| {
+                total
+                    .checked_add(field.retained_source_bytes())
+                    .ok_or(SparseError::Overflow)
+            })?
+            .checked_add(output_len)
+            .and_then(|value| value.checked_add(candidate_nested_bytes))
+            .ok_or(SparseError::Overflow)?
+    };
+    let execution_work = input_bytes
+        .checked_add(execution_fields)
+        .and_then(|value| value.checked_add(header_writes))
+        .ok_or(SparseError::Overflow)?;
+    let requirements = HeaderBucketExecutionRequirements {
+        input_bytes,
+        output_bytes: output_len,
+        retained_bytes: output_len,
+        retained_elements: usize::from(output_len != 0),
+        peak_scratch_bytes: output_len,
+        allocation_events: usize::from(output_len != 0),
+        fields: execution_fields,
+        work: execution_work,
+        header_reads: if output_len == 0 { 0 } else { output_headers },
+        header_writes: if output_len == 0 { 0 } else { header_writes },
+        headers: if output_len == 0 {
+            0
+        } else {
+            output_headers
+                .checked_add(header_writes)
+                .ok_or(SparseError::Overflow)?
+        },
+    };
+    Ok(PreparedExistingHeaderBucketRewrite {
+        bucket_index,
+        hash,
+        fields,
+        appended,
+        output_len,
+        output_headers,
+        prepare_report,
+        requirements,
+    })
 }
 
 fn rewrite_header_cell_count(
@@ -2123,6 +2669,339 @@ fn reserve<T>(target: &mut Vec<T>, requested: usize) -> Result<(), SparseError> 
         .try_reserve_exact(requested)
         .map_err(|_| SparseError::Allocation { requested })
 }
+
+fn exact_vec<T>(requested: usize) -> Result<Vec<T>, SparseError> {
+    let mut target = Vec::new();
+    reserve_exact_capacity(&mut target, requested)?;
+    Ok(target)
+}
+
+fn reserve_exact_capacity<T>(target: &mut Vec<T>, requested: usize) -> Result<(), SparseError> {
+    target
+        .try_reserve_exact(requested)
+        .map_err(|_| SparseError::Allocation { requested })?;
+    if size_of::<T>() != 0 && target.capacity() != requested {
+        return Err(SparseError::Allocation { requested });
+    }
+    Ok(())
+}
+
+fn ensure_header_execution_limits(
+    requirements: HeaderBucketExecutionRequirements,
+    limits: HeaderBucketExecutionLimits,
+) -> Result<(), SparseError> {
+    for (observed, maximum) in [
+        (requirements.input_bytes, limits.max_input_bytes),
+        (requirements.output_bytes, limits.max_output_bytes),
+        (requirements.retained_bytes, limits.max_retained_bytes),
+        (requirements.retained_elements, limits.max_retained_elements),
+        (
+            requirements.peak_scratch_bytes,
+            limits.max_peak_scratch_bytes,
+        ),
+        (requirements.allocation_events, limits.max_allocation_events),
+        (requirements.fields, limits.max_fields),
+        (requirements.work, limits.max_work),
+        (requirements.headers, limits.max_headers),
+    ] {
+        limit(observed, maximum)?;
+    }
+    Ok(())
+}
+
+fn header_execution_report(requirements: HeaderBucketExecutionRequirements) -> SparseReport {
+    SparseReport {
+        input_bytes: requirements.input_bytes,
+        output_bytes: requirements.output_bytes,
+        fields: requirements.fields,
+        work: requirements.work,
+        retained_elements: requirements.retained_elements,
+        retained_bytes: requirements.retained_bytes,
+        peak_scratch_bytes: requirements.peak_scratch_bytes,
+        allocation_events: requirements.allocation_events,
+        records: requirements.headers,
+        header_reads: requirements.header_reads,
+        header_writes: requirements.header_writes,
+        headers: requirements.headers,
+        ..SparseReport::default()
+    }
+}
+
+fn visit_fields<'source>(
+    source: &'source [u8],
+    maximum: usize,
+    mut visit: impl FnMut(Field<'source>) -> Result<(), SparseError>,
+) -> Result<(), SparseError> {
+    let mut offset = 0usize;
+    let mut count = 0usize;
+    while offset < source.len() {
+        count = count.checked_add(1).ok_or(SparseError::Overflow)?;
+        limit(count, maximum)?;
+        visit(next_field(source, &mut offset)?)?;
+    }
+    Ok(())
+}
+
+fn count_numbered_fields(source: &[u8], number: u32, maximum: usize) -> Result<usize, SparseError> {
+    let mut count = 0usize;
+    visit_fields(source, maximum, |field| {
+        if field.number == number {
+            count = count.checked_add(1).ok_or(SparseError::Overflow)?;
+        }
+        Ok(())
+    })?;
+    Ok(count)
+}
+
+fn next_field<'source>(
+    source: &'source [u8],
+    offset: &mut usize,
+) -> Result<Field<'source>, SparseError> {
+    let start = *offset;
+    let key = read_varint(source, offset)?;
+    let number = u32::try_from(key >> 3).map_err(|_| SparseError::InvalidSource)?;
+    let wire = u8::try_from(key & 7).map_err(|_| SparseError::InvalidSource)?;
+    if number == 0 {
+        return Err(SparseError::InvalidSource);
+    }
+    let value_start = *offset;
+    match wire {
+        0 => {
+            let _ = read_varint(source, offset)?;
+        },
+        1 => *offset = offset.checked_add(8).ok_or(SparseError::Overflow)?,
+        2 => {
+            let length =
+                usize::try_from(read_varint(source, offset)?).map_err(|_| SparseError::Overflow)?;
+            *offset = offset.checked_add(length).ok_or(SparseError::Overflow)?;
+        },
+        5 => *offset = offset.checked_add(4).ok_or(SparseError::Overflow)?,
+        _ => return Err(SparseError::InvalidSource),
+    }
+    if *offset > source.len() {
+        return Err(SparseError::InvalidSource);
+    }
+    let value = match wire {
+        2 => {
+            let mut length_offset = value_start;
+            let length = usize::try_from(read_varint(source, &mut length_offset)?)
+                .map_err(|_| SparseError::Overflow)?;
+            &source[length_offset
+                ..length_offset
+                    .checked_add(length)
+                    .ok_or(SparseError::Overflow)?]
+        },
+        _ => &source[value_start..*offset],
+    };
+    Ok(Field {
+        number,
+        wire,
+        raw: &source[start..*offset],
+        value,
+    })
+}
+
+fn scan_header_facts(source: &[u8], maximum: usize) -> Result<(u32, u32, usize), SparseError> {
+    let mut row = None;
+    let mut count = None;
+    let mut zero = 0usize;
+    let mut zero_type = 0usize;
+    let mut fields = 0usize;
+    visit_fields(source, maximum, |field| {
+        fields = fields.checked_add(1).ok_or(SparseError::Overflow)?;
+        match field.number {
+            1 => {
+                if field.wire != 0 || row.replace(decode_whole_varint(field.value)?).is_some() {
+                    return Err(SparseError::AmbiguousSource);
+                }
+            },
+            2 if field.wire == 5 => {
+                zero = zero.checked_add(1).ok_or(SparseError::Overflow)?;
+            },
+            2 => {},
+            3 => {
+                if field.wire != 0
+                    || zero_type
+                        .checked_add(1)
+                        .ok_or(SparseError::Overflow)
+                        .is_err()
+                {
+                    return Err(SparseError::InvalidSource);
+                }
+                let _ = decode_whole_varint(field.value)?;
+                zero_type = zero_type.checked_add(1).ok_or(SparseError::Overflow)?;
+            },
+            4 => {
+                if field.wire != 0 || count.replace(decode_whole_varint(field.value)?).is_some() {
+                    return Err(SparseError::AmbiguousSource);
+                }
+            },
+            _ => {},
+        }
+        Ok(())
+    })?;
+    if zero != 1 || zero_type != 1 {
+        return Err(SparseError::InvalidSource);
+    }
+    Ok((
+        u32::try_from(row.ok_or(SparseError::InvalidSource)?)
+            .map_err(|_| SparseError::InvalidSource)?,
+        u32::try_from(count.ok_or(SparseError::InvalidSource)?)
+            .map_err(|_| SparseError::InvalidSource)?,
+        fields,
+    ))
+}
+
+fn rewritten_header_length(source: &[u8], count: u32) -> Result<usize, SparseError> {
+    let mut output_len = 0usize;
+    let mut count_fields_seen = 0usize;
+    visit_fields(source, usize::MAX, |field| {
+        let field_len = if field.number == 4 {
+            count_fields_seen = count_fields_seen
+                .checked_add(1)
+                .ok_or(SparseError::Overflow)?;
+            varint_field_len(4, u64::from(count))?
+        } else {
+            field.raw.len()
+        };
+        output_len = output_len
+            .checked_add(field_len)
+            .ok_or(SparseError::Overflow)?;
+        Ok(())
+    })?;
+    if count_fields_seen != 1 {
+        return Err(SparseError::InvalidSource);
+    }
+    Ok(output_len)
+}
+
+fn append_rewritten_header(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    count: u32,
+) -> Result<(), SparseError> {
+    visit_fields(source, usize::MAX, |field| {
+        if field.number == 4 {
+            append_varint_field(output, 4, u64::from(count))?;
+        } else {
+            output.extend_from_slice(field.raw);
+        }
+        Ok(())
+    })
+}
+
+fn reopen_prepared_header_bucket(
+    candidate: &[u8],
+    prepared: &PreparedExistingHeaderBucketRewrite<'_>,
+) -> Result<(), SparseError> {
+    let mut field_position = 0usize;
+    let mut appended_position = 0usize;
+    let mut hash = None;
+    let mut observed_headers = 0usize;
+    visit_fields(candidate, prepared.requirements.fields, |candidate_field| {
+        if candidate_field.number == 1 {
+            if candidate_field.wire != 0
+                || hash
+                    .replace(decode_whole_varint(candidate_field.value)?)
+                    .is_some()
+            {
+                return Err(SparseError::AmbiguousSource);
+            }
+        }
+        while matches!(
+            prepared.fields.get(field_position),
+            Some(PreparedHeaderField::HeaderDelete)
+        ) {
+            field_position = field_position.checked_add(1).ok_or(SparseError::Overflow)?;
+        }
+        if let Some(expected) = prepared.fields.get(field_position).copied() {
+            field_position = field_position.checked_add(1).ok_or(SparseError::Overflow)?;
+            match expected {
+                PreparedHeaderField::Preserve(raw) => {
+                    if candidate_field.raw != raw {
+                        return Err(SparseError::InconsistentSource);
+                    }
+                },
+                PreparedHeaderField::HeaderPreserve {
+                    raw, row, count, ..
+                } => {
+                    if candidate_field.raw != raw {
+                        return Err(SparseError::InconsistentSource);
+                    }
+                    let (observed_row, observed_count, _) =
+                        scan_header_facts(candidate_field.value, prepared.requirements.fields)?;
+                    if candidate_field.number != 2 || observed_row != row || observed_count != count
+                    {
+                        return Err(SparseError::InconsistentSource);
+                    }
+                    observed_headers = observed_headers
+                        .checked_add(1)
+                        .ok_or(SparseError::Overflow)?;
+                },
+                PreparedHeaderField::HeaderReplace {
+                    row,
+                    count,
+                    encoded_len,
+                    ..
+                } => {
+                    let (observed_row, observed_count, _) =
+                        scan_header_facts(candidate_field.value, prepared.requirements.fields)?;
+                    if candidate_field.number != 2
+                        || candidate_field.raw.len() != encoded_len
+                        || observed_row != row
+                        || observed_count != count
+                    {
+                        return Err(SparseError::InconsistentSource);
+                    }
+                    observed_headers = observed_headers
+                        .checked_add(1)
+                        .ok_or(SparseError::Overflow)?;
+                },
+                PreparedHeaderField::HeaderDelete => {
+                    return Err(SparseError::InconsistentSource);
+                },
+            }
+            return Ok(());
+        }
+        let header = *prepared
+            .appended
+            .get(appended_position)
+            .ok_or(SparseError::InconsistentSource)?;
+        appended_position = appended_position
+            .checked_add(1)
+            .ok_or(SparseError::Overflow)?;
+        let (observed_row, observed_count, _) =
+            scan_header_facts(candidate_field.value, prepared.requirements.fields)?;
+        if candidate_field.number != 2
+            || observed_row != header.row
+            || observed_count != header.number_of_cells
+            || observed_row / HEADER_BUCKET_ROWS != prepared.bucket_index
+        {
+            return Err(SparseError::InconsistentSource);
+        }
+        observed_headers = observed_headers
+            .checked_add(1)
+            .ok_or(SparseError::Overflow)?;
+        Ok(())
+    })?;
+    while matches!(
+        prepared.fields.get(field_position),
+        Some(PreparedHeaderField::HeaderDelete)
+    ) {
+        field_position = field_position.checked_add(1).ok_or(SparseError::Overflow)?;
+    }
+    if field_position != prepared.fields.len()
+        || appended_position != prepared.appended.len()
+        || u32::try_from(hash.ok_or(SparseError::InvalidSource)?)
+            .map_err(|_| SparseError::InvalidSource)?
+            != prepared.hash
+        || observed_headers != prepared.output_headers
+        || candidate.len() != prepared.output_len
+    {
+        return Err(SparseError::InconsistentSource);
+    }
+    Ok(())
+}
 fn copy_bytes(source: &[u8]) -> Result<Vec<u8>, SparseError> {
     let mut output = Vec::new();
     reserve(&mut output, source.len())?;
@@ -2532,7 +3411,7 @@ mod tests {
         .expect("existing tile final rows");
         assert_eq!(
             (direct_report.header_reads, direct_report.header_writes),
-            (0, 1)
+            (1, 1)
         );
         assert_eq!(
             parse_header_bucket(&direct.expect("direct materialization"), usize::MAX)
@@ -3154,5 +4033,144 @@ mod tests {
             rewrite_table_model_data_store_with_report(&source, &replacement, limits),
             Err(SparseError::LimitExceeded { .. })
         ));
+    }
+
+    fn prepared_existing_header_fixture() -> (Vec<u8>, [FinalRowCount; 3]) {
+        let mut first = encode_header(NewRowHeader {
+            row: 0,
+            bucket_index: 0,
+            number_of_cells: 1,
+        })
+        .expect("first header");
+        append_length(&mut first, 90, b"removed-opaque").expect("first unknown");
+        let mut second = encode_header(NewRowHeader {
+            row: 1,
+            bucket_index: 0,
+            number_of_cells: 1,
+        })
+        .expect("second header");
+        append_length(&mut second, 91, b"preserved-opaque").expect("second unknown");
+        let mut bucket = Vec::new();
+        append_varint_field(&mut bucket, 1, 0).expect("hash");
+        append_length(&mut bucket, 2, &first).expect("first row");
+        append_length(&mut bucket, 2, &second).expect("second row");
+        append_varint_field(&mut bucket, 92, 19).expect("bucket unknown");
+        (
+            bucket,
+            [
+                FinalRowCount {
+                    row: 0,
+                    number_of_cells: 0,
+                },
+                FinalRowCount {
+                    row: 1,
+                    number_of_cells: 2,
+                },
+                FinalRowCount {
+                    row: 2,
+                    number_of_cells: 1,
+                },
+            ],
+        )
+    }
+
+    #[test]
+    fn prepared_existing_header_is_output_free_and_executes_exactly() {
+        let (source, final_rows) = prepared_existing_header_fixture();
+        let prepared = prepare_existing_header_bucket_final_rows(
+            &source,
+            0,
+            3,
+            &final_rows,
+            SparseLimits::default(),
+        )
+        .expect("output-free header plan");
+        let prepare = prepared.prepare_report().report();
+        assert_eq!(prepare.output_bytes, 0);
+        assert!(prepare.retained_bytes > 0);
+        let requirements = prepared.execution_requirements();
+        assert!(requirements.input_bytes > 0);
+        assert!(requirements.output_bytes > 0);
+        assert!(requirements.retained_bytes > 0);
+        assert!(requirements.retained_elements > 0);
+        assert!(requirements.peak_scratch_bytes > 0);
+        assert!(requirements.allocation_events > 0);
+        assert!(requirements.fields > 0);
+        assert!(requirements.work > 0);
+        assert!(requirements.headers > 0);
+
+        reset_prepared_header_execution_allocations();
+        let (output, report) = prepared
+            .execute(requirements.exact_limits())
+            .expect("exact execution");
+        assert_eq!(prepared_header_execution_allocations(), 1);
+        let output = output.expect("changed bucket");
+        assert_eq!(output.len(), requirements.output_bytes);
+        assert_eq!(report.output_bytes, requirements.output_bytes);
+        assert_eq!(report.retained_bytes, requirements.retained_bytes);
+        assert_eq!(report.retained_elements, requirements.retained_elements);
+        assert_eq!(report.peak_scratch_bytes, requirements.peak_scratch_bytes);
+        assert_eq!(report.allocation_events, requirements.allocation_events);
+        assert_eq!(report.fields, requirements.fields);
+        assert_eq!(report.work, requirements.work);
+        assert_eq!(report.header_writes, requirements.header_writes);
+        let fields = parse_fields(&output, usize::MAX).expect("candidate fields");
+        let rows_and_counts = fields
+            .iter()
+            .filter(|field| field.number == 2)
+            .map(|field| {
+                let (row, count, _) =
+                    scan_header_facts(field.value, usize::MAX).expect("header facts");
+                (row, count)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(rows_and_counts, [(1, 2), (2, 1)]);
+    }
+
+    #[test]
+    fn prepared_existing_header_every_axis_max_minus_one_is_preallocation() {
+        let (source, final_rows) = prepared_existing_header_fixture();
+        let baseline = prepare_existing_header_bucket_final_rows(
+            &source,
+            0,
+            3,
+            &final_rows,
+            SparseLimits::default(),
+        )
+        .expect("baseline plan")
+        .execution_requirements();
+        for axis in 0..9 {
+            let prepared = prepare_existing_header_bucket_final_rows(
+                &source,
+                0,
+                3,
+                &final_rows,
+                SparseLimits::default(),
+            )
+            .expect("axis plan");
+            let mut limits = baseline.exact_limits();
+            match axis {
+                0 => limits.max_input_bytes -= 1,
+                1 => limits.max_output_bytes -= 1,
+                2 => limits.max_retained_bytes -= 1,
+                3 => limits.max_retained_elements -= 1,
+                4 => limits.max_peak_scratch_bytes -= 1,
+                5 => limits.max_allocation_events -= 1,
+                6 => limits.max_fields -= 1,
+                7 => limits.max_work -= 1,
+                8 => limits.max_headers -= 1,
+                _ => unreachable!(),
+            }
+            reset_prepared_header_execution_allocations();
+            assert!(matches!(
+                prepared.execute(limits),
+                Err(SparseError::LimitExceeded { .. })
+            ));
+            assert_eq!(
+                prepared_header_execution_allocations(),
+                0,
+                "axis {axis} allocated a candidate"
+            );
+        }
     }
 }

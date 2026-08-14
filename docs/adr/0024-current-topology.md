@@ -2261,3 +2261,27 @@ Focused dimension tests pass 13/13, codec tests pass 11/11, protos passes
 generated-roundtrip, scoped boundary, check/no-run, strict library Clippy,
 formatting, and diff gates pass. Broad host all-target Clippy retains nine
 unrelated existing lints. ADR 0008 records the accepted native oracle.
+
+## 2026-08-14 Current Numbers formula cut
+
+Selector-first semantic formula-cell authoring is production-owned by
+`litchi-numbers`. The focused API exposes bounded semantic expressions, opaque
+same-source table handles, typed caches, and cell-edit constructors; it exposes
+no raw formula key, table identity, UUID, protobuf/Buffa value, IWA object, or
+wire payload. Local and distinct-owner cell/range/whole-axis authoring,
+supported scalar/function evaluation, complete survivor overlays, replacement,
+clear, downstream cache refresh, reversible patches, and conflict detection are
+covered by the accepted gates in ADR 0008.
+
+Physical publication remains private and raw-authoritative. It coordinates the
+formula list, BNC tiles, inline and type-4009 tiled dependency mirrors,
+CalculationEngine tracker, PackageMetadata, ArchiveInfo references, string and
+rich storage, caches, headers, and one package rewrite. Output-free logical
+plans feed a single aggregate execution barrier; strict generated views are
+agreement checks only. Native Numbers recalculation and save/reopen evidence is
+recorded in ADR 0008.
+
+The legacy host still contains production readers, setters, examples, pivot
+compatibility vocabulary, tests, and a manifest dependency. This cut removes
+the focused facade's dependency on that public vocabulary; it does not remove
+the host, its edge, or its ordered debt.

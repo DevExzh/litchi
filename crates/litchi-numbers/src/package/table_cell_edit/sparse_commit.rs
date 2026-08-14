@@ -2,9 +2,10 @@
 
 use std::{cell::Cell, mem::size_of, sync::Arc};
 
-use litchi_iwa_core::{ArchiveObject, RawMessage};
+use litchi_iwa_core::{ArchiveObject, MessageInfo, RawMessage};
 use litchi_iwa_protos::package_metadata_codec::{
-    Batch, ExternalReferenceAddition, ObjectUuidAddition, RewriteOptions, rewrite_package_metadata,
+    Batch, ExternalReferenceAddition, ObjectUuidAddition, RewriteExecutionRequirements,
+    RewriteOptions, RewriteOutput, RewriteReport, UuidBits, rewrite_package_metadata,
 };
 
 use crate::{
@@ -656,6 +657,389 @@ pub(super) fn commit_sparse_scalar_tiles(
     ))
 }
 
+pub(super) struct FormulaDependencyPublication {
+    pub(super) outcome: rewrite::RewriteOutcome,
+    pub(super) evidence: PatchEvidence,
+    pub(super) preview_count: usize,
+}
+
+pub(super) fn publish_formula_dependency_objects(
+    source: &Package,
+    mut replacements: Vec<super::PreparedReplacement>,
+    dependency_tiles: super::PreparedFormulaDependencyTiles,
+    new_tiles: Vec<super::formula_metadata::MessageEdit>,
+    future_publication: rewrite::FuturePublicationReservation,
+    budget: &mut budget::TransactionBudget,
+    path: Path,
+) -> Result<FormulaDependencyPublication, Error> {
+    if dependency_tiles.assignments.is_empty()
+        || dependency_tiles.assignments.len() != new_tiles.len()
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    let archive_limits = source
+        .state
+        .components
+        .physical()
+        .ok_or(Error::UnsupportedSource { path })?
+        .limits()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let capacity = replacements
+        .len()
+        .checked_add(new_tiles.len())
+        .and_then(|value| value.checked_add(1))
+        .ok_or(Error::InvalidSource { path })?;
+    let message_count = replacements
+        .len()
+        .checked_add(new_tiles.len())
+        .ok_or(Error::InvalidSource { path })?;
+    let reference_identifiers = replacements.iter().try_fold(0usize, |total, replacement| {
+        replacement.references.as_ref().map_or(Ok(total), |delta| {
+            total
+                .checked_add(delta.before.len())
+                .and_then(|total| total.checked_add(delta.after.len()))
+                .ok_or(Error::InvalidSource { path })
+        })
+    })?;
+    let preview_bytes = rewrite::ROOT_PREVIEWS
+        .len()
+        .checked_mul(size_of::<&'static str>())
+        .ok_or(Error::InvalidSource { path })?;
+    let staging_bytes = capacity
+        .checked_mul(size_of::<rewrite::ComponentEdit>())
+        .and_then(|bytes| {
+            replacements
+                .len()
+                .checked_mul(size_of::<rewrite::MessageEdit>())
+                .and_then(|messages| bytes.checked_add(messages))
+        })
+        .and_then(|bytes| {
+            new_tiles
+                .len()
+                .checked_mul(
+                    size_of::<ArchiveObject>()
+                        .checked_add(size_of::<RawMessage>())?
+                        .checked_add(size_of::<MessageInfo>())?
+                        .checked_add(3usize.checked_mul(size_of::<u32>())?)?,
+                )
+                .and_then(|objects| bytes.checked_add(objects))
+        })
+        .and_then(|bytes| {
+            reference_identifiers
+                .checked_mul(size_of::<u64>())
+                .and_then(|references| bytes.checked_add(references))
+        })
+        .and_then(|bytes| bytes.checked_add(preview_bytes))
+        .ok_or(Error::InvalidSource { path })?;
+    let staging_elements = capacity
+        .checked_add(replacements.len())
+        .and_then(|elements| elements.checked_add(new_tiles.len().checked_mul(6)?))
+        .and_then(|elements| elements.checked_add(reference_identifiers))
+        .and_then(|elements| elements.checked_add(rewrite::ROOT_PREVIEWS.len()))
+        .ok_or(Error::InvalidSource { path })?;
+    let staging_allocations = u64::from(capacity != 0)
+        .checked_add(usize_u64(replacements.len()))
+        .and_then(|events| events.checked_add(usize_u64(new_tiles.len()).checked_mul(5)?))
+        .and_then(|events| events.checked_add(1))
+        .ok_or(Error::InvalidSource { path })?;
+    let staging_usage = budget::Usage {
+        retained_elements: usize_u64(staging_elements),
+        retained_bytes: usize_u64(staging_bytes),
+        peak_scratch_bytes: usize_u64(staging_bytes),
+        allocation_events: staging_allocations,
+        objects: usize_u64(new_tiles.len()),
+        references: usize_u64(reference_identifiers),
+        transaction_work: usize_u64(
+            message_count
+                .checked_mul(8)
+                .and_then(|work| {
+                    source
+                        .state
+                        .components
+                        .iter_archives()
+                        .count()
+                        .checked_mul(rewrite::ROOT_PREVIEWS.len())
+                        .and_then(|preview_work| work.checked_add(preview_work))
+                })
+                .ok_or(Error::InvalidSource { path })?,
+        ),
+        ..budget::Usage::default()
+    };
+    let staging_remaining = authorize_remaining(budget)?;
+    preflight_usage(staging_usage, staging_remaining, path)?;
+    replacements.sort_unstable_by_key(|replacement| {
+        (
+            replacement.route.component_index,
+            replacement.route.object_index,
+            replacement.route.message_index,
+        )
+    });
+    if replacements.windows(2).any(|pair| {
+        (
+            pair[0].route.component_index,
+            pair[0].route.object_index,
+            pair[0].route.message_index,
+        ) >= (
+            pair[1].route.component_index,
+            pair[1].route.object_index,
+            pair[1].route.message_index,
+        )
+    }) {
+        budget.cancel_authorization();
+        return Err(Error::InvalidSource { path });
+    }
+    let component_count = replacements
+        .iter()
+        .map(|replacement| replacement.route.component_index)
+        .chain(core::iter::once(dependency_tiles.component_index))
+        .fold((None, 0usize), |(previous, count), component| {
+            if previous == Some(component) {
+                (previous, count)
+            } else {
+                (Some(component), count.saturating_add(1))
+            }
+        })
+        .1;
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(component_count)
+        .map_err(|_| Error::Allocation {
+            kind: LimitKind::RetainedElements,
+            amount: component_count,
+        })?;
+    let mut start = 0usize;
+    while start < replacements.len() {
+        let component_index = replacements[start].route.component_index;
+        let end = start
+            + replacements[start..].partition_point(|replacement| {
+                replacement.route.component_index == component_index
+            });
+        let mut messages = Vec::new();
+        messages
+            .try_reserve_exact(end - start)
+            .map_err(|_| Error::Allocation {
+                kind: LimitKind::RetainedElements,
+                amount: end - start,
+            })?;
+        let mut objects = Vec::new();
+        let object_count = usize::from(component_index == dependency_tiles.component_index)
+            .checked_mul(new_tiles.len())
+            .ok_or(Error::InvalidSource { path })?;
+        objects
+            .try_reserve_exact(object_count)
+            .map_err(|_| Error::Allocation {
+                kind: LimitKind::Objects,
+                amount: object_count,
+            })?;
+        edits.push(rewrite::ComponentEdit {
+            component_index,
+            messages,
+            object_deletions: Vec::new(),
+            new_objects: objects,
+        });
+        start = end;
+    }
+    if edits
+        .binary_search_by_key(&dependency_tiles.component_index, |edit| {
+            edit.component_index
+        })
+        .is_err()
+    {
+        let index = edits
+            .binary_search_by_key(&dependency_tiles.component_index, |edit| {
+                edit.component_index
+            })
+            .unwrap_err();
+        let mut objects = Vec::new();
+        objects
+            .try_reserve_exact(new_tiles.len())
+            .map_err(|_| Error::Allocation {
+                kind: LimitKind::Objects,
+                amount: new_tiles.len(),
+            })?;
+        edits.insert(
+            index,
+            rewrite::ComponentEdit {
+                component_index: dependency_tiles.component_index,
+                messages: Vec::new(),
+                object_deletions: Vec::new(),
+                new_objects: objects,
+            },
+        );
+    }
+    for replacement in replacements {
+        let references = replacement
+            .references
+            .map(|references| rewrite::ReferenceDelta {
+                aggregate_before: references.before,
+                aggregate_after: references.after,
+                fields: Vec::new(),
+            });
+        let edit = edits
+            .binary_search_by_key(&replacement.route.component_index, |edit| {
+                edit.component_index
+            })
+            .ok()
+            .and_then(|index| edits.get_mut(index))
+            .ok_or(Error::InvalidSource { path })?;
+        if edit.messages.len() == edit.messages.capacity() {
+            budget.cancel_authorization();
+            return Err(Error::Allocation {
+                kind: LimitKind::RetainedElements,
+                amount: edit.messages.len().saturating_add(1),
+            });
+        }
+        edit.messages.push(rewrite::MessageEdit {
+            object_index: replacement.route.object_index,
+            message_index: replacement.route.message_index,
+            expected_type: replacement.route.message_type,
+            payload: replacement.payload,
+            references,
+        });
+    }
+    for (assignment, tile) in dependency_tiles.assignments.iter().zip(new_tiles) {
+        let payload = tile.payload.ok_or(Error::InvalidSource { path })?;
+        if tile.object_id != assignment.object_id || !tile.object_references.is_empty() {
+            return Err(Error::InvalidSource { path });
+        }
+        let object =
+            one_message_object(assignment.object_id, 4_009, payload, archive_limits, path)?;
+        let edit = edits
+            .binary_search_by_key(&dependency_tiles.component_index, |edit| {
+                edit.component_index
+            })
+            .ok()
+            .and_then(|index| edits.get_mut(index))
+            .ok_or(Error::InvalidSource { path })?;
+        if edit.new_objects.len() == edit.new_objects.capacity() {
+            budget.cancel_authorization();
+            return Err(Error::Allocation {
+                kind: LimitKind::Objects,
+                amount: edit.new_objects.len().saturating_add(1),
+            });
+        }
+        edit.new_objects.push(object);
+    }
+    let previews =
+        rewrite::root_preview_deletions(source).map_err(|error| map_rewrite_error(error, path))?;
+    normalize_edits(&mut edits, path)?;
+    budget.record_authorized(staging_usage)?;
+    let preview_membership = preview_mask(&previews, path)?;
+    let evidence_count = evidence_message_count(&edits, path)?;
+    let remaining = authorize_remaining(budget)?;
+    let reference_shape =
+        evidence_reference_shape(source, &edits, remaining.transaction_work, path)?;
+    let mut observed = patch_evidence_usage(evidence_count, reference_shape, path)?;
+    merge_usage(
+        &mut observed,
+        locality_plan_usage(evidence_count, path)?,
+        path,
+    )?;
+    preflight_usage(observed, remaining, path)?;
+    let (evidence_messages, reference_evidence) =
+        prebuild_evidence(source, &edits, reference_shape, path)?;
+    let evidence = PatchEvidence::new(
+        Arc::new(evidence_messages),
+        reference_evidence,
+        preview_membership,
+        previews.len(),
+        0,
+        path,
+    )?;
+    let precharge_error = Cell::new(None);
+    let observed_cell = Cell::new(observed);
+    let outcome = match rewrite::rewrite_staged_with_evidence_authorization(
+        source,
+        rewrite::StagedRewritePlan {
+            component_edits: edits,
+            preview_deletions: &previews,
+        },
+        rewrite::EvidenceRetention::Omit,
+        |reservation| {
+            if !rewrite::component_admission_shape_fits(reservation, future_publication.component) {
+                precharge_error.set(Some(Error::Verification { path }));
+                return Err(rewrite::RewriteError::Precharge);
+            }
+            let usage = component_reservation_usage(future_publication.component, path).map_err(
+                |error| {
+                    precharge_error.set(Some(error));
+                    rewrite::RewriteError::Precharge
+                },
+            )?;
+            let mut combined = observed_cell.get();
+            merge_usage(&mut combined, usage, path)
+                .and_then(|()| preflight_usage(combined, remaining, path))
+                .map_err(|error| {
+                    precharge_error.set(Some(error));
+                    rewrite::RewriteError::Precharge
+                })
+        },
+        |reservation, cost| {
+            if !rewrite::component_cost_fits(cost, future_publication.component) {
+                precharge_error.set(Some(Error::Verification { path }));
+                return Err(rewrite::RewriteError::Precharge);
+            }
+            if !rewrite::publication_reservation_fits(reservation, future_publication.publication) {
+                precharge_error.set(Some(Error::Verification { path }));
+                return Err(rewrite::RewriteError::Precharge);
+            }
+            budget
+                .preauthorize_publication(reservation)
+                .map_err(|error| {
+                    precharge_error.set(Some(error));
+                    rewrite::RewriteError::Precharge
+                })?;
+            let usage = component_usage(cost, path).map_err(|error| {
+                precharge_error.set(Some(error));
+                rewrite::RewriteError::Precharge
+            })?;
+            let mut combined = observed_cell.get();
+            merge_usage(&mut combined, usage, path)
+                .and_then(|()| preflight_usage(combined, budget.authorization_remaining()?, path))
+                .map_err(|error| {
+                    precharge_error.set(Some(error));
+                    rewrite::RewriteError::Precharge
+                })?;
+            observed_cell.set(combined);
+            Ok(())
+        },
+    ) {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            budget.cancel_publication();
+            budget.cancel_authorization();
+            return Err(precharge_error
+                .get()
+                .unwrap_or_else(|| map_rewrite_error(error, path)));
+        },
+    };
+    let locality = verify_evidence_locality_with_report(
+        source,
+        &outcome.package,
+        &evidence,
+        outcome.publication.locality_work,
+        path,
+    )?;
+    let mut exact = observed_cell.get();
+    merge_usage(&mut exact, locality.usage(), path)?;
+    let mut publication = outcome.publication;
+    publication.locality_bytes = 0;
+    publication.locality_work = 0;
+    budget.finish_publication(publication);
+    exact.locality_bytes = locality.bytes;
+    budget.record_authorized(exact)?;
+    budget.release_retained(
+        usize_u64(dependency_tiles.retained_elements),
+        usize_u64(dependency_tiles.retained_bytes),
+    )?;
+    Ok(FormulaDependencyPublication {
+        outcome,
+        evidence,
+        preview_count: previews.len(),
+    })
+}
+
 pub(super) fn sparse_limits(
     source: &Package,
     cells: usize,
@@ -690,7 +1074,7 @@ pub(super) fn sparse_limits(
     })
 }
 
-fn metadata_options(
+pub(super) fn metadata_options(
     source: &Package,
     remaining: budget::Remaining,
     additions: usize,
@@ -701,9 +1085,14 @@ fn metadata_options(
         usize::try_from(remaining.wire_bytes)
             .map_err(|_error| Error::InvalidSource { path })?
             .min(maximum_wire),
-        usize::try_from(remaining.retained_bytes.min(remaining.peak_scratch_bytes))
-            .map_err(|_error| Error::InvalidSource { path })?
-            .min(maximum_wire),
+        usize::try_from(
+            remaining
+                .retained_bytes
+                .min(remaining.peak_scratch_bytes)
+                .min(remaining.output_bytes),
+        )
+        .map_err(|_error| Error::InvalidSource { path })?
+        .min(maximum_wire),
         usize::try_from(remaining.wire_fields)
             .map_err(|_error| Error::InvalidSource { path })?
             .min(maximum_wire),
@@ -748,7 +1137,7 @@ fn sparse_tile_limits(
 
 fn metadata_usage(
     inspected: &metadata::Inspection,
-    output: &litchi_iwa_protos::package_metadata_codec::RewriteOutput,
+    output: &RewriteOutput,
     cells: &[sparse::Cell],
     headers: &[sparse::HeaderBucketSource<'_>],
 ) -> Result<budget::Usage, Error> {
@@ -795,6 +1184,206 @@ fn metadata_usage(
         usage.transaction_work =
             checked_add(usage.transaction_work, usize_u64(report.work_bytes()))?;
     }
+    Ok(usage)
+}
+
+pub(super) fn package_metadata_plan_usage(report: RewriteReport) -> Result<budget::Usage, Error> {
+    Ok(budget::Usage {
+        wire_bytes: usize_u64(report.input_bytes()),
+        wire_fields: usize_u64(report.fields()),
+        wire_work: usize_u64(report.work_bytes()),
+        references: usize_u64(report.references_scanned()),
+        retained_bytes: usize_u64(report.retained_bytes()),
+        peak_scratch_bytes: usize_u64(report.scratch_bytes()),
+        allocation_events: usize_u64(report.allocations()),
+        transaction_work: usize_u64(report.work_bytes()),
+        ..budget::Usage::default()
+    })
+}
+
+pub(super) fn package_metadata_collect_usage(
+    report: RewriteReport,
+    requirements: metadata::InspectionRequirements,
+    identifiers: usize,
+    source_bytes: usize,
+    path: Path,
+) -> Result<budget::Usage, Error> {
+    let identifier_bytes = identifiers
+        .checked_mul(
+            size_of::<u64>()
+                .checked_add(size_of::<UuidBits>())
+                .ok_or(Error::InvalidSource { path })?,
+        )
+        .ok_or(Error::InvalidSource { path })?;
+    // Every UUID attempt performs both one mix and one binary search. New
+    // lower identifiers are unique, so across all additions the number of
+    // exact-pair collisions is bounded by the existing UUID population.
+    let attempt_work = binary_search_work(requirements.uuids)
+        .checked_add(4)
+        .ok_or(Error::InvalidSource { path })?;
+    let search_work = identifiers
+        .checked_add(requirements.uuids)
+        .and_then(|attempts| attempts.checked_mul(attempt_work))
+        .ok_or(Error::InvalidSource { path })?;
+    Ok(budget::Usage {
+        wire_bytes: usize_u64(report.input_bytes()),
+        wire_fields: usize_u64(report.fields()),
+        wire_work: usize_u64(report.work_bytes()),
+        references: usize_u64(report.references_scanned()),
+        retained_elements: usize_u64(requirements.retained_elements),
+        retained_bytes: usize_u64(requirements.retained_bytes),
+        peak_scratch_bytes: usize_u64(identifier_bytes.max(report.scratch_bytes())),
+        allocation_events: usize_u64(requirements.allocation_events)
+            .checked_add(u64::from(identifiers != 0).saturating_mul(2))
+            .ok_or(Error::InvalidSource { path })?,
+        transaction_work: usize_u64(
+            requirements
+                .work
+                .checked_add(source_bytes)
+                .and_then(|work| work.checked_add(report.work_bytes()))
+                .and_then(|work| work.checked_add(search_work))
+                .ok_or(Error::InvalidSource { path })?,
+        ),
+        ..budget::Usage::default()
+    })
+}
+
+fn binary_search_work(elements: usize) -> usize {
+    if elements < 2 {
+        1
+    } else {
+        usize::try_from(usize::BITS - (elements - 1).leading_zeros()).unwrap_or(usize::MAX)
+    }
+}
+
+pub(super) fn package_metadata_execution_usage(
+    execution: RewriteExecutionRequirements,
+) -> Result<budget::Usage, Error> {
+    Ok(budget::Usage {
+        wire_fields: usize_u64(execution.fields()),
+        wire_work: usize_u64(execution.work_bytes()),
+        output_bytes: usize_u64(execution.output_bytes()),
+        references: usize_u64(execution.references()),
+        retained_elements: usize_u64(execution.output_bytes()),
+        retained_bytes: usize_u64(execution.retained_bytes()),
+        peak_scratch_bytes: usize_u64(execution.scratch_bytes()),
+        allocation_events: usize_u64(execution.allocations()),
+        transaction_work: usize_u64(execution.work_bytes()),
+        ..budget::Usage::default()
+    })
+}
+
+pub(super) fn package_metadata_execution_report_usage(
+    report: RewriteReport,
+) -> Result<budget::Usage, Error> {
+    Ok(budget::Usage {
+        wire_fields: usize_u64(report.fields()),
+        wire_work: usize_u64(report.work_bytes()),
+        output_bytes: usize_u64(report.output_bytes()),
+        references: usize_u64(report.references_scanned()),
+        retained_elements: usize_u64(report.output_bytes()),
+        retained_bytes: usize_u64(report.retained_bytes()),
+        peak_scratch_bytes: usize_u64(report.scratch_bytes()),
+        allocation_events: usize_u64(report.allocations()),
+        transaction_work: usize_u64(report.work_bytes()),
+        ..budget::Usage::default()
+    })
+}
+
+pub(super) fn formula_dependency_prepublication_usage(
+    source: &Package,
+    replacement_messages: usize,
+    new_tiles: usize,
+    reference_routes: usize,
+    reference_identifiers: usize,
+    path: Path,
+) -> Result<budget::Usage, Error> {
+    let capacity = replacement_messages
+        .checked_add(new_tiles)
+        .and_then(|value| value.checked_add(1))
+        .ok_or(Error::InvalidSource { path })?;
+    let message_count = replacement_messages
+        .checked_add(new_tiles)
+        .ok_or(Error::InvalidSource { path })?;
+    let preview_bytes = rewrite::ROOT_PREVIEWS
+        .len()
+        .checked_mul(size_of::<&'static str>())
+        .ok_or(Error::InvalidSource { path })?;
+    let staging_bytes = capacity
+        .checked_mul(size_of::<rewrite::ComponentEdit>())
+        .and_then(|bytes| {
+            replacement_messages
+                .checked_mul(size_of::<rewrite::MessageEdit>())
+                .and_then(|messages| bytes.checked_add(messages))
+        })
+        .and_then(|bytes| {
+            new_tiles
+                .checked_mul(
+                    size_of::<ArchiveObject>()
+                        .checked_add(size_of::<RawMessage>())?
+                        .checked_add(size_of::<MessageInfo>())?
+                        .checked_add(3usize.checked_mul(size_of::<u32>())?)?,
+                )
+                .and_then(|objects| bytes.checked_add(objects))
+        })
+        .and_then(|bytes| {
+            reference_identifiers
+                .checked_mul(size_of::<u64>())
+                .and_then(|references| bytes.checked_add(references))
+        })
+        .and_then(|bytes| bytes.checked_add(preview_bytes))
+        .ok_or(Error::InvalidSource { path })?;
+    let staging_elements = capacity
+        .checked_add(replacement_messages)
+        .and_then(|elements| elements.checked_add(new_tiles.checked_mul(6)?))
+        .and_then(|elements| elements.checked_add(reference_identifiers))
+        .and_then(|elements| elements.checked_add(rewrite::ROOT_PREVIEWS.len()))
+        .ok_or(Error::InvalidSource { path })?;
+    let staging_allocations = u64::from(capacity != 0)
+        .checked_add(usize_u64(replacement_messages))
+        .and_then(|events| events.checked_add(usize_u64(new_tiles).checked_mul(5)?))
+        .and_then(|events| events.checked_add(1))
+        .ok_or(Error::InvalidSource { path })?;
+    let package_entries = source
+        .state
+        .components
+        .physical()
+        .ok_or(Error::UnsupportedSource { path })?
+        .package()
+        .len();
+    let mut usage = budget::Usage {
+        retained_elements: usize_u64(staging_elements),
+        retained_bytes: usize_u64(staging_bytes),
+        peak_scratch_bytes: usize_u64(staging_bytes),
+        allocation_events: staging_allocations,
+        objects: usize_u64(new_tiles),
+        references: usize_u64(reference_identifiers),
+        transaction_work: usize_u64(
+            message_count
+                .checked_mul(8)
+                .and_then(|work| {
+                    package_entries
+                        .checked_mul(rewrite::ROOT_PREVIEWS.len().checked_mul(2)?)
+                        .and_then(|preview_work| work.checked_add(preview_work))
+                })
+                .ok_or(Error::InvalidSource { path })?,
+        ),
+        ..budget::Usage::default()
+    };
+    merge_usage(
+        &mut usage,
+        patch_evidence_usage(
+            message_count,
+            EvidenceReferenceShape {
+                routes: reference_routes,
+                fields: 0,
+                identifiers: reference_identifiers,
+            },
+            path,
+        )?,
+        path,
+    )?;
+    merge_usage(&mut usage, locality_plan_usage(message_count, path)?, path)?;
     Ok(usage)
 }
 
@@ -1086,7 +1675,7 @@ pub(super) fn map_sparse_error(error: sparse::SparseError, path: Path) -> Error 
     }
 }
 
-fn map_metadata_error(
+pub(super) fn map_metadata_error(
     error: litchi_iwa_protos::package_metadata_codec::RewriteError,
     path: Path,
 ) -> Error {
@@ -1180,7 +1769,7 @@ fn push_object(
     Ok(())
 }
 
-fn one_message_object(
+pub(super) fn one_message_object(
     identifier: u64,
     message_type: u32,
     payload: Vec<u8>,
@@ -1322,7 +1911,7 @@ fn model_reference_delta(
 
 fn append_field_delta(
     output: &mut Vec<rewrite::FieldReferenceDelta>,
-    info: &litchi_iwa_core::MessageInfo,
+    info: &MessageInfo,
     expected_path: &[u32],
     identifiers: impl Iterator<Item = u64>,
     path: Path,

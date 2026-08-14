@@ -13,8 +13,9 @@ use litchi_iwa_common::{
     wire::{WireField, parse_wire_fields_with_limits},
 };
 use litchi_iwa_text_wire::{
-    RewriteBehavior, RewriteError, RewriteLimits, StorageRewrite, StorageValidation,
-    rewrite_storage_text_with_behavior_and_limits, validate_storage_with_limits,
+    PreparedStorageRewrite, RewriteBehavior, RewriteError, RewriteLimits, StorageRewrite,
+    StorageRewriteExecutionLimits, StorageValidation,
+    prepare_storage_text_rewrite_with_behavior_and_limits, validate_storage_with_limits,
 };
 
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
@@ -37,17 +38,17 @@ pub(super) struct FieldReferences<'a> {
 
 /// Raw one-message object admitted by the resolver.
 #[derive(Clone, Copy)]
-pub(super) struct ObjectSource<'a> {
+pub(super) struct ObjectSource<'source, 'fields, 'metadata> {
     pub(super) location: MessageLocation,
     pub(super) identifier: u64,
     pub(super) message_type: u32,
-    pub(super) payload: &'a [u8],
+    pub(super) payload: &'source [u8],
     /// Exact `MessageInfo.object_references`, in metadata order.
-    pub(super) object_references: &'a [u64],
-    pub(super) field_references: &'a [FieldReferences<'a>],
+    pub(super) object_references: &'metadata [u64],
+    pub(super) field_references: &'fields [FieldReferences<'metadata>],
 }
 
-impl fmt::Debug for ObjectSource<'_> {
+impl fmt::Debug for ObjectSource<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("ObjectSource")
@@ -81,17 +82,17 @@ pub(super) struct ListRoute {
 
 /// Complete, read-only input for one rich-text scalar transition.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct Request<'a> {
+pub(super) struct Request<'source, 'fields, 'metadata> {
     pub(super) route: ListRoute,
     pub(super) key: u32,
     pub(super) list_ref_count: u32,
-    pub(super) payload: ObjectSource<'a>,
-    pub(super) storage: ObjectSource<'a>,
+    pub(super) payload: ObjectSource<'source, 'fields, 'metadata>,
+    pub(super) storage: ObjectSource<'source, 'fields, 'metadata>,
     /// Exact inbound archive-header occurrences for the payload and storage.
     pub(super) payload_inbound_references: u32,
     pub(super) storage_inbound_references: u32,
     /// Strictly ascending, nonzero object identifiers in the package catalog.
-    pub(super) local_object_ids: &'a [u64],
+    pub(super) local_object_ids: &'metadata [u64],
 }
 
 /// Finite raw-wire and text-rewrite policy.
@@ -209,12 +210,55 @@ pub(super) struct Plan {
     result_key: u32,
     replacements: Vec<MessageReplacement>,
     report: Report,
+    execution: ExecutionReport,
+}
+
+/// Output-free rich-text plan. The source rewrite plan owns no candidate or
+/// reference Vec; execution alone creates the staged replacement.
+pub(super) struct PreparedPlan<'source, 'replacement> {
+    metadata: PreparedMetadata,
+    replacement: &'replacement str,
+    disposition: Disposition,
+    result_key: u32,
+    storage: Option<PreparedStorageRewrite<'source, 'replacement>>,
+    limits: Limits,
+    report: Report,
+    requirements: ExecutionRequirements,
+}
+
+struct PreparedMetadata {
+    location: MessageLocation,
+    aggregate_before: Vec<u64>,
+    local_object_ids: Vec<u64>,
+    field_references: Vec<(u32, u64)>,
+    aggregate_only: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) struct ExecutionRequirements {
+    pub(super) output_bytes: usize,
+    pub(super) retained_elements: usize,
+    pub(super) retained_bytes: usize,
+    pub(super) peak_scratch_bytes: usize,
+    pub(super) allocation_events: usize,
+    pub(super) work_bound: usize,
+    pub(super) reference_occurrences: usize,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) struct ExecutionReport {
+    pub(super) output_bytes: usize,
+    pub(super) retained_elements: usize,
+    pub(super) retained_bytes: usize,
+    pub(super) peak_scratch_bytes: usize,
+    pub(super) allocation_events: usize,
+    pub(super) work_bound: usize,
+    pub(super) reference_occurrences: usize,
 }
 
 #[derive(Debug)]
 pub(super) struct PlanParts {
     pub(super) disposition: Disposition,
-    pub(super) result_key: u32,
     pub(super) replacements: Vec<MessageReplacement>,
 }
 
@@ -243,41 +287,117 @@ impl Plan {
     pub(super) fn replacements(&self) -> &[MessageReplacement] {
         &self.replacements
     }
-    pub(super) const fn report(&self) -> Report {
-        self.report
-    }
-    pub(super) fn retained_accounting(&self) -> Result<RetainedAccounting, Error> {
-        let mut accounting = RetainedAccounting::default();
-        account_vec(
-            &mut accounting,
-            self.replacements.len(),
-            size_of::<MessageReplacement>(),
-        )?;
-        for replacement in &self.replacements {
-            account_bytes(&mut accounting, replacement.payload.len())?;
-            account_reference_delta(&mut accounting, &replacement.references)?;
-        }
-        Ok(accounting)
+    pub(super) const fn execution_report(&self) -> ExecutionReport {
+        self.execution
     }
     pub(super) fn into_parts(self) -> PlanParts {
         PlanParts {
             disposition: self.disposition,
-            result_key: self.result_key,
             replacements: self.replacements,
         }
     }
 }
 
+impl PreparedPlan<'_, '_> {
+    pub(super) const fn disposition(&self) -> Disposition {
+        self.disposition
+    }
+
+    pub(super) const fn result_key(&self) -> u32 {
+        self.result_key
+    }
+
+    pub(super) const fn prepare_report(&self) -> Report {
+        Report {
+            output_bytes: 0,
+            ..self.report
+        }
+    }
+
+    pub(super) const fn execution_requirements(&self) -> ExecutionRequirements {
+        self.requirements
+    }
+
+    pub(super) fn retained_accounting(&self) -> Result<RetainedAccounting, Error> {
+        let mut accounting = RetainedAccounting::default();
+        account_vec(
+            &mut accounting,
+            self.metadata.aggregate_before.capacity(),
+            size_of::<u64>(),
+        )?;
+        account_vec(
+            &mut accounting,
+            self.metadata.local_object_ids.capacity(),
+            size_of::<u64>(),
+        )?;
+        account_vec(
+            &mut accounting,
+            self.metadata.field_references.capacity(),
+            size_of::<(u32, u64)>(),
+        )?;
+        Ok(accounting)
+    }
+
+    pub(super) fn execute(self, limits: ExecutionRequirements) -> Result<Plan, Error> {
+        preflight_execution(self.requirements, limits)?;
+        let PreparedPlan {
+            metadata,
+            replacement,
+            disposition,
+            result_key,
+            storage,
+            limits: rich_limits,
+            report,
+            requirements,
+        } = self;
+        let Some(storage) = storage else {
+            return empty_plan(disposition, result_key, report);
+        };
+        let text_requirements = storage.execution_requirements();
+        let rewrite = storage
+            .execute(StorageRewriteExecutionLimits {
+                max_output_bytes: text_requirements.output_bytes(),
+                max_retained_elements: text_requirements.retained_elements(),
+                max_retained_bytes: text_requirements.retained_bytes(),
+                max_peak_scratch_bytes: text_requirements.peak_scratch_bytes(),
+                max_allocations: text_requirements.allocations(),
+                max_work: text_requirements.work(),
+            })
+            .map_err(map_text)?;
+        execute_rich_plan(
+            metadata,
+            result_key,
+            replacement,
+            rewrite,
+            report,
+            requirements,
+            rich_limits,
+        )
+    }
+}
+
 /// Plan replacement of the complete rich storage text.
+#[cfg(test)]
 pub(super) fn plan_text(
-    request: Request<'_>,
+    request: Request<'_, '_, '_>,
     replacement: &str,
     limits: Limits,
 ) -> Result<Plan, Error> {
+    let prepared = prepare_text(request, replacement, limits)?;
+    let requirements = prepared.execution_requirements();
+    prepared.execute(requirements)
+}
+
+/// Plan replacement of complete rich storage text without candidate output.
+pub(super) fn prepare_text<'source, 'replacement>(
+    request: Request<'source, '_, '_>,
+    replacement: &'replacement str,
+    limits: Limits,
+) -> Result<PreparedPlan<'source, 'replacement>, Error> {
     let payload_fields = validate_request(request, limits)?;
     let validation =
         validate_storage_with_limits(request.storage.payload, limits.text).map_err(map_text)?;
-    let rewrite = rewrite_storage_text_with_behavior_and_limits(
+    let storage = prepare_storage_text_rewrite_with_behavior_and_limits(
         request.storage.payload,
         Range {
             start: 0,
@@ -288,29 +408,61 @@ pub(super) fn plan_text(
         limits.text,
     )
     .map_err(map_text)?;
-    validate_storage_metadata(request, &rewrite, limits)?;
-    let report = base_report(
+    let storage_requirements = storage.execution_requirements();
+    let report = planned_report(
         request,
-        &rewrite,
         validation,
         payload_fields,
         replacement.len(),
+        storage_requirements.output_bytes(),
+        storage_requirements.reference_occurrences(),
     )?;
     if report.work_bound > limits.max_work {
         return Err(Error::Limit);
     }
-    if !rewrite.changed() {
-        return empty_plan(Disposition::Unchanged, request.key, report);
-    }
+    let disposition = if storage.changed() {
+        Disposition::InPlace
+    } else {
+        Disposition::Unchanged
+    };
+    let metadata = prepare_metadata(request)?;
+    let requirements = if disposition == Disposition::InPlace {
+        rich_execution_requirements(request, &metadata, storage_requirements, report)?
+    } else {
+        ExecutionRequirements::default()
+    };
+    Ok(PreparedPlan {
+        metadata,
+        replacement,
+        disposition,
+        result_key: request.key,
+        storage: (disposition == Disposition::InPlace).then_some(storage),
+        limits,
+        report,
+        requirements,
+    })
+}
+
+fn execute_rich_plan(
+    metadata: PreparedMetadata,
+    result_key: u32,
+    _replacement: &str,
+    rewrite: StorageRewrite,
+    report: Report,
+    requirements: ExecutionRequirements,
+    limits: Limits,
+) -> Result<Plan, Error> {
+    validate_prepared_storage_metadata(&metadata, &rewrite, limits)?;
     let references = reference_delta(
-        request.storage.object_references,
+        &metadata.aggregate_before,
         &rewrite,
         limits,
-        request.storage.field_references.is_empty(),
+        metadata.aggregate_only,
     )?;
     let output_bytes = rewrite.bytes().len();
+    let storage_execution = rewrite.execution_report();
     let replacement = MessageReplacement {
-        location: request.storage.location,
+        location: metadata.location,
         expected_type: STORAGE_MESSAGE_TYPE,
         kind: ReplacementKind::StorageArchive,
         payload: rewrite.into_bytes(),
@@ -319,18 +471,38 @@ pub(super) fn plan_text(
     let mut replacements = Vec::new();
     reserve(&mut replacements, 1)?;
     replacements.push(replacement);
+    let retained = retained_replacement_artifact(&replacements)?;
+    let peak_scratch_bytes = storage_execution
+        .peak_scratch_bytes
+        .checked_add(retained.bytes)
+        .and_then(|bytes| bytes.checked_add(size_of::<MessageReplacement>()))
+        .ok_or(Error::Overflow)?;
+    let allocation_events = storage_execution
+        .allocations
+        .checked_add(retained.allocation_events)
+        .and_then(|events| events.checked_add(1))
+        .ok_or(Error::Overflow)?;
     Ok(Plan {
         disposition: Disposition::InPlace,
-        result_key: request.key,
+        result_key,
         replacements,
         report: Report {
             output_bytes,
             ..report
         },
+        execution: ExecutionReport {
+            output_bytes,
+            retained_elements: retained.elements,
+            retained_bytes: retained.bytes,
+            peak_scratch_bytes,
+            allocation_events,
+            work_bound: requirements.work_bound,
+            reference_occurrences: requirements.reference_occurrences,
+        },
     })
 }
 
-fn validate_request(request: Request<'_>, limits: Limits) -> Result<usize, Error> {
+fn validate_request(request: Request<'_, '_, '_>, limits: Limits) -> Result<usize, Error> {
     if limits.max_deltas == 0
         || limits.max_work == 0
         || request.key == 0
@@ -376,7 +548,7 @@ fn validate_request(request: Request<'_>, limits: Limits) -> Result<usize, Error
 }
 
 fn validate_payload(
-    source: ObjectSource<'_>,
+    source: ObjectSource<'_, '_, '_>,
     storage_id: u64,
     local: &[u64],
     limits: WireLimits,
@@ -416,36 +588,75 @@ fn validate_payload(
         .ok_or(Error::Overflow)
 }
 
-fn validate_storage_metadata(
-    request: Request<'_>,
+fn prepare_metadata(request: Request<'_, '_, '_>) -> Result<PreparedMetadata, Error> {
+    let mut aggregate_before = Vec::new();
+    reserve(
+        &mut aggregate_before,
+        request.storage.object_references.len(),
+    )?;
+    aggregate_before.extend_from_slice(request.storage.object_references);
+    let mut local_object_ids = Vec::new();
+    reserve(&mut local_object_ids, request.local_object_ids.len())?;
+    local_object_ids.extend_from_slice(request.local_object_ids);
+    let field_count =
+        request
+            .storage
+            .field_references
+            .iter()
+            .try_fold(0usize, |count, field| {
+                count
+                    .checked_add(field.references.len())
+                    .ok_or(Error::Overflow)
+            })?;
+    let mut field_references = Vec::new();
+    reserve(&mut field_references, field_count)?;
+    for field in request.storage.field_references {
+        field_references.extend(
+            field
+                .references
+                .iter()
+                .map(|identifier| (field.root_field, *identifier)),
+        );
+    }
+    field_references.sort_unstable();
+    Ok(PreparedMetadata {
+        location: request.storage.location,
+        aggregate_before,
+        local_object_ids,
+        field_references,
+        aggregate_only: request.storage.field_references.is_empty(),
+    })
+}
+
+fn validate_prepared_storage_metadata(
+    metadata: &PreparedMetadata,
     rewrite: &StorageRewrite,
     limits: Limits,
 ) -> Result<(), Error> {
-    let aggregate_only = request.storage.field_references.is_empty();
-    let references_match = if aggregate_only {
+    let references_match = if metadata.aggregate_only {
         reference_multiset_contains(
             rewrite.object_reference_occurrences_before(),
-            request.storage.object_references,
+            &metadata.aggregate_before,
         )?
     } else {
         same_reference_multiset(
-            request.storage.object_references,
+            &metadata.aggregate_before,
             rewrite.object_reference_occurrences_before(),
         )?
     };
     if !references_match {
         return Err(Error::InvalidSource);
     }
-    if request.storage.object_references.len() > limits.max_deltas {
+    if metadata.aggregate_before.len() > limits.max_deltas {
         return Err(Error::Limit);
     }
-    for &identifier in request.storage.object_references {
-        require_local(identifier, request.local_object_ids)?;
+    for &identifier in &metadata.aggregate_before {
+        require_local(identifier, &metadata.local_object_ids)?;
     }
     for &identifier in rewrite.object_reference_occurrences_before() {
-        require_local(identifier, request.local_object_ids)?;
+        require_local(identifier, &metadata.local_object_ids)?;
     }
-    if aggregate_only {
+    if metadata.aggregate_only {
         for removed in rewrite.removed_object_references_by_field() {
             let before = rewrite
                 .object_reference_occurrences_before()
@@ -470,11 +681,11 @@ fn validate_storage_metadata(
         return Ok(());
     }
     for removed in rewrite.removed_object_references_by_field() {
-        let found = request.storage.field_references.iter().any(|field| {
-            field.root_field == removed.storage_field_number()
-                && field.references.contains(&removed.identifier())
-        });
-        if !found {
+        if metadata
+            .field_references
+            .binary_search(&(removed.storage_field_number(), removed.identifier()))
+            .is_err()
+        {
             return Err(Error::InvalidSource);
         }
     }
@@ -610,16 +821,17 @@ fn aggregate_only_after(
     Ok((after, removed))
 }
 
-fn base_report(
-    request: Request<'_>,
-    rewrite: &StorageRewrite,
+fn planned_report(
+    request: Request<'_, '_, '_>,
     validation: StorageValidation,
     payload_fields: usize,
     replacement_bytes: usize,
+    output_bytes: usize,
+    reference_occurrences: usize,
 ) -> Result<Report, Error> {
     Ok(Report {
         input_bytes: aggregate_input_bytes(request)?,
-        output_bytes: rewrite.bytes().len(),
+        output_bytes,
         wire_fields: validation
             .fields()
             .checked_add(payload_fields)
@@ -627,16 +839,129 @@ fn base_report(
         work_bound: aggregate_work_bound(
             request,
             validation,
-            rewrite.bytes().len(),
+            output_bytes,
             replacement_bytes,
             payload_fields,
         )?,
-        reference_occurrences: rewrite.object_reference_occurrences_before().len(),
+        reference_occurrences,
     })
 }
 
+fn rich_execution_requirements(
+    request: Request<'_, '_, '_>,
+    metadata: &PreparedMetadata,
+    storage: litchi_iwa_text_wire::StorageRewriteExecutionRequirements,
+    report: Report,
+) -> Result<ExecutionRequirements, Error> {
+    let occurrences = storage.reference_occurrences();
+    let aggregate = request.storage.object_references.len();
+    let after = aggregate.max(occurrences);
+    let reference_elements = aggregate
+        .checked_add(after)
+        .and_then(|value| value.checked_add(occurrences.checked_mul(2)?))
+        .ok_or(Error::Overflow)?;
+    let retained_elements = storage
+        .output_bytes()
+        .checked_add(reference_elements)
+        .ok_or(Error::Overflow)?;
+    let scalar_reference_elements = aggregate
+        .checked_add(after)
+        .and_then(|value| value.checked_add(occurrences))
+        .ok_or(Error::Overflow)?;
+    let retained_bytes = storage
+        .output_bytes()
+        .checked_add(
+            scalar_reference_elements
+                .checked_mul(size_of::<u64>())
+                .ok_or(Error::Overflow)?,
+        )
+        .and_then(|bytes| {
+            occurrences
+                .checked_mul(size_of::<(u32, u64)>())
+                .and_then(|field_bytes| bytes.checked_add(field_bytes))
+        })
+        .ok_or(Error::Overflow)?;
+    let reference_allocations = usize::from(aggregate != 0)
+        .checked_add(usize::from(after != 0))
+        .and_then(|value| value.checked_add(usize::from(occurrences != 0) * 2))
+        .ok_or(Error::Overflow)?;
+    let allocation_events = storage
+        .allocations()
+        .checked_add(reference_allocations)
+        .and_then(|events| events.checked_add(1))
+        .ok_or(Error::Overflow)?;
+    let plan_bytes = metadata
+        .aggregate_before
+        .capacity()
+        .checked_mul(size_of::<u64>())
+        .and_then(|bytes| {
+            metadata
+                .local_object_ids
+                .capacity()
+                .checked_mul(size_of::<u64>())
+                .and_then(|local| bytes.checked_add(local))
+        })
+        .and_then(|bytes| {
+            metadata
+                .field_references
+                .capacity()
+                .checked_mul(size_of::<(u32, u64)>())
+                .and_then(|fields| bytes.checked_add(fields))
+        })
+        .ok_or(Error::Overflow)?;
+    let peak_scratch_bytes = storage
+        .peak_scratch_bytes()
+        .checked_add(retained_bytes)
+        .and_then(|bytes| bytes.checked_add(size_of::<MessageReplacement>()))
+        .and_then(|bytes| bytes.checked_add(plan_bytes))
+        .ok_or(Error::Overflow)?;
+    let reference_work = aggregate
+        .checked_add(occurrences.checked_mul(8).ok_or(Error::Overflow)?)
+        .ok_or(Error::Overflow)?;
+    Ok(ExecutionRequirements {
+        output_bytes: storage.output_bytes(),
+        retained_elements,
+        retained_bytes,
+        peak_scratch_bytes,
+        allocation_events,
+        work_bound: storage
+            .work()
+            .checked_add(reference_work)
+            .ok_or(Error::Overflow)?,
+        reference_occurrences: report.reference_occurrences,
+    })
+}
+
+fn preflight_execution(
+    requirements: ExecutionRequirements,
+    limits: ExecutionRequirements,
+) -> Result<(), Error> {
+    if requirements.output_bytes > limits.output_bytes
+        || requirements.retained_elements > limits.retained_elements
+        || requirements.retained_bytes > limits.retained_bytes
+        || requirements.peak_scratch_bytes > limits.peak_scratch_bytes
+        || requirements.allocation_events > limits.allocation_events
+        || requirements.work_bound > limits.work_bound
+        || requirements.reference_occurrences > limits.reference_occurrences
+    {
+        return Err(Error::Limit);
+    }
+    Ok(())
+}
+
+fn retained_replacement_artifact(
+    replacements: &[MessageReplacement],
+) -> Result<RetainedAccounting, Error> {
+    let mut accounting = RetainedAccounting::default();
+    for replacement in replacements {
+        account_bytes(&mut accounting, replacement.payload.capacity())?;
+        account_reference_delta(&mut accounting, &replacement.references)?;
+    }
+    Ok(accounting)
+}
+
 fn aggregate_work_bound(
-    request: Request<'_>,
+    request: Request<'_, '_, '_>,
     validation: StorageValidation,
     output_bytes: usize,
     replacement_bytes: usize,
@@ -666,7 +991,7 @@ fn aggregate_work_bound(
         .ok_or(Error::Overflow)
 }
 
-fn aggregate_input_bytes(request: Request<'_>) -> Result<usize, Error> {
+fn aggregate_input_bytes(request: Request<'_, '_, '_>) -> Result<usize, Error> {
     request
         .storage
         .payload
@@ -682,6 +1007,7 @@ fn empty_plan(disposition: Disposition, result_key: u32, report: Report) -> Resu
         result_key,
         replacements: Vec::new(),
         report,
+        execution: ExecutionReport::default(),
     })
 }
 
@@ -795,12 +1121,16 @@ fn account_reference_delta(
     accounting: &mut RetainedAccounting,
     delta: &ReferenceDelta,
 ) -> Result<(), Error> {
-    for length in [delta.before.len(), delta.after.len(), delta.removed.len()] {
+    for length in [
+        delta.before.capacity(),
+        delta.after.capacity(),
+        delta.removed.capacity(),
+    ] {
         account_vec(accounting, length, size_of::<u64>())?;
     }
     account_vec(
         accounting,
-        delta.removed_by_field.len(),
+        delta.removed_by_field.capacity(),
         size_of::<(u32, u64)>(),
     )
 }
@@ -867,7 +1197,7 @@ mod tests {
         storage_fields: &'a [FieldReferences<'a>],
         owner: EntryOwner,
         list_ref_count: u32,
-    ) -> Request<'a> {
+    ) -> Request<'a, 'a, 'a> {
         Request {
             route: ListRoute {
                 root_object_id: 10,

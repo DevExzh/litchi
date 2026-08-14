@@ -1,5 +1,7 @@
 //! Strict PackageMetadata routing for sparse table-cell publication.
 
+use core::mem::size_of;
+
 use litchi_iwa_protos::package_metadata_codec::{
     ComponentDescriptor, ComponentSelector, ObjectUuidDescriptor, PackageMetadataVisitor,
     RewriteError, RewriteOptions, RewriteReport, UuidBits, inspect_package_metadata_with_visitor,
@@ -26,6 +28,104 @@ pub(super) struct Inspection {
     pub(super) uuids: Vec<UuidBits>,
     pub(super) first_report: RewriteReport,
     pub(super) second_report: RewriteReport,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct InspectionRequirements {
+    pub(super) retained_elements: usize,
+    pub(super) retained_bytes: usize,
+    pub(super) allocation_events: usize,
+    pub(super) work: usize,
+    pub(super) uuids: usize,
+}
+
+pub(super) struct InspectionPlan {
+    route: MessageRoute,
+    last_object_identifier: u64,
+    maximum_object_identifier: u64,
+    expected: Counts,
+    first_report: RewriteReport,
+}
+
+impl InspectionPlan {
+    pub(super) const fn first_report(&self) -> RewriteReport {
+        self.first_report
+    }
+
+    pub(super) fn requirements(&self, path: Path) -> Result<InspectionRequirements, Error> {
+        let retained_elements = self
+            .expected
+            .current_components
+            .checked_add(self.expected.uuids)
+            .ok_or(Error::InvalidSource { path })?;
+        let retained_bytes = self
+            .expected
+            .current_components
+            .checked_mul(size_of::<ComponentIdentity>())
+            .and_then(|bytes| {
+                self.expected
+                    .uuids
+                    .checked_mul(size_of::<UuidBits>())
+                    .and_then(|uuids| bytes.checked_add(uuids))
+            })
+            .ok_or(Error::InvalidSource { path })?;
+        let work = sort_work(self.expected.current_components, path)?
+            .checked_add(sort_work(self.expected.uuids, path)?)
+            .ok_or(Error::InvalidSource { path })?;
+        Ok(InspectionRequirements {
+            retained_elements,
+            retained_bytes,
+            allocation_events: usize::from(self.expected.current_components != 0)
+                .checked_add(usize::from(self.expected.uuids != 0))
+                .ok_or(Error::InvalidSource { path })?,
+            work,
+            uuids: self.expected.uuids,
+        })
+    }
+
+    pub(super) fn collect(
+        self,
+        source: &Package,
+        options: RewriteOptions,
+        path: Path,
+    ) -> Result<Inspection, Error> {
+        let payload = message_payload(source, self.route, path)?;
+        let mut collector = CollectVisitor::new(source, self.expected, false, path)?;
+        let second = inspect_package_metadata_with_visitor(payload, options, &mut collector)
+            .map_err(|error| map_error(error, path))?;
+        validate_inspection_report(second.report(), path)?;
+        if self.last_object_identifier != second.last_object_identifier()
+            || collector.components.len() > self.expected.current_components
+            || collector.uuids.len() != self.expected.uuids
+        {
+            return Err(Error::InvalidSource { path });
+        }
+        collector
+            .components
+            .sort_unstable_by_key(|component| component.component_index);
+        if collector
+            .components
+            .windows(2)
+            .any(|pair| pair[0].component_index >= pair[1].component_index)
+        {
+            return Err(Error::InvalidSource { path });
+        }
+        collector
+            .uuids
+            .sort_unstable_by_key(|uuid| (uuid.lower(), uuid.upper()));
+        if collector.uuids.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(Error::InvalidSource { path });
+        }
+        Ok(Inspection {
+            route: self.route,
+            last_object_identifier: self.last_object_identifier,
+            maximum_object_identifier: self.maximum_object_identifier,
+            components: collector.components,
+            uuids: collector.uuids,
+            first_report: self.first_report,
+            second_report: second.report(),
+        })
+    }
 }
 
 impl Inspection {
@@ -64,9 +164,6 @@ impl Inspection {
         source_bytes: &[u8],
         path: Path,
     ) -> Result<(Vec<u64>, Vec<UuidBits>), Error> {
-        if self.maximum_object_identifier > self.last_object_identifier {
-            return Err(Error::InvalidSource { path });
-        }
         let mut identifiers = Vec::new();
         identifiers
             .try_reserve_exact(count)
@@ -81,7 +178,19 @@ impl Inspection {
                 kind: LimitKind::RetainedElements,
                 amount: count,
             })?;
-        let mut identifier = self.last_object_identifier;
+        if identifiers.capacity() != count || uuids.capacity() != count {
+            return Err(Error::Allocation {
+                kind: LimitKind::RetainedElements,
+                amount: count,
+            });
+        }
+        // Some valid Numbers packages contain source objects whose identifiers
+        // are newer than PackageMetadata's advisory last-object watermark.
+        // Allocate above both authorities; the metadata rewrite still proves
+        // the exact prior watermark before advancing it to the final ID.
+        let mut identifier = self
+            .last_object_identifier
+            .max(self.maximum_object_identifier);
         let source_seed = fingerprint(source_bytes, 0xcbf2_9ce4_8422_2325);
         for ordinal in 0..count {
             identifier = identifier.checked_add(1).ok_or(Error::LimitExceeded {
@@ -129,6 +238,14 @@ pub(super) fn inspect(
     options: RewriteOptions,
     path: Path,
 ) -> Result<Inspection, Error> {
+    plan_inspection(source, options, path)?.collect(source, options, path)
+}
+
+pub(super) fn plan_inspection(
+    source: &Package,
+    options: RewriteOptions,
+    path: Path,
+) -> Result<InspectionPlan, Error> {
     let route = unique_metadata_route(source, path)?;
     let object = source
         .state
@@ -143,41 +260,39 @@ pub(super) fn inspect(
     let mut counter = CountVisitor::default();
     let first = inspect_package_metadata_with_visitor(payload, options, &mut counter)
         .map_err(|error| map_error(error, path))?;
-    let expected = counter.counts;
-    let mut collector = CollectVisitor::new(source, expected, counter.overflow, path)?;
-    let second = inspect_package_metadata_with_visitor(payload, options, &mut collector)
-        .map_err(|error| map_error(error, path))?;
-    if first.last_object_identifier() != second.last_object_identifier()
-        || collector.components.len() > expected.current_components
-        || collector.uuids.len() != expected.uuids
-    {
+    validate_inspection_report(first.report(), path)?;
+    if counter.overflow {
         return Err(Error::InvalidSource { path });
     }
-    collector
-        .components
-        .sort_unstable_by_key(|component| component.component_index);
-    if collector
-        .components
-        .windows(2)
-        .any(|pair| pair[0].component_index >= pair[1].component_index)
-    {
-        return Err(Error::InvalidSource { path });
-    }
-    collector
-        .uuids
-        .sort_unstable_by_key(|uuid| (uuid.lower(), uuid.upper()));
-    if collector.uuids.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(Error::InvalidSource { path });
-    }
-    Ok(Inspection {
+    Ok(InspectionPlan {
         route,
         last_object_identifier: first.last_object_identifier(),
         maximum_object_identifier: maximum_object_identifier(source, path)?,
-        components: collector.components,
-        uuids: collector.uuids,
+        expected: counter.counts,
         first_report: first.report(),
-        second_report: second.report(),
     })
+}
+
+fn validate_inspection_report(report: RewriteReport, path: Path) -> Result<(), Error> {
+    // Inspection is deliberately output-free and the codec itself owns no
+    // storage after returning. The count/collect visitors are the only live
+    // allocations and are accounted independently by `InspectionRequirements`.
+    if report.output_bytes() != 0 || report.retained_bytes() != 0 || report.allocations() != 0 {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(())
+}
+
+fn sort_work(elements: usize, path: Path) -> Result<usize, Error> {
+    if elements < 2 {
+        return Ok(elements);
+    }
+    let log = usize::try_from(usize::BITS - (elements - 1).leading_zeros())
+        .map_err(|_| Error::InvalidSource { path })?;
+    elements
+        .checked_mul(log)
+        .and_then(|work| work.checked_add(elements))
+        .ok_or(Error::InvalidSource { path })
 }
 
 #[derive(Clone, Copy, Default)]
@@ -245,6 +360,12 @@ impl<'source> CollectVisitor<'source> {
                 kind: LimitKind::RetainedElements,
                 amount: counts.uuids,
             })?;
+        if components.capacity() != counts.current_components || uuids.capacity() != counts.uuids {
+            return Err(Error::Allocation {
+                kind: LimitKind::RetainedElements,
+                amount: counts.current_components.max(counts.uuids),
+            });
+        }
         Ok(Self {
             source,
             components,

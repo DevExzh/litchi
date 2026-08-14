@@ -11,6 +11,7 @@ rust-version.workspace = true
 [dependencies]
 buffa = "=0.9.1"
 prost = { workspace = true }
+ryu = { workspace = true }
 
 [build-dependencies]
 buffa-build = "=0.9.1"

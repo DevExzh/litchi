@@ -11,6 +11,11 @@
 
 use std::{mem::size_of, ops::Range};
 
+#[cfg(test)]
+std::thread_local! {
+    static STORAGE_EXECUTION_ENTRIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 use litchi_iwa_common::varint::{
     decode_varint_from_bytes, encode_varint_into, encoded_len as varint_len,
 };
@@ -277,6 +282,118 @@ pub struct StorageRewrite {
     removed_object_references_by_field: Vec<RemovedObjectReference>,
     has_unknown_wire_fields: bool,
     changed: bool,
+    execution_report: StorageRewriteExecutionReport,
+}
+
+/// Candidate-production requirements known after strict, output-free
+/// planning. Every retained and temporary vector is bounded by the exact
+/// encoded output length or the exact source reference-occurrence count.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StorageRewriteExecutionRequirements {
+    output_bytes: usize,
+    retained_elements: usize,
+    retained_bytes: usize,
+    peak_scratch_bytes: usize,
+    allocations: usize,
+    work: usize,
+    reference_occurrences: usize,
+}
+
+impl StorageRewriteExecutionRequirements {
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+
+    #[must_use]
+    pub const fn retained_elements(self) -> usize {
+        self.retained_elements
+    }
+
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    #[must_use]
+    pub const fn peak_scratch_bytes(self) -> usize {
+        self.peak_scratch_bytes
+    }
+
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    #[must_use]
+    pub const fn work(self) -> usize {
+        self.work
+    }
+
+    #[must_use]
+    pub const fn reference_occurrences(self) -> usize {
+        self.reference_occurrences
+    }
+}
+
+/// Independent execution ceilings checked before the first candidate or
+/// reference vector is allocated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StorageRewriteExecutionLimits {
+    pub max_output_bytes: usize,
+    pub max_retained_elements: usize,
+    pub max_retained_bytes: usize,
+    pub max_peak_scratch_bytes: usize,
+    pub max_allocations: usize,
+    pub max_work: usize,
+}
+
+/// Exact post-execution resource report. Retained axes use actual vector
+/// capacities; peak scratch includes the simultaneously live intermediate
+/// reference projections.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StorageRewriteExecutionReport {
+    pub retained_elements: usize,
+    pub retained_bytes: usize,
+    pub peak_scratch_bytes: usize,
+    pub allocations: usize,
+    pub work: usize,
+}
+
+/// Strict output-free rewrite plan. It borrows source and replacement text;
+/// execution alone materializes candidate bytes or reference vectors.
+pub struct PreparedStorageRewrite<'source, 'replacement> {
+    source: &'source [u8],
+    range: Range<usize>,
+    replacement: &'replacement str,
+    text: TextPlan,
+    root: RootPlan,
+    limits: RewriteLimits,
+    requirements: StorageRewriteExecutionRequirements,
+}
+
+impl PreparedStorageRewrite<'_, '_> {
+    #[must_use]
+    pub const fn execution_requirements(&self) -> StorageRewriteExecutionRequirements {
+        self.requirements
+    }
+
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.root.expected_changed
+    }
+
+    /// Execute the already-validated rewrite under independent finite limits.
+    ///
+    /// # Errors
+    ///
+    /// Refuses any insufficient axis before allocating the candidate buffer.
+    pub fn execute(self, limits: StorageRewriteExecutionLimits) -> RewriteResult<StorageRewrite> {
+        preflight_storage_execution(self.requirements, limits)?;
+        #[cfg(test)]
+        STORAGE_EXECUTION_ENTRIES.with(|entries| entries.set(entries.get() + 1));
+        execute_prepared_storage_rewrite(self)
+    }
 }
 
 /// One schema-declared reference removed from a specific storage field.
@@ -317,6 +434,11 @@ impl StorageRewrite {
     #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
+    }
+
+    #[must_use]
+    pub const fn execution_report(&self) -> StorageRewriteExecutionReport {
+        self.execution_report
     }
 
     /// Aggregate source text length in UTF-16 code units.
@@ -625,6 +747,20 @@ fn checked_add(left: usize, right: usize, context: &'static str) -> RewriteResul
 
 fn checked_mul(left: usize, right: usize, context: &'static str) -> RewriteResult<usize> {
     left.checked_mul(right).ok_or_else(|| arithmetic(context))
+}
+
+fn require_exact_capacity<T>(
+    value: &Vec<T>,
+    expected: usize,
+    resource: &'static str,
+) -> RewriteResult<()> {
+    if size_of::<T>() != 0 && value.capacity() != expected {
+        return Err(RewriteError::Allocation {
+            resource,
+            amount: expected,
+        });
+    }
+    Ok(())
 }
 
 fn preflight_root_text(source: &[u8], limits: RewriteLimits) -> RewriteResult<TextPreflight> {
@@ -1380,7 +1516,7 @@ struct TablePlan {
     generated_entries: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct RootPlan {
     output_len: usize,
     reference_occurrences: usize,
@@ -2113,10 +2249,41 @@ pub fn rewrite_storage_text_with_behavior_and_limits(
     behavior: RewriteBehavior,
     limits: RewriteLimits,
 ) -> RewriteResult<StorageRewrite> {
+    let prepared = prepare_storage_text_rewrite_with_behavior_and_limits(
+        source,
+        range,
+        replacement,
+        behavior,
+        limits,
+    )?;
+    let requirements = prepared.execution_requirements();
+    prepared.execute(StorageRewriteExecutionLimits {
+        max_output_bytes: requirements.output_bytes,
+        max_retained_elements: requirements.retained_elements,
+        max_retained_bytes: requirements.retained_bytes,
+        max_peak_scratch_bytes: requirements.peak_scratch_bytes,
+        max_allocations: requirements.allocations,
+        max_work: requirements.work,
+    })
+}
+
+/// Strictly plan one storage-text rewrite without allocating candidate output.
+///
+/// # Errors
+///
+/// Returns the same source, semantic, and planning-limit failures as
+/// [`rewrite_storage_text_with_behavior_and_limits`].
+pub fn prepare_storage_text_rewrite_with_behavior_and_limits<'source, 'replacement>(
+    source: &'source [u8],
+    range: Range<usize>,
+    replacement: &'replacement str,
+    behavior: RewriteBehavior,
+    limits: RewriteLimits,
+) -> RewriteResult<PreparedStorageRewrite<'source, 'replacement>> {
     let text_preflight = preflight_root_text(source, limits)?;
     let text = decode_text_plan(source, &range, replacement, text_preflight, limits)?;
     let root = validate_and_plan_root(source, &range, text, replacement, behavior, limits)?;
-    preflight_rewrite_work(
+    let work = preflight_rewrite_work(
         source.len(),
         text_preflight,
         text,
@@ -2124,7 +2291,30 @@ pub fn rewrite_storage_text_with_behavior_and_limits(
         &root,
         limits,
     )?;
+    let requirements = storage_execution_requirements(&root, work)?;
+    Ok(PreparedStorageRewrite {
+        source,
+        range,
+        replacement,
+        text,
+        root,
+        limits,
+        requirements,
+    })
+}
 
+fn execute_prepared_storage_rewrite(
+    prepared: PreparedStorageRewrite<'_, '_>,
+) -> RewriteResult<StorageRewrite> {
+    let PreparedStorageRewrite {
+        source,
+        range,
+        replacement,
+        text,
+        root,
+        limits,
+        requirements,
+    } = prepared;
     let references_before =
         collect_reference_occurrences(source, root.reference_occurrences, limits)?;
     let bytes = rewrite_root(
@@ -2153,6 +2343,20 @@ pub fn rewrite_storage_text_with_behavior_and_limits(
             "storage rewrite byte delta disagrees with semantic no-op plan",
         ));
     }
+    let execution_report = storage_execution_report(
+        &bytes,
+        &object_references_before,
+        &object_references_after,
+        &object_reference_occurrences_before,
+        &object_reference_occurrences_after,
+        &removed_object_references,
+        &removed_by_field,
+        &references_before,
+        &references_after,
+        &unique_references_before,
+        &unique_references_after,
+        requirements.work,
+    )?;
     Ok(StorageRewrite {
         bytes,
         before_utf16_len: text.before_utf16_len,
@@ -2165,6 +2369,7 @@ pub fn rewrite_storage_text_with_behavior_and_limits(
         removed_object_references_by_field: removed_by_field,
         has_unknown_wire_fields: root.has_unknown_wire_fields,
         changed,
+        execution_report,
     })
 }
 
@@ -2254,7 +2459,7 @@ fn preflight_rewrite_work(
     replacement: &str,
     root: &RootPlan,
     limits: RewriteLimits,
-) -> RewriteResult<()> {
+) -> RewriteResult<usize> {
     let root_scans = checked_mul(source_len, 2, "root preflight and Buffa work")?;
     let source_tree_scans = checked_mul(root.tree_bytes, 3, "source tree rewrite work")?;
     let output_tree_scan = checked_mul(
@@ -2271,7 +2476,177 @@ fn preflight_rewrite_work(
     work = checked_add(work, replacement.len(), "aggregate rewrite work")?;
     work = checked_add(work, text.result_bytes, "aggregate rewrite work")?;
     work = checked_add(work, root.generated_fields, "aggregate rewrite work")?;
-    enforce_limit("rewrite work", work, limits.max_rewrite_work())
+    enforce_limit("rewrite work", work, limits.max_rewrite_work())?;
+    Ok(work)
+}
+
+fn storage_execution_requirements(
+    root: &RootPlan,
+    work: usize,
+) -> RewriteResult<StorageRewriteExecutionRequirements> {
+    let references = root.reference_occurrences;
+    let retained_elements = root
+        .output_len
+        .checked_add(checked_mul(references, 6, "storage retained elements")?)
+        .ok_or_else(|| arithmetic("storage retained elements"))?;
+    let identifier_bytes = checked_mul(
+        checked_mul(references, 5, "storage retained identifiers")?,
+        size_of::<u64>(),
+        "storage retained identifier bytes",
+    )?;
+    let provenance_bytes = checked_mul(
+        references,
+        size_of::<RemovedObjectReference>(),
+        "storage retained provenance bytes",
+    )?;
+    let retained_bytes = root
+        .output_len
+        .checked_add(identifier_bytes)
+        .and_then(|bytes| bytes.checked_add(provenance_bytes))
+        .ok_or_else(|| arithmetic("storage retained bytes"))?;
+    let intermediate = checked_mul(
+        checked_mul(references, 4, "storage reference intermediates")?,
+        size_of::<RemovedObjectReference>(),
+        "storage reference intermediate bytes",
+    )?;
+    let peak_scratch_bytes = retained_bytes
+        .checked_add(intermediate)
+        .ok_or_else(|| arithmetic("storage execution peak"))?;
+    let allocations = usize::from(root.output_len != 0)
+        .checked_add(if references == 0 { 0 } else { 10 })
+        .ok_or_else(|| arithmetic("storage execution allocations"))?;
+    Ok(StorageRewriteExecutionRequirements {
+        output_bytes: root.output_len,
+        retained_elements,
+        retained_bytes,
+        peak_scratch_bytes,
+        allocations,
+        work,
+        reference_occurrences: references,
+    })
+}
+
+fn preflight_storage_execution(
+    requirements: StorageRewriteExecutionRequirements,
+    limits: StorageRewriteExecutionLimits,
+) -> RewriteResult<()> {
+    for (resource, observed, limit) in [
+        (
+            "output bytes",
+            requirements.output_bytes,
+            limits.max_output_bytes,
+        ),
+        (
+            "retained elements",
+            requirements.retained_elements,
+            limits.max_retained_elements,
+        ),
+        (
+            "retained bytes",
+            requirements.retained_bytes,
+            limits.max_retained_bytes,
+        ),
+        (
+            "peak scratch bytes",
+            requirements.peak_scratch_bytes,
+            limits.max_peak_scratch_bytes,
+        ),
+        (
+            "allocations",
+            requirements.allocations,
+            limits.max_allocations,
+        ),
+        ("rewrite work", requirements.work, limits.max_work),
+    ] {
+        enforce_limit(resource, observed, limit)?;
+    }
+    Ok(())
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "each retained and intermediate storage vector remains explicit"
+)]
+fn storage_execution_report(
+    bytes: &Vec<u8>,
+    object_references_before: &Vec<u64>,
+    object_references_after: &Vec<u64>,
+    object_reference_occurrences_before: &Vec<u64>,
+    object_reference_occurrences_after: &Vec<u64>,
+    removed_object_references: &Vec<u64>,
+    removed_by_field: &Vec<RemovedObjectReference>,
+    references_before: &Vec<RemovedObjectReference>,
+    references_after: &Vec<RemovedObjectReference>,
+    unique_references_before: &Vec<RemovedObjectReference>,
+    unique_references_after: &Vec<RemovedObjectReference>,
+    work: usize,
+) -> RewriteResult<StorageRewriteExecutionReport> {
+    let identifier_elements = object_references_before
+        .capacity()
+        .checked_add(object_references_after.capacity())
+        .and_then(|value| value.checked_add(object_reference_occurrences_before.capacity()))
+        .and_then(|value| value.checked_add(object_reference_occurrences_after.capacity()))
+        .and_then(|value| value.checked_add(removed_object_references.capacity()))
+        .ok_or_else(|| arithmetic("storage actual identifier elements"))?;
+    let retained_elements = bytes
+        .capacity()
+        .checked_add(identifier_elements)
+        .and_then(|value| value.checked_add(removed_by_field.capacity()))
+        .ok_or_else(|| arithmetic("storage actual retained elements"))?;
+    let retained_bytes = bytes
+        .capacity()
+        .checked_add(checked_mul(
+            identifier_elements,
+            size_of::<u64>(),
+            "storage actual identifier bytes",
+        )?)
+        .and_then(|value| {
+            removed_by_field
+                .capacity()
+                .checked_mul(size_of::<RemovedObjectReference>())
+                .and_then(|bytes| value.checked_add(bytes))
+        })
+        .ok_or_else(|| arithmetic("storage actual retained bytes"))?;
+    let intermediate_elements = references_before
+        .capacity()
+        .checked_add(references_after.capacity())
+        .and_then(|value| value.checked_add(unique_references_before.capacity()))
+        .and_then(|value| value.checked_add(unique_references_after.capacity()))
+        .ok_or_else(|| arithmetic("storage actual intermediate elements"))?;
+    let peak_scratch_bytes = retained_bytes
+        .checked_add(checked_mul(
+            intermediate_elements,
+            size_of::<RemovedObjectReference>(),
+            "storage actual intermediate bytes",
+        )?)
+        .ok_or_else(|| arithmetic("storage actual peak scratch"))?;
+    let allocations = usize::from(bytes.capacity() != 0)
+        .checked_add(usize::from(references_before.capacity() != 0))
+        .and_then(|value| value.checked_add(usize::from(references_after.capacity() != 0)))
+        .and_then(|value| value.checked_add(usize::from(unique_references_before.capacity() != 0)))
+        .and_then(|value| value.checked_add(usize::from(unique_references_after.capacity() != 0)))
+        .and_then(|value| value.checked_add(usize::from(removed_by_field.capacity() != 0)))
+        .and_then(|value| {
+            value.checked_add(usize::from(
+                object_reference_occurrences_before.capacity() != 0,
+            ))
+        })
+        .and_then(|value| {
+            value.checked_add(usize::from(
+                object_reference_occurrences_after.capacity() != 0,
+            ))
+        })
+        .and_then(|value| value.checked_add(usize::from(object_references_before.capacity() != 0)))
+        .and_then(|value| value.checked_add(usize::from(object_references_after.capacity() != 0)))
+        .and_then(|value| value.checked_add(usize::from(removed_object_references.capacity() != 0)))
+        .ok_or_else(|| arithmetic("storage actual allocations"))?;
+    Ok(StorageRewriteExecutionReport {
+        retained_elements,
+        retained_bytes,
+        peak_scratch_bytes,
+        allocations,
+        work,
+    })
 }
 
 fn rewrite_root(
@@ -2290,6 +2665,7 @@ fn rewrite_root(
             resource: "rewritten TSWP storage",
             amount: output_len,
         })?;
+    require_exact_capacity(&output, output_len, "rewritten TSWP storage")?;
     let mut fragment_index = 0usize;
     let mut fragment_offset = 0usize;
     let mut fields = RawFields::new(source);
@@ -2571,6 +2947,7 @@ fn collect_reference_occurrences(
             resource: "TSWP object-reference occurrences",
             amount: capacity,
         })?;
+    require_exact_capacity(&references, capacity, "TSWP reference occurrences")?;
     let mut fields = RawFields::new(source);
     while let Some(field) = fields.next()? {
         match field.number {
@@ -2663,6 +3040,11 @@ fn aggregate_identifiers(references: &[RemovedObjectReference]) -> RewriteResult
             resource: "deduplicated TSWP object references",
             amount: references.len(),
         })?;
+    require_exact_capacity(
+        &identifiers,
+        references.len(),
+        "deduplicated TSWP object references",
+    )?;
     identifiers.extend(references.iter().map(|reference| reference.identifier));
     identifiers.sort_unstable();
     identifiers.dedup();
@@ -2677,6 +3059,11 @@ fn occurrence_identifiers(references: &[RemovedObjectReference]) -> RewriteResul
             resource: "TSWP object-reference occurrence identifiers",
             amount: references.len(),
         })?;
+    require_exact_capacity(
+        &identifiers,
+        references.len(),
+        "TSWP object-reference occurrence identifiers",
+    )?;
     identifiers.extend(references.iter().map(|reference| reference.identifier));
     identifiers.sort_unstable();
     Ok(identifiers)
@@ -2692,6 +3079,11 @@ fn unique_reference_pairs(
             resource: "deduplicated TSWP reference provenance",
             amount: references.len(),
         })?;
+    require_exact_capacity(
+        &unique,
+        references.len(),
+        "deduplicated TSWP reference provenance",
+    )?;
     unique.extend_from_slice(references);
     unique.dedup();
     Ok(unique)
@@ -2708,6 +3100,7 @@ fn sorted_difference(
             resource: "removed TSWP reference provenance",
             amount: before.len(),
         })?;
+    require_exact_capacity(&removed, before.len(), "removed TSWP reference provenance")?;
     let mut after_index = 0usize;
     for &candidate in before {
         while after
@@ -2731,6 +3124,7 @@ fn sorted_identifier_difference(before: &[u64], after: &[u64]) -> RewriteResult<
             resource: "removed TSWP object references",
             amount: before.len(),
         })?;
+    require_exact_capacity(&removed, before.len(), "removed TSWP object references")?;
     let mut after_index = 0usize;
     for &candidate in before {
         while after
@@ -3526,6 +3920,73 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn prepared_execution_max_minus_one_refuses_before_any_execution_allocation() {
+        let source = StorageArchive {
+            text: vec!["abc".to_owned()],
+            table_char_style: Some(object_table(&[(0, Some(11)), (2, Some(12))])),
+            ..StorageArchive::default()
+        }
+        .encode_to_vec();
+        let prepare = || {
+            prepare_storage_text_rewrite_with_behavior_and_limits(
+                &source,
+                1..2,
+                "longer",
+                RewriteBehavior::PreserveOnEqualText,
+                RewriteLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("storage plan should prepare: {error}"))
+        };
+        let requirements = prepare().execution_requirements();
+        assert!(requirements.output_bytes() > 0);
+        assert!(requirements.retained_elements() > 0);
+        assert!(requirements.retained_bytes() > 0);
+        assert!(requirements.peak_scratch_bytes() > 0);
+        assert!(requirements.allocations() > 0);
+        assert!(requirements.work() > 0);
+
+        for axis in 0..6 {
+            STORAGE_EXECUTION_ENTRIES.with(|entries| entries.set(0));
+            let mut limits = StorageRewriteExecutionLimits {
+                max_output_bytes: requirements.output_bytes(),
+                max_retained_elements: requirements.retained_elements(),
+                max_retained_bytes: requirements.retained_bytes(),
+                max_peak_scratch_bytes: requirements.peak_scratch_bytes(),
+                max_allocations: requirements.allocations(),
+                max_work: requirements.work(),
+            };
+            match axis {
+                0 => limits.max_output_bytes -= 1,
+                1 => limits.max_retained_elements -= 1,
+                2 => limits.max_retained_bytes -= 1,
+                3 => limits.max_peak_scratch_bytes -= 1,
+                4 => limits.max_allocations -= 1,
+                5 => limits.max_work -= 1,
+                _ => unreachable!(),
+            }
+            assert!(matches!(
+                prepare().execute(limits),
+                Err(RewriteError::LimitExceeded { .. })
+            ));
+            STORAGE_EXECUTION_ENTRIES.with(|entries| assert_eq!(entries.get(), 0));
+        }
+
+        STORAGE_EXECUTION_ENTRIES.with(|entries| entries.set(0));
+        let output = prepare()
+            .execute(StorageRewriteExecutionLimits {
+                max_output_bytes: requirements.output_bytes(),
+                max_retained_elements: requirements.retained_elements(),
+                max_retained_bytes: requirements.retained_bytes(),
+                max_peak_scratch_bytes: requirements.peak_scratch_bytes(),
+                max_allocations: requirements.allocations(),
+                max_work: requirements.work(),
+            })
+            .unwrap_or_else(|error| panic!("exact execution should succeed: {error}"));
+        assert!(output.changed());
+        STORAGE_EXECUTION_ENTRIES.with(|entries| assert_eq!(entries.get(), 1));
     }
 
     #[test]

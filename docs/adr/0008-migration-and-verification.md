@@ -10582,3 +10582,49 @@ audits report zero findings. Host all-target/all-feature check and no-run,
 retained-axis 2/2, Pages-layout 1/1, generated-roundtrip 1/1, scoped boundary
 6/6, strict library Clippy, formatting, and diff checks pass. Broad host
 all-target Clippy retains nine unrelated existing lints.
+
+## 2026-08-14 Formula-authoring acceptance gates
+
+The accepted Rust matrix covers local and distinct-owner cell/range/whole-axis
+references, the complete operator/function subset, every typed cache, supplied
+cache mismatch, cycle and poison refusal, insert/replace/clear, survivor and
+sequential formulas, mixed scalar overlays, clear-only multi-owner edits,
+follow-on scalar refresh after cross-table authoring, locked no-ops, exact
+apply/inverse, reopened-patch conflict, raw dependency mirrors, package metadata
+allocation, unknown-field preservation, and strict generated-view agreement.
+The Numbers library suite passes 286 tests with four explicitly ignored native
+fixtures; the public formula suite passes 15/15. Focused formula-list, metadata,
+cache, wire, tile, sparse-header, PackageMetadata-codec, and reusable-registry
+tests are green. The host library passes 1,394 tests and the formula-specific
+crate-boundary audit reports no finding.
+
+Resource gates use governed counters rather than elapsed time or RSS. Rooted
+4,096-to-8,192 authored-formula and cache-fanout fixtures stay within the 2.2
+growth ceiling on every input-sensitive asserted axis. The aggregate all-axis
+required-minus-one gate proves zero leaf execution, output, component,
+reassembly, reopen, locality, and publication work. Leaf max-minus-one tests
+also cover formula list, dependency metadata, string list, rich storage, tile,
+header bucket, PackageMetadata, formula codec, and dependency graph allocation.
+All-target/all-feature strict Clippy, formatting, diff, and focused boundary
+checks pass.
+
+The native oracle used Numbers 14.4 (build 7043.0.93) on macOS 26.5.2. The
+isolated candidate at
+`/private/tmp/litchi-numbers-formula-native-fixed.D5M24n/candidate.numbers`
+started at 136,899 bytes with SHA-256
+`0ca832525d011a368818701ca7a3c8076f5ef0afdb0eab8920ebd730695722e5`.
+Numbers displayed B3=43 with authored formula results C3=86 and D3=51. A native
+edit to B3=44 recalculated them to 88 and 52. After save, close, and reopen the
+same cells remained 44, 88, and 52 and both results retained Formula-result
+status. The saved artifact is 136,929 bytes with SHA-256
+`3edc581996d00a21493a89450aaea0bc51f8543a244fd03389ed506a31b9ef41`;
+the focused dependency inspector accepts it. A byte-identical backup of the
+pre-UI candidate was retained beside it.
+
+This oracle establishes application acceptance and recalculation for the
+inspected authored dependency graph. Replacement, clear, old-AST release,
+cross-owner refresh, and exact package locality are established by the focused
+transaction and reopen suites, not extrapolated as separate UI observations.
+It does not claim other Numbers versions, visual fidelity outside the inspected
+cells, arbitrary formulas, array/spill/pivot support, host deletion, manifest
+edge removal, or closure of the broader IWA migration debt.

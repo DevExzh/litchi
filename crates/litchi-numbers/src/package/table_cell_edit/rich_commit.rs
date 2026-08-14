@@ -28,16 +28,85 @@ pub(super) struct PreparedRichReplacement {
     pub(super) references: rich::ReferenceDelta,
 }
 
+pub(super) struct PreparedRichTransition<'source, 'replacement> {
+    pub(super) route: resolve::MessageRoute,
+    expected_type: u32,
+    plan: rich::PreparedPlan<'source, 'replacement>,
+    publication_reference_items: usize,
+}
+
+impl PreparedRichTransition<'_, '_> {
+    pub(super) const fn execution_requirements(&self) -> rich::ExecutionRequirements {
+        self.plan.execution_requirements()
+    }
+
+    pub(super) const fn publication_reference_items(&self) -> usize {
+        self.publication_reference_items
+    }
+
+    pub(super) const fn route(&self) -> resolve::MessageRoute {
+        self.route
+    }
+
+    pub(super) fn retained_accounting(
+        &self,
+        budget: &budget::TransactionBudget,
+        path: Path,
+    ) -> Result<rich::RetainedAccounting, Error> {
+        self.plan
+            .retained_accounting()
+            .map_err(|error| map_rich_error(error, budget, path))
+    }
+
+    pub(super) fn execute(
+        self,
+        budget: &budget::TransactionBudget,
+        path: Path,
+    ) -> Result<(PreparedRichReplacement, rich::ExecutionReport), Error> {
+        let requirements = self.plan.execution_requirements();
+        let plan = self
+            .plan
+            .execute(requirements)
+            .map_err(|error| map_rich_error(error, budget, path))?;
+        let execution = plan.execution_report();
+        let rich::PlanParts {
+            disposition,
+            replacements: staged,
+        } = plan.into_parts();
+        if disposition != rich::Disposition::InPlace || staged.len() != 1 {
+            return Err(Error::InvalidSource { path });
+        }
+        let replacement = staged
+            .into_iter()
+            .next()
+            .ok_or(Error::InvalidSource { path })?;
+        if replacement.location != rich_location(self.route)
+            || replacement.expected_type != self.expected_type
+            || replacement.kind != rich::ReplacementKind::StorageArchive
+            || !replacement.references.removed_by_field.is_empty()
+        {
+            return Err(Error::InvalidSource { path });
+        }
+        Ok((
+            PreparedRichReplacement {
+                route: self.route,
+                payload: replacement.payload,
+                references: replacement.references,
+            },
+            execution,
+        ))
+    }
+}
+
 /// Rich keys aligned one-for-one with the caller's changed-cell slice.
 ///
 /// `Some(key)` occurs only for the admitted `Input::Text` cell which was
 /// preclassified as rich text. Plain text cells remain `None` for the string
 /// planner, and non-text inputs are not inspected here. Exact-equality rich
 /// edits retain their key without staging a storage replacement.
-#[derive(Debug)]
-pub(super) struct PreparedRich {
+pub(super) struct PreparedRich<'source, 'replacement> {
     pub(super) keys: Vec<Option<u32>>,
-    pub(super) replacements: Vec<PreparedRichReplacement>,
+    pub(super) transition: Option<PreparedRichTransition<'source, 'replacement>>,
     /// Rich storage messages whose reference transition is owned here.
     pub(super) owned_transition_count: usize,
 }
@@ -48,13 +117,13 @@ pub(super) struct PreparedRich {
 /// release, and non-existing tiles retain the public typed `RichText` refusal.
 /// Exact aggregate reference changes travel with the staged replacement. No
 /// package, archive, tile, or list payload is mutated.
-pub(super) fn prepare_unique_rich_text_to_text(
-    source: &Package,
+pub(super) fn prepare_unique_rich_text_to_text<'source, 'replacement>(
+    source: &'source Package,
     target: &resolve::Target,
-    changes: &[Change],
+    changes: &'replacement [Change],
     budget: &mut budget::TransactionBudget,
     path: Path,
-) -> Result<PreparedRich, Error> {
+) -> Result<PreparedRich<'source, 'replacement>, Error> {
     if target.path() != path {
         return Err(Error::InvalidSource { path });
     }
@@ -142,7 +211,7 @@ pub(super) fn prepare_unique_rich_text_to_text(
                         return Err(map_tile_error(error, path));
                     },
                 };
-                let usage = match super::tile_usage(budget, outcome.report) {
+                let usage = match super::tile_usage(budget, outcome.report, 1) {
                     Ok(usage) => usage,
                     Err(error) => {
                         budget.cancel_authorization();
@@ -176,7 +245,7 @@ pub(super) fn prepare_unique_rich_text_to_text(
     let Some((change_index, key)) = selected else {
         return Ok(PreparedRich {
             keys,
-            replacements: Vec::new(),
+            transition: None,
             owned_transition_count: 0,
         });
     };
@@ -204,7 +273,7 @@ pub(super) fn prepare_unique_rich_text_to_text(
     if entry.ref_count != 1 || payload_edges != 1 || storage_edges != 1 {
         return Err(rich_refusal(path));
     }
-    let rich_plan = plan_unique(
+    let rich_plan = prepare_unique(
         source,
         index,
         entry,
@@ -215,71 +284,59 @@ pub(super) fn prepare_unique_rich_text_to_text(
         budget,
         path,
     )?;
-    let rich::PlanParts {
-        disposition,
-        result_key,
-        replacements: staged,
-    } = rich_plan.into_parts();
-    if result_key != key {
+    if rich_plan.result_key() != key {
         return Err(rich_refusal(path));
     }
-    if disposition == rich::Disposition::Unchanged {
-        if !staged.is_empty() {
-            return Err(Error::InvalidSource { path });
-        }
+    if rich_plan.disposition() == rich::Disposition::Unchanged {
         keys[change_index] = Some(key);
         return Ok(PreparedRich {
             keys,
-            replacements: Vec::new(),
+            transition: None,
             owned_transition_count: 0,
         });
     }
-    if disposition != rich::Disposition::InPlace || staged.len() != 1 {
-        return Err(rich_refusal(path));
-    }
-    let replacement = staged
-        .into_iter()
-        .next()
-        .ok_or(Error::InvalidSource { path })?;
-    if replacement.location
-        != (rich::MessageLocation {
-            component_index: pair.storage.message.component_index,
-            object_index: pair.storage.message.object_index,
-            message_index: pair.storage.message.message_index,
-        })
-        || replacement.expected_type != pair.storage.message_type
-        || replacement.kind != rich::ReplacementKind::StorageArchive
-        || !replacement.references.removed_by_field.is_empty()
-    {
+    if rich_plan.disposition() != rich::Disposition::InPlace {
         return Err(rich_refusal(path));
     }
     keys[change_index] = Some(key);
-    budget.reserve_retained(1, usize_u64(size_of::<PreparedRichReplacement>()), 1)?;
-    let mut replacements = Vec::new();
-    reserve_exact(&mut replacements, 1, LimitKind::RetainedElements)?;
-    replacements.push(PreparedRichReplacement {
+    let requirements = rich_plan.execution_requirements();
+    let publication_reference_items = pair
+        .storage
+        .object_references
+        .len()
+        .checked_add(
+            pair.storage
+                .object_references
+                .len()
+                .max(requirements.reference_occurrences)
+                .checked_mul(2)
+                .ok_or(Error::InvalidSource { path })?,
+        )
+        .ok_or(Error::InvalidSource { path })?;
+    let transition = PreparedRichTransition {
         route: pair.storage.message,
-        payload: replacement.payload,
-        references: replacement.references,
-    });
+        expected_type: pair.storage.message_type,
+        plan: rich_plan,
+        publication_reference_items,
+    };
     Ok(PreparedRich {
         keys,
-        replacements,
+        transition: Some(transition),
         owned_transition_count: 1,
     })
 }
 
-fn plan_unique(
-    source: &Package,
-    index: &resolve::RichRouteIndex,
-    entry: &resolve::RichEntryRoute,
-    pair: &resolve::RichResolvedPairRoute,
+fn prepare_unique<'source, 'target, 'replacement>(
+    source: &'source Package,
+    index: &'target resolve::RichRouteIndex,
+    entry: &'target resolve::RichEntryRoute,
+    pair: &'target resolve::RichResolvedPairRoute,
     payload_edges: u32,
     storage_edges: u32,
-    text: &str,
+    text: &'replacement str,
     budget: &mut budget::TransactionBudget,
     path: Path,
-) -> Result<rich::Plan, Error> {
+) -> Result<rich::PreparedPlan<'source, 'replacement>, Error> {
     let field_count = pair
         .payload
         .field_references
@@ -297,7 +354,7 @@ fn plan_unique(
     budget.with_scratch(
         usize_u64(scratch_bytes),
         2,
-        |budget| -> Result<rich::Plan, Error> {
+        |budget| -> Result<rich::PreparedPlan<'source, 'replacement>, Error> {
             let payload_fields = rich_fields(&pair.payload, path)?;
             let storage_fields = rich_fields(&pair.storage, path)?;
             let request = rich::Request {
@@ -327,7 +384,7 @@ fn plan_unique(
             };
             let remaining = authorize_remaining(budget)?;
             let limits = rich_limits(source, remaining, path)?;
-            let plan = match rich::plan_text(request, text, limits) {
+            let plan = match rich::prepare_text(request, text, limits) {
                 Ok(plan) => plan,
                 Err(error) => {
                     budget.cancel_authorization();
@@ -338,7 +395,7 @@ fn plan_unique(
                 budget.cancel_authorization();
                 map_rich_error(error, budget, path)
             })?;
-            let usage = rich_usage(plan.report(), retained, path)?;
+            let usage = rich_prepare_usage(plan.prepare_report(), retained, path)?;
             budget.record_authorized(usage)?;
             Ok(plan)
         },
@@ -364,12 +421,12 @@ fn rich_fields<'a>(
     Ok(fields)
 }
 
-fn rich_object<'a>(
-    source: &'a Package,
-    object: &'a resolve::RichObjectRoute,
-    fields: &'a [rich::FieldReferences<'a>],
+fn rich_object<'source, 'object, 'fields>(
+    source: &'source Package,
+    object: &'object resolve::RichObjectRoute,
+    fields: &'fields [rich::FieldReferences<'object>],
     path: Path,
-) -> Result<rich::ObjectSource<'a>, Error> {
+) -> Result<rich::ObjectSource<'source, 'fields, 'object>, Error> {
     Ok(rich::ObjectSource {
         location: rich_location(object.message),
         identifier: object.object_id,
@@ -490,7 +547,7 @@ fn rich_limits(
     })
 }
 
-fn rich_usage(
+fn rich_prepare_usage(
     report: rich::Report,
     retained: rich::RetainedAccounting,
     path: Path,
@@ -512,6 +569,47 @@ fn rich_usage(
         transaction_work: usize_u64(transaction_work),
         ..budget::Usage::default()
     })
+}
+
+pub(super) fn rich_execution_usage(
+    report: rich::ExecutionReport,
+    path: Path,
+) -> Result<budget::Usage, Error> {
+    Ok(budget::Usage {
+        output_bytes: usize_u64(report.output_bytes),
+        retained_elements: usize_u64(report.retained_elements),
+        retained_bytes: usize_u64(report.retained_bytes),
+        peak_scratch_bytes: usize_u64(report.peak_scratch_bytes),
+        allocation_events: usize_u64(report.allocation_events),
+        references: usize_u64(report.reference_occurrences),
+        rich_text_work: usize_u64(report.work_bound),
+        wire_work: usize_u64(report.work_bound),
+        transaction_work: usize_u64(
+            report
+                .work_bound
+                .checked_add(report.reference_occurrences)
+                .ok_or(Error::InvalidSource { path })?,
+        ),
+        ..budget::Usage::default()
+    })
+}
+
+pub(super) fn rich_execution_requirements_usage(
+    requirements: rich::ExecutionRequirements,
+    path: Path,
+) -> Result<budget::Usage, Error> {
+    rich_execution_usage(
+        rich::ExecutionReport {
+            output_bytes: requirements.output_bytes,
+            retained_elements: requirements.retained_elements,
+            retained_bytes: requirements.retained_bytes,
+            peak_scratch_bytes: requirements.peak_scratch_bytes,
+            allocation_events: requirements.allocation_events,
+            work_bound: requirements.work_bound,
+            reference_occurrences: requirements.reference_occurrences,
+        },
+        path,
+    )
 }
 
 fn bounded_usize(value: u64, maximum: usize, path: Path) -> Result<usize, Error> {
@@ -602,10 +700,11 @@ mod tests {
             position,
             Input::text("rich replacement").expect("replacement allocation"),
         );
+        let changes = [change];
         let prepared = prepare_unique_rich_text_to_text(
             &source,
             &target,
-            &[change],
+            &changes,
             &mut transaction,
             CellPath::Table { sheet: 0, table: 0 },
         )
@@ -613,7 +712,7 @@ mod tests {
         assert_eq!(prepared.keys.len(), 1);
         assert_eq!(prepared.keys[0], None);
         assert_eq!(prepared.owned_transition_count, 0);
-        assert!(prepared.replacements.is_empty());
+        assert!(prepared.transition.is_none());
     }
 
     #[test]
@@ -632,18 +731,23 @@ mod tests {
             position,
             Input::text("CELL: Café changed").expect("replacement allocation"),
         );
-        let prepared = prepare_unique_rich_text_to_text(
+        let changes = [change];
+        let mut prepared = prepare_unique_rich_text_to_text(
             &source,
             &target,
-            &[change],
+            &changes,
             &mut transaction,
             CellPath::Table { sheet: 0, table: 0 },
         )
         .expect("formula-rich preparation succeeds");
         assert_eq!(prepared.keys, [Some(1)]);
         assert_eq!(prepared.owned_transition_count, 1);
-        assert_eq!(prepared.replacements.len(), 1);
-        let replacement = &prepared.replacements[0];
+        let (replacement, _report) = prepared
+            .transition
+            .take()
+            .expect("rich transition is deferred")
+            .execute(&transaction, CellPath::Table { sheet: 0, table: 0 })
+            .expect("rich transition executes");
         assert_eq!(replacement.references.before, [903_835, 903_815, 905_312]);
         assert_eq!(replacement.references.after, [903_835, 903_815]);
         assert_eq!(replacement.references.removed, [905_312]);

@@ -1596,3 +1596,34 @@ Boundary units pass 243/243 with zero live retirement/API findings. Host gates
 pass retained-axis 2/2, Pages-layout 1/1, generated-roundtrip 1/1,
 all-target/all-feature check and no-run, scoped boundary 6/6, and strict library
 Clippy; broad host all-target Clippy retains nine unrelated existing lints.
+
+## 2026-08-14 Formula-cell transaction contract
+
+A Numbers cell edit stages semantic formula changes against one immutable
+source snapshot. Local and opaque same-source table references are resolved
+before physical planning. The complete final formula set is derived from source
+survivors plus insertions, replacements, and clears, so sequential authoring,
+clear-with-survivor, mixed scalar/formula batches, and later scalar refresh of
+cross-table formulas retain full graph authority.
+
+Planning is output-free. Formula-list, dependency metadata, string-list, rich
+text, table-tile, header-bucket, and PackageMetadata writers expose logical
+plans plus execution requirements. Cache AST/dependency equality, supplied
+cache validation, cycle analysis, dirty closure, and final-batch evaluation run
+before one aggregate execution authorization. A required-minus-one failure on
+any aggregate execution axis begins no leaf execution and performs no output or
+publication allocation. Accepted execution creates one atomic package rewrite,
+strictly reopens its candidates, proves route/reference/locality equality, and
+publishes once.
+
+An exact no-op shares the source and performs no component, output, reopen, or
+locality publication work. A changed edit updates only the admitted formula
+list, selected BNC tiles, selected formula-owner dependency records and their
+native inline/tiled mirrors, cache-bearing tiles, string list when needed,
+CalculationEngine tracker, PackageMetadata, and exact ArchiveInfo references.
+New dependency tiles are allocated as type 4009 objects and the same canonical
+cell record is published inline and tiled, matching native Numbers. Apply is
+source-authorized, a second apply conflicts, and the inverse restores the exact
+source artifact. Unsupported topology, stale source, lock violation, cycle,
+cache mismatch, allocation failure, or any budget/reopen/locality disagreement
+fails before publication.

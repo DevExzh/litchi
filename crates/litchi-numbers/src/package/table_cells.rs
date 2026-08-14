@@ -32,6 +32,8 @@ pub enum LimitKind {
     RetainedElements,
     /// UTF-8 bytes owned by stored text, formula, and error results.
     OwnedValueBytes,
+    /// Encoded protobuf bytes inspected by the transaction.
+    WireBytes,
     /// Strict protobuf fields inspected by the transaction.
     WireFields,
     /// Strict protobuf traversal work charged by the transaction.
@@ -46,6 +48,8 @@ pub enum LimitKind {
     RetainedBytes,
     /// Peak temporary bytes required before publication.
     PeakScratchBytes,
+    /// Fallible allocation events admitted before publication.
+    AllocationEvents,
     /// Bytes in the candidate package artifact.
     OutputBytes,
     /// Work required to reopen and verify the candidate.

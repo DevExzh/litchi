@@ -390,6 +390,29 @@ def add_numbers_table_cells_mutation_scaffold(root: Path) -> None:
     )
 
 
+def add_numbers_formula_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.NUMBERS_FORMULA_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_FORMULA_CANONICAL_TYPES
+        ),
+        encoding="utf-8",
+    )
+    transaction_limit = root / boundaries.NUMBERS_FORMULA_TRANSACTION_LIMIT_SOURCE
+    transaction_limit.parent.mkdir(parents=True, exist_ok=True)
+    transaction_limit.write_text(
+        "pub enum LimitKind { "
+        + ", ".join(boundaries.NUMBERS_FORMULA_TRANSACTION_LIMIT_VARIANTS)
+        + " }\n",
+        encoding="utf-8",
+    )
+    lib = root / boundaries.NUMBERS_SOURCE_ROOT / "lib.rs"
+    lib.parent.mkdir(parents=True, exist_ok=True)
+    lib.write_text("pub mod formula;\n", encoding="utf-8")
+
+
 def add_pages_section_settings_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -10812,6 +10835,195 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+
+    def test_numbers_formula_boundary_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.NUMBERS_FORMULA_SEMANTIC_SOURCE,
+            Path("crates/litchi-numbers/src/formula.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_FORMULA_CANONICAL_TYPES,
+            (
+                "Expression",
+                "CachedValue",
+                "CellReference",
+                "AxisReference",
+                "BinaryOperator",
+                "Table",
+                "Error",
+                "LimitKind",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_FORMULA_TRANSACTION_LIMIT_SOURCE,
+            Path("crates/litchi-numbers/src/package/table_cells.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_FORMULA_TRANSACTION_LIMIT_VARIANTS,
+            ("WireBytes", "AllocationEvents"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_NUMBERS_FORMULA_FACADE_TYPES,
+            frozenset(
+                {
+                    "FormulaExpression",
+                    "FormulaCachedValue",
+                    "FormulaCellReference",
+                    "FormulaAxisReference",
+                    "FormulaBinaryOperator",
+                    "FormulaPivotCategoryReference",
+                    "FormulaUuid",
+                }
+            ),
+        )
+
+    def test_focused_numbers_formula_requires_each_canonical_type(self) -> None:
+        for missing in boundaries.NUMBERS_FORMULA_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_formula_canonical_scaffold(root)
+                    semantic = root / boundaries.NUMBERS_FORMULA_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.NUMBERS_FORMULA_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    violations = boundaries.audit_numbers_formula_facade_source_topology(root)
+                    self.assertIn(
+                        "focused litchi-numbers formula API is missing canonical "
+                        f"formula type {missing}: "
+                        "crates/litchi-numbers/src/formula.rs",
+                        violations,
+                    )
+
+    def test_focused_numbers_formula_requires_typed_transaction_limit_kinds(self) -> None:
+        for missing in boundaries.NUMBERS_FORMULA_TRANSACTION_LIMIT_VARIANTS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_formula_canonical_scaffold(root)
+                    semantic = root / boundaries.NUMBERS_FORMULA_SEMANTIC_SOURCE
+                    transaction_limit = (
+                        root / boundaries.NUMBERS_FORMULA_TRANSACTION_LIMIT_SOURCE
+                    )
+                    transaction_limit.write_text(
+                        "pub enum LimitKind { "
+                        + ", ".join(
+                            variant
+                            for variant in boundaries.NUMBERS_FORMULA_TRANSACTION_LIMIT_VARIANTS
+                            if variant != missing
+                        )
+                        + " }\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_formula_facade_source_topology(root),
+                        [
+                            "focused litchi-numbers formula transaction API is missing typed "
+                            f"LimitKind::{missing}: "
+                            "crates/litchi-numbers/src/package/table_cells.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_formula_rejects_legacy_and_native_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_formula_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_FORMULA_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "pub use litchi_iwa_common::formula::FormulaExpression;\n"
+                + "pub type LegacyFormula = FormulaUuid;\n"
+                + "pub fn decode(table_id: u64, source_bytes: &[u8], "
+                "wire: WireView, codec: FormulaCodec) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_SOURCE_ROOT / "lib.rs"
+            lib.write_text(
+                "pub mod formula;\n"
+                "pub use formula::{Expression, CachedValue};\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_formula_facade_source_topology(root)
+
+            for fragment in (
+                "litchi-iwa formula facade litchi_iwa_common",
+                "retired formula facade type FormulaExpression",
+                "retired formula facade type FormulaUuid",
+                "raw identifier table_id",
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "wire/BNC type WireView",
+                "protobuf type FormulaCodec",
+                "retains root formula alias",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_formula_allows_contextual_formula_cell_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_formula_canonical_scaffold(root)
+            cells = root / Path("crates/litchi-numbers/src/table/cells.rs")
+            cells.parent.mkdir(parents=True)
+            cells.write_text(
+                "use crate::formula::{CachedValue, Expression, Table};\n"
+                "pub struct Edit;\n"
+                "impl Edit {\n"
+                "    pub fn formula(&mut self, expression: Expression, cached: CachedValue) {}\n"
+                "    pub fn formula_table(&mut self, table: Table) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_formula_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_formula_audits_package_public_declarations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_formula_canonical_scaffold(root)
+            for relative_path in (
+                Path("crates/litchi-numbers/src/package.rs"),
+                Path("crates/litchi-numbers/src/package/table_cells.rs"),
+            ):
+                path = root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "pub fn edit_formula(table_id: u64, source_bytes: &[u8], "
+                    "wire: WireView, generated: FormulaArchive) {}\n",
+                    encoding="utf-8",
+                )
+
+            violations = boundaries.audit_numbers_formula_facade_source_topology(root)
+
+            for path in (
+                "crates/litchi-numbers/src/package.rs",
+                "crates/litchi-numbers/src/package/table_cells.rs",
+            ):
+                self.assertTrue(
+                    any(path in item and "raw identifier table_id" in item for item in violations),
+                    msg=violations,
+                )
+                self.assertTrue(
+                    any(path in item and "raw source bytes source_bytes" in item for item in violations),
+                    msg=violations,
+                )
+                self.assertTrue(
+                    any(path in item and "wire/BNC type WireView" in item for item in violations),
+                    msg=violations,
+                )
 
     def test_numbers_table_cells_read_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(

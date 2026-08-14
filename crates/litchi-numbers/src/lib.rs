@@ -208,10 +208,6 @@ pub use document::{
     MAX_MATERIALIZED_CELLS, MAX_SHEETS, MAX_TABLES, ReadError as DocumentReadError,
     ReadLimitKind as DocumentReadLimitKind, Result as DocumentResult, Stats as DocumentStats,
 };
-pub use formula::{
-    FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
-    FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
-};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::{

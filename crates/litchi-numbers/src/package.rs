@@ -631,6 +631,11 @@ impl Package {
         self.clone()
     }
 
+    /// Return whether two handles share the exact immutable package snapshot.
+    pub(crate) fn shares_snapshot(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.state, &other.state)
+    }
+
     /// Borrow the exact immutable package source retained by this snapshot.
     ///
     /// Unsupported ZIP members and unmodeled protobuf fields remain in this

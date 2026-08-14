@@ -14,9 +14,9 @@
 //! [`Value::Empty`](crate::cell::Value::Empty), so a caller never needs to
 //! infer presence from an empty-looking value. Stored values may also be the
 //! semantic formula or error values already represented by
-//! [`Value`](crate::cell::Value). Changed batches accept only finite scalar
-//! [`Input`](crate::table::cells::Input) values or explicit clears; formula and error construction stay
-//! outside this boundary.
+//! [`Value`](crate::cell::Value). Changed batches accept finite scalar values,
+//! bounded semantic formulas with optional typed caches, or explicit clears.
+//! Error-value construction stays outside this boundary.
 //!
 //! A range is half-open and returned in row-major order. It is deliberately
 //! dense: every addressed coordinate yields a
@@ -41,13 +41,14 @@ use litchi_iwa_archive::package::{OwnedExactArtifacts, SharedBytes};
 use crate::{
     Package,
     cell::{FiniteF64, FiniteF64Error, Type as ValueType, Value},
+    formula::{CachedValue, Expression, Table},
 };
 
 use super::{CellPosition, CoordinateError, Dimensions};
 
 pub use crate::package::table_cells::{DependencyKind, Error, LimitKind, Path};
 
-/// One supported finite scalar staged for a Numbers cell.
+/// One supported scalar or bounded semantic formula staged for a Numbers cell.
 #[derive(Clone, PartialEq)]
 #[non_exhaustive]
 pub enum Input {
@@ -61,6 +62,13 @@ pub enum Input {
     Date(FiniteF64),
     /// A finite duration in seconds.
     Duration(FiniteF64),
+    /// A bounded semantic formula and optional typed display cache.
+    Formula {
+        /// The opaque expression to compile at the package boundary.
+        expression: Expression,
+        /// An optional caller-supplied typed display cache.
+        cached: Option<CachedValue>,
+    },
 }
 
 impl Input {
@@ -103,6 +111,24 @@ impl Input {
         FiniteF64::new(value).map(Self::Duration)
     }
 
+    /// Construct an authored formula without a supplied display cache.
+    #[must_use]
+    pub const fn formula(expression: Expression) -> Self {
+        Self::Formula {
+            expression,
+            cached: None,
+        }
+    }
+
+    /// Construct an authored formula with a typed display cache.
+    #[must_use]
+    pub const fn formula_cached(expression: Expression, cached: CachedValue) -> Self {
+        Self::Formula {
+            expression,
+            cached: Some(cached),
+        }
+    }
+
     /// Return the scalar kind without exposing its content.
     #[must_use]
     pub const fn value_type(&self) -> ValueType {
@@ -112,6 +138,7 @@ impl Input {
             Self::Boolean(_) => ValueType::Boolean,
             Self::Date(_) => ValueType::Date,
             Self::Duration(_) => ValueType::Duration,
+            Self::Formula { .. } => ValueType::Formula,
         }
     }
 
@@ -119,6 +146,20 @@ impl Input {
         match self {
             Self::Text(value) => value.len(),
             Self::Number(_) | Self::Boolean(_) | Self::Date(_) | Self::Duration(_) => 0,
+            Self::Formula { expression, cached } => expression
+                .owned_bytes()
+                .saturating_add(cached.as_ref().map_or(0, CachedValue::owned_bytes)),
+        }
+    }
+
+    pub(crate) const fn formula_parts(&self) -> Option<(&Expression, Option<&CachedValue>)> {
+        match self {
+            Self::Formula { expression, cached } => Some((expression, cached.as_ref())),
+            Self::Text(_)
+            | Self::Number(_)
+            | Self::Boolean(_)
+            | Self::Date(_)
+            | Self::Duration(_) => None,
         }
     }
 
@@ -129,17 +170,19 @@ impl Input {
             | (Self::Date(left), Value::Date(right))
             | (Self::Duration(left), Value::Duration(right)) => left == right,
             (Self::Boolean(left), Value::Boolean(right)) => left == right,
+            (Self::Formula { .. }, _) => false,
             _ => false,
         }
     }
 
-    pub(crate) fn into_value(self) -> Value {
+    pub(crate) fn into_scalar_value(self) -> Option<Value> {
         match self {
-            Self::Text(value) => Value::Text(value),
-            Self::Number(value) => Value::Number(value),
-            Self::Boolean(value) => Value::Boolean(value),
-            Self::Date(value) => Value::Date(value),
-            Self::Duration(value) => Value::Duration(value),
+            Self::Text(value) => Some(Value::Text(value)),
+            Self::Number(value) => Some(Value::Number(value)),
+            Self::Boolean(value) => Some(Value::Boolean(value)),
+            Self::Date(value) => Some(Value::Date(value)),
+            Self::Duration(value) => Some(Value::Duration(value)),
+            Self::Formula { .. } => None,
         }
     }
 }
@@ -153,7 +196,7 @@ impl fmt::Debug for Input {
     }
 }
 
-/// One explicit scalar replacement or clear.
+/// One explicit cell replacement or clear.
 #[derive(Clone, PartialEq)]
 pub struct Change {
     position: CellPosition,
@@ -174,6 +217,38 @@ impl Change {
     pub fn set_a1(address: &str, input: Input) -> Result<Self, Error> {
         let position = CellPosition::from_a1(address).map_err(map_coordinate_error)?;
         Ok(Self::set(position, input))
+    }
+
+    /// Stage a bounded formula at a checked zero-based position.
+    #[must_use]
+    pub const fn set_formula(position: CellPosition, expression: Expression) -> Self {
+        Self::set(position, Input::formula(expression))
+    }
+
+    /// Parse an A1 coordinate and stage a bounded formula.
+    pub fn set_formula_a1(address: &str, expression: Expression) -> Result<Self, Error> {
+        let position = CellPosition::from_a1(address).map_err(map_coordinate_error)?;
+        Ok(Self::set_formula(position, expression))
+    }
+
+    /// Stage a bounded formula and typed display cache.
+    #[must_use]
+    pub const fn set_formula_cached(
+        position: CellPosition,
+        expression: Expression,
+        cached: CachedValue,
+    ) -> Self {
+        Self::set(position, Input::formula_cached(expression, cached))
+    }
+
+    /// Parse an A1 coordinate and stage a bounded formula and display cache.
+    pub fn set_formula_cached_a1(
+        address: &str,
+        expression: Expression,
+        cached: CachedValue,
+    ) -> Result<Self, Error> {
+        let position = CellPosition::from_a1(address).map_err(map_coordinate_error)?;
+        Ok(Self::set_formula_cached(position, expression, cached))
     }
 
     /// Stage an explicit clear at a checked zero-based position.
@@ -197,7 +272,7 @@ impl Change {
         self.position
     }
 
-    /// Borrow the scalar input, or return `None` for a clear.
+    /// Borrow the staged input, or return `None` for a clear.
     #[must_use]
     pub const fn input(&self) -> Option<&Input> {
         self.input.as_ref()
@@ -304,7 +379,7 @@ impl fmt::Debug for State {
 
 type CommitFn = for<'source> fn(Plan<'source>) -> Result<Commit, Error>;
 
-/// One immutable selector-first scalar batch under construction.
+/// One immutable selector-first cell batch under construction.
 pub struct Edit<'source> {
     source: &'source Package,
     path: Path,
@@ -313,6 +388,7 @@ pub struct Edit<'source> {
     maximum_owned_bytes: usize,
     changes: Vec<Change>,
     owned_bytes: usize,
+    formula_nodes: usize,
     change_allocation_events: usize,
     commit: CommitFn,
 }
@@ -334,6 +410,7 @@ impl<'source> Edit<'source> {
             maximum_owned_bytes,
             changes: Vec::new(),
             owned_bytes: 0,
+            formula_nodes: 0,
             change_allocation_events: 0,
             commit,
         })
@@ -357,6 +434,18 @@ impl<'source> Edit<'source> {
         self.changes.is_empty()
     }
 
+    /// Select an opaque cross-table formula handle from this exact source.
+    ///
+    /// The returned handle contains no native table identifier and is rejected
+    /// if used with an edit from any independently opened or changed package.
+    pub fn formula_table<'sheet, 'table>(
+        &self,
+        sheet: impl Into<crate::SheetSelector<'sheet>>,
+        table: impl Into<crate::TableSelector<'table>>,
+    ) -> Result<Table, Error> {
+        crate::formula::resolve_table_handle(self.source, sheet, table)
+    }
+
     /// Stage one scalar replacement.
     pub fn set(self, position: CellPosition, input: Input) -> Result<Self, Error> {
         self.change(Change::set(position, input))
@@ -365,6 +454,40 @@ impl<'source> Edit<'source> {
     /// Parse an A1 coordinate and stage one scalar replacement.
     pub fn set_a1(self, address: &str, input: Input) -> Result<Self, Error> {
         self.change(Change::set_a1(address, input)?)
+    }
+
+    /// Stage one bounded formula replacement.
+    pub fn set_formula(
+        self,
+        position: CellPosition,
+        expression: Expression,
+    ) -> Result<Self, Error> {
+        self.change(Change::set_formula(position, expression))
+    }
+
+    /// Parse an A1 coordinate and stage one bounded formula replacement.
+    pub fn set_formula_a1(self, address: &str, expression: Expression) -> Result<Self, Error> {
+        self.change(Change::set_formula_a1(address, expression)?)
+    }
+
+    /// Stage one bounded formula replacement with a typed display cache.
+    pub fn set_formula_cached(
+        self,
+        position: CellPosition,
+        expression: Expression,
+        cached: CachedValue,
+    ) -> Result<Self, Error> {
+        self.change(Change::set_formula_cached(position, expression, cached))
+    }
+
+    /// Parse an A1 coordinate and stage one formula replacement with cache.
+    pub fn set_formula_cached_a1(
+        self,
+        address: &str,
+        expression: Expression,
+        cached: CachedValue,
+    ) -> Result<Self, Error> {
+        self.change(Change::set_formula_cached_a1(address, expression, cached)?)
     }
 
     /// Stage one explicit clear.
@@ -395,6 +518,16 @@ impl<'source> Edit<'source> {
             LimitKind::Updates,
             self.path,
         )?;
+        let formula_nodes = checked_staged_total(
+            self.formula_nodes,
+            change
+                .input()
+                .and_then(Input::formula_parts)
+                .map_or(0, |(expression, _cached)| expression.node_count()),
+            crate::formula::MAX_NODES,
+            LimitKind::FormulaWork,
+            self.path,
+        )?;
         let owned_bytes = checked_staged_total(
             self.owned_bytes,
             change.input().map_or(0, Input::owned_bytes),
@@ -402,10 +535,14 @@ impl<'source> Edit<'source> {
             LimitKind::OwnedValueBytes,
             self.path,
         )?;
+        if let Some((expression, _cached)) = change.input().and_then(Input::formula_parts) {
+            expression.validate_for(self.source, self.dimensions)?;
+        }
         let allocation_events =
             reserve_change_slot(&mut self.changes, self.change_allocation_events, self.path)?;
         self.changes.push(change);
         self.owned_bytes = owned_bytes;
+        self.formula_nodes = formula_nodes;
         self.change_allocation_events = allocation_events;
         debug_assert_eq!(self.changes.len(), observed);
         Ok(self)
@@ -434,6 +571,7 @@ impl<'source> Edit<'source> {
             staging_usage: StagingUsage {
                 change_capacity: self.changes.capacity(),
                 allocation_events: self.change_allocation_events,
+                formula_nodes: self.formula_nodes,
             },
             changes: self.changes,
             owned_bytes: self.owned_bytes,
@@ -487,6 +625,7 @@ impl<'source> Plan<'source> {
 pub(crate) struct StagingUsage {
     change_capacity: usize,
     allocation_events: usize,
+    formula_nodes: usize,
 }
 
 impl StagingUsage {
@@ -496,6 +635,10 @@ impl StagingUsage {
 
     pub(crate) const fn allocation_events(self) -> usize {
         self.allocation_events
+    }
+
+    pub(crate) const fn formula_nodes(self) -> usize {
+        self.formula_nodes
     }
 }
 
@@ -1494,6 +1637,7 @@ mod tests {
         let usage = StagingUsage {
             change_capacity: changes.capacity(),
             allocation_events,
+            formula_nodes: 0,
         };
         assert_eq!(usage.change_capacity(), 8_192);
         assert_eq!(usage.allocation_events(), prior_events + 1);
