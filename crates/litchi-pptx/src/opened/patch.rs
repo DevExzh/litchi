@@ -750,22 +750,33 @@ impl History {
     }
 }
 
-pub(crate) fn apply(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
-    apply_with_revision(package, patch, None)
+pub(crate) fn apply(
+    package: &mut OpcPackage,
+    patch: &Patch,
+    physical_source_provenance: bool,
+) -> Result<Snapshot> {
+    apply_with_revision(package, patch, None, physical_source_provenance)
 }
 
 pub(crate) fn apply_exact_revision(
     package: &mut OpcPackage,
     patch: &Patch,
     result_revision: [u8; 32],
+    physical_source_provenance: bool,
 ) -> Result<Snapshot> {
-    apply_with_revision(package, patch, Some(result_revision))
+    apply_with_revision(
+        package,
+        patch,
+        Some(result_revision),
+        physical_source_provenance,
+    )
 }
 
 fn apply_with_revision(
     package: &mut OpcPackage,
     patch: &Patch,
     result_revision: Option<[u8; 32]>,
+    physical_source_provenance: bool,
 ) -> Result<Snapshot> {
     let current_main = crate::parts::PresentationPart::from_package(package)?
         .part()
@@ -778,7 +789,7 @@ fn apply_with_revision(
     }
     validate_before(package, patch)?;
     if patch.is_empty() {
-        let snapshot = capture(package, patch.limits)?;
+        let snapshot = capture(package, patch.limits, physical_source_provenance)?;
         if result_revision.is_some_and(|expected| snapshot.revision() != expected) {
             return Err(invalid(
                 "opened-presentation candidate has an unexpected complete-package revision",
@@ -817,7 +828,7 @@ fn apply_with_revision(
             },
         }
     }
-    let snapshot = capture(&candidate, patch.limits)?;
+    let snapshot = capture(&candidate, patch.limits, physical_source_provenance)?;
     validate_after(&candidate, patch)?;
     if result_revision.is_some_and(|expected| snapshot.revision() != expected) {
         return Err(invalid(

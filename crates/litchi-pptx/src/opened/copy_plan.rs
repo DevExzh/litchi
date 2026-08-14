@@ -468,7 +468,11 @@ fn build_copy_candidate(
         )?;
         staged.set_blob(xml);
     }
-    let captured = super::model::capture(&candidate, snapshot.limits)?;
+    let captured = super::model::capture(
+        &candidate,
+        snapshot.limits,
+        snapshot.physical_source_provenance,
+    )?;
     let published = captured
         .slides
         .get(position)

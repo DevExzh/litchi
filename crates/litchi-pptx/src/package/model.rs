@@ -231,7 +231,8 @@ impl Package {
                 reason: "the complete package graph changed after slide-copy planning",
             });
         }
-        let snapshot = crate::opened::apply(&mut self.opc, plan.patch())?;
+        let snapshot =
+            crate::opened::apply(&mut self.opc, plan.patch(), self.physical_source_provenance)?;
         self.mutable_pres = None;
         Ok(snapshot)
     }
@@ -280,8 +281,13 @@ impl Package {
         }
         source.ensure_plain_mutation("apply_cross_slide_copy_plan")?;
         self.ensure_plain_mutation("apply_cross_slide_copy_plan")?;
-        let snapshot =
-            crate::opened::cross_copy_plan::apply_plan(&source.opc, &mut self.opc, plan)?;
+        let snapshot = crate::opened::cross_copy_plan::apply_plan(
+            &source.opc,
+            &mut self.opc,
+            plan,
+            source.physical_source_provenance,
+            self.physical_source_provenance,
+        )?;
         self.mutable_pres = None;
         Ok(snapshot)
     }
@@ -325,8 +331,13 @@ impl Package {
         }
         source.ensure_plain_mutation("apply_cross_slide_copy_patch")?;
         self.ensure_plain_mutation("apply_cross_slide_copy_patch")?;
-        let snapshot =
-            crate::opened::cross_copy_plan::apply_patch(&source.opc, &mut self.opc, patch)?;
+        let snapshot = crate::opened::cross_copy_plan::apply_patch(
+            &source.opc,
+            &mut self.opc,
+            patch,
+            source.physical_source_provenance,
+            self.physical_source_provenance,
+        )?;
         self.mutable_pres = None;
         Ok(snapshot)
     }
@@ -359,6 +370,7 @@ impl Package {
             &mut self.opc,
             plan.patch(),
             "apply_slide_removal_plan",
+            self.physical_source_provenance,
         )?;
         self.mutable_pres = None;
         Ok(snapshot)
@@ -382,8 +394,12 @@ impl Package {
             });
         }
         self.ensure_plain_mutation("apply_slide_removal_patch")?;
-        let snapshot =
-            crate::opened::apply_removal_patch(&mut self.opc, patch, "apply_slide_removal_patch")?;
+        let snapshot = crate::opened::apply_removal_patch(
+            &mut self.opc,
+            patch,
+            "apply_slide_removal_patch",
+            self.physical_source_provenance,
+        )?;
         self.mutable_pres = None;
         Ok(snapshot)
     }
@@ -424,7 +440,7 @@ impl Package {
         // The opened owner validates and captures a detached complete candidate
         // before one assignment, so the facade's clone-and-rollback wrapper
         // would only duplicate the entire OPC graph without adding atomicity.
-        let snapshot = crate::opened::apply(&mut self.opc, patch)?;
+        let snapshot = crate::opened::apply(&mut self.opc, patch, self.physical_source_provenance)?;
         if changed {
             self.mutable_pres = None;
         }
