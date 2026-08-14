@@ -8,7 +8,10 @@ use std::collections::BTreeMap;
 use litchi_odf_common::{
     constants,
     core::{AuthoredXmlFragment, OwnedPackage, PackageWriter, XmlSourcePart, XmlSplicePublication},
-    package::{raw_identical_members, replace_content_xml, replace_content_xml_spliced},
+    package::{
+        raw_identical_members, replace_content_xml, replace_content_xml_spliced,
+        replace_content_xml_with_payload_verification,
+    },
 };
 use soapberry_zip::{PreservationIndex, ZipArchive};
 
@@ -110,6 +113,26 @@ fn text_replacement_publication(source: &OwnedPackage) -> XmlSplicePublication {
     publication
 }
 
+fn corrupt_stored_payload(mut bytes: Vec<u8>, target: &str) -> Vec<u8> {
+    let archive = ZipArchive::from_slice(&bytes).unwrap().into_zip_archive();
+    let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let mut records = archive.entries(&mut buffer);
+    for preserved in index.entries() {
+        let record = records.next_entry().unwrap().unwrap();
+        if record.file_path().try_normalize().unwrap().as_ref() != target {
+            continue;
+        }
+        let local = preserved.local_span().start as usize;
+        let name_len = u16::from_le_bytes([bytes[local + 26], bytes[local + 27]]) as usize;
+        let extra_len = u16::from_le_bytes([bytes[local + 28], bytes[local + 29]]) as usize;
+        let payload = local + 30 + name_len + extra_len;
+        bytes[payload] ^= 1;
+        return bytes;
+    }
+    panic!("target member was not found");
+}
+
 #[test]
 fn content_replacement_raw_copies_every_untouched_member() {
     let source = source_package(false);
@@ -190,6 +213,20 @@ fn signed_content_replacement_uses_the_signature_stripping_fallback() {
     assert_eq!(
         spliced.get_file("Pictures/opaque.bin").unwrap(),
         media_payload()
+    );
+}
+
+#[test]
+fn shared_raw_path_does_not_inflate_opaque_members_but_opt_in_verification_does() {
+    let source = corrupt_stored_payload(source_package(false), "Pictures/opaque.bin");
+    let source_package = OwnedPackage::from_bytes(source.clone()).unwrap();
+    let output = replace_content_xml(&source_package, TARGET_CONTENT).unwrap();
+    assert_eq!(
+        raw_members(&source)["Pictures/opaque.bin"],
+        raw_members(&output)["Pictures/opaque.bin"]
+    );
+    assert!(
+        replace_content_xml_with_payload_verification(&source_package, TARGET_CONTENT).is_err()
     );
 }
 
