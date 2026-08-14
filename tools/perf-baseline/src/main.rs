@@ -2271,6 +2271,7 @@ impl WriteSizeBuckets {
         *bucket += 1;
     }
 
+    #[cfg(test)]
     const fn total(self) -> Option<u64> {
         let Some(total) = self.bytes_0.checked_add(self.bytes_1_to_512) else {
             return None;
@@ -24538,7 +24539,7 @@ mod tests {
         let mut sink = CountingSink::bounded(1_000_000, u64::MAX);
         for size in [0, 1, 512, 513, 4096, 4097, 16384, 16385, 65536, 65537] {
             if size == 0 {
-                sink.write(&[]).unwrap();
+                assert_eq!(sink.write(&[]).unwrap(), 0);
             } else {
                 sink.write_all(&vec![0_u8; size]).unwrap();
             }
@@ -24661,10 +24662,13 @@ mod tests {
 
         let mut buckets = WriteSizeBuckets::empty();
         buckets.bytes_0 = u64::MAX;
+        assert_eq!(buckets.total(), Some(u64::MAX));
+        buckets.bytes_1_to_512 = 1;
         assert_eq!(buckets.total(), None);
 
         let mut summary = SinkSummary::default();
         summary.write_size_buckets.bytes_0 = u64::MAX;
+        summary.write_size_buckets.bytes_1_to_512 = 1;
         assert_eq!(summary.write_size_buckets.total(), None);
     }
 }
