@@ -376,6 +376,7 @@ pub(crate) fn apply_patch(
     package: &mut OpcPackage,
     patch: &SlideRemovalPatch,
     operation: &'static str,
+    physical_source_provenance: bool,
 ) -> Result<Snapshot> {
     if super::model::package_fingerprint(package)? != patch.source_revision {
         return Err(Error::UnsafeEdit {
@@ -394,7 +395,8 @@ pub(crate) fn apply_patch(
     let slide_name = slide_name.clone();
     match direction {
         SinglePartChange::Remove => {
-            let source = super::model::capture(package, patch.patch.limits())?;
+            let source =
+                super::model::capture(package, patch.patch.limits(), physical_source_provenance)?;
             let proof = replan_exact_removal(&source, &slide_name, operation)?;
             if !patch.has_same_semantics(proof.patch()) {
                 return Err(Error::UnsafeEdit {
@@ -402,7 +404,12 @@ pub(crate) fn apply_patch(
                     reason: "the durable patch does not match a freshly proven slide removal",
                 });
             }
-            super::patch::apply_exact_revision(package, &patch.patch, patch.target_revision)
+            super::patch::apply_exact_revision(
+                package,
+                &patch.patch,
+                patch.target_revision,
+                physical_source_provenance,
+            )
         },
         SinglePartChange::Add => {
             let mut candidate = package.clone();
@@ -410,6 +417,7 @@ pub(crate) fn apply_patch(
                 &mut candidate,
                 &patch.patch,
                 patch.target_revision,
+                physical_source_provenance,
             )?;
             let proof = replan_exact_removal(&restored, &slide_name, operation)?;
             if !patch.inverse().has_same_semantics(proof.patch()) {
@@ -484,7 +492,11 @@ fn build_candidate(snapshot: &Snapshot, selected: &Slide) -> Result<OpcPackage> 
     if !candidate.remove_part(&selected.part_name) {
         return Err(invalid("slide-removal selected part disappeared"));
     }
-    let captured = super::model::capture(&candidate, snapshot.limits)?;
+    let captured = super::model::capture(
+        &candidate,
+        snapshot.limits,
+        snapshot.physical_source_provenance,
+    )?;
     if captured.slides.len() + 1 != snapshot.slides.len()
         || captured
             .slides

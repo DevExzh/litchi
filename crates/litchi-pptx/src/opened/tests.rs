@@ -110,6 +110,31 @@ fn cross_slide_copy_is_source_exact_reversible_and_reopens() -> Result<()> {
 }
 
 #[test]
+fn opened_transaction_does_not_upgrade_borrowed_physical_provenance() -> Result<()> {
+    let authored = opened_plain_slide_package()?;
+    let bytes = {
+        let mut authored = authored;
+        authored.to_bytes()?
+    };
+    let borrowed = Package::from_bytes(&bytes)?;
+    let snapshot = borrowed.opened_presentation()?;
+    let mut edit = snapshot.edit();
+    edit.set_shape_text(0_usize, 0_usize, "borrowed edit")?;
+    let commit = edit.commit()?;
+
+    let destination = opened_plain_slides_package(2)?;
+    let destination_snapshot = destination.opened_presentation()?;
+    assert!(matches!(
+        destination_snapshot.plan_cross_slide_copy(commit.snapshot(), 0, 0, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::UnknownPhysicalMember,
+            ..
+        })
+    ));
+    Ok(())
+}
+
+#[test]
 fn cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions() -> Result<()> {
     let mut authored_source = Package::new()?;
     authored_source
@@ -403,7 +428,21 @@ fn cross_slide_copy_refuses_mixed_strict_and_transitional_packages_both_directio
     let transitional_source = opened_plain_slide_package()?;
     let mut strict_source = opened_plain_slide_package()?;
     make_package_strict(&mut strict_source)?;
-    let strict_source = Package::from_vec(strict_source.to_bytes()?)?;
+    let mut strict_source = Package::from_vec(strict_source.to_bytes()?)?;
+
+    let mut mixed_strict_source = Package::from_vec(strict_source.to_bytes()?)?;
+    let presentation = PackURI::new("/ppt/presentation.xml").map_err(Error::Invalid)?;
+    let mixed_xml = std::str::from_utf8(mixed_strict_source.opc.get_part(&presentation)?.blob())
+        .map_err(|error| Error::Xml(error.to_string()))?
+        .replace(
+            "http://purl.oclc.org/ooxml/officeDocument/relationships",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        )
+        .into_bytes();
+    mixed_strict_source
+        .opc
+        .get_part_mut(&presentation)?
+        .set_blob(mixed_xml);
 
     let transitional_destination = opened_plain_slides_package(2)?;
     let mut strict_destination = opened_plain_slides_package(2)?;
@@ -423,6 +462,16 @@ fn cross_slide_copy_refuses_mixed_strict_and_transitional_packages_both_directio
         strict_destination
             .opened_presentation()?
             .plan_cross_slide_copy(&transitional_source.opened_presentation()?, 0, 0, 1),
+        Err(Error::SlideCopyPlan {
+            kind: SlideCopyRefusal::UnknownSemanticSurface,
+            ..
+        })
+    ));
+
+    assert!(matches!(
+        opened_plain_slides_package(2)?
+            .opened_presentation()?
+            .plan_cross_slide_copy(&mixed_strict_source.opened_presentation()?, 0, 0, 1),
         Err(Error::SlideCopyPlan {
             kind: SlideCopyRefusal::UnknownSemanticSurface,
             ..
@@ -565,6 +614,8 @@ fn add_inbound_slide_owner(
 fn make_package_strict(package: &mut Package) -> Result<()> {
     const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
     const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/";
+    const REL_NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const STRICT_REL_NS: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
     const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
     const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
     const DML: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
@@ -666,6 +717,7 @@ fn make_package_strict(package: &mut Package) -> Result<()> {
             part.set_blob(
                 xml.replace(PML, STRICT_PML)
                     .replace(DML, STRICT_DML)
+                    .replace(REL_NS, STRICT_REL_NS)
                     .into_bytes(),
             );
         }

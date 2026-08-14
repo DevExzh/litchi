@@ -39,6 +39,9 @@ const STRICT_CHART_DRAWING: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/chart
 const TRANSITIONAL_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
 const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/";
+const TRANSITIONAL_REL_NS: &[u8] =
+    b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const STRICT_REL_NS: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 
 /// An immutable plan to copy one source slide into a different destination
 /// presentation.
@@ -448,6 +451,8 @@ pub(crate) fn apply_plan(
     source: &OpcPackage,
     destination: &mut OpcPackage,
     plan: &CrossSlideCopyPlan,
+    source_physical_source_provenance: bool,
+    destination_physical_source_provenance: bool,
 ) -> Result<Snapshot> {
     if super::model::package_fingerprint(source)? != plan.source_revision {
         return Err(Error::UnsafeEdit {
@@ -477,8 +482,16 @@ pub(crate) fn apply_plan(
             reason: "the serialized destination package changed after cross-slide planning",
         });
     }
-    let source_snapshot = super::model::capture(source, plan.patch.patch.limits())?;
-    let destination_snapshot = super::model::capture(destination, plan.patch.patch.limits())?;
+    let source_snapshot = super::model::capture(
+        source,
+        plan.patch.patch.limits(),
+        source_physical_source_provenance,
+    )?;
+    let destination_snapshot = super::model::capture(
+        destination,
+        plan.patch.patch.limits(),
+        destination_physical_source_provenance,
+    )?;
     let fresh = plan_cross_slide_copy_for_slides(
         &source_snapshot,
         &destination_snapshot,
@@ -504,6 +517,7 @@ pub(crate) fn apply_plan(
         &mut candidate,
         &plan.patch.patch,
         plan.target_revision,
+        destination_physical_source_provenance,
     )?;
     if physical_package_fingerprint(&candidate, plan.patch.patch.limits())?
         != plan.target_physical_revision
@@ -521,6 +535,8 @@ pub(crate) fn apply_patch(
     source: &OpcPackage,
     destination: &mut OpcPackage,
     patch: &CrossSlideCopyPatch,
+    source_physical_source_provenance: bool,
+    destination_physical_source_provenance: bool,
 ) -> Result<Snapshot> {
     if super::model::package_fingerprint(source)? != patch.source_revision {
         return Err(Error::UnsafeEdit {
@@ -549,8 +565,16 @@ pub(crate) fn apply_patch(
             reason: "the serialized destination package differs from the cross-slide patch source",
         });
     }
-    let source_snapshot = super::model::capture(source, patch.patch.limits())?;
-    let destination_snapshot = super::model::capture(destination, patch.patch.limits())?;
+    let source_snapshot = super::model::capture(
+        source,
+        patch.patch.limits(),
+        source_physical_source_provenance,
+    )?;
+    let destination_snapshot = super::model::capture(
+        destination,
+        patch.patch.limits(),
+        destination_physical_source_provenance,
+    )?;
     let source_slide = find_slide_by_part(&source_snapshot, &patch.source_slide)?;
     let destination_slide = find_slide_by_part(&destination_snapshot, &patch.destination_slide)?;
     let forward_matches = plan_cross_slide_copy_for_slides(
@@ -576,8 +600,13 @@ pub(crate) fn apply_patch(
         // and comparing the exact inverse. The real destination is untouched
         // until this proof succeeds.
         let mut restored = destination.clone();
-        if super::patch::apply_exact_revision(&mut restored, &patch.patch, patch.target_revision)
-            .is_err()
+        if super::patch::apply_exact_revision(
+            &mut restored,
+            &patch.patch,
+            patch.target_revision,
+            destination_physical_source_provenance,
+        )
+        .is_err()
         {
             false
         } else if physical_package_fingerprint(&restored, patch.patch.limits()).ok()
@@ -585,7 +614,11 @@ pub(crate) fn apply_patch(
         {
             false
         } else {
-            let restored_snapshot = super::model::capture(&restored, patch.patch.limits());
+            let restored_snapshot = super::model::capture(
+                &restored,
+                patch.patch.limits(),
+                destination_physical_source_provenance,
+            );
             restored_snapshot
                 .ok()
                 .and_then(|base| {
@@ -611,8 +644,12 @@ pub(crate) fn apply_patch(
         });
     }
     let mut candidate = destination.clone();
-    let snapshot =
-        super::patch::apply_exact_revision(&mut candidate, &patch.patch, patch.target_revision)?;
+    let snapshot = super::patch::apply_exact_revision(
+        &mut candidate,
+        &patch.patch,
+        patch.target_revision,
+        destination_physical_source_provenance,
+    )?;
     if physical_package_fingerprint(&candidate, patch.patch.limits())?
         != patch.target_physical_revision
     {
@@ -967,7 +1004,11 @@ fn build_candidate(
     }
     let serialized = bounded_package_bytes(&candidate, archive_limit)?;
     let reopened = OpcPackage::from_vec(serialized)?;
-    let captured = super::model::capture(&reopened, destination.limits)?;
+    let captured = super::model::capture(
+        &reopened,
+        destination.limits,
+        destination.physical_source_provenance,
+    )?;
     let published = captured
         .slides
         .get(position)
@@ -1710,6 +1751,7 @@ fn dialect_namespace_flags(bytes: &[u8]) -> (bool, bool) {
         TRANSITIONAL_CHART,
         TRANSITIONAL_DIAGRAM,
         TRANSITIONAL_CHART_DRAWING,
+        TRANSITIONAL_REL_NS,
     ]
     .iter()
     .any(|namespace| {
@@ -1723,6 +1765,7 @@ fn dialect_namespace_flags(bytes: &[u8]) -> (bool, bool) {
         STRICT_CHART,
         STRICT_DIAGRAM,
         STRICT_CHART_DRAWING,
+        STRICT_REL_NS,
     ]
     .iter()
     .any(|namespace| {

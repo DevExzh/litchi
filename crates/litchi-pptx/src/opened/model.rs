@@ -214,8 +214,12 @@ impl Snapshot {
     }
 }
 
-pub(crate) fn capture(package: &OpcPackage, limits: Limits) -> Result<Snapshot> {
-    capture_with_provenance(package, limits, true)
+pub(crate) fn capture(
+    package: &OpcPackage,
+    limits: Limits,
+    physical_source_provenance: bool,
+) -> Result<Snapshot> {
+    capture_with_provenance(package, limits, physical_source_provenance)
 }
 
 pub(crate) fn capture_with_provenance(

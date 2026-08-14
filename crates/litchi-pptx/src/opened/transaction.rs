@@ -130,11 +130,19 @@ impl Transaction {
     /// Returns an error for a missing selector, the final remaining slide, or
     /// an unsupported slide-list or relationship topology.
     pub fn remove_slide<'s>(&mut self, slide: impl Into<crate::slide::Key<'s>>) -> Result<Slide> {
-        let snapshot = capture(&self.working, self.source.limits)?;
+        let snapshot = capture(
+            &self.working,
+            self.source.limits,
+            self.source.physical_source_provenance,
+        )?;
         let plan = snapshot.plan_slide_removal(slide)?;
         let selected = plan.source().clone();
-        let published =
-            super::remove_plan::apply_patch(&mut self.working, plan.patch(), "remove_slide")?;
+        let published = super::remove_plan::apply_patch(
+            &mut self.working,
+            plan.patch(),
+            "remove_slide",
+            self.source.physical_source_provenance,
+        )?;
         self.slides = published.slides;
         Ok(selected)
     }
@@ -1197,7 +1205,11 @@ impl Transaction {
                 patch,
             });
         }
-        let snapshot = capture(&working, self.source.limits)?;
+        let snapshot = capture(
+            &working,
+            self.source.limits,
+            self.source.physical_source_provenance,
+        )?;
         Ok(Commit { snapshot, patch })
     }
 
