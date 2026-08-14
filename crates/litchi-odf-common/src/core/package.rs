@@ -187,6 +187,19 @@ impl OwnedPackage {
         Arc::clone(&self.data)
     }
 
+    /// Clone the immutable archive/index handles without retaining a
+    /// decryption credential. Snapshot owners use this when the credential is
+    /// intentionally scoped to the opening document and must not become part
+    /// of a public, cloneable snapshot.
+    #[doc(hidden)]
+    pub fn clone_without_password(&self) -> Self {
+        Self {
+            data: Arc::clone(&self.data),
+            index: Arc::clone(&self.index),
+            password: None,
+        }
+    }
+
     /// Return a stable identity for the retained archive index.
     #[doc(hidden)]
     #[must_use]
