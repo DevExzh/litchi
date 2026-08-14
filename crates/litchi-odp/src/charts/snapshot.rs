@@ -4,6 +4,7 @@ use super::codec::{content_xml, locate_pages, page_index};
 use super::model::{Chart, Limits, Location, Page, Part, Selector, Storage};
 use super::package;
 use crate::Presentation;
+use crate::core::OwnedPackage;
 use litchi_core::{Error, Result};
 use std::sync::Arc;
 use xml_minifier::audit;
@@ -12,11 +13,23 @@ const MAX_PACKAGE_BYTES: usize = 128 * 1024 * 1024;
 const MAX_XML_PARTS: usize = 65_536;
 
 /// Immutable embedded-chart inventory tied to exact ODP package bytes.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Snapshot {
     source: Arc<Vec<u8>>,
+    package: OwnedPackage,
     limits: Limits,
     charts: Arc<[Chart]>,
+}
+
+impl std::fmt::Debug for Snapshot {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Snapshot")
+            .field("source_len", &self.source.len())
+            .field("limits", &self.limits)
+            .field("charts", &self.charts)
+            .finish()
+    }
 }
 
 impl Snapshot {
@@ -42,10 +55,21 @@ impl Snapshot {
         if source.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP chart snapshot exceeds the 128 MiB package limit");
         }
-        let presentation = Presentation::from_shared_bytes(Arc::clone(&source))?;
+        let package = OwnedPackage::from_shared_bytes(Arc::clone(&source))?;
+        Self::from_owned_package(package, limits)
+    }
+
+    pub(crate) fn from_owned_package(package: OwnedPackage, limits: Limits) -> Result<Self> {
+        if package.as_bytes().len() > MAX_PACKAGE_BYTES {
+            return invalid("ODP chart snapshot exceeds the 128 MiB package limit");
+        }
+        let presentation = Presentation::from_owned_package(package)?;
         let charts = presentation.charts_with(limits)?.charts;
+        let package = presentation.owned_package().clone_without_password();
+        let source = package.shared_bytes();
         Ok(Self {
             source,
+            package,
             limits,
             charts: Arc::from(charts),
         })
@@ -98,7 +122,19 @@ impl Snapshot {
     ///
     /// Returns an error when the retained package can no longer be parsed.
     pub fn to_presentation(&self) -> Result<Presentation> {
-        Presentation::from_shared_bytes(Arc::clone(&self.source))
+        Presentation::from_owned_package(self.package.clone())
+    }
+
+    pub(crate) fn owned_package(&self) -> &OwnedPackage {
+        &self.package
+    }
+
+    /// Return the identity of the validated archive index retained by this
+    /// immutable chart snapshot.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn prepared_index_identity(&self) -> usize {
+        self.package.prepared_index_identity()
     }
 }
 
@@ -230,9 +266,9 @@ impl Edit {
                 &self.before.charts,
                 &self.draft,
             )?;
-            let target = Arc::new(bytes);
+            let target = OwnedPackage::from_bytes(bytes)?;
             validate_compact_package(&target)?;
-            let reopened = Snapshot::from_shared_bytes(target, self.before.limits)?;
+            let reopened = Snapshot::from_owned_package(target, self.before.limits)?;
             if !charts_semantically_equal(&reopened.charts, &self.draft) {
                 return invalid("ODP chart commit failed typed readback");
             }
@@ -270,8 +306,7 @@ impl Patch {
         if !self.is_applicable_to(source) {
             return invalid("stale ODP chart patch source");
         }
-        let snapshot =
-            Snapshot::from_shared_bytes(Arc::clone(&self.after.source), self.after.limits)?;
+        let snapshot = self.after.clone();
         let changed = !self.is_noop();
         Ok(Commit {
             changed,
@@ -380,9 +415,7 @@ impl Commit {
     }
 }
 
-pub(super) fn validate_compact_package(bytes: &[u8]) -> Result<()> {
-    let presentation = Presentation::from_bytes(bytes.to_vec())?;
-    let package = presentation.owned_package();
+pub(super) fn validate_compact_package(package: &OwnedPackage) -> Result<()> {
     let mut part_count = 0usize;
     let mut aggregate_bytes = 0usize;
     for path in package.files()? {

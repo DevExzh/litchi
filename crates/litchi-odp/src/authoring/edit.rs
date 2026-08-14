@@ -138,6 +138,14 @@ impl CryptoCapability {
 #[derive(Clone)]
 pub struct Snapshot {
     bytes: Arc<Vec<u8>>,
+    /// The validated physical package retained with this immutable snapshot.
+    ///
+    /// `OwnedPackage` keeps its ZIP index behind an `Arc`, so semantic
+    /// reopenings of the same immutable artifact can share the validated
+    /// archive state instead of rebuilding the central directory from the
+    /// same bytes. The separate byte owner remains authoritative for exact
+    /// lineage and patch source checks.
+    package: OwnedPackage,
     resource_bytes: usize,
     slides: Arc<[Slide]>,
 }
@@ -171,10 +179,11 @@ impl Snapshot {
             return invalid("ODP editing package exceeds the 128 MiB limit");
         }
         let package = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
-        Self::from_owned_package(bytes, package)
+        Self::from_owned_package(package)
     }
 
-    fn from_owned_package(bytes: Arc<Vec<u8>>, package: OwnedPackage) -> Result<Self> {
+    pub(crate) fn from_owned_package(package: OwnedPackage) -> Result<Self> {
+        validate_package_size(package.as_bytes().len())?;
         let presentation = Presentation::from_owned_package(package)?;
         let slides = presentation.slides()?;
         if slides.len() > MAX_SLIDES {
@@ -184,8 +193,11 @@ impl Snapshot {
         if resource_bytes > MAX_DRAFT_BYTES {
             return invalid("ODP editing snapshot exceeds the aggregate draft limit");
         }
+        let package = presentation.owned_package().clone_without_password();
+        let bytes = package.shared_bytes();
         Ok(Self {
             bytes,
+            package,
             resource_bytes,
             slides: Arc::from(slides),
         })
@@ -209,8 +221,7 @@ impl Snapshot {
     ///
     /// Returns an error when the retained package cannot be reopened.
     pub fn security_policy(&self) -> Result<SecurityPolicy> {
-        let package = OwnedPackage::from_shared_bytes(Arc::clone(&self.bytes))?;
-        package_security_policy(&package)
+        package_security_policy(&self.package)
     }
 
     /// Resolve one crypto lifecycle request without mutating the package.
@@ -262,8 +273,7 @@ impl Snapshot {
     ///
     /// Returns an error for malformed, ambiguous, or oversized content owners.
     pub fn rich_content(&self) -> Result<crate::content::Inventory> {
-        let package = OwnedPackage::from_shared_bytes(Arc::clone(&self.bytes))?;
-        crate::content::inventory(&package)
+        crate::content::inventory(&self.package)
     }
 
     /// Select a slide by checked zero-based position or exact title.
@@ -286,7 +296,7 @@ impl Snapshot {
     /// Returns an error when the exact source package cannot be reparsed for staging or
     /// its signature/encryption policy makes it read-only.
     pub fn transaction(&self) -> Result<Transaction> {
-        let presentation = Presentation::from_shared_bytes(Arc::clone(&self.bytes))?;
+        let presentation = Presentation::from_owned_package(self.package.clone())?;
         ensure_editable_source(presentation.owned_package())?;
         Ok(Transaction {
             source: self.clone(),
@@ -315,7 +325,15 @@ impl Snapshot {
     ///
     /// Returns an error when the retained package can no longer be parsed.
     pub fn to_presentation(&self) -> Result<Presentation> {
-        Presentation::from_shared_bytes(Arc::clone(&self.bytes))
+        Presentation::from_owned_package(self.package.clone())
+    }
+
+    /// Return the identity of the validated archive index retained by this
+    /// immutable snapshot.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn prepared_index_identity(&self) -> usize {
+        self.package.prepared_index_identity()
     }
 }
 
@@ -404,7 +422,7 @@ enum RdfOperation {
 }
 
 struct RdfDraft {
-    bytes: Arc<Vec<u8>>,
+    package: OwnedPackage,
     original_graphs: Vec<crate::rdf::Graph>,
     graphs: Vec<crate::rdf::Graph>,
     operations: Vec<RdfOperation>,
@@ -472,7 +490,7 @@ enum ChartOperation {
 }
 
 struct ChartDraft {
-    bytes: Arc<Vec<u8>>,
+    package: OwnedPackage,
     original: Vec<crate::charts::Chart>,
     charts: Vec<crate::charts::Chart>,
     operations: Vec<ChartOperation>,
@@ -506,7 +524,7 @@ enum DesignOperation {
 }
 
 struct DesignDraft {
-    bytes: Arc<Vec<u8>>,
+    package: OwnedPackage,
     original_layouts: crate::layout::Collection,
     layouts: crate::layout::Collection,
     original_masters: Vec<crate::MasterPage>,
@@ -532,7 +550,7 @@ enum AnnotationOperation {
 }
 
 struct AnnotationDraft {
-    bytes: Arc<Vec<u8>>,
+    package: OwnedPackage,
     original: Vec<crate::annotation::Info>,
     annotations: Vec<crate::annotation::Info>,
     operations: Vec<AnnotationOperation>,
@@ -540,6 +558,7 @@ struct AnnotationDraft {
 
 struct ContentDraft {
     bytes: Arc<Vec<u8>>,
+    package: OwnedPackage,
     operations: Vec<crate::content::Operation>,
 }
 
@@ -548,6 +567,14 @@ impl Transaction {
     #[must_use]
     pub fn slides(&self) -> &[Slide] {
         self.draft.slides()
+    }
+
+    /// Return the identity of the validated archive index retained by the
+    /// transaction's immutable source snapshot.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn prepared_index_identity(&self) -> usize {
+        self.source.prepared_index_identity()
     }
 
     /// Append a compact title/body slide.
@@ -814,10 +841,10 @@ impl Transaction {
             return invalid("ODP transaction exceeds the slide-count limit");
         }
 
-        let source_package = OwnedPackage::from_shared_bytes(Arc::clone(&source.bytes))?;
+        let source_package = source.package.clone();
         ensure_editable_source(&source_package)?;
         super::mutable::ensure_foreign_transfer_package_safety(&source_package, "donor")?;
-        let source_presentation = Presentation::from_shared_bytes(Arc::clone(&source.bytes))?;
+        let source_presentation = Presentation::from_owned_package(source.package.clone())?;
         audit::verify_authored(
             source_presentation.content_xml().as_bytes(),
             audit::Limits::default(),
@@ -1051,7 +1078,7 @@ impl Transaction {
     ///
     /// Returns an error for malformed, ambiguous, or oversized content owners.
     pub fn rich_content(&mut self) -> Result<crate::content::Inventory> {
-        let package = OwnedPackage::from_shared_bytes(self.content_bytes()?)?;
+        let package = self.content_package()?;
         crate::content::inventory(&package)
     }
 
@@ -1550,7 +1577,7 @@ impl Transaction {
         edit.replace(owned_selector.borrowed(), part.clone())?;
         let commit = edit.commit()?;
         self.stage_chart(
-            commit.snapshot().bytes().to_vec(),
+            commit.snapshot().owned_package().clone(),
             commit.snapshot().charts().to_vec(),
             ChartOperation::Replace {
                 selector: owned_selector,
@@ -1683,7 +1710,7 @@ impl Transaction {
         let removed = edit.remove(owned_selector.borrowed())?;
         let commit = edit.commit()?;
         self.stage_chart(
-            commit.snapshot().bytes().to_vec(),
+            commit.snapshot().owned_package().clone(),
             commit.snapshot().charts().to_vec(),
             ChartOperation::Remove {
                 selector: owned_selector,
@@ -1720,7 +1747,7 @@ impl Transaction {
         )?;
         let commit = edit.commit()?;
         self.stage_chart(
-            commit.snapshot().bytes().to_vec(),
+            commit.snapshot().owned_package().clone(),
             commit.snapshot().charts().to_vec(),
             ChartOperation::Add {
                 page: owned_page,
@@ -1778,16 +1805,15 @@ impl Transaction {
         S: Into<crate::charts::Selector<'a>>,
         P: Into<crate::charts::Page<'b>>,
     {
-        let inventory = crate::charts::Snapshot::from_shared_bytes(
-            Arc::clone(&source.bytes),
+        let inventory = crate::charts::Snapshot::from_owned_package(
+            source.package.clone(),
             crate::charts::Limits::default(),
         )?;
         let selected = inventory
             .get(source_chart)?
             .ok_or_else(|| invalid_error("ODP source chart selector did not match"))?;
-        let source_package = OwnedPackage::from_shared_bytes(Arc::clone(&source.bytes))?;
-        let destination_bytes = self.content_bytes()?;
-        let destination_package = OwnedPackage::from_shared_bytes(destination_bytes)?;
+        let source_package = source.package.clone();
+        let destination_package = self.content_package()?;
         let source_base = selected.content_path().unwrap_or("content.xml");
         let destination_base = match storage {
             crate::charts::Storage::InlineXml => "content.xml",
@@ -1968,11 +1994,11 @@ impl Transaction {
         annotation: &crate::annotation::Annotation,
     ) -> Result<usize> {
         self.ensure_annotations()?;
-        let current = self.annotation_bytes()?;
-        let mut presentation = Presentation::from_shared_bytes(current)?;
+        let current = self.annotation_package()?;
+        let mut presentation = Presentation::from_owned_package(current)?;
         let index = presentation.add_annotation(anchor, annotation)?;
         self.stage_annotation(
-            Arc::new(presentation.to_bytes()?),
+            OwnedPackage::from_bytes(presentation.to_bytes()?)?,
             AnnotationOperation::Add {
                 anchor: anchor.clone(),
                 annotation: annotation.clone(),
@@ -1992,11 +2018,11 @@ impl Transaction {
         annotation: &crate::annotation::Annotation,
     ) -> Result<()> {
         self.ensure_annotations()?;
-        let current = self.annotation_bytes()?;
-        let mut presentation = Presentation::from_shared_bytes(current)?;
+        let current = self.annotation_package()?;
+        let mut presentation = Presentation::from_owned_package(current)?;
         presentation.replace_annotation(index, annotation)?;
         self.stage_annotation(
-            Arc::new(presentation.to_bytes()?),
+            OwnedPackage::from_bytes(presentation.to_bytes()?)?,
             AnnotationOperation::Replace {
                 index,
                 annotation: annotation.clone(),
@@ -2011,11 +2037,11 @@ impl Transaction {
     /// Returns an error when the position is out of range or package content is malformed.
     pub fn remove_annotation(&mut self, index: usize) -> Result<()> {
         self.ensure_annotations()?;
-        let current = self.annotation_bytes()?;
-        let mut presentation = Presentation::from_shared_bytes(current)?;
+        let current = self.annotation_package()?;
+        let mut presentation = Presentation::from_owned_package(current)?;
         presentation.remove_annotation(index)?;
         self.stage_annotation(
-            Arc::new(presentation.to_bytes()?),
+            OwnedPackage::from_bytes(presentation.to_bytes()?)?,
             AnnotationOperation::Remove { index },
         )
     }
@@ -2081,29 +2107,34 @@ impl Transaction {
         {
             return Ok(Commit::unchanged(self.source));
         }
-        let mut bytes = if self.changed {
-            Arc::new(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)
-        } else {
-            Arc::clone(&self.source.bytes)
-        };
-        let slide_candidate = if self.changed {
-            let candidate = Snapshot::from_shared_bytes(Arc::clone(&bytes))?;
+        let (mut bytes, mut package, slide_candidate) = if self.changed {
+            let package =
+                OwnedPackage::from_bytes(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)?;
+            let bytes = package.shared_bytes();
+            let candidate = Snapshot::from_owned_package(package.clone())?;
             if candidate.slides() != self.draft.slides() {
                 return invalid("ODP transaction readback differs from the staged slide model");
             }
-            Some(candidate)
+            (bytes, package, Some(candidate))
         } else {
-            None
+            let package = self.source.package.clone();
+            (package.shared_bytes(), package, None)
         };
         if let Some(design) = &self.design
             && !design.operations.is_empty()
         {
             if self.changed {
                 for operation in &design.operations {
-                    bytes = Arc::new(apply_design_operation(Arc::clone(&bytes), operation)?);
+                    let output = apply_design_operation(&package, operation)?;
+                    if output.len() > MAX_PACKAGE_BYTES {
+                        return invalid("ODP design transaction exceeds the 128 MiB package limit");
+                    }
+                    package = OwnedPackage::from_bytes(output)?;
+                    bytes = package.shared_bytes();
                 }
             } else {
-                bytes = Arc::clone(&design.bytes);
+                package = design.package.clone();
+                bytes = package.shared_bytes();
             }
         }
         if let Some(annotations) = &self.annotations
@@ -2111,10 +2142,18 @@ impl Transaction {
         {
             if self.changed || design_changed {
                 for operation in &annotations.operations {
-                    bytes = Arc::new(apply_annotation_operation(Arc::clone(&bytes), operation)?);
+                    let output = apply_annotation_operation(&package, operation)?;
+                    if output.len() > MAX_PACKAGE_BYTES {
+                        return invalid(
+                            "ODP annotation transaction exceeds the 128 MiB package limit",
+                        );
+                    }
+                    package = OwnedPackage::from_bytes(output)?;
+                    bytes = package.shared_bytes();
                 }
             } else {
-                bytes = Arc::clone(&annotations.bytes);
+                package = annotations.package.clone();
+                bytes = package.shared_bytes();
             }
         }
         if let Some(rdf) = &self.rdf
@@ -2122,14 +2161,16 @@ impl Transaction {
         {
             if self.changed || design_changed || annotations_changed {
                 for operation in &rdf.operations {
-                    let package = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
-                    bytes = Arc::new(apply_rdf_operation(&package, operation)?);
-                    if bytes.len() > MAX_PACKAGE_BYTES {
+                    let output = apply_rdf_operation(&package, operation)?;
+                    if output.len() > MAX_PACKAGE_BYTES {
                         return invalid("ODP RDF transaction exceeds the 128 MiB package limit");
                     }
+                    package = OwnedPackage::from_bytes(output)?;
+                    bytes = package.shared_bytes();
                 }
             } else {
-                bytes = Arc::clone(&rdf.bytes);
+                package = rdf.package.clone();
+                bytes = package.shared_bytes();
             }
         }
         if let Some(charts) = &self.charts
@@ -2137,17 +2178,16 @@ impl Transaction {
         {
             if self.changed || design_changed || annotations_changed || rdf_changed {
                 for operation in &charts.operations {
-                    bytes = Arc::new(apply_chart_operation(
-                        Arc::clone(&bytes),
-                        charts.limits,
-                        operation,
-                    )?);
-                    if bytes.len() > MAX_PACKAGE_BYTES {
+                    let output = apply_chart_operation(&package, charts.limits, operation)?;
+                    if output.len() > MAX_PACKAGE_BYTES {
                         return invalid("ODP chart transaction exceeds the 128 MiB package limit");
                     }
+                    package = OwnedPackage::from_bytes(output)?;
+                    bytes = package.shared_bytes();
                 }
             } else {
-                bytes = Arc::clone(&charts.bytes);
+                package = charts.package.clone();
+                bytes = package.shared_bytes();
             }
         }
         if let Some(content) = &self.content
@@ -2160,20 +2200,22 @@ impl Transaction {
                 || charts_changed
             {
                 for operation in &content.operations {
-                    let package = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
-                    bytes = Arc::new(crate::content::apply(&package, operation)?);
-                    if bytes.len() > MAX_PACKAGE_BYTES {
+                    let output = crate::content::apply(&package, operation)?;
+                    if output.len() > MAX_PACKAGE_BYTES {
                         return invalid(
                             "ODP semantic-content transaction exceeds the 128 MiB package limit",
                         );
                     }
+                    package = OwnedPackage::from_bytes(output)?;
+                    bytes = package.shared_bytes();
                 }
             } else {
-                bytes = Arc::clone(&content.bytes);
+                package = content.package.clone();
+                bytes = package.shared_bytes();
             }
         }
-        let reopened = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
-        let source_package = OwnedPackage::from_shared_bytes(Arc::clone(&self.source.bytes))?;
+        let reopened = package;
+        let source_package = self.source.package.clone();
         if !content_changed {
             validate_raw_preserved_referenced_xml_parts(&source_package)?;
         }
@@ -2186,13 +2228,20 @@ impl Transaction {
         }
         if let Some(charts) = &self.charts {
             let reopened_charts =
-                crate::charts::Snapshot::from_shared_bytes(Arc::clone(&bytes), charts.limits)?;
+                crate::charts::Snapshot::from_owned_package(reopened.clone(), charts.limits)?;
             if !root_charts_equal(reopened_charts.charts(), &charts.charts) {
                 return invalid("ODP transaction chart readback differs from the staged model");
             }
         }
+        let presentation = if design_changed || annotations_changed {
+            Some(Presentation::from_owned_package(reopened.clone())?)
+        } else {
+            None
+        };
         if let Some(design) = &self.design {
-            let presentation = Presentation::from_shared_bytes(Arc::clone(&bytes))?;
+            let presentation = presentation
+                .as_ref()
+                .ok_or_else(|| invalid_error("ODP design readback presentation missing"))?;
             if presentation.layouts()? != design.layouts
                 || !root_masters_equal(&presentation.master_pages()?, &design.masters)
                 || !root_design_pages_equal(&presentation.pages()?, &design.pages)
@@ -2201,7 +2250,9 @@ impl Transaction {
             }
         }
         if let Some(annotations) = &self.annotations {
-            let presentation = Presentation::from_shared_bytes(Arc::clone(&bytes))?;
+            let presentation = presentation
+                .as_ref()
+                .ok_or_else(|| invalid_error("ODP annotation readback presentation missing"))?;
             if !root_annotations_equal(&presentation.annotations()?, &annotations.annotations) {
                 return invalid(
                     "ODP transaction annotation readback differs from the staged model",
@@ -2214,7 +2265,7 @@ impl Transaction {
                 candidate
             },
             (true, None) => unreachable!("a slide-only ODP commit always has a slide candidate"),
-            (false, _) => Snapshot::from_owned_package(bytes, reopened)?,
+            (false, _) => Snapshot::from_owned_package(reopened)?,
         };
         let patch = Patch {
             before: self.source,
@@ -2230,10 +2281,10 @@ impl Transaction {
 
     fn ensure_rdf(&mut self) -> Result<()> {
         if self.rdf.is_none() {
-            let package = OwnedPackage::from_shared_bytes(Arc::clone(&self.source.bytes))?;
+            let package = self.source.package.clone();
             let graphs = crate::rdf::graphs(&package)?;
             self.rdf = Some(RdfDraft {
-                bytes: Arc::clone(&self.source.bytes),
+                package,
                 original_graphs: graphs.clone(),
                 graphs,
                 operations: Vec::new(),
@@ -2244,22 +2295,19 @@ impl Transaction {
 
     fn rdf_package(&mut self) -> Result<OwnedPackage> {
         self.ensure_rdf()?;
-        let bytes = self
-            .rdf
+        self.rdf
             .as_ref()
-            .map(|draft| Arc::clone(&draft.bytes))
-            .ok_or_else(|| invalid_error("ODP RDF draft initialization failed"))?;
-        OwnedPackage::from_shared_bytes(bytes)
+            .map(|draft| draft.package.clone())
+            .ok_or_else(|| invalid_error("ODP RDF draft initialization failed"))
     }
 
     fn stage_rdf(&mut self, bytes: Vec<u8>, operation: RdfOperation) -> Result<()> {
         if bytes.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP RDF transaction exceeds the 128 MiB package limit");
         }
-        let candidate = Arc::new(bytes);
-        let presentation = Presentation::from_shared_bytes(Arc::clone(&candidate))?;
+        let package = OwnedPackage::from_bytes(bytes)?;
+        let presentation = Presentation::from_owned_package(package.clone())?;
         let graphs = crate::rdf::graphs(presentation.owned_package())?;
-        let source_bytes = Arc::clone(&self.source.bytes);
         let draft = self
             .rdf
             .as_mut()
@@ -2268,12 +2316,12 @@ impl Transaction {
             return Ok(());
         }
         if graphs == draft.original_graphs {
-            draft.bytes = source_bytes;
+            draft.package = self.source.package.clone();
             draft.graphs = graphs;
             draft.operations.clear();
             return Ok(());
         }
-        draft.bytes = candidate;
+        draft.package = package;
         draft.graphs = graphs;
         draft.operations.push(operation);
         Ok(())
@@ -2283,10 +2331,10 @@ impl Transaction {
         if self.charts.is_none() {
             let limits = crate::charts::Limits::default();
             let snapshot =
-                crate::charts::Snapshot::from_shared_bytes(Arc::clone(&self.source.bytes), limits)?;
+                crate::charts::Snapshot::from_owned_package(self.source.package.clone(), limits)?;
             let charts = snapshot.charts().to_vec();
             self.charts = Some(ChartDraft {
-                bytes: Arc::clone(&self.source.bytes),
+                package: self.source.package.clone(),
                 original: charts.clone(),
                 charts,
                 operations: Vec::new(),
@@ -2298,38 +2346,39 @@ impl Transaction {
 
     fn chart_snapshot(&mut self) -> Result<crate::charts::Snapshot> {
         self.ensure_charts()?;
-        let (current_bytes, limits, operations) = self
+        let (current_package, limits, operations) = self
             .charts
             .as_ref()
             .map(|draft| {
                 (
-                    Arc::clone(&draft.bytes),
+                    draft.package.clone(),
                     draft.limits,
                     draft.operations.clone(),
                 )
             })
             .ok_or_else(|| invalid_error("ODP chart draft initialization failed"))?;
         if !self.changed {
-            return crate::charts::Snapshot::from_shared_bytes(current_bytes, limits);
+            return crate::charts::Snapshot::from_owned_package(current_package, limits);
         }
-        let mut bytes = Arc::new(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?);
+        let mut package =
+            OwnedPackage::from_bytes(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)?;
         for operation in &operations {
-            bytes = Arc::new(apply_chart_operation(bytes, limits, operation)?);
+            package =
+                OwnedPackage::from_bytes(apply_chart_operation(&package, limits, operation)?)?;
         }
-        crate::charts::Snapshot::from_shared_bytes(bytes, limits)
+        crate::charts::Snapshot::from_owned_package(package, limits)
     }
 
     fn stage_chart(
         &mut self,
-        bytes: Vec<u8>,
+        package: OwnedPackage,
         charts: Vec<crate::charts::Chart>,
         operation: ChartOperation,
     ) -> Result<()> {
         self.check_no_slide_order_change("chart")?;
-        if bytes.len() > MAX_PACKAGE_BYTES {
+        if package.as_bytes().len() > MAX_PACKAGE_BYTES {
             return invalid("ODP chart transaction exceeds the 128 MiB package limit");
         }
-        let source_bytes = Arc::clone(&self.source.bytes);
         let draft = self
             .charts
             .as_mut()
@@ -2338,12 +2387,12 @@ impl Transaction {
             return Ok(());
         }
         if root_charts_equal(&charts, &draft.original) {
-            draft.bytes = source_bytes;
+            draft.package = self.source.package.clone();
             draft.charts = charts;
             draft.operations.clear();
             return Ok(());
         }
-        draft.bytes = Arc::new(bytes);
+        draft.package = package;
         draft.charts = charts;
         draft.operations.push(operation);
         Ok(())
@@ -2351,12 +2400,13 @@ impl Transaction {
 
     fn ensure_design(&mut self) -> Result<()> {
         if self.design.is_none() {
-            let presentation = Presentation::from_shared_bytes(Arc::clone(&self.source.bytes))?;
+            let package = self.source.package.clone();
+            let presentation = Presentation::from_owned_package(package.clone())?;
             let layouts = presentation.layouts()?;
             let masters = presentation.master_pages()?;
             let pages = presentation.pages()?;
             self.design = Some(DesignDraft {
-                bytes: Arc::clone(&self.source.bytes),
+                package,
                 original_layouts: layouts.clone(),
                 layouts,
                 original_masters: masters.clone(),
@@ -2375,17 +2425,16 @@ impl Transaction {
         let current = self
             .design
             .as_ref()
-            .map(|draft| Arc::clone(&draft.bytes))
+            .map(|draft| draft.package.clone())
             .ok_or_else(|| invalid_error("ODP design draft initialization failed"))?;
-        let bytes = Arc::new(apply_design_operation(current, &operation)?);
-        if bytes.len() > MAX_PACKAGE_BYTES {
+        let package = OwnedPackage::from_bytes(apply_design_operation(&current, &operation)?)?;
+        if package.as_bytes().len() > MAX_PACKAGE_BYTES {
             return invalid("ODP design transaction exceeds the 128 MiB package limit");
         }
-        let presentation = Presentation::from_shared_bytes(Arc::clone(&bytes))?;
+        let presentation = Presentation::from_owned_package(package.clone())?;
         let layouts = presentation.layouts()?;
         let masters = presentation.master_pages()?;
         let pages = presentation.pages()?;
-        let source_bytes = Arc::clone(&self.source.bytes);
         let draft = self
             .design
             .as_mut()
@@ -2400,14 +2449,14 @@ impl Transaction {
             && root_masters_equal(&masters, &draft.original_masters)
             && pages == draft.original_pages
         {
-            draft.bytes = source_bytes;
+            draft.package = self.source.package.clone();
             draft.layouts = layouts;
             draft.masters = masters;
             draft.pages = pages;
             draft.operations.clear();
             return Ok(());
         }
-        draft.bytes = bytes;
+        draft.package = package;
         draft.layouts = layouts;
         draft.masters = masters;
         draft.pages = pages;
@@ -2417,10 +2466,11 @@ impl Transaction {
 
     fn ensure_annotations(&mut self) -> Result<()> {
         if self.annotations.is_none() {
-            let presentation = Presentation::from_shared_bytes(Arc::clone(&self.source.bytes))?;
+            let package = self.source.package.clone();
+            let presentation = Presentation::from_owned_package(package.clone())?;
             let annotations = presentation.annotations()?;
             self.annotations = Some(AnnotationDraft {
-                bytes: Arc::clone(&self.source.bytes),
+                package,
                 original: annotations.clone(),
                 annotations,
                 operations: Vec::new(),
@@ -2430,8 +2480,7 @@ impl Transaction {
     }
 
     fn content_page_index(&mut self, page: crate::charts::Page<'_>) -> Result<usize> {
-        let bytes = self.content_bytes()?;
-        let package = OwnedPackage::from_shared_bytes(bytes)?;
+        let package = self.content_package()?;
         let content = String::from_utf8(package.get_file("content.xml")?)
             .map_err(|source| invalid_error(format!("ODP content.xml is not UTF-8: {source}")))?;
         crate::charts::page_index(&content, page)
@@ -2461,32 +2510,43 @@ impl Transaction {
         if let Some(content) = &self.content {
             return Ok(Arc::clone(&content.bytes));
         }
-        let bytes = if self.changed {
-            Arc::new(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)
+        let package = if self.changed {
+            OwnedPackage::from_bytes(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)?
         } else {
-            Arc::clone(&self.source.bytes)
+            self.source.package.clone()
         };
+        let bytes = package.shared_bytes();
         self.content = Some(ContentDraft {
             bytes: Arc::clone(&bytes),
+            package,
             operations: Vec::new(),
         });
         Ok(bytes)
     }
 
+    fn content_package(&mut self) -> Result<OwnedPackage> {
+        self.content_bytes()?;
+        self.content
+            .as_ref()
+            .map(|draft| draft.package.clone())
+            .ok_or_else(|| invalid_error("ODP semantic-content draft initialization failed"))
+    }
+
     fn stage_content(&mut self, operation: crate::content::Operation) -> Result<()> {
         self.check_no_slide_order_change("rich-content")?;
-        let current = self.content_bytes()?;
-        let package = OwnedPackage::from_shared_bytes(current)?;
-        let bytes = Arc::new(crate::content::apply(&package, &operation)?);
+        let package = self.content_package()?;
+        let bytes = crate::content::apply(&package, &operation)?;
         if bytes.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP semantic-content transaction exceeds the 128 MiB package limit");
         }
-        Presentation::from_shared_bytes(Arc::clone(&bytes))?;
+        let package = OwnedPackage::from_bytes(bytes)?;
+        Presentation::from_owned_package(package.clone())?;
         let draft = self
             .content
             .as_mut()
             .ok_or_else(|| invalid_error("ODP semantic-content draft initialization failed"))?;
-        draft.bytes = bytes;
+        draft.bytes = package.shared_bytes();
+        draft.package = package;
         draft.operations.push(operation);
         Ok(())
     }
@@ -2496,8 +2556,7 @@ impl Transaction {
         replacements: Vec<crate::content::OwnedTextBoxModelReplacement>,
     ) -> Result<usize> {
         self.check_no_slide_order_change("rich-content")?;
-        let current = self.content_bytes()?;
-        let package = OwnedPackage::from_shared_bytes(current)?;
+        let package = self.content_package()?;
         let (bytes, changed) =
             crate::content::apply_text_box_model_replacements(&package, &replacements)?;
         let Some(bytes) = bytes else {
@@ -2506,8 +2565,8 @@ impl Transaction {
         if bytes.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP semantic-content transaction exceeds the 128 MiB package limit");
         }
-        let bytes = Arc::new(bytes);
-        let presentation = Presentation::from_shared_bytes(Arc::clone(&bytes))?;
+        let package = OwnedPackage::from_bytes(bytes)?;
+        let presentation = Presentation::from_owned_package(package.clone())?;
         crate::content::verify_text_box_model_replacements(
             presentation.owned_package(),
             &replacements,
@@ -2516,32 +2575,33 @@ impl Transaction {
             .content
             .as_mut()
             .ok_or_else(|| invalid_error("ODP semantic-content draft initialization failed"))?;
-        draft.bytes = bytes;
+        draft.bytes = package.shared_bytes();
+        draft.package = package;
         draft
             .operations
             .push(crate::content::Operation::ReplaceTextBoxModels { replacements });
         Ok(changed)
     }
 
-    fn annotation_bytes(&self) -> Result<Arc<Vec<u8>>> {
+    fn annotation_package(&self) -> Result<OwnedPackage> {
         self.annotations
             .as_ref()
-            .map(|draft| Arc::clone(&draft.bytes))
+            .map(|draft| draft.package.clone())
             .ok_or_else(|| invalid_error("ODP annotation draft initialization failed"))
     }
 
     fn stage_annotation(
         &mut self,
-        bytes: Arc<Vec<u8>>,
+        package: OwnedPackage,
         operation: AnnotationOperation,
     ) -> Result<()> {
         self.check_no_slide_order_change("annotation")?;
+        let bytes = package.shared_bytes();
         if bytes.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP annotation transaction exceeds the 128 MiB package limit");
         }
-        let presentation = Presentation::from_shared_bytes(Arc::clone(&bytes))?;
+        let presentation = Presentation::from_owned_package(package.clone())?;
         let annotations = presentation.annotations()?;
-        let source_bytes = Arc::clone(&self.source.bytes);
         let draft = self
             .annotations
             .as_mut()
@@ -2550,12 +2610,12 @@ impl Transaction {
             return Ok(());
         }
         if annotations == draft.original {
-            draft.bytes = source_bytes;
+            draft.package = self.source.package.clone();
             draft.annotations = annotations;
             draft.operations.clear();
             return Ok(());
         }
-        draft.bytes = bytes;
+        draft.package = package;
         draft.annotations = annotations;
         draft.operations.push(operation);
         Ok(())
@@ -2733,8 +2793,7 @@ impl Patch {
         if !same_source(&self.before, source) {
             return invalid("stale ODP presentation patch source");
         }
-        let package = OwnedPackage::from_shared_bytes(Arc::clone(&source.bytes))?;
-        ensure_editable_source(&package)?;
+        ensure_editable_source(&source.package)?;
         Ok(self.after.clone())
     }
 
@@ -3300,23 +3359,22 @@ fn package_security_policy(package: &OwnedPackage) -> Result<SecurityPolicy> {
 }
 
 fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> Result<Snapshot> {
-    let base_package = OwnedPackage::from_shared_bytes(Arc::clone(&rdf_patch.before.bytes))?;
-    let rdf_target_package = OwnedPackage::from_shared_bytes(Arc::clone(&rdf_patch.after.bytes))?;
+    let base_package = rdf_patch.before.package.clone();
+    let rdf_target_package = rdf_patch.after.package.clone();
     let base_graphs = crate::rdf::graphs(&base_package)?;
     let expected_graphs = crate::rdf::graphs(&rdf_target_package)?;
-    let mut bytes = Arc::clone(&target_patch.after.bytes);
+    let mut package = target_patch.after.package.clone();
 
     for expected in &expected_graphs {
         let Some(before) = base_graphs.iter().find(|graph| graph.path == expected.path) else {
             continue;
         };
         if before != expected {
-            let package = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
-            bytes = Arc::new(crate::rdf::replace_graph(
+            package = OwnedPackage::from_bytes(crate::rdf::replace_graph(
                 &package,
                 &expected.path,
                 &expected.triples,
-            )?);
+            )?)?;
         }
     }
 
@@ -3333,10 +3391,9 @@ fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> Result<Snaps
         let mut progress = false;
         let mut retained = Vec::new();
         for path in removals {
-            let package = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
             match crate::rdf::remove_graph(&package, &path) {
                 Ok(updated) => {
-                    bytes = Arc::new(updated);
+                    package = OwnedPackage::from_bytes(updated)?;
                     progress = true;
                 },
                 Err(_error) => retained.push(path),
@@ -3352,21 +3409,19 @@ fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> Result<Snaps
         if base_graphs.iter().any(|graph| graph.path == expected.path) {
             continue;
         }
-        let package = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
         let (updated, actual_path) =
             crate::rdf::add_graph(&package, Some(&expected.path), &expected.triples)?;
         if actual_path != expected.path {
             return invalid("ODP RDF join resolved a different metadata graph path");
         }
-        bytes = Arc::new(updated);
+        package = OwnedPackage::from_bytes(updated)?;
     }
 
-    if bytes.len() > MAX_PACKAGE_BYTES {
+    if package.as_bytes().len() > MAX_PACKAGE_BYTES {
         return invalid("ODP joined package exceeds the 128 MiB package limit");
     }
-    let joined = Snapshot::from_shared_bytes(bytes)?;
-    let joined_package = OwnedPackage::from_shared_bytes(Arc::clone(&joined.bytes))?;
-    if crate::rdf::graphs(&joined_package)? != expected_graphs {
+    let joined = Snapshot::from_owned_package(package)?;
+    if crate::rdf::graphs(&joined.package)? != expected_graphs {
         return invalid("ODP joined package RDF readback differs from the expected graph model");
     }
     Ok(joined)
@@ -3403,11 +3458,11 @@ fn apply_rdf_operation(package: &OwnedPackage, operation: &RdfOperation) -> Resu
 }
 
 fn apply_chart_operation(
-    bytes: Arc<Vec<u8>>,
+    package: &OwnedPackage,
     limits: crate::charts::Limits,
     operation: &ChartOperation,
 ) -> Result<Vec<u8>> {
-    let snapshot = crate::charts::Snapshot::from_shared_bytes(bytes, limits)?;
+    let snapshot = crate::charts::Snapshot::from_owned_package(package.clone(), limits)?;
     let mut edit = snapshot.edit();
     match operation {
         ChartOperation::Replace { selector, part } => {
@@ -3438,8 +3493,8 @@ fn root_charts_equal(left: &[crate::charts::Chart], right: &[crate::charts::Char
         })
 }
 
-fn apply_design_operation(bytes: Arc<Vec<u8>>, operation: &DesignOperation) -> Result<Vec<u8>> {
-    let mut presentation = Presentation::from_shared_bytes(bytes)?;
+fn apply_design_operation(package: &OwnedPackage, operation: &DesignOperation) -> Result<Vec<u8>> {
+    let mut presentation = Presentation::from_owned_package(package.clone())?;
     match operation {
         DesignOperation::AddLayout(layout) => presentation.add_layout(layout)?,
         DesignOperation::ReplaceLayout(layout) => presentation.replace_page_layout(layout)?,
@@ -3486,10 +3541,10 @@ fn root_design_pages_equal(
 }
 
 fn apply_annotation_operation(
-    bytes: Arc<Vec<u8>>,
+    package: &OwnedPackage,
     operation: &AnnotationOperation,
 ) -> Result<Vec<u8>> {
-    let mut presentation = Presentation::from_shared_bytes(bytes)?;
+    let mut presentation = Presentation::from_owned_package(package.clone())?;
     match operation {
         AnnotationOperation::Add { anchor, annotation } => {
             let _index = presentation.add_annotation(anchor, annotation)?;
@@ -3768,6 +3823,13 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(invalid_error(message))
 }
 
+fn validate_package_size(length: usize) -> Result<()> {
+    if length > MAX_PACKAGE_BYTES {
+        return invalid("ODP editing package exceeds the 128 MiB limit");
+    }
+    Ok(())
+}
+
 fn invalid_error(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
@@ -3778,7 +3840,9 @@ fn unsupported<T>(message: impl Into<String>) -> Result<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{bounded_candidate, projected_size, read_bounded};
+    use super::{
+        MAX_PACKAGE_BYTES, bounded_candidate, projected_size, read_bounded, validate_package_size,
+    };
     use litchi_core::Result;
 
     #[test]
@@ -3797,6 +3861,13 @@ mod tests {
         assert!(bounded_candidate(3, 0, 2, 4).is_err());
         assert_eq!(projected_size(3, 2, 2, 1, 4)?, 4);
         assert!(projected_size(3, 2, 2, 2, 4).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn owned_package_size_gate_accepts_n_and_rejects_n_plus_one() -> Result<()> {
+        validate_package_size(MAX_PACKAGE_BYTES)?;
+        assert!(validate_package_size(MAX_PACKAGE_BYTES + 1).is_err());
         Ok(())
     }
 }
