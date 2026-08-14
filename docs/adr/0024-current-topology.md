@@ -676,7 +676,7 @@ model and budget owner.
 `extract_structured_data`, and it no longer depends on
 `litchi-iwa-structured`. The host adapter, its tests, and support-only Numbers
 hooks are gone. Debt identity 011 is retired without renumbering later
-identities. The current checked topology is 64 workspace packages, 227
+identities. The current checked topology is 64 workspace packages, 238
 internal dependency declarations, and 14 ordered migration debts.
 
 The host is still required for the remaining compatibility and edit surfaces.

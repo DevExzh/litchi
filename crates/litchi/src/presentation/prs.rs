@@ -133,6 +133,7 @@ mod ooxml_odf_polyglot_tests {
         output.into_inner()
     }
 
+    #[cfg(not(feature = "docx"))]
     fn dual_marker_docx() -> Vec<u8> {
         let mut output = Cursor::new(Vec::new());
         let mut writer = zip::ZipWriter::new(&mut output);
