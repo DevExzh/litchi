@@ -400,6 +400,46 @@ pub(crate) fn metadata_after_dependency_free_page_copy(
     Collection::new(pages)
 }
 
+/// Materialize destination page metadata for a dependency-free page imported
+/// from another presentation.
+///
+/// The imported page has no layout, master, identifier, navigation, or link
+/// metadata. Existing destination metadata is retained verbatim and the new
+/// page receives only its deterministic local name.
+pub(crate) fn metadata_after_foreign_dependency_free_page_copy(
+    metadata: Option<&Collection>,
+    slide_count: usize,
+    new_name: String,
+) -> Result<Collection> {
+    let new_count = slide_count
+        .checked_add(1)
+        .ok_or_else(|| invalid("presentation page count overflow"))?;
+    if new_count > MAX_PAGES {
+        return Err(invalid("presentation exceeds 65536 pages"));
+    }
+    let names = effective_page_names(metadata, slide_count)?;
+    let mut pages = Vec::new();
+    pages
+        .try_reserve_exact(new_count)
+        .map_err(|source| Error::Allocation {
+            resource: "ODP foreign copied page metadata",
+            source,
+        })?;
+    for (index, name) in names.into_iter().enumerate() {
+        let mut page = metadata
+            .and_then(|value| value.page(index))
+            .cloned()
+            .unwrap_or_else(|| Page::new(index));
+        page.slide_index = index;
+        page.name.get_or_insert(name);
+        pages.push(page);
+    }
+    let mut copied = Page::new(slide_count);
+    copied.name = Some(new_name);
+    pages.push(copied);
+    Collection::new(pages)
+}
+
 fn fallback_page_name(slide_index: usize) -> Result<String> {
     let ordinal = slide_index
         .checked_add(1)
