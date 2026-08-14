@@ -45,6 +45,9 @@ pub mod smart_tag;
 pub mod smartart;
 pub mod source_backed;
 pub mod statistics;
+/// Source-backed package-wide inventory and forward-only redaction of
+/// relationship-owned story hyperlinks.
+pub mod story_hyperlinks;
 pub mod styles;
 pub mod table;
 pub mod template;

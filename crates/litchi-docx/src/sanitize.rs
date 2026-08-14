@@ -477,6 +477,29 @@ fn scan(
     relationships: &[RelationshipState],
     limits: Limits,
 ) -> Result<(Vec<Wrapper>, EffectReport)> {
+    scan_with_root(xml, relationships, limits, b"document")
+}
+
+/// Scan one relationship-owned WordprocessingML story for removable external
+/// hyperlink wrappers.  The source-backed package sanitizer uses the same
+/// byte-range scanner as the main-document detachment API, but supplies the
+/// story root (`hdr`, `ftr`, `footnotes`, `endnotes`, `comments`, or
+/// `glossaryDocument`).
+pub(crate) fn scan_story_wrappers(
+    xml: &[u8],
+    relationships: &[RelationshipState],
+    limits: Limits,
+    expected_root: &[u8],
+) -> Result<(Vec<Wrapper>, EffectReport)> {
+    scan_with_root(xml, relationships, limits, expected_root)
+}
+
+fn scan_with_root(
+    xml: &[u8],
+    relationships: &[RelationshipState],
+    limits: Limits,
+    expected_root: &[u8],
+) -> Result<(Vec<Wrapper>, EffectReport)> {
     if xml.len() > limits.max_document_bytes {
         return Err(limit(
             "main-document XML bytes",
@@ -515,7 +538,7 @@ fn scan(
                 if depth > limits.max_depth {
                     return Err(limit("main-document XML depth", limits.max_depth, depth));
                 }
-                validate_root(&namespace, &element, depth, &mut roots)?;
+                validate_root(&namespace, &element, depth, &mut roots, expected_root)?;
                 if is_hyperlink(&namespace, element.local_name().as_ref()) {
                     if active.is_some() {
                         return Err(invalid("nested WordprocessingML hyperlinks are ambiguous"));
@@ -544,7 +567,7 @@ fn scan(
                         child_depth,
                     ));
                 }
-                validate_root(&namespace, &element, child_depth, &mut roots)?;
+                validate_root(&namespace, &element, child_depth, &mut roots, expected_root)?;
                 if is_hyperlink(&namespace, element.local_name().as_ref()) {
                     if active.is_some() {
                         return Err(invalid("nested WordprocessingML hyperlinks are ambiguous"));
@@ -617,9 +640,11 @@ fn scan(
         return Err(invalid("main-document XML has an unterminated element"));
     }
     if roots != 1 {
-        return Err(invalid(
-            "main-document XML must contain exactly one w:document root",
-        ));
+        return Err(invalid(if expected_root == b"document" {
+            "main-document XML must contain exactly one w:document root"
+        } else {
+            "WordprocessingML story XML must contain exactly one root"
+        }));
     }
     wrappers.sort_unstable_by_key(|wrapper| wrapper.open.start);
     for pair in wrappers.windows(2) {
@@ -660,6 +685,7 @@ fn validate_root(
     element: &BytesStart<'_>,
     depth: usize,
     roots: &mut usize,
+    expected_root: &[u8],
 ) -> Result<()> {
     if depth != 1 {
         return Ok(());
@@ -667,10 +693,12 @@ fn validate_root(
     *roots = roots
         .checked_add(1)
         .ok_or_else(|| invalid("main-document root counter overflows usize"))?;
-    if !is_wordprocessing_namespace(namespace) || element.local_name().as_ref() != b"document" {
-        return Err(invalid(
-            "external hyperlink-wrapper detachment source root is not w:document",
-        ));
+    if !is_wordprocessing_namespace(namespace) || element.local_name().as_ref() != expected_root {
+        return Err(invalid(if expected_root == b"document" {
+            "external hyperlink-wrapper detachment source root is not w:document"
+        } else {
+            "external hyperlink-wrapper detachment source root is not a supported WordprocessingML story"
+        }));
     }
     Ok(())
 }

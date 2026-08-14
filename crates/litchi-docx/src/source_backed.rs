@@ -683,6 +683,76 @@ impl Package {
         Ok(report)
     }
 
+    /// Capture the package-wide, relationship-owned story hyperlink closure.
+    ///
+    /// The inventory covers the main, header, footer, footnote, endnote,
+    /// comments, and glossary stories. It does not alter the established
+    /// main-only sanitization or redaction APIs above.
+    pub fn story_hyperlinks_only_snapshot(&self) -> Result<crate::story_hyperlinks::Snapshot> {
+        self.story_hyperlinks_only_snapshot_with_limits(crate::story_hyperlinks::Limits::default())
+    }
+
+    /// Capture the story hyperlink closure under an explicit bounded policy.
+    pub fn story_hyperlinks_only_snapshot_with_limits(
+        &self,
+        limits: crate::story_hyperlinks::Limits,
+    ) -> Result<crate::story_hyperlinks::Snapshot> {
+        self.package.check_execution()?;
+        crate::story_hyperlinks::capture_source(&self.package, limits)
+    }
+
+    /// Plan exact target URL removal across all relationship-owned stories.
+    ///
+    /// Strict mode rejects unsupported external-reference classes before any
+    /// publication. Best-effort mode retains explicit diagnostics and still
+    /// fails closed for this tranche's security-sensitive classes.
+    pub fn plan_story_hyperlink_redaction(
+        &self,
+        target_urls: &[&str],
+        mode: crate::story_hyperlinks::Mode,
+    ) -> Result<crate::story_hyperlinks::Plan> {
+        self.plan_story_hyperlink_redaction_with_limits(
+            target_urls,
+            mode,
+            crate::story_hyperlinks::Limits::default(),
+        )
+    }
+
+    /// Plan story hyperlink removal with explicit semantic bounds.
+    pub fn plan_story_hyperlink_redaction_with_limits(
+        &self,
+        target_urls: &[&str],
+        mode: crate::story_hyperlinks::Mode,
+        limits: crate::story_hyperlinks::Limits,
+    ) -> Result<crate::story_hyperlinks::Plan> {
+        self.story_hyperlinks_only_snapshot_with_limits(limits)?
+            .plan_target_urls_with_mode(target_urls, mode)
+    }
+
+    /// Publish a sealed forward-only story hyperlink redaction.
+    ///
+    /// Selected story XML and `.rels` members are regenerated as one bounded
+    /// preservation plan. Every untouched ZIP member is raw-copied. Exact
+    /// no-ops copy the source byte-for-byte; changed signed/protected or stale
+    /// sources are refused before output begins.
+    pub fn publish_story_hyperlink_redaction_to_stream<W: Write>(
+        self,
+        writer: W,
+        commit: &crate::story_hyperlinks::Commit,
+    ) -> Result<crate::story_hyperlinks::Report> {
+        let current = self.story_hyperlinks_only_snapshot_with_limits(commit.patch().limits())?;
+        commit.patch().validate_source(&current)?;
+        let report = commit.report().clone();
+        if report.effect().is_noop() {
+            self.package.source_artifact().write_to_stream(writer)?;
+            return Ok(report);
+        }
+        let parts = crate::story_hyperlinks::publication_parts(commit)?;
+        self.package
+            .write_part_overlays_with_external_relationship_removals_to_stream(writer, parts)?;
+        Ok(report)
+    }
+
     fn main_document_snapshot(
         &self,
         operation: &'static str,
