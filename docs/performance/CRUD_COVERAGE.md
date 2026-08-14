@@ -134,7 +134,14 @@ conversion for other formats remain.
    0075. Plain ODT paragraph move, ODS worksheet move/dependency-free copy, and
    ODP dependency-free blank-slide copy/removal are correctness-only; new style
    creation, general dependency closure, extension preservation and broader
-   structural operations remain.
+   structural operations remain. [Change 0104](changes/0104-odt-mixed-model-publication-evidence.md)
+   now adds matched medium/large
+   mixed model-content ODT publication evidence: 80/320 logical operations
+   preserve per-shape output and logical hashes while the measured publication
+   count falls from 49/193 scalar publications to one. Its timing excludes
+   preparation, reopen/lifecycle/security/limits, I/O, serialization,
+   allocation/RSS, and physical cold behavior, so it does not close the wider
+   ODF CRUD or resource-evidence gaps.
    iWork is deliberately deferred while the `iwa-*` crates change separately.
 
 The former first item is complete for existing-document ODT transaction

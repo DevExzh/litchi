@@ -555,6 +555,17 @@ incomplete program and CRUD matrix.
   906.439 to 15.615 ms (-98.28%, 58.05x), allocation calls fall 96.13%, and
   scalar one-edit guards remain neutral. See
   [`0045`](changes/0045-odt-coalesced-paragraph-publication.md).
+- A matched release ABBA now covers the mixed model-content ODT workload as
+  well. On the medium 80-operation shape, scalar A/B p50 values of 25.640 ms
+  and 25.052 ms compare with batch values of 0.803 ms and 0.785 ms
+  (31.9435x/31.9334x; 96.8695%/96.8685% reduction). On the large
+  320-operation shape, scalar A/B p50 values of 2.759 s and 2.756 s compare
+  with 21.276 ms and 20.998 ms (129.6876x/131.2449x;
+  99.2289%/99.2381% reduction). This is only repeated-publication versus
+  one-transaction evidence: source preparation, reopen/lifecycle/security/
+  limits, I/O, serialization, allocation/RSS, and physical cold behavior are
+  outside the timed claim. See
+  [`0104`](changes/0104-odt-mixed-model-publication-evidence.md).
 - Public ODT middle-paragraph lookup now validates the complete XML while
   retaining only the requested paragraph. Large-corpus p50 falls from 3.202 to
   1.647 ms (-48.56%), allocation calls fall 27.05%, peak heap falls 24.74%,
