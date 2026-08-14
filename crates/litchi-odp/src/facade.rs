@@ -67,4 +67,4 @@ pub mod slide {
 
 pub use crate::authoring::Builder;
 pub use crate::authoring::flat::FlatPresentation;
-pub use crate::package::{MasterPage, Presentation};
+pub use crate::package::{MasterPage, Presentation, SourceBackedPresentation};

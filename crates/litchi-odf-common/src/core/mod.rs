@@ -86,7 +86,7 @@ pub use metadata::{
     UserDefinedMetadata, UserDefinedValueType,
 };
 pub use metadata::{MetaXmlPatch, patch_meta_xml};
-pub use package::OwnedPackage;
+pub use package::{OwnedPackage, SourceBackedPackage, SourcePackageLimits};
 pub use writer::{PackageWriter, Structure};
 pub use xml::{Content, Meta, Styles};
 pub use xml_splice::{

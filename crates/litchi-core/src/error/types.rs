@@ -79,6 +79,15 @@ pub enum Error {
     #[error(transparent)]
     ResourceLimit(#[from] crate::ResourceLimit),
 
+    /// A positional source changed after a caller captured its identity.
+    #[error("positional source changed (expected {expected:?}, observed {observed:?})")]
+    SourceChanged {
+        /// Source identity and revision captured before the operation.
+        expected: crate::SourceVersion,
+        /// Source identity and revision observed during or after the operation.
+        observed: crate::SourceVersion,
+    },
+
     /// Generic error
     #[error("{0}")]
     Other(String),

@@ -70,13 +70,18 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 use an uninstrumented `litchi_core::OwnedSource`; independent untimed
 `InstrumentedSource` replays provide the source-read counters. The current
-`Case` matrix exposes 229 selectable case names in total. Eight additional
+`Case` matrix exposes 233 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
 default 36 cases / 198 records. Two repeated native-PPT selected-shape query
 selectors (`ppt_semantic_repeated_shape_text` and
 `ppt_source_backed_repeated_shape_text`) are also opt-in and use matched
 eight-query eager/source-backed controls;
+four matched ODP media-rich read selectors (`odp_media_eager_open`,
+`odp_media_source_backed_open`, `odp_media_eager_one_slide`, and
+`odp_media_source_backed_one_slide`) are also opt-in. The four ODP selectors
+bring the selectable matrix to 233 names while leaving the default 36 cases /
+198 records unchanged;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 
@@ -1179,6 +1184,30 @@ cases add selectable evidence only: no latency, allocation, memory, or
 materialization improvement is claimed without a frozen CPU-pinned balanced
 ABBA capture.
 
+`odp_media_eager_open` and `odp_media_source_backed_open` are matched
+media-rich read controls over the same 12-slide/eight-2 MiB `Pictures/` corpus;
+`odp_media_eager_one_slide` and `odp_media_source_backed_one_slide` keep the
+same prepared owner and query the deterministic middle slide. Eager timing
+uses an owned byte buffer and source timing uses an uninstrumented
+`litchi_core::OwnedSource`; cloning/owner preparation and complete semantic
+parity are outside the query-only interval. Every source sample has an
+independent untimed `InstrumentedSource` replay recording exact calls, bytes,
+coalesced prior-range overlap, and overlap with all compressed `Pictures/*`
+ranges. The JSON names this aggregate `pictures_read_compressed_range_bytes`;
+it is not the prior-read overlap counter (`source_read_range_overlap_bytes`).
+The open replay may include a bounded ZIP-tail request that physically touches
+the last Pictures range; that is recorded as compressed-range overlap, not
+called a media materialization. One additional untimed replay reads exactly the
+selected media member and gates its compressed-range overlap against the
+selected member (and its non-Pictures bytes) before reporting the sample. The
+summary distinguishes `pictures_compressed_range_bytes` (aggregate compressed
+ZIP ranges) from `pictures_uncompressed_payload_bytes` and its uncompressed
+payload digest; selected-media fields likewise distinguish compressed-range
+bytes from uncompressed payload bytes/digest. The eager records retain the
+same semantic/media digests but intentionally have no source vectors. These
+selectors provide correctness/logical-read evidence only; they make no
+latency, physical-I/O, decompression, allocation, RSS, or release ABBA claim.
+
 Each ODP batch uses `Builder`, `Presentation::from_bytes`, `slides()`,
 `Presentation::text`, source snapshots, and public presentation transactions.
 Opened source slides are preservation-only under the public rewrite contract,
@@ -1639,6 +1668,20 @@ list replay classification requires every slide range. Eager PPTX samples set
 the replay object to null and mark the generic counter scope
 `not_applicable_eager_pptx`; their zero generic fields must not be interpreted
 as source-read measurements.
+
+ODP media-rich selectors additionally record `source.odp_media`: the exact
+phase/timing scope, selected middle slide and media member, canonical full
+semantic digest, uncompressed media payload digest, total source calls/bytes
+and prior-range overlap, compressed `Pictures/*` overlap, and independent
+selected-media calls/bytes/prior-range-overlap vectors. The
+`pictures_compressed_range_bytes` and `selected_media_compressed_range_bytes`
+fields are compressed ZIP ranges; the corresponding `*_uncompressed_*` fields
+are payload bytes or digests. The selected-media replay proves one full
+Pictures range and reports bytes outside Pictures separately; its prior-read
+and compressed-range overlap vectors are named
+`selected_media_read_prior_range_overlap_bytes` and
+`selected_media_read_compressed_range_overlap_bytes`. Source open and
+one-slide query vectors remain separate from that explicit media-read replay.
 
 Positional XLSX records additionally contain `source.xlsx` arrays for physical
 overlap with the workbook, selected worksheet, all unselected worksheets,
