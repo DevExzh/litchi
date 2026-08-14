@@ -73,6 +73,7 @@ impl From<usize> for Selector<'_> {
 #[derive(Clone)]
 pub struct Snapshot {
     source: Arc<Vec<u8>>,
+    package: Arc<Package>,
     sheets: Arc<[Sheet]>,
 }
 
@@ -96,15 +97,26 @@ impl Snapshot {
         Self::from_arc(Arc::new(source))
     }
 
-    pub(crate) fn from_shared_bytes(source: Arc<Vec<u8>>) -> Result<Self> {
-        Self::from_arc(source)
-    }
-
     fn from_arc(source: Arc<Vec<u8>>) -> Result<Self> {
         let package = Package::from_shared_bytes(Arc::clone(&source))?;
+        Self::from_package(package)
+    }
+
+    /// Adopt a package that has already passed the ODS package boundary.
+    ///
+    /// Worksheet graph parsing and validation remain mandatory; only the
+    /// immutable ZIP/archive ownership is reused.
+    pub(crate) fn from_package(package: Package) -> Result<Self> {
+        Self::from_shared_package(Arc::new(package))
+    }
+
+    pub(crate) fn from_shared_package(package: Arc<Package>) -> Result<Self> {
+        let source = package.shared_bytes_owner();
+        let sheets = Arc::from(package.sheets()?);
         Ok(Self {
             source,
-            sheets: Arc::from(package.sheets()?),
+            package,
+            sheets,
         })
     }
 
@@ -116,6 +128,11 @@ impl Snapshot {
     #[must_use]
     pub fn sheets(&self) -> &[Sheet] {
         &self.sheets
+    }
+
+    #[cfg(test)]
+    pub(crate) fn prepared_index_identity(&self) -> usize {
+        self.package.prepared_index_identity()
     }
 
     /// Select one sheet.
@@ -382,7 +399,7 @@ impl Edit {
         if self.draft.as_slice() == self.before.sheets() {
             return Ok(Commit::unchanged(self.before));
         }
-        let package = Package::from_shared_bytes(Arc::clone(&self.before.source))?;
+        let package = Arc::clone(&self.before.package);
         let row_local = super::package::try_replace_changed_rows_spliced(
             package.package(),
             self.before.sheets(),
@@ -404,7 +421,7 @@ impl Edit {
             },
         };
         litchi_odf_common::compact_xml::validate(content.as_bytes()).map_err(Error::from)?;
-        let target = Snapshot::from_bytes(target_package.into_bytes())?;
+        let target = Snapshot::from_package(target_package)?;
         if target.sheets() != self.draft {
             return Err(Error::InvalidFormat(
                 "ODS worksheet typed readback does not match the staged edit".to_string(),
@@ -546,6 +563,10 @@ impl Snapshot {
     pub(crate) fn into_shared_bytes(self) -> Arc<Vec<u8>> {
         self.source
     }
+
+    pub(crate) fn package_owner(&self) -> Arc<Package> {
+        Arc::clone(&self.package)
+    }
 }
 
 fn select(sheets: &[Sheet], selector: Selector<'_>) -> Result<Option<usize>> {
@@ -685,6 +706,10 @@ mod tests {
         assert_eq!(snapshot.source.as_slice().as_ptr(), source_pointer);
         let package = Package::from_shared_bytes(Arc::clone(&snapshot.source))?;
         assert!(Arc::ptr_eq(&snapshot.source, &package.shared_bytes()));
+
+        let package_identity = package.prepared_index_identity();
+        let adopted = Snapshot::from_package(package)?;
+        assert_eq!(adopted.package.prepared_index_identity(), package_identity);
 
         let mut edit = snapshot.edit();
         assert!(

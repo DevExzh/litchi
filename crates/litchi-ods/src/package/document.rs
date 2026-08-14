@@ -6,8 +6,8 @@ use litchi_odf_common::core::{
 use litchi_odf_common::package::{
     replace_content_xml as replace_package_content_xml, replace_content_xml_spliced,
 };
-use std::path::Path;
 use std::sync::Arc;
+use std::{fmt, path::Path};
 
 use crate::model::names::Definition;
 
@@ -15,7 +15,28 @@ const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
 const BODY_MARKER: &str = "<office:spreadsheet";
 
 /// Validated ownership boundary for an ODS package.
-pub struct Package(family::Package);
+///
+/// The family package is immutable after construction.  Keeping one private
+/// shared handle here lets nested ODS transaction owners pass a validated
+/// archive/index handoff without reparsing the ZIP central directory.  The
+/// wrapper remains crate-private in ordinary signatures; callers still see
+/// semantic snapshots and byte slices.
+pub struct Package {
+    inner: Arc<family::Package>,
+}
+
+impl fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("bytes", &self.inner.as_bytes().len())
+            .field(
+                "prepared_index",
+                &self.inner.package().prepared_index_identity(),
+            )
+            .finish()
+    }
+}
 
 impl Package {
     ///
@@ -24,7 +45,9 @@ impl Package {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let package = family::Package::open(path, MIMETYPE, BODY_MARKER, "ODS")?;
         crate::authoring::validate_content_xml(package.content_xml())?;
-        Ok(Self(package))
+        Ok(Self {
+            inner: Arc::new(package),
+        })
     }
 
     /// Open a password-encrypted ODS package and validate its decrypted semantic owners.
@@ -43,7 +66,9 @@ impl Package {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let package = family::Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS")?;
         crate::authoring::validate_content_xml(package.content_xml())?;
-        Ok(Self(package))
+        Ok(Self {
+            inner: Arc::new(package),
+        })
     }
 
     /// Adopt the indexed package retained by smart ODF detection.
@@ -64,7 +89,9 @@ impl Package {
             "ODS",
         )?;
         crate::authoring::validate_content_xml(package.content_xml())?;
-        Ok(Self(package))
+        Ok(Self {
+            inner: Arc::new(package),
+        })
     }
 
     /// Alias for [`Self::from_prepared_package`].
@@ -77,7 +104,9 @@ impl Package {
     pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
         let package = family::Package::from_shared_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS")?;
         crate::authoring::validate_content_xml(package.content_xml())?;
-        Ok(Self(package))
+        Ok(Self {
+            inner: Arc::new(package),
+        })
     }
 
     /// Decode a password-encrypted ODS package and validate its decrypted semantic owners.
@@ -95,29 +124,48 @@ impl Package {
             "ODS",
         )?;
         crate::authoring::validate_content_xml(package.content_xml())?;
-        Ok(Self(package))
+        Ok(Self {
+            inner: Arc::new(package),
+        })
+    }
+
+    /// Return a cloneable package owner that never retains a decryption
+    /// credential.  The common owned archive clone shares both its bytes and
+    /// prepared ZIP index; family XML projections are validated without
+    /// reparsing the archive.
+    pub(crate) fn clone_without_password(&self) -> Result<Self> {
+        let package = family::Package::from_owned_package(
+            self.inner.package().clone_without_password(),
+            MIMETYPE,
+            BODY_MARKER,
+            "ODS",
+        )?;
+        crate::authoring::validate_content_xml(package.content_xml())?;
+        Ok(Self {
+            inner: Arc::new(package),
+        })
     }
 
     #[must_use]
     pub fn content_xml(&self) -> &str {
-        self.0.content_xml()
+        self.inner.content_xml()
     }
 
     #[must_use]
     pub fn styles_xml(&self) -> Option<&str> {
-        self.0.styles_xml()
+        self.inner.styles_xml()
     }
 
     #[must_use]
     pub fn package(&self) -> &OwnedPackage {
-        self.0.package()
+        self.inner.package()
     }
 
     /// Return the identity of the archive index retained by smart detection.
     #[doc(hidden)]
     #[must_use]
     pub fn prepared_index_identity(&self) -> usize {
-        self.0.package().prepared_index_identity()
+        self.inner.package().prepared_index_identity()
     }
 
     /// Decode the complete ODS metadata snapshot, retaining the bounded
@@ -156,7 +204,12 @@ impl Package {
 
     #[cfg(test)]
     pub(crate) fn shared_bytes(&self) -> Arc<Vec<u8>> {
-        self.0.shared_bytes()
+        self.inner.shared_bytes()
+    }
+
+    /// Clone the exact immutable archive byte owner retained by this package.
+    pub(crate) fn shared_bytes_owner(&self) -> Arc<Vec<u8>> {
+        self.inner.shared_bytes()
     }
 
     /// Rebuild this package with a replacement `content.xml`.
@@ -214,7 +267,7 @@ impl Package {
         }
         let commit = transaction.commit()?;
         if !commit.changed() {
-            return Self::from_bytes(self.0.as_bytes().to_vec());
+            return Self::from_bytes(self.inner.as_bytes().to_vec());
         }
         let content_xml = commit.into_owned();
         let bytes = self.rebuild(&content_xml, Part::Preserve, Part::Preserve)?;
@@ -252,7 +305,10 @@ impl Package {
 
     #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
-        self.0.into_bytes()
+        match Arc::try_unwrap(self.inner) {
+            Ok(package) => package.into_bytes(),
+            Err(package) => package.as_bytes().to_vec(),
+        }
     }
 }
 

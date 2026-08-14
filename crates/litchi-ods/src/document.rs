@@ -154,7 +154,11 @@ impl Default for Limits {
 /// An immutable ODS package snapshot with exact source lineage.
 #[derive(Clone)]
 pub struct Snapshot {
-    source: Arc<[u8]>,
+    source: Arc<Vec<u8>>,
+    // The package/index is immutable and internally Arc-backed.  Retain the
+    // validated owner next to the exact source bytes so reads, edits, and
+    // publication handoffs do not rebuild the ZIP index for every operation.
+    package: Arc<Package>,
     limits: Limits,
 }
 
@@ -184,22 +188,73 @@ impl Snapshot {
     ///
     /// Returns an error when the package exceeds a bound or fails complete facade readback.
     pub fn from_bytes_with(source: Vec<u8>, limits: Limits) -> Result<Self> {
-        Self::from_arc(Arc::from(source), limits)
+        Self::from_arc(Arc::new(source), limits)
     }
 
-    fn from_arc(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
+    fn from_arc(source: Arc<Vec<u8>>, limits: Limits) -> Result<Self> {
         validate_package_size(source.len(), limits)?;
-        let bytes = source.as_ref().to_vec();
-        let package = Package::from_bytes(bytes)?;
+        let package = Package::from_shared_bytes(Arc::clone(&source))?;
         validate_resource_count(&package, limits)?;
-        let _facade = crate::Spreadsheet::from_package(package)?;
-        Ok(Self { source, limits })
+        if package
+            .package()
+            .package()?
+            .manifest()
+            .has_encrypted_entries()
+        {
+            return invalid(
+                "ODS encrypted sources require an explicit credential-retaining transaction",
+            );
+        }
+        let package = Arc::new(package);
+        let _facade = crate::Spreadsheet::from_shared_package(Arc::clone(&package))?;
+        Ok(Self {
+            source,
+            package,
+            limits,
+        })
+    }
+
+    /// Adopt an already credential-free immutable package owner.
+    pub(crate) fn from_shared_package(package: Arc<Package>, limits: Limits) -> Result<Self> {
+        let source = package.shared_bytes_owner();
+        validate_package_size(source.len(), limits)?;
+        validate_resource_count(package.as_ref(), limits)?;
+        // A password-bearing facade package must not be captured by this
+        // cloneable, credential-free snapshot.  The previous byte-ingress
+        // handoff rejected encrypted sources here as well; retain that
+        // security/fallback boundary instead of silently retaining or
+        // cloning credentials.
+        if package
+            .package()
+            .package()?
+            .manifest()
+            .has_encrypted_entries()
+        {
+            return invalid(
+                "ODS encrypted sources require an explicit credential-retaining transaction",
+            );
+        }
+        let _facade = crate::Spreadsheet::from_shared_package(Arc::clone(&package))?;
+        Ok(Self {
+            source,
+            package,
+            limits,
+        })
     }
 
     /// Borrow the exact package bytes.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.source
+    }
+
+    /// Return the identity of the immutable archive index retained by this
+    /// snapshot.  This is diagnostic-only and is not a physical package ID in
+    /// ordinary CRUD APIs.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn prepared_index_identity(&self) -> usize {
+        self.package.prepared_index_identity()
     }
 
     /// Bounds retained by this snapshot.
@@ -222,7 +277,7 @@ impl Snapshot {
     /// resource exceeds the retained transfer bound.
     pub fn resource(&self, path: &str) -> Result<Option<Resource>> {
         validate_resource_path(path)?;
-        let package = Package::from_bytes(self.source.as_ref().to_vec())?;
+        let package = Arc::clone(&self.package);
         if !package.package().has_file(path)? {
             return Ok(None);
         }
@@ -248,7 +303,7 @@ impl Snapshot {
     ///
     /// Returns an error when package security metadata is malformed.
     pub fn security_capabilities(&self) -> Result<SecurityCapabilities> {
-        let package = Package::from_bytes(self.source.as_ref().to_vec())?;
+        let package = Arc::clone(&self.package);
         let reader = package.package().package()?;
         let signed =
             reader.has_file(DOCUMENT_SIGNATURE_PATH) || reader.has_file(MACRO_SIGNATURE_PATH);
@@ -302,7 +357,7 @@ impl Snapshot {
         &self,
         signatures: SignatureWritePolicy,
     ) -> Result<EncryptionWriteCapability> {
-        let package = Package::from_bytes(self.source.as_ref().to_vec())?;
+        let package = Arc::clone(&self.package);
         let reader = package.package().package()?;
         if reader.manifest().has_encrypted_entries() {
             return Ok(EncryptionWriteCapability::Refused(
@@ -366,7 +421,7 @@ impl Snapshot {
                 );
             },
         }
-        let package = Package::from_bytes(self.source.as_ref().to_vec())?;
+        let package = Arc::clone(&self.package);
         let mut writer = PackageWriter::new_bounded(self.limits.package_bytes);
         writer.set_mimetype(&package.package().mimetype()?)?;
         writer.set_encryption(password.to_string(), profile.shared())?;
@@ -385,7 +440,8 @@ impl Snapshot {
     pub fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
-            candidate: self.source.as_ref().to_vec(),
+            candidate: Arc::clone(&self.source),
+            package: Arc::clone(&self.package),
             steps: Vec::new(),
             spliced_parts: BTreeSet::new(),
         }
@@ -572,7 +628,8 @@ struct Step {
 #[derive(Clone, Debug)]
 pub struct Edit {
     before: Snapshot,
-    candidate: Vec<u8>,
+    candidate: Arc<Vec<u8>>,
+    package: Arc<Package>,
     steps: Vec<Step>,
     spliced_parts: BTreeSet<String>,
 }
@@ -581,7 +638,7 @@ impl Edit {
     /// Borrow the exact current package candidate.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
-        &self.candidate
+        self.candidate.as_slice()
     }
 
     /// Stage worksheet structure, cell value, formula, and direct-style changes.
@@ -593,9 +650,14 @@ impl Edit {
     where
         F: FnOnce(&mut crate::worksheet::Edit) -> Result<()>,
     {
-        let source = Arc::new(std::mem::take(&mut self.candidate));
-        let outcome: Result<Option<(Arc<Vec<u8>>, bool)>> = (|| {
-            let snapshot = crate::worksheet::Snapshot::from_shared_bytes(Arc::clone(&source))?;
+        let outcome: Result<Option<(Arc<Package>, Arc<Vec<u8>>, bool)>> = (|| {
+            // The current candidate has already passed package validation at
+            // the previous staging boundary.  Hand the immutable package
+            // owner directly to the worksheet transaction; its semantic
+            // snapshot still parses and validates the complete worksheet
+            // graph, but does not rebuild the archive index.
+            let snapshot =
+                crate::worksheet::Snapshot::from_shared_package(Arc::clone(&self.package))?;
             let mut edit = snapshot.edit();
             update(&mut edit)?;
             let commit = edit.commit()?;
@@ -603,19 +665,22 @@ impl Edit {
                 return Ok(None);
             }
             let provenance_spliced = commit.content_provenance_spliced();
+            let target = commit.into_snapshot();
+            let package = target.package_owner();
             Ok(Some((
-                commit.into_snapshot().into_shared_bytes(),
+                package,
+                target.into_shared_bytes(),
                 provenance_spliced,
             )))
         })();
-        self.candidate = take_shared_bytes(source);
-        let Some((candidate, provenance_spliced)) = outcome? else {
+        let Some((package, candidate, provenance_spliced)) = outcome? else {
             return Ok(());
         };
         if provenance_spliced {
-            self.stage_spliced_shared("worksheet.edit", "worksheets", candidate)
+            self.stage_package("worksheet.edit", "worksheets", package, candidate, true)
+                .map(|_| ())
         } else {
-            self.stage_shared("worksheet.edit", "worksheets", candidate)
+            self.stage_package("worksheet.edit", "worksheets", package, candidate, false)
                 .map(|_| ())
         }
     }
@@ -629,7 +694,7 @@ impl Edit {
     where
         F: FnOnce(&mut crate::definitions::Edit) -> Result<()>,
     {
-        let snapshot = crate::definitions::Snapshot::from_bytes(self.candidate.clone())?;
+        let snapshot = crate::definitions::Snapshot::from_bytes(self.candidate.as_ref().clone())?;
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit()?;
@@ -650,7 +715,7 @@ impl Edit {
     where
         F: FnOnce(&mut crate::annotations::Transaction) -> Result<()>,
     {
-        let package = Package::from_bytes(self.candidate.clone())?;
+        let package = Arc::clone(&self.package);
         let snapshot = crate::annotations::Snapshot::parse(package.content_xml())?;
         let mut edit = snapshot.edit();
         update(&mut edit)?;
@@ -660,7 +725,7 @@ impl Edit {
                 .replace_content_xml(commit.content_xml())?
                 .into_bytes()
         } else {
-            self.candidate.clone()
+            self.candidate.as_ref().clone()
         };
         self.stage("annotation.edit", "annotations", bytes)
             .map(|_| ())
@@ -683,9 +748,9 @@ impl Edit {
             &mut crate::content_validation::Transaction<'_, '_>,
         ) -> crate::content_validation::Result<()>,
     {
-        let source = Arc::new(std::mem::take(&mut self.candidate));
-        let outcome: Result<Option<Vec<u8>>> = (|| {
-            let package = Package::from_shared_bytes(Arc::clone(&source))?;
+        let source = std::mem::replace(&mut self.candidate, Arc::new(Vec::new()));
+        let outcome: Result<Option<(Arc<Package>, Arc<Vec<u8>>)>> = (|| {
+            let package = Arc::clone(&self.package);
             let snapshot = crate::content_validation::Snapshot::parse(package.content_xml())
                 .map_err(content_validation_error)?;
             let mut edit = snapshot.edit().map_err(content_validation_error)?;
@@ -694,15 +759,22 @@ impl Edit {
             if !commit.changed() {
                 return Ok(None);
             }
-            crate::content_validation::publish_package_commit(&package, &commit)
-                .map(Package::into_bytes)
-                .map(Some)
+            let target = crate::content_validation::publish_package_commit(&package, &commit)?;
+            let bytes = target.shared_bytes_owner();
+            Ok(Some((Arc::new(target), bytes)))
         })();
-        self.candidate = take_shared_bytes(source);
-        let Some(candidate) = outcome? else {
+        self.candidate = source;
+        let Some((package, candidate)) = outcome? else {
             return Ok(());
         };
-        self.stage_spliced("content-validation.edit", "content-validations", candidate)
+        self.stage_package(
+            "content-validation.edit",
+            "content-validations",
+            package,
+            candidate,
+            true,
+        )
+        .map(|_| ())
     }
 
     /// Stage a reversible content-validation patch against its exact XML source.
@@ -715,24 +787,31 @@ impl Edit {
         &mut self,
         patch: &crate::content_validation::Patch,
     ) -> Result<()> {
-        let source = Arc::new(std::mem::take(&mut self.candidate));
-        let outcome: Result<Option<Vec<u8>>> = (|| {
-            let package = Package::from_shared_bytes(Arc::clone(&source))?;
+        let source = std::mem::replace(&mut self.candidate, Arc::new(Vec::new()));
+        let outcome: Result<Option<(Arc<Package>, Arc<Vec<u8>>)>> = (|| {
+            let package = Arc::clone(&self.package);
             let snapshot = crate::content_validation::Snapshot::parse(package.content_xml())
                 .map_err(content_validation_error)?;
             let commit = patch.apply(&snapshot).map_err(content_validation_error)?;
             if !commit.changed() {
                 return Ok(None);
             }
-            crate::content_validation::publish_package_commit(&package, &commit)
-                .map(Package::into_bytes)
-                .map(Some)
+            let target = crate::content_validation::publish_package_commit(&package, &commit)?;
+            let bytes = target.shared_bytes_owner();
+            Ok(Some((Arc::new(target), bytes)))
         })();
-        self.candidate = take_shared_bytes(source);
-        let Some(candidate) = outcome? else {
+        self.candidate = source;
+        let Some((package, candidate)) = outcome? else {
             return Ok(());
         };
-        self.stage_spliced("content-validation.patch", "content-validations", candidate)
+        self.stage_package(
+            "content-validation.patch",
+            "content-validations",
+            package,
+            candidate,
+            true,
+        )
+        .map(|_| ())
     }
 
     /// Stage inert RDF graph and triple CRUD.
@@ -744,7 +823,8 @@ impl Edit {
     where
         F: FnOnce(&mut crate::metadata_graphs::Edit) -> Result<()>,
     {
-        let snapshot = crate::metadata_graphs::Snapshot::from_bytes(self.candidate.clone())?;
+        let snapshot =
+            crate::metadata_graphs::Snapshot::from_bytes(self.candidate.as_ref().clone())?;
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit();
@@ -768,7 +848,7 @@ impl Edit {
     where
         F: FnOnce(&mut crate::protection::Transaction) -> Result<()>,
     {
-        let package = Package::from_bytes(self.candidate.clone())?;
+        let package = Arc::clone(&self.package);
         let snapshot =
             crate::protection::Snapshot::parse(package.content_xml(), package.styles_xml())?;
         let mut edit = snapshot.edit();
@@ -779,7 +859,7 @@ impl Edit {
                 .replace_content_xml(commit.content_xml())?
                 .into_bytes()
         } else {
-            self.candidate.clone()
+            self.candidate.as_ref().clone()
         };
         self.stage("protection.edit", "protection", bytes)
             .map(|_| ())
@@ -794,7 +874,7 @@ impl Edit {
     where
         F: FnOnce(&mut crate::data_pilot::Edit) -> Result<()>,
     {
-        let snapshot = crate::data_pilot::Snapshot::from_bytes(self.candidate.clone())?;
+        let snapshot = crate::data_pilot::Snapshot::from_bytes(self.candidate.as_ref().clone())?;
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit()?;
@@ -815,7 +895,7 @@ impl Edit {
     where
         F: FnOnce(&mut crate::tracked_changes::Transaction) -> Result<()>,
     {
-        let package = Package::from_bytes(self.candidate.clone())?;
+        let package = Arc::clone(&self.package);
         let snapshot = crate::tracked_changes::Snapshot::parse(package.content_xml())?;
         let mut edit = crate::tracked_changes::Transaction::new(snapshot)?;
         update(&mut edit)?;
@@ -825,7 +905,7 @@ impl Edit {
                 .replace_content_xml(commit.content_xml())?
                 .into_bytes()
         } else {
-            self.candidate.clone()
+            self.candidate.as_ref().clone()
         };
         self.stage("tracked-change.edit", "tracked-changes", bytes)
             .map(|_| ())
@@ -840,7 +920,7 @@ impl Edit {
     where
         F: FnOnce(&mut crate::charts::Edit) -> Result<()>,
     {
-        let snapshot = crate::charts::Snapshot::from_bytes(self.candidate.clone())?;
+        let snapshot = crate::charts::Snapshot::from_bytes(self.candidate.as_ref().clone())?;
         let before = snapshot.charts().to_vec();
         let mut edit = snapshot.edit();
         update(&mut edit)?;
@@ -1076,8 +1156,10 @@ impl Edit {
     /// unsupported dependency owner, source/output bound, or provenance splice
     /// failure. Every refusal leaves the edit unchanged.
     pub fn move_sheet(&mut self, sheet: &str, position: SheetPosition) -> Result<()> {
-        let package = Package::from_bytes(self.candidate.clone())?;
-        let count = crate::Spreadsheet::from_package(package)?.sheets().len();
+        let package = Arc::clone(&self.package);
+        let count = crate::Spreadsheet::from_shared_package(package)?
+            .sheets()
+            .len();
         if count == 0 {
             return invalid("ODS sheet move requires a non-empty workbook");
         }
@@ -1122,8 +1204,10 @@ impl Edit {
         destination_name: &str,
         position: SheetPosition,
     ) -> Result<()> {
-        let package = Package::from_bytes(self.candidate.clone())?;
-        let count = crate::Spreadsheet::from_package(package)?.sheets().len();
+        let package = Arc::clone(&self.package);
+        let count = crate::Spreadsheet::from_shared_package(package)?
+            .sheets()
+            .len();
         if count == 0 {
             return invalid("ODS sheet copy requires a non-empty workbook");
         }
@@ -1364,7 +1448,7 @@ impl Edit {
             .iter()
             .map(Resource::path)
             .collect::<BTreeSet<_>>();
-        let current = Package::from_bytes(candidate.candidate.clone())?;
+        let current = Arc::clone(&candidate.package);
         for control in controls {
             if let Some(path) = &control.image_path
                 && !supplied.contains(path.as_str())
@@ -1405,7 +1489,7 @@ impl Edit {
             .iter()
             .map(Resource::path)
             .collect::<BTreeSet<_>>();
-        let current = Package::from_bytes(candidate.candidate.clone())?;
+        let current = Arc::clone(&candidate.package);
         for control in controls {
             if let Some(path) = &control.image_path
                 && !supplied.contains(path.as_str())
@@ -1552,8 +1636,8 @@ impl Edit {
         let resource = Resource::new(&content_path, "text/xml", chart.content_xml.as_bytes())?;
         let mut candidate = self.clone();
         let disposition = candidate.put_resource(resource, collision)?;
-        let package = Package::from_bytes(candidate.candidate.clone())?;
-        candidate.candidate = rebuild_package(
+        let package = Arc::clone(&candidate.package);
+        candidate.candidate = Arc::new(rebuild_package(
             package.package(),
             package.content_xml(),
             Vec::new(),
@@ -1563,7 +1647,7 @@ impl Edit {
             )],
             Vec::<String>::new(),
             Vec::<String>::new(),
-        )?;
+        )?);
         let bytes = crate::advanced::put_chart_object(
             &candidate.candidate,
             sheet,
@@ -1571,7 +1655,8 @@ impl Edit {
             candidate.before.limits.package_bytes,
         )?;
         candidate.stage_spliced("chart-object.put", &chart.name, bytes)?;
-        let chart_snapshot = crate::charts::Snapshot::from_bytes(candidate.candidate.clone())?;
+        let chart_snapshot =
+            crate::charts::Snapshot::from_bytes(candidate.candidate.as_ref().clone())?;
         if chart_snapshot
             .charts()
             .iter()
@@ -1631,7 +1716,7 @@ impl Edit {
         let destination_content_path = format!("{destination_object_path}/content.xml");
         validate_resource_path(&source_content_path)?;
         validate_resource_path(&destination_content_path)?;
-        let source_package = Package::from_bytes(source.source.as_ref().to_vec())?;
+        let source_package = Arc::clone(&source.package);
         let content = source_package
             .package()
             .has_file(&source_content_path)?
@@ -1750,7 +1835,7 @@ impl Edit {
         collision: Collision,
     ) -> Result<TransferDisposition> {
         validate_resource_size(resource.bytes.len(), self.before.limits)?;
-        let package = Package::from_bytes(self.candidate.clone())?;
+        let package = Arc::clone(&self.package);
         let existing = package.package().has_file(&resource.path)?;
         if existing {
             let bytes = package.package().get_file(&resource.path)?;
@@ -1821,7 +1906,7 @@ impl Edit {
     /// rebuilding fails.
     pub fn remove_resource(&mut self, path: &str) -> Result<()> {
         validate_resource_path(path)?;
-        let package = Package::from_bytes(self.candidate.clone())?;
+        let package = Arc::clone(&self.package);
         if !package.package().has_file(path)? {
             return invalid(format!("ODS resource '{path}' was not found"));
         }
@@ -1832,7 +1917,8 @@ impl Edit {
 
     /// Restore the exact source candidate and discard every staged semantic operation.
     pub fn rollback(&mut self) {
-        self.candidate = self.before.source.as_ref().to_vec();
+        self.candidate = Arc::clone(&self.before.source);
+        self.package = Arc::clone(&self.before.package);
         self.steps.clear();
         self.spliced_parts.clear();
     }
@@ -1858,12 +1944,8 @@ impl Edit {
     /// or when bounds, compactness, readback, or durable patch construction fails.
     pub fn commit_with_security(self, policy: SecurityWritePolicy) -> Result<Commit> {
         if self.candidate.as_slice() == self.before.as_bytes() || self.steps.is_empty() {
-            let patch = Patch::build(
-                self.before.source.clone(),
-                self.before.source.clone(),
-                Vec::new(),
-                self.before.limits,
-            )?;
+            let source: Arc<[u8]> = Arc::from(self.before.source.as_slice());
+            let patch = Patch::build(Arc::clone(&source), source, Vec::new(), self.before.limits)?;
             return Ok(Commit {
                 snapshot: self.before,
                 patch,
@@ -1875,13 +1957,14 @@ impl Edit {
         enforce_security_policy(&self.before, policy)?;
         validate_package_size(self.candidate.len(), self.before.limits)?;
         validate_authored_parts(&self.before.source, &self.candidate, &self.spliced_parts)?;
-        let snapshot = Snapshot::from_bytes_with(self.candidate, self.before.limits)?;
-        let patch = Patch::build(
-            self.before.source,
-            snapshot.source.clone(),
-            self.steps,
-            snapshot.limits,
-        )?;
+        // `self.package` was validated when the latest candidate was staged.
+        // Re-run the complete facade readback against that same immutable
+        // package owner instead of rebuilding its archive/index from bytes.
+        let snapshot =
+            Snapshot::from_shared_package(Arc::clone(&self.package), self.before.limits)?;
+        let source: Arc<[u8]> = Arc::from(self.before.source.as_slice());
+        let target: Arc<[u8]> = Arc::from(snapshot.source.as_slice());
+        let patch = Patch::build(source, target, self.steps, snapshot.limits)?;
         Ok(Commit {
             snapshot,
             patch,
@@ -1908,13 +1991,48 @@ impl Edit {
             }
         }
         let validated = Package::from_shared_bytes(Arc::clone(&candidate))?;
-        drop(validated);
-        self.candidate = take_shared_bytes(candidate);
+        self.candidate = Arc::clone(&candidate);
+        self.package = Arc::new(validated);
         self.steps.push(Step {
             op: op.to_string(),
             target: target.to_string(),
             effects,
         });
+        Ok(true)
+    }
+
+    fn stage_package(
+        &mut self,
+        op: &str,
+        target: &str,
+        package: Arc<Package>,
+        candidate: Arc<Vec<u8>>,
+        provenance_spliced: bool,
+    ) -> Result<bool> {
+        validate_package_size(candidate.len(), self.before.limits)?;
+        let effects = changed_effects(&self.candidate, candidate.as_slice())?;
+        if effects.is_empty() {
+            return Ok(false);
+        }
+        for effect in &effects {
+            if let Some(path) = effect.strip_prefix("part:") {
+                self.spliced_parts.remove(path);
+            }
+        }
+        // The worksheet owner has already validated this exact package and
+        // completed its typed graph readback.  Keep the same immutable package
+        // handle for the unified commit boundary; the final facade reopen is
+        // still performed by `Snapshot::from_package`.
+        self.candidate = candidate;
+        self.package = package;
+        self.steps.push(Step {
+            op: op.to_string(),
+            target: target.to_string(),
+            effects,
+        });
+        if provenance_spliced {
+            self.spliced_parts.insert("content.xml".to_string());
+        }
         Ok(true)
     }
 
@@ -1924,22 +2042,6 @@ impl Edit {
         }
         Ok(())
     }
-
-    fn stage_spliced_shared(
-        &mut self,
-        op: &str,
-        target: &str,
-        candidate: Arc<Vec<u8>>,
-    ) -> Result<()> {
-        if self.stage_shared(op, target, candidate)? {
-            self.spliced_parts.insert("content.xml".to_string());
-        }
-        Ok(())
-    }
-}
-
-fn take_shared_bytes(bytes: Arc<Vec<u8>>) -> Vec<u8> {
-    Arc::try_unwrap(bytes).unwrap_or_else(|shared| (*shared).clone())
 }
 
 /// A durable, exact-source, reversible unified package patch.
@@ -2111,7 +2213,7 @@ impl Patch {
         if self.changed() {
             enforce_security_policy(snapshot, policy)?;
         }
-        let target = Snapshot::from_arc(self.target.clone(), self.limits)?;
+        let target = Snapshot::from_bytes_with(self.target.as_ref().to_vec(), self.limits)?;
         Ok(Commit {
             snapshot: target,
             patch: self.clone(),
@@ -2246,8 +2348,8 @@ impl Patch {
         }
         let source: Arc<[u8]> = Arc::from(source);
         let target: Arc<[u8]> = Arc::from(target);
-        let _source_snapshot = Snapshot::from_arc(source.clone(), limits)?;
-        let _target_snapshot = Snapshot::from_arc(target.clone(), limits)?;
+        let _source_snapshot = Snapshot::from_bytes_with(source.as_ref().to_vec(), limits)?;
+        let _target_snapshot = Snapshot::from_bytes_with(target.as_ref().to_vec(), limits)?;
         Ok(Self {
             source,
             target,
@@ -2945,7 +3047,7 @@ fn refuse_referenced_removal(package: &Package, path: &str) -> Result<()> {
 }
 
 fn enforce_security_policy(snapshot: &Snapshot, policy: SecurityWritePolicy) -> Result<()> {
-    let package = Package::from_bytes(snapshot.source.as_ref().to_vec())?;
+    let package = Arc::clone(&snapshot.package);
     let reader = package.package().package()?;
     if reader.manifest().has_encrypted_entries() {
         return match policy.encryption {
@@ -3135,7 +3237,7 @@ mod raw_package_diff_tests {
 
     use litchi_core::DiagnosticFingerprint;
 
-    use super::{Limits, Patch, Step, changed_effects};
+    use super::{Limits, Patch, Snapshot, Step, changed_effects};
 
     const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xml="http://www.w3.org/XML/1998/namespace" office:version="1.3"><office:body><office:spreadsheet><table:table xml:id="sheet" table:name="Sheet1"/></office:spreadsheet></office:body></office:document-content>"#;
     const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
@@ -3202,6 +3304,63 @@ mod raw_package_diff_tests {
             changed_effects(&source, &changed_payload).unwrap(),
             ["part:Pictures/opaque.bin"]
         );
+    }
+
+    #[test]
+    fn validated_package_index_is_retained_across_document_handoffs() {
+        let source = raw_package(
+            zip::CompressionMethod::Stored,
+            "application/octet-stream",
+            b"retained package payload",
+        );
+        let spreadsheet = crate::Spreadsheet::from_bytes(source).unwrap();
+        let facade_identity = spreadsheet.prepared_index_identity();
+        let snapshot = spreadsheet.document_snapshot().unwrap();
+        assert_eq!(snapshot.prepared_index_identity(), facade_identity);
+        let snapshot_source = snapshot.as_bytes().as_ptr();
+
+        let mut edit = snapshot.edit();
+        assert_eq!(edit.as_bytes().as_ptr(), snapshot_source);
+        edit.worksheets(|_| Ok(())).unwrap();
+        let commit = edit.commit().unwrap();
+        assert!(!commit.changed());
+        assert_eq!(commit.snapshot().prepared_index_identity(), facade_identity);
+
+        // A repeated package-owned read must reuse the same immutable index;
+        // malformed/stale physical state is still rejected by the existing
+        // source-bound APIs rather than silently falling back to a guessed
+        // package.
+        assert!(
+            commit
+                .snapshot()
+                .resource("Pictures/opaque.bin")
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(commit.snapshot().prepared_index_identity(), facade_identity);
+        let malformed = Snapshot::from_bytes(vec![0x50, 0x4b, 0x03]);
+        assert!(malformed.is_err());
+    }
+
+    #[test]
+    fn plaintext_password_open_sanitizes_snapshot_without_copying_archive_bytes() {
+        let source = raw_package(
+            zip::CompressionMethod::Stored,
+            "application/octet-stream",
+            b"plaintext password source",
+        );
+        let source_pointer = source.as_ptr();
+        let spreadsheet =
+            crate::Spreadsheet::from_bytes_with_password(source, "scoped-secret").unwrap();
+        let facade_identity = spreadsheet.prepared_index_identity();
+        let snapshot = spreadsheet.document_snapshot().unwrap();
+        assert_eq!(snapshot.as_bytes().as_ptr(), source_pointer);
+        assert_eq!(snapshot.prepared_index_identity(), facade_identity);
+
+        let mut edit = snapshot.edit();
+        assert_eq!(edit.as_bytes().as_ptr(), source_pointer);
+        edit.worksheets(|_| Ok(())).unwrap();
+        assert_eq!(edit.as_bytes().as_ptr(), source_pointer);
     }
 
     #[test]
