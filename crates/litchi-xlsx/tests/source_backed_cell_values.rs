@@ -1,12 +1,19 @@
 #![allow(clippy::unwrap_used, reason = "focused integration assertions")]
 
 use std::io;
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, ReadAt,
+    Resource, SourceVersion,
+};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, TargetMode};
+use litchi_opc::{
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part, Relationships, SourceCacheLimits,
+    TargetMode,
+};
 use litchi_xlsx::cell_values::{
     CellValueEdit, MAX_BATCH_EDITS, SheetCellValueEdit, SourceBackedEditor,
 };
@@ -25,6 +32,67 @@ struct VersionedSource {
     revision: AtomicU64,
     rejected_read_offset: AtomicU64,
     rejected_read_count: AtomicU64,
+    flip_after_read_offset: AtomicU64,
+    pending_version_flip: AtomicU64,
+}
+
+#[derive(Clone)]
+struct CancelOnBlobArcPart {
+    inner: BlobPart,
+    cancellation_source: CancellationSource,
+    blob_arc_calls: Arc<AtomicU64>,
+    cancel_on_call: u64,
+}
+
+impl CancelOnBlobArcPart {
+    fn new(
+        partname: PackURI,
+        content_type: String,
+        blob: Vec<u8>,
+        cancellation_source: CancellationSource,
+        cancel_on_call: u64,
+    ) -> Self {
+        Self {
+            inner: BlobPart::new(partname, content_type, blob),
+            cancellation_source,
+            blob_arc_calls: Arc::new(AtomicU64::new(0)),
+            cancel_on_call,
+        }
+    }
+}
+
+impl Part for CancelOnBlobArcPart {
+    fn blob(&self) -> &[u8] {
+        self.inner.blob()
+    }
+
+    fn blob_arc(&self) -> Arc<Vec<u8>> {
+        let call = self.blob_arc_calls.fetch_add(1, Ordering::SeqCst) + 1;
+        if call == self.cancel_on_call {
+            self.cancellation_source.cancel();
+        }
+        self.inner.blob_arc()
+    }
+
+    fn content_type(&self) -> &str {
+        self.inner.content_type()
+    }
+
+    fn partname(&self) -> &PackURI {
+        self.inner.partname()
+    }
+
+    fn rels(&self) -> &Relationships {
+        self.inner.rels()
+    }
+
+    fn rels_mut(&mut self) -> &mut Relationships {
+        self.inner.rels_mut()
+    }
+
+    fn set_blob(&mut self, blob: Vec<u8>) {
+        self.inner.set_blob(blob);
+    }
 }
 
 impl VersionedSource {
@@ -35,6 +103,8 @@ impl VersionedSource {
             revision: AtomicU64::new(0),
             rejected_read_offset: AtomicU64::new(u64::MAX),
             rejected_read_count: AtomicU64::new(0),
+            flip_after_read_offset: AtomicU64::new(u64::MAX),
+            pending_version_flip: AtomicU64::new(0),
         }
     }
     fn changed(&self) {
@@ -47,6 +117,10 @@ impl VersionedSource {
     fn rejected_small_read_count(&self) -> u64 {
         self.rejected_read_count.load(Ordering::SeqCst)
     }
+    fn flip_after_read_at(&self, offset: u64) {
+        self.flip_after_read_offset.store(offset, Ordering::SeqCst);
+        self.pending_version_flip.store(0, Ordering::SeqCst);
+    }
 }
 
 impl ReadAt for VersionedSource {
@@ -54,8 +128,19 @@ impl ReadAt for VersionedSource {
         Ok(self.bytes.len() as u64)
     }
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
-        if offset == self.rejected_read_offset.load(Ordering::SeqCst) && output.len() < 64 * 1024
+        let flip_offset = self.flip_after_read_offset.load(Ordering::SeqCst);
+        if offset == flip_offset
+            && self
+                .flip_after_read_offset
+                .compare_exchange(flip_offset, u64::MAX, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
         {
+            // Delay the flip until the selected Part's post-load checks have
+            // observed the old revision; the facade's final post-parse check
+            // must observe the new one.
+            self.pending_version_flip.store(3, Ordering::SeqCst);
+        }
+        if offset == self.rejected_read_offset.load(Ordering::SeqCst) && output.len() < 64 * 1024 {
             self.rejected_read_count.fetch_add(1, Ordering::SeqCst);
             return Err(io::Error::other("selected worksheet payload read rejected"));
         }
@@ -68,6 +153,11 @@ impl ReadAt for VersionedSource {
         Ok(count)
     }
     fn version(&self) -> io::Result<SourceVersion> {
+        if self.pending_version_flip.load(Ordering::SeqCst) != 0
+            && self.pending_version_flip.fetch_sub(1, Ordering::SeqCst) == 1
+        {
+            self.revision.fetch_add(1, Ordering::SeqCst);
+        }
         Ok(SourceVersion::new(
             self.id,
             self.revision.load(Ordering::SeqCst),
@@ -130,19 +220,33 @@ fn fixture(sheet_xml: String, signed: bool) -> Vec<u8> {
     PackageWriter::to_bytes(&package).unwrap()
 }
 
+fn replace_sheet_with_cancel_on_blob_arc(
+    package: &mut OpcPackage,
+    cancellation_source: CancellationSource,
+    cancel_on_call: u64,
+) {
+    let uri = PackURI::new(SHEET).unwrap();
+    let (content_type, blob) = {
+        let part = package.get_part(&uri).unwrap();
+        (part.content_type().to_owned(), part.blob().to_vec())
+    };
+    assert!(package.remove_part(&uri));
+    package.add_part(Box::new(CancelOnBlobArcPart::new(
+        uri,
+        content_type,
+        blob,
+        cancellation_source,
+        cancel_on_call,
+    )));
+}
+
 fn zip_member_data_offset(bytes: &[u8], member: &[u8]) -> u64 {
     for offset in 0..bytes.len().saturating_sub(30) {
         if bytes.get(offset..offset + 4) != Some(b"PK\x03\x04") {
             continue;
         }
-        let name_len = usize::from(u16::from_le_bytes([
-            bytes[offset + 26],
-            bytes[offset + 27],
-        ]));
-        let extra_len = usize::from(u16::from_le_bytes([
-            bytes[offset + 28],
-            bytes[offset + 29],
-        ]));
+        let name_len = usize::from(u16::from_le_bytes([bytes[offset + 26], bytes[offset + 27]]));
+        let extra_len = usize::from(u16::from_le_bytes([bytes[offset + 28], bytes[offset + 29]]));
         let name_start = offset + 30;
         let name_end = name_start.checked_add(name_len).unwrap();
         if bytes.get(name_start..name_end) == Some(member) {
@@ -150,6 +254,55 @@ fn zip_member_data_offset(bytes: &[u8], member: &[u8]) -> u64 {
         }
     }
     panic!("ZIP member local header not found")
+}
+
+fn part_len(bytes: &[u8], member: &str) -> u64 {
+    OpcPackage::from_bytes(bytes)
+        .unwrap()
+        .get_part(&PackURI::new(member).unwrap())
+        .unwrap()
+        .blob()
+        .len() as u64
+}
+
+fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "xlsx-cell-values-managed-test",
+        Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroU64::new(memory.max(1)).unwrap(),
+        0,
+    )
+    .unwrap();
+    let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+    (budget, cancellation_source, context)
+}
+
+fn with_style_and_theme(bytes: &[u8]) -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/theme/theme1.xml").unwrap(),
+            ct::OFC_THEME.to_owned(),
+            b"<theme/>".to_vec(),
+        )))
+        .unwrap();
+    package
+        .get_part_mut(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            rt::THEME.to_owned(),
+            "theme/theme1.xml".to_owned(),
+            "rIdTheme".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    PackageWriter::to_bytes(&package).unwrap()
 }
 
 fn oversized_worksheet_xml(padding: usize, value: &str) -> Vec<u8> {
@@ -938,6 +1091,27 @@ fn changed_positional_source_and_stale_in_memory_patch_are_refused() {
 }
 
 #[test]
+fn source_version_flip_after_selected_read_rejects_single_and_multi_snapshots() {
+    let bytes = three_cells();
+    let worksheet_data_offset = zip_member_data_offset(&bytes, b"xl/worksheets/sheet1.xml");
+    let source = Arc::new(VersionedSource::new(bytes.clone()));
+    let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+    source.flip_after_read_at(worksheet_data_offset);
+    assert!(matches!(
+        editor.snapshot("Sheet1"),
+        Err(Error::Package(OpcError::SourceChanged { .. }))
+    ));
+
+    let source = Arc::new(VersionedSource::new(bytes));
+    let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+    source.flip_after_read_at(worksheet_data_offset);
+    assert!(matches!(
+        editor.edit_sheets(["Sheet1".into()]),
+        Err(Error::Package(OpcError::SourceChanged { .. }))
+    ));
+}
+
+#[test]
 fn exact_noop_publication_does_not_reparse_an_oversized_selected_worksheet() {
     let bytes = oversized_multi_sheet_source();
     let worksheet_data_offset = zip_member_data_offset(&bytes, b"xl/worksheets/sheet1.xml");
@@ -1068,4 +1242,365 @@ fn noop_patch_rejects_added_worksheet_relationship() {
         noop.patch().apply(&mut hostile),
         Err(Error::PatchConflict { .. })
     ));
+}
+
+#[test]
+fn managed_editor_retains_complete_payload_closure_and_releases_budget() {
+    let base = fixture(
+        format!(
+            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1" s="1"><v>1</v></c></row></sheetData></worksheet>"#
+        ),
+        false,
+    );
+    let (with_styles, _style_uri, _style_xml) = with_two_cell_styles(&base);
+    let bytes = with_style_and_theme(&with_styles);
+    let exact = part_len(&bytes, MAIN)
+        + part_len(&bytes, SHEET)
+        + part_len(&bytes, "/xl/styles.xml")
+        + part_len(&bytes, "/xl/theme/theme1.xml");
+    let (budget, _cancellation_source, context) = managed_context(exact);
+    let editor =
+        SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            Arc::new(VersionedSource::new(bytes)),
+            litchi_xlsx::ReadLimits::default(),
+            SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
+            context,
+        )
+        .unwrap();
+
+    assert!(editor.cache_diagnostics().budget_managed);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    let commit = editor.edit("Sheet1").unwrap().commit().unwrap();
+    assert_eq!(budget.used(Resource::Memory), exact);
+    let diagnostics = commit.snapshot();
+    assert_eq!(
+        diagnostics.value(address("A1")),
+        Some(&Value::Number(Number::new("1").unwrap()))
+    );
+    assert_eq!(
+        commit.snapshot().source_xml(),
+        commit.patch().before().source_xml()
+    );
+    assert_eq!(
+        commit.patch().before().source_xml().len() as u64,
+        part_len(&with_styles, SHEET)
+    );
+    drop(commit);
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_multi_sheet_batch_retains_each_selected_payload_and_streams_once() {
+    let bytes = two_sheets();
+    let exact = part_len(&bytes, MAIN)
+        + part_len(&bytes, SHEET)
+        + part_len(&bytes, "/xl/worksheets/sheet2.xml");
+    let (budget, _cancellation_source, context) = managed_context(exact);
+    let editor =
+        SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            Arc::new(VersionedSource::new(bytes.clone())),
+            litchi_xlsx::ReadLimits::default(),
+            SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
+            context,
+        )
+        .unwrap();
+    let commit = editor
+        .edit_many([
+            SheetCellValueEdit::set("Sheet1", address("A1"), 40u32),
+            SheetCellValueEdit::set("Sheet2", address("A1"), 50u32),
+        ])
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert_eq!(budget.used(Resource::Memory), exact);
+    let mut output = Vec::new();
+    editor
+        .publish_multi_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let published = OpcPackage::from_bytes(&output).unwrap();
+    assert_eq!(
+        litchi_xlsx::cell_values::Snapshot::load_multi(&published, "Sheet1")
+            .unwrap()
+            .value(address("A1")),
+        Some(&Value::Number(Number::new("40").unwrap()))
+    );
+    assert_eq!(
+        litchi_xlsx::cell_values::Snapshot::load_multi(&published, "Sheet2")
+            .unwrap()
+            .value(address("A1")),
+        Some(&Value::Number(Number::new("50").unwrap()))
+    );
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_one_under_budget_refuses_before_selected_worksheet_io() {
+    let bytes = three_cells();
+    let workbook_bytes = part_len(&bytes, MAIN);
+    let worksheet_bytes = part_len(&bytes, SHEET);
+    let exact = workbook_bytes + worksheet_bytes;
+    let worksheet_data_offset = zip_member_data_offset(&bytes, b"xl/worksheets/sheet1.xml");
+    let source = Arc::new(VersionedSource::new(bytes));
+    source.reject_small_read_at(worksheet_data_offset);
+    let (budget, _cancellation_source, context) = managed_context(exact - 1);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        source.clone(),
+        litchi_xlsx::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    assert_eq!(budget.used(Resource::Memory), 0);
+    let result = editor.edit("Sheet1");
+    assert!(matches!(
+        result,
+        Err(Error::Package(OpcError::Execution(
+            ExecutionError::ResourceLimit(_)
+        )))
+    ));
+    assert_eq!(source.rejected_small_read_count(), 0);
+    assert_eq!(editor.cache_diagnostics().successful_loads, 1);
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_stream_publication_works_and_inverse_materialization_is_explicit() {
+    let bytes = three_cells();
+    let workbook_bytes = part_len(&bytes, MAIN);
+    let worksheet_bytes = part_len(&bytes, SHEET);
+    let exact = workbook_bytes + worksheet_bytes;
+    let (budget, _cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        litchi_xlsx::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let commit = changed_commit(&editor);
+    assert_eq!(budget.used(Resource::Memory), exact);
+
+    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    commit.patch().apply(&mut replay).unwrap();
+    assert!(matches!(
+        commit.patch().inverse().apply(&mut replay),
+        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
+    ));
+    commit
+        .patch()
+        .inverse()
+        .apply_materialized(&mut replay, worksheet_bytes as usize)
+        .unwrap();
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob(),
+        OpcPackage::from_bytes(&bytes)
+            .unwrap()
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob(),
+    );
+
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(
+        litchi_xlsx::cell_values::Snapshot::load(
+            &OpcPackage::from_bytes(&output).unwrap(),
+            "Sheet1",
+        )
+        .unwrap()
+        .value(address("A1")),
+        Some(&Value::Number(Number::new("10.50").unwrap())),
+    );
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_cancellation_is_checked_after_snapshot_and_before_stream_output() {
+    let bytes = three_cells();
+    let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+    let source = Arc::new(VersionedSource::new(bytes.clone()));
+    let (budget, cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        source,
+        litchi_xlsx::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let commit = changed_commit(&editor);
+    cancellation_source.cancel();
+    let mut output = Vec::new();
+    assert!(matches!(
+        editor.publish_commit_to_stream(&mut output, &commit),
+        Err(Error::Package(OpcError::Cancelled))
+    ));
+    assert!(output.is_empty());
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_cancellation_during_batch_iterators_keeps_staging_atomic() {
+    let bytes = three_cells();
+    let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+    let (budget, cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        litchi_xlsx::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    let cancellation_for_iterator = cancellation_source.clone();
+    let mut index = 0;
+    let result = edit.apply_batch(std::iter::from_fn(move || {
+        let value = match index {
+            0 => Some(CellValueEdit::set(address("A1"), 2u32)),
+            1 => {
+                cancellation_for_iterator.cancel();
+                Some(CellValueEdit::set(address("B2"), false))
+            },
+            _ => None,
+        };
+        index += 1;
+        value
+    }));
+    assert!(matches!(result, Err(Error::Package(OpcError::Cancelled))));
+    assert!(edit.is_empty());
+    drop(edit);
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    let bytes = two_sheets();
+    let exact = part_len(&bytes, MAIN)
+        + part_len(&bytes, SHEET)
+        + part_len(&bytes, "/xl/worksheets/sheet2.xml");
+    let (budget, cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(bytes)),
+        litchi_xlsx::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let mut edit = editor
+        .edit_sheets(["Sheet1".into(), "Sheet2".into()])
+        .unwrap();
+    let cancellation_for_iterator = cancellation_source.clone();
+    let mut index = 0;
+    let result = edit.apply_batch(std::iter::from_fn(move || {
+        let value = match index {
+            0 => Some(SheetCellValueEdit::set("Sheet1", address("A1"), 2u32)),
+            1 => {
+                cancellation_for_iterator.cancel();
+                Some(SheetCellValueEdit::set("Sheet2", address("A1"), 3u32))
+            },
+            _ => None,
+        };
+        index += 1;
+        value
+    }));
+    assert!(matches!(result, Err(Error::Package(OpcError::Cancelled))));
+    assert!(edit.is_empty());
+    drop(edit);
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_patch_cancellation_during_finalization_does_not_publish_candidate() {
+    let bytes = three_cells();
+    let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+    let (budget, cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        litchi_xlsx::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let commit = changed_commit(&editor);
+    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    replace_sheet_with_cancel_on_blob_arc(&mut replay, cancellation_source, 1);
+    assert!(matches!(
+        commit.patch().apply(&mut replay),
+        Err(Error::Package(OpcError::Cancelled))
+    ));
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob(),
+        OpcPackage::from_bytes(&bytes)
+            .unwrap()
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob(),
+    );
+    drop(commit);
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    let bytes = two_sheets();
+    let exact = part_len(&bytes, MAIN)
+        + part_len(&bytes, SHEET)
+        + part_len(&bytes, "/xl/worksheets/sheet2.xml");
+    let (budget, cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        litchi_xlsx::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let commit = editor
+        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 10u32)])
+        .unwrap()
+        .commit()
+        .unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    // MultiPatch's initial owning readback consumes the first blob_arc call;
+    // the second call is the candidate readback after staged replacement.
+    replace_sheet_with_cancel_on_blob_arc(&mut replay, cancellation_source, 2);
+    assert!(matches!(
+        commit.patch().apply(&mut replay),
+        Err(Error::Package(OpcError::Cancelled))
+    ));
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob(),
+        OpcPackage::from_bytes(&bytes)
+            .unwrap()
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob(),
+    );
+    drop(commit);
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_empty_multi_edit_iterator_reports_cancellation_before_invalid_batch() {
+    let bytes = three_cells();
+    let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+    let (budget, cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(bytes)),
+        litchi_xlsx::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let result = editor.edit_many(std::iter::from_fn(move || {
+        cancellation_source.cancel();
+        None::<SheetCellValueEdit<'static>>
+    }));
+    assert!(matches!(result, Err(Error::Package(OpcError::Cancelled))));
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
 }
