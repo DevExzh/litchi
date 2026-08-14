@@ -10,6 +10,7 @@ litchi-core = { path = "../../crates/litchi-core" }
 litchi-doc = { path = "../../crates/litchi-doc" }
 litchi-docx = { path = "../../crates/litchi-docx" }
 litchi-odf-common = { path = "../../crates/litchi-odf-common" }
+litchi-odraw = { path = "../../crates/litchi-odraw" }
 litchi-odp = { path = "../../crates/litchi-odp" }
 litchi-ods = { path = "../../crates/litchi-ods" }
 litchi-odt = { path = "../../crates/litchi-odt" }
