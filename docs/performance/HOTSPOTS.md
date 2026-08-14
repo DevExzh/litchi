@@ -453,8 +453,11 @@ The format-owned validation tranche now has bounded DOCX, PPTX, RTF and XLS
 semantic reports in addition to the CFB, OPC and ODF reports. These paths are
 finite correctness boundaries, not profiled hotspots. ODF repair remains one
 typed non-destructive plan for removing a recognized local-header extra from a
-first stored `mimetype` member; encrypted, signed, macro, structural and
-semantic repairs refuse rather than widening the preservation boundary.
+first stored `mimetype` member. One opt-in selector now exercises its bounded
+preflight, exact forward/inverse, refusal and zero-retained-output publication
+contract, but supplies no latency or total-memory claim. Encrypted, signed,
+macro, structural and semantic repairs refuse rather than widening the
+preservation boundary.
 
 A matching media-rich ODP case now adds one source-backed text box beside
 eight deterministic 2 MiB opaque resources. Reusing the same accepted common

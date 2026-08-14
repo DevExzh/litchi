@@ -14,8 +14,8 @@ definitions, commands, and profiler limitations are in
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **200 selectable cases**; 196 was the count before the
-four CFB selective-range selectors were added. The measured 36-default-case,
+HEAD harness contains **201 selectable cases**; 200 was the count before the
+opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
 opt-in simulated-range cases, two opt-in scaling cases, one opt-in XLSX
@@ -56,7 +56,7 @@ is still not broad program or CRUD coverage.
 | [Managed OPC source cache](changes/0086-opc-source-cache-budget-management.md) and [release contention](changes/0088-opc-source-cache-contention-evidence.md) | Managed source-backed OPC (`f8d417ac3`) charges exact physical `InputBytes`, cumulative declared cold-load `Work`, retained catalog/flight/payload `Objects`, and retained/in-flight payload `Memory` to hierarchical `Budget`; compatibility opens remain finite under unmanaged `SourceCacheLimits`; correctness tests cover resource charges, retained-resource releases, pinning, eviction, single-flight, cancellation, sibling competition and contention invariants | Release ABBA provides structural/distribution evidence only; no managed-versus-control speedup accepted. Allocation, peak-memory/RSS, hardware, copied/decompressed-byte, CPU-utilization and production-performance evidence remain missing |
 | XLSX source-provenance publication reuse | Matched scalar-cell source-backed p50 geomean **-21.66%/-22.65%** and p95 **-21.38%/-22.70%** across ABBA directions; exact output hashes | Removes the repeated semantic worksheet reload/reparse only; physical read/materialization counters are unchanged, and allocation/RSS/cold-I/O claims remain open |
 | Bounded forward-only XLSX/RTF creation | RTF streaming p50 geomean **-76.41%/-76.47%**, p95 **-75.23%/-75.76%**; large sink calls **7,208,970 -> 1,441,802**; exact output hashes | RTF escape-free ASCII only, hard 32-byte request ceiling and unchanged 37-byte retained encoder state. XLSX streaming latency/memory evidence and allocation/RSS claims remain pending |
-| Bounded semantic validation and ODF repair | DOCX, PPTX, RTF and XLS reports now complement CFB, OPC and ODF reports; ODF exposes one typed non-destructive `mimetype` local-extra repair plan | Correctness-only, finite and fail-closed. No validation latency claim; structural, encrypted, signed, macro and semantic repairs remain unsupported |
+| Bounded semantic validation and ODF repair | DOCX, PPTX, RTF and XLS reports now complement CFB, OPC and ODF reports; one opt-in selector exercises ODF's typed non-destructive `mimetype` local-extra repair plan with exact forward/inverse and zero-retained-output sink evidence | Correctness-only, finite and fail-closed. Planning still performs a bounded full-candidate preflight, so no memory or latency claim is made; structural, encrypted, signed, macro and semantic repairs remain unsupported |
 | RTF logical-tail append | Two opt-in existing-document cases cover tiny/medium/large append and exact no-op publication through a fixed 16 KiB non-seek hashing window that caps accepted bytes per write and retains zero output | Correctness/coverage only: candidate snapshot is not window-bounded, and no release ABBA, allocation, RSS, or speedup claim exists; see [change 0090](changes/0090-rtf-logical-tail-append-evidence.md) |
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |
 | Coalesced DOCX paragraph edits | Large 100-edit/save p50 **-94.99% (19.97x)** and mean **-95.02%**; medium two-edit/save p50 **-12.98%**; scalar one-edit guardrail neutral | Direct-body, strictly ordered paragraph text replacement; generated corpus; scalar API remains separate |
@@ -955,9 +955,10 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 200 selectable cases. Change
-0091 adds four committed opt-in XLS visibility selectors, and change 0094 adds
-four committed opt-in CFB selective-range selectors. The visibility selectors
+The committed HEAD standalone harness provides 201 selectable cases. Change
+0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
+committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
+ODF repair-plan selector. The visibility and repair selectors
 are correctness/coverage evidence only. Change 0094 has a pinned 30-warmup,
 500-sample release ABBA summary: MiniFAT exact-range source bytes fall from
 261,184 to 36 and from 2,096,192 to 36, with stable read-stage p50/p95 gains

@@ -58,8 +58,9 @@ four matched native XLS existing-comment publication cases,
 four matched native XLS worksheet-visibility publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 21 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, 15 RTF semantic cases (13 transport/read/edit
-cases plus two logical-tail publication cases), and 36 ODF semantic cases are
-opt-in. The current `Case` matrix exposes 200 selectable case names in total;
+cases plus two logical-tail publication cases), 36 ODF semantic cases, and one
+ODF `mimetype` repair-plan case are opt-in. The current `Case` matrix exposes
+201 selectable case names in total;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 
