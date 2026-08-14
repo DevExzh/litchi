@@ -23,8 +23,8 @@ mod composition;
 mod picture_payload;
 mod transfer;
 pub use composition::{
-    Composition, CompositionConflict, CompositionError, CompositionLimits, ConflictSet, MergePlan,
-    MergeResolution, Prepared,
+    Composition, CompositionConflict, CompositionError, CompositionLimits, ConflictSet,
+    DurableComposition, DurableMergePlan, MergePlan, MergeResolution, Prepared,
 };
 pub use picture_payload::{
     MAX_PICTURE_PAYLOAD_OPERATIONS, MAX_PICTURE_REMOVAL_OPERATIONS, PicturePayloadReplacement,
@@ -5775,7 +5775,11 @@ pub(crate) fn apply_durable<Mode>(
             &source_hash,
         );
     }
-    let mut edit = source.edit();
+    // A durable operation may be admitted under a caller-selected patch
+    // bound larger than the ordinary edit default.  Bind replay to the
+    // validated patch's operation count so a valid 257+ operation patch does
+    // not fail merely because `Snapshot::edit()` defaults to 256.
+    let mut edit = source.edit_with_limits(Limits::new(patch.operations().len()));
     let mut expected_result_hash = None;
     for operation in patch.operations() {
         let expected_preconditions = match operation.op.as_str() {

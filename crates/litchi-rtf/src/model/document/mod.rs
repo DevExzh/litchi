@@ -6,4 +6,3 @@ mod model;
 mod tests;
 
 pub use model::RtfDocument;
-pub(crate) use model::owned_table;

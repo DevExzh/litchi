@@ -6,80 +6,21 @@
 
 use litchi_rtf::{
     CellStoryEvent, Document, FieldOwner, StoryEvent, TableCellPath,
-    edit::{
-        Composition, CompositionLimits, Error, History, HistoryLimits, MergePlan, MergeResolution,
-        TransferPlan,
-    },
+    edit::{Error, TransferPlan},
     style::Kind as StyleKind,
 };
 
-fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
-    litchi_core::patch::PatchLimits::new(
-        litchi_core::patch::BlobLimits::new(0, 0, 0),
-        4 * 1024 * 1024,
-        max_operations,
-        8,
-        2 * 1024 * 1024,
-        4 * 1024 * 1024,
-    )
-}
-
 #[test]
-fn field_transfer_is_durable_reversible_historical_and_mergeable() {
+fn external_hyperlink_transfer_is_refused_before_publication() {
     let source = Document::parse(
         r#"{\rtf1\ansi{\field{\*\fldinst HYPERLINK "https://example.com"}{\fldrslt Link}}}"#,
     )
     .unwrap();
     let target = Document::parse(r"{\rtf1\ansi Target}").unwrap();
-    let transfer = TransferPlan::field(&source, 0, &target).unwrap();
-    assert!(transfer.is_dependency_free());
-    let commit = transfer.commit().unwrap();
-    assert_eq!(commit.snapshot().fields().len(), 1);
-    assert_eq!(
-        commit.snapshot().fields()[0].instruction,
-        source.fields()[0].instruction
-    );
-
-    let durable = commit.patch().to_durable(durable_limits(1)).unwrap();
-    let applied = target.apply_durable(&durable).unwrap();
-    assert_eq!(
-        applied.to_bytes().unwrap(),
-        commit.snapshot().to_bytes().unwrap()
-    );
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
-    assert_eq!(restored.to_bytes().unwrap(), target.to_bytes().unwrap());
-
-    let mut history = History::new(target.clone(), HistoryLimits::new(2, 1024 * 1024));
-    history.record_commit(&commit).unwrap();
-    assert!(history.undo());
-    assert!(history.current().same_snapshot(&target));
-    assert!(history.redo());
-    assert_eq!(history.current().fields().len(), 1);
-
-    let limits = CompositionLimits::new(4, 8, 16, 8);
-    let left_plan = TransferPlan::field(&source, 0, &target).unwrap();
-    let right_source = Document::parse(r"{\rtf1{\field{\*\fldinst PAGE}{\fldrslt 1}}}").unwrap();
-    let right_plan = TransferPlan::field(&right_source, 0, &target).unwrap();
-    let mut left = Composition::new(&target, limits);
-    left.join(left_plan.into_edit().into_sub_edit("left", limits).unwrap())
-        .unwrap();
-    let mut right = Composition::new(&target, limits);
-    right
-        .join(
-            right_plan
-                .into_edit()
-                .into_sub_edit("right", limits)
-                .unwrap(),
-        )
-        .unwrap();
-    let mut merge = MergePlan::new(left, right).unwrap();
-    assert_eq!(merge.conflicts().len(), 1);
-    merge.resolve(MergeResolution::Right);
-    let merged = merge.finish().unwrap().commit().unwrap();
-    assert_eq!(
-        merged.snapshot().fields()[0].field_type,
-        litchi_rtf::FieldType::Page
-    );
+    assert!(matches!(
+        TransferPlan::field(&source, 0, &target),
+        Err(Error::UnsupportedSource(_))
+    ));
 }
 
 #[test]
@@ -133,6 +74,21 @@ fn nested_table_style_list_and_object_transfers_reopen_with_dependencies() {
     assert_eq!(nested.fields().len(), 1);
     assert_eq!(nested.fields()[0].owner, FieldOwner::TableCell(2));
     Document::from_bytes(&nested.to_bytes().unwrap()).unwrap();
+
+    let mismatched_color_target = Document::parse(
+        r"{\rtf1{\colortbl;\red0\green0\blue255;}\trowd\cellx1000\intbl Target\cell\row}",
+    )
+    .unwrap();
+    assert!(matches!(
+        TransferPlan::nested_table(
+            &nested_source,
+            &TableCellPath::outer(0, 0, 0),
+            0,
+            &mismatched_color_target,
+            TableCellPath::outer(0, 0, 0),
+        ),
+        Err(Error::UnsupportedSource(_))
+    ));
 
     let style_source =
         Document::parse(r"{\rtf1{\stylesheet{\s0 Normal;}{\s1\sbasedon0 Heading;}}Body}").unwrap();

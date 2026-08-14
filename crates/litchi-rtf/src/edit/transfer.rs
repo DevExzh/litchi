@@ -4,6 +4,9 @@ use super::{Commit, Edit, Error, HeaderFooterParagraph, Snapshot};
 use crate::{RtfWriter, TableCellPath};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
+use std::io;
+
+const MAX_TRANSFER_TABLE_NODES: usize = 65_536;
 
 /// A checked, non-applying transfer into one immutable target snapshot.
 pub struct TransferPlan {
@@ -23,10 +26,11 @@ impl TransferPlan {
         target: &Snapshot,
         insert_after: usize,
     ) -> Result<Self, Error> {
-        let paragraphs = source.body().paragraphs().collect::<Vec<_>>();
-        let count = paragraphs.len();
-        let text = paragraphs
-            .get(source_position)
+        let count = source.paragraph_count();
+        let text = source
+            .body()
+            .paragraphs()
+            .nth(source_position)
             .ok_or(Error::ParagraphOutOfRange {
                 position: source_position,
                 count,
@@ -92,8 +96,9 @@ impl TransferPlan {
 
     /// Plans transfer of one inert, plain-result body field at the target body end.
     ///
-    /// Active/external field kinds and nested generic fields are refused.
-    /// Self-contained result drawings and explicit breaks are retained.
+    /// Active/external field kinds, legacy shape-result fallbacks, and nested
+    /// generic fields are refused. Self-contained instruction-backed drawings
+    /// and explicit breaks are retained.
     ///
     /// # Errors
     /// Returns an error for an invalid selector, active field, unresolved
@@ -104,11 +109,7 @@ impl TransferPlan {
             .get(source_index)
             .ok_or(Error::DestinationOutOfRange("field"))?;
         refuse_feature_opaque(source, crate::opaque::Context::Field, source_field.position)?;
-        if active_field(source_field.field_type) {
-            return Err(Error::UnsupportedSource(
-                "field transfer refuses active or external field instructions",
-            ));
-        }
+        validate_transferable_field_kind(source_field)?;
         if source_field
             .result_events
             .iter()
@@ -121,8 +122,9 @@ impl TransferPlan {
         if !source_field.shapes.is_empty() || !source_field.shape_groups.is_empty() {
             refuse_feature_opaque(source, crate::opaque::Context::Drawing, usize::MAX)?;
             refuse_drawing_story_fields(&source_field.shapes, &source_field.shape_groups)?;
+            require_equal_text_resources(source, target)?;
         }
-        let mut field = owned_field(source_field);
+        let mut field = owned_field(source_field, source.limits())?;
         let dependency_count = field.shapes.len().saturating_add(field.shape_groups.len());
         field.owner = crate::FieldOwner::Body;
         field.position = target.text().len();
@@ -139,9 +141,11 @@ impl TransferPlan {
 
     /// Plans transfer of one inert root body text frame at the target body end.
     ///
-    /// Geometry, properties, text formatting, fallbacks, and self-contained
-    /// nested drawings are retained when font/color resources match. Active
-    /// hyperlinks, nested generic fields, and unknown drawing syntax are refused.
+    /// Geometry, properties, text formatting, and self-contained nested
+    /// drawings are retained when font/color resources match. Legacy
+    /// `shprslt` fallbacks, active hyperlinks, nested generic fields, and
+    /// unknown drawing syntax are refused because their recursive ownership
+    /// is not transfer-safe.
     ///
     /// # Errors
     /// Returns an error for an invalid selector, active or unresolved drawing
@@ -161,13 +165,14 @@ impl TransferPlan {
         }
         refuse_feature_opaque(source, crate::opaque::Context::Drawing, shape.position)?;
         refuse_drawing_story_fields(std::slice::from_ref(shape), &[])?;
-        if super::shape_has_active_link(shape) {
+        refuse_active_shape_links(std::slice::from_ref(shape), &[])?;
+        if shape.result.is_some() {
             return Err(Error::UnsupportedSource(
-                "shape transfer refuses active hyperlink metadata",
+                "shape transfer refuses legacy shape-result ownership",
             ));
         }
-        let dependency_count = shape_dependency_count(shape);
-        let mut transferred_shape = shape.clone().into_owned();
+        let dependency_count = shape_dependency_count(shape)?;
+        let mut transferred_shape = owned_shape(shape, source.limits())?;
         transferred_shape.position = target.text().len();
         let effect = format!("body:shape:append:{source_index}");
         let after = canonical_candidate(target, |model| model.push_shape(transferred_shape))?;
@@ -177,9 +182,10 @@ impl TransferPlan {
     /// Plans copying one complete nested table tree into a target cell end.
     ///
     /// Nested table text, geometry, borders, and recursively nested tables are
-    /// retained. Self-contained drawings, explicit breaks, and passive generic
-    /// fields are copied; navigation/revision handles and incompatible
-    /// table-style dependencies are refused.
+    /// retained. Self-contained instruction-backed drawings, explicit breaks,
+    /// and passive generic fields are copied; legacy shape-result fallbacks,
+    /// navigation/revision handles, and incompatible table-style dependencies
+    /// are refused.
     ///
     /// # Errors
     /// Returns an error for invalid paths, unresolved dependencies, opaque
@@ -198,17 +204,27 @@ impl TransferPlan {
         let source_parent_depth = table_cell_depth(source_cell)?;
         let target_parent_depth = table_cell_depth(&target_cell)?;
         refuse_feature_opaque(source, crate::opaque::Context::Table, usize::MAX)?;
+        // Table borders, shading, cell text, and nested drawings can all
+        // carry numeric font/color references.  The table owner has no safe
+        // remapping seam, so require the complete resource tables before
+        // copying any part of the tree.
+        require_equal_text_resources(source, target)?;
         let field_indices = table_story_field_indices(&nested.table)?;
         let field_count = field_indices.len();
         let mut field_drawing_count = 0usize;
         let mut transferred_fields = Vec::new();
+        transferred_fields
+            .try_reserve(field_count)
+            .map_err(|_error| {
+                Error::Write("could not reserve nested-table field transfers".to_string())
+            })?;
         for index in field_indices {
             let field = source.fields().get(index).ok_or(Error::UnsupportedSource(
                 "nested-table story references a missing field",
             ))?;
             field_drawing_count =
                 field_drawing_count.saturating_add(validate_transferable_field(source, field)?);
-            let mut transferred_field = owned_field(field);
+            let mut transferred_field = owned_field(field, source.limits())?;
             let crate::FieldOwner::TableCell(source_depth) = transferred_field.owner else {
                 return Err(Error::UnsupportedSource(
                     "nested-table story field has an incompatible owner",
@@ -234,14 +250,14 @@ impl TransferPlan {
             transferred_field.owner = crate::FieldOwner::TableCell(target_depth);
             transferred_fields.push((index, transferred_field));
         }
-        let drawing_count = validate_table_transfer(source, &nested.table)?;
+        let drawing_count = validate_table_transfer(source, &nested.table, 0)?;
         let styled_rows = count_styled_rows(&nested.table);
         if styled_rows != 0 && source.styles() != target.styles() {
             return Err(Error::UnsupportedSource(
                 "nested-table transfer requires identical table-style dependencies",
             ));
         }
-        let mut table = crate::document::owned_table(&nested.table)?;
+        let mut table = owned_transfer_table(&nested.table, source.limits(), 0)?;
         let target_offset = super::table_cell(target, &target_cell)?.text().len();
         let effect = format!(
             "{}:nested-table:append",
@@ -459,6 +475,11 @@ impl TransferPlan {
             ));
         }
         let mut pictures = Vec::new();
+        pictures
+            .try_reserve(object.result_picture_indices.len())
+            .map_err(|_error| {
+                Error::Write("could not reserve embedded-object pictures".to_string())
+            })?;
         for index in &object.result_picture_indices {
             let picture = source
                 .pictures()
@@ -545,11 +566,12 @@ fn canonical_candidate(
     }
     let mut model = crate::document::RtfDocument::parse_bytes_with_limits(bytes, target.limits())?;
     mutation(&mut model)?;
-    let mut output = Vec::new();
+    let limit = target.limits().max_source_bytes();
+    let mut output = BoundedOutput::new(limit);
     RtfWriter::new(&mut output)
         .write_document(&model)
         .map_err(|error| Error::Write(error.to_string()))?;
-    let limit = target.limits().max_source_bytes();
+    let output = output.into_inner();
     if output.len() > limit {
         return Err(Error::InputTooLarge {
             observed: output.len(),
@@ -563,6 +585,54 @@ fn canonical_candidate(
         ));
     }
     Ok(output)
+}
+
+/// A fallible, source-size-bounded sink for canonical transfer output.
+///
+/// `RtfWriter` writes incrementally, so retaining the output in a plain
+/// `Vec<u8>` would otherwise permit infallible growth until the writer's
+/// final size check.  This sink enforces the document limit before every
+/// append and maps allocation failure back into the writer's `io::Result`.
+struct BoundedOutput {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+
+impl BoundedOutput {
+    fn new(limit: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            limit,
+        }
+    }
+
+    fn into_inner(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+impl io::Write for BoundedOutput {
+    fn write(&mut self, input: &[u8]) -> io::Result<usize> {
+        let remaining = self
+            .limit
+            .checked_sub(self.bytes.len())
+            .ok_or_else(|| io::Error::new(io::ErrorKind::WriteZero, "output limit exceeded"))?;
+        if input.len() > remaining {
+            return Err(io::Error::new(
+                io::ErrorKind::WriteZero,
+                "output limit exceeded",
+            ));
+        }
+        self.bytes
+            .try_reserve(input.len())
+            .map_err(|_error| io::Error::other("output allocation failed"))?;
+        self.bytes.extend_from_slice(input);
+        Ok(input.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 fn refuse_feature_opaque(
@@ -600,60 +670,577 @@ fn equal_color_tables(left: &crate::ColorTable, right: &crate::ColorTable) -> bo
         })
 }
 
-fn active_field(kind: crate::FieldType) -> bool {
-    matches!(
-        kind,
-        crate::FieldType::MacroButton
-            | crate::FieldType::GoToButton
-            | crate::FieldType::Print
-            | crate::FieldType::Embed
-            | crate::FieldType::AddIn
-            | crate::FieldType::Control
-            | crate::FieldType::HtmlControl
-            | crate::FieldType::Dde
-            | crate::FieldType::DdeAuto
-            | crate::FieldType::Link
-            | crate::FieldType::Include
-            | crate::FieldType::Import
-            | crate::FieldType::IncludeText
-            | crate::FieldType::IncludePicture
-            | crate::FieldType::Database
-            | crate::FieldType::Ask
-            | crate::FieldType::FillIn
-    )
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FieldTransferClass {
+    /// The typed field model explicitly guarantees inert metadata semantics.
+    Passive,
+    /// The instruction names an external document, data source, or update.
+    External,
+    /// The instruction can invoke active content or application behavior.
+    Active,
+    /// The instruction is not covered by a transfer policy.
+    Unknown,
 }
 
-fn owned_field(field: &crate::Field<'_>) -> crate::Field<'static> {
-    crate::Field {
-        field_type: field.field_type,
-        instruction: Cow::Owned(field.instruction.to_string()),
-        result: Cow::Owned(field.result.to_string()),
-        status: field.status,
-        shapes: field
-            .shapes
-            .iter()
-            .cloned()
-            .map(crate::Shape::into_owned)
-            .collect(),
-        shape_groups: field
-            .shape_groups
-            .iter()
-            .cloned()
-            .map(crate::ShapeGroup::into_owned)
-            .collect(),
-        drawing_order: field.drawing_order.clone(),
-        result_events: field.result_events.clone(),
-        owner: field.owner,
-        position: field.position,
-        range_end: field.range_end,
+fn field_transfer_class(field: &crate::Field<'_>) -> FieldTransferClass {
+    use crate::FieldType;
+    let parsed_code = field.parsed_code();
+    match field.field_type {
+        // HYPERLINK is deliberately allowed only because HyperlinkField's
+        // existing contract is inert: this crate retains the target and
+        // cached result but never resolves, opens, fetches, or activates it.
+        FieldType::Hyperlink => {
+            if matches!(
+                &parsed_code,
+                crate::ParsedFieldCode::Hyperlink(code)
+                    if code.external_target.is_none() && code.bookmark.is_some()
+            ) {
+                FieldTransferClass::Passive
+            } else {
+                FieldTransferClass::Unknown
+            }
+        },
+        FieldType::Reference if matches!(&parsed_code, crate::ParsedFieldCode::Reference(_)) => {
+            FieldTransferClass::Passive
+        },
+        FieldType::PageReference
+            if matches!(&parsed_code, crate::ParsedFieldCode::PageReference(_)) =>
+        {
+            FieldTransferClass::Passive
+        },
+        FieldType::NoteReference
+            if matches!(&parsed_code, crate::ParsedFieldCode::NoteReference(_)) =>
+        {
+            FieldTransferClass::Passive
+        },
+        FieldType::ReferencedDocument
+        | FieldType::Dde
+        | FieldType::DdeAuto
+        | FieldType::Link
+        | FieldType::Include
+        | FieldType::Import
+        | FieldType::IncludeText
+        | FieldType::IncludePicture
+        | FieldType::Database
+        | FieldType::MergeField
+        | FieldType::MailMergeData
+        | FieldType::MergeRecord
+        | FieldType::MergeSequence
+        | FieldType::MailMergeNext
+        | FieldType::MailMergeNextIf
+        | FieldType::MailMergeSkipIf
+        | FieldType::AddressBlock
+        | FieldType::GreetingLine
+        | FieldType::MergeBarcode => FieldTransferClass::External,
+        FieldType::MacroButton
+        | FieldType::GoToButton
+        | FieldType::Print
+        | FieldType::Embed
+        | FieldType::AddIn
+        | FieldType::Control
+        | FieldType::HtmlControl
+        | FieldType::Ask
+        | FieldType::FillIn
+        | FieldType::Shape
+        | FieldType::FormText
+        | FieldType::FormCheckbox
+        | FieldType::FormDropdown => FieldTransferClass::Active,
+        FieldType::Page
+        | FieldType::Date
+        | FieldType::Toc
+        | FieldType::TocEntry
+        | FieldType::TableOfAuthorities
+        | FieldType::TableOfAuthoritiesEntry
+        | FieldType::Bookmark
+        | FieldType::Equation
+        | FieldType::Barcode
+        | FieldType::DisplayBarcode
+        | FieldType::BidiOutline
+        | FieldType::Private => {
+            if matches!(&parsed_code, crate::ParsedFieldCode::Malformed(_)) {
+                FieldTransferClass::Unknown
+            } else {
+                FieldTransferClass::Passive
+            }
+        },
+        _ => FieldTransferClass::Unknown,
     }
 }
 
-fn validate_table_transfer(source: &Snapshot, table: &crate::Table<'_>) -> Result<usize, Error> {
+fn validate_transferable_field_kind(field: &crate::Field<'_>) -> Result<(), Error> {
+    match field_transfer_class(field) {
+        FieldTransferClass::Passive => Ok(()),
+        FieldTransferClass::External => Err(Error::UnsupportedSource(
+            "field transfer refuses external, referenced-document, or mail-merge instructions",
+        )),
+        FieldTransferClass::Active => Err(Error::UnsupportedSource(
+            "field transfer refuses active field instructions",
+        )),
+        FieldTransferClass::Unknown => Err(Error::UnsupportedSource(
+            "field transfer requires a validated passive field policy",
+        )),
+    }
+}
+
+fn owned_field(
+    field: &crate::Field<'_>,
+    limits: crate::ParseLimits,
+) -> Result<crate::Field<'static>, Error> {
+    let instruction = super::clone_bounded_text(
+        field.instruction.as_ref(),
+        limits,
+        "could not reserve transferred field instruction",
+    )?;
+    let result = super::clone_bounded_text(
+        field.result.as_ref(),
+        limits,
+        "could not reserve transferred field result",
+    )?;
+    refuse_active_shape_links(&field.shapes, &field.shape_groups)?;
+    let mut shapes = Vec::new();
+    shapes
+        .try_reserve(field.shapes.len())
+        .map_err(|_error| Error::Write("could not reserve transferred field shapes".to_string()))?;
+    for shape in &field.shapes {
+        shapes.push(owned_shape(shape, limits)?);
+    }
+    let mut shape_groups = Vec::new();
+    shape_groups
+        .try_reserve(field.shape_groups.len())
+        .map_err(|_error| {
+            Error::Write("could not reserve transferred field shape groups".to_string())
+        })?;
+    for group in &field.shape_groups {
+        shape_groups.push(owned_shape_group(group, limits)?);
+    }
+    let mut drawing_order = Vec::new();
+    drawing_order
+        .try_reserve(field.drawing_order.len())
+        .map_err(|_error| {
+            Error::Write("could not reserve transferred field drawing order".to_string())
+        })?;
+    drawing_order.extend_from_slice(&field.drawing_order);
+    let mut result_events = Vec::new();
+    result_events
+        .try_reserve(field.result_events.len())
+        .map_err(|_error| {
+            Error::Write("could not reserve transferred field story events".to_string())
+        })?;
+    result_events.extend_from_slice(&field.result_events);
+    Ok(crate::Field {
+        field_type: field.field_type,
+        instruction: Cow::Owned(instruction),
+        result: Cow::Owned(result),
+        status: field.status,
+        shapes,
+        shape_groups,
+        drawing_order,
+        result_events,
+        owner: field.owner,
+        position: field.position,
+        range_end: field.range_end,
+    })
+}
+
+const MAX_TRANSFER_SHAPE_NESTING_DEPTH: usize = 64;
+
+fn owned_shape(
+    shape: &crate::Shape<'_>,
+    limits: crate::ParseLimits,
+) -> Result<crate::Shape<'static>, Error> {
+    owned_shape_at_depth(shape, limits, 0)
+}
+
+fn owned_shape_at_depth(
+    shape: &crate::Shape<'_>,
+    limits: crate::ParseLimits,
+    depth: usize,
+) -> Result<crate::Shape<'static>, Error> {
+    if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
+        return Err(Error::UnsupportedSource(
+            "shape transfer refuses excessive nested drawing depth",
+        ));
+    }
+    if shape.result.is_some() {
+        return Err(Error::UnsupportedSource(
+            "shape transfer refuses legacy shape-result ownership",
+        ));
+    }
+    let text = super::clone_bounded_text(
+        shape.text.as_ref(),
+        limits,
+        "could not reserve transferred shape text",
+    )?;
+    let name = super::clone_bounded_text(
+        shape.name.as_ref(),
+        limits,
+        "could not reserve transferred shape name",
+    )?;
+
+    let mut text_shapes = Vec::new();
+    text_shapes
+        .try_reserve(shape.text_shapes.len())
+        .map_err(|_error| {
+            Error::Write("could not reserve transferred shape text drawings".to_string())
+        })?;
+    for nested in &shape.text_shapes {
+        text_shapes.push(owned_shape_at_depth(nested, limits, depth + 1)?);
+    }
+
+    let mut text_shape_groups = Vec::new();
+    text_shape_groups
+        .try_reserve(shape.text_shape_groups.len())
+        .map_err(|_error| {
+            Error::Write("could not reserve transferred shape text groups".to_string())
+        })?;
+    for group in &shape.text_shape_groups {
+        text_shape_groups.push(owned_shape_group_at_depth(group, limits, depth + 1)?);
+    }
+
+    let mut text_drawing_order = Vec::new();
+    text_drawing_order
+        .try_reserve(shape.text_drawing_order.len())
+        .map_err(|_error| {
+            Error::Write("could not reserve transferred shape drawing order".to_string())
+        })?;
+    text_drawing_order.extend_from_slice(&shape.text_drawing_order);
+
+    let mut text_story_events = Vec::new();
+    text_story_events
+        .try_reserve(shape.text_story_events.len())
+        .map_err(|_error| {
+            Error::Write("could not reserve transferred shape story events".to_string())
+        })?;
+    text_story_events.extend_from_slice(&shape.text_story_events);
+
+    let mut properties = Vec::new();
+    properties
+        .try_reserve(shape.properties.len())
+        .map_err(|_error| {
+            Error::Write("could not reserve transferred shape properties".to_string())
+        })?;
+    for property in &shape.properties {
+        properties.push(owned_shape_property(property, limits)?);
+    }
+
+    let mut info = Vec::new();
+    info.try_reserve(shape.info.len())
+        .map_err(|_error| Error::Write("could not reserve transferred shape info".to_string()))?;
+    info.extend_from_slice(&shape.info);
+
+    Ok(crate::Shape {
+        position: shape.position,
+        instruction_present: shape.instruction_present,
+        shape_type: shape.shape_type,
+        geometry: shape.geometry,
+        fill: shape.fill,
+        border: shape.border,
+        line: shape.line,
+        text: Cow::Owned(text),
+        text_destination_present: shape.text_destination_present,
+        text_formatting: shape.text_formatting,
+        text_shapes,
+        text_shape_groups,
+        text_drawing_order,
+        text_story_events,
+        wrap_mode: shape.wrap_mode,
+        behind_doc: shape.behind_doc,
+        is_background: shape.is_background,
+        locked: shape.locked,
+        name: Cow::Owned(name),
+        properties,
+        result: None,
+        info,
+    })
+}
+
+fn owned_shape_group(
+    group: &crate::ShapeGroup<'_>,
+    limits: crate::ParseLimits,
+) -> Result<crate::ShapeGroup<'static>, Error> {
+    owned_shape_group_at_depth(group, limits, 0)
+}
+
+fn owned_shape_group_at_depth(
+    group: &crate::ShapeGroup<'_>,
+    limits: crate::ParseLimits,
+    depth: usize,
+) -> Result<crate::ShapeGroup<'static>, Error> {
+    if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
+        return Err(Error::UnsupportedSource(
+            "shape transfer refuses excessive nested drawing depth",
+        ));
+    }
+    if group.result.is_some() {
+        return Err(Error::UnsupportedSource(
+            "shape transfer refuses legacy shape-result ownership",
+        ));
+    }
+    let name = super::clone_bounded_text(
+        group.name.as_ref(),
+        limits,
+        "could not reserve transferred shape-group name",
+    )?;
+
+    let mut shapes = Vec::new();
+    shapes.try_reserve(group.shapes.len()).map_err(|_error| {
+        Error::Write("could not reserve transferred shape-group shapes".to_string())
+    })?;
+    for shape in &group.shapes {
+        shapes.push(owned_shape_at_depth(shape, limits, depth + 1)?);
+    }
+
+    let mut groups = Vec::new();
+    groups
+        .try_reserve(group.groups.len())
+        .map_err(|_error| Error::Write("could not reserve transferred shape groups".to_string()))?;
+    for nested in &group.groups {
+        groups.push(owned_shape_group_at_depth(nested, limits, depth + 1)?);
+    }
+
+    let mut child_order = Vec::new();
+    child_order
+        .try_reserve(group.child_order.len())
+        .map_err(|_error| {
+            Error::Write("could not reserve transferred shape-group child order".to_string())
+        })?;
+    child_order.extend_from_slice(&group.child_order);
+
+    let mut info = Vec::new();
+    info.try_reserve(group.info.len()).map_err(|_error| {
+        Error::Write("could not reserve transferred shape-group info".to_string())
+    })?;
+    info.extend_from_slice(&group.info);
+
+    let mut properties = Vec::new();
+    properties
+        .try_reserve(group.properties.len())
+        .map_err(|_error| {
+            Error::Write("could not reserve transferred shape-group properties".to_string())
+        })?;
+    for property in &group.properties {
+        properties.push(owned_shape_property(property, limits)?);
+    }
+
+    Ok(crate::ShapeGroup {
+        position: group.position,
+        name: Cow::Owned(name),
+        shapes,
+        groups,
+        child_order,
+        info,
+        geometry: group.geometry,
+        properties,
+        result: None,
+    })
+}
+
+fn owned_shape_property(
+    property: &crate::ShapeProperty<'_>,
+    limits: crate::ParseLimits,
+) -> Result<crate::ShapeProperty<'static>, Error> {
+    let name = super::clone_bounded_text(
+        property.name.as_ref(),
+        limits,
+        "could not reserve transferred shape-property name",
+    )?;
+    let value = super::clone_bounded_text(
+        property.value.as_ref(),
+        limits,
+        "could not reserve transferred shape-property value",
+    )?;
+    let binary_value = property
+        .binary_value
+        .as_ref()
+        .map(|bytes| {
+            super::clone_bounded_bytes(
+                bytes.as_ref(),
+                limits,
+                "could not reserve transferred shape-property binary value",
+            )
+            .map(Cow::Owned)
+        })
+        .transpose()?;
+    let hyperlink = property
+        .hyperlink
+        .as_ref()
+        .map(|link| owned_shape_hyperlink(link, limits))
+        .transpose()?;
+    Ok(crate::ShapeProperty {
+        name: Cow::Owned(name),
+        value: Cow::Owned(value),
+        binary_value,
+        theme_value: property.theme_value,
+        hyperlink,
+    })
+}
+
+fn owned_shape_hyperlink(
+    hyperlink: &crate::ShapeHyperlink<'_>,
+    limits: crate::ParseLimits,
+) -> Result<crate::ShapeHyperlink<'static>, Error> {
+    Ok(crate::ShapeHyperlink {
+        location: owned_optional_shape_text(
+            hyperlink.location.as_ref(),
+            limits,
+            "could not reserve transferred shape-hyperlink location",
+        )?,
+        source: owned_optional_shape_text(
+            hyperlink.source.as_ref(),
+            limits,
+            "could not reserve transferred shape-hyperlink source",
+        )?,
+        friendly_name: owned_optional_shape_text(
+            hyperlink.friendly_name.as_ref(),
+            limits,
+            "could not reserve transferred shape-hyperlink friendly name",
+        )?,
+    })
+}
+
+fn owned_optional_shape_text(
+    value: Option<&Cow<'_, str>>,
+    limits: crate::ParseLimits,
+    context: &'static str,
+) -> Result<Option<Cow<'static, str>>, Error> {
+    value
+        .map(|value| super::clone_bounded_text(value.as_ref(), limits, context))
+        .transpose()
+        .map(|value| value.map(Cow::Owned))
+}
+
+fn owned_transfer_table(
+    table: &crate::Table<'_>,
+    limits: crate::ParseLimits,
+    depth: usize,
+) -> Result<crate::Table<'static>, Error> {
+    if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
+        return Err(Error::UnsupportedSource(
+            "nested-table transfer refuses excessive table depth",
+        ));
+    }
+    let mut output = crate::Table::new();
+    output.set_direction(table.direction());
+    for row in table.rows() {
+        let mut owned_row = crate::Row::new();
+        owned_row.set_table_style(row.table_style());
+        owned_row.set_table_rsid(row.table_rsid());
+        owned_row.set_direction(row.direction());
+        owned_row.set_layout(*row.layout());
+        owned_row.set_borders(row.borders().clone());
+        owned_row.set_shading(row.shading());
+        owned_row.set_geometry(row.geometry());
+        owned_row.set_autoformat_flags(row.autoformat_flags());
+        owned_row.set_banding(row.banding());
+        owned_row.set_revision(row.revision());
+        for cell in row.cells() {
+            let text = super::clone_bounded_text(
+                cell.text(),
+                limits,
+                "could not reserve nested-table cell text",
+            )?;
+            let mut owned_cell = crate::Cell::with_distances(
+                Cow::Owned(text),
+                cell.padding().clone(),
+                cell.spacing().clone(),
+            );
+            owned_cell.set_layout(*cell.layout());
+            owned_cell.set_merge(cell.merge());
+            owned_cell.set_right_boundary(cell.right_boundary());
+            owned_cell.set_preferred_width(cell.preferred_width());
+            owned_cell.set_revision(cell.revision());
+            owned_cell.set_borders(cell.borders().clone());
+            owned_cell.set_shading(cell.shading());
+            for nested in cell.nested_tables() {
+                owned_cell.add_nested_table(
+                    nested.text_offset,
+                    owned_transfer_table(&nested.table, limits, depth + 1)?,
+                )?;
+            }
+
+            let mut shapes = Vec::new();
+            shapes.try_reserve(cell.shapes().len()).map_err(|_error| {
+                Error::Write("could not reserve nested-table shapes".to_string())
+            })?;
+            for shape in cell.shapes() {
+                shapes.push(owned_shape(shape, limits)?);
+            }
+            let mut shape_groups = Vec::new();
+            shape_groups
+                .try_reserve(cell.shape_groups().len())
+                .map_err(|_error| {
+                    Error::Write("could not reserve nested-table shape groups".to_string())
+                })?;
+            for group in cell.shape_groups() {
+                shape_groups.push(owned_shape_group(group, limits)?);
+            }
+            let mut drawing_order = Vec::new();
+            drawing_order
+                .try_reserve(cell.drawing_order().len())
+                .map_err(|_error| {
+                    Error::Write("could not reserve nested-table drawing order".to_string())
+                })?;
+            drawing_order.extend_from_slice(cell.drawing_order());
+            let mut story_events = Vec::new();
+            story_events
+                .try_reserve(cell.story_events().len())
+                .map_err(|_error| {
+                    Error::Write("could not reserve nested-table story events".to_string())
+                })?;
+            story_events.extend_from_slice(cell.story_events());
+            owned_cell.set_story_content(shapes, shape_groups, drawing_order, story_events)?;
+            owned_row.try_add_cell(owned_cell)?;
+        }
+        owned_row.set_padding(row.padding().clone());
+        owned_row.set_spacing(row.spacing().clone());
+        owned_row.set_cell_defaults(row.cell_defaults().clone());
+        owned_row.set_positioning(row.positioning().clone());
+        output.try_add_row(owned_row)?;
+    }
+    Ok(output)
+}
+
+fn validate_table_transfer(
+    source: &Snapshot,
+    table: &crate::Table<'_>,
+    depth: usize,
+) -> Result<usize, Error> {
+    let mut node_count = 1usize;
+    validate_table_transfer_at_depth(source, table, depth, &mut node_count)
+}
+
+fn validate_table_transfer_at_depth(
+    source: &Snapshot,
+    table: &crate::Table<'_>,
+    depth: usize,
+    node_count: &mut usize,
+) -> Result<usize, Error> {
+    if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
+        return Err(Error::UnsupportedSource(
+            "nested-table transfer refuses excessive table depth",
+        ));
+    }
     let mut drawing_count = 0usize;
     for row in table.rows() {
+        *node_count = node_count.checked_add(1).ok_or(Error::UnsupportedSource(
+            "nested-table transfer node count overflows",
+        ))?;
+        if *node_count > MAX_TRANSFER_TABLE_NODES {
+            return Err(Error::UnsupportedSource(
+                "nested-table transfer exceeds bounded table ownership",
+            ));
+        }
         for cell in row.cells() {
+            *node_count = node_count.checked_add(1).ok_or(Error::UnsupportedSource(
+                "nested-table transfer node count overflows",
+            ))?;
+            if *node_count > MAX_TRANSFER_TABLE_NODES {
+                return Err(Error::UnsupportedSource(
+                    "nested-table transfer exceeds bounded table ownership",
+                ));
+            }
             refuse_drawing_story_fields(cell.shapes(), cell.shape_groups())?;
+            refuse_active_shape_links(cell.shapes(), cell.shape_groups())?;
             drawing_count = drawing_count
                 .saturating_add(cell.shapes().len())
                 .saturating_add(cell.shape_groups().len());
@@ -671,8 +1258,20 @@ fn validate_table_transfer(source: &Snapshot, table: &crate::Table<'_>) -> Resul
                 ));
             }
             for nested in cell.nested_tables() {
-                drawing_count =
-                    drawing_count.saturating_add(validate_table_transfer(source, &nested.table)?);
+                *node_count = node_count.checked_add(1).ok_or(Error::UnsupportedSource(
+                    "nested-table transfer node count overflows",
+                ))?;
+                if *node_count > MAX_TRANSFER_TABLE_NODES {
+                    return Err(Error::UnsupportedSource(
+                        "nested-table transfer exceeds bounded table ownership",
+                    ));
+                }
+                drawing_count = drawing_count.saturating_add(validate_table_transfer_at_depth(
+                    source,
+                    &nested.table,
+                    depth + 1,
+                    node_count,
+                )?);
             }
         }
     }
@@ -730,7 +1329,7 @@ fn remap_table_field_indices(
             for nested in cell.nested_tables_mut() {
                 remap_table_field_indices(&mut nested.table, indices)?;
             }
-            let mut events = cell.story_events().to_vec();
+            let (shapes, shape_groups, drawing_order, mut events) = cell.take_story_content();
             for event in &mut events {
                 if let crate::CellStoryEvent::Field(field) = event {
                     field.field_index = *indices.get(&field.field_index).ok_or_else(|| {
@@ -740,12 +1339,7 @@ fn remap_table_field_indices(
                     })?;
                 }
             }
-            cell.set_story_content(
-                cell.shapes().to_vec(),
-                cell.shape_groups().to_vec(),
-                cell.drawing_order().to_vec(),
-                events,
-            )?;
+            cell.set_story_content(shapes, shape_groups, drawing_order, events)?;
         }
     }
     Ok(())
@@ -760,11 +1354,7 @@ fn validate_transferable_field(
             "nested-table story field has an incompatible owner",
         ));
     }
-    if active_field(field.field_type) {
-        return Err(Error::UnsupportedSource(
-            "nested-table field transfer refuses active or external instructions",
-        ));
-    }
+    validate_transferable_field_kind(field)?;
     if field
         .result_events
         .iter()
@@ -786,55 +1376,187 @@ fn refuse_drawing_story_fields(
     shapes: &[crate::Shape<'_>],
     groups: &[crate::ShapeGroup<'_>],
 ) -> Result<(), Error> {
-    if shapes.iter().any(shape_has_story_fields) || groups.iter().any(shape_group_has_story_fields)
+    for shape in shapes {
+        refuse_shape_story_fields(shape, 0)?;
+    }
+    for group in groups {
+        refuse_shape_group_story_fields(group, 0)?;
+    }
+    Ok(())
+}
+
+fn refuse_active_shape_links(
+    shapes: &[crate::Shape<'_>],
+    groups: &[crate::ShapeGroup<'_>],
+) -> Result<(), Error> {
+    for shape in shapes {
+        refuse_shape_active_link(shape, 0)?;
+    }
+    for group in groups {
+        refuse_shape_group_active_link(group, 0)?;
+    }
+    Ok(())
+}
+
+fn refuse_shape_story_fields(shape: &crate::Shape<'_>, depth: usize) -> Result<(), Error> {
+    if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
+        return Err(Error::UnsupportedSource(
+            "drawing transfer refuses excessive nested drawing depth",
+        ));
+    }
+    if shape
+        .text_story_events
+        .iter()
+        .any(|event| matches!(event, crate::StoryEvent::Field(_)))
     {
         return Err(Error::UnsupportedSource(
             "drawing transfer refuses unresolved shape-text field handles",
         ));
     }
+    for nested in &shape.text_shapes {
+        refuse_shape_story_fields(nested, depth + 1)?;
+    }
+    for group in &shape.text_shape_groups {
+        refuse_shape_group_story_fields(group, depth + 1)?;
+    }
     Ok(())
 }
 
-fn shape_has_story_fields(shape: &crate::Shape<'_>) -> bool {
-    shape
-        .text_story_events
+fn refuse_shape_group_story_fields(
+    group: &crate::ShapeGroup<'_>,
+    depth: usize,
+) -> Result<(), Error> {
+    if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
+        return Err(Error::UnsupportedSource(
+            "drawing transfer refuses excessive nested drawing depth",
+        ));
+    }
+    for shape in &group.shapes {
+        refuse_shape_story_fields(shape, depth + 1)?;
+    }
+    for nested in &group.groups {
+        refuse_shape_group_story_fields(nested, depth + 1)?;
+    }
+    Ok(())
+}
+
+fn refuse_shape_active_link(shape: &crate::Shape<'_>, depth: usize) -> Result<(), Error> {
+    if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
+        return Err(Error::UnsupportedSource(
+            "shape transfer refuses excessive nested drawing depth",
+        ));
+    }
+    if shape
+        .properties
         .iter()
-        .any(|event| matches!(event, crate::StoryEvent::Field(_)))
-        || shape.text_shapes.iter().any(shape_has_story_fields)
-        || shape
-            .text_shape_groups
-            .iter()
-            .any(shape_group_has_story_fields)
+        .any(|property| property.hyperlink.is_some())
+    {
+        return Err(Error::UnsupportedSource(
+            "shape transfer refuses active hyperlink metadata",
+        ));
+    }
+    for nested in &shape.text_shapes {
+        refuse_shape_active_link(nested, depth + 1)?;
+    }
+    for group in &shape.text_shape_groups {
+        refuse_shape_group_active_link(group, depth + 1)?;
+    }
+    Ok(())
 }
 
-fn shape_group_has_story_fields(group: &crate::ShapeGroup<'_>) -> bool {
-    group.shapes.iter().any(shape_has_story_fields)
-        || group.groups.iter().any(shape_group_has_story_fields)
+fn refuse_shape_group_active_link(
+    group: &crate::ShapeGroup<'_>,
+    depth: usize,
+) -> Result<(), Error> {
+    if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
+        return Err(Error::UnsupportedSource(
+            "shape transfer refuses excessive nested drawing depth",
+        ));
+    }
+    if group
+        .properties
+        .iter()
+        .any(|property| property.hyperlink.is_some())
+    {
+        return Err(Error::UnsupportedSource(
+            "shape transfer refuses active hyperlink metadata",
+        ));
+    }
+    for shape in &group.shapes {
+        refuse_shape_active_link(shape, depth + 1)?;
+    }
+    for nested in &group.groups {
+        refuse_shape_group_active_link(nested, depth + 1)?;
+    }
+    Ok(())
 }
 
-fn shape_dependency_count(shape: &crate::Shape<'_>) -> usize {
+fn shape_dependency_count(shape: &crate::Shape<'_>) -> Result<usize, Error> {
+    shape_dependency_count_at_depth(shape, 0)
+}
+
+fn shape_dependency_count_at_depth(shape: &crate::Shape<'_>, depth: usize) -> Result<usize, Error> {
+    if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
+        return Err(Error::UnsupportedSource(
+            "shape transfer refuses excessive nested drawing depth",
+        ));
+    }
     let mut count = shape
         .text_shapes
         .len()
-        .saturating_add(shape.text_shape_groups.len());
+        .checked_add(shape.text_shape_groups.len())
+        .ok_or(Error::UnsupportedSource(
+            "shape transfer dependency count overflows",
+        ))?;
     for nested in &shape.text_shapes {
-        count = count.saturating_add(shape_dependency_count(nested));
+        count = count
+            .checked_add(shape_dependency_count_at_depth(nested, depth + 1)?)
+            .ok_or(Error::UnsupportedSource(
+                "shape transfer dependency count overflows",
+            ))?;
     }
     for group in &shape.text_shape_groups {
-        count = count.saturating_add(shape_group_dependency_count(group));
+        count = count
+            .checked_add(shape_group_dependency_count_at_depth(group, depth + 1)?)
+            .ok_or(Error::UnsupportedSource(
+                "shape transfer dependency count overflows",
+            ))?;
     }
-    count
+    Ok(count)
 }
 
-fn shape_group_dependency_count(group: &crate::ShapeGroup<'_>) -> usize {
-    let mut count = group.shapes.len().saturating_add(group.groups.len());
+fn shape_group_dependency_count_at_depth(
+    group: &crate::ShapeGroup<'_>,
+    depth: usize,
+) -> Result<usize, Error> {
+    if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
+        return Err(Error::UnsupportedSource(
+            "shape transfer refuses excessive nested drawing depth",
+        ));
+    }
+    let mut count =
+        group
+            .shapes
+            .len()
+            .checked_add(group.groups.len())
+            .ok_or(Error::UnsupportedSource(
+                "shape transfer dependency count overflows",
+            ))?;
     for shape in &group.shapes {
-        count = count.saturating_add(shape_dependency_count(shape));
+        count = count
+            .checked_add(shape_dependency_count_at_depth(shape, depth + 1)?)
+            .ok_or(Error::UnsupportedSource(
+                "shape transfer dependency count overflows",
+            ))?;
     }
     for nested in &group.groups {
-        count = count.saturating_add(shape_group_dependency_count(nested));
+        count = count
+            .checked_add(shape_group_dependency_count_at_depth(nested, depth + 1)?)
+            .ok_or(Error::UnsupportedSource(
+                "shape transfer dependency count overflows",
+            ))?;
     }
-    count
+    Ok(count)
 }
 
 fn count_styled_rows(table: &crate::Table<'_>) -> usize {
