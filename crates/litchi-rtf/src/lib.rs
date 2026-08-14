@@ -187,7 +187,9 @@ pub use api::Document;
 pub use codec::error::{RtfError as Error, RtfResult as Result};
 pub use tail_append::{
     DurableTailAppendPatch, PlainParagraph, PlainRun, TailAppendCommit, TailAppendDiagnostics,
-    TailAppendEdit, TailAppendError, TailAppendLimits, TailAppendPatch, TailSelector,
+    TailAppendEdit, TailAppendError, TailAppendLimits, TailAppendOutputProgress, TailAppendPatch,
+    TailAppendPublicationError, TailAppendPublicationLimits, TailAppendPublicationPlan,
+    TailAppendPublicationReport, TailSelector,
 };
 pub use validation::{
     ValidationCheck, ValidationCounts, ValidationDependency, ValidationLimits, ValidationReport,
