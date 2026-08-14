@@ -61,6 +61,7 @@ fn presentation_with_vba_storage() -> Presentation {
         persist_mapping,
         slide_directory: SlideDirectory::new_for_test(0),
         pictures_data: None,
+        pictures_source: None,
         record_limits: crate::RecordLimits::default(),
     }
 }
@@ -76,6 +77,7 @@ fn lazy_live_document_reuses_presentation_record_limits() {
         persist_mapping,
         slide_directory: SlideDirectory::new_for_test(0),
         pictures_data: None,
+        pictures_source: None,
         record_limits: crate::RecordLimits {
             max_record_payload_bytes: 0,
             ..crate::RecordLimits::default()

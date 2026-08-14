@@ -22,9 +22,90 @@ use crate::sound_collection::Collection;
 use crate::view_info::SlideViewInformation;
 #[cfg(feature = "vba-inspection")]
 use litchi_cfb::OleFile;
+use litchi_cfb::SharedOleFile;
 use litchi_odraw::image::{File as ImageFile, Id as ImageId, Store as ImageStore};
 #[cfg(feature = "vba-inspection")]
 use std::io::Cursor;
+use std::sync::{Arc, OnceLock};
+
+/// Deferred native `Pictures` stream owned by a positional presentation.
+///
+/// The descriptor is created from the validated CFB directory and is kept
+/// independently from the payload cache.  A successful materialization is
+/// published exactly once; failed reads are deliberately left retryable.
+pub(super) struct LazyPictures {
+    shared: Arc<SharedOleFile>,
+    path: &'static [&'static str],
+    length: usize,
+    limits: RecordLimits,
+    #[cfg(feature = "encryption")]
+    crypto: Option<litchi_crypto::rc4::Context>,
+    cache: OnceLock<Arc<[u8]>>,
+}
+
+impl LazyPictures {
+    pub(super) fn new(
+        shared: Arc<SharedOleFile>,
+        path: &'static [&'static str],
+        length: usize,
+        limits: RecordLimits,
+        #[cfg(feature = "encryption")] crypto: Option<litchi_crypto::rc4::Context>,
+    ) -> Self {
+        Self {
+            shared,
+            path,
+            length,
+            limits,
+            #[cfg(feature = "encryption")]
+            crypto,
+            cache: OnceLock::new(),
+        }
+    }
+
+    pub(super) fn bytes(&self) -> Result<&[u8]> {
+        // This check is intentionally before the cache branch: a stale source
+        // must not make a previously successful payload appear current.
+        self.shared.source_version()?;
+        if self.cache.get().is_none() {
+            if self.length > self.limits.max_input_bytes {
+                return Err(Error::ResourceLimit(format!(
+                    "Pictures stream size {} exceeds limit {}",
+                    self.length, self.limits.max_input_bytes
+                )));
+            }
+            let declared = self.shared.stream_len(self.path)?;
+            let declared = usize::try_from(declared).map_err(|_error| {
+                Error::ResourceLimit("Pictures stream size exceeds this platform".to_string())
+            })?;
+            if declared != self.length {
+                return Err(Error::Corrupted(
+                    "Pictures stream length changed after positional open".to_string(),
+                ));
+            }
+            #[cfg(feature = "encryption")]
+            let mut data = self.shared.open_stream(self.path)?;
+            #[cfg(not(feature = "encryption"))]
+            let data = self.shared.open_stream(self.path)?;
+            if data.len() != self.length {
+                return Err(Error::Corrupted(
+                    "Pictures stream was truncated during positional read".to_string(),
+                ));
+            }
+            #[cfg(feature = "encryption")]
+            if let Some(crypto) = &self.crypto {
+                crate::encryption::decrypt_pictures(&mut data, crypto, self.limits)?;
+            }
+            // Check again after the potentially expensive decode/decrypt and
+            // before publishing the cache entry.
+            self.shared.source_version()?;
+            let _ = self.cache.set(data.into());
+        }
+        self.cache
+            .get()
+            .map(Arc::as_ref)
+            .ok_or_else(|| Error::Corrupted("Pictures cache was not published".to_string()))
+    }
+}
 
 /// A `PowerPoint` presentation (.ppt) with high-performance zero-copy parsing.
 ///
@@ -60,6 +141,8 @@ pub struct Presentation {
     pub(super) slide_directory: SlideDirectory,
     /// Pictures stream data (for image extraction)
     pub(super) pictures_data: Option<Vec<u8>>,
+    /// Positional Pictures descriptor and success-only payload cache.
+    pub(super) pictures_source: Option<LazyPictures>,
     /// Record limits retained for lazy live-persist parsing.
     pub(crate) record_limits: RecordLimits,
 }
@@ -1174,10 +1257,9 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn images(&self) -> Result<Vec<ImageFile<'_>>> {
         if let Some(store) = self.image_store()? {
-            return litchi_odraw::image::all(&store, self.pictures_data.as_deref())
-                .map_err(Error::from);
+            return litchi_odraw::image::all(&store, self.pictures_bytes()?).map_err(Error::from);
         }
-        self.pictures_data.as_deref().map_or_else(
+        self.pictures_bytes()?.map_or_else(
             || Ok(Vec::new()),
             |pictures| litchi_odraw::image::delay(pictures).map_err(Error::from),
         )
@@ -1201,7 +1283,7 @@ impl Presentation {
         let Some(store) = self.image_store()? else {
             return Ok(None);
         };
-        litchi_odraw::image::get(&store, id, self.pictures_data.as_deref()).map_err(Error::from)
+        litchi_odraw::image::get(&store, id, self.pictures_bytes()?).map_err(Error::from)
     }
 
     /// Resolves a raw one-based host index after checking its `OfficeArt` range.
@@ -1241,10 +1323,19 @@ impl Presentation {
         Ok(store)
     }
 
+    fn pictures_bytes(&self) -> Result<Option<&[u8]>> {
+        if let Some(data) = self.pictures_data.as_deref() {
+            return Ok(Some(data));
+        }
+        self.pictures_source
+            .as_ref()
+            .map_or(Ok(None), |source| source.bytes().map(Some))
+    }
+
     /// Check if the presentation has a Pictures stream
     #[must_use]
     pub fn has_pictures(&self) -> bool {
-        self.pictures_data.is_some()
+        self.pictures_data.is_some() || self.pictures_source.is_some()
     }
 
     /// Strictly parse slide and notes editing-view information.
