@@ -154,8 +154,8 @@ pub use media_parts::{
 };
 pub use modern_comments::*;
 pub use opened::{
-    MAX_SHAPE_TEXT_REPLACEMENTS, ShapeTextReplacement, SlideCopyPart, SlideCopyPlan,
-    SlideRemovalPatch, SlideRemovalPlan,
+    CrossSlideCopyPatch, CrossSlideCopyPlan, MAX_SHAPE_TEXT_REPLACEMENTS, ShapeTextReplacement,
+    SlideCopyPart, SlideCopyPlan, SlideRemovalPatch, SlideRemovalPlan,
 };
 pub use package::Package;
 pub use presentation::{

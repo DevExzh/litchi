@@ -49,6 +49,9 @@ pub enum SlideCopyRefusal {
     AmbiguousTopology,
     /// A DrawingML table depends on the presentation-global table-style catalog.
     GlobalTableStyle,
+    /// The physical package carries an unknown non-Part ZIP member that this
+    /// topology-changing operation cannot preserve or authorize.
+    UnknownPhysicalMember,
 }
 
 /// Stable classification for a whole-slide removal plan that cannot prove a
@@ -72,6 +75,9 @@ pub enum SlideRemovalRefusal {
     UnsupportedRelationship,
     /// The package or selected slide has ambiguous physical ownership.
     AmbiguousTopology,
+    /// The physical package carries an unknown non-Part ZIP member that this
+    /// topology-changing operation cannot preserve.
+    UnknownPhysicalMember,
     /// A presentation must retain at least one slide.
     FinalSlide,
 }
@@ -88,6 +94,7 @@ impl std::fmt::Display for SlideCopyRefusal {
             Self::DependencyCycle => "dependency cycle",
             Self::AmbiguousTopology => "ambiguous package topology",
             Self::GlobalTableStyle => "presentation-global table style",
+            Self::UnknownPhysicalMember => "unknown physical package member",
         })
     }
 }
@@ -103,6 +110,7 @@ impl std::fmt::Display for SlideRemovalRefusal {
             Self::SharedOwner => "shared or cross-slide owner",
             Self::UnsupportedRelationship => "unsupported relationship family",
             Self::AmbiguousTopology => "ambiguous package topology",
+            Self::UnknownPhysicalMember => "unknown physical package member",
             Self::FinalSlide => "final remaining slide",
         })
     }

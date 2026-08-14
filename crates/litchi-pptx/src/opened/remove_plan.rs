@@ -8,8 +8,8 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::copy_plan::{
-    has_signature_infrastructure, reject_mce, resolve_slide, validate_registered_layout,
-    validate_slide_surface,
+    has_signature_infrastructure, reject_mce, reject_unknown_non_part_members, resolve_slide,
+    validate_registered_layout, validate_slide_surface,
 };
 use super::model::{Slide, Snapshot, invalid};
 use super::patch::Patch;
@@ -269,6 +269,10 @@ impl Snapshot {
                 limit: self.limits.max_parts(),
             });
         }
+        map_copy_refusal(reject_unknown_non_part_members(
+            self.package.as_ref(),
+            "slide-removal source",
+        ))?;
         if has_signature_infrastructure(self.package.as_ref()) {
             return refusal(
                 SlideRemovalRefusal::SignedPackage,
@@ -876,6 +880,9 @@ fn map_copy_refusal(value: Result<()>) -> Result<()> {
                 },
                 SlideCopyRefusal::SharedOwner | SlideCopyRefusal::GlobalTableStyle => {
                     SlideRemovalRefusal::SharedOwner
+                },
+                SlideCopyRefusal::UnknownPhysicalMember => {
+                    SlideRemovalRefusal::UnknownPhysicalMember
                 },
                 SlideCopyRefusal::UnsupportedRelationship => {
                     SlideRemovalRefusal::UnsupportedRelationship

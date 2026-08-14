@@ -161,6 +161,7 @@ impl Package {
         Ok(Self {
             opc: package,
             mutable_pres: Some(MutablePresentation::new()),
+            physical_source_provenance: false,
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
             #[cfg(feature = "automatic-fonts")]
@@ -186,7 +187,7 @@ impl Package {
         path: P,
         limits: litchi_opc::ReadLimits,
     ) -> Result<Self> {
-        Self::from_opc_package(OpcPackage::open_with_limits(path, limits)?)
+        Self::from_opc_package_with_provenance(OpcPackage::open_with_limits(path, limits)?, true)
     }
 
     /// Parse a PPTX from a reader.
@@ -207,7 +208,10 @@ impl Package {
         reader: R,
         limits: litchi_opc::ReadLimits,
     ) -> Result<Self> {
-        Self::from_opc_package(OpcPackage::from_reader_with_limits(reader, limits)?)
+        Self::from_opc_package_with_provenance(
+            OpcPackage::from_reader_with_limits(reader, limits)?,
+            true,
+        )
     }
 
     /// Parse a PPTX from an owned ZIP buffer.
@@ -225,7 +229,10 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_vec_with_limits(bytes: Vec<u8>, limits: litchi_opc::ReadLimits) -> Result<Self> {
-        Self::from_opc_package(OpcPackage::from_vec_with_limits(bytes, limits)?)
+        Self::from_opc_package_with_provenance(
+            OpcPackage::from_vec_with_limits(bytes, limits)?,
+            true,
+        )
     }
 
     /// Parse a PPTX from a borrowed ZIP buffer.
@@ -252,11 +259,19 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_opc_package(opc: OpcPackage) -> Result<Self> {
+        Self::from_opc_package_with_provenance(opc, false)
+    }
+
+    fn from_opc_package_with_provenance(
+        opc: OpcPackage,
+        physical_source_provenance: bool,
+    ) -> Result<Self> {
         let main = opc.main_document_part()?;
         PresentationPart::from_part(main)?;
         Ok(Self {
             opc,
             mutable_pres: None,
+            physical_source_provenance,
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
             #[cfg(feature = "automatic-fonts")]

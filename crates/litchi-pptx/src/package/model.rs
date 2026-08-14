@@ -13,6 +13,9 @@ use crate::{Error, Result};
 pub struct Package {
     pub(crate) opc: OpcPackage,
     pub(crate) mutable_pres: Option<MutablePresentation>,
+    /// Whether ingress retained the exact source archive needed for physical
+    /// revision authorization of topology-changing cross-package edits.
+    pub(crate) physical_source_provenance: bool,
     #[cfg(feature = "encryption")]
     pub(crate) encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
     #[cfg(feature = "automatic-fonts")]
@@ -183,7 +186,7 @@ impl Package {
                 reason: "save and reopen the authored presentation before starting an opened-package transaction",
             });
         }
-        crate::opened::capture(&self.opc, limits)
+        crate::opened::capture_with_provenance(&self.opc, limits, self.physical_source_provenance)
     }
 
     /// Start one detached transaction over an immutable opened root.
@@ -229,6 +232,101 @@ impl Package {
             });
         }
         let snapshot = crate::opened::apply(&mut self.opc, plan.patch())?;
+        self.mutable_pres = None;
+        Ok(snapshot)
+    }
+
+    /// Atomically publish a source-bound cross-presentation slide-copy plan.
+    ///
+    /// The source package is read-only and must retain the complete graph
+    /// revision captured during planning.  The destination is cloned and
+    /// fully validated before one publication assignment; stale or foreign
+    /// source packages are rejected before mutation.  The source layout is
+    /// never copied: the plan has already proved its inheritance equivalent to
+    /// the selected destination layout.
+    /// Source and destination must have been opened through source-preserving
+    /// ingress (`from_vec`, `open`, or `from_reader`) so discarded ZIP
+    /// ordering and extra fields cannot alias the authorization revision.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for stale source/destination graphs, a foreign source,
+    /// package mutation policy, or a candidate graph that no longer applies
+    /// exactly.
+    pub fn apply_cross_slide_copy_plan(
+        &mut self,
+        source: &Self,
+        plan: &crate::opened::CrossSlideCopyPlan,
+    ) -> Result<crate::opened::Snapshot> {
+        self.ensure_graph_current("apply_cross_slide_copy_plan")?;
+        source.ensure_graph_current("apply_cross_slide_copy_plan")?;
+        if self.mutable_pres.is_some() {
+            return Err(Error::UnsafeEdit {
+                operation: "apply_cross_slide_copy_plan",
+                reason: "cross-slide plans require an already-opened destination package",
+            });
+        }
+        if source.mutable_pres.is_some() {
+            return Err(Error::UnsafeEdit {
+                operation: "apply_cross_slide_copy_plan",
+                reason: "cross-slide plans require an already-opened source package",
+            });
+        }
+        if !source.physical_source_provenance || !self.physical_source_provenance {
+            return Err(Error::SlideCopyPlan {
+                kind: crate::SlideCopyRefusal::UnknownPhysicalMember,
+                detail: "cross-slide physical authorization requires source-preserving package ingress (use Package::from_vec, open, or from_reader)".to_owned(),
+            });
+        }
+        source.ensure_plain_mutation("apply_cross_slide_copy_plan")?;
+        self.ensure_plain_mutation("apply_cross_slide_copy_plan")?;
+        let snapshot =
+            crate::opened::cross_copy_plan::apply_plan(&source.opc, &mut self.opc, plan)?;
+        self.mutable_pres = None;
+        Ok(snapshot)
+    }
+
+    /// Atomically publish a durable source- and destination-bound
+    /// cross-presentation slide-copy patch.
+    ///
+    /// The source package remains immutable.  The patch's inverse can restore
+    /// the destination when the same source revision and the corresponding
+    /// destination target revision are still present.
+    /// Both packages must retain source-preserving physical provenance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for stale or foreign packages, malformed forged patch
+    /// descriptors, rejected mutation policy, or candidate validation failure.
+    pub fn apply_cross_slide_copy_patch(
+        &mut self,
+        source: &Self,
+        patch: &crate::opened::CrossSlideCopyPatch,
+    ) -> Result<crate::opened::Snapshot> {
+        self.ensure_graph_current("apply_cross_slide_copy_patch")?;
+        source.ensure_graph_current("apply_cross_slide_copy_patch")?;
+        if self.mutable_pres.is_some() {
+            return Err(Error::UnsafeEdit {
+                operation: "apply_cross_slide_copy_patch",
+                reason: "cross-slide patches require an already-opened destination package",
+            });
+        }
+        if source.mutable_pres.is_some() {
+            return Err(Error::UnsafeEdit {
+                operation: "apply_cross_slide_copy_patch",
+                reason: "cross-slide patches require an already-opened source package",
+            });
+        }
+        if !source.physical_source_provenance || !self.physical_source_provenance {
+            return Err(Error::SlideCopyPlan {
+                kind: crate::SlideCopyRefusal::UnknownPhysicalMember,
+                detail: "cross-slide physical authorization requires source-preserving package ingress (use Package::from_vec, open, or from_reader)".to_owned(),
+            });
+        }
+        source.ensure_plain_mutation("apply_cross_slide_copy_patch")?;
+        self.ensure_plain_mutation("apply_cross_slide_copy_patch")?;
+        let snapshot =
+            crate::opened::cross_copy_plan::apply_patch(&source.opc, &mut self.opc, patch)?;
         self.mutable_pres = None;
         Ok(snapshot)
     }
