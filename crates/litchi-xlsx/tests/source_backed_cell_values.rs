@@ -23,6 +23,8 @@ struct VersionedSource {
     bytes: Vec<u8>,
     id: u64,
     revision: AtomicU64,
+    rejected_read_offset: AtomicU64,
+    rejected_read_count: AtomicU64,
 }
 
 impl VersionedSource {
@@ -31,10 +33,19 @@ impl VersionedSource {
             bytes,
             id: NEXT_SOURCE_ID.fetch_add(1, Ordering::Relaxed),
             revision: AtomicU64::new(0),
+            rejected_read_offset: AtomicU64::new(u64::MAX),
+            rejected_read_count: AtomicU64::new(0),
         }
     }
     fn changed(&self) {
         self.revision.fetch_add(1, Ordering::SeqCst);
+    }
+    fn reject_small_read_at(&self, offset: u64) {
+        self.rejected_read_count.store(0, Ordering::SeqCst);
+        self.rejected_read_offset.store(offset, Ordering::SeqCst);
+    }
+    fn rejected_small_read_count(&self) -> u64 {
+        self.rejected_read_count.load(Ordering::SeqCst)
     }
 }
 
@@ -43,6 +54,11 @@ impl ReadAt for VersionedSource {
         Ok(self.bytes.len() as u64)
     }
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        if offset == self.rejected_read_offset.load(Ordering::SeqCst) && output.len() < 64 * 1024
+        {
+            self.rejected_read_count.fetch_add(1, Ordering::SeqCst);
+            return Err(io::Error::other("selected worksheet payload read rejected"));
+        }
         let offset = usize::try_from(offset).map_err(|_| io::Error::other("offset"))?;
         if offset >= self.bytes.len() {
             return Ok(0);
@@ -111,6 +127,56 @@ fn fixture(sheet_xml: String, signed: bool) -> Vec<u8> {
             .unwrap();
         package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     }
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
+fn zip_member_data_offset(bytes: &[u8], member: &[u8]) -> u64 {
+    for offset in 0..bytes.len().saturating_sub(30) {
+        if bytes.get(offset..offset + 4) != Some(b"PK\x03\x04") {
+            continue;
+        }
+        let name_len = usize::from(u16::from_le_bytes([
+            bytes[offset + 26],
+            bytes[offset + 27],
+        ]));
+        let extra_len = usize::from(u16::from_le_bytes([
+            bytes[offset + 28],
+            bytes[offset + 29],
+        ]));
+        let name_start = offset + 30;
+        let name_end = name_start.checked_add(name_len).unwrap();
+        if bytes.get(name_start..name_end) == Some(member) {
+            return u64::try_from(name_end + extra_len).unwrap();
+        }
+    }
+    panic!("ZIP member local header not found")
+}
+
+fn oversized_worksheet_xml(padding: usize, value: &str) -> Vec<u8> {
+    let mut sheet = String::with_capacity(padding + 512);
+    sheet.push_str(&format!(r#"<worksheet xmlns="{SML}">"#));
+    let mut remaining = padding;
+    while remaining != 0 {
+        let chunk = remaining.min(1024 * 1024);
+        sheet.push_str("<!--");
+        sheet.extend(std::iter::repeat_n('x', chunk));
+        sheet.push_str("-->");
+        remaining -= chunk;
+    }
+    sheet.push_str(&format!(
+        r#"<sheetData><row r="1"><c r="A1"><v>{value}</v></c></row></sheetData></worksheet>"#
+    ));
+    sheet.into_bytes()
+}
+
+fn oversized_multi_sheet_source() -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(&two_sheets()).unwrap();
+    package
+        .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
+        .unwrap()
+        // Keep Sheet1 above the default 8 MiB source payload-cache limit so
+        // an independent semantic reload must perform physical ZIP I/O.
+        .set_blob(oversized_worksheet_xml(8 * 1024 * 1024 + 64 * 1024, "1"));
     PackageWriter::to_bytes(&package).unwrap()
 }
 
@@ -599,6 +665,25 @@ fn multi_sheet_commit_rejects_foreign_source_lineage() {
 }
 
 #[test]
+fn multi_sheet_publication_rejects_source_revision_before_output() {
+    let bytes = two_sheets();
+    let source = Arc::new(VersionedSource::new(bytes));
+    let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+    let commit = editor
+        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 4u32)])
+        .unwrap()
+        .commit()
+        .unwrap();
+    source.changed();
+    let mut output = Vec::new();
+    assert!(matches!(
+        editor.publish_multi_commit_to_stream(&mut output, &commit),
+        Err(Error::Package(OpcError::SourceChanged { .. }))
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
 fn multi_sheet_exact_noop_publishes_source_byte_for_byte() {
     let bytes = two_sheets();
     let editor =
@@ -850,6 +935,33 @@ fn changed_positional_source_and_stale_in_memory_patch_are_refused() {
         commit.patch().apply(&mut stale),
         Err(Error::PatchConflict { .. })
     ));
+}
+
+#[test]
+fn exact_noop_publication_does_not_reparse_an_oversized_selected_worksheet() {
+    let bytes = oversized_multi_sheet_source();
+    let worksheet_data_offset = zip_member_data_offset(&bytes, b"xl/worksheets/sheet1.xml");
+    let source = Arc::new(VersionedSource::new(bytes.clone()));
+    let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+    let commit = editor
+        .edit_sheets(["Sheet1".into(), "Sheet2".into()])
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(commit.patch().is_empty());
+
+    source.reject_small_read_at(worksheet_data_offset);
+    let uncached_reload = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+    assert!(uncached_reload.edit_sheets(["Sheet1".into()]).is_err());
+    let rejected_reads = source.rejected_small_read_count();
+    assert!(rejected_reads > 0);
+
+    let mut output = Vec::new();
+    editor
+        .publish_multi_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(source.rejected_small_read_count(), rejected_reads);
+    assert_eq!(output, bytes);
 }
 
 #[test]
