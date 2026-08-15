@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **255 selectable cases**; 200 was the count before the
+HEAD harness contains **257 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -1015,7 +1015,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 255 selectable cases. Change
+The committed HEAD standalone harness provides 257 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1092,6 +1092,18 @@ and retained-media payload checks remain untimed. This is
 correctness/logical-read evidence only; no latency, physical-I/O,
 decompression, allocation, RSS, cold-cache, ABBA, or release claim is accepted.
 See [`0127`](changes/0127-ods-source-cell-sweep-evidence.md).
+
+Change 0134 adds matched eager/source-backed ODS ordered cell-batch sweep
+selectors over the same two-sheet 32 by 32 media-rich corpus. Owners and
+2,048 borrowed selectors are prepared before timing; each timed sample covers
+four bounded `cell_batch` calls and 8,192 black-boxed result slots. An
+independent source replay records exactly eight version observations and zero
+post-preparation payload reads per four-call sweep. Ordered digest/count and
+source/member/media identity checks remain untimed. The selectable matrix is
+257 while the default 36 cases / 198 records remain unchanged. This is
+correctness/logical-read evidence only, with no release speed or resource claim
+without ABBA. See
+[`0134`](changes/0134-ods-source-cell-batch-sweep-evidence.md).
 
 Change 0103 adds a separate pinned release ABBA capture for
 `cfb_file_same_length_overlay_atomic_save` on CPU 2 (five warm-ups and 30
