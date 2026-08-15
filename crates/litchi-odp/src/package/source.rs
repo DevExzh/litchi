@@ -6,7 +6,10 @@
 //! package media remains cold until [`SourceBackedPresentation::media_data`]
 //! selects a member.
 
-use std::sync::Arc;
+use std::sync::{
+    Arc, OnceLock,
+    atomic::{AtomicUsize, Ordering},
+};
 
 #[cfg(any(unix, windows))]
 use std::path::Path;
@@ -25,6 +28,8 @@ use crate::model::{Reference, Slide};
 const ODF_PRESENTATION: &str = "application/vnd.oasis.opendocument.presentation";
 const BODY_MARKER: &str = "<office:presentation";
 const FAMILY_NAME: &str = "ODP";
+const TEXT_CACHE_QUERY_THRESHOLD: usize = 2;
+const TEXT_CACHE_MAX_BYTES: usize = 16 * 1024 * 1024;
 
 /// The bounded ZIP-index limits accepted by source-backed ODF facades.
 pub type ReadLimits = SourcePackageLimits;
@@ -52,6 +57,8 @@ pub struct SourceBackedPresentation {
     content_xml: String,
     styles_xml: Option<String>,
     metadata: Option<litchi_core::Metadata>,
+    text_queries: AtomicUsize,
+    text_cache: OnceLock<Option<String>>,
 }
 
 impl SourceBackedPresentation {
@@ -219,6 +226,8 @@ impl SourceBackedPresentation {
             content_xml,
             styles_xml,
             metadata,
+            text_queries: AtomicUsize::new(0),
+            text_cache: OnceLock::new(),
         })
     }
 
@@ -287,6 +296,41 @@ impl SourceBackedPresentation {
     /// Extract all visible presentation text with the ordinary facade's
     /// ordering and separator semantics.
     pub fn text(&self) -> Result<String> {
+        if let Some(cache) = self.text_cache.get() {
+            self.check_source()?;
+            return self.text_from_cache(cache);
+        }
+
+        // Keep the first call on the established parser path.  Once the
+        // finite threshold is reached, retain one bounded projection when it
+        // is safe to do so.  Saturating the counter avoids an eventual wrap
+        // changing the cache state after an impractical number of calls.
+        let previous = self
+            .text_queries
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
+                Some(count.saturating_add(1))
+            })
+            .unwrap_or(usize::MAX);
+        if previous.saturating_add(1) < TEXT_CACHE_QUERY_THRESHOLD {
+            return self.text_uncached();
+        }
+
+        let text = self.text_uncached()?;
+        // Do not retain a projection unless the source is still current after
+        // the complete validating parser has finished.  The trailing check
+        // below still covers the publication window itself.
+        self.check_source()?;
+        if self.text_cache.get().is_none() {
+            self.publish_text_cache(&text);
+        }
+        let final_check = self.check_source();
+        match final_check {
+            Err(error) => Err(error),
+            Ok(()) => Ok(text),
+        }
+    }
+
+    fn text_uncached(&self) -> Result<String> {
         let slides = self.slides()?;
         let mut all_text = Vec::new();
         for slide in slides {
@@ -297,6 +341,38 @@ impl SourceBackedPresentation {
         }
         self.check_source()?;
         Ok(all_text.join("\n\n"))
+    }
+
+    fn text_from_cache(&self, cache: &Option<String>) -> Result<String> {
+        // `None` is a terminal no-retention marker for an oversized or
+        // refused cache construction.  Keep returning the ordinary parser
+        // result without retrying the cache construction.
+        let Some(text) = cache else {
+            return self.text_uncached();
+        };
+        let result = clone_text_result(text);
+        let final_check = self.check_source();
+        match final_check {
+            Err(error) => Err(error),
+            Ok(()) => result,
+        }
+    }
+
+    fn publish_text_cache(&self, text: &str) {
+        if text.len() > TEXT_CACHE_MAX_BYTES {
+            let _ = self.text_cache.set(None);
+            return;
+        }
+
+        // Reserve the retained copy fallibly.  The original parser result is
+        // still returned when the bounded optional cache cannot be allocated.
+        let mut retained = String::new();
+        if retained.try_reserve_exact(text.len()).is_err() {
+            let _ = self.text_cache.set(None);
+            return;
+        }
+        retained.push_str(text);
+        let _ = self.text_cache.set(Some(retained));
     }
 
     /// Read one package-contained media payload without following external
@@ -328,6 +404,18 @@ impl SourceBackedPresentation {
             .materialize()
             .and_then(super::Presentation::from_owned_package)
     }
+}
+
+fn clone_text_result(text: &str) -> Result<String> {
+    let mut result = String::new();
+    result
+        .try_reserve_exact(text.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODP source text result",
+            source,
+        })?;
+    result.push_str(text);
+    Ok(result)
 }
 
 fn ensure_current(expected: SourceVersion, observed: SourceVersion) -> Result<()> {

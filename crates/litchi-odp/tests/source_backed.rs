@@ -13,6 +13,7 @@ use litchi_core::{Error, ReadAt, SourceVersion};
 use litchi_odf_common::core::{PackageWriter, Profile, SourcePackageLimits};
 use litchi_odp::model::Reference;
 use litchi_odp::{Builder, Presentation, SourceBackedPresentation};
+use soapberry_zip::office::StreamingArchiveWriter;
 
 const MIME: &str = "application/vnd.oasis.opendocument.presentation";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -24,6 +25,7 @@ struct CountingSource {
     reads: AtomicUsize,
     bytes_read: AtomicUsize,
     revision: AtomicU64,
+    versions: AtomicUsize,
     ranges: Mutex<Vec<(u64, u64)>>,
 }
 
@@ -34,12 +36,21 @@ impl CountingSource {
             reads: AtomicUsize::new(0),
             bytes_read: AtomicUsize::new(0),
             revision: AtomicU64::new(0),
+            versions: AtomicUsize::new(0),
             ranges: Mutex::new(Vec::new()),
         }
     }
 
+    fn reads(&self) -> usize {
+        self.reads.load(Ordering::Relaxed)
+    }
+
     fn bytes_read(&self) -> usize {
         self.bytes_read.load(Ordering::Relaxed)
+    }
+
+    fn versions(&self) -> usize {
+        self.versions.load(Ordering::Relaxed)
     }
 
     fn bump_revision(&self) {
@@ -78,6 +89,7 @@ impl ReadAt for CountingSource {
     }
 
     fn version(&self) -> io::Result<SourceVersion> {
+        self.versions.fetch_add(1, Ordering::Relaxed);
         Ok(SourceVersion::new(
             0x4f44_5001,
             self.revision.load(Ordering::Relaxed),
@@ -102,6 +114,48 @@ fn media_package() -> Vec<u8> {
         .add_file("Media/clip.bin", &incompressible_media())
         .unwrap();
     writer.finish_to_bytes().unwrap()
+}
+
+fn text_package() -> Vec<u8> {
+    let mut builder = Builder::new();
+    builder.add_slide_with_title("First", "alpha").unwrap();
+    builder.add_slide_with_title("Second", "beta").unwrap();
+    builder.build().unwrap()
+}
+
+fn malformed_text_package() -> Vec<u8> {
+    let content = format!(
+        r#"<office:document-content xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:text="{TEXT}"><office:body><office:presentation><draw:page><draw:frame><draw:text-box><text:p><text:p>nested</text:p></text:p></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#
+    );
+    let mut writer = PackageWriter::new();
+    writer.set_mimetype(MIME).unwrap();
+    writer.add_file("content.xml", content.as_bytes()).unwrap();
+    writer.finish_to_bytes().unwrap()
+}
+
+fn oversized_text_package() -> Vec<u8> {
+    let paragraph = "x".repeat(1024 * 1024);
+    let mut content = format!(
+        r#"<office:document-content xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:text="{TEXT}"><office:body><office:presentation><draw:page>"#
+    );
+    for _ in 0..17 {
+        content.push_str("<draw:frame><draw:text-box><text:p>");
+        content.push_str(&paragraph);
+        content.push_str("</text:p></draw:text-box></draw:frame>");
+    }
+    content.push_str("</draw:page></office:presentation></office:body></office:document-content>");
+    let manifest = format!(
+        r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{MIME}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#
+    );
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
+    archive
+        .write_deflated("content.xml", content.as_bytes())
+        .unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", manifest.as_bytes())
+        .unwrap();
+    archive.finish_to_bytes().unwrap()
 }
 
 fn password_package(password: &str) -> Vec<u8> {
@@ -199,6 +253,96 @@ fn source_facade_matches_owned_semantics_and_defers_media() {
             .into_iter()
             .any(|range| overlaps(range, media_range)),
         "selected media read must touch selected media range"
+    );
+}
+
+#[test]
+fn source_facade_text_cache_preserves_projection_and_checks_freshness() {
+    let bytes = text_package();
+    let eager = Presentation::from_bytes(bytes.clone()).unwrap();
+    let source = Arc::new(CountingSource::new(bytes));
+    let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+    let expected = eager.text().unwrap();
+    let reads_before_text = source.reads();
+
+    assert_eq!(presentation.text().unwrap(), expected);
+    let versions_before_threshold_call = source.versions();
+    assert_eq!(presentation.text().unwrap(), expected);
+    assert!(source.versions() - versions_before_threshold_call >= 3);
+    let versions_before_cache_hit = source.versions();
+    assert_eq!(presentation.text().unwrap(), expected);
+    assert_eq!(
+        source.versions() - versions_before_cache_hit,
+        2,
+        "a retained text cache hit only observes source freshness before and after cloning"
+    );
+    assert_eq!(source.reads(), reads_before_text);
+    assert_eq!(expected, "First\nalpha\n\nSecond\nbeta");
+
+    source.bump_revision();
+    assert!(matches!(
+        presentation.text(),
+        Err(Error::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn source_facade_text_cache_is_safe_for_concurrent_first_construction() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<SourceBackedPresentation>();
+
+    let bytes = text_package();
+    let expected = Presentation::from_bytes(bytes.clone())
+        .unwrap()
+        .text()
+        .unwrap();
+    let source = Arc::new(CountingSource::new(bytes));
+    let presentation = Arc::new(SourceBackedPresentation::from_read_at(source.clone()).unwrap());
+
+    let handles: Vec<_> = (0..8)
+        .map(|_| {
+            let presentation = Arc::clone(&presentation);
+            std::thread::spawn(move || presentation.text())
+        })
+        .collect();
+    for handle in handles {
+        assert_eq!(handle.join().unwrap().unwrap(), expected);
+    }
+
+    let versions_before_cache_hit = source.versions();
+    assert_eq!(presentation.text().unwrap(), expected);
+    assert_eq!(source.versions() - versions_before_cache_hit, 2);
+}
+
+#[test]
+fn source_facade_text_parse_errors_are_not_cached() {
+    let source = Arc::new(CountingSource::new(malformed_text_package()));
+    let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+
+    assert!(presentation.text().is_err());
+    let versions_before_retry = source.versions();
+    assert!(presentation.text().is_err());
+    assert_eq!(
+        source.versions() - versions_before_retry,
+        2,
+        "a parse error must leave the thresholded cache uninitialized so the parser is retried"
+    );
+}
+
+#[test]
+fn source_facade_oversized_text_falls_back_without_retention() {
+    let source = Arc::new(CountingSource::new(oversized_text_package()));
+    let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+
+    let first = presentation.text().unwrap();
+    assert!(first.len() > 16 * 1024 * 1024);
+    assert_eq!(presentation.text().unwrap(), first);
+
+    let versions_before_fallback = source.versions();
+    assert_eq!(presentation.text().unwrap(), first);
+    assert!(
+        source.versions() - versions_before_fallback >= 3,
+        "an oversized projection uses the parser fallback instead of retaining text"
     );
 }
 
