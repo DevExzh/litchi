@@ -4,7 +4,6 @@ use litchi_opc::OpcPackage;
 use litchi_xlsx::Package;
 
 #[test]
-#[allow(deprecated)]
 fn plaintext_build_retains_the_legacy_opc_conversion() {
     let raw: OpcPackage = Package::create().unwrap().into();
 
