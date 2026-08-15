@@ -8,7 +8,10 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsd, tsp, tst};
-use litchi_numbers::{Package, SheetSelector, TableSelector, cell::Value, names};
+use litchi_numbers::{
+    MAX_MATERIALIZED_CELLS, Package, PackageReadOptions, PackageSemanticLimits, SheetSelector,
+    TableSelector, cell::Value, names,
+};
 use prost::Message as _;
 
 const DOCUMENT: &str = "Index/Document.iwa";
@@ -516,6 +519,42 @@ fn selectors_unicode_invalid_names_and_final_collisions_are_typed() -> TestResul
         .commit()?;
     assert_eq!(table_name(collision_away.package(), 0, 0), "Two");
     assert_eq!(table_name(collision_away.package(), 0, 1), "Three");
+    Ok(())
+}
+
+#[test]
+fn staged_name_bytes_accept_exact_limit_reject_one_over_and_bound_multiple_operations() -> TestResult
+{
+    let maximum = 256;
+    let semantic =
+        PackageSemanticLimits::default().with_projection_limits(MAX_MATERIALIZED_CELLS, maximum)?;
+    let package = Package::from_bytes_with_options(
+        &package_bytes(false, false, 0)?,
+        PackageReadOptions::new(Limits::default(), semantic),
+    )?;
+
+    let exact = package
+        .edit_names()
+        .rename_sheet("Alpha", &"a".repeat(100))?
+        .rename_table("Alpha", "One", &"b".repeat(100))?
+        .rename_table("Alpha", "Two", &"c".repeat(45))?;
+    assert!(format!("{exact:?}").contains("operations: 3"));
+
+    let first = package
+        .edit_names()
+        .rename_sheet("Alpha", &"a".repeat(100))?
+        .rename_table("Alpha", "One", &"b".repeat(100))?;
+    let error = first
+        .rename_table("Alpha", "Two", &"c".repeat(46))
+        .expect_err("the third staged name must exceed the aggregate retained budget");
+    assert!(matches!(
+        error,
+        names::Error::LimitExceeded {
+            kind: names::LimitKind::NameBytes,
+            observed: 257,
+            maximum: 256,
+        }
+    ));
     Ok(())
 }
 

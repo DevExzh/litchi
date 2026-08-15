@@ -2996,3 +2996,49 @@ with `internal-iwork-source`. The boundary-policy snapshot also records eight
 previously unclassified current manifest edges—two normal `xml-minifier`
 edges and six dev-only `soapberry-zip` edges—without changing migration-debt
 ordering. No hidden compatibility alias or new host dependency is introduced.
+
+## 2026-08-15 amendment: focused Keynote production-Prost exit
+
+The focused Keynote package no longer directly decodes application payloads
+through generated Prost messages in production. The remaining eight eager
+sites are removed together: slide node, slide, build, and shape-owner reads in
+`package.rs`, plus the two color and two path-source validations in the slide-
+transition transaction. Slide ownership and placeholder/note fields reuse the
+strict bounded speaker-notes Buffa projection; transition semantics reuse the
+strict bounded transition Buffa projection. Repeated build/drawable references,
+build fallback durations, the slide-node edge, and the shape-owned-storage
+edge are projected through complete bounded raw-wire preflights without
+publishing generated types.
+
+Opaque transition colors and paths now have strict schema-aware validation in
+place of generated decode. Selected keys and scalar framing are canonical,
+strings are UTF-8, Booleans are 0/1, floats are finite, singular fields are
+unique, and the nested proto2-required point, size, element, connection,
+subpath, and editable-node envelopes are proven before the bytes can enter a
+semantic transaction. Unknown non-group fields remain caller-owned opaque
+bytes. The ordinary `litchi-keynote` manifest edge to `prost` moves to
+development-only oracle/fixture scope.
+
+A permanent boundary ratchet scans every focused Keynote production source
+prefix and rejects `prost::Message`, generated-message `decode`, the former
+generic decode helper, and any restored normal/build Prost manifest edge. Its
+258 regression cases and the live 64-package/239-declaration boundary graph
+pass with the existing 14 ordered monolith debts unchanged. This does not
+claim that transitive archive/proto internals are Prost-free, nor does it
+retire any remaining `KeynoteEditor`, creation, media, chart, shape, table, or
+layout owner. Ordered debt 014 and the `litchi-iwa -> litchi-keynote` edge stay
+open.
+
+The same integration cut closes an allocation-amplification gap in focused
+Numbers name edits. An edit now checks the aggregate retained bytes for every
+staged before/after name before allocating either `Arc<str>`; exact no-ops
+share one `Arc`, while checked overflow and one-over-limit cases return the
+typed redacted `NameBytes` error. This is transaction hardening only and does
+not change Numbers host ownership or ordered debt 015.
+
+The root fuzz suite registers `keynote_slide_deletion` with a bounded native
+three-slide command seed. It covers selector staging, successful deletion,
+exact apply/inverse, conflicts, final-slide refusal, semantic/input limits,
+redaction, malformed ingress, and source atomicity. This adds adversarial
+evidence for the already focused deletion owner; it does not broaden deletion
+semantics or remove another host surface.

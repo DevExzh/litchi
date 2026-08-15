@@ -22,6 +22,7 @@ use std::fmt;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
+use std::str;
 use std::sync::Arc;
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -35,7 +36,7 @@ use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_detect::{Format, PreparedSource};
 use litchi_iwa_protos::{
     keynote_document_codec, keynote_placeholder_text_codec, keynote_show_codec,
-    keynote_speaker_notes_codec, kn, tswp,
+    keynote_slide_transition_codec, keynote_speaker_notes_codec,
 };
 use litchi_iwa_text::storage::Storage;
 use litchi_iwa_text_wire::{
@@ -44,7 +45,6 @@ use litchi_iwa_text_wire::{
     Limits as TextWireLimits,
 };
 use once_cell::sync::OnceCell;
-use prost::Message;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -885,30 +885,15 @@ impl Package {
                 &[SLIDE_NODE_MESSAGE_TYPE],
                 "Keynote slide node",
             )?;
-            let is_skipped =
-                strict_slide_node_skipped(node_payload, wire_limits).map_err(|error| {
-                    map_wire_preflight_error(
-                        error,
-                        "Keynote slide node",
-                        SemanticPath::Slide { index },
-                    )
-                })?;
-            let node_archive: kn::SlideNodeArchive =
-                decode_message(node_payload, "Keynote slide node")?;
-            if node_archive.is_skipped != is_skipped {
-                return Err(ReadError::Decode(
-                    "Keynote slide-node skip state disagrees with its wire value".to_owned(),
-                ));
-            }
-            let slide = node_archive.slide.ok_or_else(|| {
-                ReadError::InvalidFormat(
-                    "Keynote slide node has no required slide reference".to_owned(),
-                )
-            })?;
+            let (slide_identifier, is_skipped) = decode_slide_node_projection(
+                node_payload,
+                wire_limits,
+                SemanticPath::Slide { index },
+            )?;
             budget.charge_references(1, SemanticPath::Slide { index })?;
             records.push(SlideRecord {
                 node_identifier,
-                slide_identifier: slide.identifier,
+                slide_identifier,
                 is_skipped,
             });
         }
@@ -953,14 +938,29 @@ impl Package {
     ) -> ReadResult<Slide> {
         let payload = unique_payload(&object.messages, &[SLIDE_MESSAGE_TYPE], "Keynote slide")?;
         let preflight = preflight_slide(payload, self.semantic_wire_limits()?, budget, index)?;
-        let slide: kn::SlideArchive = decode_message(payload, "Keynote slide")?;
-        if slide.builds.len() != preflight.builds
-            || slide.owned_drawables.len() != preflight.owned_drawables
-        {
-            return Err(ReadError::Decode(
-                "Keynote slide reference counts disagree with wire preflight".to_owned(),
-            ));
-        }
+        let wire_limits = self.semantic_wire_limits()?;
+        let owner = decode_slide_owner(payload, wire_limits, SemanticPath::Slide { index })?;
+        let transition = decode_slide_transition_projection(
+            payload,
+            wire_limits,
+            SemanticPath::SlideTransition { index },
+        )?;
+        let builds = decode_slide_repeated_references(
+            payload,
+            wire_limits,
+            2,
+            preflight.builds,
+            "Keynote slide build reference",
+            SemanticPath::Slide { index },
+        )?;
+        let owned_drawables = decode_slide_repeated_references(
+            payload,
+            wire_limits,
+            7,
+            preflight.owned_drawables,
+            "Keynote slide drawable reference",
+            SemanticPath::Slide { index },
+        )?;
         let mut builder = Slide::builder(index);
         builder.set_skipped(is_skipped);
         builder
@@ -969,8 +969,7 @@ impl Package {
                 resource: "Keynote semantic builds",
                 amount: preflight.builds,
             })?;
-        let storage_capacity = slide
-            .owned_drawables
+        let storage_capacity = owned_drawables
             .len()
             .saturating_add(1)
             .min(budget.remaining_text_storages());
@@ -981,12 +980,12 @@ impl Package {
                 amount: storage_capacity,
             })?;
 
-        if let Some(name) = slide.name.filter(|name| !name.is_empty()) {
-            builder.set_name(Some(name));
+        if let Some(name) = owner.name().filter(|name| !name.is_empty()) {
+            builder.set_name(Some(name.to_owned()));
         }
-        for (build_index, build) in slide.builds.iter().enumerate() {
+        for (build_index, &build_identifier) in builds.iter().enumerate() {
             builder.push_build(self.extract_build(
-                build.identifier,
+                build_identifier,
                 budget,
                 SemanticPath::SlideBuild {
                     slide: index,
@@ -994,20 +993,21 @@ impl Package {
                 },
             )?);
         }
-        builder.set_transition(Some(Self::transition(&slide.transition)?));
+        builder.set_transition(Some(transition_from_projection(
+            &transition.settings,
+            preflight.database_effect,
+            preflight.database_duration,
+        )?));
 
-        let title = slide
-            .title_placeholder
-            .as_ref()
-            .map(|reference| reference.identifier);
-        let body = slide
-            .body_placeholder
-            .as_ref()
-            .map(|reference| reference.identifier);
-        let slide_number = slide
-            .slide_number_placeholder
-            .as_ref()
-            .map(|reference| reference.identifier);
+        let title = owner
+            .title_placeholder()
+            .map(|reference| reference.identifier().get());
+        let body = owner
+            .body_placeholder()
+            .map(|reference| reference.identifier().get());
+        let slide_number = owner
+            .slide_number_placeholder()
+            .map(|reference| reference.identifier().get());
         if let Some(identifier) = title
             && let Some(storage) =
                 self.drawable_storage(identifier, true, budget, SemanticPath::SlideTitle { index })?
@@ -1022,15 +1022,15 @@ impl Package {
         {
             builder.push_text_storage(storage);
         }
-        for (drawable_index, drawable) in slide.owned_drawables.iter().enumerate() {
-            if Some(drawable.identifier) == title
-                || Some(drawable.identifier) == body
-                || Some(drawable.identifier) == slide_number
+        for (drawable_index, &drawable_identifier) in owned_drawables.iter().enumerate() {
+            if Some(drawable_identifier) == title
+                || Some(drawable_identifier) == body
+                || Some(drawable_identifier) == slide_number
             {
                 continue;
             }
             if let Some(storage) = self.drawable_storage(
-                drawable.identifier,
+                drawable_identifier,
                 false,
                 budget,
                 SemanticPath::SlideDrawable {
@@ -1042,9 +1042,12 @@ impl Package {
                 builder.push_text_storage(storage);
             }
         }
-        if let Some(note) = slide.note {
-            let notes_text =
-                self.notes_text(note.identifier, budget, SemanticPath::SlideNotes { index })?;
+        if let Some(note) = owner.note() {
+            let notes_text = self.notes_text(
+                note.identifier().get(),
+                budget,
+                SemanticPath::SlideNotes { index },
+            )?;
             if !notes_text.is_empty() {
                 builder.set_notes(Some(notes_text));
             }
@@ -1060,60 +1063,14 @@ impl Package {
     ) -> ReadResult<Build> {
         let object = self.required_object(identifier, "Keynote build")?;
         let payload = unique_payload(&object.messages, &[BUILD_MESSAGE_TYPE], "Keynote build")?;
-        preflight_build(payload, self.semantic_wire_limits()?, budget, path)?;
-        let build: kn::BuildArchive = decode_message(payload, "Keynote build")?;
-        let animation = AnimationType::from_identifier(&build.delivery).map_err(|error| {
+        let build = preflight_build(payload, self.semantic_wire_limits()?, budget, path)?;
+        let animation = AnimationType::from_identifier(build.delivery).map_err(|error| {
             ReadError::Decode(format!("invalid Keynote build identifier: {error}"))
         })?;
-        #[allow(
-            deprecated,
-            reason = "native Keynote schemas retain compatibility duration fields"
-        )]
-        let raw_duration = build
-            .attributes
-            .animation_attributes
-            .as_ref()
-            .and_then(|attributes| attributes.duration)
-            .or(build.attributes.database_duration)
-            .or(build.duration)
-            .unwrap_or(0.0);
-        let duration = Seconds::new(raw_duration).map_err(|error| {
+        let duration = Seconds::new(build.duration).map_err(|error| {
             ReadError::Decode(format!("invalid Keynote build duration: {error}"))
         })?;
         Ok(Build::new(animation, duration))
-    }
-
-    fn transition(transition: &kn::TransitionArchive) -> ReadResult<Transition> {
-        #[allow(
-            deprecated,
-            reason = "native Keynote schemas retain compatibility duration fields"
-        )]
-        let raw_duration = transition
-            .attributes
-            .animation_attributes
-            .as_ref()
-            .and_then(|attributes| attributes.duration)
-            .or(transition.attributes.database_duration)
-            .unwrap_or(0.0);
-        let duration = Seconds::new(raw_duration).map_err(|error| {
-            ReadError::Decode(format!("invalid Keynote transition duration: {error}"))
-        })?;
-        #[allow(
-            deprecated,
-            reason = "native Keynote schemas retain compatibility effect fields"
-        )]
-        let identifier = transition
-            .attributes
-            .animation_attributes
-            .as_ref()
-            .and_then(|attributes| attributes.effect.as_deref())
-            .or(transition.attributes.database_effect.as_deref());
-        let effect = identifier.map_or(Ok(Effect::None), |value| {
-            Effect::from_identifier(value).map_err(|error| {
-                ReadError::Decode(format!("invalid Keynote transition effect: {error}"))
-            })
-        })?;
-        Ok(Transition::new(effect, duration))
     }
 
     fn drawable_storage(
@@ -1143,15 +1100,7 @@ impl Package {
         let storage_reference = if let Some(payload) = placeholder {
             decode_placeholder_storage_reference(payload, self.semantic_wire_limits()?, path)?
         } else if let Some(payload) = shape {
-            preflight_required_length_delimited_field(
-                payload,
-                self.semantic_wire_limits()?,
-                1,
-                "Keynote shape base archive",
-                path,
-            )?;
-            let value: tswp::ShapeInfoArchive = decode_message(payload, "Keynote drawable shape")?;
-            value.owned_storage.map(|reference| reference.identifier)
+            decode_shape_storage_reference(payload, self.semantic_wire_limits()?, path)?
         } else {
             None
         };
@@ -1309,10 +1258,18 @@ pub(crate) fn semantic_document_from_prepared_source(
     Ok(Document::from_source(show, metadata, stats))
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SlidePreflight {
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct SlidePreflight<'source> {
     builds: usize,
     owned_drawables: usize,
+    database_effect: Option<&'source str>,
+    database_duration: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct BuildPreflight<'source> {
+    delivery: &'source str,
+    duration: f64,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1949,12 +1906,12 @@ fn validate_size(payload: &[u8], limits: WireLimits) -> litchi_iwa_common::Resul
     Ok(())
 }
 
-fn preflight_slide(
-    payload: &[u8],
+fn preflight_slide<'source>(
+    payload: &'source [u8],
     wire_limits: WireLimits,
     budget: &mut SemanticBudget,
     index: usize,
-) -> ReadResult<SlidePreflight> {
+) -> ReadResult<SlidePreflight<'source>> {
     let mut style_fields = 0usize;
     let mut builds = 0usize;
     let mut owned_drawables = 0usize;
@@ -1965,9 +1922,11 @@ fn preflight_slide(
     let mut transition_attribute_fields = 0usize;
     let mut animation_attribute_fields = 0usize;
     let mut in_document_fields = 0usize;
-    let mut name_bytes = None;
-    let mut database_effect_bytes = None;
-    let mut animation_effect_bytes = None;
+    let mut name = None;
+    let mut database_effect = None;
+    let mut animation_effect = None;
+    let mut database_duration = None;
+    let mut animation_duration = None;
 
     preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
         let field = visit.field();
@@ -2011,7 +1970,7 @@ fn preflight_slide(
                 Ok(WireDescent::Skip)
             },
             ([], 10) => {
-                set_unique_payload_len(field, &mut name_bytes, "Keynote slide name")?;
+                set_unique_utf8(field, &mut name, "Keynote slide name")?;
                 Ok(WireDescent::Skip)
             },
             ([], 19) => {
@@ -2047,18 +2006,30 @@ fn preflight_slide(
                 Ok(WireDescent::Descend)
             },
             ([4, 2], 2) => {
-                set_unique_payload_len(
+                set_unique_utf8(
                     field,
-                    &mut database_effect_bytes,
+                    &mut database_effect,
                     "Keynote transition database effect",
                 )?;
                 Ok(WireDescent::Skip)
             },
-            ([4, 2, 8], 2) => {
-                set_unique_payload_len(
+            ([4, 2], 3) => {
+                set_unique_f64(
                     field,
-                    &mut animation_effect_bytes,
-                    "Keynote transition effect",
+                    &mut database_duration,
+                    "Keynote transition database duration",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([4, 2, 8], 2) => {
+                set_unique_utf8(field, &mut animation_effect, "Keynote transition effect")?;
+                Ok(WireDescent::Skip)
+            },
+            ([4, 2, 8], 3) => {
+                set_unique_f64(
+                    field,
+                    &mut animation_duration,
+                    "Keynote transition duration",
                 )?;
                 Ok(WireDescent::Skip)
             },
@@ -2087,42 +2058,79 @@ fn preflight_slide(
             ReadError::InvalidFormat("Keynote slide reference count overflowed".to_owned())
         })?;
     budget.charge_references(references, SemanticPath::Slide { index })?;
-    budget.charge_text(name_bytes.unwrap_or(0), SemanticPath::SlideName { index })?;
+    budget.charge_text(name.map_or(0, str::len), SemanticPath::SlideName { index })?;
     budget.charge_text(
-        animation_effect_bytes
-            .or(database_effect_bytes)
-            .unwrap_or(0),
+        animation_effect.or(database_effect).map_or(0, str::len),
         SemanticPath::SlideTransition { index },
     )?;
     Ok(SlidePreflight {
         builds,
         owned_drawables,
+        database_effect,
+        database_duration,
     })
 }
 
-fn preflight_build(
-    payload: &[u8],
+fn preflight_build<'source>(
+    payload: &'source [u8],
     wire_limits: WireLimits,
     budget: &mut SemanticBudget,
     path: SemanticPath,
-) -> ReadResult<()> {
-    let mut delivery_bytes = None;
+) -> ReadResult<BuildPreflight<'source>> {
+    let mut delivery = None;
+    let mut root_duration = None;
     let mut attribute_fields = 0usize;
+    let mut animation_attribute_fields = 0usize;
+    let mut database_duration = None;
+    let mut animation_duration = None;
     preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
         let field = visit.field();
-        if visit.path().is_empty() && field.number() == 2 {
-            set_unique_payload_len(field, &mut delivery_bytes, "Keynote build delivery")?;
-        } else if visit.path().is_empty() && field.number() == 4 {
-            require_unique_length_delimited(
-                field,
-                &mut attribute_fields,
-                "Keynote build attributes",
-            )?;
+        match (visit.path(), field.number()) {
+            ([], 2) => {
+                set_unique_utf8(field, &mut delivery, "Keynote build delivery")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], 3) => {
+                set_unique_f64(field, &mut root_duration, "Keynote build duration")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], 4) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut attribute_fields,
+                    "Keynote build attributes",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([4], 8) => {
+                set_unique_f64(
+                    field,
+                    &mut database_duration,
+                    "Keynote build database duration",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([4], 18) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut animation_attribute_fields,
+                    "Keynote build animation attributes",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([4, 18], 3) => {
+                set_unique_f64(
+                    field,
+                    &mut animation_duration,
+                    "Keynote build animation duration",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            _ => Ok(WireDescent::Skip),
         }
-        Ok(WireDescent::Skip)
     })
     .map_err(|error| map_wire_preflight_error(error, "Keynote build", path))?;
-    let amount = delivery_bytes.ok_or_else(|| {
+    let delivery = delivery.ok_or_else(|| {
         ReadError::InvalidFormat("Keynote build has no unique delivery identifier".to_owned())
     })?;
     if attribute_fields != 1 {
@@ -2130,30 +2138,273 @@ fn preflight_build(
             "Keynote build has no unique required attributes".to_owned(),
         ));
     }
-    budget.charge_text(amount, path)
+    budget.charge_text(delivery.len(), path)?;
+    Ok(BuildPreflight {
+        delivery,
+        duration: animation_duration
+            .or(database_duration)
+            .or(root_duration)
+            .unwrap_or(0.0),
+    })
 }
 
-fn preflight_required_length_delimited_field(
+fn decode_slide_node_projection(
+    payload: &[u8],
+    wire_limits: WireLimits,
+    path: SemanticPath,
+) -> ReadResult<(u64, bool)> {
+    let is_skipped = strict_slide_node_skipped(payload, wire_limits)
+        .map_err(|error| map_wire_preflight_error(error, "Keynote slide node", path))?;
+    let view = WireView::parse_with_limits(payload, wire_limits)
+        .map_err(|error| map_wire_preflight_error(error, "Keynote slide node", path))?;
+    let mut slide_fields = 0usize;
+    let mut slide_identifier = None;
+    for field in view.fields() {
+        if field.number() == 2 {
+            require_unique_canonical_length_delimited(
+                field,
+                &mut slide_fields,
+                "Keynote slide-node slide reference",
+            )
+            .and_then(|_| {
+                validate_reference_payload(
+                    field.payload(),
+                    wire_limits,
+                    "Keynote slide-node slide reference",
+                )
+                .map(|identifier| {
+                    slide_identifier = Some(identifier);
+                })
+            })
+            .map_err(|error| map_wire_preflight_error(error, "Keynote slide node", path))?;
+        }
+    }
+    let slide_identifier = slide_identifier.ok_or_else(|| {
+        ReadError::InvalidFormat("Keynote slide node has no required slide reference".to_owned())
+    })?;
+    Ok((slide_identifier, is_skipped))
+}
+
+fn decode_slide_owner<'source>(
+    payload: &'source [u8],
+    wire_limits: WireLimits,
+    path: SemanticPath,
+) -> ReadResult<keynote_speaker_notes_codec::SlideNotesOwnerSnapshot<'source>> {
+    let recursion_limit = u32::try_from(wire_limits.max_nesting()).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote speaker-note nesting limit does not fit u32".to_owned())
+    })?;
+    let options = keynote_speaker_notes_codec::DecodeOptions::new(
+        payload.len().min(wire_limits.max_input_bytes()),
+        wire_limits.max_fields(),
+        wire_limits.max_rewrite_work(),
+        recursion_limit,
+    );
+    keynote_speaker_notes_codec::decode_slide_notes_owner(payload, options)
+        .map_err(|error| map_speaker_notes_projection_error(error, path))
+}
+
+fn decode_slide_transition_projection<'source>(
+    payload: &'source [u8],
+    wire_limits: WireLimits,
+    path: SemanticPath,
+) -> ReadResult<keynote_slide_transition_codec::SlideTransitionSnapshot<'source>> {
+    let recursion_limit = u32::try_from(wire_limits.max_nesting()).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote transition nesting limit does not fit u32".to_owned())
+    })?;
+    let options = keynote_slide_transition_codec::DecodeOptions::new(
+        payload.len().min(wire_limits.max_input_bytes()),
+        recursion_limit,
+    )
+    .with_resource_limits(wire_limits.max_fields(), wire_limits.max_rewrite_work());
+    keynote_slide_transition_codec::decode_slide_transition(payload, options)
+        .map_err(|error| map_transition_projection_error(error, path))
+}
+
+fn map_transition_projection_error(
+    error: keynote_slide_transition_codec::DecodeError,
+    path: SemanticPath,
+) -> ReadError {
+    if let Some(limit) = error.wire_resource_limit() {
+        return match limit {
+            keynote_slide_transition_codec::WireResourceLimit::Bytes { observed, maximum } => {
+                ReadError::PayloadLimit {
+                    kind: PayloadLimitKind::Bytes,
+                    observed,
+                    maximum,
+                    path,
+                }
+            },
+            keynote_slide_transition_codec::WireResourceLimit::Nesting { observed, maximum } => {
+                ReadError::PayloadLimit {
+                    kind: PayloadLimitKind::Nesting,
+                    observed: usize::try_from(observed).unwrap_or(usize::MAX),
+                    maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+                    path,
+                }
+            },
+            _ => ReadError::InvalidFormat(
+                "Keynote transition projection resource failure".to_owned(),
+            ),
+        };
+    }
+    if let Some((observed, maximum)) = error.field_limit_values() {
+        return ReadError::PayloadLimit {
+            kind: PayloadLimitKind::Fields,
+            observed,
+            maximum,
+            path,
+        };
+    }
+    if let Some((observed, maximum)) = error.work_limit_values() {
+        return ReadError::PayloadLimit {
+            kind: PayloadLimitKind::Work,
+            observed,
+            maximum,
+            path,
+        };
+    }
+    ReadError::InvalidFormat("Keynote transition projection is malformed".to_owned())
+}
+
+fn decode_slide_repeated_references(
     payload: &[u8],
     wire_limits: WireLimits,
     field_number: u32,
+    expected: usize,
     context: &'static str,
     path: SemanticPath,
-) -> ReadResult<()> {
-    let mut fields = 0usize;
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
-        if visit.path().is_empty() && visit.field().number() == field_number {
-            require_unique_length_delimited(visit.field(), &mut fields, context)?;
+) -> ReadResult<Vec<u64>> {
+    let view = WireView::parse_with_limits(payload, wire_limits)
+        .map_err(|error| map_wire_preflight_error(error, "Keynote slide", path))?;
+    let mut references = Vec::new();
+    references
+        .try_reserve_exact(expected)
+        .map_err(|_error| ReadError::Allocation {
+            resource: "Keynote slide reference projection",
+            amount: expected,
+        })?;
+    for field in view.fields() {
+        if field.number() == field_number {
+            require_length_delimited(field, context)
+                .and_then(|_| validate_reference_payload(field.payload(), wire_limits, context))
+                .map(|identifier| {
+                    references.push(identifier);
+                })
+                .map_err(|error| map_wire_preflight_error(error, "Keynote slide", path))?;
         }
-        Ok(WireDescent::Skip)
-    })
-    .map_err(|error| map_wire_preflight_error(error, context, path))?;
-    if fields != 1 {
-        return Err(ReadError::InvalidFormat(format!(
-            "{context} is missing or duplicated"
-        )));
     }
-    Ok(())
+    if references.len() != expected {
+        return Err(ReadError::Decode(
+            "Keynote slide reference counts disagree with wire preflight".to_owned(),
+        ));
+    }
+    Ok(references)
+}
+
+fn transition_from_projection(
+    settings: &keynote_slide_transition_codec::TransitionSettingsSnapshot<'_>,
+    legacy_effect: Option<&str>,
+    legacy_duration: Option<f64>,
+) -> ReadResult<Transition> {
+    let modern_effect = settings.animation.and_then(|animation| animation.effect);
+    let modern_duration = settings.animation.and_then(|animation| animation.duration);
+    let duration =
+        Seconds::new(modern_duration.or(legacy_duration).unwrap_or(0.0)).map_err(|error| {
+            ReadError::Decode(format!("invalid Keynote transition duration: {error}"))
+        })?;
+    let effect = modern_effect
+        .or(legacy_effect)
+        .map_or(Ok(Effect::None), |value| {
+            Effect::from_identifier(value).map_err(|error| {
+                ReadError::Decode(format!("invalid Keynote transition effect: {error}"))
+            })
+        })?;
+    Ok(Transition::new(effect, duration))
+}
+
+fn decode_shape_storage_reference(
+    payload: &[u8],
+    wire_limits: WireLimits,
+    path: SemanticPath,
+) -> ReadResult<Option<u64>> {
+    let mut shape_super_fields = 0usize;
+    let mut shape_drawable_super_fields = 0usize;
+    let mut owned_storage_fields = 0usize;
+    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+        let field = visit.field();
+        match (visit.path(), field.number()) {
+            ([], 1) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut shape_super_fields,
+                    "Keynote shape base archive",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([], 4) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut owned_storage_fields,
+                    "Keynote shape owned storage",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([1], 1) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut shape_drawable_super_fields,
+                    "Keynote shape drawable base archive",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            _ => Ok(WireDescent::Skip),
+        }
+    })
+    .map_err(|error| map_wire_preflight_error(error, "Keynote drawable shape", path))?;
+    if shape_super_fields != 1 {
+        return Err(ReadError::InvalidFormat(
+            "Keynote shape base archive is missing or duplicated".to_owned(),
+        ));
+    }
+    let view = WireView::parse_with_limits(payload, wire_limits)
+        .map_err(|error| map_wire_preflight_error(error, "Keynote drawable shape", path))?;
+    let mut storage_reference = None;
+    for field in view.fields() {
+        match field.number() {
+            1 => {
+                let shape =
+                    WireView::parse_with_limits(field.payload(), wire_limits).map_err(|error| {
+                        map_wire_preflight_error(error, "Keynote shape base archive", path)
+                    })?;
+                let drawable = shape
+                    .fields()
+                    .find(|field| field.number() == 1)
+                    .ok_or_else(|| {
+                        ReadError::InvalidFormat(
+                            "Keynote shape drawable base archive is missing required super"
+                                .to_owned(),
+                        )
+                    })?;
+                WireView::parse_with_limits(drawable.payload(), wire_limits).map_err(|error| {
+                    map_wire_preflight_error(error, "Keynote shape drawable archive", path)
+                })?;
+            },
+            4 => {
+                storage_reference = Some(
+                    validate_reference_payload(
+                        field.payload(),
+                        wire_limits,
+                        "Keynote shape owned storage",
+                    )
+                    .map_err(|error| {
+                        map_wire_preflight_error(error, "Keynote drawable shape", path)
+                    })?,
+                );
+            },
+            _ => {},
+        }
+    }
+    Ok(storage_reference)
 }
 
 fn decode_placeholder_storage_reference(
@@ -2471,17 +2722,39 @@ fn require_unique_bool(
     }
 }
 
-fn set_unique_payload_len(
-    field: WireFieldView<'_>,
-    slot: &mut Option<usize>,
+fn set_unique_utf8<'source>(
+    field: WireFieldView<'source>,
+    slot: &mut Option<&'source str>,
     context: &'static str,
 ) -> litchi_iwa_common::Result<()> {
     require_length_delimited(field, context)?;
-    if slot.replace(field.payload().len()).is_some() {
+    let value = str::from_utf8(field.payload()).map_err(|_error| {
+        litchi_iwa_common::Error::InvalidFormat(format!("{context} is not valid UTF-8"))
+    })?;
+    if slot.replace(value).is_some() {
         return Err(litchi_iwa_common::Error::InvalidFormat(format!(
             "{context} is duplicated"
         )));
     }
+    Ok(())
+}
+
+fn set_unique_f64(
+    field: WireFieldView<'_>,
+    slot: &mut Option<f64>,
+    context: &'static str,
+) -> litchi_iwa_common::Result<()> {
+    let mut fields = usize::from(slot.is_some());
+    if fields != 0 {
+        return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+            "{context} is duplicated"
+        )));
+    }
+    require_unique_fixed64(field, &mut fields, context)?;
+    let value = f64::from_le_bytes(field.payload().try_into().map_err(|_error| {
+        litchi_iwa_common::Error::InvalidFormat(format!("{context} has invalid fixed64 width"))
+    })?);
+    slot.replace(value);
     Ok(())
 }
 
@@ -2631,14 +2904,6 @@ fn optional_unique_payload<'a>(
         )));
     }
     Ok(payload)
-}
-
-fn decode_message<M>(payload: &[u8], context: &'static str) -> ReadResult<M>
-where
-    M: Message + Default,
-{
-    M::decode(payload)
-        .map_err(|_error| ReadError::InvalidFormat(format!("{context} payload is malformed")))
 }
 
 pub(crate) fn semantic_text(show: &Show) -> ReadResult<String> {
