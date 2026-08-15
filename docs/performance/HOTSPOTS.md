@@ -2,10 +2,13 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0143`](changes/0143-cfb-fingerprint-read-coalescing.md)
+Evidence through: [`change 0144`](changes/0144-cfb-simulated-range-source-evidence.md)
 (the newest accepted semantic-format optimization remains limited to four repeated
-source-backed ODP full-text projections; the latest release CFB selective-range evidence remains
-[`0094`](changes/0094-cfb-selective-read-evidence.md), and the latest accepted
+source-backed ODP full-text projections; the latest release CFB selective-range
+evidence is the configured simulator result in
+[`0144`](changes/0144-cfb-simulated-range-source-evidence.md), while
+[`0094`](changes/0094-cfb-selective-read-evidence.md) retains the non-simulated
+exact-range result, and the latest accepted
 generic multi-format filesystem result remains
 [`0089`](changes/0089-filesystem-release-repeated-evidence.md); Change 0143 is
 the latest accepted before/after CFB filesystem result)
@@ -1100,9 +1103,10 @@ changes. Remaining gaps are:
   neither proves a cold device or storage result.
 - CFB selective-range acceptance is bounded to exact source-byte counters,
   MiniFAT read-stage p50/p95, and the modest total-p50 direction in change
-  0094. Change 0125 adds correctness/request-amplification evidence for the
-  4095-byte MiniFAT boundary but no release speed claim. FAT tail behavior,
-  p99, simulated high-latency range sources,
+  0094. Change 0144 additionally accepts p50/p95 only for the named configured
+  simulated range source: both MiniFAT targets reduce to one exact request and
+  improve in both ABBA directions, while the exact-work FAT control stays near
+  neutral. Real cold/network/device range sources, FAT tail behavior, p99,
   allocation, and peak-RSS evidence remain open, and no DOC/XLS/PPT semantic
   consumer is covered.
 - Decompressed and recompressed byte observers. Positional range-request

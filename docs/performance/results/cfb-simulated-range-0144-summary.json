@@ -1,0 +1,241 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "matched_simulated_range_release_abba",
+  "revision": "c9f755026423d8f1a4771413be8461a6d8f40b49",
+  "worktree_clean": true,
+  "binary": {
+    "sha256": "60658045f3278a735928a4818289f55362caed22b2435d7e34600c0eeb4f3f51",
+    "bytes": 39464320
+  },
+  "environment": {
+    "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+    "cpu_affinity": "2",
+    "logical_cpus_available_to_process": 1,
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator"
+  },
+  "configuration": {
+    "profile": "release",
+    "warmups_per_leg": 20,
+    "samples_per_result_per_leg": 200,
+    "order": [
+      "a1_legacy",
+      "b1_shared",
+      "b2_shared",
+      "a2_legacy"
+    ],
+    "shapes": [
+      "many-small",
+      "wide-root"
+    ],
+    "fixed_latency_us": 100,
+    "request_overhead_us": 25,
+    "bandwidth_bytes_per_second": 52428800,
+    "max_physical_range_bytes": 65536
+  },
+  "raw_artifacts": {
+    "a1_legacy": {
+      "file": "cfb-simulated-range-0144-a1.json.zst",
+      "json_sha256": "e5cd753794348a286d44ad5d61bcd736ad85dd1916be4d10065e0722cf2ee625",
+      "zstd_sha256": "664d132342a3f9780858a0a5ff0f9adcfa983d4f9287e15363b05e37b13011b8"
+    },
+    "b1_shared": {
+      "file": "cfb-simulated-range-0144-b1.json.zst",
+      "json_sha256": "2249cc21dc05cc89fef92f60a48e598550c8e4d4208e178ce2f47c47f41e58d9",
+      "zstd_sha256": "465f214c7dd3ea5bd608e56ff31fba0ecfb3397dbf1b7687247aaf12cf9052f8"
+    },
+    "b2_shared": {
+      "file": "cfb-simulated-range-0144-b2.json.zst",
+      "json_sha256": "e4deaccda7f034e3681dc7ee02c61cd154d1b2573608c3681c36b1abfd19f0db",
+      "zstd_sha256": "2c71a9456489bd7e58296d5b3bc63281a33423d9eb743f6ad6921830c9998363"
+    },
+    "a2_legacy": {
+      "file": "cfb-simulated-range-0144-a2.json.zst",
+      "json_sha256": "2163b44a1f406f2579e94adef09059400508ee8295cd1b8c31b0350ee4a45e3f",
+      "zstd_sha256": "f74d98f56e970b3b0b675432b08e202c4a8dfeb4a6671b02bb3f45ec052605cb"
+    }
+  },
+  "comparisons": [
+    {
+      "shape": "many-small",
+      "target": "minifat-36-byte",
+      "archive_sha256": "988be74585fe447a2695a8a584ce459181ab7a20b5bc4dd79d24ebf9e1d49557",
+      "target_sha256": "bfef92407b49c20492ba3a6b991bbe6ada9678f50c4d7f241865239870e35fd7",
+      "target_bytes": 36,
+      "selective_read_work": {
+        "legacy_requests": 4,
+        "legacy_returned_bytes": 261184,
+        "legacy_service_floor_ns": 5481690,
+        "shared_requests": 1,
+        "shared_returned_bytes": 36,
+        "shared_service_floor_ns": 125687
+      },
+      "latency_ns": {
+        "a1_legacy": { "p50": 14049128, "p95": 14377841 },
+        "b1_shared": { "p50": 8413202, "p95": 8535019 },
+        "b2_shared": { "p50": 8383621, "p95": 8588444 },
+        "a2_legacy": { "p50": 13970727, "p95": 14097672 }
+      },
+      "shared_reduction_percent": {
+        "pair_1": { "p50": 40.115842065073366, "p95": 40.63768684046513 },
+        "pair_2": { "p50": 39.99151941055036, "p95": 39.078991197979356 }
+      },
+      "classification": "simulated_latency_reduction_both_directions"
+    },
+    {
+      "shape": "many-small",
+      "target": "minifat-4095-byte",
+      "archive_sha256": "e5c90470074e936cff06ad73be993acea1017bce11042208c472ab770fb8af48",
+      "target_sha256": "fda5453a18bb3ea66d1125e98f8e5f80f73b6138e868f84313ef8ea34c9204a8",
+      "target_bytes": 4095,
+      "selective_read_work": {
+        "legacy_requests": 5,
+        "legacy_returned_bytes": 265216,
+        "legacy_service_floor_ns": 5683594,
+        "shared_requests": 1,
+        "shared_returned_bytes": 4095,
+        "shared_service_floor_ns": 203106
+      },
+      "latency_ns": {
+        "a1_legacy": { "p50": 14464465, "p95": 14680598 },
+        "b1_shared": { "p50": 8666116, "p95": 8769874 },
+        "b2_shared": { "p50": 8669980, "p95": 8764295 },
+        "a2_legacy": { "p50": 14405631, "p95": 14545569 }
+      },
+      "shared_reduction_percent": {
+        "pair_1": { "p50": 40.08685423207841, "p95": 40.26214735939231 },
+        "pair_2": { "p50": 39.81534026520602, "p95": 39.74594599908742 }
+      },
+      "classification": "simulated_latency_reduction_both_directions"
+    },
+    {
+      "shape": "many-small",
+      "target": "fat-4mib",
+      "archive_sha256": "27ebd0a4280e068e93f915f6b58f3199a6e15eaf0d506990d046cbf2cd7f66b9",
+      "target_sha256": "631416b01a32fc6ff0f57b7215b5665837891e217928d6de4b4dc9d3c8efbf49",
+      "target_bytes": 4194304,
+      "selective_read_work": {
+        "legacy_requests": 64,
+        "legacy_returned_bytes": 4194304,
+        "legacy_service_floor_ns": 88000000,
+        "shared_requests": 64,
+        "shared_returned_bytes": 4194304,
+        "shared_service_floor_ns": 88000000
+      },
+      "latency_ns": {
+        "a1_legacy": { "p50": 112937871, "p95": 113249726 },
+        "b1_shared": { "p50": 113015927, "p95": 114011454 },
+        "b2_shared": { "p50": 112956314, "p95": 113876033 },
+        "a2_legacy": { "p50": 112857192, "p95": 113315054 }
+      },
+      "shared_reduction_percent": {
+        "pair_1": { "p50": -0.06911410610883571, "p95": -0.6726091328468203 },
+        "pair_2": { "p50": -0.08782958200838455, "p95": -0.4950613181546028 }
+      },
+      "classification": "matched_work_near_neutral_control"
+    },
+    {
+      "shape": "wide-root",
+      "target": "minifat-36-byte",
+      "archive_sha256": "3bc17d57a6504792a3b04d47db237891ddd6615daaa512c6aa05d833427a56f3",
+      "target_sha256": "576db38a7fe2ab2dea96350bcc49e7f4aa2dfd0fc51648419fc9b6f07d2f337f",
+      "target_bytes": 36,
+      "selective_read_work": {
+        "legacy_requests": 32,
+        "legacy_returned_bytes": 2096192,
+        "legacy_service_floor_ns": 43981690,
+        "shared_requests": 1,
+        "shared_returned_bytes": 36,
+        "shared_service_floor_ns": 125687
+      },
+      "latency_ns": {
+        "a1_legacy": { "p50": 109870534, "p95": 111174273 },
+        "b1_shared": { "p50": 63767296, "p95": 64228564 },
+        "b2_shared": { "p50": 63918943, "p95": 64709003 },
+        "a2_legacy": { "p50": 109886809, "p95": 110769376 }
+      },
+      "shared_reduction_percent": {
+        "pair_1": { "p50": 41.96142161282296, "p95": 42.22713379020702 },
+        "pair_2": { "p50": 41.83201461423818, "p95": 41.582226661636156 }
+      },
+      "classification": "simulated_latency_reduction_both_directions"
+    },
+    {
+      "shape": "wide-root",
+      "target": "minifat-4095-byte",
+      "archive_sha256": "5d02a3b1486d676f2db3b4c43fc8698957a24fcd2b347ec4beba8e64d021efcb",
+      "target_sha256": "eba8bf108edb885a295970d3e4e368773530e49ba9c22e142451aafbbdec9434",
+      "target_bytes": 4095,
+      "selective_read_work": {
+        "legacy_requests": 33,
+        "legacy_returned_bytes": 2100224,
+        "legacy_service_floor_ns": 44183594,
+        "shared_requests": 1,
+        "shared_returned_bytes": 4095,
+        "shared_service_floor_ns": 203106
+      },
+      "latency_ns": {
+        "a1_legacy": { "p50": 110417783, "p95": 111098898 },
+        "b1_shared": { "p50": 64045751, "p95": 64486580 },
+        "b2_shared": { "p50": 64152895, "p95": 64682886 },
+        "a2_legacy": { "p50": 110294759, "p95": 110955371 }
+      },
+      "shared_reduction_percent": {
+        "pair_1": { "p50": 41.996887403544406, "p95": 41.95569788640028 },
+        "pair_2": { "p50": 41.83504675865877, "p95": 41.703690937142646 }
+      },
+      "classification": "simulated_latency_reduction_both_directions"
+    },
+    {
+      "shape": "wide-root",
+      "target": "fat-4mib",
+      "archive_sha256": "fdb1cb7aa2eca3ccdc4af6b1a54372526801d5c508d194dc947656bf4a95fa5b",
+      "target_sha256": "96c293c75513a15370279c3e87ab876094ae0443389981bed54651c211d745ed",
+      "target_bytes": 4194304,
+      "selective_read_work": {
+        "legacy_requests": 64,
+        "legacy_returned_bytes": 4194304,
+        "legacy_service_floor_ns": 88000000,
+        "shared_requests": 64,
+        "shared_returned_bytes": 4194304,
+        "shared_service_floor_ns": 88000000
+      },
+      "latency_ns": {
+        "a1_legacy": { "p50": 168241753, "p95": 169067377 },
+        "b1_shared": { "p50": 168123465, "p95": 168824182 },
+        "b2_shared": { "p50": 168105738, "p95": 168757779 },
+        "a2_legacy": { "p50": 168211123, "p95": 168780002 }
+      },
+      "shared_reduction_percent": {
+        "pair_1": { "p50": 0.0703083496758382, "p95": 0.14384501866377214 },
+        "pair_2": { "p50": 0.06265043483479983, "p95": 0.013166844256821374 }
+      },
+      "classification": "matched_work_near_neutral_control"
+    }
+  ],
+  "correctness": {
+    "all_results_have_200_samples": true,
+    "all_legs_match_revision_and_configuration": true,
+    "all_target_hashes_stable_across_legs": true,
+    "all_returned_target_lengths_exact": true,
+    "all_request_sizes_nonzero_and_at_most_65536": true,
+    "all_request_count_byte_bucket_and_service_floor_formulas_hold": true,
+    "shared_minifat_reads_are_one_exact_target_request": true,
+    "fat_control_read_work_is_exactly_matched": true
+  },
+  "claim_scope": {
+    "accepted": [
+      "configured simulated-range CFB selective-read latency for the two MiniFAT targets",
+      "configured physical request-count, returned-byte, request-size, and service-floor reductions",
+      "matched-work near-neutral 4 MiB FAT control"
+    ],
+    "not_accepted": [
+      "cold-filesystem, physical-device, or ambient-network latency",
+      "production-source request scheduling",
+      "allocation, peak-heap, or RSS reduction",
+      "native DOC, XLS, or PPT semantic-operation latency",
+      "generic OLE2, OOXML, ODF, RTF, or iWork performance"
+    ]
+  }
+}

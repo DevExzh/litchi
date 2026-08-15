@@ -1,6 +1,6 @@
 # Performance program phase report
 
-Date: 2026-08-15
+Date: 2026-08-16
 Branch: `feat/office-format-completeness`
 Historical production base for the original measured tranche:
 `6df5d4a1fbe53a8216e63f24cc1392be60b714a8`
@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **265 selectable cases**; 200 was the count before the
+HEAD harness contains **271 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -82,7 +82,8 @@ is still not broad program or CRUD coverage.
 | XLSX row-start index | ABBA p50 geomean **-80.499%**, mean geomean **-79.962%**; full scan **+0.03%** mean; first cell **-1.31%** mean | Heap allocations **+17**, RSS **+0.25%**; narrow-range query only |
 | Targeted OPC raw publication | Four-cell ABBA p50 geomean **-84.98%**; few-large/incompressible **-71.70%**; matched cycles **-69.21%** | Initial peak heap **+37.18%**, one-shot RSS **+22.26%** from retained source/provenance and a changed-payload copy; the copy is removed by the shared-payload follow-up below |
 | Positional CFB/ZIP and explicit execution | Large-task p50 scaling at 12 CPUs: OPC **4.52x**, CFB **5.93x**; no hidden global Rayon | Many-small tasks regress at high worker counts; default/legacy paths remain serial |
-| CFB selective exact-range read | MiniFAT source bytes **261,184 -> 36** (many-small) and **2,096,192 -> 36** (wide-root), one request in each; read-stage p50 **-95.1%/-94.8%** and **-99.2%/-99.2%** across ABBA directions; read-stage p95 **-94.4%/-94.8%** and **-98.9%/-99.1%**; total p50 **-8.4%/-14.2%** and **-6.6%/-11.9%** | FAT retains one 4 MiB request/call and paired read/total p50 changes stay within 5% control drift. No p95/p99 FAT, MiniFAT p99, cold-filesystem, simulated high-latency range, allocation, peak-RSS, or DOC/XLS/PPT semantic claim |
+| CFB selective exact-range read | MiniFAT source bytes **261,184 -> 36** (many-small) and **2,096,192 -> 36** (wide-root), one request in each; read-stage p50 **-95.1%/-94.8%** and **-99.2%/-99.2%** across ABBA directions; read-stage p95 **-94.4%/-94.8%** and **-98.9%/-99.1%**; total p50 **-8.4%/-14.2%** and **-6.6%/-11.9%** | FAT retains one 4 MiB request/call and paired read/total p50 changes stay within 5% control drift. That record makes no p95/p99 FAT, MiniFAT p99, cold-filesystem, simulated high-latency range, allocation, peak-RSS, or DOC/XLS/PPT semantic claim |
+| CFB selective simulated-range read | With a harness-only 100 us + 25 us/request, 50 MiB/s, 64 KiB-ceiling model, both MiniFAT targets reduce selective-read work to one exact request. Total p50 improves **40.12%/39.99%** and **40.09%/39.82%** on many-small, and **41.96%/41.83%** and **42.00%/41.84%** on wide-root; p95 agrees in both directions | The 4 MiB FAT controls retain 64 requests / 4 MiB / 88 ms modeled read floor and stay near neutral. This accepts only configured simulator latency and request/byte/service-floor evidence; no real cold/network/device, production scheduling, allocation/RSS, or native semantic claim |
 | CFB MiniFAT 4095-byte physical-run evidence | Focused matched legacy/positional controls record exact open/read/total timing, source calls/bytes/range sizes, 4095-byte payload hash, and request amplification across 64 logical mini-sectors | Correctness/request-amplification evidence only; no release latency, p99, cold/high-latency, allocation/RSS, physical-I/O, or native semantic claim |
 | Ordinary-root DOCX source-path evidence | Eight opt-in eager/source filesystem selectors over the unchanged 200-paragraph/eight-incompressible-2 MiB-media corpus; untimed parity covers paragraphs, full text, tables, elements, and metadata, while exact source SHA plus logical OPC part/relationship/content-type/blob-hash gates cover package preservation, including all media hashes and source immutability; typed replays classify zero-payload-overlap open, complete main-range preparation for query selectors, and zero-overlap queries | Selectable matrix 245 -> 253; correctness/logical compressed-range evidence only; no latency, physical-I/O, decompression, allocation, RSS, cold-cache, ABBA, broad-security, or Markdown-performance claim |
 | Source-backed OPC and DOCX/XLSX/PPTX facades | EOCD structural-open source bytes **-73.6% to -98.5%**; ordinary payload overlap zero | No latency claim: later EntryId/cache-diagnostic changes confound comparison and some cells exceed 5% variance |
@@ -1018,7 +1019,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 265 selectable cases. Change
+The committed HEAD standalone harness provides 271 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1026,8 +1027,13 @@ are correctness/coverage evidence only. Change 0094 has a pinned 30-warmup,
 500-sample release ABBA summary: MiniFAT exact-range source bytes fall from
 261,184 to 36 and from 2,096,192 to 36, with stable read-stage p50/p95 gains
 and only modest total-p50 movement; FAT retains one 4 MiB read request/call.
-No p99, cold-filesystem, simulated high-latency range, allocation, peak-RSS,
-or DOC/XLS/PPT semantic claim is accepted. See the [compact ABBA summary](results/cfb-selective-range-abba-0106-summary.json).
+No p99, cold-filesystem, allocation, peak-RSS, or DOC/XLS/PPT semantic claim
+is accepted by that record. Change 0144 separately accepts only the configured
+harness-simulator result: the 36- and 4095-byte MiniFAT targets reduce to one
+exact request and improve total p50/p95 in both 200-sample ABBA directions,
+while the exact-work FAT control stays near neutral. This is not real
+cold/network/device evidence. See the [exact-range summary](results/cfb-selective-range-abba-0106-summary.json)
+and [simulated-range summary](results/cfb-simulated-range-0144-summary.json).
 
 Change 0119 adds three opt-in native PPT selected-shape controls and preserves
 the 36-case / 198-record default. The query-only and fresh-open-plus-query
@@ -1195,6 +1201,17 @@ full-text projections on the prepared source-backed corpus and makes no
 single-call, open, physical-I/O, decompression, cold-cache, operation-local
 allocated-byte, or generic ODF claim. See
 [`0140`](changes/0140-odp-repeated-text-cache-release-abba.md).
+
+Change 0144 adds six opt-in CFB simulated-range selectors, taking the current
+selectable matrix from 265 to 271 while preserving the default 36 cases / 198
+records. A clean release `A1, B1, B2, A2` run on CPU 2 uses 20 warmups and 200
+samples for each target/shape. Both MiniFAT targets reduce the selected read to
+one exact request and improve total p50/p95 in both directions; the matched
+4 MiB FAT control keeps identical request, byte, and modeled-service work and
+stays near neutral. The claim is limited to the named configured simulator;
+real cold/network/device I/O, production scheduling, allocation/RSS, and
+native DOC/XLS/PPT semantic adoption remain open. See
+[`0144`](changes/0144-cfb-simulated-range-source-evidence.md).
 
 Change 0103 adds a separate pinned release ABBA capture for
 `cfb_file_same_length_overlay_atomic_save` on CPU 2 (five warm-ups and 30

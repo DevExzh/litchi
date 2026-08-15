@@ -171,11 +171,13 @@ sizes, size buckets, and a deterministic simulated service floor alongside
 the existing target hash and phase counters. The Mini controls require the
 shared read stage to do exactly target work and the legacy stage to retain its
 full-root amplification; the FAT pair remains a matched control. These cases
-are selectable evidence only and do not imply a latency or native semantic
-performance claim. Together these additions bring the selectable matrix to
-271 names while leaving the default 36 cases / 198 records unchanged. Change
-0144 documents the evidence boundary.
-the validation/section and scalar-cell selectors are opt-in and do not alter the default
+are selectable evidence only and do not by themselves imply a latency or
+native semantic performance claim. Together these additions bring the
+selectable matrix to 271 names while leaving the default 36 cases / 198 records
+unchanged. Change 0144 documents the evidence boundary and the separate clean
+release result.
+
+The validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 
 ```sh
@@ -1521,8 +1523,10 @@ the configured fixed latency, request overhead, bandwidth, and physical-range
 ceiling. Legacy uses a bounded delayed cursor; shared uses `ReadAt` range
 simulation. Open/read/total logical and physical request counts, bytes, sorted
 sizes, buckets, and deterministic service-floor nanoseconds are emitted beside
-the existing phase counters and target hash. They are opt-in evidence only;
-no speedup, cold-I/O, allocation, or semantic native-Office claim is made.
+the existing phase counters and target hash. They are opt-in evidence only.
+Change 0144 accepts p50/p95 only for its clean, configured-simulator ABBA;
+no cold-I/O, physical-device, ambient-network, allocation, RSS, or semantic
+native-Office claim is made.
 - `doc_fresh_write_to`: construct a new `litchi_doc::writer::Writer`, add the
   selected fixed paragraphs through its public API, and package it with public
   `write_to`.

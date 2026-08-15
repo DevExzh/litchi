@@ -1,6 +1,6 @@
 # Change 0144: simulated CFB range-source selective-read evidence
 
-Date: 2026-08-15
+Date: 2026-08-16
 
 ## Scope
 
@@ -47,11 +47,12 @@ tests keep requested-size and returned-byte accounting honest.
 
 ## Claim boundary
 
-This change supplies reproducible simulated-source evidence only. It is not a
-cold-filesystem or ambient-network measurement and does not accept a release
-latency, tail, allocation, RSS, physical-device-I/O, or native DOC/XLS/PPT
-performance claim. A configured service floor is a model accounting quantity,
-not observed wall-clock service.
+This change supplies reproducible simulated-source evidence only. The release
+record accepts p50/p95 only for the named configured simulator. It is not a
+cold-filesystem, physical-device, or ambient-network measurement and does not
+accept production-source scheduling, p99, allocation, RSS, or native
+DOC/XLS/PPT performance. A configured service floor is a model accounting
+quantity, not observed wall-clock service.
 
 The default matrix remains 36 cases / 198 result records. The six names raise
 the selectable case-name count from 265 to 271. iWork remains deferred.
@@ -78,5 +79,35 @@ Verification on the implementation revision:
 - two independent read-only reviews, including correction of asymmetric timed
   source construction and short/EOF request accounting.
 
-Release distributions and any paired latency result remain a separate evidence
-commit.
+## Clean release evidence
+
+The implementation was committed as `c9f755026423d8f1a4771413be8461a6d8f40b49`.
+One exact release binary (SHA-256
+`60658045f3278a735928a4818289f55362caed22b2435d7e34600c0eeb4f3f51`)
+ran from a clean detached worktree on CPU 2 in `A1 legacy, B1 shared,
+B2 shared, A2 legacy` order. Every target/shape result has 20 warmups and 200
+samples. The fixed model was 100 us latency plus 25 us overhead per request,
+50 MiB/s bandwidth, and a 64 KiB physical-request ceiling.
+
+| Target / shape | Selective read work, legacy -> shared | Total p50 reduction, pair 1 / pair 2 | Total p95 reduction, pair 1 / pair 2 |
+|---|---:|---:|---:|
+| 36-byte MiniFAT / many-small | 4 requests / 261,184 B -> 1 / 36 B | 40.12% / 39.99% | 40.64% / 39.08% |
+| 4095-byte MiniFAT / many-small | 5 requests / 265,216 B -> 1 / 4,095 B | 40.09% / 39.82% | 40.26% / 39.75% |
+| 36-byte MiniFAT / wide-root | 32 requests / 2,096,192 B -> 1 / 36 B | 41.96% / 41.83% | 42.23% / 41.58% |
+| 4095-byte MiniFAT / wide-root | 33 requests / 2,100,224 B -> 1 / 4,095 B | 42.00% / 41.84% | 41.96% / 41.70% |
+
+The 4 MiB FAT controls retain exactly 64 requests, 4,194,304 returned bytes,
+and an 88,000,000 ns modeled read-service floor for both implementations.
+Their paired p50 changes range from -0.09% to +0.08%, so they are classified
+as matched-work near-neutral controls. Corpus and selected-target hashes,
+returned lengths, configurations, revision, profile, affinity, sample counts,
+and selector-paired identities match across all four legs. Every leg's request
+buckets and service-floor arithmetic validate against its own observations.
+
+The [compact summary](../results/cfb-simulated-range-0144-summary.json) retains
+the exact comparison values and artifact hashes. The complete per-sample raw
+records are committed as compressed
+[`A1`](../results/cfb-simulated-range-0144-a1.json.zst),
+[`B1`](../results/cfb-simulated-range-0144-b1.json.zst),
+[`B2`](../results/cfb-simulated-range-0144-b2.json.zst), and
+[`A2`](../results/cfb-simulated-range-0144-a2.json.zst) JSON.

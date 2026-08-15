@@ -247,6 +247,31 @@ evidence; it does not certify DOC/XLS/PPT semantic CRUD adoption. See the
 [change record](changes/0094-cfb-selective-read-evidence.md) and
 [compact ABBA summary](results/cfb-selective-range-abba-0106-summary.json).
 
+## CFB selective simulated-range ABBA (change 0144)
+
+The follow-up clean-revision release run keeps the same deterministic
+final-position MiniFAT and FAT targets, but applies a harness-only bounded
+range model: 100 us fixed latency, 25 us request overhead, 50 MiB/s bandwidth,
+and a 64 KiB physical-request ceiling. Four CPU-2-pinned legs ran in
+`A1 legacy, B1 shared, B2 shared, A2 legacy` order, with 20 warmups and 200
+samples for each of three targets and both `many-small` and `wide-root` shapes.
+
+| Target / shape | Selective read work, legacy -> shared | Total p50 reduction, pair 1 / pair 2 | Total p95 reduction, pair 1 / pair 2 |
+|---|---:|---:|---:|
+| 36-byte MiniFAT / many-small | 4 requests / 261,184 B -> 1 / 36 B | 40.12% / 39.99% | 40.64% / 39.08% |
+| 4095-byte MiniFAT / many-small | 5 requests / 265,216 B -> 1 / 4,095 B | 40.09% / 39.82% | 40.26% / 39.75% |
+| 36-byte MiniFAT / wide-root | 32 requests / 2,096,192 B -> 1 / 36 B | 41.96% / 41.83% | 42.23% / 41.58% |
+| 4095-byte MiniFAT / wide-root | 33 requests / 2,100,224 B -> 1 / 4,095 B | 42.00% / 41.84% | 41.96% / 41.70% |
+
+The 4 MiB FAT controls retain exactly 64 requests, 4,194,304 returned bytes,
+and an 88,000,000 ns modeled read-service floor for both implementations.
+Their paired p50 changes are between -0.09% and +0.08%; they are classified as
+matched-work near-neutral controls, not improvements. The accepted result is
+only for this configured simulator. It is not cold-filesystem, physical-device,
+ambient-network, production scheduling, allocation, RSS, or native DOC/XLS/PPT
+evidence. See the [compact summary](results/cfb-simulated-range-0144-summary.json)
+and [change record](changes/0144-cfb-simulated-range-source-evidence.md).
+
 ## CFB MiniFAT physical-run boundary evidence (change 0125)
 
 The current harness adds a matched 4095-byte MiniFAT boundary pair over the
@@ -436,7 +461,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**265 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**271 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
