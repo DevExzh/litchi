@@ -2,10 +2,11 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0126`](changes/0126-docx-root-source-path-evidence.md)
-(current-HEAD CFB MiniFAT request-amplification observation; the latest
-release CFB selective-range evidence remains [`0094`](changes/0094-cfb-selective-read-evidence.md),
-and release filesystem evidence is [`0089`](changes/0089-filesystem-release-repeated-evidence.md))
+Evidence through: [`change 0140`](changes/0140-odp-repeated-text-cache-release-abba.md)
+(the newest accepted result is limited to four repeated source-backed ODP
+full-text projections; the latest release CFB selective-range evidence remains
+[`0094`](changes/0094-cfb-selective-read-evidence.md), and release filesystem
+evidence is [`0089`](changes/0089-filesystem-release-repeated-evidence.md))
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -45,6 +46,19 @@ profiles for managed XLSX, a CFB save read-amplification breakdown, and a
 CPU-pinned repeated scaling run with uncertainty.  None should be treated as
 an optimization acceptance gate until matched controls and preservation gates
 exist.
+
+## ODP repeated full-text projection (change 0140)
+
+The production threshold-two cache removes two of four complete semantic text
+projections in the matched `SourceBackedPresentation` selector shape. A clean
+CPU-2 `A1, B1, B2, A2` release run accepts p50 reductions of 45.80%/46.32% and
+p95 reductions of 45.25%/45.83%; p99 and mean agree. Whole-process Heaptrack
+allocation calls fall 14.31% and temporary allocations 17.25%, but peak heap
+is unchanged at 89.22M and process VmHWM is near-neutral. The prepared-source
+replay performs zero post-preparation reads, so this is parse/projection/cache
+work rather than physical-I/O or decompression evidence. Broader slide-object,
+single-call, open, edit/save, real-producer, and generic ODF work remains in the
+ODF queue.
 
 ## Shared OOXML data path
 

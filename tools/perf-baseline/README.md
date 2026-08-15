@@ -154,10 +154,12 @@ and `Pictures` payload reads; freshness vectors are `[3, 3, 3, 3]` for the
 control and `[3, 5, 2, 2]` for the candidate (12 observations total in each
 case). Archive topology, eight-picture/16 MiB media identity, text parity and
 hashes remain untimed. These additions bring the selectable matrix to 265
-names while leaving the default 36 cases / 198 records unchanged. This is
-correctness and logical replay evidence only: no latency, physical-I/O,
-decompression, allocation, RSS, cold-cache, ABBA, or release claim is made
-until a frozen measured ABBA run;
+names while leaving the default 36 cases / 198 records unchanged. Change 0140
+accepts the frozen CPU-2 selector-pair result for this exact four-call shape:
+p50 improves 45.80%/46.32% and p95 improves 45.25%/45.83% in paired directions;
+whole-process allocation-call counts improve 14.31%, while peak heap and RSS
+remain neutral. No single-call, open, physical-I/O, decompression, cold-cache,
+or generic ODF claim is made;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 

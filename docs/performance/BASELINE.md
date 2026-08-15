@@ -575,6 +575,22 @@ latency, physical-I/O, decompression, allocation, RSS, cold-cache, ABBA, or
 release claim is made until a frozen measured ABBA run. See
 [`0139`](changes/0139-odp-repeated-text-cache-evidence.md).
 
+Change 0140 records a clean-revision CPU-2 `A1, B1, B2, A2` release run for
+those two selectors with 20 warmups and 200 samples per fresh process. Cached
+four-call p50 improves 45.80%/46.32%, p95 improves 45.25%/45.83%, p99 improves
+39.91%/45.41%, and mean improves 45.74%/46.33% in the paired directions.
+Matched Heaptrack 1.5.0 profiles (three warmups/30 samples) record deterministic
+whole-process allocation-call reductions of 14.31% and temporary-allocation
+reductions of 17.25%, with unchanged 89.22M peak heap. Matched process VmHWM
+is neutral (0.00%/0.16%), so no peak-heap or RSS reduction is accepted. Exact
+archive/text/media hashes, zero post-preparation reads, and freshness vectors
+remain green on every raw record. This accepted result is limited to the exact
+four-call prepared source-backed projection shape; it makes no single-call,
+open, physical-I/O, decompression, cold-cache, operation-local allocated-byte,
+or generic ODF claim. See
+[`0140`](changes/0140-odp-repeated-text-cache-release-abba.md) and its linked
+schema-1 raw artifacts.
+
 The earlier five-case filesystem smoke exercises eager/source-backed OPC open,
 eager/source-backed one-Part atomic save, and same-length CFB atomic overlay
 save. A

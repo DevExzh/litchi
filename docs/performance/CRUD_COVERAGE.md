@@ -1024,6 +1024,16 @@ only, with no latency, physical-I/O, decompression, allocation, RSS,
 cold-cache, ABBA, or release claim. See
 [`0139`](changes/0139-odp-repeated-text-cache-evidence.md).
 
+Change 0140 accepts the corresponding clean-revision CPU-2 matched release
+result for this exact four-call source-backed projection shape. Paired p50
+improves 45.80%/46.32% and p95 improves 45.25%/45.83%; p99 and mean agree as
+well. Whole-process Heaptrack allocation-call and temporary-allocation counts
+fall 14.31% and 17.25%, while peak heap and process VmHWM remain neutral. The
+result does not broaden CRUD coverage and makes no single-call, open,
+physical-I/O, decompression, cold-cache, peak-memory, operation-local
+allocated-byte, or generic ODF claim. See
+[`0140`](changes/0140-odp-repeated-text-cache-release-abba.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.
