@@ -6,12 +6,13 @@ use std::sync::Arc;
 use litchi_core::{ExecutionContext, ExecutionError, Selector as CoreSelector, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    OpcError, OpcPackage, PackURI, Part, PartData, Relationship, Relationships,
-    SourceBackedPackage, SourceLineage, TargetMode,
+    OpcError, OpcPackage, PackURI, Part, Relationship, Relationships, SourceBackedPackage,
+    SourceLineage, TargetMode,
 };
 
 use crate::cell::{Cell, Store, Value};
 use crate::error::{Error, Result, allocation, invalid};
+use crate::source_payload::SourcePayload;
 use crate::workbook::source::validate_sheet_graph;
 use crate::{Selector, WorksheetKind, raw};
 
@@ -28,83 +29,6 @@ const INTL_MACROSHEET_REL: &str =
     "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet";
 const CHARTSHEET_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
-
-/// Payload ownership used by source-backed value snapshots.
-///
-/// Managed OPC payloads remain attached to their [`PartData`] reservation for
-/// as long as a snapshot, patch, or commit retains them. Compatibility source
-/// opens use the existing unmanaged `Arc<Vec<u8>>` allocation because the old
-/// owning-package patch API needs a detached target; managed handles remain
-/// attached because the OPC `PartData` handle intentionally does not expose
-/// its allocation directly on managed packages.
-#[derive(Clone, Debug)]
-enum SourcePayload {
-    Managed(PartData),
-    Owned(Arc<Vec<u8>>),
-}
-
-impl SourcePayload {
-    fn as_bytes(&self) -> &[u8] {
-        match self {
-            Self::Managed(data) => data.as_bytes(),
-            Self::Owned(bytes) => bytes.as_slice(),
-        }
-    }
-
-    fn len(&self) -> usize {
-        self.as_bytes().len()
-    }
-
-    fn from_part_data(package: &SourceBackedPackage, data: PartData) -> Result<Self> {
-        if package.cache_diagnostics().budget_managed {
-            return Ok(Self::Managed(data));
-        }
-        // `PartData::into_arc` is reachable only on the compatibility,
-        // explicitly unmanaged cache path. Managed handles take the branch
-        // above and retain their reservation instead of detaching it.
-        Ok(Self::Owned(data.into_arc().map_err(Error::Package)?))
-    }
-
-    /// Return an already-owned payload for the legacy owning-package patch
-    /// path. Managed handles intentionally refuse this implicit escape.
-    fn detached_arc(&self) -> Result<Arc<Vec<u8>>> {
-        match self {
-            Self::Managed(_) => Err(Error::Package(OpcError::ManagedPartDataArcEscape)),
-            Self::Owned(bytes) => Ok(Arc::clone(bytes)),
-        }
-    }
-
-    /// Explicitly copy a managed payload into an owning-package allocation.
-    /// The caller supplies the aggregate bound before this operation can
-    /// allocate, so this handoff cannot silently bypass the managed budget.
-    fn materialized_arc(&self, maximum: usize, resource: &'static str) -> Result<Arc<Vec<u8>>> {
-        if self.as_bytes().len() > maximum {
-            return Err(invalid(format!(
-                "{resource} exceeds the explicit materialization bound {maximum} bytes"
-            )));
-        }
-        match self {
-            Self::Managed(data) => Ok(copy_bytes(data.as_bytes(), resource)?),
-            Self::Owned(bytes) => Ok(Arc::clone(bytes)),
-        }
-    }
-}
-
-impl PartialEq for SourcePayload {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_bytes() == other.as_bytes()
-    }
-}
-
-impl Eq for SourcePayload {}
-
-fn copy_bytes(bytes: &[u8], resource: &'static str) -> Result<Arc<Vec<u8>>> {
-    let mut copy = Vec::new();
-    copy.try_reserve_exact(bytes.len())
-        .map_err(|source| allocation(resource, source))?;
-    copy.extend_from_slice(bytes);
-    Ok(Arc::new(copy))
-}
 
 fn check_execution(context: Option<&ExecutionContext>) -> Result<()> {
     let Some(context) = context else {

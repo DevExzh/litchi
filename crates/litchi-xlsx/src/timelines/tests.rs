@@ -4,6 +4,10 @@ use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
 #[cfg(test)]
+#[allow(
+    clippy::module_inception,
+    reason = "the nested module keeps timeline regressions scoped under the test support module"
+)]
 mod tests {
     use super::*;
 

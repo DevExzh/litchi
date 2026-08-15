@@ -4,8 +4,8 @@ use std::borrow::Cow;
 use std::io::Write;
 use std::sync::Arc;
 
-use litchi_core::ReadAt;
-use litchi_opc::{ReadLimits, SourceBackedPackage};
+use litchi_core::{ExecutionContext, ReadAt};
+use litchi_opc::{ReadLimits, SourceBackedPackage, SourceCacheLimits};
 
 use super::patch::{Commit, Patch};
 use super::snapshot::{Snapshot, same_properties};
@@ -48,11 +48,85 @@ impl SourceBackedEditor {
         )
     }
 
-    fn from_source_backed_package(
+    /// Open with an explicit finite deferred-payload cache policy.
+    pub fn from_read_at_with_cache_limits(
+        source: Arc<dyn ReadAt>,
+        cache_limits: SourceCacheLimits,
+        calculation_limits: Limits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_cache_limits(source, cache_limits)?,
+            calculation_limits,
+        )
+    }
+
+    /// Open with explicit read and finite cache policies.
+    pub fn from_read_at_with_limits_and_cache_limits(
+        source: Arc<dyn ReadAt>,
+        read_limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        calculation_limits: Limits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+                source,
+                read_limits,
+                cache_limits,
+            )?,
+            calculation_limits,
+        )
+    }
+
+    /// Open with an explicit caller-owned execution context and the default cache.
+    pub fn from_read_at_with_execution_context(
+        source: Arc<dyn ReadAt>,
+        read_limits: ReadLimits,
+        calculation_limits: Limits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_execution_context(source, read_limits, context)?,
+            calculation_limits,
+        )
+    }
+
+    /// Open with explicit read and execution policies.
+    pub fn from_read_at_with_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        read_limits: ReadLimits,
+        calculation_limits: Limits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_execution_context(source, read_limits, calculation_limits, context)
+    }
+
+    /// Open with explicit read, cache, and caller-owned execution policies.
+    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        read_limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        calculation_limits: Limits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                read_limits,
+                cache_limits,
+                context,
+            )?,
+            calculation_limits,
+        )
+    }
+
+    /// Build an editor from a validated deferred OPC package.
+    pub fn from_source_backed_package(
         package: SourceBackedPackage,
         calculation_limits: Limits,
     ) -> Result<Self> {
+        package.check_execution()?;
         let snapshot = Snapshot::load_source_backed_with_limits(&package, &calculation_limits)?;
+        package.check_execution()?;
         Ok(Self { package, snapshot })
     }
 
@@ -85,6 +159,7 @@ impl SourceBackedEditor {
         writer: W,
         commit: &Commit,
     ) -> Result<Snapshot> {
+        self.package.check_execution()?;
         let current =
             Snapshot::load_source_backed_with_limits(&self.package, &self.snapshot.limits())?;
         if !current.same_source(commit.patch().before()) {
@@ -102,6 +177,7 @@ impl SourceBackedEditor {
             target.workbook_part_name(),
             target.source_xml().to_vec(),
         )?;
+        target.check_execution()?;
         Ok(target)
     }
 }
@@ -193,6 +269,7 @@ impl SourceEdit {
 
     /// Validate and freeze this isolated edit for source-backed publication.
     pub fn commit(self) -> Result<Commit> {
+        self.before.check_execution()?;
         if !self.is_changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
             return Ok(Commit::new(self.before, patch, false));
@@ -213,6 +290,7 @@ impl SourceEdit {
             },
         };
         let snapshot = Snapshot::from_rewritten_source(&self.before, output)?;
+        snapshot.check_execution()?;
         if !snapshot.same_semantics(self.properties.as_ref(), self.features.as_ref()) {
             return Err(invalid(
                 "calculation metadata publication changed the staged semantics",

@@ -9,6 +9,7 @@ use litchi_opc::{
 };
 
 use crate::error::{Error, Result, TabEditBlock, allocation, invalid};
+use crate::source_payload::SourcePayload;
 use crate::workbook::source::validate_sheet_graph;
 use crate::{Visibility, WorksheetKind, raw};
 
@@ -69,13 +70,15 @@ impl Snapshot {
         package: &SourceBackedPackage,
         origin: Arc<()>,
     ) -> Result<Self> {
+        package.check_execution()?;
+        let source_version = package.source_version()?;
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
-        let workbook_bytes = workbook.data()?.into_arc()?;
-        let catalog = raw::parse_catalog(workbook_bytes.as_slice())?;
+        let workbook_bytes = SourcePayload::from_part_data(package, workbook.data()?)?;
+        let catalog = raw::parse_catalog(workbook_bytes.as_bytes())?;
         let graph = capture_source_graph(package, &workbook, &catalog.sheets)?;
         let (tabs, active) = semantic_tabs(&catalog)?;
-        Ok(Self {
+        let snapshot = Self {
             tabs,
             active,
             source: SourceState {
@@ -89,7 +92,12 @@ impl Snapshot {
                 touched: Arc::from([]),
             },
             origin: Some(origin),
-        })
+        };
+        package.check_execution()?;
+        if package.source_version()? != source_version {
+            return Err(invalid("tab-state source version changed during snapshot"));
+        }
+        Ok(snapshot)
     }
 
     fn load_owned_with_touched(package: &OpcPackage, positions: &[usize]) -> Result<Self> {
@@ -107,7 +115,7 @@ impl Snapshot {
                 workbook: PartState::new(
                     workbook.partname().clone(),
                     workbook.content_type(),
-                    workbook_bytes,
+                    SourcePayload::Owned(workbook_bytes),
                     "tab-state workbook content type",
                 )?,
                 graph: Arc::new(graph),
@@ -170,7 +178,7 @@ impl Snapshot {
                 part: PartState::new(
                     source.part.uri.clone(),
                     &source.part.content_type,
-                    Arc::new(bytes.clone()),
+                    SourcePayload::Owned(Arc::new(bytes.clone())),
                     "tab-state touched sheet content type",
                 )?,
                 relationships: Arc::clone(&source.relationships),
@@ -184,7 +192,7 @@ impl Snapshot {
                 workbook: PartState::new(
                     before.source.workbook.uri.clone(),
                     &before.source.workbook.content_type,
-                    Arc::new(workbook),
+                    SourcePayload::Owned(Arc::new(workbook)),
                     "tab-state workbook content type",
                 )?,
                 graph: Arc::clone(&before.source.graph),
@@ -221,13 +229,16 @@ impl Snapshot {
     /// Exact source workbook XML.
     #[must_use]
     pub fn workbook_xml(&self) -> &[u8] {
-        self.source.workbook.bytes.as_slice()
+        self.source.workbook.bytes.as_bytes()
     }
 
     /// Shared exact source workbook XML.
-    #[must_use]
-    pub fn workbook_source_arc(&self) -> Arc<Vec<u8>> {
-        Arc::clone(&self.source.workbook.bytes)
+    ///
+    /// Managed source payloads return
+    /// [`litchi_opc::OpcError::ManagedPartDataArcEscape`] rather than silently
+    /// detaching their execution-budget reservation.
+    pub fn workbook_source_arc(&self) -> Result<Arc<Vec<u8>>> {
+        self.source.workbook.bytes.detached_arc()
     }
 
     pub(super) fn binding(&self, position: usize) -> Result<&SheetBinding> {
@@ -355,14 +366,14 @@ pub(super) struct TouchedPart {
 pub(super) struct PartState {
     pub(super) uri: PackURI,
     content_type: Box<str>,
-    pub(super) bytes: Arc<Vec<u8>>,
+    pub(super) bytes: SourcePayload,
 }
 
 impl PartState {
     fn new(
         uri: PackURI,
         content_type: &str,
-        bytes: Arc<Vec<u8>>,
+        bytes: SourcePayload,
         resource: &'static str,
     ) -> Result<Self> {
         Ok(Self {
@@ -375,7 +386,7 @@ impl PartState {
     fn matches_view(&self, part: &PartView<'_>, bytes: &[u8]) -> bool {
         part.partname() == &self.uri
             && part.content_type() == self.content_type.as_ref()
-            && bytes == self.bytes.as_slice()
+            && bytes == self.bytes.as_bytes()
     }
 }
 
@@ -526,7 +537,7 @@ fn capture_source_touched(
     for position in positions {
         let binding = checked_tabular_binding(graph, position)?;
         let part = package.part(&binding.part.uri)?;
-        let bytes = part.data()?.into_arc()?;
+        let bytes = SourcePayload::from_part_data(package, part.data()?)?;
         touched.push(TouchedPart {
             position,
             part: PartState::new(
@@ -559,7 +570,7 @@ fn capture_owned_touched(
             part: PartState::new(
                 binding.part.uri.clone(),
                 &binding.part.content_type,
-                part.blob_arc(),
+                SourcePayload::Owned(part.blob_arc()),
                 "tab-state touched sheet content type",
             )?,
             relationships: capture_relationships(part.rels())?.into(),

@@ -46,33 +46,28 @@ impl Patch {
 
     /// Apply after validating the complete workbook owner state.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+        self.before.check_execution()?;
+        self.after.check_execution()?;
         if !self.before.matches_current_source(target) {
             return Err(Error::PatchConflict {
                 part: self.before.workbook_part_name().to_string(),
             });
         }
         if self.is_empty() {
+            self.before.check_execution()?;
+            self.after.check_execution()?;
             return Ok(());
         }
         if target.is_signed() {
             return Err(Error::Signed);
         }
 
-        let source = self.after.source_xml();
-        let mut output = Vec::new();
-        output
-            .try_reserve_exact(source.len())
-            .map_err(|source| Error::Allocation {
-                resource: "calculation metadata patch output",
-                source,
-            })?;
-        output.extend_from_slice(source);
-
         let mut candidate = target.clone();
         candidate
             .get_part_mut(self.before.workbook_part_name())?
-            .set_blob(output);
+            .set_blob_shared(self.after.source_arc()?);
         let resulting = Snapshot::load_with_limits(&candidate, &self.after.limits())?;
+        self.after.check_execution()?;
         if !resulting.same_source(&self.after) {
             return Err(Error::PatchConflict {
                 part: self.after.workbook_part_name().to_string(),

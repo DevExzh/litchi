@@ -51,12 +51,16 @@ impl Patch {
     /// Returns an error for stale source bytes, signed packages, invalid OPC
     /// state, or a target that fails semantic readback.
     pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+        self.before.check_execution()?;
+        self.after.check_execution()?;
         if !self.before.matches_current_source(package) {
             return Err(Error::PatchConflict {
                 part: self.before.worksheet_part_name().to_string(),
             });
         }
         if self.is_empty() {
+            self.before.check_execution()?;
+            self.after.check_execution()?;
             return Ok(());
         }
         if package.is_signed() {
@@ -65,8 +69,9 @@ impl Patch {
         let mut candidate = package.clone();
         candidate
             .get_part_mut(self.before.worksheet_part_name())?
-            .set_blob_shared(self.after.source_arc());
+            .set_blob_shared(self.after.source_arc()?);
         let resulting = Snapshot::load(&candidate, self.after.sheet_position())?;
+        self.after.check_execution()?;
         if !resulting.same_source(&self.after)
             || resulting.page_margins() != self.after.page_margins()
         {

@@ -77,6 +77,26 @@ shape-selected ODT/ODS/ODP semantic cases, twelve fixed media-rich ODF cases,
 and 21 opt-in native DOC/XLS/PPT semantic cases. It
 is still not broad program or CRUD coverage.
 
+## Managed XLSX source-editor production freeze (change 0151)
+
+[Change 0151](changes/0151-xlsx-managed-source-editors.md) freezes managed
+source-backed constructors and ownership for eleven focused XLSX editors:
+calculation properties, defined names, tab state, print options, page breaks,
+page margins, page setup, sheet protection, data validation, auto filter, and
+conditional formatting. The private `Managed(PartData)`/`Owned(Arc<Vec<u8>>)`
+owner keeps managed cache reservations attached to snapshots and makes
+managed-to-owned `Arc` escape a typed fallible boundary. Validated package
+handoffs, direct selected-Part publication, raw preservation of unselected
+members, exact no-op/signed/MCE/stale/cancellation/unknown-owner protections,
+and representative one-byte-under `Resource::Memory` gates are retained.
+
+This is a production correctness/resource-accounting freeze, not a measured
+optimization. The validation run reported 765 green XLSX unit, integration,
+and documentation tests, including 74 focused source-editor checks. It adds no
+benchmark selector or performance artifact and makes no latency, allocation,
+RSS/peak-memory, copy, decompression, cold-I/O, total-memory, hardware, or
+real-producer claim.
+
 | Change | Current evidence | Scope / limitation |
 |---|---|---|
 | XLSX row-start index | ABBA p50 geomean **-80.499%**, mean geomean **-79.962%**; full scan **+0.03%** mean; first cell **-1.31%** mean | Heap allocations **+17**, RSS **+0.25%**; narrow-range query only |

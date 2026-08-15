@@ -5,12 +5,18 @@
 
 use std::io;
 use std::io::Write;
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
+    SourceVersion,
+};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, TargetMode};
+use litchi_opc::{
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
+};
 use litchi_xlsx::sheet_protection::{
     Metadata, ProtectedRange, ProtectedRangeCollection, ProtectedRangeSource, Protection,
     ProtectionPasswordVerifier, ProtectionRangeSqref, SourceBackedEditor, SourceEdit,
@@ -161,6 +167,32 @@ fn ordinary_fixture(workbook_suffix: &str, signed: bool) -> Vec<u8> {
     )
 }
 
+fn part_len(bytes: &[u8], member: &str) -> u64 {
+    OpcPackage::from_bytes(bytes)
+        .unwrap()
+        .get_part(&PackURI::new(member).unwrap())
+        .unwrap()
+        .blob()
+        .len() as u64
+}
+
+fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "xlsx-sheet-protection-managed-test",
+        Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroU64::new(memory.max(1)).unwrap(),
+        0,
+    )
+    .unwrap();
+    let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+    (budget, cancellation_source, context)
+}
+
 fn target_metadata() -> Metadata {
     let mut protection = Protection::new();
     protection
@@ -284,6 +316,57 @@ fn changed_edit_reopens_inverts_and_changes_only_the_selected_worksheet() {
             .unwrap(),
         target_metadata()
     );
+}
+
+#[test]
+fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
+    let source_bytes = ordinary_fixture(r#"<extLst><ext uri="urn:keep"/></extLst>"#, false);
+    let exact = part_len(&source_bytes, MAIN) + part_len(&source_bytes, SHEET);
+    let (budget, _cancellation_source, context) = managed_context(exact);
+    let editor =
+        SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            Arc::new(VersionedSource::new(source_bytes.clone())),
+            ReadLimits::default(),
+            SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
+            context,
+        )
+        .unwrap();
+    let snapshot = editor.snapshot("Sheet1").unwrap();
+    assert_eq!(snapshot.metadata(), &Metadata::new());
+    assert_eq!(budget.used(Resource::Memory), exact);
+    drop(snapshot);
+
+    let commit = changed_commit(&editor);
+    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    commit.patch().apply(&mut replay).unwrap();
+    assert!(matches!(
+        commit.patch().inverse().apply(&mut replay),
+        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
+    ));
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let published = OpcPackage::from_bytes(&output).unwrap();
+    assert_eq!(
+        litchi_xlsx::sheet_protection::Snapshot::load(&published, "Sheet1")
+            .unwrap()
+            .metadata(),
+        &target_metadata()
+    );
+    assert_eq!(
+        published
+            .get_part(&PackURI::new(UNUSED).unwrap())
+            .unwrap()
+            .blob(),
+        OpcPackage::from_bytes(&source_bytes)
+            .unwrap()
+            .get_part(&PackURI::new(UNUSED).unwrap())
+            .unwrap()
+            .blob()
+    );
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
 }
 
 #[test]

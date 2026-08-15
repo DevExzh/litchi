@@ -7,11 +7,13 @@ be available and turns their output into one compact, content-addressed JSON
 record.  Missing or permission-denied profilers are represented explicitly;
 they are never converted into zeroes.
 
-The external traces are temporary.  The aggregate report retains their SHA
-and size, the command, and parsed counters, but not the potentially large raw
-trace.  Source/sink counters are logical harness counters.  ``strace`` values
-are whole-process syscall observations and must not be read as decompressed or
-recompressed byte counts.
+The ordinary current-HEAD mode uses temporary external traces and retains
+their SHA and size, command, and parsed counters, but not the potentially
+large raw trace.  Its XLSX managed-batch ABBA mode instead retains per-leg
+harness, ``/usr/bin/time``, and optional heaptrack artifacts under an explicit
+artifact directory.  Source/sink counters are logical harness counters.
+``strace`` values are whole-process syscall observations and must not be read
+as decompressed or recompressed byte counts.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ import platform
 import re
 import shutil
 import stat
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -36,12 +39,20 @@ from typing import Any, Iterable, Sequence
 SCHEMA_VERSION = 1
 TOOL_NAME = "litchi-resource-profile"
 TOOL_VERSION = "0.1.1"
+ABBA_SCHEMA_VERSION = 1
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HARNESS_MANIFEST = REPO_ROOT / "tools" / "perf-baseline" / "Cargo.toml"
 DEFAULT_BINARY = (
     REPO_ROOT / "tools" / "perf-baseline" / "target" / "release" / "litchi-perf-baseline"
 )
 DEFAULT_OUTPUT = REPO_ROOT / "docs" / "performance" / "results" / "resource-profile-current-head-0115.json"
+DEFAULT_ABBA_OUTPUT = (
+    REPO_ROOT
+    / "docs"
+    / "performance"
+    / "results"
+    / "xlsx-managed-batch-resource-abba-current.json"
+)
 MAX_UNTRACKED_FILES = 4096
 MAX_UNTRACKED_FILE_BYTES = 16 * 1024 * 1024
 MAX_UNTRACKED_BYTES = 64 * 1024 * 1024
@@ -138,6 +149,71 @@ DEFAULT_WORKLOADS: tuple[dict[str, Any], ...] = (
     },
 )
 
+XLSX_MANAGED_BATCH_ID = "xlsx-managed-batch"
+XLSX_MANAGED_BATCH_CASE = "xlsx_source_backed_managed_cell_values_batch_edit_save"
+XLSX_MANAGED_BATCH_SHAPE = "medium"
+XLSX_MANAGED_BATCH_ARGS: tuple[str, ...] = (
+    "--case",
+    XLSX_MANAGED_BATCH_CASE,
+    "--xlsx-cell-crud-shape",
+    XLSX_MANAGED_BATCH_SHAPE,
+)
+ABBA_LEG_ORDER: tuple[str, ...] = ("A1", "B1", "B2", "A2")
+ABBA_LEG_VARIANTS: dict[str, str] = {
+    "A1": "control",
+    "B1": "candidate",
+    "B2": "candidate",
+    "A2": "control",
+}
+RESOURCE_METRIC_SPECS: tuple[tuple[str, str], ...] = (
+    ("harness.elapsed_ns.p50", "harness operation-summary elapsed time (ns)"),
+    ("harness.elapsed_ns.p95", "harness operation-summary elapsed time (ns)"),
+    ("harness.elapsed_ns.p99", "harness operation-summary elapsed time (ns)"),
+    ("harness.elapsed_ns.mean", "harness operation-summary elapsed time (ns)"),
+    (
+        "harness.elapsed_ns.standard_deviation",
+        "harness operation-summary elapsed time (ns)",
+    ),
+    ("time.max_rss_kib", "whole-process maximum resident set size (KiB)"),
+    ("time.user_seconds", "whole-process user CPU time (s)"),
+    ("time.system_seconds", "whole-process system CPU time (s)"),
+    (
+        "time.voluntary_context_switches",
+        "whole-process voluntary context switches",
+    ),
+    (
+        "time.involuntary_context_switches",
+        "whole-process involuntary context switches",
+    ),
+    ("time.major_page_faults", "whole-process major page faults"),
+    ("time.minor_page_faults", "whole-process minor page faults"),
+    ("heaptrack.allocation_calls", "whole-process heaptrack allocation calls"),
+    (
+        "heaptrack.temporary_allocations",
+        "whole-process heaptrack temporary allocations",
+    ),
+    ("heaptrack.allocated_bytes", "whole-process heaptrack allocated bytes"),
+    ("heaptrack.peak_heap_bytes", "whole-process heaptrack peak heap bytes"),
+    ("heaptrack.peak_rss_bytes", "whole-process heaptrack peak RSS bytes"),
+)
+NOT_MEASURED_RESOURCE_DIMENSIONS: dict[str, str] = {
+    "memory_copy_bytes": (
+        "not measured: /usr/bin/time and heaptrack report process totals, not bytes copied"
+    ),
+    "decompressed_bytes": (
+        "not measured: no profiler counter is interpreted as decompressed payload bytes"
+    ),
+    "physical_cold_io": (
+        "not measured: this mode does not flush or otherwise establish cold physical I/O"
+    ),
+}
+
+
+class ResourceProfileInputError(ValueError):
+    """Raised when resource-profile comparison inputs are not comparable."""
+
+
+SHA256_HEX_RE = re.compile(r"[0-9a-fA-F]{64}\Z")
 EVENTS = ("cycles", "instructions", "branches", "branch-misses", "cache-misses", "page-faults")
 TIME_FIELDS = {
     "Maximum resident set size (kbytes)": "max_rss_kib",
@@ -594,8 +670,9 @@ def tool_version(name: str, args: Sequence[str]) -> str | None:
     return next((line.strip() for line in output.splitlines() if line.strip()), None)
 
 
-def parse_time_report(path: Path) -> dict[str, Any]:
+def parse_time_report(path: Path, *, retained: bool = False) -> dict[str, Any]:
     parsed: dict[str, Any] = {"status": "missing"}
+    malformed = False
     try:
         lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError as error:
@@ -603,7 +680,9 @@ def parse_time_report(path: Path) -> dict[str, Any]:
     for raw_line in lines:
         line = raw_line.strip()
         if line.startswith("Elapsed (wall clock") and ": " in line:
-            parsed["elapsed_wall_seconds"] = parse_elapsed_clock(line.rpartition(": ")[2].strip())
+            elapsed = parse_elapsed_clock(line.rpartition(": ")[2].strip())
+            parsed["elapsed_wall_seconds"] = elapsed
+            malformed = malformed or elapsed is None
             continue
         if ":" not in line:
             continue
@@ -613,11 +692,19 @@ def parse_time_report(path: Path) -> dict[str, Any]:
         key = TIME_FIELDS.get(label)
         if key is not None:
             try:
-                parsed[key] = float(raw) if "time" in label.lower() else int(raw.replace(",", ""))
-            except ValueError:
+                value: float | int
+                if "time" in label.lower():
+                    value = float(raw)
+                    if not math.isfinite(value):
+                        raise ValueError("non-finite time value")
+                else:
+                    value = int(raw.replace(",", ""))
+                parsed[key] = value
+            except (OverflowError, ValueError):
                 parsed[key] = None
-    parsed["status"] = "ok" if "max_rss_kib" in parsed else "unparsed"
-    parsed["artifact"] = artifact(path)
+                malformed = True
+    parsed["status"] = "ok" if "max_rss_kib" in parsed and not malformed else "unparsed"
+    parsed["artifact"] = artifact(path, retained=retained)
     return parsed
 
 
@@ -626,12 +713,15 @@ def parse_elapsed_clock(value: str) -> float | None:
         parts = value.split(":")
         if len(parts) == 3:
             hours, minutes, seconds = parts
-            return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+            result = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+            return result if math.isfinite(result) else None
         if len(parts) == 2:
             minutes, seconds = parts
-            return int(minutes) * 60 + float(seconds)
-        return float(value)
-    except ValueError:
+            result = int(minutes) * 60 + float(seconds)
+            return result if math.isfinite(result) else None
+        result = float(value)
+        return result if math.isfinite(result) else None
+    except (OverflowError, ValueError):
         return None
 
 
@@ -657,12 +747,16 @@ def _bytes_token(value: str) -> int | None:
     return int(number * scale)
 
 
-def parse_heaptrack_print(path: Path) -> dict[str, Any]:
+def parse_heaptrack_print(path: Path, *, retained: bool = False) -> dict[str, Any]:
     """Parse stable process-total fields from heaptrack_print -H output."""
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError as error:
-        return {"status": "missing", "error": str(error), "artifact": artifact(path)}
+        return {
+            "status": "missing",
+            "error": str(error),
+            "artifact": artifact(path, retained=retained),
+        }
     patterns: tuple[tuple[str, str, Any], ...] = (
         ("allocation_calls", r"calls to allocation functions:\s*([0-9,]+)", _numeric_token),
         (
@@ -677,7 +771,10 @@ def parse_heaptrack_print(path: Path) -> dict[str, Any]:
             _bytes_token,
         ),
     )
-    parsed: dict[str, Any] = {"status": "ok", "artifact": artifact(path)}
+    parsed: dict[str, Any] = {
+        "status": "ok",
+        "artifact": artifact(path, retained=retained),
+    }
     for key, pattern, converter in patterns:
         match = re.search(pattern, text, re.IGNORECASE)
         parsed[key] = converter(match.group(1)) if match else None
@@ -873,6 +970,495 @@ def logical_measurements(report: dict[str, Any]) -> list[dict[str, Any]]:
     if filesystem:
         measurements.append({"filesystem_evidence": compact_filesystem_evidence(filesystem)})
     return measurements
+
+
+def _canonical_json(value: Any, location: str) -> str:
+    try:
+        return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    except (TypeError, ValueError) as error:
+        raise ResourceProfileInputError(f"{location} is not canonical JSON: {error}") from error
+
+
+def validate_abba_order(labels: Sequence[str]) -> tuple[str, ...]:
+    """Require the fixed control/candidate/control ABBA execution order."""
+    observed = tuple(str(label) for label in labels)
+    if observed != ABBA_LEG_ORDER:
+        raise ResourceProfileInputError(
+            f"ABBA leg order must be {list(ABBA_LEG_ORDER)!r}; got {list(observed)!r}"
+        )
+    return observed
+
+
+def _validate_sha256(value: Any, location: str) -> str:
+    if not isinstance(value, str) or SHA256_HEX_RE.fullmatch(value) is None:
+        raise ResourceProfileInputError(
+            f"{location} must contain exactly 64 hexadecimal SHA-256 characters"
+        )
+    return value.lower()
+
+
+def binary_identity(path: Path, *, label: str) -> dict[str, Any]:
+    """Return exact identity for a release binary, failing before any run."""
+    resolved = path.expanduser().resolve()
+    if not resolved.is_file():
+        raise ResourceProfileInputError(f"{label} binary does not exist: {resolved}")
+    if not os.access(resolved, os.X_OK):
+        raise ResourceProfileInputError(f"{label} binary is not executable: {resolved}")
+    try:
+        digest = sha256_file(resolved)
+        binary_stat = resolved.stat()
+        size = binary_stat.st_size
+        mode_bits = stat.S_IMODE(binary_stat.st_mode)
+    except OSError as error:
+        raise ResourceProfileInputError(f"cannot inspect {label} binary {resolved}: {error}") from error
+    _validate_sha256(digest, f"{label} binary SHA-256")
+    return {
+        "label": label,
+        "path": str(resolved),
+        "binary_sha256": digest,
+        "binary_bytes": size,
+        "mode_bits": mode_bits,
+        "executable": True,
+    }
+
+
+def _validate_binary_descriptor(
+    binary: Any,
+    *,
+    location: str,
+    expected_label: str | None = None,
+) -> dict[str, Any]:
+    """Verify a run-produced binary descriptor against the current executable."""
+    if not isinstance(binary, dict):
+        raise ResourceProfileInputError(f"{location} must be an object")
+    label = binary.get("label")
+    if expected_label is not None and label != expected_label:
+        raise ResourceProfileInputError(
+            f"{location}.label must be {expected_label!r}; got {label!r}"
+        )
+    path_value = binary.get("path")
+    if not isinstance(path_value, str) or not path_value:
+        raise ResourceProfileInputError(f"{location}.path must be a non-empty string")
+    path = Path(path_value)
+    if not path.is_absolute():
+        raise ResourceProfileInputError(f"{location}.path must be absolute")
+    try:
+        path_stat = path.lstat()
+    except OSError as error:
+        raise ResourceProfileInputError(f"{location}.path is not readable: {error}") from error
+    if stat.S_ISLNK(path_stat.st_mode) or not stat.S_ISREG(path_stat.st_mode):
+        raise ResourceProfileInputError(f"{location}.path must reference a regular file")
+    if not os.access(path, os.X_OK):
+        raise ResourceProfileInputError(f"{location}.path must reference an executable file")
+    if binary.get("executable") is not True:
+        raise ResourceProfileInputError(f"{location}.executable must be true")
+    expected_mode = binary.get("mode_bits")
+    if (
+        isinstance(expected_mode, bool)
+        or not isinstance(expected_mode, int)
+        or expected_mode < 0
+        or expected_mode > 0o7777
+    ):
+        raise ResourceProfileInputError(f"{location}.mode_bits must be permission bits")
+    expected_size = binary.get("binary_bytes")
+    if (
+        isinstance(expected_size, bool)
+        or not isinstance(expected_size, int)
+        or expected_size < 0
+    ):
+        raise ResourceProfileInputError(f"{location}.binary_bytes must be a non-negative integer")
+    expected_digest = _validate_sha256(binary.get("binary_sha256"), f"{location}.binary_sha256")
+    try:
+        actual_size = path_stat.st_size
+        actual_mode = stat.S_IMODE(path_stat.st_mode)
+        actual_digest = sha256_file(path)
+    except OSError as error:
+        raise ResourceProfileInputError(f"cannot hash {location}.path: {error}") from error
+    if actual_size != expected_size:
+        raise ResourceProfileInputError(
+            f"{location}.binary_bytes does not match executable: "
+            f"{expected_size} != {actual_size}"
+        )
+    if actual_mode != expected_mode:
+        raise ResourceProfileInputError(
+            f"{location}.mode_bits does not match executable: "
+            f"{expected_mode:o} != {actual_mode:o}"
+        )
+    if actual_digest.lower() != expected_digest:
+        raise ResourceProfileInputError(
+            f"{location}.binary_sha256 does not match executable"
+        )
+    return {
+        **binary,
+        "path": str(path),
+        "binary_sha256": expected_digest,
+        "binary_bytes": actual_size,
+        "mode_bits": actual_mode,
+        "executable": True,
+    }
+
+
+def reserve_abba_paths(output_path: Path, artifact_root: Path) -> tuple[Path, Path]:
+    """Reserve fresh ABBA output/artifact paths before launching any workload."""
+    output = output_path.expanduser().resolve()
+    root = artifact_root.expanduser().resolve()
+    if output == root:
+        raise ResourceProfileInputError("ABBA output path and artifact root must differ")
+    try:
+        output.relative_to(root)
+        root_contains_output = True
+    except ValueError:
+        root_contains_output = False
+    try:
+        root.relative_to(output)
+        output_contains_root = True
+    except ValueError:
+        output_contains_root = False
+    if root_contains_output or output_contains_root:
+        raise ResourceProfileInputError(
+            "ABBA output path and artifact root must not contain one another"
+        )
+    if os.path.lexists(output):
+        raise ResourceProfileInputError(f"ABBA output path already exists: {output}")
+    if os.path.lexists(root):
+        raise ResourceProfileInputError(
+            f"ABBA artifact root already exists (possible stale capture): {root}"
+        )
+    try:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        root.mkdir(parents=True, exist_ok=False)
+    except OSError as error:
+        raise ResourceProfileInputError(f"cannot reserve ABBA output paths: {error}") from error
+    return output, root
+
+
+def _harness_result(report: Any, location: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    if not isinstance(report, dict):
+        raise ResourceProfileInputError(f"{location} must be an object")
+    if report.get("schema_version") != SCHEMA_VERSION:
+        raise ResourceProfileInputError(
+            f"{location}.schema_version must be {SCHEMA_VERSION!r}"
+        )
+    configuration = report.get("configuration")
+    if not isinstance(configuration, dict):
+        raise ResourceProfileInputError(f"{location}.configuration must be an object")
+    results = report.get("results")
+    if not isinstance(results, list) or len(results) != 1:
+        raise ResourceProfileInputError(
+            f"{location}.results must contain exactly one XLSX managed-batch result"
+        )
+    result = results[0]
+    if not isinstance(result, dict):
+        raise ResourceProfileInputError(f"{location}.results[0] must be an object")
+    if result.get("case") != XLSX_MANAGED_BATCH_CASE:
+        raise ResourceProfileInputError(
+            f"{location}.results[0].case must be {XLSX_MANAGED_BATCH_CASE!r}"
+        )
+    corpus = result.get("corpus")
+    if not isinstance(corpus, dict) or not corpus:
+        raise ResourceProfileInputError(f"{location}.results[0].corpus must be a non-empty object")
+    if corpus.get("shape") != XLSX_MANAGED_BATCH_SHAPE:
+        raise ResourceProfileInputError(
+            f"{location}.results[0].corpus.shape must be {XLSX_MANAGED_BATCH_SHAPE!r}"
+        )
+    return configuration, result
+
+
+def _require_revision(report: dict[str, Any], location: str) -> str:
+    environment = report.get("environment")
+    if not isinstance(environment, dict):
+        raise ResourceProfileInputError(f"{location}.environment must be an object")
+    if environment.get("git_worktree_dirty") is not False:
+        raise ResourceProfileInputError(
+            f"{location}.environment.git_worktree_dirty must be false"
+        )
+    revision = environment.get("git_revision")
+    if not isinstance(revision, str) or not revision:
+        raise ResourceProfileInputError(
+            f"{location}.environment.git_revision must be a non-empty string"
+        )
+    return revision
+
+
+def validate_abba_inputs(
+    legs: Sequence[dict[str, Any]],
+    *,
+    expected_configuration: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Validate clean binary/revision/corpus/config identity for four ABBA legs.
+
+    ``legs`` intentionally contains the parsed harness report and the exact
+    binary descriptor used for that leg.  Validation is performed before any
+    statistics are interpreted, and a missing identity is an error rather than
+    an implicit match.
+    """
+    if len(legs) != len(ABBA_LEG_ORDER):
+        raise ResourceProfileInputError(
+            f"ABBA requires exactly {len(ABBA_LEG_ORDER)} legs; got {len(legs)}"
+        )
+    if any(not isinstance(leg, dict) for leg in legs):
+        raise ResourceProfileInputError("ABBA legs must be objects")
+    labels = [leg.get("leg") for leg in legs]
+    validate_abba_order(labels)
+    revisions: dict[str, str] = {}
+    binary_hashes: dict[str, str] = {}
+    binary_paths: dict[str, str] = {}
+    binary_modes: dict[str, int] = {}
+    configurations: list[dict[str, Any]] = []
+    corpora: list[dict[str, Any]] = []
+    tools: list[Any] = []
+    for index, leg in enumerate(legs):
+        location = f"legs[{index}]"
+        if not isinstance(leg, dict):
+            raise ResourceProfileInputError(f"{location} must be an object")
+        label = leg.get("leg")
+        if label not in ABBA_LEG_VARIANTS:
+            raise ResourceProfileInputError(f"{location}.leg is not a recognized ABBA leg")
+        expected_variant = ABBA_LEG_VARIANTS[label]
+        if leg.get("variant") != expected_variant:
+            raise ResourceProfileInputError(
+                f"{location}.variant must be {expected_variant!r} for {label!r}"
+            )
+        binary = _validate_binary_descriptor(
+            leg.get("binary_identity"),
+            location=f"{location}.binary_identity",
+            expected_label=expected_variant,
+        )
+        binary_hashes[label] = binary["binary_sha256"]
+        binary_paths[label] = binary["path"]
+        binary_modes[label] = binary["mode_bits"]
+        report = leg.get("harness_report")
+        if report is None:
+            report = leg.get("report")
+        configuration, result = _harness_result(report, f"{location}.harness_report")
+        configurations.append(configuration)
+        corpus = result["corpus"]
+        corpora.append(corpus)
+        revisions[label] = _require_revision(report, f"{location}.harness_report")
+        tool = report.get("tool")
+        if not isinstance(tool, dict):
+            raise ResourceProfileInputError(f"{location}.harness_report.tool must be an object")
+        if tool.get("profile") != "release":
+            raise ResourceProfileInputError(
+                f"{location}.harness_report.tool.profile must be 'release'"
+            )
+        tools.append(tool)
+
+    configuration_identity = _canonical_json(configurations[0], "ABBA configuration")
+    if any(_canonical_json(item, "ABBA configuration") != configuration_identity for item in configurations[1:]):
+        raise ResourceProfileInputError("ABBA harness configurations do not match")
+    corpus_identity = _canonical_json(corpora[0], "ABBA corpus")
+    if any(_canonical_json(item, "ABBA corpus") != corpus_identity for item in corpora[1:]):
+        raise ResourceProfileInputError("ABBA XLSX corpora do not match")
+    tool_identity = _canonical_json(tools[0], "ABBA tool identity")
+    if any(_canonical_json(item, "ABBA tool identity") != tool_identity for item in tools[1:]):
+        raise ResourceProfileInputError("ABBA harness tool identities do not match")
+    if binary_hashes["A1"] != binary_hashes["A2"]:
+        raise ResourceProfileInputError("control binary changed between A1 and A2")
+    if binary_hashes["B1"] != binary_hashes["B2"]:
+        raise ResourceProfileInputError("candidate binary changed between B1 and B2")
+    if binary_paths["A1"] != binary_paths["A2"]:
+        raise ResourceProfileInputError("control binary path changed between A1 and A2")
+    if binary_paths["B1"] != binary_paths["B2"]:
+        raise ResourceProfileInputError("candidate binary path changed between B1 and B2")
+    if binary_modes["A1"] != binary_modes["A2"]:
+        raise ResourceProfileInputError("control binary mode changed between A1 and A2")
+    if binary_modes["B1"] != binary_modes["B2"]:
+        raise ResourceProfileInputError("candidate binary mode changed between B1 and B2")
+    if binary_hashes["A1"] == binary_hashes["B1"]:
+        raise ResourceProfileInputError("control and candidate binary hashes are identical")
+    if revisions["A1"] != revisions["A2"]:
+        raise ResourceProfileInputError("control revision changed between A1 and A2")
+    if revisions["B1"] != revisions["B2"]:
+        raise ResourceProfileInputError("candidate revision changed between B1 and B2")
+    if revisions["A1"] == revisions["B1"]:
+        raise ResourceProfileInputError("control and candidate revisions are identical")
+    if expected_configuration is not None:
+        for key, expected in expected_configuration.items():
+            if configurations[0].get(key) != expected:
+                raise ResourceProfileInputError(
+                    f"ABBA configuration.{key} does not match fixed configuration: "
+                    f"{configurations[0].get(key)!r} != {expected!r}"
+                )
+    return {
+        "status": "validated",
+        "leg_order": list(ABBA_LEG_ORDER),
+        "control_revision": revisions["A1"],
+        "candidate_revision": revisions["B1"],
+        "control_binary_sha256": binary_hashes["A1"],
+        "candidate_binary_sha256": binary_hashes["B1"],
+        "configuration": configurations[0],
+        "corpus": corpora[0],
+        "tool": tools[0],
+        "claim": "identity validation only; no performance or speedup claim",
+    }
+
+
+def _finite_resource_value(value: Any) -> float | int | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        return None
+    if not math.isfinite(number) or number < 0:
+        return None
+    return value
+
+
+def _leg_resource_metric(leg: dict[str, Any], metric: str) -> float | int | None:
+    direct = leg.get("resource_metrics")
+    if isinstance(direct, dict) and metric in direct:
+        return _finite_resource_value(direct[metric])
+    if metric.startswith("harness.elapsed_ns."):
+        report = leg.get("harness_report") or leg.get("report")
+        if isinstance(report, dict):
+            results = report.get("results")
+            if isinstance(results, list) and len(results) == 1 and isinstance(results[0], dict):
+                elapsed = results[0].get("elapsed_ns")
+                if isinstance(elapsed, dict):
+                    return _finite_resource_value(elapsed.get(metric.rsplit(".", 1)[1]))
+        return None
+    if metric.startswith("time."):
+        timed = leg.get("time")
+        parsed = timed.get("parsed") if isinstance(timed, dict) else None
+        if isinstance(parsed, dict):
+            return _finite_resource_value(parsed.get(metric.split(".", 1)[1]))
+        return None
+    if metric.startswith("heaptrack."):
+        heaptrack = leg.get("heaptrack")
+        parsed: Any = None
+        if isinstance(heaptrack, dict):
+            printed = heaptrack.get("print")
+            if isinstance(printed, dict):
+                parsed = printed.get("parsed")
+            if parsed is None:
+                parsed = heaptrack.get("parsed")
+        if isinstance(parsed, dict):
+            return _finite_resource_value(parsed.get(metric.split(".", 1)[1]))
+    return None
+
+
+def _value_summary(values: Sequence[float | int | None]) -> dict[str, Any]:
+    observed = [float(value) for value in values if _finite_resource_value(value) is not None]
+    if not observed:
+        return {
+            "status": "not_measured",
+            "count": 0,
+            "mean": None,
+            "median": None,
+            "minimum": None,
+            "maximum": None,
+        }
+    try:
+        mean = statistics.fmean(observed)
+    except (OverflowError, ValueError):
+        mean = None
+    try:
+        median = statistics.median(observed)
+    except (OverflowError, ValueError):
+        median = None
+    if mean is not None and not math.isfinite(mean):
+        mean = None
+    if median is not None and not math.isfinite(median):
+        median = None
+    overflowed = mean is None or median is None
+    return {
+        "status": "observed_with_overflow" if overflowed else "observed",
+        "count": len(observed),
+        "mean": mean,
+        "median": median,
+        "minimum": min(observed),
+        "maximum": max(observed),
+        "overflow_fields": [
+            field
+            for field, value in (("mean", mean), ("median", median))
+            if value is None
+        ],
+    }
+
+
+def _paired_resource_statistic(
+    control: float | int | None,
+    candidate: float | int | None,
+    *,
+    execution_order: str,
+) -> dict[str, Any]:
+    control_value = _finite_resource_value(control)
+    candidate_value = _finite_resource_value(candidate)
+    result: dict[str, Any] = {
+        "execution_order": execution_order,
+        "control": control_value,
+        "candidate": candidate_value,
+        "relative_delta_percent": None,
+        "ratio_candidate_to_control": None,
+        "status": "not_measured",
+    }
+    if control_value is None or candidate_value is None:
+        return result
+    control_number = float(control_value)
+    candidate_number = float(candidate_value)
+    if control_number == 0:
+        result["status"] = "undefined_zero_control" if candidate_number != 0 else "observed_equal_zero"
+        return result
+    try:
+        relative_delta = (candidate_number - control_number) / control_number * 100.0
+    except (OverflowError, ZeroDivisionError):
+        relative_delta = None
+    try:
+        ratio = candidate_number / control_number
+    except (OverflowError, ZeroDivisionError):
+        ratio = None
+    if relative_delta is not None and not math.isfinite(relative_delta):
+        relative_delta = None
+    if ratio is not None and not math.isfinite(ratio):
+        ratio = None
+    result.update(
+        {
+            "relative_delta_percent": relative_delta,
+            "ratio_candidate_to_control": ratio,
+            "status": "observed" if relative_delta is not None and ratio is not None else "overflow",
+        }
+    )
+    return result
+
+
+def abba_statistics(legs: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Emit descriptive paired resource statistics without accepting a speedup."""
+    if any(not isinstance(leg, dict) for leg in legs):
+        raise ResourceProfileInputError("ABBA legs must be objects")
+    labels = [leg.get("leg") for leg in legs]
+    validate_abba_order(labels)
+    metrics: dict[str, Any] = {}
+    for metric, description in RESOURCE_METRIC_SPECS:
+        values = {label: _leg_resource_metric(leg, metric) for label, leg in zip(labels, legs)}
+        controls = [values["A1"], values["A2"]]
+        candidates = [values["B1"], values["B2"]]
+        metrics[metric] = {
+            "description": description,
+            "values_by_leg": values,
+            "control": _value_summary(controls),
+            "candidate": _value_summary(candidates),
+            "paired": {
+                "A1_control_to_B1_candidate": _paired_resource_statistic(
+                    values["A1"], values["B1"], execution_order="A1, B1"
+                ),
+                "A2_control_to_B2_candidate": _paired_resource_statistic(
+                    values["A2"], values["B2"], execution_order="B2, A2"
+                ),
+            },
+            "claim": "descriptive paired process statistics only; no automatic speedup claim",
+        }
+    return {
+        "status": "observed",
+        "leg_order": list(ABBA_LEG_ORDER),
+        "metrics": metrics,
+        "not_measured": dict(NOT_MEASURED_RESOURCE_DIMENSIONS),
+        "interpretation": (
+            "Values are descriptive summaries of four fresh process legs. A relative delta is "
+            "not an accepted optimization or speedup claim."
+        ),
+    }
 
 
 def scaling_analysis(measurements: Iterable[dict[str, Any]]) -> dict[str, Any]:
@@ -1107,6 +1693,312 @@ def _profile_external(
     return result
 
 
+def _retain_run_artifacts(
+    run: dict[str, Any], stdout_path: Path, stderr_path: Path
+) -> dict[str, Any]:
+    retained = dict(run)
+    retained["stdout"] = artifact(stdout_path, retained=True)
+    retained["stderr"] = artifact(stderr_path, retained=True)
+    return retained
+
+
+def _profile_abba_heaptrack(
+    binary: Path,
+    args: Sequence[str],
+    workdir: Path,
+    tools: dict[str, dict[str, Any]],
+    *,
+    warmup: int,
+    samples: int,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    """Collect an optional retained heaptrack process-total profile for one leg."""
+    heaptrack_tool = tools.get("heaptrack", {})
+    print_tool = tools.get("heaptrack_print", {})
+    if not heaptrack_tool.get("available"):
+        return {
+            "status": "unsupported",
+            "reason": "heaptrack unavailable",
+            "scope": "whole process when available; profiler overhead is included",
+        }
+    profile_json = workdir / "heaptrack-harness.json"
+    profile_args = _profile_command(
+        binary,
+        args,
+        warmup=warmup,
+        samples=samples,
+        output=profile_json,
+    )
+    prefix = workdir / "heaptrack-profile"
+    stdout = workdir / "heaptrack-stdout.txt"
+    stderr = workdir / "heaptrack-stderr.txt"
+    command = [str(heaptrack_tool["path"]), "--record-only", "-o", str(prefix), *profile_args]
+    run = run_command(command, stdout_path=stdout, stderr_path=stderr, timeout_seconds=timeout_seconds)
+    run = _retain_run_artifacts(run, stdout, stderr)
+    captures = sorted(
+        path
+        for path in workdir.glob(prefix.name + "*")
+        if path.is_file() and path not in (stdout, stderr)
+    )
+    result: dict[str, Any] = {
+        "status": "ok" if captures and run["returncode"] == 0 else "failed",
+        "scope": "whole process; heaptrack instrumentation overhead is included",
+        "command": command_record(command),
+        "run": run,
+        "harness": artifact(profile_json, retained=True),
+        "captures": [artifact(path, retained=True) for path in captures],
+    }
+    if not captures:
+        result["capture"] = artifact(workdir / "heaptrack-profile", retained=True)
+        if run["returncode"] == 0:
+            result["status"] = "unparsed"
+        return result
+    capture = captures[-1]
+    result["capture"] = artifact(capture, retained=True)
+    if not print_tool.get("available"):
+        result["print"] = {
+            "status": "unsupported",
+            "reason": "heaptrack_print unavailable; raw capture retained",
+        }
+        if run["returncode"] == 0:
+            result["status"] = "unsupported"
+            result["failure_stage"] = "heaptrack_print_unavailable"
+        else:
+            result["status"] = "failed"
+            result["failure_stage"] = "heaptrack"
+        return result
+    printed = workdir / "heaptrack-print.txt"
+    print_stderr = workdir / "heaptrack-print-stderr.txt"
+    histogram = workdir / "heaptrack-histogram.tsv"
+    print_command = [str(print_tool["path"]), "-f", str(capture), "-H", str(histogram)]
+    print_run = run_command(
+        print_command,
+        stdout_path=printed,
+        stderr_path=print_stderr,
+        timeout_seconds=timeout_seconds,
+    )
+    print_run = _retain_run_artifacts(print_run, printed, print_stderr)
+    parsed = parse_heaptrack_print(printed, retained=True)
+    parsed["allocated_bytes"] = parse_heaptrack_histogram(histogram)
+    parsed["histogram_artifact"] = artifact(histogram, retained=True)
+    parsed["scope"] = "whole process; heaptrack instrumentation overhead is included"
+    print_status = "ok"
+    if print_run["returncode"] != 0 or parsed.get("status") != "ok":
+        print_status = "failed"
+        result["status"] = "failed"
+        result["failure_stage"] = "heaptrack_print"
+    result["print"] = {
+        "status": print_status,
+        "command": command_record(print_command),
+        "run": print_run,
+        "parsed": parsed,
+        "artifact": artifact(printed, retained=True),
+    }
+    return result
+
+
+def profile_xlsx_abba_leg(
+    *,
+    leg: str,
+    variant: str,
+    binary: Path,
+    binary_descriptor: dict[str, Any],
+    artifact_root: Path,
+    warmup: int,
+    samples: int,
+    tools: dict[str, dict[str, Any]],
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    """Run one fixed-configuration XLSX managed-batch process and retain artifacts."""
+    if leg not in ABBA_LEG_VARIANTS or ABBA_LEG_VARIANTS[leg] != variant:
+        raise ResourceProfileInputError(f"invalid ABBA leg/variant pair: {leg!r}/{variant!r}")
+    leg_dir = artifact_root / leg.lower()
+    leg_dir.mkdir(parents=True, exist_ok=True)
+    harness_json = leg_dir / "harness.json"
+    stdout = leg_dir / "harness-stdout.txt"
+    stderr = leg_dir / "harness-stderr.txt"
+    command = _profile_command(
+        binary,
+        XLSX_MANAGED_BATCH_ARGS,
+        warmup=warmup,
+        samples=samples,
+        output=harness_json,
+    )
+    time_tool = tools.get("time", {})
+    if time_tool.get("available"):
+        time_report = leg_dir / "time-v.txt"
+        timed_command = [str(time_tool["path"]), "-v", "-o", str(time_report), "--", *command]
+    else:
+        time_report = leg_dir / "time-v.txt"
+        timed_command = command
+    run = run_command(timed_command, stdout_path=stdout, stderr_path=stderr, timeout_seconds=timeout_seconds)
+    run = _retain_run_artifacts(run, stdout, stderr)
+    if run["returncode"] != 0 or not harness_json.is_file():
+        raise RuntimeError(
+            f"harness failed for {leg}: returncode={run['returncode']} stderr={run['stderr_excerpt']}"
+        )
+    report = load_json(harness_json)
+    time_result: dict[str, Any]
+    if time_tool.get("available"):
+        parsed_time = parse_time_report(time_report, retained=True)
+        time_result = {
+            "status": parsed_time.get("status", "unparsed"),
+            "command": command_record(timed_command),
+            "run": run,
+            "parsed": parsed_time,
+        }
+    else:
+        time_result = {
+            "status": "unsupported",
+            "reason": "GNU /usr/bin/time unavailable",
+            "scope": "whole process when available",
+        }
+    return {
+        "leg": leg,
+        "variant": variant,
+        "binary_identity": dict(binary_descriptor),
+        "harness": {
+            "command": command_record(command),
+            "run": run,
+            "report": artifact(harness_json, retained=True),
+            "logical_measurements": logical_measurements(report),
+        },
+        # This private field is removed before JSON publication.  Keeping the
+        # parsed report until validation prevents a compacted summary from
+        # accidentally hiding revision/corpus/config mismatches.
+        "harness_report": report,
+        "time": time_result,
+        "heaptrack": _profile_abba_heaptrack(
+            binary,
+            XLSX_MANAGED_BATCH_ARGS,
+            leg_dir,
+            tools,
+            warmup=warmup,
+            samples=samples,
+            timeout_seconds=timeout_seconds,
+        ),
+        "artifact_directory": str(leg_dir),
+    }
+
+
+def _fixed_xlsx_abba_configuration(warmup: int, samples: int) -> dict[str, Any]:
+    return {
+        "warmup_iterations": warmup,
+        "samples": samples,
+        "case": XLSX_MANAGED_BATCH_CASE,
+        "xlsx_cell_crud_shape": XLSX_MANAGED_BATCH_SHAPE,
+        "harness_expected": {
+            "samples_per_case": samples,
+            "warmup_iterations_per_case": warmup,
+            "cases": [XLSX_MANAGED_BATCH_CASE],
+            "xlsx_cell_crud_shapes": [XLSX_MANAGED_BATCH_SHAPE],
+        },
+        "leg_order": list(ABBA_LEG_ORDER),
+    }
+
+
+def run_xlsx_managed_batch_abba(arguments: argparse.Namespace) -> int:
+    control = binary_identity(Path(arguments.control_binary), label="control")
+    candidate = binary_identity(Path(arguments.candidate_binary), label="candidate")
+    if control["binary_sha256"] == candidate["binary_sha256"]:
+        raise ResourceProfileInputError("control and candidate binary hashes are identical")
+    output_path = Path(arguments.output).expanduser().resolve()
+    artifact_root = (
+        Path(arguments.artifact_dir).expanduser().resolve()
+        if arguments.artifact_dir
+        else output_path.with_name(output_path.stem + "-artifacts")
+    )
+    output_path, artifact_root = reserve_abba_paths(output_path, artifact_root)
+    tools = {
+        "time": probe_tool("/usr/bin/time", ("--version",)),
+        "heaptrack": probe_tool("heaptrack", ("--version",)),
+        "heaptrack_print": probe_tool("heaptrack_print", ("--version",)),
+    }
+    legs: list[dict[str, Any]] = []
+    for leg in ABBA_LEG_ORDER:
+        variant = ABBA_LEG_VARIANTS[leg]
+        descriptor = control if variant == "control" else candidate
+        legs.append(
+            profile_xlsx_abba_leg(
+                leg=leg,
+                variant=variant,
+                binary=Path(descriptor["path"]),
+                binary_descriptor=descriptor,
+                artifact_root=artifact_root,
+                warmup=arguments.warmup,
+                samples=arguments.samples,
+                tools=tools,
+                timeout_seconds=arguments.timeout,
+            )
+        )
+    control_after = binary_identity(Path(arguments.control_binary), label="control")
+    candidate_after = binary_identity(Path(arguments.candidate_binary), label="candidate")
+    if control_after["binary_sha256"] != control["binary_sha256"]:
+        raise ResourceProfileInputError("control binary changed during ABBA execution")
+    if control_after["mode_bits"] != control["mode_bits"]:
+        raise ResourceProfileInputError("control binary mode changed during ABBA execution")
+    if candidate_after["binary_sha256"] != candidate["binary_sha256"]:
+        raise ResourceProfileInputError("candidate binary changed during ABBA execution")
+    if candidate_after["mode_bits"] != candidate["mode_bits"]:
+        raise ResourceProfileInputError("candidate binary mode changed during ABBA execution")
+    fixed_configuration = _fixed_xlsx_abba_configuration(arguments.warmup, arguments.samples)
+    validation = validate_abba_inputs(
+        legs,
+        expected_configuration=fixed_configuration["harness_expected"],
+    )
+    statistics_report = abba_statistics(legs)
+    published_legs = [
+        {key: value for key, value in leg.items() if key != "harness_report"}
+        for leg in legs
+    ]
+    report = {
+        "schema_version": SCHEMA_VERSION,
+        "abba_schema_version": ABBA_SCHEMA_VERSION,
+        "tool": {
+            "name": TOOL_NAME,
+            "version": TOOL_VERSION,
+            "mode": "xlsx-managed-batch-abba-resource-profile",
+            "python_standard_library_only": True,
+        },
+        "scope": {
+            "claim": (
+                "four fresh process legs in fixed A1/B1/B2/A2 order; descriptive resource "
+                "comparison only and no automatic speedup claim"
+            ),
+            "excluded_formats": ["iWork"],
+            "resource_scope": (
+                "harness elapsed summaries plus process-total /usr/bin/time and heaptrack "
+                "observations when available"
+            ),
+        },
+        "host_environment": environment(),
+        "binary_identity": {"control": control, "candidate": candidate},
+        "configuration": fixed_configuration,
+        "tools": tools,
+        "validation": validation,
+        "legs": published_legs,
+        "statistics": statistics_report,
+        "perf_counters": {
+            "status": "not_measured",
+            "reason": "perf counters are not collected or synthesized by this mode",
+            "counters": {event: {"value": None, "available": False} for event in EVENTS},
+        },
+        "not_measured": dict(NOT_MEASURED_RESOURCE_DIMENSIONS),
+        "artifact_directory": str(artifact_root),
+        "limitations": [
+            "Control and candidate revisions must come from clean harness worktrees.",
+            "Missing optional tools remain unsupported/null; no zero is substituted.",
+            "Allocation and RSS values are whole-process observations, including profiler overhead where applicable.",
+            "Copy bytes, decompressed bytes, and physical-cold I/O are not measured.",
+        ],
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("x", encoding="utf-8") as handle:
+        json.dump(report, handle, indent=2, sort_keys=True, allow_nan=False)
+        handle.write("\n")
+    return 0
+
+
 def profile_workload(
     spec: dict[str, Any],
     binary: Path,
@@ -1266,6 +2158,35 @@ def build_identity(
 
 
 def run_profile(arguments: argparse.Namespace) -> int:
+    abba_control = getattr(arguments, "control_binary", None)
+    abba_candidate = getattr(arguments, "candidate_binary", None)
+    if abba_control is not None or abba_candidate is not None:
+        if abba_control is None or abba_candidate is None:
+            raise ResourceProfileInputError(
+                "--control-binary and --candidate-binary must be supplied together"
+            )
+        if arguments.build:
+            raise ResourceProfileInputError(
+                "ABBA mode accepts already-built release binaries; omit --build"
+            )
+        if arguments.only and arguments.only != XLSX_MANAGED_BATCH_ID:
+            raise ResourceProfileInputError(
+                "ABBA mode only supports --only xlsx-managed-batch"
+            )
+        abba_arguments = argparse.Namespace(
+            control_binary=abba_control,
+            candidate_binary=abba_candidate,
+            output=(
+                DEFAULT_ABBA_OUTPUT
+                if arguments.output == DEFAULT_OUTPUT
+                else arguments.output
+            ),
+            artifact_dir=getattr(arguments, "artifact_dir", None),
+            warmup=arguments.warmup,
+            samples=arguments.samples,
+            timeout=arguments.timeout,
+        )
+        return run_xlsx_managed_batch_abba(abba_arguments)
     binary = Path(arguments.binary).resolve() if arguments.binary else DEFAULT_BINARY
     build_command: list[str] = [
         "cargo",
@@ -1417,16 +2338,72 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     run.add_argument("--build", action="store_true", help="build the isolated release harness first")
     run.add_argument("--only", help="comma-separated workload IDs")
+    run.add_argument(
+        "--control-binary",
+        "--control",
+        "--before-binary",
+        dest="control_binary",
+        type=Path,
+        help="switch to the retained XLSX managed-batch ABBA mode",
+    )
+    run.add_argument(
+        "--candidate-binary",
+        "--candidate",
+        "--after-binary",
+        dest="candidate_binary",
+        type=Path,
+        help="switch to the retained XLSX managed-batch ABBA mode",
+    )
+    run.add_argument("--artifact-dir", type=Path)
     run.add_argument("--warmup", type=int, default=1)
     run.add_argument("--samples", type=int, default=3)
     run.add_argument("--timeout", type=float, default=600.0)
     run.set_defaults(function=run_profile)
+    abba = subparsers.add_parser(
+        "compare-xlsx-managed-batch",
+        aliases=("abba-xlsx-managed-batch", "abba", "compare"),
+        help="run a retained A1/B1/B2/A2 resource comparison for XLSX managed batch",
+    )
+    abba.add_argument(
+        "--control-binary",
+        "--control",
+        "--before-binary",
+        dest="control_binary",
+        type=Path,
+        required=True,
+    )
+    abba.add_argument(
+        "--candidate-binary",
+        "--candidate",
+        "--after-binary",
+        dest="candidate_binary",
+        type=Path,
+        required=True,
+    )
+    abba.add_argument("--output", type=Path, default=DEFAULT_ABBA_OUTPUT)
+    abba.add_argument(
+        "--artifact-dir",
+        type=Path,
+        help="directory for retained per-leg harness/time/heaptrack artifacts",
+    )
+    abba.add_argument("--warmup", type=int, default=3)
+    abba.add_argument("--samples", type=int, default=30)
+    abba.add_argument("--timeout", type=float, default=600.0)
+    abba.set_defaults(function=run_xlsx_managed_batch_abba)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
     if arguments.command == "run":
+        if arguments.warmup < 0 or arguments.samples < 1 or arguments.timeout <= 0:
+            raise SystemExit("--warmup must be non-negative, --samples and --timeout must be positive")
+    elif arguments.command in {
+        "compare-xlsx-managed-batch",
+        "abba-xlsx-managed-batch",
+        "abba",
+        "compare",
+    }:
         if arguments.warmup < 0 or arguments.samples < 1 or arguments.timeout <= 0:
             raise SystemExit("--warmup must be non-negative, --samples and --timeout must be positive")
     try:

@@ -3,8 +3,8 @@
 use std::io::Write;
 use std::sync::Arc;
 
-use litchi_core::ReadAt;
-use litchi_opc::{ReadLimits, SourceBackedPackage};
+use litchi_core::{ExecutionContext, ReadAt};
+use litchi_opc::{ReadLimits, SourceBackedPackage, SourceCacheLimits};
 
 use super::{Commit, Patch, Snapshot};
 use crate::error::{Result, invalid};
@@ -39,7 +39,79 @@ impl SourceBackedEditor {
         read_limits: ReadLimits,
     ) -> Result<Self> {
         let package = SourceBackedPackage::from_read_at_with_limits(source, read_limits)?;
+        Self::from_source_backed_package(package)
+    }
+
+    /// Open with an explicit finite deferred-payload cache policy.
+    pub fn from_read_at_with_cache_limits(
+        source: Arc<dyn ReadAt>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
+            source,
+            cache_limits,
+        )?)
+    }
+
+    /// Open with explicit read and finite cache policies.
+    pub fn from_read_at_with_limits_and_cache_limits(
+        source: Arc<dyn ReadAt>,
+        read_limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+                source,
+                read_limits,
+                cache_limits,
+            )?,
+        )
+    }
+
+    /// Open with an explicit caller-owned execution context and the default cache.
+    pub fn from_read_at_with_execution_context(
+        source: Arc<dyn ReadAt>,
+        read_limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            read_limits,
+            context,
+        )?)
+    }
+
+    /// Open with explicit read and execution policies.
+    pub fn from_read_at_with_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        read_limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_execution_context(source, read_limits, context)
+    }
+
+    /// Open with explicit read, cache, and caller-owned execution policies.
+    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        read_limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                read_limits,
+                cache_limits,
+                context,
+            )?,
+        )
+    }
+
+    /// Build an editor from a validated deferred OPC package.
+    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
+        package.check_execution()?;
         let snapshot = Snapshot::load_source_backed(&package)?;
+        package.check_execution()?;
         Ok(Self { package, snapshot })
     }
 
@@ -72,6 +144,7 @@ impl SourceBackedEditor {
         writer: W,
         commit: &Commit,
     ) -> Result<Snapshot> {
+        self.package.check_execution()?;
         let current = Snapshot::load_source_backed(&self.package)?;
         if !current.same_source(commit.patch().before()) {
             return Err(crate::Error::PatchConflict {
@@ -88,6 +161,7 @@ impl SourceBackedEditor {
             target.workbook_part_name(),
             target.source_xml().to_vec(),
         )?;
+        target.check_execution()?;
         Ok(target)
     }
 }
@@ -138,6 +212,7 @@ impl SourceEdit {
 
     /// Validate and freeze this isolated edit for source-backed publication.
     pub fn commit(self) -> Result<Commit> {
+        self.before.check_execution()?;
         if !self.is_changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
             return Ok(Commit::new(self.before, patch, false));
@@ -145,6 +220,7 @@ impl SourceEdit {
         let output =
             raw::catalog_edit::replace_defined_names(self.before.source_xml(), &self.names)?;
         let snapshot = Snapshot::from_rewritten_source(&self.before, output)?;
+        snapshot.check_execution()?;
         if snapshot.defined_names() != self.names {
             return Err(invalid(
                 "defined-name publication changed the staged semantic state",

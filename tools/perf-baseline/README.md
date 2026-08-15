@@ -15,11 +15,16 @@ timed interval covers open, selector planning, commit, and sequential
 publication; reopen, semantic equality, exact hashes, raw media identity,
 lifecycle gates, and source/materialization counter sampling remain outside the
 reported timing. Source-backed JSON also records those stages separately,
-including managed Budget/cache diagnostics and release-to-zero checks.
+including managed Budget/cache diagnostics and release-to-zero checks. Managed
+cell-value records retain pre-publication `InputBytes`/`OutputBytes`/`Work`/
+`Objects` limits and usage, cache/catalog object reservations, and an
+immediate post-publication shared-budget snapshot so direct output charging is
+visible without extending the timed interval.
 The reported duration is the sum of open/stage/commit and sequential
 publication segments; source cache diagnostics are sampled between those
-segments and are excluded. They are evidence for later release ABBA work, not
-a speedup claim. It does not
+segments and immediately after managed publication; all such diagnostics are
+excluded. They are evidence for later release ABBA work, not a speedup claim.
+It does not
 depend on untracked office files, network state, or randomness. ODP builder
 timestamps are replaced with fixed metadata before measurement. The JSON
 report contains the generator parameters and SHA-256 hashes for the generated
@@ -337,12 +342,18 @@ source-backed p50 geomean improves 21.66%/22.65% in the two directions, while
 physical read/materialization counters remain unchanged. No allocation, RSS,
 cold-I/O or decompression claim is attached to that result.
 
-Change 0109's managed tranche has no controlled release ABBA comparison and
-therefore makes no speedup or throughput claim. Its Budget covers only retained
-and in-flight OPC `PartData` payload reservations; parsed stores, metadata,
-staging, rewritten candidates, and output buffers are outside that accounting.
-The tranche also does not claim allocations, RSS/peak memory, hardware/CPU
-pinning, cold I/O, decompression, or real-producer breadth.
+[Change 0150](../../docs/performance/changes/0150-xlsx-managed-cell-values-budget-evidence.md)'s
+managed tranche has no controlled release ABBA comparison and therefore makes
+no speedup or throughput claim. Its Budget covers only retained
+and in-flight OPC `PartData` payload reservations plus the managed publisher's
+accepted `OutputBytes`; parsed stores, metadata, staging, rewritten
+candidates, and output buffers are outside that accounting. The current
+tranche also performs one untimed one-byte-under first-publication-request
+replay per managed selector: the typed `OutputBytes` refusal accepts zero
+output and preserves the source version. Declared `Work` remains separate
+from decompressed/read bytes. The tranche does not claim allocations, RSS/
+peak memory, hardware/CPU pinning, cold I/O, decompression, or real-producer
+breadth.
 
 Measure the opt-in OPC source-cache Budget boundary and controlled contention
 matrix on one fixed many-small incompressible corpus:

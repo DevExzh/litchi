@@ -2,17 +2,20 @@
 
 use std::sync::Arc;
 
+use litchi_core::{ExecutionContext, ExecutionError};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, PartView, Relationship, SourceBackedPackage, TargetMode};
 
 use crate::error::{Error, Result, invalid};
 use crate::raw::{self, DefinedName};
+use crate::source_payload::SourcePayload;
 
 /// Exact workbook owner state plus its inert defined-name catalog.
 #[derive(Clone, Debug)]
 pub struct Snapshot {
     names: Box<[DefinedName]>,
     source: SourceState,
+    context: Option<ExecutionContext>,
 }
 
 impl Snapshot {
@@ -25,40 +28,54 @@ impl Snapshot {
         Self::from_parts(
             workbook.partname().clone(),
             workbook.content_type(),
-            workbook.blob_arc(),
+            SourcePayload::Owned(workbook.blob_arc()),
             owner,
+            None,
         )
     }
 
     pub(super) fn load_source_backed(package: &SourceBackedPackage) -> Result<Self> {
+        package.check_execution()?;
+        let source_version = package.source_version()?;
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
-        let bytes = workbook.data()?.into_arc()?;
+        let bytes = SourcePayload::from_part_data(package, workbook.data()?)?;
         let owner = current_owner_relationship(package.rels())
             .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?;
-        Self::from_source_backed_parts(&workbook, bytes, owner)
+        let snapshot =
+            Self::from_source_backed_parts(&workbook, bytes, owner, package.execution_context())?;
+        package.check_execution()?;
+        if package.source_version()? != source_version {
+            return Err(invalid(
+                "defined-name source version changed during snapshot",
+            ));
+        }
+        Ok(snapshot)
     }
 
     fn from_source_backed_parts(
         workbook: &PartView<'_>,
-        bytes: Arc<Vec<u8>>,
+        bytes: SourcePayload,
         owner: &Relationship,
+        context: Option<ExecutionContext>,
     ) -> Result<Self> {
         Self::from_parts(
             workbook.partname().clone(),
             workbook.content_type(),
             bytes,
             owner,
+            context,
         )
     }
 
     fn from_parts(
         part_name: PackURI,
         content_type: &str,
-        bytes: Arc<Vec<u8>>,
+        bytes: SourcePayload,
         owner: &Relationship,
+        context: Option<ExecutionContext>,
     ) -> Result<Self> {
-        let names = raw::parse_catalog(bytes.as_slice())?
+        let names = raw::parse_catalog(bytes.as_bytes())?
             .defined_names
             .into_boxed_slice();
         Ok(Self {
@@ -69,6 +86,7 @@ impl Snapshot {
                 bytes,
                 owner_relationship: SourceRelationship::capture(owner)?,
             },
+            context,
         })
     }
 
@@ -76,7 +94,7 @@ impl Snapshot {
         let names = raw::parse_catalog(&bytes)?.defined_names.into_boxed_slice();
         let mut rewritten = source.clone();
         rewritten.names = names;
-        rewritten.source.bytes = Arc::new(bytes);
+        rewritten.source.bytes = SourcePayload::Owned(Arc::new(bytes));
         Ok(rewritten)
     }
 
@@ -95,13 +113,28 @@ impl Snapshot {
     /// Exact source workbook XML.
     #[must_use]
     pub fn source_xml(&self) -> &[u8] {
-        self.source.bytes.as_slice()
+        self.source.bytes.as_bytes()
     }
 
     /// Shared exact source workbook XML.
-    #[must_use]
-    pub fn source_arc(&self) -> Arc<Vec<u8>> {
-        Arc::clone(&self.source.bytes)
+    ///
+    /// Managed source payloads return
+    /// [`litchi_opc::OpcError::ManagedPartDataArcEscape`] rather than silently
+    /// detaching their execution-budget reservation.
+    pub fn source_arc(&self) -> Result<Arc<Vec<u8>>> {
+        self.source.bytes.detached_arc()
+    }
+
+    pub(super) fn check_execution(&self) -> Result<()> {
+        let Some(context) = self.context.as_ref() else {
+            return Ok(());
+        };
+        context.check().map_err(|error| {
+            Error::Package(match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                error => litchi_opc::OpcError::Execution(error),
+            })
+        })
     }
 
     /// Exact workbook content type captured at ingress.
@@ -120,7 +153,7 @@ impl Snapshot {
         };
         workbook.partname() == &self.source.part_name
             && workbook.content_type() == self.source.content_type.as_ref()
-            && workbook.blob() == self.source.bytes.as_slice()
+            && workbook.blob() == self.source.bytes.as_bytes()
             && current_owner_relationship(package.rels())
                 .is_some_and(|owner| self.source.owner_relationship.matches(owner))
     }
@@ -138,7 +171,7 @@ impl Eq for Snapshot {}
 struct SourceState {
     part_name: PackURI,
     content_type: Box<str>,
-    bytes: Arc<Vec<u8>>,
+    bytes: SourcePayload,
     owner_relationship: SourceRelationship,
 }
 

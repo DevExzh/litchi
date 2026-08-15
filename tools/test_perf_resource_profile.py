@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from tools import perf_resource_profile
@@ -31,6 +32,20 @@ Minor (reclaiming a frame) page faults: 34
         self.assertEqual(parsed["user_seconds"], 1.25)
         self.assertEqual(parsed["elapsed_wall_seconds"], 2.75)
         self.assertEqual(parsed["voluntary_context_switches"], 12)
+
+    def test_time_parser_marks_malformed_numeric_fields_unparsed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "malformed-time.txt"
+            path.write_text(
+                """\
+Maximum resident set size (kbytes): 12345
+User time (seconds): nope
+""",
+                encoding="utf-8",
+            )
+            parsed = perf_resource_profile.parse_time_report(path)
+        self.assertEqual(parsed["status"], "unparsed")
+        self.assertIsNone(parsed["user_seconds"])
 
     def test_strace_parser_buckets_successes_and_failures(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -281,6 +296,376 @@ peak RSS (including heaptrack overhead): 4.00M
         self.assertNotIn("logical_read_request_sizes", sample)
         self.assertEqual(sample["logical_read_calls"], 4)
         self.assertEqual(sample["logical_read_request_size_buckets"]["1-511"], 4)
+
+    @staticmethod
+    def _abba_report(revision="control-revision", *, corpus_shape="medium", samples=3):
+        return {
+            "schema_version": perf_resource_profile.SCHEMA_VERSION,
+            "tool": {
+                "name": "litchi-perf-baseline",
+                "version": "0.1.0",
+                "profile": "release",
+            },
+            "environment": {
+                "git_revision": revision,
+                "git_worktree_dirty": False,
+            },
+            "configuration": {
+                "samples_per_case": samples,
+                "warmup_iterations_per_case": 1,
+                "cases": [perf_resource_profile.XLSX_MANAGED_BATCH_CASE],
+                "xlsx_cell_crud_shapes": [corpus_shape],
+            },
+            "results": [
+                {
+                    "case": perf_resource_profile.XLSX_MANAGED_BATCH_CASE,
+                    "corpus": {
+                        "name": "xlsx-test",
+                        "shape": corpus_shape,
+                        "archive_sha256": "a" * 64,
+                    },
+                    "elapsed_ns": {
+                        "unit": "ns",
+                        "p50": 100,
+                        "p95": 110,
+                        "p99": 120,
+                        "mean": 105,
+                        "standard_deviation": 5,
+                    },
+                }
+            ],
+        }
+
+    @classmethod
+    def _abba_legs(cls, root):
+        binaries = {}
+        for variant, content in (
+            ("control", b"control-binary"),
+            ("candidate", b"candidate-binary"),
+        ):
+            path = Path(root) / f"{variant}-binary"
+            path.write_bytes(content)
+            path.chmod(0o755)
+            binaries[variant] = perf_resource_profile.binary_identity(path, label=variant)
+        legs = []
+        for leg in perf_resource_profile.ABBA_LEG_ORDER:
+            variant = perf_resource_profile.ABBA_LEG_VARIANTS[leg]
+            revision = "control-revision" if variant == "control" else "candidate-revision"
+            legs.append(
+                {
+                    "leg": leg,
+                    "variant": variant,
+                    "binary_identity": dict(binaries[variant]),
+                    "harness_report": cls._abba_report(revision),
+                }
+            )
+        return legs
+
+    def test_abba_order_is_fixed_and_rejects_reordering(self):
+        self.assertEqual(
+            perf_resource_profile.validate_abba_order(["A1", "B1", "B2", "A2"]),
+            ("A1", "B1", "B2", "A2"),
+        )
+        with self.assertRaisesRegex(
+            perf_resource_profile.ResourceProfileInputError, "leg order"
+        ):
+            perf_resource_profile.validate_abba_order(["A1", "B2", "B1", "A2"])
+
+    def test_abba_validation_rejects_dirty_identical_and_mismatched_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            legs = self._abba_legs(directory)
+            validated = perf_resource_profile.validate_abba_inputs(
+                legs,
+                expected_configuration={
+                    "samples_per_case": 3,
+                    "warmup_iterations_per_case": 1,
+                    "cases": [perf_resource_profile.XLSX_MANAGED_BATCH_CASE],
+                    "xlsx_cell_crud_shapes": ["medium"],
+                },
+            )
+            self.assertEqual(validated["status"], "validated")
+            self.assertNotEqual(
+                validated["control_binary_sha256"], validated["candidate_binary_sha256"]
+            )
+            uppercase = self._abba_legs(directory)
+            uppercase[1]["binary_identity"]["binary_sha256"] = uppercase[1]["binary_identity"][
+                "binary_sha256"
+            ].upper()
+            uppercase[2]["binary_identity"]["binary_sha256"] = uppercase[2]["binary_identity"][
+                "binary_sha256"
+            ].upper()
+            self.assertEqual(perf_resource_profile.validate_abba_inputs(uppercase)["status"], "validated")
+            dirty = self._abba_legs(directory)
+            dirty[0]["harness_report"]["environment"]["git_worktree_dirty"] = True
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError, "dirty"
+            ):
+                perf_resource_profile.validate_abba_inputs(dirty)
+
+            identical = self._abba_legs(directory)
+            for key in ("path", "binary_sha256", "binary_bytes", "executable"):
+                identical[1]["binary_identity"][key] = identical[0]["binary_identity"][key]
+                identical[2]["binary_identity"][key] = identical[0]["binary_identity"][key]
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError, "identical"
+            ):
+                perf_resource_profile.validate_abba_inputs(identical)
+
+            mismatched = self._abba_legs(directory)
+            mismatched[2]["harness_report"]["results"][0]["corpus"]["archive_sha256"] = "b" * 64
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError, "corpora do not match"
+            ):
+                perf_resource_profile.validate_abba_inputs(mismatched)
+
+            malformed = self._abba_legs(directory)
+            malformed[1]["binary_identity"]["binary_sha256"] = "z" * 64
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError, "hexadecimal"
+            ):
+                perf_resource_profile.validate_abba_inputs(malformed)
+
+            missing = self._abba_legs(directory)
+            missing[1]["binary_identity"]["path"] = str(Path(directory) / "missing")
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError, "not readable"
+            ):
+                perf_resource_profile.validate_abba_inputs(missing)
+
+            mode_mismatch = self._abba_legs(directory)
+            Path(mode_mismatch[1]["binary_identity"]["path"]).chmod(0o700)
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError, "mode_bits"
+            ):
+                perf_resource_profile.validate_abba_inputs(mode_mismatch)
+
+    def test_abba_statistics_are_descriptive_and_preserve_not_measured_dimensions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            legs = self._abba_legs(directory)
+            resource_values = {
+                "A1": {"harness.elapsed_ns.p50": 100, "time.max_rss_kib": 1000},
+                "B1": {"harness.elapsed_ns.p50": 80, "time.max_rss_kib": 1100},
+                "B2": {"harness.elapsed_ns.p50": 90, "time.max_rss_kib": 1050},
+                "A2": {"harness.elapsed_ns.p50": 110, "time.max_rss_kib": 1000},
+            }
+            for leg in legs:
+                leg["resource_metrics"] = resource_values[leg["leg"]]
+            report = perf_resource_profile.abba_statistics(legs)
+        elapsed = report["metrics"]["harness.elapsed_ns.p50"]
+        self.assertEqual(elapsed["control"]["median"], 105.0)
+        self.assertEqual(elapsed["candidate"]["median"], 85.0)
+        self.assertAlmostEqual(
+            elapsed["paired"]["A1_control_to_B1_candidate"]["relative_delta_percent"],
+            -20.0,
+        )
+        self.assertIn("no automatic speedup claim", elapsed["claim"])
+        self.assertEqual(report["not_measured"]["decompressed_bytes"].split(":", 1)[0], "not measured")
+        self.assertIsNone(
+            report["metrics"]["heaptrack.allocation_calls"]["control"]["median"]
+        )
+        json.dumps(report, allow_nan=False)
+
+    def test_abba_statistics_null_overflowing_extreme_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            legs = self._abba_legs(directory)
+            extreme_values = {
+                "A1": {"harness.elapsed_ns.p50": 1e-308},
+                "B1": {"harness.elapsed_ns.p50": 1e308},
+                "B2": {"harness.elapsed_ns.p50": 1e308},
+                "A2": {"harness.elapsed_ns.p50": 1e-308},
+            }
+            for leg in legs:
+                leg["resource_metrics"] = extreme_values[leg["leg"]]
+            report = perf_resource_profile.abba_statistics(legs)
+        metric = report["metrics"]["harness.elapsed_ns.p50"]
+        self.assertEqual(metric["control"]["status"], "observed")
+        self.assertEqual(metric["control"]["mean"], 1e-308)
+        self.assertEqual(metric["candidate"]["status"], "observed_with_overflow")
+        self.assertIsNone(metric["candidate"]["mean"])
+        self.assertIsNone(metric["candidate"]["median"])
+        self.assertEqual(
+            metric["paired"]["A1_control_to_B1_candidate"]["status"], "overflow"
+        )
+        self.assertIsNone(
+            metric["paired"]["A1_control_to_B1_candidate"]["relative_delta_percent"]
+        )
+        json.dumps(report, allow_nan=False)
+
+    def test_abba_reserves_fresh_output_and_artifact_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "result.json"
+            artifacts = root / "artifacts"
+            reserved_output, reserved_artifacts = perf_resource_profile.reserve_abba_paths(
+                output, artifacts
+            )
+            self.assertEqual(reserved_output, output.resolve())
+            self.assertEqual(reserved_artifacts, artifacts.resolve())
+            self.assertTrue(artifacts.is_dir())
+
+            output.write_text("existing", encoding="utf-8")
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError, "output path already exists"
+            ):
+                perf_resource_profile.reserve_abba_paths(output, root / "fresh-artifacts")
+
+            stale = root / "stale-artifacts"
+            stale.mkdir()
+            (stale / "old-capture.zst").write_bytes(b"stale")
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError, "stale capture"
+            ):
+                perf_resource_profile.reserve_abba_paths(root / "fresh.json", stale)
+
+            empty_existing = root / "empty-existing-artifacts"
+            empty_existing.mkdir()
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError, "already exists"
+            ):
+                perf_resource_profile.reserve_abba_paths(root / "another.json", empty_existing)
+
+    def test_abba_time_status_surfaces_missing_and_unparsed_reports(self):
+        for contents, expected_status in ((None, "missing"), ("not time output\n", "unparsed")):
+            with self.subTest(expected_status=expected_status), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                binary = root / "control-binary"
+                binary.write_bytes(b"control")
+                binary.chmod(0o755)
+                artifact_root = root / "artifacts"
+                harness_dir = artifact_root / "a1"
+                harness_dir.mkdir(parents=True)
+                (harness_dir / "harness.json").write_text(
+                    json.dumps(self._abba_report()), encoding="utf-8"
+                )
+
+                def fake_run(command, *, stdout_path, stderr_path, timeout_seconds):
+                    del timeout_seconds
+                    if contents is not None and "-o" in command:
+                        time_path = Path(command[command.index("-o") + 1])
+                        time_path.write_text(contents, encoding="utf-8")
+                    return {
+                        "command": list(command),
+                        "returncode": 0,
+                        "timed_out": False,
+                        "wall_ns": 1,
+                        "stdout": {},
+                        "stderr": {},
+                        "stderr_excerpt": None,
+                    }
+
+                descriptor = perf_resource_profile.binary_identity(binary, label="control")
+                with mock.patch.object(
+                    perf_resource_profile, "run_command", side_effect=fake_run
+                ), mock.patch.object(
+                    perf_resource_profile,
+                    "_profile_abba_heaptrack",
+                    return_value={"status": "unsupported"},
+                ):
+                    leg = perf_resource_profile.profile_xlsx_abba_leg(
+                        leg="A1",
+                        variant="control",
+                        binary=binary,
+                        binary_descriptor=descriptor,
+                        artifact_root=artifact_root,
+                        warmup=1,
+                        samples=3,
+                        tools={"time": {"available": True, "path": "/usr/bin/time"}},
+                        timeout_seconds=1,
+                    )
+                self.assertEqual(leg["time"]["status"], expected_status)
+                self.assertEqual(leg["time"]["parsed"]["status"], expected_status)
+
+    def test_heaptrack_outer_status_surfaces_print_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def fake_run(command, *, stdout_path, stderr_path, timeout_seconds):
+                del timeout_seconds
+                if "--record-only" in command:
+                    (root / "heaptrack-profile.zst").write_bytes(b"capture")
+                    returncode = 0
+                else:
+                    stdout_path.write_text("not heaptrack output\n", encoding="utf-8")
+                    returncode = 1
+                return {
+                    "command": list(command),
+                    "returncode": returncode,
+                    "timed_out": False,
+                    "wall_ns": 1,
+                    "stdout": {},
+                    "stderr": {},
+                    "stderr_excerpt": None,
+                }
+
+            with mock.patch.object(perf_resource_profile, "run_command", side_effect=fake_run):
+                result = perf_resource_profile._profile_abba_heaptrack(
+                    root / "unused-binary",
+                    perf_resource_profile.XLSX_MANAGED_BATCH_ARGS,
+                    root,
+                    {
+                        "heaptrack": {"available": True, "path": "heaptrack"},
+                        "heaptrack_print": {"available": True, "path": "heaptrack_print"},
+                    },
+                    warmup=1,
+                    samples=3,
+                    timeout_seconds=1,
+                )
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["failure_stage"], "heaptrack_print")
+        self.assertEqual(result["print"]["status"], "failed")
+
+    def test_heaptrack_failed_run_is_not_relabelled_unsupported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def fake_run(command, *, stdout_path, stderr_path, timeout_seconds):
+                del stdout_path, stderr_path, timeout_seconds
+                (root / "heaptrack-profile.zst").write_bytes(b"partial-capture")
+                return {
+                    "command": list(command),
+                    "returncode": 1,
+                    "timed_out": False,
+                    "wall_ns": 1,
+                    "stdout": {},
+                    "stderr": {},
+                    "stderr_excerpt": "heaptrack failed",
+                }
+
+            with mock.patch.object(perf_resource_profile, "run_command", side_effect=fake_run):
+                result = perf_resource_profile._profile_abba_heaptrack(
+                    root / "unused-binary",
+                    perf_resource_profile.XLSX_MANAGED_BATCH_ARGS,
+                    root,
+                    {
+                        "heaptrack": {"available": True, "path": "heaptrack"},
+                        "heaptrack_print": {"available": False},
+                    },
+                    warmup=1,
+                    samples=3,
+                    timeout_seconds=1,
+                )
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["failure_stage"], "heaptrack")
+        self.assertEqual(result["print"]["status"], "unsupported")
+
+    def test_missing_optional_tools_remain_unsupported_without_zeroes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = perf_resource_profile._profile_abba_heaptrack(
+                Path(directory) / "unused-binary",
+                perf_resource_profile.XLSX_MANAGED_BATCH_ARGS,
+                Path(directory),
+                {
+                    "heaptrack": {"available": False},
+                    "heaptrack_print": {"available": False},
+                },
+                warmup=1,
+                samples=3,
+                timeout_seconds=1,
+            )
+        self.assertEqual(result["status"], "unsupported")
+        self.assertNotIn("allocation_calls", result)
+        self.assertNotIn("peak_heap_bytes", result)
+        self.assertNotIn("allocated_bytes", result)
 
 
 if __name__ == "__main__":

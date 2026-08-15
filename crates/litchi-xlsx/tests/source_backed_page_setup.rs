@@ -5,12 +5,18 @@
 
 use std::io;
 use std::io::Write;
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
+    SourceVersion,
+};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, TargetMode};
+use litchi_opc::{
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
+};
 use litchi_xlsx::page_setup::{SourceBackedEditor, SourceEdit};
 use litchi_xlsx::{
     Error, Order, Orientation, Package, Paper, ReadLimits, Scale, Setup,
@@ -201,6 +207,72 @@ fn changed_commit(editor: &SourceBackedEditor) -> litchi_xlsx::page_setup::Commi
     assert!(commit.changed());
     assert_eq!(commit.diagnostics().touched_worksheets(), 1);
     commit
+}
+
+fn part_len(bytes: &[u8], member: &str) -> u64 {
+    OpcPackage::from_bytes(bytes)
+        .unwrap()
+        .get_part(&PackURI::new(member).unwrap())
+        .unwrap()
+        .blob()
+        .len() as u64
+}
+
+fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "xlsx-page-setup-managed-test",
+        Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroU64::new(memory.max(1)).unwrap(),
+        0,
+    )
+    .unwrap();
+    let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+    (budget, cancellation_source, context)
+}
+
+#[test]
+fn managed_payload_retention_publication_and_owning_escape_are_explicit() {
+    let bytes = ordinary_fixture("", false);
+    let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+    let (budget, _cancellation_source, context) = managed_context(exact);
+    let editor =
+        SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            Arc::new(VersionedSource::new(bytes.clone())),
+            ReadLimits::default(),
+            SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
+            context,
+        )
+        .unwrap();
+    assert!(editor.cache_diagnostics().budget_managed);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    let commit = changed_commit(&editor);
+    assert_eq!(budget.used(Resource::Memory), exact);
+    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    commit.patch().apply(&mut replay).unwrap();
+    assert!(matches!(
+        commit.patch().inverse().apply(&mut replay),
+        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
+    ));
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(
+        litchi_xlsx::page_setup::Snapshot::load(
+            &OpcPackage::from_bytes(&output).unwrap(),
+            "Sheet1",
+        )
+        .unwrap()
+        .page_setup(),
+        Some(&target_setup())
+    );
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
 }
 
 fn relationship_signatures(relationships: &litchi_opc::Relationships) -> Vec<String> {

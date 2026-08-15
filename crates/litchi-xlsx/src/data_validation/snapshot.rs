@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use litchi_core::Selector as CoreSelector;
+use litchi_core::{ExecutionContext, ExecutionError, Selector as CoreSelector};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     OpcPackage, PackURI, Part, PartView, Relationship, Relationships, SourceBackedPackage,
@@ -11,6 +11,7 @@ use litchi_opc::{
 
 use super::Collection;
 use crate::error::{Error, Result, invalid};
+use crate::source_payload::SourcePayload;
 use crate::workbook::source::validate_sheet_graph;
 use crate::{Selector, Workbook, WorksheetKind, raw};
 
@@ -21,6 +22,7 @@ pub struct Snapshot {
     sheet_name: Box<str>,
     sheet_position: usize,
     source: SourceState,
+    context: Option<ExecutionContext>,
 }
 
 impl Snapshot {
@@ -61,13 +63,14 @@ impl Snapshot {
             sheet.position(),
             workbook_part.partname().clone(),
             workbook_part.content_type(),
-            workbook_part.blob_arc(),
+            SourcePayload::Owned(workbook_part.blob_arc()),
             owner,
             worksheet.partname().clone(),
             worksheet.content_type(),
-            worksheet.blob_arc(),
+            SourcePayload::Owned(worksheet.blob_arc()),
             relationship,
             worksheet.rels(),
+            None,
         )
     }
 
@@ -75,10 +78,12 @@ impl Snapshot {
         package: &SourceBackedPackage,
         selector: impl Into<Selector<'a>>,
     ) -> Result<Self> {
+        package.check_execution()?;
+        let source_version = package.source_version()?;
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
-        let workbook_xml = workbook.data()?.into_arc()?;
-        let catalog = raw::parse_catalog(workbook_xml.as_slice())?;
+        let workbook_xml = SourcePayload::from_part_data(package, workbook.data()?)?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
         let sheet_position = resolve_selector(&catalog.sheets, selector.into())?
             .ok_or_else(|| invalid("data-validation worksheet selector did not resolve"))?;
@@ -96,7 +101,7 @@ impl Snapshot {
             worksheet.partname(),
             worksheet.content_type(),
         )?;
-        let worksheet_xml = worksheet.data()?.into_arc()?;
+        let worksheet_xml = SourcePayload::from_part_data(package, worksheet.data()?)?;
         let owner = current_owner_relationship(package.rels())
             .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?;
 
@@ -112,7 +117,17 @@ impl Snapshot {
             worksheet_xml,
             relationship,
             worksheet.rels(),
+            package.execution_context(),
         )
+        .and_then(|snapshot| {
+            package.check_execution()?;
+            if package.source_version()? != source_version {
+                return Err(invalid(
+                    "data-validation source version changed during snapshot",
+                ));
+            }
+            Ok(snapshot)
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -121,15 +136,16 @@ impl Snapshot {
         sheet_position: usize,
         workbook_uri: PackURI,
         workbook_content_type: &str,
-        workbook_xml: Arc<Vec<u8>>,
+        workbook_xml: SourcePayload,
         owner_relationship: &Relationship,
         worksheet_uri: PackURI,
         worksheet_content_type: &str,
-        worksheet_xml: Arc<Vec<u8>>,
+        worksheet_xml: SourcePayload,
         sheet_relationship: &Relationship,
         worksheet_relationships: &Relationships,
+        context: Option<ExecutionContext>,
     ) -> Result<Self> {
-        let value = super::parse_data_validation_collections(worksheet_xml.as_slice())?;
+        let value = super::parse_data_validation_collections(worksheet_xml.as_bytes())?;
         Ok(Self {
             value: Arc::new(value),
             sheet_name: copy_boxed(sheet_name, "data-validation sheet name")?,
@@ -151,6 +167,7 @@ impl Snapshot {
                 sheet_relationship: SourceRelationship::capture(sheet_relationship)?,
                 worksheet_relationships: capture_relationships(worksheet_relationships)?,
             },
+            context,
         })
     }
 
@@ -161,7 +178,7 @@ impl Snapshot {
     ) -> Self {
         let mut rewritten = source.clone();
         rewritten.value = Arc::new(value);
-        rewritten.source.worksheet.bytes = Arc::new(bytes);
+        rewritten.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
         rewritten
     }
 
@@ -192,13 +209,27 @@ impl Snapshot {
     /// Exact source worksheet XML.
     #[must_use]
     pub fn source_xml(&self) -> &[u8] {
-        self.source.worksheet.bytes.as_slice()
+        self.source.worksheet.bytes.as_bytes()
     }
 
     /// Shared exact source worksheet XML.
-    #[must_use]
-    pub fn source_arc(&self) -> Arc<Vec<u8>> {
-        Arc::clone(&self.source.worksheet.bytes)
+    ///
+    /// Managed snapshots return `ManagedPartDataArcEscape` instead of
+    /// detaching the payload reservation.
+    pub fn source_arc(&self) -> Result<Arc<Vec<u8>>> {
+        self.source.worksheet.bytes.detached_arc()
+    }
+
+    pub(super) fn check_execution(&self) -> Result<()> {
+        let Some(context) = self.context.as_ref() else {
+            return Ok(());
+        };
+        context.check().map_err(|error| {
+            Error::Package(match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                error => litchi_opc::OpcError::Execution(error),
+            })
+        })
     }
 
     pub(super) fn same_source(&self, other: &Self) -> bool {
@@ -297,14 +328,14 @@ struct SourceState {
 struct PartState {
     uri: PackURI,
     content_type: Box<str>,
-    bytes: Arc<Vec<u8>>,
+    bytes: SourcePayload,
 }
 
 impl PartState {
     fn new(
         uri: PackURI,
         content_type: &str,
-        bytes: Arc<Vec<u8>>,
+        bytes: SourcePayload,
         resource: &'static str,
     ) -> Result<Self> {
         Ok(Self {
@@ -317,13 +348,13 @@ impl PartState {
     fn matches_part(&self, part: &dyn Part) -> bool {
         part.partname() == &self.uri
             && part.content_type() == self.content_type.as_ref()
-            && part.blob() == self.bytes.as_slice()
+            && part.blob() == self.bytes.as_bytes()
     }
 
     fn matches_view(&self, part: &PartView<'_>, bytes: &[u8]) -> bool {
         part.partname() == &self.uri
             && part.content_type() == self.content_type.as_ref()
-            && bytes == self.bytes.as_slice()
+            && bytes == self.bytes.as_bytes()
     }
 }
 

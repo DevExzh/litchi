@@ -4,12 +4,18 @@
 )]
 
 use std::io::{self, Write};
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits,
+    Limits as BudgetLimits, ReadAt, Resource, SourceVersion,
+};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, TargetMode};
+use litchi_opc::{
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
+};
 use litchi_xlsx::tab_state::{Commit, SourceBackedEditor};
 use litchi_xlsx::{Error, Package, ReadLimits, Visibility};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -248,6 +254,32 @@ fn relationship_signatures(relationships: &litchi_opc::Relationships) -> Vec<Str
     signatures
 }
 
+fn part_len(bytes: &[u8], member: &str) -> u64 {
+    OpcPackage::from_bytes(bytes)
+        .unwrap()
+        .get_part(&PackURI::new(member).unwrap())
+        .unwrap()
+        .blob()
+        .len() as u64
+}
+
+fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "xlsx-tab-state-managed-test",
+        BudgetLimits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroU64::new(memory.max(1)).unwrap(),
+        0,
+    )
+    .unwrap();
+    let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+    (budget, cancellation_source, context)
+}
+
 fn replace_zip_member_unchecked(source: &[u8], name: &str, replacement: &[u8]) -> Vec<u8> {
     let archive = ArchiveReader::new(source).unwrap();
     let names = archive
@@ -456,8 +488,8 @@ fn noop_signed_source_is_exact_and_changed_signatures_are_refused() {
     let commit = edit.commit().unwrap();
     assert!(!commit.changed());
     assert!(Arc::ptr_eq(
-        &snapshot.workbook_source_arc(),
-        &commit.snapshot().workbook_source_arc()
+        &snapshot.workbook_source_arc().unwrap(),
+        &commit.snapshot().workbook_source_arc().unwrap()
     ));
     let mut output = Vec::new();
     editor
@@ -769,4 +801,103 @@ fn malformed_duplicate_external_and_retargeted_sheet_relationships_are_refused()
         commit.patch().apply(&mut touched_relationship),
         Err(Error::PatchConflict { .. })
     ));
+}
+
+#[test]
+fn managed_workbook_payload_is_budgeted_streamed_and_released() {
+    let bytes = fixture(Fixture::default());
+    let exact = part_len(&bytes, MAIN);
+    let (budget, _cancellation_source, context) = managed_context(exact);
+    let editor =
+        SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            Arc::new(VersionedSource::new(bytes.clone())),
+            ReadLimits::default(),
+            SourceCacheLimits::new(usize::try_from(exact).unwrap(), 4).unwrap(),
+            context,
+        )
+        .unwrap();
+    assert!(editor.cache_diagnostics().budget_managed);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    let mut edit = editor.edit().unwrap();
+    assert_eq!(budget.used(Resource::Memory), exact);
+    assert!(edit.show("Two").unwrap());
+    let commit = edit.commit().unwrap();
+
+    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    commit.patch().apply(&mut replay).unwrap();
+    assert!(matches!(
+        commit.patch().inverse().apply(&mut replay),
+        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
+    ));
+    let mut output = Vec::new();
+    let published = editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(published.tabs()[1].visibility(), &Visibility::Visible);
+    let reopened = Package::from_bytes(output)
+        .unwrap()
+        .into_workbook()
+        .unwrap();
+    assert_eq!(
+        reopened.sheet("Two").unwrap().unwrap().visibility(),
+        &Visibility::Visible
+    );
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_one_under_budget_fails_before_payload_retention_and_cancellation_stops_output() {
+    let bytes = fixture(Fixture::default());
+    let exact = part_len(&bytes, MAIN);
+    let (budget, _cancellation_source, context) = managed_context(exact - 1);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    assert!(matches!(
+        editor.edit(),
+        Err(Error::Package(OpcError::Execution(
+            ExecutionError::ResourceLimit(_)
+        )))
+    ));
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    let (budget, cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let edit = editor.edit().unwrap();
+    cancellation_source.cancel();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Package(OpcError::Cancelled))
+    ));
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    let (budget, cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(bytes)),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let mut edit = editor.edit().unwrap();
+    edit.show("Two").unwrap();
+    let commit = edit.commit().unwrap();
+    cancellation_source.cancel();
+    let mut output = Vec::new();
+    assert!(matches!(
+        editor.publish_commit_to_stream(&mut output, &commit),
+        Err(Error::Package(OpcError::Cancelled))
+    ));
+    assert!(output.is_empty());
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
 }
