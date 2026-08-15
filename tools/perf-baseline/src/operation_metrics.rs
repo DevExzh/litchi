@@ -10,7 +10,7 @@ use std::error::Error;
 
 use serde::Serialize;
 
-use crate::filesystem::SampleEvidence;
+use crate::filesystem::{CfbPhaseEvidence, CfbPhaseSample, SampleEvidence};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -97,6 +97,22 @@ pub(crate) struct MaterializationMetrics {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub(crate) struct CfbPhaseMetricSet {
+    pub elapsed_ns: MetricVector,
+    pub logical_read_calls: MetricVector,
+    pub logical_read_requested_bytes: MetricVector,
+    pub logical_read_returned_bytes: MetricVector,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct CfbPhaseMetrics {
+    pub status: MetricStatus,
+    pub open: CfbPhaseMetricSet,
+    pub plan: CfbPhaseMetricSet,
+    pub atomic_publication: CfbPhaseMetricSet,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct OperationMetrics {
     /// Number of values in every measured vector below.
     pub sample_count: usize,
@@ -108,6 +124,7 @@ pub(crate) struct OperationMetrics {
     pub sink: SinkMetrics,
     pub publication: PublicationMetrics,
     pub materialization: MaterializationMetrics,
+    pub cfb_phases: CfbPhaseMetrics,
 }
 
 const ALIGNMENT: &str = "elapsed_ns.samples";
@@ -119,6 +136,8 @@ const HWM_SCOPE: &str = "process_lifetime_high_water_after_not_operation_peak";
 const OUTPUT_SCOPE: &str = "post_operation_output_length_not_sink_write_volume";
 const PUBLICATION_SCOPE: &str = "logical_publication_counter";
 const MATERIALIZATION_SCOPE: &str = "logical_materialization_counter";
+const CFB_PHASE_ELAPSED_SCOPE: &str = "timed_cfb_phase_elapsed_ns";
+const CFB_PHASE_SOURCE_SCOPE: &str = "timed_cfb_phase_logical_read_at";
 
 /// Builds the additive envelope for one warm or cold `CaseResult`.
 ///
@@ -253,6 +272,7 @@ pub(crate) fn aggregate(
             MATERIALIZATION_SCOPE,
         )?,
     };
+    let cfb_phases = cfb_phase_metrics(&selected)?;
 
     Ok(OperationMetrics {
         sample_count,
@@ -262,7 +282,64 @@ pub(crate) fn aggregate(
         sink,
         publication,
         materialization,
+        cfb_phases,
     })
+}
+
+fn cfb_phase_metrics(samples: &[&SampleEvidence]) -> Result<CfbPhaseMetrics, Box<dyn Error>> {
+    let status = optional_status(samples, |sample| sample.cfb_phases.is_some(), "cfb_phases")?;
+    let phase = |name: &str, select: fn(&CfbPhaseEvidence) -> &CfbPhaseSample| {
+        cfb_phase_metric_set(samples, status, name, select)
+    };
+    Ok(CfbPhaseMetrics {
+        status,
+        open: phase("open", |phases| &phases.open)?,
+        plan: phase("plan", |phases| &phases.plan)?,
+        atomic_publication: phase("atomic_publication", |phases| &phases.atomic_publication)?,
+    })
+}
+
+fn cfb_phase_metric_set(
+    samples: &[&SampleEvidence],
+    status: MetricStatus,
+    name: &str,
+    select: fn(&CfbPhaseEvidence) -> &CfbPhaseSample,
+) -> Result<CfbPhaseMetricSet, Box<dyn Error>> {
+    let value = |suffix: &str, field: fn(&CfbPhaseSample) -> u64, scope: &'static str| {
+        optional_values(
+            samples,
+            |sample| sample.cfb_phases.as_ref().map(select).map(field),
+            &format!("cfb_phases.{name}.{suffix}"),
+            MetricStatus::NotApplicable,
+            scope,
+        )
+    };
+    let metrics = CfbPhaseMetricSet {
+        elapsed_ns: value(
+            "elapsed_ns",
+            |phase| phase.elapsed_ns,
+            CFB_PHASE_ELAPSED_SCOPE,
+        )?,
+        logical_read_calls: value(
+            "logical_read_calls",
+            |phase| phase.logical_read_calls,
+            CFB_PHASE_SOURCE_SCOPE,
+        )?,
+        logical_read_requested_bytes: value(
+            "logical_read_requested_bytes",
+            |phase| phase.logical_read_requested_bytes,
+            CFB_PHASE_SOURCE_SCOPE,
+        )?,
+        logical_read_returned_bytes: value(
+            "logical_read_returned_bytes",
+            |phase| phase.logical_read_returned_bytes,
+            CFB_PHASE_SOURCE_SCOPE,
+        )?,
+    };
+    if status == MetricStatus::Measured && metrics.elapsed_ns.status != MetricStatus::Measured {
+        return Err(format!("operation metrics CFB phase {name} is unexpectedly absent").into());
+    }
+    Ok(metrics)
 }
 
 fn process_metrics(samples: &[&SampleEvidence]) -> Result<ProcessMetrics, Box<dyn Error>> {
@@ -408,7 +485,9 @@ mod tests {
     use serde_json::Value;
 
     use super::{MetricStatus, MetricVector, aggregate};
-    use crate::filesystem::{ColdAdvice, ReadSizeBuckets, SampleEvidence};
+    use crate::filesystem::{
+        CfbPhaseEvidence, CfbPhaseSample, ColdAdvice, ReadSizeBuckets, SampleEvidence,
+    };
 
     fn sample(
         index: usize,
@@ -435,6 +514,7 @@ mod tests {
             opc_materialized_parts: None,
             cfb_changed_spans: None,
             cfb_published_bytes: None,
+            cfb_phases: None,
             pptx_source_replay: None,
             docx_source_replay: None,
         }
@@ -563,5 +643,47 @@ mod tests {
         let envelope = aggregate(&[sample], "warm", &[10]).unwrap();
         assert_eq!(envelope.source.status, MetricStatus::Unavailable);
         assert!(envelope.source.logical_read_calls.values.is_none());
+    }
+
+    #[test]
+    fn cfb_phase_metrics_are_aligned_and_fail_closed() {
+        let phase = |elapsed_ns, calls, bytes| CfbPhaseSample {
+            elapsed_ns,
+            logical_read_calls: calls,
+            logical_read_requested_bytes: bytes,
+            logical_read_returned_bytes: bytes,
+        };
+        let mut first = sample(0, "warm", 20, Some(metrics()));
+        first.cfb_phases = Some(CfbPhaseEvidence {
+            open: phase(2, 3, 4),
+            plan: phase(5, 6, 7),
+            atomic_publication: phase(8, 9, 10),
+        });
+        let mut second = sample(1, "warm", 10, Some(metrics()));
+        second.cfb_phases = Some(CfbPhaseEvidence {
+            open: phase(11, 12, 13),
+            plan: phase(14, 15, 16),
+            atomic_publication: phase(17, 18, 19),
+        });
+
+        let mut samples = vec![first, second];
+        let envelope = aggregate(&samples, "warm", &[20, 10]).unwrap();
+        assert_eq!(envelope.cfb_phases.status, MetricStatus::Measured);
+        assert_eq!(
+            envelope.cfb_phases.open.elapsed_ns.values,
+            Some(vec![11, 2])
+        );
+        assert_eq!(
+            envelope
+                .cfb_phases
+                .atomic_publication
+                .logical_read_returned_bytes
+                .values,
+            Some(vec![19, 10])
+        );
+
+        samples[1].cfb_phases = None;
+        let error = aggregate(&samples, "warm", &[20, 10]).unwrap_err();
+        assert!(error.to_string().contains("cfb_phases"));
     }
 }
