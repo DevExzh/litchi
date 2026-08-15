@@ -10688,3 +10688,37 @@ copy remained SHA-256
 after open and close. This is read-only native compatibility evidence for the
 fixture and focused semantic projection; it is not a save/reopen, byte-inert
 save, general rendering, or host-editor retirement claim.
+
+## 2026-08-15 Focused Keynote production-Prost acceptance
+
+Focused Keynote verification passes 110/110 all-feature library cases and
+127/127 integration cases after the last eight direct generated-Prost
+application-payload decodes are replaced by strict raw-wire projections and
+the existing bounded Buffa slide-owner/transition views. The added opaque
+transition gate covers required color-model presence, duplicate fields,
+non-finite components, invalid UTF-8 and Boolean framing, and the nested
+required connection, subpath, element, point, size, and editable-node
+envelopes. All-target compilation passes with Prost present only as a direct
+development dependency. The boundary suite passes 258/258 and its live audit
+accepts 64 workspace packages, 239 internal declarations, and the unchanged
+14-item ordered migration debt.
+
+Focused Numbers name staging passes its exact aggregate byte limit, one-over,
+and multi-operation regression. Retained before/after bytes are checked before
+allocation, overflow is typed, and exact no-ops share their immutable name
+allocation. The registered `keynote_slide_deletion` target builds under
+nightly ASan and completes a bounded direct libFuzzer smoke (`Done 2 runs`)
+without a crash or artifact. Its embedded three-slide A/B/C native command
+seed decodes to SHA-256
+`49c7ee349cddb9fcd4671b7cd36c90008a76e457311cd3bb70d4b765f217b3df`.
+
+Computer Use opened only the mode-0444 disposable Keynote copy at
+`/private/tmp/litchi-keynote-prost-exit.cfBH8D/candidate.key`. Apple Keynote
+accepted it without repair, recovery, conversion, or warning UI; the document
+was visibly locked and exposed one slide with exact title
+`Litchi native Keynote fixture`, body
+`Buffa lazy-view migration verification`, and date `2026-08-07`. Open and
+close preserved the 500,058-byte candidate and tracked source at SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+This is read-only application acceptance for the focused reader migration,
+not a save/reopen, rendering-fidelity, or additional mutation claim.

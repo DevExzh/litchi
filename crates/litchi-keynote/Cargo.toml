@@ -23,11 +23,11 @@ litchi-iwa-text = { workspace = true }
 litchi-iwa-text-wire = { workspace = true }
 once_cell         = { workspace = true }
 plist             = { workspace = true }
-prost             = { workspace = true }
 serde             = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+prost = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

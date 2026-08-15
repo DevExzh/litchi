@@ -8701,6 +8701,174 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(boundaries.audit_pages_document_public_api(root), [])
 
+    def test_focused_keynote_package_no_eager_prost_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection() {}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::kn::SlideArchive;\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = SlideArchive::decode(bytes);\n"
+                "        let _ = M::decode(bytes);\n"
+                "        let _ = decode_message::<SlideArchive>(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            test_only = (
+                root
+                / boundaries.KEYNOTE_SOURCE_ROOT
+                / "package"
+                / "perf_tests.rs"
+            )
+            test_only.parent.mkdir(parents=True)
+            test_only.write_text(
+                "use litchi_iwa_protos::tsp::ArchiveInfo;\n"
+                "use prost::Message;\n"
+                "fn decode(bytes: &[u8]) { let _ = ArchiveInfo::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            manifest = root / boundaries.KEYNOTE_PACKAGE_MANIFEST
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                "[dependencies]\n"
+                "thiserror = { workspace = true }\n"
+                "\n"
+                "[dev-dependencies]\n"
+                "prost = { workspace = true }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_package_no_eager_prost_source_topology(root),
+                [],
+            )
+
+    def test_focused_keynote_package_no_eager_prost_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "prost::Message": "use prost::Message;\n",
+            "generated-message decode": (
+                "let _ = kn::SlideArchive::decode(bytes);\n"
+            ),
+            "generated-message generic decode": "let _ = M::decode(bytes);\n",
+            "generated-message decode helper": (
+                "let _ = decode_message::<kn::SlideArchive>(bytes);\n"
+            ),
+        }
+        for label, marker in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package.rs"
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {\n"
+                        "    use prost::Message;\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+                    manifest = root / boundaries.KEYNOTE_PACKAGE_MANIFEST
+                    manifest.parent.mkdir(parents=True, exist_ok=True)
+                    manifest.write_text(
+                        "[dependencies]\n"
+                        "thiserror = { workspace = true }\n"
+                        "[dev-dependencies]\n"
+                        "prost = { workspace = true }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_keynote_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    expected_label = (
+                        "generated-message decode"
+                        if label == "generated-message generic decode"
+                        else label
+                    )
+                    self.assertTrue(
+                        any(f"uses {expected_label}:" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_keynote_package_no_eager_prost_rejects_normal_manifest_dependency(
+        self,
+    ) -> None:
+        for section in (
+            "[dependencies]",
+            "[target.'cfg(unix)'.dependencies]",
+            "[build-dependencies]",
+            "[target.'cfg(unix)'.build-dependencies]",
+        ):
+            with self.subTest(section=section):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    manifest = root / boundaries.KEYNOTE_PACKAGE_MANIFEST
+                    manifest.parent.mkdir(parents=True, exist_ok=True)
+                    manifest.write_text(
+                        f"{section}\nprost = {{ workspace = true }}\n\n"
+                        "[target.'cfg(unix)'.dev-dependencies]\n"
+                        "prost = { workspace = true }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_keynote_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "focused litchi-keynote Cargo manifest retains normal prost "
+                        "dependency: crates/litchi-keynote/Cargo.toml:2",
+                        violations,
+                    )
+
+    def test_focused_keynote_package_no_eager_prost_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// prost::Message\n"
+                'const NOTE: &str = "kn::SlideArchive::decode";\n'
+                "/* decode_message::<kn::SlideArchive> */\n"
+                "fn production_projection() {}\n",
+                encoding="utf-8",
+            )
+            manifest = root / boundaries.KEYNOTE_PACKAGE_MANIFEST
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                "[dependencies]\n"
+                "prost-types = { workspace = true }\n"
+                "# prost = { workspace = true }\n"
+                "\n"
+                "[dev-dependencies]\n"
+                "prost = { workspace = true }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_package_no_eager_prost_source_topology(root),
+                [],
+            )
+
     def test_focused_pages_package_no_eager_prost_allows_test_only_usage(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

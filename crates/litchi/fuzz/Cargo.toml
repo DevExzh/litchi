@@ -88,6 +88,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "keynote_slide_deletion"
+path = "fuzz_targets/keynote_slide_deletion.rs"
+test = false
+doc = false
+bench = false
+
 [dependencies]
 libfuzzer-sys = "0.4"
 litchi = { path = "..", default-features = false, features = ["iwork"] }

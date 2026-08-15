@@ -263,6 +263,7 @@ pub struct Edit<'a> {
     operations: Vec<Operation>,
     targets: HashSet<Location>,
     destinations: HashSet<Destination>,
+    staged_name_bytes: usize,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -281,6 +282,7 @@ impl<'a> Edit<'a> {
             operations: Vec::new(),
             targets: HashSet::new(),
             destinations: HashSet::new(),
+            staged_name_bytes: 0,
         }
     }
 
@@ -384,8 +386,18 @@ impl<'a> Edit<'a> {
                 maximum: usize_as_u64(maximum_name_bytes),
             });
         }
+        let staged_name_bytes = retained_name_bytes(before, after, maximum_name_bytes)?;
+        let next_staged_name_bytes = checked_name_bytes(
+            self.staged_name_bytes,
+            staged_name_bytes,
+            maximum_name_bytes,
+        )?;
         let before = try_arc_str(before)?;
-        let after = try_arc_str(after)?;
+        let after = if before.as_ref() == after {
+            Arc::clone(&before)
+        } else {
+            try_arc_str(after)?
+        };
         let destination = Destination {
             namespace: match location {
                 Location::Sheet(_) => Namespace::Sheets,
@@ -422,6 +434,7 @@ impl<'a> Edit<'a> {
         let inserted_destination = self.destinations.insert(destination);
         debug_assert!(inserted_target && inserted_destination);
         self.operations.push(operation);
+        self.staged_name_bytes = next_staged_name_bytes;
         Ok(())
     }
 
@@ -839,7 +852,11 @@ fn validate_final_names(source: &Package, operations: &[Operation]) -> Result<()
 }
 
 fn checked_name_bytes(current: usize, added: usize, maximum: usize) -> Result<usize, Error> {
-    let observed = current.saturating_add(added);
+    let observed = current.checked_add(added).ok_or(Error::LimitExceeded {
+        kind: LimitKind::NameBytes,
+        observed: u64::MAX,
+        maximum: usize_as_u64(maximum),
+    })?;
     if observed > maximum {
         return Err(Error::LimitExceeded {
             kind: LimitKind::NameBytes,
@@ -848,6 +865,21 @@ fn checked_name_bytes(current: usize, added: usize, maximum: usize) -> Result<us
         });
     }
     Ok(observed)
+}
+
+fn retained_name_bytes(before: &str, after: &str, maximum: usize) -> Result<usize, Error> {
+    if before == after {
+        Ok(before.len())
+    } else {
+        before
+            .len()
+            .checked_add(after.len())
+            .ok_or(Error::LimitExceeded {
+                kind: LimitKind::NameBytes,
+                observed: u64::MAX,
+                maximum: usize_as_u64(maximum),
+            })
+    }
 }
 
 fn validate_changed_work_budget(source: &Package, operations: &[Operation]) -> Result<(), Error> {

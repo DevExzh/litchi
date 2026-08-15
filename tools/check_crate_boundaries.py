@@ -163,6 +163,62 @@ IWA_KEYNOTE_DOCUMENT_CALLER_ROOTS = (
     Path("crates/litchi-iwa/examples"),
 )
 KEYNOTE_SOURCE_ROOT = Path("crates/litchi-keynote/src")
+KEYNOTE_PACKAGE_MANIFEST = Path("crates/litchi-keynote/Cargo.toml")
+# `perf_tests.rs` is included only from a `#[cfg(test)]` module in its parent
+# source file. Keep the production audit from treating that test-only module
+# body as a reachable crate item when walking the source tree.
+KEYNOTE_TEST_ONLY_SOURCE_NAMES = frozenset({"perf_tests.rs"})
+KEYNOTE_PRODUCTION_TEST_MODULE = re.compile(
+    r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]"
+    r"[ \t\r\n]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?mod\b",
+    re.MULTILINE,
+)
+KEYNOTE_GENERATED_PROTO_MODULES = (
+    "kn",
+    "knsos",
+    "tn",
+    "tnsos",
+    "tp",
+    "tpsos",
+    "tsa",
+    "tsasos",
+    "tsd",
+    "tsdsos",
+    "tsk",
+    "tsp",
+    "tss",
+    "tsssos",
+    "tswp",
+    "tswpsos",
+)
+KEYNOTE_NO_EAGER_PROST_SOURCE_PATTERNS = (
+    (
+        "prost::Message",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])prost[ \t\r\n]*::[ \t\r\n]*Message\b"
+        ),
+    ),
+    (
+        "generated-message decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:"
+            r"(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*)?"
+            r"(?:"
+            + "|".join(KEYNOTE_GENERATED_PROTO_MODULES)
+            + r")[ \t\r\n]*::[ \t\r\n]*"
+            r"[A-Za-z_][A-Za-z0-9_]*"
+            r"|M"
+            r")[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "generated-message decode helper",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])decode_message"
+            r"(?:[ \t\r\n]*::)?[ \t\r\n]*(?:<|\()"
+        ),
+    ),
+)
 KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "show.rs",
     KEYNOTE_SOURCE_ROOT / "package" / "show_settings.rs",
@@ -8532,6 +8588,60 @@ def audit_pages_package_no_eager_prost_source_topology(
     return sorted(set(violations))
 
 
+def audit_keynote_package_no_eager_prost_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep focused Keynote production ingress free of generated Prost reads."""
+
+    violations: list[str] = []
+
+    source_root = root / KEYNOTE_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            if path.name in KEYNOTE_TEST_ONLY_SOURCE_NAMES:
+                continue
+            raw_source = path.read_text(encoding="utf-8")
+            masked_source = _mask_rust_non_code(raw_source)
+            test_module = KEYNOTE_PRODUCTION_TEST_MODULE.search(masked_source)
+            production_source = (
+                raw_source[: test_module.start()]
+                if test_module is not None
+                else raw_source
+            )
+            production_code = _mask_rust_non_code(production_source)
+            for label, pattern in KEYNOTE_NO_EAGER_PROST_SOURCE_PATTERNS:
+                for match in pattern.finditer(production_code):
+                    line_number = production_code.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "focused litchi-keynote production source uses "
+                        f"{label}: {path.relative_to(root)}:{line_number}"
+                    )
+
+    manifest_path = root / KEYNOTE_PACKAGE_MANIFEST
+    if manifest_path.is_file():
+        section: str | None = None
+        for line_number, line in enumerate(
+            manifest_path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            header = CARGO_SECTION_HEADER.match(line)
+            if header is not None:
+                section = header.group(1).strip()
+                continue
+            if CARGO_PROST_DEPENDENCY.match(line) is None:
+                continue
+            is_dev_dependency = section == "dev-dependencies" or (
+                section is not None and section.endswith(".dev-dependencies")
+            )
+            if is_dev_dependency:
+                continue
+            violations.append(
+                "focused litchi-keynote Cargo manifest retains normal prost "
+                f"dependency: {KEYNOTE_PACKAGE_MANIFEST}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_pages_page_layout_facade_source_topology(root: Path = ROOT) -> list[str]:
     """Reject physical identifiers and implementation types from the layout facade."""
 
@@ -9549,6 +9659,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_placeholder_visibility_source_topology()
         + audit_iwa_keynote_slide_number_visibility_source_topology()
         + audit_keynote_placeholder_visibility_facade_source_topology()
+        + audit_keynote_package_no_eager_prost_source_topology()
         + audit_iwa_numbers_names_source_topology()
         + audit_numbers_names_facade_source_topology()
         + audit_iwa_numbers_sheet_order_source_topology()
