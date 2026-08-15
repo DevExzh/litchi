@@ -360,7 +360,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**263 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**265 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -554,6 +554,26 @@ these two deterministic fixed-width families and this release configuration;
 no bounded-total-memory, physical-I/O or cold-cache claim is made. See
 [`0138`](changes/0138-xls-numeric-plan-only-release-abba.md) and its schema-1
 raw artifacts.
+
+Change 0139 adds two opt-in source-backed ODP repeated-text selectors, bringing
+the selectable matrix to 265 names while preserving the default 36-case /
+198-record tranche. Both selectors use the same deterministic 12-slide,
+eight-picture, 16 MiB-uncompressed-media corpus and prepare the
+`SourceBackedPresentation` owner plus four output slots outside timing. The
+control reconstructs the pre-cache public sequence (`slides()` plus filtered
+`Slide::all_text()` joined with exact `\n\n`, followed by the trailing source
+check); the candidate calls `SourceBackedPresentation::text()` four times.
+The timer contains only those projections. Untimed instrumented replays record
+preparation and post-preparation source evidence; the four-call replay is
+required to have zero reads, bytes, compressed-range overlap, and `Pictures`
+payload reads, with freshness vectors `[3,3,3,3]` for control and
+`[3,5,2,2]` for candidate (12 observations total each). Archive topology,
+media/text parity, and digest gates remain outside timing. Preparation
+compressed-range overlap is recorded separately and is not interpreted as
+media materialization. This is correctness/logical-replay evidence only: no
+latency, physical-I/O, decompression, allocation, RSS, cold-cache, ABBA, or
+release claim is made until a frozen measured ABBA run. See
+[`0139`](changes/0139-odp-repeated-text-cache-evidence.md).
 
 The earlier five-case filesystem smoke exercises eager/source-backed OPC open,
 eager/source-backed one-Part atomic save, and same-length CFB atomic overlay
