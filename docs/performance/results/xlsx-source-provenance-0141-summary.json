@@ -1,0 +1,873 @@
+{
+  "candidate": {
+    "binary_bytes": 39400432,
+    "binary_sha256": "86842e4c42999ac1a1cf974b4a6227abeb40ab196148d2c0dbe47f9818e97ebf",
+    "reverted_by": "a12387478",
+    "revision": "eccd8de780bbf0ba0347f62bd156d4c19b7155d5"
+  },
+  "control": {
+    "binary_bytes": 39381960,
+    "binary_sha256": "c632b2733656a9d932b1299faad0cdc0753fd08364f423da0c8f864ba4b7c4f8",
+    "revision": "b5ace54a792a0b82d819939d6a25c6e8f8ad0725"
+  },
+  "correctness": {
+    "corpus_output_sink_and_source_vectors_identical_across_all_four_legs": true,
+    "physical_io_decompression_recompression_and_copy_claims": "not measured",
+    "total_latency_observations": 5600
+  },
+  "decision": "reverted",
+  "environment": {
+    "affinity": "2",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic x86_64",
+    "rustc": "1.95.0 (59807616e 2026-04-14)"
+  },
+  "heaptrack": {
+    "candidate": {
+      "allocation_calls": 656136,
+      "peak_heap": "152.90M",
+      "peak_rss_including_heaptrack": "157.44M",
+      "temporary_allocations": 81745
+    },
+    "candidate_change_percent": {
+      "allocation_calls": -2.842166052152284,
+      "temporary_allocations": -2.1240675774374718
+    },
+    "control": {
+      "allocation_calls": 675330,
+      "peak_heap": "152.90M",
+      "peak_rss_including_heaptrack": "157.38M",
+      "temporary_allocations": 83519
+    },
+    "samples_per_case": 20,
+    "version": "1.5.0",
+    "warmups_per_case": 0,
+    "whole_process": true
+  },
+  "latency": {
+    "cases": [
+      {
+        "case": "xlsx_source_backed_calculation_metadata_edit_save",
+        "corpus": {
+          "archive_bytes": 16786830,
+          "archive_member_count": 17,
+          "archive_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+          "compression": "deflate",
+          "entry_bytes": 2097152,
+          "entry_count": 12,
+          "generator": "litchi-xlsx-calculation-metadata-source-edit-media-v1",
+          "name": "xlsx-calculation-metadata-media",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-incompressible-media",
+          "shape": "media-rich",
+          "target_entry": "workbook:calculation-metadata",
+          "target_payload_bytes": 303,
+          "target_payload_sha256": "f20dde8c0c2942754908b7264d7c46cdcdb3d264b34109ca561ed1bd7733bbab",
+          "uncompressed_payload_bytes": 16782412,
+          "xlsx": null
+        },
+        "legs": {
+          "A1": {
+            "max_ns": 4957372,
+            "mean_ns": 4500189.965,
+            "min_ns": 4126578,
+            "p50_ns": 4504644,
+            "p95_ns": 4831990,
+            "p99_ns": 4935602,
+            "sample_count": 200
+          },
+          "A2": {
+            "max_ns": 5769671,
+            "mean_ns": 4660372.28,
+            "min_ns": 4090761,
+            "p50_ns": 4652077,
+            "p95_ns": 4859930,
+            "p99_ns": 5167743,
+            "sample_count": 200
+          },
+          "B1": {
+            "max_ns": 5668242,
+            "mean_ns": 4864669.95,
+            "min_ns": 4588735,
+            "p50_ns": 4833983,
+            "p95_ns": 5128097,
+            "p99_ns": 5534657,
+            "sample_count": 200
+          },
+          "B2": {
+            "max_ns": 5971720,
+            "mean_ns": 4656718.925,
+            "min_ns": 4227138,
+            "p50_ns": 4648413,
+            "p95_ns": 5089805,
+            "p99_ns": 5488904,
+            "sample_count": 200
+          }
+        },
+        "output_sha256": "96f60a09a8e87204a533e178bdda115b0202e8aa8ac4fe5673a881f981d3e98d",
+        "paired_candidate_change_percent": {
+          "B1_over_A1_p50": 7.311099389874087,
+          "B2_over_A2_p50": -0.0787605192261398
+        },
+        "pooled": {
+          "candidate": {
+            "max_ns": 5971720,
+            "mean_ns": 4760694.4375,
+            "min_ns": 4227138,
+            "p50_ns": 4775798,
+            "p95_ns": 5111275,
+            "p99_ns": 5534657,
+            "sample_count": 400
+          },
+          "candidate_change_percent": {
+            "mean": 3.938913577023584,
+            "p50": 3.84348020834806,
+            "p95": 5.262643039622228,
+            "p99": 7.490795712298359
+          },
+          "control": {
+            "max_ns": 5769671,
+            "mean_ns": 4580281.1225,
+            "min_ns": 4090761,
+            "p50_ns": 4599035,
+            "p95_ns": 4855735,
+            "p99_ns": 5148959,
+            "sample_count": 400
+          }
+        },
+        "sink": {
+          "accepted_bytes": 16786830,
+          "largest_write": 32768,
+          "write_calls": 547,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 512,
+            "bytes_1_to_512": 27,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 8,
+            "bytes_over_65536": 0
+          }
+        },
+        "source_first_sample": {
+          "max_in_flight_reads": 1,
+          "ordinary_payload_materializations": 1,
+          "ordinary_payload_read_bytes": 16783429,
+          "ordinary_payload_read_calls": 524,
+          "read_bytes": 16791002,
+          "read_calls": 597
+        },
+        "source_vectors_identical_across_legs": true
+      },
+      {
+        "case": "xlsx_source_backed_defined_names_edit_save",
+        "corpus": {
+          "archive_bytes": 16786830,
+          "archive_member_count": 17,
+          "archive_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+          "compression": "deflate",
+          "entry_bytes": 2097152,
+          "entry_count": 12,
+          "generator": "litchi-xlsx-defined-names-source-edit-media-v1",
+          "name": "xlsx-defined-names-media",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-incompressible-media",
+          "shape": "media-rich",
+          "target_entry": "workbook:definedNames",
+          "target_payload_bytes": 303,
+          "target_payload_sha256": "f20dde8c0c2942754908b7264d7c46cdcdb3d264b34109ca561ed1bd7733bbab",
+          "uncompressed_payload_bytes": 16782412,
+          "xlsx": null
+        },
+        "legs": {
+          "A1": {
+            "max_ns": 6643273,
+            "mean_ns": 4710363.95,
+            "min_ns": 4243409,
+            "p50_ns": 4701425,
+            "p95_ns": 5056539,
+            "p99_ns": 5329964,
+            "sample_count": 200
+          },
+          "A2": {
+            "max_ns": 5525315,
+            "mean_ns": 4818594.495,
+            "min_ns": 4436396,
+            "p50_ns": 4801429,
+            "p95_ns": 5137211,
+            "p99_ns": 5439177,
+            "sample_count": 200
+          },
+          "B1": {
+            "max_ns": 5407993,
+            "mean_ns": 4851169.45,
+            "min_ns": 4504509,
+            "p50_ns": 4842684,
+            "p95_ns": 5105766,
+            "p99_ns": 5229146,
+            "sample_count": 200
+          },
+          "B2": {
+            "max_ns": 10513691,
+            "mean_ns": 4929626.615,
+            "min_ns": 4382212,
+            "p50_ns": 4901766,
+            "p95_ns": 5275913,
+            "p99_ns": 5590445,
+            "sample_count": 200
+          }
+        },
+        "output_sha256": "f59c85a4003018c58732db832aff9ac3577cff7e7af37d9372ddc4ca5679a615",
+        "paired_candidate_change_percent": {
+          "B1_over_A1_p50": 3.0045996692492194,
+          "B2_over_A2_p50": 2.089732036025116
+        },
+        "pooled": {
+          "candidate": {
+            "max_ns": 10513691,
+            "mean_ns": 4890398.0325,
+            "min_ns": 4382212,
+            "p50_ns": 4865341,
+            "p95_ns": 5186680,
+            "p99_ns": 5450833,
+            "sample_count": 400
+          },
+          "candidate_change_percent": {
+            "mean": 2.6428661794841046,
+            "p50": 2.523070815402706,
+            "p95": 1.3448610862526023,
+            "p99": 0.21429712620126828
+          },
+          "control": {
+            "max_ns": 6643273,
+            "mean_ns": 4764479.2225,
+            "min_ns": 4243409,
+            "p50_ns": 4745606,
+            "p95_ns": 5117852,
+            "p99_ns": 5439177,
+            "sample_count": 400
+          }
+        },
+        "sink": {
+          "accepted_bytes": 16786946,
+          "largest_write": 32768,
+          "write_calls": 547,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 512,
+            "bytes_1_to_512": 27,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 8,
+            "bytes_over_65536": 0
+          }
+        },
+        "source_first_sample": {
+          "max_in_flight_reads": 1,
+          "ordinary_payload_materializations": 1,
+          "ordinary_payload_read_bytes": 16783429,
+          "ordinary_payload_read_calls": 524,
+          "read_bytes": 16791002,
+          "read_calls": 597
+        },
+        "source_vectors_identical_across_legs": true
+      },
+      {
+        "case": "xlsx_source_backed_page_break_edit_save",
+        "corpus": {
+          "archive_bytes": 16786830,
+          "archive_member_count": 17,
+          "archive_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+          "compression": "deflate",
+          "entry_bytes": 2097152,
+          "entry_count": 12,
+          "generator": "litchi-xlsx-page-break-source-edit-media-v1",
+          "name": "xlsx-page-break-media",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-incompressible-media",
+          "shape": "media-rich",
+          "target_entry": "worksheet:Sheet1:rowBreaks",
+          "target_payload_bytes": 207,
+          "target_payload_sha256": "c78af5ae31d6f622b0a9544bd9476c3f6f370258727219d9f62fb27b4e66d91f",
+          "uncompressed_payload_bytes": 16782412,
+          "xlsx": null
+        },
+        "legs": {
+          "A1": {
+            "max_ns": 6030168,
+            "mean_ns": 4687326.07,
+            "min_ns": 4348414,
+            "p50_ns": 4683599,
+            "p95_ns": 4913881,
+            "p99_ns": 5013198,
+            "sample_count": 200
+          },
+          "A2": {
+            "max_ns": 5891108,
+            "mean_ns": 4811242.69,
+            "min_ns": 4541721,
+            "p50_ns": 4788020,
+            "p95_ns": 5018208,
+            "p99_ns": 5197473,
+            "sample_count": 200
+          },
+          "B1": {
+            "max_ns": 5982133,
+            "mean_ns": 4773484.345,
+            "min_ns": 4378676,
+            "p50_ns": 4762074,
+            "p95_ns": 5004657,
+            "p99_ns": 5293986,
+            "sample_count": 200
+          },
+          "B2": {
+            "max_ns": 5035150,
+            "mean_ns": 4795242.54,
+            "min_ns": 4570821,
+            "p50_ns": 4782998,
+            "p95_ns": 4963061,
+            "p99_ns": 5000272,
+            "sample_count": 200
+          }
+        },
+        "output_sha256": "1e3b7a9f763feaed4ad4888aa8aa0cd3773cdb9fd9f12e16f3c05b7fd0cd95b3",
+        "paired_candidate_change_percent": {
+          "B1_over_A1_p50": 1.67552772985049,
+          "B2_over_A2_p50": -0.1048867799215536
+        },
+        "pooled": {
+          "candidate": {
+            "max_ns": 5982133,
+            "mean_ns": 4784363.4425,
+            "min_ns": 4378676,
+            "p50_ns": 4775242,
+            "p95_ns": 4977260,
+            "p99_ns": 5242926,
+            "sample_count": 400
+          },
+          "candidate_change_percent": {
+            "mean": 0.7386178567811985,
+            "p50": 0.7911333626017258,
+            "p95": -0.1745500317591575,
+            "p99": 1.5599542460427829
+          },
+          "control": {
+            "max_ns": 6030168,
+            "mean_ns": 4749284.38,
+            "min_ns": 4348414,
+            "p50_ns": 4737760,
+            "p95_ns": 4985963,
+            "p99_ns": 5162395,
+            "sample_count": 400
+          }
+        },
+        "sink": {
+          "accepted_bytes": 16786878,
+          "largest_write": 32768,
+          "write_calls": 547,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 512,
+            "bytes_1_to_512": 27,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 8,
+            "bytes_over_65536": 0
+          }
+        },
+        "source_first_sample": {
+          "max_in_flight_reads": 1,
+          "ordinary_payload_materializations": 2,
+          "ordinary_payload_read_bytes": 16783634,
+          "ordinary_payload_read_calls": 525,
+          "read_bytes": 16791244,
+          "read_calls": 602
+        },
+        "source_vectors_identical_across_legs": true
+      },
+      {
+        "case": "xlsx_source_backed_page_margin_edit_save",
+        "corpus": {
+          "archive_bytes": 16786830,
+          "archive_member_count": 17,
+          "archive_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+          "compression": "deflate",
+          "entry_bytes": 2097152,
+          "entry_count": 12,
+          "generator": "litchi-xlsx-page-margin-source-edit-media-v1",
+          "name": "xlsx-page-margin-media",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-incompressible-media",
+          "shape": "media-rich",
+          "target_entry": "worksheet:Sheet1:pageMargins",
+          "target_payload_bytes": 207,
+          "target_payload_sha256": "c78af5ae31d6f622b0a9544bd9476c3f6f370258727219d9f62fb27b4e66d91f",
+          "uncompressed_payload_bytes": 16782412,
+          "xlsx": null
+        },
+        "legs": {
+          "A1": {
+            "max_ns": 6381070,
+            "mean_ns": 4672160.945,
+            "min_ns": 4198477,
+            "p50_ns": 4650665,
+            "p95_ns": 5087371,
+            "p99_ns": 5303928,
+            "sample_count": 200
+          },
+          "A2": {
+            "max_ns": 5866165,
+            "mean_ns": 4758516.58,
+            "min_ns": 4284597,
+            "p50_ns": 4738142,
+            "p95_ns": 5060074,
+            "p99_ns": 5509433,
+            "sample_count": 200
+          },
+          "B1": {
+            "max_ns": 5915190,
+            "mean_ns": 4660834.425,
+            "min_ns": 4120139,
+            "p50_ns": 4708851,
+            "p95_ns": 5075435,
+            "p99_ns": 5218431,
+            "sample_count": 200
+          },
+          "B2": {
+            "max_ns": 5726451,
+            "mean_ns": 4801673.065,
+            "min_ns": 4451527,
+            "p50_ns": 4791163,
+            "p95_ns": 5050311,
+            "p99_ns": 5227976,
+            "sample_count": 200
+          }
+        },
+        "output_sha256": "2b50a470f5066dd078c0566ca9e203f26843026b58b6a7a6eca14ac8435429a7",
+        "paired_candidate_change_percent": {
+          "B1_over_A1_p50": 1.251132902498897,
+          "B2_over_A2_p50": 1.1190251368574433
+        },
+        "pooled": {
+          "candidate": {
+            "max_ns": 5915190,
+            "mean_ns": 4731253.745,
+            "min_ns": 4120139,
+            "p50_ns": 4755921,
+            "p95_ns": 5062527,
+            "p99_ns": 5227976,
+            "sample_count": 400
+          },
+          "candidate_change_percent": {
+            "mean": 0.3375151458166359,
+            "p50": 1.3384958014993842,
+            "p95": -0.22107934495709802,
+            "p99": -1.6757700376033635
+          },
+          "control": {
+            "max_ns": 6381070,
+            "mean_ns": 4715338.7625,
+            "min_ns": 4198477,
+            "p50_ns": 4693104,
+            "p95_ns": 5073744,
+            "p99_ns": 5317078,
+            "sample_count": 400
+          }
+        },
+        "sink": {
+          "accepted_bytes": 16786883,
+          "largest_write": 32768,
+          "write_calls": 547,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 512,
+            "bytes_1_to_512": 27,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 8,
+            "bytes_over_65536": 0
+          }
+        },
+        "source_first_sample": {
+          "max_in_flight_reads": 1,
+          "ordinary_payload_materializations": 2,
+          "ordinary_payload_read_bytes": 16783634,
+          "ordinary_payload_read_calls": 525,
+          "read_bytes": 16791244,
+          "read_calls": 602
+        },
+        "source_vectors_identical_across_legs": true
+      },
+      {
+        "case": "xlsx_source_backed_page_setup_edit_save",
+        "corpus": {
+          "archive_bytes": 16786830,
+          "archive_member_count": 17,
+          "archive_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+          "compression": "deflate",
+          "entry_bytes": 2097152,
+          "entry_count": 12,
+          "generator": "litchi-xlsx-page-setup-source-edit-media-v1",
+          "name": "xlsx-page-setup-media",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-incompressible-media",
+          "shape": "media-rich",
+          "target_entry": "worksheet:Sheet1:pageSetup",
+          "target_payload_bytes": 207,
+          "target_payload_sha256": "c78af5ae31d6f622b0a9544bd9476c3f6f370258727219d9f62fb27b4e66d91f",
+          "uncompressed_payload_bytes": 16782412,
+          "xlsx": null
+        },
+        "legs": {
+          "A1": {
+            "max_ns": 5174290,
+            "mean_ns": 4682295.855,
+            "min_ns": 4266781,
+            "p50_ns": 4714738,
+            "p95_ns": 4960266,
+            "p99_ns": 5060345,
+            "sample_count": 200
+          },
+          "A2": {
+            "max_ns": 5482907,
+            "mean_ns": 4835594.545,
+            "min_ns": 4377096,
+            "p50_ns": 4810786,
+            "p95_ns": 5169925,
+            "p99_ns": 5401264,
+            "sample_count": 200
+          },
+          "B1": {
+            "max_ns": 6090303,
+            "mean_ns": 4767384.91,
+            "min_ns": 4284035,
+            "p50_ns": 4750593,
+            "p95_ns": 4995205,
+            "p99_ns": 5422503,
+            "sample_count": 200
+          },
+          "B2": {
+            "max_ns": 5659580,
+            "mean_ns": 4771097.445,
+            "min_ns": 4339502,
+            "p50_ns": 4765268,
+            "p95_ns": 5043271,
+            "p99_ns": 5115170,
+            "sample_count": 200
+          }
+        },
+        "output_sha256": "fd866304c7aab42bcd5195e38bef5dd76f6192b05bcb551786a2096ad898fcb1",
+        "paired_candidate_change_percent": {
+          "B1_over_A1_p50": 0.7604876453368048,
+          "B2_over_A2_p50": -0.9461655538200997
+        },
+        "pooled": {
+          "candidate": {
+            "max_ns": 6090303,
+            "mean_ns": 4769241.1775,
+            "min_ns": 4284035,
+            "p50_ns": 4759336,
+            "p95_ns": 5010187,
+            "p99_ns": 5422503,
+            "sample_count": 400
+          },
+          "candidate_change_percent": {
+            "mean": 0.21634999075004213,
+            "p50": -0.04236190847433097,
+            "p95": -1.516955749150839,
+            "p99": 2.221846450712417
+          },
+          "control": {
+            "max_ns": 5482907,
+            "mean_ns": 4758945.2,
+            "min_ns": 4266781,
+            "p50_ns": 4761353,
+            "p95_ns": 5087360,
+            "p99_ns": 5304642,
+            "sample_count": 400
+          }
+        },
+        "sink": {
+          "accepted_bytes": 16786902,
+          "largest_write": 32768,
+          "write_calls": 547,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 512,
+            "bytes_1_to_512": 27,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 8,
+            "bytes_over_65536": 0
+          }
+        },
+        "source_first_sample": {
+          "max_in_flight_reads": 1,
+          "ordinary_payload_materializations": 2,
+          "ordinary_payload_read_bytes": 16783634,
+          "ordinary_payload_read_calls": 525,
+          "read_bytes": 16791244,
+          "read_calls": 602
+        },
+        "source_vectors_identical_across_legs": true
+      },
+      {
+        "case": "xlsx_source_backed_print_options_edit_save",
+        "corpus": {
+          "archive_bytes": 16786830,
+          "archive_member_count": 17,
+          "archive_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+          "compression": "deflate",
+          "entry_bytes": 2097152,
+          "entry_count": 12,
+          "generator": "litchi-xlsx-print-options-source-edit-media-v1",
+          "name": "xlsx-print-options-media",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-incompressible-media",
+          "shape": "media-rich",
+          "target_entry": "worksheet:Sheet1:printOptions",
+          "target_payload_bytes": 207,
+          "target_payload_sha256": "c78af5ae31d6f622b0a9544bd9476c3f6f370258727219d9f62fb27b4e66d91f",
+          "uncompressed_payload_bytes": 16782412,
+          "xlsx": null
+        },
+        "legs": {
+          "A1": {
+            "max_ns": 6244262,
+            "mean_ns": 4818976.15,
+            "min_ns": 4328346,
+            "p50_ns": 4802493,
+            "p95_ns": 5088963,
+            "p99_ns": 6087005,
+            "sample_count": 200
+          },
+          "A2": {
+            "max_ns": 6035187,
+            "mean_ns": 4695589.4,
+            "min_ns": 4171742,
+            "p50_ns": 4697586,
+            "p95_ns": 5106569,
+            "p99_ns": 5875919,
+            "sample_count": 200
+          },
+          "B1": {
+            "max_ns": 5186577,
+            "mean_ns": 4640370.095,
+            "min_ns": 4252713,
+            "p50_ns": 4639820,
+            "p95_ns": 4970120,
+            "p99_ns": 5118845,
+            "sample_count": 200
+          },
+          "B2": {
+            "max_ns": 5953594,
+            "mean_ns": 4900794.47,
+            "min_ns": 4386649,
+            "p50_ns": 4896034,
+            "p95_ns": 5157118,
+            "p99_ns": 5419599,
+            "sample_count": 200
+          }
+        },
+        "output_sha256": "6eee37e1c0e4e9cdf1f364fdf1cbc90d58a6c25acc6fce222670f937abd5a74c",
+        "paired_candidate_change_percent": {
+          "B1_over_A1_p50": -3.387261574353151,
+          "B2_over_A2_p50": 4.224467630821449
+        },
+        "pooled": {
+          "candidate": {
+            "max_ns": 5953594,
+            "mean_ns": 4770582.2825,
+            "min_ns": 4252713,
+            "p50_ns": 4786272,
+            "p95_ns": 5106258,
+            "p99_ns": 5201230,
+            "sample_count": 400
+          },
+          "candidate_change_percent": {
+            "mean": 0.2795610042331198,
+            "p50": 0.4206264749621491,
+            "p95": 0.23750730984251067,
+            "p99": -13.23012718289316
+          },
+          "control": {
+            "max_ns": 6244262,
+            "mean_ns": 4757282.775,
+            "min_ns": 4171742,
+            "p50_ns": 4766224,
+            "p95_ns": 5094159,
+            "p99_ns": 5994281,
+            "sample_count": 400
+          }
+        },
+        "sink": {
+          "accepted_bytes": 16786886,
+          "largest_write": 32768,
+          "write_calls": 547,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 512,
+            "bytes_1_to_512": 27,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 8,
+            "bytes_over_65536": 0
+          }
+        },
+        "source_first_sample": {
+          "max_in_flight_reads": 1,
+          "ordinary_payload_materializations": 2,
+          "ordinary_payload_read_bytes": 16783634,
+          "ordinary_payload_read_calls": 525,
+          "read_bytes": 16791244,
+          "read_calls": 602
+        },
+        "source_vectors_identical_across_legs": true
+      },
+      {
+        "case": "xlsx_source_backed_sheet_protection_edit_save",
+        "corpus": {
+          "archive_bytes": 16786830,
+          "archive_member_count": 17,
+          "archive_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+          "compression": "deflate",
+          "entry_bytes": 2097152,
+          "entry_count": 12,
+          "generator": "litchi-xlsx-sheet-protection-source-edit-media-v1",
+          "name": "xlsx-sheet-protection-media",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-incompressible-media",
+          "shape": "media-rich",
+          "target_entry": "worksheet:Sheet1:protection",
+          "target_payload_bytes": 207,
+          "target_payload_sha256": "c78af5ae31d6f622b0a9544bd9476c3f6f370258727219d9f62fb27b4e66d91f",
+          "uncompressed_payload_bytes": 16782412,
+          "xlsx": null
+        },
+        "legs": {
+          "A1": {
+            "max_ns": 5989642,
+            "mean_ns": 4796865.38,
+            "min_ns": 4337269,
+            "p50_ns": 4769453,
+            "p95_ns": 5239390,
+            "p99_ns": 5403545,
+            "sample_count": 200
+          },
+          "A2": {
+            "max_ns": 5737668,
+            "mean_ns": 4926832.93,
+            "min_ns": 4561709,
+            "p50_ns": 4898712,
+            "p95_ns": 5215308,
+            "p99_ns": 5412591,
+            "sample_count": 200
+          },
+          "B1": {
+            "max_ns": 5771873,
+            "mean_ns": 4851499.68,
+            "min_ns": 4369253,
+            "p50_ns": 4840156,
+            "p95_ns": 5089044,
+            "p99_ns": 5296550,
+            "sample_count": 200
+          },
+          "B2": {
+            "max_ns": 5113408,
+            "mean_ns": 4735814.0,
+            "min_ns": 4347494,
+            "p50_ns": 4736984,
+            "p95_ns": 4932249,
+            "p99_ns": 5017687,
+            "sample_count": 200
+          }
+        },
+        "output_sha256": "76b3a48e9682479a7dc75b047e37f221c52dc6953c10168e20995adbf992b8f3",
+        "paired_candidate_change_percent": {
+          "B1_over_A1_p50": 1.4824131823921949,
+          "B2_over_A2_p50": -3.3014392354561717
+        },
+        "pooled": {
+          "candidate": {
+            "max_ns": 5771873,
+            "mean_ns": 4793656.84,
+            "min_ns": 4347494,
+            "p50_ns": 4786258,
+            "p95_ns": 5010305,
+            "p99_ns": 5165500,
+            "sample_count": 400
+          },
+          "candidate_change_percent": {
+            "mean": -1.402600385696262,
+            "p50": -1.5225529179726638,
+            "p95": -4.026448777187497,
+            "p99": -4.565114932940617
+          },
+          "control": {
+            "max_ns": 5989642,
+            "mean_ns": 4861849.155,
+            "min_ns": 4337269,
+            "p50_ns": 4860258,
+            "p95_ns": 5220506,
+            "p99_ns": 5412591,
+            "sample_count": 400
+          }
+        },
+        "sink": {
+          "accepted_bytes": 16787247,
+          "largest_write": 32768,
+          "write_calls": 547,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 512,
+            "bytes_1_to_512": 26,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 9,
+            "bytes_over_65536": 0
+          }
+        },
+        "source_first_sample": {
+          "max_in_flight_reads": 1,
+          "ordinary_payload_materializations": 2,
+          "ordinary_payload_read_bytes": 16783634,
+          "ordinary_payload_read_calls": 525,
+          "read_bytes": 16791244,
+          "read_calls": 602
+        },
+        "source_vectors_identical_across_legs": true
+      }
+    ],
+    "p50_geometric_mean_candidate_change_percent": 1.0373395960941112
+  },
+  "latency_protocol": {
+    "all_reports_release_clean_and_cpu_pinned": true,
+    "case_count": 7,
+    "leg_order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ],
+    "samples_per_case_per_leg": 200,
+    "warmups_per_case": 20
+  },
+  "mechanism_tested": "retain SourceLineage and SourceVersion in seven typed XLSX snapshots to skip publication-time semantic reload on an exact match",
+  "rationale": "The candidate was 1.04% slower on the pooled seven-case p50 geometric mean, individual paired directions were inconsistent, allocation reductions were below 3%, peak heap was unchanged, and VmHWM changed by less than 1%; the complexity was not retained.",
+  "record": "xlsx-source-provenance-negative-result-0141",
+  "schema_version": 1,
+  "time_v": {
+    "candidate": {
+      "elapsed_seconds": 13.62,
+      "exit_status": 0,
+      "max_rss_kib": 146900,
+      "system_seconds": 1.7,
+      "user_seconds": 11.91
+    },
+    "candidate_max_rss_change_percent": -0.6868763352172902,
+    "control": {
+      "elapsed_seconds": 15.37,
+      "exit_status": 0,
+      "max_rss_kib": 147916,
+      "system_seconds": 3.41,
+      "user_seconds": 11.96
+    },
+    "samples_per_case": 30,
+    "warmups_per_case": 3,
+    "whole_process": true
+  }
+}
