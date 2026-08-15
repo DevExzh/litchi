@@ -82,6 +82,28 @@ behavior.
 The probe does not establish cold-cache, remote-range, allocation attribution,
 decompressed/recompressed bytes, memory-copy volume, or before/after change.
 
+## Rejected XLSX publisher-provenance experiment (change 0141)
+
+Clean release binaries at control `b5ace54a7` and candidate `eccd8de78` ran
+seven media-rich source-backed XLSX edit/save cases in strict CPU-2
+`A1, B1, B2, A2` order, with 20 warmups and 200 measured samples per case and
+leg. The candidate skipped publication-time semantic reloads by retaining
+private lineage/version metadata in each snapshot. It was 1.04% slower on the
+pooled seven-case p50 geometric mean; pooled individual p50 changes ranged from
+-1.52% to +3.84%, and paired directions were inconsistent.
+
+All 5,600 observations retained identical corpus, output, sink, logical source,
+and materialization evidence. Heaptrack recorded 675,330 -> 656,136
+whole-process allocation calls (-2.84%) and 83,519 -> 81,745 temporary
+allocations (-2.12%), with peak heap unchanged at 152.90M. One matched
+`/usr/bin/time -v` direction observed 147,916 -> 146,900 KiB VmHWM (-0.69%),
+which is classified as neutral. The candidate was fully reverted by
+`a12387478`; see
+[`change 0141`](changes/0141-xlsx-source-provenance-negative-result.md) and the
+[`machine-readable summary`](results/xlsx-source-provenance-0141-summary.json).
+No physical-I/O, decompression, recompression, copy-byte, or cold-cache claim is
+made.
+
 ## Measurement environment
 
 | Item | Value |

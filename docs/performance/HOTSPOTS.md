@@ -2,8 +2,8 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0140`](changes/0140-odp-repeated-text-cache-release-abba.md)
-(the newest accepted result is limited to four repeated source-backed ODP
+Evidence through: [`change 0141`](changes/0141-xlsx-source-provenance-negative-result.md)
+(the newest accepted optimization result remains limited to four repeated source-backed ODP
 full-text projections; the latest release CFB selective-range evidence remains
 [`0094`](changes/0094-cfb-selective-read-evidence.md), and release filesystem
 evidence is [`0089`](changes/0089-filesystem-release-repeated-evidence.md))
@@ -59,6 +59,21 @@ replay performs zero post-preparation reads, so this is parse/projection/cache
 work rather than physical-I/O or decompression evidence. Broader slide-object,
 single-call, open, edit/save, real-producer, and generic ODF work remains in the
 ODF queue.
+
+## Rejected XLSX publisher provenance reuse (change 0141)
+
+A private lineage/version fast path was tested across calculation metadata,
+defined names, page breaks, page margins, page setup, print options, and sheet
+protection. It skipped the publication-time semantic reload but left the raw
+ZIP publication path unchanged. Clean CPU-2 `A1, B1, B2, A2` evidence found a
+1.04% regression in the pooled seven-case p50 geometric mean; calculation
+metadata regressed 3.84% p50, and paired directions were mixed. Whole-process
+allocation calls fell only 2.84%, temporary allocations 2.12%, peak heap was
+unchanged, and VmHWM moved less than 1%. The production change was fully
+reverted. Future XLSX publication work should target physical output work,
+broad graph validation, whole-Part reconstruction, or a materially larger
+semantic parse instead of reintroducing generic provenance fields to these
+seven snapshots.
 
 ## Shared OOXML data path
 
