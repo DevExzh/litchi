@@ -572,6 +572,12 @@ enum Case {
     CfbSelectiveMini4095SharedRead,
     CfbSelectiveFatLegacyRead,
     CfbSelectiveFatSharedRead,
+    CfbSelectiveSimulatedMiniLegacyRead,
+    CfbSelectiveSimulatedMiniSharedRead,
+    CfbSelectiveSimulatedMini4095LegacyRead,
+    CfbSelectiveSimulatedMini4095SharedRead,
+    CfbSelectiveSimulatedFatLegacyRead,
+    CfbSelectiveSimulatedFatSharedRead,
     DocFreshWriteTo,
     XlsFreshWriteTo,
     PptFreshWriteTo,
@@ -917,6 +923,16 @@ impl Case {
             Self::CfbSelectiveMini4095SharedRead => "cfb_selective_mini_4095_shared_read",
             Self::CfbSelectiveFatLegacyRead => "cfb_selective_fat_legacy_read",
             Self::CfbSelectiveFatSharedRead => "cfb_selective_fat_shared_read",
+            Self::CfbSelectiveSimulatedMiniLegacyRead => "cfb_selective_simulated_mini_legacy_read",
+            Self::CfbSelectiveSimulatedMiniSharedRead => "cfb_selective_simulated_mini_shared_read",
+            Self::CfbSelectiveSimulatedMini4095LegacyRead => {
+                "cfb_selective_simulated_mini_4095_legacy_read"
+            },
+            Self::CfbSelectiveSimulatedMini4095SharedRead => {
+                "cfb_selective_simulated_mini_4095_shared_read"
+            },
+            Self::CfbSelectiveSimulatedFatLegacyRead => "cfb_selective_simulated_fat_legacy_read",
+            Self::CfbSelectiveSimulatedFatSharedRead => "cfb_selective_simulated_fat_shared_read",
             Self::DocFreshWriteTo => "doc_fresh_write_to",
             Self::XlsFreshWriteTo => "xls_fresh_write_to",
             Self::PptFreshWriteTo => "ppt_fresh_write_to",
@@ -1126,8 +1142,16 @@ impl Case {
                 | Self::CfbSharedConcurrentReads
                 | Self::CfbSelectiveMiniLegacyRead
                 | Self::CfbSelectiveMiniSharedRead
+                | Self::CfbSelectiveMini4095LegacyRead
+                | Self::CfbSelectiveMini4095SharedRead
                 | Self::CfbSelectiveFatLegacyRead
                 | Self::CfbSelectiveFatSharedRead
+                | Self::CfbSelectiveSimulatedMiniLegacyRead
+                | Self::CfbSelectiveSimulatedMiniSharedRead
+                | Self::CfbSelectiveSimulatedMini4095LegacyRead
+                | Self::CfbSelectiveSimulatedMini4095SharedRead
+                | Self::CfbSelectiveSimulatedFatLegacyRead
+                | Self::CfbSelectiveSimulatedFatSharedRead
                 | Self::CfbBulkReadScaling
         )
     }
@@ -1481,6 +1505,54 @@ impl Case {
                 | Self::CfbSelectiveMini4095SharedRead
                 | Self::CfbSelectiveFatLegacyRead
                 | Self::CfbSelectiveFatSharedRead
+                | Self::CfbSelectiveSimulatedMiniLegacyRead
+                | Self::CfbSelectiveSimulatedMiniSharedRead
+                | Self::CfbSelectiveSimulatedMini4095LegacyRead
+                | Self::CfbSelectiveSimulatedMini4095SharedRead
+                | Self::CfbSelectiveSimulatedFatLegacyRead
+                | Self::CfbSelectiveSimulatedFatSharedRead
+        )
+    }
+
+    const fn is_cfb_selective_simulated(self) -> bool {
+        matches!(
+            self,
+            Self::CfbSelectiveSimulatedMiniLegacyRead
+                | Self::CfbSelectiveSimulatedMiniSharedRead
+                | Self::CfbSelectiveSimulatedMini4095LegacyRead
+                | Self::CfbSelectiveSimulatedMini4095SharedRead
+                | Self::CfbSelectiveSimulatedFatLegacyRead
+                | Self::CfbSelectiveSimulatedFatSharedRead
+        )
+    }
+
+    const fn cfb_selective_target(self) -> Option<CfbSelectiveTarget> {
+        match self {
+            Self::CfbSelectiveMiniLegacyRead
+            | Self::CfbSelectiveMiniSharedRead
+            | Self::CfbSelectiveSimulatedMiniLegacyRead
+            | Self::CfbSelectiveSimulatedMiniSharedRead => Some(CfbSelectiveTarget::Mini),
+            Self::CfbSelectiveMini4095LegacyRead
+            | Self::CfbSelectiveMini4095SharedRead
+            | Self::CfbSelectiveSimulatedMini4095LegacyRead
+            | Self::CfbSelectiveSimulatedMini4095SharedRead => Some(CfbSelectiveTarget::Mini4095),
+            Self::CfbSelectiveFatLegacyRead
+            | Self::CfbSelectiveFatSharedRead
+            | Self::CfbSelectiveSimulatedFatLegacyRead
+            | Self::CfbSelectiveSimulatedFatSharedRead => Some(CfbSelectiveTarget::Fat),
+            _ => None,
+        }
+    }
+
+    const fn cfb_selective_shared(self) -> bool {
+        matches!(
+            self,
+            Self::CfbSelectiveMiniSharedRead
+                | Self::CfbSelectiveMini4095SharedRead
+                | Self::CfbSelectiveFatSharedRead
+                | Self::CfbSelectiveSimulatedMiniSharedRead
+                | Self::CfbSelectiveSimulatedMini4095SharedRead
+                | Self::CfbSelectiveSimulatedFatSharedRead
         )
     }
 
@@ -1910,12 +1982,34 @@ struct CfbSelectiveImplementationEvidence {
     selected_payload_sha256: String,
 }
 
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct CfbSelectiveSimulationPhase {
+    logical_read_calls: u64,
+    logical_read_bytes: u64,
+    physical_request_count: u64,
+    physical_request_bytes: u64,
+    physical_request_sizes: Vec<u64>,
+    physical_request_size_buckets: RequestSizeBuckets,
+    simulated_service_floor_ns: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct CfbSelectiveSimulationEvidence {
+    implementation: &'static str,
+    config: RangeSimulationConfig,
+    open: Vec<CfbSelectiveSimulationPhase>,
+    read: Vec<CfbSelectiveSimulationPhase>,
+    total: Vec<CfbSelectiveSimulationPhase>,
+}
+
 #[derive(Clone, Debug, Serialize)]
 struct CfbSelectiveEvidence {
     timing_scope: &'static str,
     sink: &'static str,
     selected_target_kind: &'static str,
     legacy_or_positional: CfbSelectiveImplementationEvidence,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    simulation: Option<CfbSelectiveSimulationEvidence>,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
@@ -2826,6 +2920,101 @@ impl Seek for SelectiveCursor {
     }
 }
 
+/// Harness-only delayed cursor used to keep the legacy `Read + Seek` control
+/// subject to the same bounded physical-request model as the positional
+/// adapter. It never changes the production reader or writer APIs.
+#[derive(Debug)]
+struct SimulatedCursor {
+    bytes: Arc<Vec<u8>>,
+    position: u64,
+    config: RangeSimulationConfig,
+    metrics: Arc<SimulatedRangeMetrics>,
+}
+
+impl SimulatedCursor {
+    fn new(
+        bytes: Arc<Vec<u8>>,
+        config: RangeSimulationConfig,
+        metrics: Arc<SimulatedRangeMetrics>,
+    ) -> Self {
+        Self {
+            bytes,
+            position: 0,
+            config,
+            metrics,
+        }
+    }
+}
+
+impl io::Read for SimulatedCursor {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        if output.is_empty() {
+            return Ok(0);
+        }
+        if self.config.max_physical_range_bytes == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "range simulator maximum physical request must be non-zero",
+            ));
+        }
+        if self.config.bandwidth_bytes_per_second == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "range simulator bandwidth must be non-zero",
+            ));
+        }
+        let start = usize::try_from(self.position).unwrap_or(usize::MAX);
+        let mut copied = 0usize;
+        while copied < output.len() {
+            let requested = (output.len() - copied).min(self.config.max_physical_range_bytes);
+            std::thread::sleep(simulated_request_delay(self.config, requested));
+            let physical_start = start.saturating_add(copied);
+            let returned = self
+                .bytes
+                .get(physical_start..)
+                .map_or(0, |remaining| remaining.len().min(requested));
+            if returned != 0 {
+                output[copied..copied + returned]
+                    .copy_from_slice(&self.bytes[physical_start..physical_start + returned]);
+            }
+            self.metrics.record_physical(requested, returned)?;
+            copied += returned;
+            if returned < requested {
+                break;
+            }
+        }
+        self.metrics.record_logical(copied)?;
+        self.position = self
+            .position
+            .checked_add(u64::try_from(copied).map_err(|_error| {
+                io::Error::other("simulated CFB cursor count does not fit u64")
+            })?)
+            .ok_or_else(|| io::Error::other("simulated CFB cursor position overflows"))?;
+        Ok(copied)
+    }
+}
+
+impl Seek for SimulatedCursor {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        let length = u64::try_from(self.bytes.len())
+            .map_err(|_error| io::Error::other("simulated CFB cursor length does not fit u64"))?;
+        let next = match position {
+            SeekFrom::Start(offset) => i128::from(offset),
+            SeekFrom::Current(offset) => i128::from(self.position) + i128::from(offset),
+            SeekFrom::End(offset) => i128::from(length) + i128::from(offset),
+        };
+        if next < 0 || next > i128::from(u64::MAX) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "simulated CFB cursor seek is outside the source",
+            ));
+        }
+        self.position = u64::try_from(next)
+            .map_err(|_error| io::Error::other("simulated CFB cursor seek does not fit u64"))?;
+        Ok(self.position)
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct RangeSimulationSnapshot {
     logical_read_calls: u64,
@@ -2836,15 +3025,85 @@ struct RangeSimulationSnapshot {
     physical_request_size_buckets: RequestSizeBuckets,
 }
 
-#[derive(Debug)]
-struct SimulatedRangeSource {
-    backing: Arc<InstrumentedSource>,
-    config: RangeSimulationConfig,
+#[derive(Debug, Default)]
+struct SimulatedRangeMetrics {
     logical_read_calls: AtomicU64,
     logical_read_bytes: AtomicU64,
     physical_request_count: AtomicU64,
     physical_request_bytes: AtomicU64,
     physical_request_sizes: Mutex<Vec<u64>>,
+}
+
+impl SimulatedRangeMetrics {
+    fn snapshot(&self) -> io::Result<RangeSimulationSnapshot> {
+        let mut sizes = self
+            .physical_request_sizes
+            .lock()
+            .map_err(|_error| io::Error::other("range simulator request sizes are poisoned"))?
+            .clone();
+        sizes.sort_unstable();
+        let mut buckets = RequestSizeBuckets::default();
+        for &size in &sizes {
+            buckets.observe(size);
+        }
+        Ok(RangeSimulationSnapshot {
+            logical_read_calls: self.logical_read_calls.load(Ordering::SeqCst),
+            logical_read_bytes: self.logical_read_bytes.load(Ordering::SeqCst),
+            physical_request_count: self.physical_request_count.load(Ordering::SeqCst),
+            physical_request_bytes: self.physical_request_bytes.load(Ordering::SeqCst),
+            physical_request_sizes: sizes,
+            physical_request_size_buckets: buckets,
+        })
+    }
+
+    fn reset(&self) -> io::Result<()> {
+        self.logical_read_calls.store(0, Ordering::SeqCst);
+        self.logical_read_bytes.store(0, Ordering::SeqCst);
+        self.physical_request_count.store(0, Ordering::SeqCst);
+        self.physical_request_bytes.store(0, Ordering::SeqCst);
+        self.physical_request_sizes
+            .lock()
+            .map_err(|_error| io::Error::other("range simulator request sizes are poisoned"))?
+            .clear();
+        Ok(())
+    }
+
+    fn record_logical(&self, bytes: usize) -> io::Result<()> {
+        self.logical_read_calls.fetch_add(1, Ordering::SeqCst);
+        self.logical_read_bytes.fetch_add(
+            u64::try_from(bytes)
+                .map_err(|_error| io::Error::other("logical read size does not fit u64"))?,
+            Ordering::SeqCst,
+        );
+        Ok(())
+    }
+
+    fn record_physical(&self, requested: usize, returned: usize) -> io::Result<()> {
+        let requested = u64::try_from(requested)
+            .map_err(|_error| io::Error::other("physical request size does not fit u64"))?;
+        let returned = u64::try_from(returned)
+            .map_err(|_error| io::Error::other("physical return size does not fit u64"))?;
+        if requested == 0 || returned > requested {
+            return Err(io::Error::other(
+                "physical range result is inconsistent with its request",
+            ));
+        }
+        self.physical_request_count.fetch_add(1, Ordering::SeqCst);
+        self.physical_request_bytes
+            .fetch_add(returned, Ordering::SeqCst);
+        self.physical_request_sizes
+            .lock()
+            .map_err(|_error| io::Error::other("range simulator request sizes are poisoned"))?
+            .push(requested);
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct SimulatedRangeSource {
+    backing: Arc<InstrumentedSource>,
+    config: RangeSimulationConfig,
+    metrics: Arc<SimulatedRangeMetrics>,
 }
 
 #[derive(Serialize)]
@@ -3606,49 +3865,40 @@ fn simulated_request_delay(config: RangeSimulationConfig, bytes: usize) -> Durat
     Duration::from_nanos(nanos as u64)
 }
 
+fn simulated_service_floor_ns(
+    snapshot: &RangeSimulationSnapshot,
+    config: RangeSimulationConfig,
+) -> Result<u64, Box<dyn Error>> {
+    if config.bandwidth_bytes_per_second == 0 {
+        return Err("range simulator bandwidth must be non-zero".into());
+    }
+    if snapshot.physical_request_count != u64::try_from(snapshot.physical_request_sizes.len())? {
+        return Err("range simulator physical request count does not match sizes".into());
+    }
+    let mut total = 0u128;
+    for &bytes in &snapshot.physical_request_sizes {
+        total = total
+            .checked_add(simulated_request_delay(config, usize::try_from(bytes)?).as_nanos())
+            .ok_or("simulated service floor overflows u128")?;
+    }
+    u64::try_from(total).map_err(|_| "simulated service floor exceeds u64".into())
+}
+
 impl SimulatedRangeSource {
     fn new(backing: Arc<InstrumentedSource>, config: RangeSimulationConfig) -> Self {
         Self {
             backing,
             config,
-            logical_read_calls: AtomicU64::new(0),
-            logical_read_bytes: AtomicU64::new(0),
-            physical_request_count: AtomicU64::new(0),
-            physical_request_bytes: AtomicU64::new(0),
-            physical_request_sizes: Mutex::new(Vec::new()),
+            metrics: Arc::new(SimulatedRangeMetrics::default()),
         }
     }
 
     fn snapshot(&self) -> io::Result<RangeSimulationSnapshot> {
-        let mut sizes = self
-            .physical_request_sizes
-            .lock()
-            .map_err(|_error| io::Error::other("range simulator request sizes are poisoned"))?
-            .clone();
-        sizes.sort_unstable();
-        let mut buckets = RequestSizeBuckets::default();
-        for &size in &sizes {
-            buckets.observe(size);
-        }
-        Ok(RangeSimulationSnapshot {
-            logical_read_calls: self.logical_read_calls.load(Ordering::SeqCst),
-            logical_read_bytes: self.logical_read_bytes.load(Ordering::SeqCst),
-            physical_request_count: self.physical_request_count.load(Ordering::SeqCst),
-            physical_request_bytes: self.physical_request_bytes.load(Ordering::SeqCst),
-            physical_request_sizes: sizes,
-            physical_request_size_buckets: buckets,
-        })
+        self.metrics.snapshot()
     }
 
     fn reset(&self) -> io::Result<()> {
-        self.logical_read_calls.store(0, Ordering::SeqCst);
-        self.logical_read_bytes.store(0, Ordering::SeqCst);
-        self.physical_request_count.store(0, Ordering::SeqCst);
-        self.physical_request_bytes.store(0, Ordering::SeqCst);
-        self.physical_request_sizes
-            .lock()
-            .map_err(|_error| io::Error::other("range simulator request sizes are poisoned"))?
-            .clear();
+        self.metrics.reset()?;
         self.backing.reset();
         Ok(())
     }
@@ -3660,7 +3910,21 @@ impl ReadAt for SimulatedRangeSource {
     }
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
-        self.logical_read_calls.fetch_add(1, Ordering::SeqCst);
+        if output.is_empty() {
+            return Ok(0);
+        }
+        if self.config.max_physical_range_bytes == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "range simulator maximum physical request must be non-zero",
+            ));
+        }
+        if self.config.bandwidth_bytes_per_second == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "range simulator bandwidth must be non-zero",
+            ));
+        }
         let mut total = 0usize;
         while total < output.len() {
             let requested = (output.len() - total).min(self.config.max_physical_range_bytes);
@@ -3669,22 +3933,13 @@ impl ReadAt for SimulatedRangeSource {
             let read = self
                 .backing
                 .read_at(physical_offset, &mut output[total..total + requested])?;
-            let read_u64 = u64::try_from(read)
-                .map_err(|_error| io::Error::other("physical request size does not fit u64"))?;
-            self.physical_request_count.fetch_add(1, Ordering::SeqCst);
-            self.physical_request_bytes
-                .fetch_add(read_u64, Ordering::SeqCst);
-            self.physical_request_sizes
-                .lock()
-                .map_err(|_error| io::Error::other("range simulator request sizes are poisoned"))?
-                .push(read_u64);
+            self.metrics.record_physical(requested, read)?;
             total += read;
             if read < requested {
                 break;
             }
         }
-        self.logical_read_bytes
-            .fetch_add(u64::try_from(total).unwrap_or(u64::MAX), Ordering::SeqCst);
+        self.metrics.record_logical(total)?;
         Ok(total)
     }
 
@@ -4447,37 +4702,25 @@ fn main() -> Result<(), Box<dyn Error>> {
             ] {
                 let corpus = build_cfb_selective_corpus(shape, target)?;
                 for case in options.cases.iter().copied().filter(|case| {
-                    case.is_cfb_selective()
-                        && match target {
-                            CfbSelectiveTarget::Mini => {
-                                matches!(
-                                    case,
-                                    Case::CfbSelectiveMiniLegacyRead
-                                        | Case::CfbSelectiveMiniSharedRead
-                                )
-                            },
-                            CfbSelectiveTarget::Mini4095 => {
-                                matches!(
-                                    case,
-                                    Case::CfbSelectiveMini4095LegacyRead
-                                        | Case::CfbSelectiveMini4095SharedRead
-                                )
-                            },
-                            CfbSelectiveTarget::Fat => {
-                                matches!(
-                                    case,
-                                    Case::CfbSelectiveFatLegacyRead
-                                        | Case::CfbSelectiveFatSharedRead
-                                )
-                            },
-                        }
+                    case.is_cfb_selective() && case.cfb_selective_target() == Some(target)
                 }) {
-                    results.push(run_cfb_selective_read(
-                        case,
-                        &corpus,
-                        options.warmup_iterations,
-                        options.samples,
-                    )?);
+                    let result = if case.is_cfb_selective_simulated() {
+                        run_cfb_selective_simulated_read(
+                            case,
+                            &corpus,
+                            options.warmup_iterations,
+                            options.samples,
+                            options.range_simulation,
+                        )?
+                    } else {
+                        run_cfb_selective_read(
+                            case,
+                            &corpus,
+                            options.warmup_iterations,
+                            options.samples,
+                        )?
+                    };
+                    results.push(result);
                 }
             }
         }
@@ -5673,6 +5916,20 @@ fn parse_case(value: &str) -> Option<Case> {
         "cfb_selective_mini_4095_shared_read" => Some(Case::CfbSelectiveMini4095SharedRead),
         "cfb_selective_fat_legacy_read" => Some(Case::CfbSelectiveFatLegacyRead),
         "cfb_selective_fat_shared_read" => Some(Case::CfbSelectiveFatSharedRead),
+        "cfb_selective_simulated_mini_legacy_read" => {
+            Some(Case::CfbSelectiveSimulatedMiniLegacyRead)
+        },
+        "cfb_selective_simulated_mini_shared_read" => {
+            Some(Case::CfbSelectiveSimulatedMiniSharedRead)
+        },
+        "cfb_selective_simulated_mini_4095_legacy_read" => {
+            Some(Case::CfbSelectiveSimulatedMini4095LegacyRead)
+        },
+        "cfb_selective_simulated_mini_4095_shared_read" => {
+            Some(Case::CfbSelectiveSimulatedMini4095SharedRead)
+        },
+        "cfb_selective_simulated_fat_legacy_read" => Some(Case::CfbSelectiveSimulatedFatLegacyRead),
+        "cfb_selective_simulated_fat_shared_read" => Some(Case::CfbSelectiveSimulatedFatSharedRead),
         "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
         "pptx_source_backed_one_edit_save" => Some(Case::PptxSourceBackedOneEditSave),
         "pptx_eager_batch_edit_save" => Some(Case::PptxEagerBatchEditSave),
@@ -6097,6 +6354,12 @@ fn print_usage() {
                                        cfb_selective_mini_4095_shared_read,\n\
                                        cfb_selective_fat_legacy_read,\n\
                                        cfb_selective_fat_shared_read,\n\
+                                       cfb_selective_simulated_mini_legacy_read,\n\
+                                       cfb_selective_simulated_mini_shared_read,\n\
+                                       cfb_selective_simulated_mini_4095_legacy_read,\n\
+                                       cfb_selective_simulated_mini_4095_shared_read,\n\
+                                       cfb_selective_simulated_fat_legacy_read,\n\
+                                       cfb_selective_simulated_fat_shared_read,\n\
                                        doc_fresh_write_to,xls_fresh_write_to,ppt_fresh_write_to,\n\
                                        doc_semantic_open,doc_semantic_list_paragraphs,\n\
                                        doc_semantic_one_paragraph,doc_semantic_full_text,\n\
@@ -10288,7 +10551,13 @@ fn run_case_with_config(
         | Case::CfbSelectiveMini4095LegacyRead
         | Case::CfbSelectiveMini4095SharedRead
         | Case::CfbSelectiveFatLegacyRead
-        | Case::CfbSelectiveFatSharedRead => {
+        | Case::CfbSelectiveFatSharedRead
+        | Case::CfbSelectiveSimulatedMiniLegacyRead
+        | Case::CfbSelectiveSimulatedMiniSharedRead
+        | Case::CfbSelectiveSimulatedMini4095LegacyRead
+        | Case::CfbSelectiveSimulatedMini4095SharedRead
+        | Case::CfbSelectiveSimulatedFatLegacyRead
+        | Case::CfbSelectiveSimulatedFatSharedRead => {
             Err("selective CFB case requires its dedicated corpus dispatcher".into())
         },
         Case::DocFreshWriteTo | Case::XlsFreshWriteTo | Case::PptFreshWriteTo => {
@@ -25899,6 +26168,264 @@ fn run_cfb_selective_read(
             returned_payload_bytes,
             selected_payload_sha256,
         },
+        simulation: None,
+    };
+    let source = SourceSummary {
+        cfb_selective: Some(evidence),
+        ..SourceSummary::default()
+    };
+    Ok(result_with_source(case, corpus, elapsed, source))
+}
+
+fn cfb_simulation_phase(
+    snapshot: RangeSimulationSnapshot,
+    config: RangeSimulationConfig,
+) -> Result<CfbSelectiveSimulationPhase, Box<dyn Error>> {
+    if snapshot.logical_read_calls == 0
+        || snapshot.logical_read_bytes == 0
+        || snapshot.physical_request_count == 0
+        || snapshot.physical_request_bytes == 0
+    {
+        return Err("simulated CFB selective phase performed no source I/O".into());
+    }
+    if snapshot.logical_read_bytes != snapshot.physical_request_bytes {
+        return Err("simulated CFB logical and physical bytes differ".into());
+    }
+    let max_physical_range_bytes = u64::try_from(config.max_physical_range_bytes)?;
+    if snapshot.physical_request_count != u64::try_from(snapshot.physical_request_sizes.len())?
+        || snapshot
+            .physical_request_sizes
+            .iter()
+            .any(|&bytes| bytes == 0 || bytes > max_physical_range_bytes)
+    {
+        return Err("simulated CFB physical request distribution is invalid".into());
+    }
+    let simulated_service_floor_ns = simulated_service_floor_ns(&snapshot, config)?;
+    Ok(CfbSelectiveSimulationPhase {
+        logical_read_calls: snapshot.logical_read_calls,
+        logical_read_bytes: snapshot.logical_read_bytes,
+        physical_request_count: snapshot.physical_request_count,
+        physical_request_bytes: snapshot.physical_request_bytes,
+        physical_request_sizes: snapshot.physical_request_sizes,
+        physical_request_size_buckets: snapshot.physical_request_size_buckets,
+        simulated_service_floor_ns,
+    })
+}
+
+fn combine_range_simulation_snapshots(
+    open: &RangeSimulationSnapshot,
+    read: &RangeSimulationSnapshot,
+) -> Result<RangeSimulationSnapshot, Box<dyn Error>> {
+    let capacity = open
+        .physical_request_sizes
+        .len()
+        .checked_add(read.physical_request_sizes.len())
+        .ok_or("simulated CFB request-size vector overflows usize")?;
+    let mut physical_request_sizes = Vec::with_capacity(capacity);
+    physical_request_sizes.extend_from_slice(&open.physical_request_sizes);
+    physical_request_sizes.extend_from_slice(&read.physical_request_sizes);
+    physical_request_sizes.sort_unstable();
+    Ok(RangeSimulationSnapshot {
+        logical_read_calls: open
+            .logical_read_calls
+            .checked_add(read.logical_read_calls)
+            .ok_or("simulated CFB logical request count overflows u64")?,
+        logical_read_bytes: open
+            .logical_read_bytes
+            .checked_add(read.logical_read_bytes)
+            .ok_or("simulated CFB logical byte count overflows u64")?,
+        physical_request_count: open
+            .physical_request_count
+            .checked_add(read.physical_request_count)
+            .ok_or("simulated CFB physical request count overflows u64")?,
+        physical_request_bytes: open
+            .physical_request_bytes
+            .checked_add(read.physical_request_bytes)
+            .ok_or("simulated CFB physical byte count overflows u64")?,
+        physical_request_sizes,
+        physical_request_size_buckets: RequestSizeBuckets {
+            bytes_1_to_512: open
+                .physical_request_size_buckets
+                .bytes_1_to_512
+                .checked_add(read.physical_request_size_buckets.bytes_1_to_512)
+                .ok_or("simulated CFB request bucket overflows u64")?,
+            bytes_513_to_4096: open
+                .physical_request_size_buckets
+                .bytes_513_to_4096
+                .checked_add(read.physical_request_size_buckets.bytes_513_to_4096)
+                .ok_or("simulated CFB request bucket overflows u64")?,
+            bytes_4097_to_16384: open
+                .physical_request_size_buckets
+                .bytes_4097_to_16384
+                .checked_add(read.physical_request_size_buckets.bytes_4097_to_16384)
+                .ok_or("simulated CFB request bucket overflows u64")?,
+            bytes_16385_to_65536: open
+                .physical_request_size_buckets
+                .bytes_16385_to_65536
+                .checked_add(read.physical_request_size_buckets.bytes_16385_to_65536)
+                .ok_or("simulated CFB request bucket overflows u64")?,
+            bytes_over_65536: open
+                .physical_request_size_buckets
+                .bytes_over_65536
+                .checked_add(read.physical_request_size_buckets.bytes_over_65536)
+                .ok_or("simulated CFB request bucket overflows u64")?,
+        },
+    })
+}
+
+fn run_cfb_selective_simulated_read(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    config: RangeSimulationConfig,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !case.is_cfb_selective_simulated() {
+        return Err("non-simulated CFB case reached simulated selective runner".into());
+    }
+    if config.max_physical_range_bytes == 0 {
+        return Err("range simulator maximum physical request must be non-zero".into());
+    }
+    if config.bandwidth_bytes_per_second == 0 {
+        return Err("range simulator bandwidth must be non-zero".into());
+    }
+    let shared = case.cfb_selective_shared();
+    let implementation = if shared {
+        "shared-positional-simulated-read-at"
+    } else {
+        "legacy-cursor-bounded-delayed-read"
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut open_ns = Vec::with_capacity(samples);
+    let mut read_ns = Vec::with_capacity(samples);
+    let mut total_ns = Vec::with_capacity(samples);
+    let mut open_read_calls = Vec::with_capacity(samples);
+    let mut open_read_bytes = Vec::with_capacity(samples);
+    let mut open_range_sizes = Vec::with_capacity(samples);
+    let mut read_calls = Vec::with_capacity(samples);
+    let mut read_bytes = Vec::with_capacity(samples);
+    let mut read_range_sizes = Vec::with_capacity(samples);
+    let mut returned_payload_bytes = Vec::with_capacity(samples);
+    let mut simulation_open = Vec::with_capacity(samples);
+    let mut simulation_read = Vec::with_capacity(samples);
+    let mut simulation_total = Vec::with_capacity(samples);
+    let mut selected_hash = None;
+    let limits = cfb_shared_limits(corpus)?;
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let bytes = Arc::new(corpus.archive.clone());
+        let metrics = Arc::new(SimulatedRangeMetrics::default());
+        let shared_source = shared.then(|| {
+            Arc::new(SimulatedRangeSource {
+                backing: Arc::new(InstrumentedSource::new((*bytes).clone(), Vec::new())),
+                config,
+                metrics: Arc::clone(&metrics),
+            })
+        });
+        let legacy_cursor = (!shared)
+            .then(|| SimulatedCursor::new(Arc::clone(&bytes), config, Arc::clone(&metrics)));
+        let open_started = Instant::now();
+        let selected = if shared {
+            let source = shared_source.ok_or("simulated shared CFB source is absent")?;
+            let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
+            let open_duration = open_started.elapsed();
+            let open_snapshot = source.snapshot()?;
+            metrics.reset()?;
+            let read_started = Instant::now();
+            let path = [corpus.target_name.as_str()];
+            let mut payload = Vec::new();
+            payload.try_reserve_exact(corpus.target_payload.len())?;
+            payload.resize(corpus.target_payload.len(), 0);
+            ole.read_stream_range(&path, 0, &mut payload)?;
+            let read_duration = read_started.elapsed();
+            (payload, open_duration, read_duration, open_snapshot)
+        } else {
+            let cursor = legacy_cursor.ok_or("simulated legacy CFB cursor is absent")?;
+            let mut ole = OleFile::open(cursor)?;
+            let open_duration = open_started.elapsed();
+            let open_snapshot = metrics.snapshot()?;
+            metrics.reset()?;
+            let read_started = Instant::now();
+            let path = [corpus.target_name.as_str()];
+            let payload = ole.open_stream(&path)?;
+            let read_duration = read_started.elapsed();
+            (payload, open_duration, read_duration, open_snapshot)
+        };
+        let (payload, open_duration, read_duration, open_snapshot) = selected;
+        let total_duration = open_duration
+            .checked_add(read_duration)
+            .ok_or("simulated CFB combined duration overflows")?;
+        let read_snapshot = metrics.snapshot()?;
+        if payload != corpus.target_payload {
+            return Err(
+                "simulated CFB selective read differs from deterministic target payload".into(),
+            );
+        }
+        let total_snapshot = combine_range_simulation_snapshots(&open_snapshot, &read_snapshot)?;
+        let hash = sha256_hex(&payload);
+        if let Some(expected) = selected_hash.as_deref() {
+            if expected != hash {
+                return Err("simulated CFB selective payload hash changed across samples".into());
+            }
+        } else {
+            selected_hash = Some(hash);
+        }
+        let open_phase = cfb_simulation_phase(open_snapshot, config)?;
+        let read_phase = cfb_simulation_phase(read_snapshot, config)?;
+        let total_phase = cfb_simulation_phase(total_snapshot, config)?;
+        std::hint::black_box(&payload);
+        if iteration >= warmup_iterations {
+            let open_duration = elapsed_ns(open_duration)?;
+            let read_duration = elapsed_ns(read_duration)?;
+            let total_duration = elapsed_ns(total_duration)?;
+            elapsed.push(total_duration);
+            open_ns.push(open_duration);
+            read_ns.push(read_duration);
+            total_ns.push(total_duration);
+            open_read_calls.push(open_phase.logical_read_calls);
+            open_read_bytes.push(open_phase.logical_read_bytes);
+            open_range_sizes.push(open_phase.physical_request_sizes.clone());
+            read_calls.push(read_phase.logical_read_calls);
+            read_bytes.push(read_phase.logical_read_bytes);
+            read_range_sizes.push(read_phase.physical_request_sizes.clone());
+            returned_payload_bytes.push(u64::try_from(payload.len())?);
+            simulation_open.push(open_phase);
+            simulation_read.push(read_phase);
+            simulation_total.push(total_phase);
+        }
+    }
+    let selected_payload_sha256 =
+        selected_hash.ok_or("simulated CFB selective read produced no hash")?;
+    let evidence = CfbSelectiveEvidence {
+        timing_scope: "open and selected read are separate stages and total is their checked sum; every bounded source request pays the configured deterministic delay; adapter construction, corpus construction, validation, evidence snapshots, and hash generation are excluded",
+        sink: "none",
+        selected_target_kind: match corpus.manifest.target_payload_bytes {
+            36 => Some("minifat-36-byte"),
+            4095 => Some("minifat-4095-byte"),
+            bytes if bytes == 4 * 1024 * 1024 => Some("fat-4mib"),
+            _ => None,
+        }
+        .ok_or("simulated CFB selective target has unknown size")?,
+        legacy_or_positional: CfbSelectiveImplementationEvidence {
+            implementation,
+            open_ns,
+            read_ns,
+            total_ns,
+            open_read_calls,
+            open_read_bytes,
+            open_range_sizes,
+            read_calls,
+            read_bytes,
+            read_range_sizes,
+            returned_payload_bytes,
+            selected_payload_sha256,
+        },
+        simulation: Some(CfbSelectiveSimulationEvidence {
+            implementation,
+            config,
+            open: simulation_open,
+            read: simulation_read,
+            total: simulation_total,
+        }),
     };
     let source = SourceSummary {
         cfb_selective: Some(evidence),
@@ -26928,17 +27455,23 @@ fn write_report(report: &Report, output: Option<&PathBuf>) -> Result<(), Box<dyn
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeMap, io::Write, sync::Arc, time::Duration};
+    use std::{
+        collections::BTreeMap,
+        io::{Read, Write},
+        sync::Arc,
+        time::Duration,
+    };
 
     use litchi_core::ReadAt;
 
     use super::{
-        Case, CfbSelectiveTarget, CorpusShape, CountingSeekSink, CountingSink, HashingDiscardSink,
-        InstrumentedSource, ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES,
-        ODP_TEXT_BOX_BATCH_COUNT, ODT_RESOURCE_BATCH_COUNT, OpcCacheMode, PPT_PICTURE_BYTES,
-        PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR, PPT_REPEATED_QUERY_COUNT,
-        PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
-        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
+        Case, CfbSelectiveSimulationPhase, CfbSelectiveTarget, CorpusShape, CountingSeekSink,
+        CountingSink, HashingDiscardSink, InstrumentedSource, ODF_REPAIR_LOCAL_EXTRA,
+        ODF_REPAIR_PUBLICATION_SCRATCH_BYTES, ODP_TEXT_BOX_BATCH_COUNT, ODT_RESOURCE_BATCH_COUNT,
+        OpcCacheMode, PPT_PICTURE_BYTES, PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR,
+        PPT_REPEATED_QUERY_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind,
+        RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
+        RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
         SimulatedRangeSource, SinkSummary, SourceBackedPackage, WindowedHashingSink,
         WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
         XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape, XlsxShape,
@@ -26959,11 +27492,12 @@ mod tests {
         build_xlsx_sheet_protection_edit_corpus, expected_opc_overlay_output,
         ole_common_changed_output, opc_overlay_replacement_payload, parse_case, payload_bytes,
         resolve_execution_workers, run_case, run_case_with_config, run_cfb_selective_read,
-        run_docx_source_backed_one_edit_save, run_opc_source_cache_budget_boundary,
-        run_opc_source_cache_contention, run_opc_source_overlay_one_part_save, run_ppt_pictures,
-        run_pptx_batch_edit_save, run_pptx_multi_slide_batch_edit_save,
-        run_pptx_source_backed_one_edit_save, run_scaling_case, run_streaming_creation,
-        run_xls_comments_edit_save, run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
+        run_cfb_selective_simulated_read, run_docx_source_backed_one_edit_save,
+        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
+        run_pptx_multi_slide_batch_edit_save, run_pptx_source_backed_one_edit_save,
+        run_scaling_case, run_streaming_creation, run_xls_comments_edit_save,
+        run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
         run_xlsx_data_validation_edit_save, run_xlsx_defined_names_edit_save,
         run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
@@ -27229,6 +27763,121 @@ mod tests {
             // physical-run coalescer therefore submits one exact request.
             assert_eq!(shared.read_calls, vec![1]);
             assert_eq!(shared.read_range_sizes, vec![vec![4095]]);
+        }
+    }
+
+    #[test]
+    fn simulated_selective_cfb_records_bounded_service_and_control_invariants() {
+        let config = RangeSimulationConfig {
+            fixed_latency_us: 1,
+            request_overhead_us: 2,
+            bandwidth_bytes_per_second: 1_000_000_000,
+            max_physical_range_bytes: 4_096,
+        };
+
+        let check_phase = |phase: &CfbSelectiveSimulationPhase| {
+            assert!(phase.logical_read_calls > 0);
+            assert!(phase.logical_read_bytes > 0);
+            assert_eq!(phase.logical_read_bytes, phase.physical_request_bytes);
+            assert_eq!(
+                phase.physical_request_count,
+                u64::try_from(phase.physical_request_sizes.len()).unwrap()
+            );
+            assert!(
+                phase
+                    .physical_request_sizes
+                    .iter()
+                    .all(|&bytes| bytes > 0 && bytes <= config.max_physical_range_bytes as u64)
+            );
+            let bucket_count = phase.physical_request_size_buckets.bytes_1_to_512
+                + phase.physical_request_size_buckets.bytes_513_to_4096
+                + phase.physical_request_size_buckets.bytes_4097_to_16384
+                + phase.physical_request_size_buckets.bytes_16385_to_65536
+                + phase.physical_request_size_buckets.bytes_over_65536;
+            assert_eq!(bucket_count, phase.physical_request_count);
+            let expected_floor = phase
+                .physical_request_sizes
+                .iter()
+                .map(|&bytes| {
+                    super::simulated_request_delay(config, bytes as usize).as_nanos() as u64
+                })
+                .sum::<u64>();
+            assert_eq!(phase.simulated_service_floor_ns, expected_floor);
+        };
+
+        for shape in [CorpusShape::ManySmall, CorpusShape::WideRoot] {
+            for target in [
+                CfbSelectiveTarget::Mini,
+                CfbSelectiveTarget::Mini4095,
+                CfbSelectiveTarget::Fat,
+            ] {
+                let corpus = build_cfb_selective_corpus(shape, target).unwrap();
+                let legacy_case = match target {
+                    CfbSelectiveTarget::Mini => Case::CfbSelectiveSimulatedMiniLegacyRead,
+                    CfbSelectiveTarget::Mini4095 => Case::CfbSelectiveSimulatedMini4095LegacyRead,
+                    CfbSelectiveTarget::Fat => Case::CfbSelectiveSimulatedFatLegacyRead,
+                };
+                let shared_case = match target {
+                    CfbSelectiveTarget::Mini => Case::CfbSelectiveSimulatedMiniSharedRead,
+                    CfbSelectiveTarget::Mini4095 => Case::CfbSelectiveSimulatedMini4095SharedRead,
+                    CfbSelectiveTarget::Fat => Case::CfbSelectiveSimulatedFatSharedRead,
+                };
+                let evidence = |case| {
+                    let result =
+                        run_cfb_selective_simulated_read(case, &corpus, 0, 1, config).unwrap();
+                    let source = result.source.unwrap();
+                    let selective = source.cfb_selective.unwrap();
+                    assert_eq!(
+                        selective.legacy_or_positional.returned_payload_bytes,
+                        vec![target.target_bytes() as u64]
+                    );
+                    assert_eq!(
+                        selective.legacy_or_positional.selected_payload_sha256,
+                        corpus.manifest.target_payload_sha256
+                    );
+                    let simulation = selective.simulation.unwrap();
+                    assert_eq!(simulation.config, config);
+                    assert_eq!(simulation.open.len(), 1);
+                    assert_eq!(simulation.read.len(), 1);
+                    assert_eq!(simulation.total.len(), 1);
+                    check_phase(&simulation.open[0]);
+                    check_phase(&simulation.read[0]);
+                    check_phase(&simulation.total[0]);
+                    assert_eq!(
+                        simulation.total[0].physical_request_bytes,
+                        simulation.open[0].physical_request_bytes
+                            + simulation.read[0].physical_request_bytes
+                    );
+                    simulation
+                };
+                let legacy_simulation = evidence(legacy_case);
+                let shared_simulation = evidence(shared_case);
+                let target_bytes = target.target_bytes() as u64;
+                assert_eq!(
+                    shared_simulation.read[0].physical_request_bytes,
+                    target_bytes
+                );
+                assert_eq!(shared_simulation.read[0].logical_read_bytes, target_bytes);
+                match target {
+                    CfbSelectiveTarget::Mini | CfbSelectiveTarget::Mini4095 => {
+                        assert!(legacy_simulation.read[0].physical_request_bytes > target_bytes);
+                        assert!(
+                            legacy_simulation.read[0].physical_request_count
+                                > shared_simulation.read[0].physical_request_count
+                        );
+                    },
+                    CfbSelectiveTarget::Fat => {
+                        assert_eq!(
+                            legacy_simulation.read[0].physical_request_bytes,
+                            target_bytes
+                        );
+                        assert_eq!(
+                            legacy_simulation.read[0].physical_request_count,
+                            shared_simulation.read[0].physical_request_count
+                        );
+                    },
+                }
+            }
         }
     }
 
@@ -30338,6 +30987,69 @@ mod tests {
         source.reset().unwrap();
         assert_eq!(source.read_at(0, &mut output).unwrap(), bytes.len());
         assert_eq!(source.snapshot().unwrap(), first);
+    }
+
+    #[test]
+    fn range_simulators_account_short_and_eof_requests_without_rejecting_empty_reads() {
+        let invalid = RangeSimulationConfig {
+            fixed_latency_us: 0,
+            request_overhead_us: 0,
+            bandwidth_bytes_per_second: 0,
+            max_physical_range_bytes: 0,
+        };
+        let source = SimulatedRangeSource::new(
+            Arc::new(InstrumentedSource::new(vec![1], Vec::new())),
+            invalid,
+        );
+        let mut empty = [];
+        assert_eq!(source.read_at(0, &mut empty).unwrap(), 0);
+        assert_eq!(source.snapshot().unwrap(), Default::default());
+
+        let cursor_metrics = Arc::new(SimulatedRangeMetrics::default());
+        let mut cursor = SimulatedCursor::new(Arc::new(vec![1]), invalid, cursor_metrics.clone());
+        assert_eq!(cursor.read(&mut empty).unwrap(), 0);
+        assert_eq!(cursor_metrics.snapshot().unwrap(), Default::default());
+
+        let config = RangeSimulationConfig {
+            fixed_latency_us: 0,
+            request_overhead_us: 0,
+            bandwidth_bytes_per_second: 1_000_000_000,
+            max_physical_range_bytes: 4,
+        };
+        let source = SimulatedRangeSource::new(
+            Arc::new(InstrumentedSource::new(vec![1, 2, 3], Vec::new())),
+            config,
+        );
+        let mut output = [0; 4];
+        assert_eq!(source.read_at(2, &mut output).unwrap(), 1);
+        assert_eq!(&output[..1], &[3]);
+        let short = source.snapshot().unwrap();
+        assert_eq!(short.logical_read_calls, 1);
+        assert_eq!(short.logical_read_bytes, 1);
+        assert_eq!(short.physical_request_count, 1);
+        assert_eq!(short.physical_request_bytes, 1);
+        assert_eq!(short.physical_request_sizes, vec![4]);
+
+        source.reset().unwrap();
+        assert_eq!(source.read_at(3, &mut output).unwrap(), 0);
+        let eof = source.snapshot().unwrap();
+        assert_eq!(eof.logical_read_calls, 1);
+        assert_eq!(eof.logical_read_bytes, 0);
+        assert_eq!(eof.physical_request_count, 1);
+        assert_eq!(eof.physical_request_bytes, 0);
+        assert_eq!(eof.physical_request_sizes, vec![4]);
+
+        let cursor_metrics = Arc::new(SimulatedRangeMetrics::default());
+        let mut cursor =
+            SimulatedCursor::new(Arc::new(vec![3]), config, Arc::clone(&cursor_metrics));
+        assert_eq!(cursor.read(&mut output).unwrap(), 1);
+        assert_eq!(cursor.read(&mut output).unwrap(), 0);
+        let cursor_snapshot = cursor_metrics.snapshot().unwrap();
+        assert_eq!(cursor_snapshot.logical_read_calls, 2);
+        assert_eq!(cursor_snapshot.logical_read_bytes, 1);
+        assert_eq!(cursor_snapshot.physical_request_count, 2);
+        assert_eq!(cursor_snapshot.physical_request_bytes, 1);
+        assert_eq!(cursor_snapshot.physical_request_sizes, vec![4, 4]);
     }
 
     #[test]
