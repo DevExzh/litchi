@@ -58,7 +58,8 @@ bound), one bounded unmanaged source-backed two-worksheet case, and four
 managed source-backed scalar-cell cases (one cell, `ceil(1%)`, exact 256, and
 two worksheets),
 two bounded XLSX/RTF streaming-creation cases,
-six matched CFB selective-read cases,
+six matched CFB selective-read cases and six matched simulated high-latency
+CFB selective-read cases,
 four matched native XLS existing-comment publication cases,
 six matched native XLS fixed-width numeric publication cases,
 four matched native XLS worksheet-visibility publication cases,
@@ -71,7 +72,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 263
+provide their source-read counters. The current `Case` matrix exposes 271
 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -160,6 +161,20 @@ p50 improves 45.80%/46.32% and p95 improves 45.25%/45.83% in paired directions;
 whole-process allocation-call counts improve 14.31%, while peak heap and RSS
 remain neutral. No single-call, open, physical-I/O, decompression, cold-cache,
 or generic ODF claim is made;
+six additional matched simulated CFB selective-read cases
+(`cfb_selective_simulated_{mini,mini_4095,fat}_{legacy,shared}_read`) reuse the
+same deterministic final-position targets while applying the configured
+bounded range delay. Legacy uses a harness-only delayed `Read + Seek` adapter;
+the shared control uses the bounded `ReadAt` simulator. Each result records
+open/read/total logical and physical request counts, bytes, sorted request
+sizes, size buckets, and a deterministic simulated service floor alongside
+the existing target hash and phase counters. The Mini controls require the
+shared read stage to do exactly target work and the legacy stage to retain its
+full-root amplification; the FAT pair remains a matched control. These cases
+are selectable evidence only and do not imply a latency or native semantic
+performance claim. Together these additions bring the selectable matrix to
+271 names while leaving the default 36 cases / 198 records unchanged. Change
+0144 documents the evidence boundary.
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 
@@ -1500,6 +1515,14 @@ cfb_selective_mini_4095_legacy_read,cfb_selective_mini_4095_shared_read,\
 cfb_selective_fat_legacy_read,cfb_selective_fat_shared_read \
   --json target/perf/cfb-selective-read.json
 ```
+The six simulated selectors (`cfb_selective_simulated_{mini,mini_4095,fat}_
+{legacy,shared}_read`) use the same `many-small` and `wide-root` targets with
+the configured fixed latency, request overhead, bandwidth, and physical-range
+ceiling. Legacy uses a bounded delayed cursor; shared uses `ReadAt` range
+simulation. Open/read/total logical and physical request counts, bytes, sorted
+sizes, buckets, and deterministic service-floor nanoseconds are emitted beside
+the existing phase counters and target hash. They are opt-in evidence only;
+no speedup, cold-I/O, allocation, or semantic native-Office claim is made.
 - `doc_fresh_write_to`: construct a new `litchi_doc::writer::Writer`, add the
   selected fixed paragraphs through its public API, and package it with public
   `write_to`.
