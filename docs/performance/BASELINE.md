@@ -283,6 +283,20 @@ checks remain outside timing. This is correctness and sink-counter evidence
 only: no speedup, allocation, RSS, release-ABBA, or physical-I/O claim is made.
 See the [change record](changes/0145-pptx-cross-slide-copy-evidence.md).
 
+## CFB MiniFAT `open_stream` evidence (change 0146)
+
+Twelve opt-in selectors now call `SharedOleFile::open_stream` directly for
+36-byte and 4,095-byte MiniFAT targets across the deterministic 256- and
+2,048-sibling shapes. One-shot, repeat-3, and sequential repeat-8 operations
+record exact output hashes, per-invocation positional source events, root Mini
+Stream identity, source-version checks, and matched deterministic-range-model
+evidence. Current-candidate tests bind the direct-then-root-cache counter shape;
+the same runner also permits the clean parent revision's initial root
+materialization. This is harness/correctness evidence only. Release ABBA,
+allocation, RSS, physical-I/O, cold/network/device, native DOC/XLS/PPT, and
+cross-format claims remain open. See the
+[change record](changes/0146-cfb-open-stream-evidence.md).
+
 ## CFB MiniFAT physical-run boundary evidence (change 0125)
 
 The current harness adds a matched 4095-byte MiniFAT boundary pair over the
@@ -472,7 +486,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**273 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**285 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.

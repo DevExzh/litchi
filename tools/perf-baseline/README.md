@@ -73,7 +73,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 273
+provide their source-read counters. The current `Case` matrix exposes 285
 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -183,9 +183,21 @@ three-slide source/two-slide destination packages. They report plan, commit,
 and OPC sequential publication timings separately, with reopen timing retained
 as a non-publication diagnostic. Complete semantic/package/dependency-closure,
 collision-remap, source-immutability, durable-patch, and stale/foreign/refusal
-gates are untimed. The selectors bring the current selectable matrix to 273
+gates are untimed. The selectors brought the selectable matrix to 273 at that point
 names while leaving the default 36 cases / 198 records unchanged. They make no
 speedup, allocation, RSS, release-ABBA, or physical-I/O claim.
+
+Change 0146 adds 12 shared CFB MiniFAT `open_stream` evidence selectors:
+36-byte and 4095-byte targets across `many-small` and `wide-root`, with
+one-shot, repeat-3, and sequential repeat-8 operations plus matched
+deterministic-delay simulator controls. They call `SharedOleFile::open_stream`
+directly and record per-invocation output hashes, logical read events, source
+version/refusal checks, root Mini Stream identity, and inferred direct/cache
+counter evidence. Repeat-8 is bounded sequential repetition; it is not
+`bulk_read`, concurrent traversal, or a full-workload claim. The selectors are
+opt-in and bring the current selectable matrix to 285 names while leaving the
+default 36 cases / 198 records unchanged. Change 0146 makes no performance
+claim until identical-harness clean release ABBA evidence is available.
 
 The validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
