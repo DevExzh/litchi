@@ -9,12 +9,13 @@
 mod filesystem;
 mod operation_metrics;
 mod process_metrics;
+mod xls_numeric;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error,
     fs::{self, File},
-    io::{self, Cursor, Seek, SeekFrom, Write},
+    io::{self, Cursor, Read, Seek, SeekFrom, Write},
     num::{NonZeroU64, NonZeroUsize},
     ops::Range,
     path::PathBuf,
@@ -587,6 +588,10 @@ enum Case {
     XlsCommentsSourceBackedEditSave,
     XlsCommentsEagerBatchEditSave,
     XlsCommentsSourceBackedBatchEditSave,
+    XlsNumericEagerNumberEditSave,
+    XlsNumericSourceBackedNumberEditSave,
+    XlsNumericEagerRkMulrkEditSave,
+    XlsNumericSourceBackedRkMulrkEditSave,
     XlsVisibilityEagerEditSave,
     XlsVisibilitySourceBackedEditSave,
     XlsVisibilityEagerBatchEditSave,
@@ -926,6 +931,14 @@ impl Case {
             Self::XlsCommentsSourceBackedBatchEditSave => {
                 "xls_comments_source_backed_batch_edit_save"
             },
+            Self::XlsNumericEagerNumberEditSave => "xls_numeric_eager_number_edit_save",
+            Self::XlsNumericSourceBackedNumberEditSave => {
+                "xls_numeric_source_backed_number_edit_save"
+            },
+            Self::XlsNumericEagerRkMulrkEditSave => "xls_numeric_eager_rk_mulrk_edit_save",
+            Self::XlsNumericSourceBackedRkMulrkEditSave => {
+                "xls_numeric_source_backed_rk_mulrk_edit_save"
+            },
             Self::XlsVisibilityEagerEditSave => "xls_visibility_eager_edit_save",
             Self::XlsVisibilitySourceBackedEditSave => "xls_visibility_source_backed_edit_save",
             Self::XlsVisibilityEagerBatchEditSave => "xls_visibility_eager_batch_edit_save",
@@ -1174,6 +1187,16 @@ impl Case {
                 | Self::XlsVisibilitySourceBackedEditSave
                 | Self::XlsVisibilityEagerBatchEditSave
                 | Self::XlsVisibilitySourceBackedBatchEditSave
+        )
+    }
+
+    const fn is_xls_numeric_edit_save(self) -> bool {
+        matches!(
+            self,
+            Self::XlsNumericEagerNumberEditSave
+                | Self::XlsNumericSourceBackedNumberEditSave
+                | Self::XlsNumericEagerRkMulrkEditSave
+                | Self::XlsNumericSourceBackedRkMulrkEditSave
         )
     }
 
@@ -1944,6 +1967,8 @@ struct SourceSummary {
     xlsx_cell_values: Option<XlsxCellValuesSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xls_comments: Option<XlsCommentsSourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xls_numeric: Option<xls_numeric::XlsNumericSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xls_visibility: Option<XlsVisibilitySourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -4291,6 +4316,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_conditional_formatting_edit_save()
                     && !case.is_xlsx_merge_edit_save()
                     && !case.is_xls_comments_edit_save()
+                    && !case.is_xls_numeric_edit_save()
                     && !case.is_xls_visibility_edit_save()
                     && !case.uses_validation_xls()
                     && !case.uses_validation_rtf()
@@ -4409,6 +4435,29 @@ fn main() -> Result<(), Box<dyn Error>> {
             results.push(run_xls_comments_edit_save(
                 *case,
                 &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_xls_numeric_edit_save())
+    {
+        let number_corpus = build_xls_comments_edit_corpus()?;
+        let rk_mulrk_corpus = xls_numeric::build_rk_mulrk_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_xls_numeric_edit_save())
+        {
+            results.push(xls_numeric::run(
+                case,
+                &number_corpus,
+                &rk_mulrk_corpus,
                 options.warmup_iterations,
                 options.samples,
             )?);
@@ -5645,6 +5694,14 @@ fn parse_case(value: &str) -> Option<Case> {
         "xls_comments_source_backed_batch_edit_save" => {
             Some(Case::XlsCommentsSourceBackedBatchEditSave)
         },
+        "xls_numeric_eager_number_edit_save" => Some(Case::XlsNumericEagerNumberEditSave),
+        "xls_numeric_source_backed_number_edit_save" => {
+            Some(Case::XlsNumericSourceBackedNumberEditSave)
+        },
+        "xls_numeric_eager_rk_mulrk_edit_save" => Some(Case::XlsNumericEagerRkMulrkEditSave),
+        "xls_numeric_source_backed_rk_mulrk_edit_save" => {
+            Some(Case::XlsNumericSourceBackedRkMulrkEditSave)
+        },
         "xls_visibility_eager_edit_save" => Some(Case::XlsVisibilityEagerEditSave),
         "xls_visibility_source_backed_edit_save" => Some(Case::XlsVisibilitySourceBackedEditSave),
         "xls_visibility_eager_batch_edit_save" => Some(Case::XlsVisibilityEagerBatchEditSave),
@@ -5953,6 +6010,10 @@ fn print_usage() {
                                        xls_comments_source_backed_edit_save,\n\
                                        xls_comments_eager_batch_edit_save,\n\
                                        xls_comments_source_backed_batch_edit_save,\n\
+                                       xls_numeric_eager_number_edit_save,\n\
+                                       xls_numeric_source_backed_number_edit_save,\n\
+                                       xls_numeric_eager_rk_mulrk_edit_save,\n\
+                                       xls_numeric_source_backed_rk_mulrk_edit_save,\n\
                                        xls_visibility_eager_edit_save,\n\
                                        xls_visibility_source_backed_edit_save,\n\
                                        xls_visibility_eager_batch_edit_save,\n\
@@ -10087,6 +10148,12 @@ fn run_case_with_config(
         Case::XlsxEagerMergeCommitSave | Case::XlsxEagerUnmergeCommitSave => {
             run_xlsx_merge_edit_save(case, corpus, warmup_iterations, samples)
         },
+        Case::XlsNumericEagerNumberEditSave
+        | Case::XlsNumericSourceBackedNumberEditSave
+        | Case::XlsNumericEagerRkMulrkEditSave
+        | Case::XlsNumericSourceBackedRkMulrkEditSave => {
+            Err("XLS numeric cases are dispatched by the fixed native-XLS runner".into())
+        },
         Case::CfbOpen => run_cfb_open(corpus, warmup_iterations, samples),
         Case::CfbListStreams => run_cfb_list_streams(corpus, warmup_iterations, samples),
         Case::CfbReadOne => run_cfb_read_one(corpus, warmup_iterations, samples),
@@ -12660,6 +12727,49 @@ fn read_xls_comments_source(
     Ok(())
 }
 
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct CfbDirectorySignature {
+    path: Vec<String>,
+    entry_type: u8,
+    clsid: String,
+}
+
+fn cfb_directory_inventory<R: Read + Seek>(
+    ole: &OleFile<R>,
+) -> Result<Vec<CfbDirectorySignature>, Box<dyn Error>> {
+    let root = ole
+        .root_entry()
+        .ok_or("CFB source has no root directory entry")?;
+    let mut inventory = Vec::new();
+    inventory.push(CfbDirectorySignature {
+        path: vec![root.name.clone()],
+        entry_type: root.entry_type,
+        clsid: root.clsid.clone(),
+    });
+
+    // `list_directory_entries` exposes every child, including empty storages;
+    // walk only storage paths and retain relative paths beneath the root.  The
+    // root itself is recorded above because it is not a child of a directory.
+    let mut pending = vec![Vec::<String>::new()];
+    while let Some(path) = pending.pop() {
+        let references = path.iter().map(String::as_str).collect::<Vec<_>>();
+        for entry in ole.list_directory_entries(&references)? {
+            let mut full_path = path.clone();
+            full_path.push(entry.name.clone());
+            inventory.push(CfbDirectorySignature {
+                path: full_path.clone(),
+                entry_type: entry.entry_type,
+                clsid: entry.clsid.clone(),
+            });
+            if entry.entry_type == 1 {
+                pending.push(full_path);
+            }
+        }
+    }
+    inventory.sort();
+    Ok(inventory)
+}
+
 fn verify_xls_untouched_streams(
     source: &[u8],
     candidate: &[u8],
@@ -12667,6 +12777,9 @@ fn verify_xls_untouched_streams(
 ) -> Result<(), Box<dyn Error>> {
     let mut source_ole = OleFile::open(Cursor::new(source))?;
     let mut candidate_ole = OleFile::open(Cursor::new(candidate))?;
+    if cfb_directory_inventory(&source_ole)? != cfb_directory_inventory(&candidate_ole)? {
+        return Err("XLS comment publication changed the complete CFB directory topology".into());
+    }
     let mut source_paths = source_ole.list_streams();
     let mut candidate_paths = candidate_ole.list_streams();
     source_paths.sort();

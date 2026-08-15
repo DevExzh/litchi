@@ -360,7 +360,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**257 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**261 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -479,6 +479,24 @@ gates remain untimed. The additions bring the current selectable matrix to
 correctness/logical-read evidence only; no release speed or resource claim is
 made without ABBA. See
 [`0134`](changes/0134-ods-source-cell-batch-sweep-evidence.md).
+
+The four 0135 selectors bring the current selectable matrix to 261 names while
+the default 36 cases / 198 records remain unchanged.
+
+Change 0135 adds four matched eager/source-backed native XLS fixed-width
+numeric selectors. The Number pair reuses `Untouched!E21` (`42` -> `43`) from
+the deterministic comments corpus; the RK/MulRK pair uses one standalone RK
+and one two-cell MulRK record in a deterministic native corpus and edits all
+three values in one transaction. The timer separates transaction creation,
+`set_number`/`set_numeric`, eager/source-backed commit, and complete publication
+to the same preallocated bounded sink. Complete target materialization is
+reported on both paths because source-backed commits retain a reopened target
+snapshot. Source ingress, no-op/fingerprint, patch/inverse/stale,
+security/unsupported refusal, complete Snapshot/Workbook reopen, untouched
+CFB topology/member bytes, and the untimed 54016.xls real-producer gate remain
+outside timing. This is correctness/coverage evidence only: no positional-I/O,
+allocation/RSS, bounded-artifact-memory, speedup, or broad-producer claim is
+made. See [`0135`](changes/0135-xls-numeric-source-publication.md).
 
 The earlier five-case filesystem smoke exercises eager/source-backed OPC open,
 eager/source-backed one-Part atomic save, and same-length CFB atomic overlay
