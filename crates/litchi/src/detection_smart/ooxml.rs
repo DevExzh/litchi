@@ -163,7 +163,11 @@ fn detect_ooxml_format_from_content_types(
 /// validated source-backed PPTX owner to the unified API while retaining the
 /// existing eager [`detect_ooxml_format_from_package`] path for byte-backed
 /// callers and non-PPTX fallbacks.
-#[cfg(all(feature = "pptx", any(unix, windows)))]
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(feature = "ods", feature = "pptx"),
+    any(unix, windows)
+))]
 pub(crate) fn detect_ooxml_format_from_source_backed_package(
     package: &litchi_opc::SourceBackedPackage,
 ) -> Option<FileFormat> {

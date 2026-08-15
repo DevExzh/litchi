@@ -32,6 +32,55 @@ pub fn is_linked_href(href: &str) -> bool {
 /// Returns an error when the href is not a safe, non-administrative relative
 /// package path or contains an invalid percent escape.
 pub fn resolve_package_path(href: &str) -> Result<String> {
+    let path = resolve_relative_package_path(href)?;
+    if path == "mimetype" || path == "META-INF" || path.starts_with("META-INF/") {
+        return Err(Error::InvalidFormat(format!(
+            "package href targets an administrative entry: '{href}'"
+        )));
+    }
+    Ok(path)
+}
+
+/// Validate a manifest `full-path` without applying aliases.
+///
+/// Manifest paths are the package's security metadata keys.  They must use
+/// the same spelling as the archive member that callers later request; in
+/// particular, accepting `./content.xml`, `foo/../content.xml`, or a percent
+/// encoded alias would allow a requested canonical member to miss its
+/// encryption descriptor.  The ODF root entry (`/`) is the one intentional
+/// absolute path.  Directory entries retain their required trailing slash.
+pub(crate) fn validate_manifest_path(path: &str) -> Result<()> {
+    if path == "/" {
+        return Ok(());
+    }
+    if path.contains(['?', '#', ':']) {
+        return Err(Error::InvalidFormat(format!(
+            "unsafe ODF manifest full-path '{path}'"
+        )));
+    }
+    let body = path.strip_suffix('/').unwrap_or(path);
+    if body.is_empty() {
+        return Err(Error::InvalidFormat(
+            "ODF manifest directory entry has an empty path".to_string(),
+        ));
+    }
+    let canonical = resolve_relative_package_path(body)?;
+    let expected = if path.ends_with('/') {
+        let mut expected = canonical;
+        expected.push('/');
+        expected
+    } else {
+        canonical
+    };
+    if expected != path {
+        return Err(Error::InvalidFormat(format!(
+            "non-canonical ODF manifest full-path '{path}'"
+        )));
+    }
+    Ok(())
+}
+
+fn resolve_relative_package_path(href: &str) -> Result<String> {
     let decoded = percent_decode(href)?;
     if decoded.starts_with('/') || decoded.contains('\\') {
         return Err(Error::InvalidFormat(format!(
@@ -66,13 +115,7 @@ pub fn resolve_package_path(href: &str) -> Result<String> {
             "package href has no file path: '{href}'"
         )));
     }
-    let path = segments.join("/");
-    if path == "mimetype" || path == "META-INF" || path.starts_with("META-INF/") {
-        return Err(Error::InvalidFormat(format!(
-            "package href targets an administrative entry: '{href}'"
-        )));
-    }
-    Ok(path)
+    Ok(segments.join("/"))
 }
 
 fn percent_decode(value: &str) -> Result<String> {
@@ -115,7 +158,7 @@ fn hex_value(byte: u8) -> Option<u8> {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_linked_href, resolve_package_path};
+    use super::{is_linked_href, resolve_package_path, validate_manifest_path};
 
     #[test]
     fn classifies_non_package_links_without_fetching() {
@@ -134,5 +177,30 @@ mod tests {
         );
         assert!(resolve_package_path("../../outside.png").is_err());
         assert!(resolve_package_path("META-INF/manifest.xml").is_err());
+    }
+
+    #[test]
+    fn manifest_paths_keep_only_the_root_as_absolute_and_allow_directories() {
+        assert!(validate_manifest_path("/").is_ok());
+        assert!(validate_manifest_path("Pictures/").is_ok());
+        assert!(validate_manifest_path("META-INF/documentsignatures.xml").is_ok());
+
+        for alias in [
+            "/content.xml",
+            "./content.xml",
+            "foo/../content.xml",
+            "Pictures//image.png",
+            "content%2Exml",
+            "content\\.xml",
+            "content.xml?cache=1",
+            "content.xml#fragment",
+            "C:content.xml",
+            "foo:content.xml",
+        ] {
+            assert!(
+                validate_manifest_path(alias).is_err(),
+                "manifest alias must be rejected: {alias}"
+            );
+        }
     }
 }

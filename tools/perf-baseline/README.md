@@ -70,7 +70,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 use an uninstrumented `litchi_core::OwnedSource`; independent untimed
 `InstrumentedSource` replays provide the source-read counters. The current
-`Case` matrix exposes 237 selectable case names in total. Eight additional
+`Case` matrix exposes 243 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
 default 36 cases / 198 records. Two repeated native-PPT selected-shape query
@@ -85,6 +85,15 @@ selected_slide}`) are also opt-in and compare eager byte ownership with the
 filesystem source-root handoff over the same media-rich corpus. Together they
 bring the selectable matrix to 237 names while leaving the default 36 cases /
 198 records unchanged;
+six matched ODS unified-root/source selectors (`ods_file_{eager,source}_{open,
+selected_cell,selected_media}`) are also opt-in over the deterministic
+two-sheet media-rich ODS corpus. Root open timing covers only root construction;
+typed selected-cell/media timing covers only the query after owner preparation.
+Independent `SourceBackedSpreadsheet` replays report logical positional reads,
+exact compressed-member range coverage, and zero-read selected-cell behavior;
+compressed ranges and uncompressed payloads remain separate fields. Together
+these additions bring the selectable matrix to 243 names while leaving the
+default 36 cases / 198 records unchanged;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 

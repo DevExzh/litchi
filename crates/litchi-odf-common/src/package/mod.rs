@@ -26,6 +26,7 @@ pub(crate) use model::PreparedArchive;
 pub use model::{Archive, ArchiveNames, Entry, Manifest};
 #[cfg(test)]
 pub(crate) use model::{index_build_count, note_index_build, reset_index_build_count};
+pub(crate) use path::validate_manifest_path;
 pub use path::{is_linked_href, resolve_package_path};
 
 /// Borrowed package metadata used by read-only XML inventory scanners.

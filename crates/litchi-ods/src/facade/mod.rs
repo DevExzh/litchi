@@ -1,6 +1,7 @@
 //! Concise user-facing ODS entry points.
 
 mod cell_locator;
+mod source;
 
 use litchi_core::Result;
 use std::{
@@ -14,6 +15,7 @@ use std::{
 pub use crate::authoring::{Builder, MutableSpreadsheet};
 use crate::model::names::{Definition, Expression, Range, Scope};
 pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
+pub use source::{ReadLimits, SourceBackedSpreadsheet};
 
 /// Immutable ODS document facade.
 pub struct Spreadsheet {
@@ -93,6 +95,12 @@ impl Spreadsheet {
         Self::from_shared_package(Arc::new(package))
     }
 
+    pub(crate) fn from_owned_package(
+        package: litchi_odf_common::core::OwnedPackage,
+    ) -> Result<Self> {
+        Self::from_package(crate::package::Package::from_owned_package(package)?)
+    }
+
     pub(crate) fn from_shared_package(package: Arc<crate::package::Package>) -> Result<Self> {
         let definitions = package.definitions()?;
         let sheets = package.sheets()?;
@@ -151,6 +159,27 @@ impl Spreadsheet {
     #[must_use]
     pub fn content_xml(&self) -> &str {
         self.package.content_xml()
+    }
+
+    /// Return worksheet names in document order.
+    #[must_use]
+    pub fn sheet_names(&self) -> Vec<String> {
+        self.sheets.iter().map(|sheet| sheet.name.clone()).collect()
+    }
+
+    /// Return the number of worksheets.
+    #[must_use]
+    pub fn sheet_count(&self) -> usize {
+        self.sheets.len()
+    }
+
+    /// Extract displayed worksheet text using tab-separated cells and
+    /// newline-separated rows, preserving sheet order.
+    ///
+    /// # Errors
+    /// Returns an error when the bounded projection cannot reserve its output.
+    pub fn text(&self) -> Result<String> {
+        source::project_text(&self.sheets)
     }
 
     #[must_use]

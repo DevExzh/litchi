@@ -2028,7 +2028,11 @@ mod tests {
         assert_eq!(super::overlap_len(&request, &(0..10)), 0);
         assert_eq!(super::overlap_len(&request, &(20..40)), 10);
         assert_eq!(super::overlap_with_ranges(&request, &[0..12, 24..28]), 6);
-        assert_eq!(super::overlap_with_ranges(&request, &[30..40]), 0);
+        let disjoint = 30..40;
+        assert_eq!(
+            super::overlap_with_ranges(&request, std::slice::from_ref(&disjoint)),
+            0
+        );
         assert_eq!(
             super::pptx_slide_part_position("ppt/slides/slide101.xml"),
             Some(100)

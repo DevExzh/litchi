@@ -1753,31 +1753,48 @@ mod tests {
     }
 
     #[test]
-    fn source_backed_leading_slash_manifest_entry_cannot_bypass_decryption() {
+    fn manifest_aliases_cannot_bypass_encryption_metadata() {
         use std::io::Write;
 
-        let manifest = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.text"/><m:file-entry m:full-path="/content.xml" m:media-type="text/xml" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="http://www.w3.org/2001/04/xmlenc#sha256" m:key-size="32"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#;
-        let mut bytes = Vec::new();
-        {
-            let mut zip = zip::ZipWriter::new(Cursor::new(&mut bytes));
-            let options = zip::write::SimpleFileOptions::default()
-                .compression_method(zip::CompressionMethod::Stored);
-            zip.start_file("mimetype", options).unwrap();
-            zip.write_all(b"application/vnd.oasis.opendocument.text")
-                .unwrap();
-            zip.start_file("META-INF/manifest.xml", options).unwrap();
-            zip.write_all(manifest).unwrap();
-            zip.start_file("content.xml", options).unwrap();
-            zip.write_all(&[0_u8; 32]).unwrap();
-            zip.finish().unwrap();
+        for alias in [
+            "/content.xml",
+            "./content.xml",
+            "foo/../content.xml",
+            "content%2Exml",
+            "C:content.xml",
+            "foo:content.xml",
+        ] {
+            let manifest = format!(
+                r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.text"/><m:file-entry m:full-path="{alias}" m:media-type="text/xml" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="http://www.w3.org/2001/04/xmlenc#sha256" m:key-size="32"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#
+            );
+            let mut bytes = Vec::new();
+            {
+                let mut zip = zip::ZipWriter::new(Cursor::new(&mut bytes));
+                let options = zip::write::SimpleFileOptions::default()
+                    .compression_method(zip::CompressionMethod::Stored);
+                zip.start_file("mimetype", options).unwrap();
+                zip.write_all(b"application/vnd.oasis.opendocument.text")
+                    .unwrap();
+                zip.start_file("META-INF/manifest.xml", options).unwrap();
+                zip.write_all(manifest.as_bytes()).unwrap();
+                zip.start_file("content.xml", options).unwrap();
+                zip.write_all(&[0_u8; 32]).unwrap();
+                zip.finish().unwrap();
+            }
+
+            assert!(SourceBackedPackage::from_read_at(CountingSource::new(bytes.clone())).is_err());
+            assert!(
+                SourceBackedPackage::from_read_at_with_password(
+                    CountingSource::new(bytes.clone()),
+                    "wrong",
+                )
+                .is_err()
+            );
+            let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
+            assert!(package.package().is_err());
+            let package = OwnedPackage::from_bytes_with_password(bytes, "wrong").unwrap();
+            assert!(package.package().is_err());
         }
-
-        let source = CountingSource::new(bytes.clone());
-        let package = SourceBackedPackage::from_read_at_with_password(source, "password").unwrap();
-        assert!(package.get_file("/content.xml").is_err());
-
-        let package = OwnedPackage::from_bytes_with_password(bytes, "password").unwrap();
-        assert!(package.package().unwrap().get_file("/content.xml").is_err());
     }
 
     #[test]
