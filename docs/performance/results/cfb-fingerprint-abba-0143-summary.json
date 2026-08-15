@@ -1,0 +1,271 @@
+{
+  "schema_version": 1,
+  "change": "0143-cfb-fingerprint-read-coalescing",
+  "decision": "accepted",
+  "protocol": {
+    "order": [
+      "A1-control",
+      "B1-candidate",
+      "B2-candidate",
+      "A2-control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_leg": 20,
+    "samples_per_state_per_leg": 200,
+    "cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "fresh_child_per_sample": true,
+    "cold_requested_is_advisory": true,
+    "total_measured_samples": 1600,
+    "invalid_dirty_worktree_captures_excluded": true
+  },
+  "builds": {
+    "control": {
+      "revision": "3c23ab40dd9a2fd01875ef501f9723771cf06a7e",
+      "worktree_dirty": false,
+      "binary_sha256": "c56d190f6a70c2bfcce4969f50268c89ccdbb6cd1954b0f8b0a35c0006c286e0",
+      "binary_bytes": 39382224
+    },
+    "candidate": {
+      "revision": "3ef285be2efd4d4c443380674c58738e2c04dcec",
+      "worktree_dirty": false,
+      "binary_sha256": "8cafbfacb40346be66951e63c7ed6583e41d49966e9043953af7ffd2fc8e9f0c",
+      "binary_bytes": 39399400
+    },
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "profile": "release"
+  },
+  "environment": {
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "filesystem": "ext2/ext3",
+    "source_destination_same_device": true,
+    "allocator": "Rust system allocator"
+  },
+  "corpus": {
+    "name": "ole-common-few-large-incompressible",
+    "format": "CFB/OLE2",
+    "entries": 5,
+    "source_bytes": 16913408,
+    "source_sha256": "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d",
+    "replacement_bytes": 36,
+    "output_bytes": 16913408,
+    "output_sha256": "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc",
+    "changed_spans": 1
+  },
+  "exact_work": {
+    "logical_read_calls": {
+      "control": 1825,
+      "candidate": 857,
+      "delta": -968,
+      "reduction_percent": 53.0411
+    },
+    "logical_read_requested_bytes": {
+      "control": 84838500,
+      "candidate": 84838500,
+      "delta": 0
+    },
+    "phase_logical_read_calls": {
+      "open": {
+        "control": 264,
+        "candidate": 264
+      },
+      "plan": {
+        "control": 784,
+        "candidate": 300
+      },
+      "atomic_publication": {
+        "control": 777,
+        "candidate": 293
+      }
+    }
+  },
+  "legs": [
+    {
+      "leg": "A1",
+      "variant": "control",
+      "state": "warm",
+      "p50_ns": 105840020,
+      "p95_ns": 110751696,
+      "p99_ns": 114574340,
+      "mean_ns": 106308180.00499992,
+      "phase_p50_ns": {
+        "open": 307308,
+        "plan": 33509976,
+        "atomic_publication": 71964463.5
+      }
+    },
+    {
+      "leg": "A1",
+      "variant": "control",
+      "state": "cold-requested",
+      "p50_ns": 118451198,
+      "p95_ns": 128508710,
+      "p99_ns": 401252054,
+      "mean_ns": 129446493.16499999,
+      "phase_p50_ns": {
+        "open": 1299922.5,
+        "plan": 44460004.5,
+        "atomic_publication": 71864542
+      }
+    },
+    {
+      "leg": "B1",
+      "variant": "candidate",
+      "state": "warm",
+      "p50_ns": 102312742,
+      "p95_ns": 107400487,
+      "p99_ns": 109860349,
+      "mean_ns": 102487477.52000001,
+      "phase_p50_ns": {
+        "open": 308835.5,
+        "plan": 32849178.5,
+        "atomic_publication": 68872016
+      }
+    },
+    {
+      "leg": "B1",
+      "variant": "candidate",
+      "state": "cold-requested",
+      "p50_ns": 105696527,
+      "p95_ns": 110631594,
+      "p99_ns": 112239841,
+      "mean_ns": 105737843.74000001,
+      "phase_p50_ns": {
+        "open": 1327938,
+        "plan": 35449986.5,
+        "atomic_publication": 68724261.5
+      }
+    },
+    {
+      "leg": "B2",
+      "variant": "candidate",
+      "state": "warm",
+      "p50_ns": 102893024,
+      "p95_ns": 107029869,
+      "p99_ns": 109584416,
+      "mean_ns": 103189001.405,
+      "phase_p50_ns": {
+        "open": 307183.5,
+        "plan": 33541718,
+        "atomic_publication": 68976346.5
+      }
+    },
+    {
+      "leg": "B2",
+      "variant": "candidate",
+      "state": "cold-requested",
+      "p50_ns": 105497592,
+      "p95_ns": 109781819,
+      "p99_ns": 110992895,
+      "mean_ns": 105927738.28999998,
+      "phase_p50_ns": {
+        "open": 1242268,
+        "plan": 35763107,
+        "atomic_publication": 68379684
+      }
+    },
+    {
+      "leg": "A2",
+      "variant": "control",
+      "state": "warm",
+      "p50_ns": 104265459,
+      "p95_ns": 108791793,
+      "p99_ns": 110557158,
+      "mean_ns": 104337589.98000003,
+      "phase_p50_ns": {
+        "open": 310668,
+        "plan": 33649338,
+        "atomic_publication": 70154056.5
+      }
+    },
+    {
+      "leg": "A2",
+      "variant": "control",
+      "state": "cold-requested",
+      "p50_ns": 116525718,
+      "p95_ns": 120683765,
+      "p99_ns": 124292564,
+      "mean_ns": 116627519.36,
+      "phase_p50_ns": {
+        "open": 1239638,
+        "plan": 45046842.5,
+        "atomic_publication": 70156926
+      }
+    }
+  ],
+  "paired_improvement_percent": [
+    {
+      "direction": "A1-control-to-B1-candidate",
+      "state": "warm",
+      "p50": 3.3327,
+      "p95": 3.0259,
+      "mean": 3.594
+    },
+    {
+      "direction": "A1-control-to-B1-candidate",
+      "state": "cold-requested",
+      "p50": 10.7679,
+      "p95": 13.9112,
+      "mean": 18.3154
+    },
+    {
+      "direction": "B2-candidate-to-A2-control",
+      "state": "warm",
+      "p50": 1.3163,
+      "p95": 1.6195,
+      "mean": 1.1008
+    },
+    {
+      "direction": "B2-candidate-to-A2-control",
+      "state": "cold-requested",
+      "p50": 9.4641,
+      "p95": 9.0335,
+      "mean": 9.1743
+    }
+  ],
+  "resource_boundary": {
+    "fingerprint_buffer_max_bytes": {
+      "control": 65536,
+      "candidate": 1048576,
+      "delta": 983040
+    },
+    "publication_buffer_max_bytes": {
+      "control": 65536,
+      "candidate": 65536
+    },
+    "fingerprint_and_publication_buffers_overlap": false,
+    "whole_process_max_rss_kib": {
+      "A1_control": 111640,
+      "B1_candidate": 111508,
+      "B2_candidate": 111508,
+      "A2_control": 111508
+    },
+    "rss_protocol": {
+      "tool": "/usr/bin/time -v",
+      "warmups_per_leg": 3,
+      "warm_samples_per_leg": 30,
+      "scope": "whole benchmark parent/child process tree",
+      "operation_peak_allocation_measured": false
+    }
+  },
+  "claim_boundaries": {
+    "logical_read_at_not_physical_io": true,
+    "cold_requested_not_proven_cold": true,
+    "no_cpu_cycle_claim": true,
+    "no_operation_peak_allocation_claim": true,
+    "no_decompression_or_recompression_claim": true
+  },
+  "artifacts": {
+    "A1_sha256": "426630e89f0894ffaa570cc5aab3b17c9ef54933067611985a45f586fe22e6c6",
+    "B1_sha256": "9b4ad83601533f309439611738c6ca9df89d21f44deadde857fe394bc23fbe9a",
+    "B2_sha256": "c1697a94e3420838f333473634f2ede766602788d4920aa1067e0fde0bd9edaf",
+    "A2_sha256": "8ec3d9c45cd452ab16bfd37e5826f7caef0a253a5a0c38099d8b205e647a2ecb",
+    "combined_decompressed_bytes": 53189198,
+    "combined_decompressed_sha256": "018617c68ddb65037e376f17e1c88cebe7bf2eaec266fbac4fd426b1e4083357",
+    "combined_zstd_bytes": 121250,
+    "combined_zstd_sha256": "f3956ea9d52ffa24867704afb8f4c22bcf0c2480b1308777039e2309eb2e946e"
+  }
+}

@@ -315,6 +315,36 @@ hypothesis. See the [compact record](results/cfb-save-phase-current-0142-summary
 The [compressed full capture](results/cfb-save-phase-current-0142.json.zst)
 retains the raw aligned filesystem evidence.
 
+### Accepted CFB fingerprint-request coalescing
+
+[Change 0143](changes/0143-cfb-fingerprint-read-coalescing.md) implements the
+bounded hypothesis from Change 0142. Complete fingerprint scans use a
+right-sized window capped at 1 MiB, while comparison and publication remain at
+64 KiB and the buffers never overlap. No fingerprint pass or source-mutation,
+candidate-reopen, typed-output or atomic-rename check was removed.
+
+A clean CPU-2 `A1 control, B1 candidate, B2 candidate, A2 control` release run
+used 20 warm-ups and 200 fresh-child samples per warm and advisory-cold state in
+every leg. All 1,600 samples retained the same 84,838,500 logical bytes, one
+changed span and exact 16,913,408-byte output. Logical requests fell from 1,825
+to 857 (53.0411%): plan 784 -> 300 and atomic publication 777 -> 293, while
+open remained 264.
+
+| Direction / state | p50 improvement | p95 improvement | Mean improvement |
+|---|---:|---:|---:|
+| A1 -> B1 warm | 3.3327% | 3.0259% | 3.5940% |
+| B2 -> A2 warm | 1.3163% | 1.6195% | 1.1008% |
+| A1 -> B1 cold-requested | 10.7679% | 13.9112% | 18.3154% |
+| B2 -> A2 cold-requested | 9.4641% | 9.0335% | 9.1743% |
+
+The code-local fingerprint window is at most 983,040 bytes larger. A matched
+whole-process `/usr/bin/time -v` boundary found no candidate RSS increase
+(control 111,640/111,508 KiB; candidate 111,508/111,508 KiB), but this is not an
+operation-only allocation or peak-memory measurement. `cold-requested` remains
+advisory, and logical `ReadAt` calls are not physical device I/O. See the
+[compact summary](results/cfb-fingerprint-abba-0143-summary.json) and
+[compressed raw capture](results/cfb-fingerprint-abba-0143.json.zst).
+
 ## Parallel scaling observation
 
 This historical `opc_open` experiment used `RAYON_NUM_THREADS` in separate
