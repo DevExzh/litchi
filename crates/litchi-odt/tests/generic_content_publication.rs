@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, io::Write};
 
 use flate2::{Compression, write::DeflateEncoder};
+use litchi_core::Error;
 use litchi_odf_common::constants;
 use litchi_odt::core::OwnedPackage as CoreOwnedPackage;
 use litchi_odt::odc::{ChartClass, Definition, Document, Text, serialize_content};
@@ -508,7 +509,7 @@ fn generic_content_publication_refuses_encrypted_source_without_password_writer(
 }
 
 #[test]
-fn generic_content_publication_falls_back_for_noncanonical_mimetype_and_root_mime() {
+fn generic_content_publication_rejects_noncanonical_manifest_aliases() {
     let source_definition = chart_definition("before");
     let mut replacement = source_definition.clone();
     replacement.title = Some(Text::new("after"));
@@ -591,14 +592,11 @@ fn generic_content_publication_falls_back_for_noncanonical_mimetype_and_root_mim
             false,
             Some(alias),
         );
-        let mut aliased_document = Document::from_bytes(aliased).unwrap();
-        aliased_document.set_definition(&replacement).unwrap();
-        let output = aliased_document.to_bytes();
-        let reopened = CoreOwnedPackage::from_bytes(output).unwrap();
-        let manifest =
-            String::from_utf8(reopened.get_file("META-INF/manifest.xml").unwrap()).unwrap();
-        assert!(!manifest.contains(alias));
-        assert!(!manifest.contains("manifest:size=\"999\""));
+        match Document::from_bytes(aliased) {
+            Err(Error::InvalidFormat(_)) => {},
+            Ok(_) => panic!("accepted unsafe manifest alias {alias:?}"),
+            Err(error) => panic!("unexpected error for unsafe manifest alias {alias:?}: {error}"),
+        }
     }
 }
 

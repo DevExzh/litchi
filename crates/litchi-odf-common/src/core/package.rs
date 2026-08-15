@@ -487,23 +487,22 @@ impl SourceBackedPackage {
 
     /// Check whether an archive member exists.
     pub fn has_file(&self, path: &str) -> Result<bool> {
-        let path = normalize_member_path(path)?;
-        self.ensure_current()?;
-        let present = self.archive.contains(path);
-        self.ensure_current()?;
-        Ok(present)
+        let result = (|| {
+            self.ensure_current()?;
+            let path = normalize_member_path(path)?;
+            Ok(self.archive.contains(path))
+        })();
+        prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
     /// Check whether an archive member uses ZIP Store compression.
     pub fn is_stored(&self, path: &str) -> Result<bool> {
-        let path = normalize_member_path(path)?;
-        self.ensure_current()?;
-        let stored = prefer_current(
-            self.source.as_ref(),
-            self.source_version,
-            self.archive.is_stored(path).map_err(map_zip_error),
-        )?;
-        Ok(stored)
+        let result = (|| {
+            self.ensure_current()?;
+            let path = normalize_member_path(path)?;
+            self.archive.is_stored(path).map_err(map_zip_error)
+        })();
+        prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
     /// List package members without reading payload bytes.
@@ -545,37 +544,34 @@ impl SourceBackedPackage {
     /// Read and verify one archive member, decrypting it when its manifest
     /// entry requires a retained password.
     pub fn get_file(&self, path: &str) -> Result<Vec<u8>> {
-        let path = normalize_member_path(path)?;
-        let bytes = self.read_entry(path)?;
-        let Some(entry) = manifest_entry_for_path(&self.manifest, path)? else {
+        let result = (|| {
             self.ensure_current()?;
-            return Ok(bytes);
-        };
-        let Some(encryption) = &entry.encryption else {
-            self.ensure_current()?;
-            return Ok(bytes);
-        };
-        if !self.is_stored(path)? {
-            return Err(Error::InvalidFormat(format!(
-                "Encrypted ODF entry '{path}' must use ZIP Store"
-            )));
-        }
-        let password = self.password.as_ref().ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Password required for encrypted ODF entry '{path}'"
-            ))
-        })?;
-        let size = entry.size.ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Encrypted ODF entry '{path}' has no plaintext size"
-            ))
-        })?;
-        let decrypted = super::encryption::decrypt_entry(&bytes, password, encryption, size);
-        match self.ensure_current() {
-            Err(changed @ Error::SourceChanged { .. }) => Err(changed),
-            Err(other) => Err(other),
-            Ok(()) => decrypted,
-        }
+            let path = normalize_member_path(path)?;
+            let bytes = self.read_entry(path)?;
+            let Some(entry) = manifest_entry_for_path(&self.manifest, path)? else {
+                return Ok(bytes);
+            };
+            let Some(encryption) = &entry.encryption else {
+                return Ok(bytes);
+            };
+            if !self.is_stored(path)? {
+                return Err(Error::InvalidFormat(format!(
+                    "Encrypted ODF entry '{path}' must use ZIP Store"
+                )));
+            }
+            let password = self.password.as_ref().ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Password required for encrypted ODF entry '{path}'"
+                ))
+            })?;
+            let size = entry.size.ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Encrypted ODF entry '{path}' has no plaintext size"
+                ))
+            })?;
+            super::encryption::decrypt_entry(&bytes, password, encryption, size)
+        })();
+        prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
     /// Materialize an exact, source-checked owned package.
@@ -1317,6 +1313,16 @@ impl package::PackageLookup for Package<'_> {
     }
 }
 
+impl package::PackageLookup for SourceBackedPackage {
+    fn has_file(&self, path: &str) -> bool {
+        self.archive.contains(path)
+    }
+
+    fn media_type(&self, path: &str) -> Option<&str> {
+        self.manifest.get_media_type(path)
+    }
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -1324,6 +1330,7 @@ impl package::PackageLookup for Package<'_> {
 )]
 mod tests {
     use super::*;
+    use crate::core::{PackageWriter, Profile};
     use std::io::Cursor;
     use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
@@ -1545,6 +1552,59 @@ mod tests {
         ));
         let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
         source.mutate_next_read();
+        assert!(matches!(
+            package.get_file("content.xml"),
+            Err(Error::SourceChanged { .. })
+        ));
+    }
+
+    #[test]
+    fn source_backed_member_errors_preserve_current_errors_and_stale_precedence() {
+        let source = CountingSource::new(create_test_odf_package(
+            "application/vnd.oasis.opendocument.text",
+        ));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+
+        for operation in [
+            package.has_file("../content.xml"),
+            package.is_stored("../content.xml"),
+            package.get_file("../content.xml").map(|_| true),
+        ] {
+            assert!(matches!(operation, Err(Error::InvalidFormat(_))));
+        }
+
+        source.bump_version();
+        assert!(matches!(
+            package.has_file("../content.xml"),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            package.is_stored("../content.xml"),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            package.get_file("../content.xml"),
+            Err(Error::SourceChanged { .. })
+        ));
+
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer
+            .set_encryption("source-password", Profile::compatible())
+            .unwrap();
+        writer
+            .add_file("content.xml", b"<office:document-content/>")
+            .unwrap();
+        let encrypted = writer.finish_to_bytes().unwrap();
+        let source = CountingSource::new(encrypted);
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        assert!(matches!(
+            package.get_file("content.xml"),
+            Err(Error::InvalidFormat(message)) if message.contains("Password required")
+        ));
+        source.bump_version();
         assert!(matches!(
             package.get_file("content.xml"),
             Err(Error::SourceChanged { .. })

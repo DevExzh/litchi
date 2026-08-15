@@ -320,7 +320,7 @@ pub mod section;
 pub mod tracked_changes;
 
 pub use builder::Builder;
-pub use document::Document;
+pub use document::{Document, ReadLimits, SourceBackedDocument};
 #[allow(unused_imports)]
 pub use dynamic_text::{
     insert_database_field_xml, insert_dynamic_text_field_xml, remove_database_field_xml,
