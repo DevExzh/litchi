@@ -2,7 +2,7 @@
 
 Date: 2026-08-15
 
-This is a coverage map, not a completion claim. It compares the 255 selectable
+This is a coverage map, not a completion claim. It compares the 257 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -14,7 +14,7 @@ performance claim.
 | List semantic children without payloads | Partial | XLS/XLSX/ODS sheets, DOC/RTF/DOCX/ODT paragraphs and PPT/PPTX/ODP slides; opt-in `docx_section_inventory` now lists the exact source-backed DOCX section descriptors, PPTX ordinary-root `slide_count` proves catalog-only source replay while `list_slides` intentionally materializes all owned slide payloads, change 0122 adds ODP source-backed open/one-middle-slide logical-read guards over a media-rich package, change 0123 adds unified-root ODP filesystem open/list parity guards, and change 0124 adds unified-root ODS filesystem worksheet-name/count/text parity plus direct typed source-read evidence; broader section/edit matrices remain missing |
 | Query one property or named object | Partial | XLS/XLSX/ODS cells, one DOC/RTF/DOCX paragraph, an indexed fully validated ODT paragraph, one PPT shape and one PPTX/ODP slide; native PPT now also has matched eager/source-backed selected-shape query-only and fresh-open-plus-query controls, change 0120 adds eager/source-root `slide_count` plus selector-first slide-100 controls with independent exact range evidence, change 0122 adds matched eager/source-backed ODP middle-slide query evidence over retained media, change 0123 adds matched unified-root ODP middle-slide filesystem queries, and change 0124 adds matched typed ODS eager/source selected-cell queries after owner preparation; the already-open RTF paragraph query reuses its parser-derived exact story length and cardinality, while explicit sparse `nth` skips discarded-view construction; broader properties/images remain missing |
 | Read one cell/paragraph/slide/image/Part | Partial | XLS/XLSX/ODS cells, DOC/RTF/DOCX paragraphs, indexed ODT paragraphs, PPT/PPTX/ODP text objects and generic OPC Part. Change 0120 adds a source-path PPTX slide-100 read with no unselected-slide/media payload overlap in its separate untimed replay; change 0122 adds an explicit ODP selected-media replay that proves one complete compressed `Pictures/` range and reports non-Pictures bytes separately; change 0123 adds root-path ODP archive/member/hash parity and direct typed source replay evidence; change 0124 adds typed ODS selected-cell and selected-media controls, with compressed-range and uncompressed-payload evidence kept distinct. Three opt-in OPC source-cache selectors add exact managed-Budget boundary evidence plus finite-control/managed same-Part and fixed-work disjoint-Part contention across `1/2x`, `1x`, and `2x` capacities and capped worker widths; their deterministic source delay is correctness evidence, not a latency claim. Semantic image selection remains missing |
-| Scan all cells/paragraphs/slides | Covered for generated native/OOXML/RTF/ODF text corpora | XLS/XLSX/ODS cell scans, including the isolated ODS public-cell sweep; DOC/RTF/DOCX/ODT paragraph enumeration and PPT/PPTX/ODP slide/text enumeration. Change 0120 adds an ordinary-root PPTX full owned-slide list; its source replay reads all slide payloads and no media, while eager/source parity and names/text are checked outside timing |
+| Scan all cells/paragraphs/slides | Covered for generated native/OOXML/RTF/ODF text corpora | XLS/XLSX/ODS cell scans, including the isolated ODS public-cell scalar and ordered batch sweeps; DOC/RTF/DOCX/ODT paragraph enumeration and PPT/PPTX/ODP slide/text enumeration. Change 0120 adds an ordinary-root PPTX full owned-slide list; its source replay reads all slide payloads and no media, while eager/source parity and names/text are checked outside timing |
 | Full text extraction | Covered for generated DOC/PPT/RTF/DOCX/PPTX/ODT/ODS/ODP | Complete deterministic text or row-major cell text is checked; RTF additionally verifies raw CP-1252/LZFu text and the body plus public header-shape projection of a real-producer watermark; ODT consuming block ownership is measured in change 0023; broader real-producer/media-heavy corpora remain missing |
 | Semantic conversion to sequential sink | Partial | Measured: RTF writes semantic body text to a bounded forward-only, non-seek UTF-8 sink with configurable paragraph separators; output and sink counters are fully verified outside timing. Production correctness tests, rather than the timing sink, cover partial/interrupted/write-zero behavior. No other-format semantic sink benchmark exists |
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring, and narrow XLSX/RTF forward-only creation with selectable timing evidence; broader streaming authoring remains missing |
@@ -925,6 +925,17 @@ digest/count and complete source/member/media preservation checks remain
 untimed. The selectors bring the selectable matrix to 255 names while the
 default 36 cases / 198 records remain unchanged; no latency or resource claim
 is made pending a clean release ABBA run.
+
+Change 0134 adds matched eager/source-backed ODS ordered cell-batch sweep
+selectors over the same two-sheet 32 by 32 corpus. The timed scope prepares
+owners and 2,048 borrowed selectors first, then performs four bounded
+`cell_batch` calls (8,192 result slots) with black-boxed results. Independent
+source replay records exactly eight version observations and zero
+post-preparation payload reads per sweep, with ordered parity and digest/count
+gates outside timing. The selectable matrix is now 257 while the default
+36-case / 198-record tranche is unchanged; this is correctness/logical-read
+evidence only, not a release speed or resource claim. See
+[`0134`](changes/0134-ods-source-cell-batch-sweep-evidence.md).
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
