@@ -54,8 +54,19 @@ impl Patch {
     }
 
     /// Apply atomically after checking the complete retained package closure.
+    ///
+    /// A managed source target returns
+    /// [`litchi_opc::OpcError::ManagedPartDataArcEscape`] rather than silently
+    /// detaching its payload reservation. Use [`Self::apply_materialized`] for
+    /// an explicit bounded handoff to an owning [`OpcPackage`].
     pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
         self.inner.apply(package)
+    }
+
+    /// Apply after explicitly copying the managed target payload into the
+    /// owning package, bounded by `maximum_bytes`.
+    pub fn apply_materialized(&self, package: &mut OpcPackage, maximum_bytes: usize) -> Result<()> {
+        self.inner.apply_materialized(package, maximum_bytes)
     }
 }
 
