@@ -1359,10 +1359,16 @@ reduced independently.
 
 CFB now has a public bounded exact-range read with release ABBA evidence for a
 MiniFAT target and exact logical source-work evidence for the atomic overlay
-save scan reduction. Both results remain substrate-only: no DOC/XLS/PPT
+save scan reduction. Current-revision phase attribution assigns 135,680 bytes
+to open, 33,962,596 to plan/validation and 50,740,224 to atomic publication in
+each of 400 samples. This identifies fingerprint request coalescing as the next
+bounded experiment without weakening the two planning brackets or three
+save-time scans. These results
+remain substrate-only: no DOC/XLS/PPT
 semantic owner consumes the exact-range seam, FAT tail behavior is withheld,
-and p99, cold/high-latency range, allocation, peak-RSS, and storage-device
-evidence remain open. The atomic-save latency directions disagree, so its
+and matched before/after p99, high-latency range, allocation, peak-RSS, and
+storage-device evidence remain open. The atomic-save latency directions
+disagree, so its
 16.6222% logical-byte and 12.4280% logical-call reductions must not be read as
 a speedup.
 

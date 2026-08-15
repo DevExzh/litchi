@@ -2,11 +2,13 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0141`](changes/0141-xlsx-source-provenance-negative-result.md)
+Evidence through: [`change 0142`](changes/0142-cfb-atomic-save-phase-attribution.md)
 (the newest accepted optimization result remains limited to four repeated source-backed ODP
 full-text projections; the latest release CFB selective-range evidence remains
-[`0094`](changes/0094-cfb-selective-read-evidence.md), and release filesystem
-evidence is [`0089`](changes/0089-filesystem-release-repeated-evidence.md))
+[`0094`](changes/0094-cfb-selective-read-evidence.md), and the latest accepted
+before/after release filesystem result remains
+[`0089`](changes/0089-filesystem-release-repeated-evidence.md); Change 0142 is
+current-revision attribution only)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -41,11 +43,13 @@ process.
   task granularity and serial work, but does not justify adding parallelism or
   changing the execution API.
 
-The next evidence-oriented priorities are operation-scoped allocation/RSS
-profiles for managed XLSX, a CFB save read-amplification breakdown, and a
-CPU-pinned repeated scaling run with uncertainty.  None should be treated as
-an optimization acceptance gate until matched controls and preservation gates
-exist.
+The CFB read-amplification breakdown is now captured: open accounts for
+135,680 logical bytes, plan/validation for 33,962,596, and atomic publication
+for 50,740,224 in every sample. The next evidence-oriented priorities are a
+matched fingerprint-request coalescing experiment, operation-scoped
+allocation/RSS profiles for managed XLSX, and a CPU-pinned repeated scaling
+run with uncertainty. None should be treated as an optimization acceptance
+gate until matched controls and preservation gates exist.
 
 ## ODP repeated full-text projection (change 0140)
 

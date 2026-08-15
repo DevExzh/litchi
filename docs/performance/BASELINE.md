@@ -291,6 +291,30 @@ Parent-wall and warm process `read_bytes` fields remain descriptive counters,
 not speed or storage-device evidence. See the [change record](changes/0103-cfb-atomic-save-scan-evidence.md)
 and [compact summary](results/cfb-save-atomic-scan-0112-summary.json).
 
+### Current CFB save phase attribution
+
+[Change 0142](changes/0142-cfb-atomic-save-phase-attribution.md) divides the
+selector into open, plan/validation and atomic-publication intervals; the last
+retains the three scans in `ValidatedOverlayPlan::save`. No production code
+changed. A clean CPU-2 release capture used
+20 warm-ups and 200 fresh-child samples in both warm and advisory-cold states.
+All 400 samples retained the exact 1,825 calls / 84,838,500 logical bytes and
+the same 16,913,408-byte output.
+
+| Phase | Calls | Logical bytes | Warm p50 | Cold-requested p50 |
+|---|---:|---:|---:|---:|
+| open | 264 | 135,680 | 311,740 ns | 1,418,851 ns |
+| plan and candidate validation | 784 | 33,962,596 | 33,442,779 ns | 46,936,548 ns |
+| atomic publication | 777 | 50,740,224 | 103,842,832 ns | 86,794,070 ns |
+| operation | 1,825 | 84,838,500 | 138,153,550 ns | 135,319,622 ns |
+
+Phase percentiles are independent and do not sum. This is current-revision
+attribution, not a speedup result. It identifies fingerprint request
+coalescing—not removal of another required scan—as the next bounded A/B
+hypothesis. See the [compact record](results/cfb-save-phase-current-0142-summary.json).
+The [compressed full capture](results/cfb-save-phase-current-0142.json.zst)
+retains the raw aligned filesystem evidence.
+
 ## Parallel scaling observation
 
 This historical `opc_open` experiment used `RAYON_NUM_THREADS` in separate
