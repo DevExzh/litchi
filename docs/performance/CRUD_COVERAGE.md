@@ -1,8 +1,8 @@
 # Performance CRUD coverage
 
-Date: 2026-08-15
+Date: 2026-08-16
 
-This is a coverage map, not a completion claim. It compares the 265 selectable
+This is a coverage map, not a completion claim. It compares the 271 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -1033,6 +1033,15 @@ result does not broaden CRUD coverage and makes no single-call, open,
 physical-I/O, decompression, cold-cache, peak-memory, operation-local
 allocated-byte, or generic ODF claim. See
 [`0140`](changes/0140-odp-repeated-text-cache-release-abba.md).
+
+Change 0144 adds six opt-in CFB simulated-range selective-read selectors,
+taking the current selectable matrix from 265 to 271 while preserving the
+default 36 cases / 198 records. The clean CPU-2 release ABBA accepts only the
+configured simulator's MiniFAT request/byte/service-floor reductions and
+matching p50/p95 direction; the 4 MiB FAT exact-work control stays near neutral.
+This is generic OLE2 substrate evidence and does not add DOC/XLS/PPT semantic
+CRUD coverage or claim real cold/network/device, allocation, or RSS behavior.
+See [`0144`](changes/0144-cfb-simulated-range-source-evidence.md).
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
