@@ -297,6 +297,26 @@ allocation, RSS, physical-I/O, cold/network/device, native DOC/XLS/PPT, and
 cross-format claims remain open. See the
 [change record](changes/0146-cfb-open-stream-evidence.md).
 
+## CFB MiniFAT `open_stream` release ABBA (change 0147)
+
+Four clean CPU-2 release processes ran in `A1 control, B1 candidate, B2
+candidate, A2 control` order with 20 warmups and 200 samples for each of 24
+records. Under the configured 100 us fixed latency + 25 us/request, 50 MiB/s,
+4 KiB-range model, every 36- and 4,095-byte one-shot cell improves total
+p50/p95/p99/mean by about 62-64% in both directions; the isolated
+`open_stream` interval improves about 98.4-99.9%. Exact positional work falls
+from the complete 261,184/265,216/2,096,192/2,100,224-byte root Mini Stream to
+one exact 36- or 4,095-byte range.
+
+The result is not generalized to repeats. Candidate repeat work is
+`[L,R,0...]` rather than the control's `[R,0...]`; several many-small modeled
+p50/mean cells regress about 0.3-1.2%, with consistent tails up to about 2.8%.
+One 9.5% p99 leg reverses direction and carries same-implementation tail drift.
+No generic local wall-clock, allocation/RSS, physical-I/O, cold/network/device,
+native-format, or cross-format claim is accepted. See the
+[release record](changes/0147-cfb-open-stream-release-abba.md) and
+[compact summary](results/cfb-open-stream-abba-0147-summary.json).
+
 ## CFB MiniFAT physical-run boundary evidence (change 0125)
 
 The current harness adds a matched 4095-byte MiniFAT boundary pair over the

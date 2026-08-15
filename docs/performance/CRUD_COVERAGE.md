@@ -1067,6 +1067,13 @@ correctness/counter coverage only; no release latency, allocation, RSS,
 physical-I/O, native DOC/XLS/PPT, cross-format, or iWork claim is made. See
 [`0146`](changes/0146-cfb-open-stream-evidence.md).
 
+Change 0147 adds no CRUD surface or selector. Its clean release ABBA accepts
+only the configured simulator's one-shot result and exact proportional source
+work. The repeated many-small tradeoff remains visible and no generic repeat,
+local wall-clock, resource, physical-I/O, native semantic, cross-format, or
+iWork claim is added. See
+[`0147`](changes/0147-cfb-open-stream-release-abba.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.

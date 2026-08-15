@@ -2,7 +2,8 @@
 
 Date: 2026-08-16
 
-Status: harness and correctness evidence added; no performance claim.
+Status: harness and correctness evidence added; the scoped release result is
+recorded in [change 0147](0147-cfb-open-stream-release-abba.md).
 
 ## Scope
 
@@ -85,13 +86,12 @@ parent materializing baseline is accepted by the same runner and may report
 
 ## Verification boundary
 
-No latency, throughput, allocation, RSS, physical-I/O, decompression, cold
-cache, or release-performance result is claimed here. A performance statement
-requires the identical harness on clean release builds of the parent and
-candidate revisions, CPU-pinned A1/B1/B2/A2 ordering, and the existing release
-ABBA reporting rules. The JSON evidence is intended to make that later
-comparison auditable and to prevent a direct MiniFAT read from being confused
-with a bulk or concurrent workload.
+This harness-only change makes no latency, throughput, allocation, RSS,
+physical-I/O, decompression, or cold-cache claim. Change 0147 applies the
+identical harness to clean parent/candidate release builds in CPU-pinned
+A1/B1/B2/A2 order. Its accepted result remains limited to the named configured
+simulator's one-shot cells; the repeated-work tradeoff and all broader limits
+are retained there.
 
 Focused validation for this change:
 

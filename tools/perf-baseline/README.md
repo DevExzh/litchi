@@ -199,6 +199,15 @@ opt-in and bring the current selectable matrix to 285 names while leaving the
 default 36 cases / 198 records unchanged. Change 0146 makes no performance
 claim until identical-harness clean release ABBA evidence is available.
 
+Change 0147 supplies that clean release ABBA. Under the exact 100 us fixed +
+25 us/request, 50 MiB/s, 4 KiB-range simulator, all four named one-shot cells
+improve total p50/p95/p99/mean by about 62-64% in both directions, while exact
+one-shot source work falls from the complete root Mini Stream to one 36- or
+4095-byte target range. Repeated many-small cells retain a smaller modeled
+cost from the extra first direct request, so no generic repeat improvement is
+claimed. Local wall-clock tails, allocation/RSS, physical-I/O, native-format,
+and cross-format claims remain open.
+
 The validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 
