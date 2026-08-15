@@ -25,8 +25,12 @@
 mod structural;
 
 use crate::records::{BoundSheetRecord, Encoding, SheetType};
-use crate::{Error, Result, Workbook};
+use crate::{Error, Result, SheetKind, Workbook};
 use litchi_biff::Records;
+use litchi_cfb::{
+    ArtifactFingerprint, OverlayError, PublishReport, SameLengthStreamSplice, StreamSpliceLimits,
+    ValidatedOverlayPlan,
+};
 use litchi_core::binary;
 pub use litchi_core::patch::HistoryLimits;
 use litchi_core::patch::{
@@ -34,11 +38,13 @@ use litchi_core::patch::{
     Reversible, ReversibleOperation,
 };
 use litchi_core::sheet::{Cell as _, CellValue};
+use litchi_core::{ReadAt, SourceVersion};
 use litchi_ole_common::object::{Editor as PackageEditor, Limits, Targets};
+use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io::{Cursor, Read, Seek};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 const BOF: u16 = 0x0809;
 const EOF: u16 = 0x000a;
@@ -65,6 +71,15 @@ const NUMBER_VALUE_OFFSET: usize = 6;
 const MAX_STAGED_CHANGES: usize = 4_096;
 const MAX_SCALAR_TRANSFER_CELLS: usize = 4_096;
 const MAX_SCALAR_TRANSFER_BYTES: usize = 4 * 1024 * 1024;
+
+static SNAPSHOT_SOURCE_ID: OnceLock<std::sync::atomic::AtomicU64> = OnceLock::new();
+
+fn fresh_snapshot_source_version() -> SourceVersion {
+    let next = SNAPSHOT_SOURCE_ID
+        .get_or_init(|| std::sync::atomic::AtomicU64::new(1))
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    SourceVersion::new(next, 0)
+}
 
 pub(crate) fn replace_workbook_ranges_and_adjust_bounds(
     workbook: &mut Vec<u8>,
@@ -413,6 +428,7 @@ struct SheetData {
 
 struct Inner {
     bytes: Arc<[u8]>,
+    source_version: SourceVersion,
     workbook_path: Vec<String>,
     workbook_stream: Arc<[u8]>,
     shared_strings: Arc<Vec<String>>,
@@ -458,6 +474,7 @@ impl Snapshot {
             .stream_shared(&workbook_path)
             .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
         let source = package.finish()?;
+        let source_version = fresh_snapshot_source_version();
 
         let (mut sheets, sst_total_offset, xf_records) = parse_workbook_stream(&workbook_stream)?;
         // A full semantic open catches cross-stream and workbook-global
@@ -489,6 +506,7 @@ impl Snapshot {
         Ok(Self {
             inner: Arc::new(Inner {
                 bytes: Arc::from(source),
+                source_version,
                 workbook_path,
                 workbook_stream,
                 shared_strings,
@@ -521,6 +539,7 @@ impl Snapshot {
         Ok(Self {
             inner: Arc::new(Inner {
                 bytes: Arc::from(source),
+                source_version: fresh_snapshot_source_version(),
                 workbook_path: source_snapshot.inner.workbook_path.clone(),
                 workbook_stream,
                 shared_strings: Arc::clone(&source_snapshot.inner.shared_strings),
@@ -534,10 +553,42 @@ impl Snapshot {
         })
     }
 
+    fn retag_source_version(self, source_version: SourceVersion) -> Self {
+        if self.inner.source_version == source_version {
+            return self;
+        }
+        let inner = &self.inner;
+        Self {
+            inner: Arc::new(Inner {
+                bytes: Arc::clone(&inner.bytes),
+                source_version,
+                workbook_path: inner.workbook_path.clone(),
+                workbook_stream: Arc::clone(&inner.workbook_stream),
+                shared_strings: Arc::clone(&inner.shared_strings),
+                shared_string_properties: Arc::clone(&inner.shared_string_properties),
+                sst_total_offset: inner.sst_total_offset,
+                xf_records: Arc::clone(&inner.xf_records),
+                sheets: inner.sheets.clone(),
+            }),
+        }
+    }
+
     /// Returns exact source CFB bytes.
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.inner.bytes
+    }
+
+    /// Opaque source version captured for this immutable snapshot lineage.
+    ///
+    /// `Snapshot::from_bytes` mints this process-local token over its owned,
+    /// immutable byte allocation; it is not an external-file change watcher.
+    /// The token is stable across cheap snapshot and worksheet-handle clones.
+    /// A source-backed commit derives its target token from this lineage and
+    /// the validated overlay target fingerprint.
+    #[must_use]
+    pub fn source_version(&self) -> SourceVersion {
+        self.inner.source_version
     }
 
     /// Returns the exact source Workbook stream.
@@ -1095,6 +1146,30 @@ impl Transaction {
             )));
         }
         self.stage(sheet_index, entry, Storage::Number, Value::Number(value))
+    }
+
+    /// Sets one existing numeric cell without changing its BIFF8 storage
+    /// family.
+    ///
+    /// `Number` values retain their eight-byte IEEE-754 field. `RK` and
+    /// `MulRk` values retain their four-byte compressed field and therefore
+    /// accept only values that are exactly representable by the source RK
+    /// encoding. This is the ordinary semantic entry point for the
+    /// source-backed numeric publication path; callers needing a guaranteed
+    /// standalone `Number` record may use [`Self::set_number`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for an absent or ambiguous cell, a nonnumeric
+    /// source family, an invalid `Xnum`, a non-RK-representable replacement,
+    /// or a transaction staging bound.
+    pub fn set_numeric(
+        &mut self,
+        selector: Selector<'_>,
+        reference: Reference,
+        value: f64,
+    ) -> Result<()> {
+        self.set_value(selector, reference, Value::Number(value))
     }
 
     /// Copies a bounded dependency-free scalar rectangle from another opened
@@ -2347,6 +2422,33 @@ impl Transaction {
         Ok(())
     }
 
+    /// Publishes unchanged-family numeric edits through a validated,
+    /// source-backed CFB splice plan.
+    ///
+    /// Only existing `Number`, `RK`, and `MulRk` value fields are eligible.
+    /// The transaction submits the exact source-relative ranges recorded by
+    /// the private [`Entry`] inventory to
+    /// [`SourceBackedOverlayPublisher`]; it never renders a replacement
+    /// Workbook stream or falls back to [`Self::commit`]. Unsupported,
+    /// structural, resource, protected, signed, encrypted, macro-bearing,
+    /// stale, and length-changing edits are rejected before a candidate is
+    /// published.
+    ///
+    /// A successful result retains the ordinary exact-source [`Patch`] and
+    /// semantic inverse while also exposing the reusable bounded overlay plan
+    /// and content-free source/target provenance diagnostics. An exact
+    /// semantic no-op shares the source snapshot and artifact allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for unsupported staged operations, protected,
+    /// signed/encrypted, or macro-bearing sources, stale source ranges,
+    /// invalid RK values, CFB limits, failed complete reopen, worksheet
+    /// coverage, or numeric readback.
+    pub fn commit_source_backed(self) -> Result<SourceBackedCommit> {
+        commit_source_backed_numeric(self)
+    }
+
     /// Publishes a fully reopened snapshot and reversible exact-source patch.
     ///
     /// # Errors
@@ -2934,6 +3036,195 @@ impl Commit {
     #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch, Diagnostics) {
         (self.snapshot, self.patch, self.diagnostics)
+    }
+}
+
+/// Content-free evidence for a source-backed fixed-width numeric publication.
+///
+/// The value retains bounded counts, lengths, opaque CFB fingerprints, and
+/// source lineage tokens only. It never copies workbook payloads or semantic
+/// cell values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceBackedDiagnostics {
+    changed_cells: usize,
+    touched_streams: usize,
+    splice_count: usize,
+    replacement_bytes: u64,
+    changed_spans: usize,
+    source_bytes: u64,
+    source_workbook_bytes: u64,
+    target_workbook_bytes: u64,
+    source_version: SourceVersion,
+    target_version: SourceVersion,
+    source_fingerprint: ArtifactFingerprint,
+    target_fingerprint: ArtifactFingerprint,
+}
+
+impl SourceBackedDiagnostics {
+    /// Number of semantically changed numeric cells.
+    #[must_use]
+    pub const fn changed_cells(self) -> usize {
+        self.changed_cells
+    }
+
+    /// Number of logical CFB streams selected for publication.
+    #[must_use]
+    pub const fn touched_streams(self) -> usize {
+        self.touched_streams
+    }
+
+    /// Number of source-relative numeric ranges submitted to CFB.
+    #[must_use]
+    pub const fn splice_count(self) -> usize {
+        self.splice_count
+    }
+
+    /// Aggregate replacement bytes submitted to CFB.
+    #[must_use]
+    pub const fn replacement_bytes(self) -> u64 {
+        self.replacement_bytes
+    }
+
+    /// Number of physical CFB spans retained by the validated plan.
+    #[must_use]
+    pub const fn changed_spans(self) -> usize {
+        self.changed_spans
+    }
+
+    /// Complete source CFB artifact length.
+    #[must_use]
+    pub const fn source_bytes(self) -> u64 {
+        self.source_bytes
+    }
+
+    /// Source `Workbook`/`Book` stream length.
+    #[must_use]
+    pub const fn source_workbook_bytes(self) -> u64 {
+        self.source_workbook_bytes
+    }
+
+    /// Candidate `Workbook`/`Book` stream length.
+    #[must_use]
+    pub const fn target_workbook_bytes(self) -> u64 {
+        self.target_workbook_bytes
+    }
+
+    /// Source lineage/version checked before and during publication.
+    #[must_use]
+    pub const fn source_version(self) -> SourceVersion {
+        self.source_version
+    }
+
+    /// Target lineage/version derived by the validated overlay.
+    #[must_use]
+    pub const fn target_version(self) -> SourceVersion {
+        self.target_version
+    }
+
+    /// Complete source CFB fingerprint.
+    #[must_use]
+    pub const fn source_fingerprint(self) -> ArtifactFingerprint {
+        self.source_fingerprint
+    }
+
+    /// Complete composed target CFB fingerprint.
+    #[must_use]
+    pub const fn target_fingerprint(self) -> ArtifactFingerprint {
+        self.target_fingerprint
+    }
+}
+
+/// Successful source-backed fixed-width numeric publication.
+///
+/// The reusable [`ValidatedOverlayPlan`] owns only the immutable positional
+/// source and changed physical spans. The target snapshot is retained to keep
+/// the ordinary XLS semantic and exact reversible-patch contract available to
+/// callers that need immediate readback or inverse application. Consequently,
+/// this API avoids Workbook-stream reserialization but still materializes one
+/// complete target CFB allocation; it is not a bounded-artifact-memory API.
+pub struct SourceBackedCommit {
+    source: Snapshot,
+    snapshot: Snapshot,
+    plan: ValidatedOverlayPlan,
+    patch: Patch,
+    diagnostics: SourceBackedDiagnostics,
+}
+
+impl SourceBackedCommit {
+    /// Exact immutable source snapshot used by this publication.
+    #[must_use]
+    pub const fn source(&self) -> &Snapshot {
+        &self.source
+    }
+
+    /// Fully reopened target snapshot.
+    #[must_use]
+    pub const fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+
+    /// Exact-source reversible semantic/artifact patch.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    /// Reusable checked CFB publication plan.
+    #[must_use]
+    pub const fn plan(&self) -> &ValidatedOverlayPlan {
+        &self.plan
+    }
+
+    /// Content-free source/target publication evidence.
+    #[must_use]
+    pub const fn diagnostics(&self) -> SourceBackedDiagnostics {
+        self.diagnostics
+    }
+
+    /// Whether every staged numeric replacement was an exact byte no-op.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.plan.is_noop()
+    }
+
+    /// Streams the complete validated target to a sequential sink.
+    ///
+    /// A sink failure may leave a typed prefix in the sink. The returned
+    /// [`OverlayError`] retains that partial-output progress.
+    pub fn write_to<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+    ) -> std::result::Result<PublishReport, OverlayError> {
+        self.plan.write_to(writer)
+    }
+
+    /// Alias emphasizing the forward-only publication boundary.
+    pub fn publish_to_stream<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+    ) -> std::result::Result<PublishReport, OverlayError> {
+        self.write_to(writer)
+    }
+
+    /// Publishes through the common synced sibling-temp/atomic-rename path.
+    pub fn save<P: AsRef<std::path::Path>>(
+        &self,
+        path: P,
+    ) -> std::result::Result<PublishReport, OverlayError> {
+        self.plan.save(path)
+    }
+}
+
+impl fmt::Debug for SourceBackedCommit {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SourceBackedCommit")
+            .field("source", &self.source)
+            .field("snapshot", &self.snapshot)
+            .field("plan", &self.plan)
+            .field("patch", &self.patch)
+            .field("diagnostics", &self.diagnostics)
+            .finish()
     }
 }
 
@@ -4543,6 +4834,368 @@ impl fmt::Debug for Patch {
     }
 }
 
+#[derive(Clone)]
+struct SnapshotSource {
+    bytes: Arc<[u8]>,
+    version: SourceVersion,
+}
+
+impl SnapshotSource {
+    fn new(bytes: Arc<[u8]>, version: SourceVersion) -> Self {
+        Self { bytes, version }
+    }
+}
+
+impl ReadAt for SnapshotSource {
+    fn len(&self) -> std::io::Result<u64> {
+        u64::try_from(self.bytes.len())
+            .map_err(|_error| std::io::Error::other("XLS snapshot length exceeds u64"))
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+        let start = match usize::try_from(offset) {
+            Ok(start) => start,
+            Err(_error) => return Ok(0),
+        };
+        let Some(source) = self.bytes.get(start..) else {
+            return Ok(0);
+        };
+        let count = source.len().min(output.len());
+        output[..count].copy_from_slice(&source[..count]);
+        Ok(count)
+    }
+
+    fn version(&self) -> std::io::Result<SourceVersion> {
+        Ok(self.version)
+    }
+}
+
+fn commit_source_backed_numeric(transaction: Transaction) -> Result<SourceBackedCommit> {
+    let Transaction {
+        source,
+        changes,
+        structural_changes,
+        resource_changes,
+    } = transaction;
+
+    if !structural_changes.is_empty() || !resource_changes.is_empty() {
+        return Err(Error::UnsupportedFeature(
+            "source-backed numeric publication accepts no structural or resource edits".into(),
+        ));
+    }
+    if !changes_are_fixed_numeric(&source, &changes) {
+        return Err(Error::UnsupportedFeature(
+            "source-backed numeric publication requires unchanged Number, RK, or MulRk storage"
+                .into(),
+        ));
+    }
+
+    let semantic = SemanticPatch::from_transaction(&source, &changes, &[], &[])?;
+    let source_workbook = Workbook::new(Cursor::new(source.bytes()))?;
+    require_public_worksheet_coverage(&source_workbook, &source.inner.sheets)?;
+    require_unprotected_workbook(&source_workbook)?;
+    require_macro_free_workbook(&source_workbook)?;
+
+    let source_adapter: Arc<dyn ReadAt> = Arc::new(SnapshotSource::new(
+        Arc::clone(&source.inner.bytes),
+        source.inner.source_version,
+    ));
+    let publisher =
+        SourceBackedOverlayPublisher::open(source_adapter).map_err(source_backed_overlay_error)?;
+    let source_version = publisher
+        .source_version()
+        .map_err(source_backed_overlay_error)?;
+    if source_version != source.inner.source_version {
+        return Err(Error::UnsafeEdit(
+            "source-backed numeric publication lost its source lineage".into(),
+        ));
+    }
+
+    let mut splices = Vec::new();
+    splices
+        .try_reserve_exact(changes.len())
+        .map_err(|_error| Error::Allocation("staging source-backed numeric splices"))?;
+    let mut replacement_bytes = 0_u64;
+    for change in &changes {
+        if !change_is_effective(&source, change) {
+            continue;
+        }
+        let splice = fixed_numeric_splice(&source, change)?;
+        replacement_bytes = replacement_bytes
+            .checked_add(u64::try_from(splice.replacement().len()).map_err(|_error| {
+                Error::InvalidData("numeric replacement length exceeds u64".into())
+            })?)
+            .ok_or_else(|| Error::InvalidData("numeric replacement bytes overflow u64".into()))?;
+        splices.push(splice);
+    }
+    let splice_count = splices.len();
+    let plan = publisher
+        .plan_splices(splices, StreamSpliceLimits::default())
+        .map_err(source_backed_overlay_error)?;
+    let target_version = if plan.is_noop() {
+        source_version
+    } else {
+        plan.composed_source()
+            .map_err(source_backed_overlay_error)?
+            .version()
+            .map_err(Error::Io)?
+    };
+
+    let target = if plan.is_noop() {
+        source.clone()
+    } else {
+        let target_bytes = materialize_numeric_plan(&plan, source.bytes().len())?;
+        let target = Snapshot::from_bytes(target_bytes.clone())?;
+        if target.bytes() != target_bytes.as_slice() {
+            return Err(Error::UnsafeEdit(
+                "source-backed numeric target changed during complete reopen".into(),
+            ));
+        }
+        verify_source_backed_numeric_target(&source, &target, &changes)?;
+        target.retag_source_version(target_version)
+    };
+
+    let source_bytes = u64::try_from(source.bytes().len())
+        .map_err(|_error| Error::InvalidData("source CFB length exceeds u64".into()))?;
+    let source_workbook_bytes = u64::try_from(source.workbook_stream().len())
+        .map_err(|_error| Error::InvalidData("source Workbook length exceeds u64".into()))?;
+    let target_workbook_bytes = u64::try_from(target.workbook_stream().len())
+        .map_err(|_error| Error::InvalidData("target Workbook length exceeds u64".into()))?;
+    let patch = Patch::new(
+        Arc::clone(&source.inner.bytes),
+        Arc::clone(&target.inner.bytes),
+        semantic,
+    );
+    let diagnostics = SourceBackedDiagnostics {
+        changed_cells: changes
+            .iter()
+            .filter(|change| change_is_effective(&source, change))
+            .count(),
+        touched_streams: usize::from(!plan.is_noop()),
+        splice_count,
+        replacement_bytes,
+        changed_spans: plan.changed_spans(),
+        source_bytes,
+        source_workbook_bytes,
+        target_workbook_bytes,
+        source_version,
+        target_version,
+        source_fingerprint: plan.source_fingerprint(),
+        target_fingerprint: plan.target_fingerprint(),
+    };
+    Ok(SourceBackedCommit {
+        source,
+        snapshot: target,
+        plan,
+        patch,
+        diagnostics,
+    })
+}
+
+fn fixed_numeric_splice(source: &Snapshot, change: &Change) -> Result<SameLengthStreamSplice> {
+    let sheet = source
+        .inner
+        .sheets
+        .get(change.sheet)
+        .ok_or_else(|| Error::UnsafeEdit("source-backed numeric worksheet is stale".into()))?;
+    let entry = sheet
+        .entries
+        .get(change.entry)
+        .ok_or_else(|| Error::UnsafeEdit("source-backed numeric cell is stale".into()))?;
+    if entry.cell.storage != change.storage
+        || !matches!(
+            change.storage,
+            Storage::Number | Storage::Rk | Storage::MulRk
+        )
+    {
+        return Err(Error::UnsafeEdit(
+            "source-backed numeric edit changed its BIFF storage family".into(),
+        ));
+    }
+    let Value::Number(value) = change.value else {
+        return Err(Error::UnsafeEdit(
+            "source-backed numeric edit has a nonnumeric replacement".into(),
+        ));
+    };
+    let width = match change.storage {
+        Storage::Number => 8,
+        Storage::Rk | Storage::MulRk => 4,
+        Storage::BoolErr | Storage::Blank | Storage::LabelSst | Storage::Formula => {
+            return Err(Error::UnsafeEdit(
+                "source-backed numeric edit has an unsupported storage family".into(),
+            ));
+        },
+    };
+    let kind = binary::read_u16_le_at(&source.inner.workbook_stream, entry.kind_offset)?;
+    if kind != storage_record_kind(entry.cell.storage) {
+        return Err(Error::UnsafeEdit(
+            "source-backed numeric record family is stale".into(),
+        ));
+    }
+    let start = entry
+        .value_offset
+        .ok_or_else(|| Error::UnsafeEdit("numeric cell has no fixed-width value field".into()))?;
+    let end = start
+        .checked_add(width)
+        .ok_or_else(|| Error::InvalidData("numeric splice range overflows usize".into()))?;
+    let source_bytes = source
+        .inner
+        .workbook_stream
+        .get(start..end)
+        .ok_or_else(|| Error::InvalidData("numeric splice range is outside Workbook".into()))?;
+    let Value::Number(source_value) = entry.cell.value else {
+        return Err(Error::UnsafeEdit(
+            "source cell does not contain a fixed-width numeric value".into(),
+        ));
+    };
+    let decoded_source_value = match change.storage {
+        Storage::Number => {
+            let raw: [u8; 8] = source_bytes.try_into().map_err(|_error| {
+                Error::InvalidData("Number source field has an unexpected width".into())
+            })?;
+            f64::from_le_bytes(raw)
+        },
+        Storage::Rk | Storage::MulRk => {
+            let raw: [u8; 4] = source_bytes.try_into().map_err(|_error| {
+                Error::InvalidData("RK source field has an unexpected width".into())
+            })?;
+            crate::utils::rk_to_f64(u32::from_le_bytes(raw))
+        },
+        Storage::BoolErr | Storage::Blank | Storage::LabelSst | Storage::Formula => {
+            return Err(Error::UnsafeEdit(
+                "source cell does not contain a fixed-width numeric value".into(),
+            ));
+        },
+    };
+    if decoded_source_value.to_bits() != source_value.to_bits() {
+        return Err(Error::UnsafeEdit(
+            "source-backed numeric field failed its exact semantic precondition".into(),
+        ));
+    }
+    let expected = source_bytes.to_vec();
+    let replacement = match change.storage {
+        Storage::Number => {
+            if !valid_xnum(value) {
+                return Err(Error::UnsupportedFeature(
+                    "source-backed Number replacement is not a valid Xnum".into(),
+                ));
+            }
+            value.to_le_bytes().to_vec()
+        },
+        Storage::Rk | Storage::MulRk => encode_rk(value)
+            .ok_or_else(|| {
+                Error::UnsupportedFeature(
+                    "source-backed RK replacement is not exactly representable".into(),
+                )
+            })?
+            .to_le_bytes()
+            .to_vec(),
+        Storage::BoolErr | Storage::Blank | Storage::LabelSst | Storage::Formula => {
+            return Err(Error::UnsafeEdit(
+                "source-backed numeric edit has an unsupported storage family".into(),
+            ));
+        },
+    };
+    let offset = u64::try_from(start)
+        .map_err(|_error| Error::InvalidData("numeric splice offset exceeds u64".into()))?;
+    Ok(SameLengthStreamSplice::new(
+        source.inner.workbook_path.clone(),
+        offset,
+        Arc::from(expected),
+        Arc::from(replacement),
+    ))
+}
+
+fn materialize_numeric_plan(plan: &ValidatedOverlayPlan, capacity: usize) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(capacity)
+        .map_err(|_error| Error::Allocation("materializing source-backed numeric target"))?;
+    plan.write_to(&mut bytes)
+        .map_err(source_backed_overlay_error)?;
+    if bytes.len() != capacity {
+        return Err(Error::UnsafeEdit(
+            "source-backed numeric publication changed CFB artifact length".into(),
+        ));
+    }
+    Ok(bytes)
+}
+
+fn verify_source_backed_numeric_target(
+    source: &Snapshot,
+    target: &Snapshot,
+    changes: &[Change],
+) -> Result<()> {
+    if source.inner.workbook_path != target.inner.workbook_path {
+        return Err(Error::UnsafeEdit(
+            "source-backed numeric publication changed the Workbook owner".into(),
+        ));
+    }
+    let workbook = Workbook::new(Cursor::new(target.bytes()))?;
+    require_public_worksheet_coverage(&workbook, &source.inner.sheets)?;
+    require_unprotected_workbook(&workbook)?;
+    require_macro_free_workbook(&workbook)?;
+    let _ = carry_fixed_numeric_inventory(source, &target.inner.workbook_stream, changes)?;
+    verify_public_numeric_readback(&workbook, source, changes)
+}
+
+fn source_backed_overlay_error(error: OverlayError) -> Error {
+    match error {
+        OverlayError::Ole(error) => Error::Cfb(error),
+        OverlayError::Io(error) => Error::Io(error),
+        OverlayError::Allocation { resource, .. } => Error::Allocation(resource),
+        other => Error::UnsafeEdit(format!("source-backed numeric overlay refused: {other}")),
+    }
+}
+
+fn require_unprotected_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Result<()> {
+    let protection = workbook.protection();
+    if protection.structure_protected()
+        || protection.windows_protected()
+        || protection.password().is_set()
+        || protection.revisions_protected()
+        || protection.revision_password().is_set()
+        || protection.write_protected()
+        || protection.file_sharing().is_some()
+    {
+        return Err(Error::UnsafeEdit(
+            "protected or shared workbooks are not eligible for source-backed numeric edits".into(),
+        ));
+    }
+    for metadata in workbook.sheets() {
+        let Some(index) = metadata.parsed_worksheet_index() else {
+            continue;
+        };
+        let protection = workbook.xls_worksheet(index)?.protection();
+        if protection.is_protected()
+            || protection.objects_protected()
+            || protection.scenarios_protected()
+            || protection.has_password()
+        {
+            return Err(Error::UnsafeEdit(
+                "protected worksheets are not eligible for source-backed numeric edits".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn require_macro_free_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Result<()> {
+    let metadata = workbook.vba_metadata();
+    if metadata.has_project_marker()
+        || workbook.vba_project_storage().is_some()
+        || workbook
+            .sheets()
+            .iter()
+            .any(|sheet| matches!(sheet.kind(), SheetKind::MacroSheet | SheetKind::VbaModule))
+    {
+        return Err(Error::UnsafeEdit(
+            "macro-bearing XLS sources are not eligible for source-backed numeric edits".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn parse_workbook_stream(
     source: &Arc<[u8]>,
 ) -> Result<(Vec<SheetData>, Option<usize>, Vec<Vec<u8>>)> {
@@ -5175,17 +5828,62 @@ fn encode_rk(value: f64) -> Option<u32> {
             None
         }
     }
+    fn exact_encoding(value: f64, encoded: u32) -> Option<u32> {
+        (crate::utils::rk_to_f64(encoded).to_bits() == value.to_bits()).then_some(encoded)
+    }
 
     if !value.is_finite() {
         return None;
     }
-    upper_word_if_exact(value).or_else(|| {
-        let scaled = value * 100.0;
-        scaled
-            .is_finite()
-            .then(|| upper_word_if_exact(scaled).map(|encoded| encoded | 1))
-            .flatten()
-    })
+    // Keep this ordering and range identical to the BIFF writer's RK
+    // encoder.  The integer form stores a signed 30-bit value in bits 2..31;
+    // the scaled form stores that same value after multiplying by 100 and
+    // sets bit 0.  The upper-word forms remain available for existing RK
+    // values whose IEEE-754 low 34 bits are zero (including noncanonical
+    // producer encodings), but writer-compatible integer forms are preferred
+    // for replacements.
+    let int_value = crate::utils::saturating_f64_to_i32(value);
+    if f64::from(int_value) == value
+        && (-(1_i32 << 29)..(1_i32 << 29)).contains(&int_value)
+        && !(value == 0.0 && value.is_sign_negative())
+    {
+        let encoded = (crate::utils::reinterpret_i32_as_u32(int_value) << 2) | 0x02;
+        if let Some(encoded) = exact_encoding(value, encoded) {
+            return Some(encoded);
+        }
+    }
+
+    let scaled = value * 100.0;
+    if scaled.is_finite() {
+        // Binary floating-point multiplication can land one ulp below or
+        // above an intended decimal integer (for example, `0.29 * 100.0`
+        // may be `28.999999999999996`).  Try the nearby rounded signed
+        // 30-bit candidate, but require a full RK decode to reproduce the
+        // requested f64 bit pattern before accepting it.
+        let rounded = scaled.round();
+        let scaled_int = crate::utils::saturating_f64_to_i32(rounded);
+        if f64::from(scaled_int) == rounded
+            && (-(1_i32 << 29)..(1_i32 << 29)).contains(&scaled_int)
+            && !(rounded == 0.0 && rounded.is_sign_negative())
+        {
+            let encoded = (crate::utils::reinterpret_i32_as_u32(scaled_int) << 2) | 0x03;
+            if let Some(encoded) = exact_encoding(value, encoded) {
+                return Some(encoded);
+            }
+        }
+    }
+
+    upper_word_if_exact(value)
+        .and_then(|encoded| exact_encoding(value, encoded))
+        .or_else(|| {
+            scaled
+                .is_finite()
+                .then(|| {
+                    upper_word_if_exact(scaled)
+                        .and_then(|encoded| exact_encoding(value, encoded | 1))
+                })
+                .flatten()
+        })
 }
 
 fn change_is_effective(snapshot: &Snapshot, change: &Change) -> bool {

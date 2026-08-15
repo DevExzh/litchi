@@ -6,6 +6,7 @@
 
 use super::*;
 use litchi_cfb::{OleFile, OleWriter};
+use std::io::Write;
 
 fn package() -> Vec<u8> {
     let mut writer = crate::Writer::new();
@@ -26,6 +27,147 @@ fn package() -> Vec<u8> {
         .add_stream(vec!["Opaque".to_string()], b"untouched".to_vec())
         .unwrap();
     package.finish().unwrap()
+}
+
+fn fixed_numeric_family_package(storage: Storage) -> (Vec<u8>, Reference) {
+    let source = package();
+    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let mut records = Vec::new();
+    let parsed = Records::new(&workbook);
+    for record in parsed {
+        let record = record.unwrap();
+        records.push((record.kind().get(), record.payload().to_vec()));
+    }
+
+    let number_indices = records
+        .iter()
+        .enumerate()
+        .filter(|(_, (kind, _))| *kind == NUMBER)
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    let (indices, reference) = match storage {
+        Storage::Rk => {
+            let index = *number_indices.first().unwrap();
+            let payload = &records[index].1;
+            (
+                vec![index],
+                Reference::new(
+                    u32::from(u16::from_le_bytes([payload[0], payload[1]])),
+                    u32::from(u16::from_le_bytes([payload[2], payload[3]])),
+                )
+                .unwrap(),
+            )
+        },
+        Storage::MulRk => {
+            let pair = number_indices
+                .windows(2)
+                .find(|pair| {
+                    pair[1] == pair[0] + 1
+                        && records[pair[0]].1[0..2] == records[pair[1]].1[0..2]
+                        && u16::from_le_bytes([records[pair[1]].1[2], records[pair[1]].1[3]])
+                            == u16::from_le_bytes([records[pair[0]].1[2], records[pair[0]].1[3]])
+                                + 1
+                })
+                .map(|pair| [pair[0], pair[1]])
+                .unwrap();
+            let payload = &records[pair[0]].1;
+            (
+                pair.to_vec(),
+                Reference::new(
+                    u32::from(u16::from_le_bytes([payload[0], payload[1]])),
+                    u32::from(u16::from_le_bytes([payload[2], payload[3]])),
+                )
+                .unwrap(),
+            )
+        },
+        Storage::Number => panic!("the native package already contains Number records"),
+        Storage::BoolErr | Storage::Blank | Storage::LabelSst | Storage::Formula => {
+            panic!("test fixture requests a nonnumeric storage family")
+        },
+    };
+    let mut transformed = Vec::new();
+    for (index, (kind, payload)) in records.iter().enumerate() {
+        if storage == Storage::MulRk && index == indices[1] {
+            continue;
+        }
+        let mut payload = payload.clone();
+        if index == indices[0] {
+            if storage == Storage::Rk {
+                payload.truncate(10);
+                let rk = encode_rk(f64::from_le_bytes(
+                    records[index].1[6..14].try_into().unwrap(),
+                ))
+                .unwrap();
+                payload[6..10].copy_from_slice(&rk.to_le_bytes());
+                transformed.push((RK, payload));
+                continue;
+            }
+            let first = &records[indices[0]].1;
+            let second = &records[indices[1]].1;
+            let mut packed = Vec::with_capacity(18);
+            packed.extend_from_slice(&first[0..4]);
+            packed.extend_from_slice(&first[4..10]);
+            packed.extend_from_slice(&second[4..10]);
+            packed.extend_from_slice(&u16::from_le_bytes([second[2], second[3]]).to_le_bytes());
+            transformed.push((MUL_RK, packed));
+            continue;
+        }
+        transformed.push((*kind, payload));
+    }
+    let mut rebuilt = Vec::new();
+    for (kind, payload) in transformed {
+        rebuilt.extend_from_slice(&kind.to_le_bytes());
+        rebuilt.extend_from_slice(&(u16::try_from(payload.len()).unwrap()).to_le_bytes());
+        rebuilt.extend_from_slice(&payload);
+    }
+    let opaque = ole.open_stream(&["Opaque"]).unwrap();
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], &rebuilt).unwrap();
+    writer.create_stream(&["Opaque"], &opaque).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    (output.into_inner(), reference)
+}
+
+fn raw_rk_family_package(storage: Storage, raw_values: &[u32]) -> (Vec<u8>, Reference) {
+    let (source, reference) = fixed_numeric_family_package(storage);
+    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let mut rebuilt = Vec::new();
+    let mut replaced = false;
+    for record in Records::new(&workbook) {
+        let record = record.unwrap();
+        let kind = record.kind().get();
+        let mut payload = record.payload().to_vec();
+        match storage {
+            Storage::Rk if kind == RK => {
+                assert_eq!(raw_values.len(), 1);
+                payload[6..10].copy_from_slice(&raw_values[0].to_le_bytes());
+                replaced = true;
+            },
+            Storage::MulRk if kind == MUL_RK => {
+                assert_eq!(raw_values.len(), 2);
+                for (index, raw) in raw_values.iter().enumerate() {
+                    let offset = 6 + index * 6;
+                    payload[offset..offset + 4].copy_from_slice(&raw.to_le_bytes());
+                }
+                replaced = true;
+            },
+            _ => {},
+        }
+        rebuilt.extend_from_slice(&kind.to_le_bytes());
+        rebuilt.extend_from_slice(&(u16::try_from(payload.len()).unwrap()).to_le_bytes());
+        rebuilt.extend_from_slice(&payload);
+    }
+    assert!(replaced);
+    let opaque = ole.open_stream(&["Opaque"]).unwrap();
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], &rebuilt).unwrap();
+    writer.create_stream(&["Opaque"], &opaque).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    (output.into_inner(), reference)
 }
 
 fn formula_free_package() -> Vec<u8> {
@@ -65,6 +207,29 @@ fn signed_package() -> Vec<u8> {
     writer.create_stream(&["Opaque"], &opaque).unwrap();
     writer
         .create_stream(&["DigitalSignature"], b"signature")
+        .unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn macro_package() -> Vec<u8> {
+    let mut ole = OleFile::open(Cursor::new(package())).unwrap();
+    let workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let opaque = ole.open_stream(&["Opaque"]).unwrap();
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], &workbook).unwrap();
+    writer.create_stream(&["Opaque"], &opaque).unwrap();
+    writer.create_storage(&["_VBA_PROJECT_CUR"]).unwrap();
+    writer.create_storage(&["_VBA_PROJECT_CUR", "VBA"]).unwrap();
+    writer
+        .create_stream(&["_VBA_PROJECT_CUR", "VBA", "_VBA_PROJECT"], b"project")
+        .unwrap();
+    writer
+        .create_stream(&["_VBA_PROJECT_CUR", "VBA", "dir"], b"dir")
+        .unwrap();
+    writer
+        .create_stream(&["_VBA_PROJECT_CUR", "VBA", "Module1"], b"module")
         .unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
@@ -143,6 +308,471 @@ fn edits_only_one_number_field_and_round_trips_patch() {
         commit.patch().inverse().apply(&applied).unwrap().bytes(),
         source.bytes()
     );
+}
+
+#[test]
+fn source_backed_number_publication_preserves_the_artifact_contract() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let reference = Reference::new(3, 2).unwrap();
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), reference, 9.25).unwrap();
+    let commit = edit.commit_source_backed().unwrap();
+
+    assert_eq!(commit.diagnostics().changed_cells(), 1);
+    assert_eq!(commit.diagnostics().touched_streams(), 1);
+    assert_eq!(commit.diagnostics().splice_count(), 1);
+    assert_eq!(commit.diagnostics().replacement_bytes(), 8);
+    assert!(commit.diagnostics().changed_spans() > 0);
+    assert_eq!(
+        commit.diagnostics().source_version(),
+        source.source_version()
+    );
+    assert_eq!(
+        commit.diagnostics().target_version(),
+        commit.snapshot().source_version()
+    );
+    assert_ne!(
+        commit.diagnostics().source_fingerprint(),
+        commit.diagnostics().target_fingerprint()
+    );
+
+    let mut output = Vec::new();
+    let report = commit.write_to(&mut output).unwrap();
+    assert_eq!(output, commit.snapshot().bytes());
+    assert_eq!(
+        report.target_fingerprint(),
+        commit.diagnostics().target_fingerprint()
+    );
+    assert_eq!(stream(&output, "Opaque"), b"untouched");
+    assert_eq!(
+        commit
+            .snapshot()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .number(reference)
+            .unwrap()
+            .unwrap()
+            .value(),
+        9.25
+    );
+
+    let applied = commit.patch().apply(&source).unwrap();
+    assert_eq!(applied.bytes(), commit.snapshot().bytes());
+    assert_eq!(
+        commit.patch().inverse().apply(&applied).unwrap().bytes(),
+        source.bytes()
+    );
+}
+
+#[test]
+fn source_backed_numeric_noop_reuses_identity_and_fingerprint() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let reference = Reference::new(3, 2).unwrap();
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), reference, 4.5).unwrap();
+    let commit = edit.commit_source_backed().unwrap();
+
+    assert!(commit.is_noop());
+    assert!(commit.patch().is_empty());
+    assert!(std::ptr::eq(
+        commit.snapshot().bytes().as_ptr(),
+        source.bytes().as_ptr()
+    ));
+    assert_eq!(
+        commit.diagnostics().source_fingerprint(),
+        commit.diagnostics().target_fingerprint()
+    );
+    assert_eq!(
+        commit.diagnostics().source_version(),
+        commit.diagnostics().target_version()
+    );
+    assert_eq!(commit.diagnostics().splice_count(), 0);
+    assert_eq!(commit.diagnostics().replacement_bytes(), 0);
+}
+
+#[test]
+fn source_backed_numeric_refuses_non_numeric_and_structural_operations() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+
+    let mut text = source.edit();
+    text.set_value(
+        "Sheet1".into(),
+        Reference::new(6, 0).unwrap(),
+        Value::Text("beta".into()),
+    )
+    .unwrap();
+    assert!(text.commit_source_backed().is_err());
+
+    let mut structural = source.edit();
+    structural.insert_rows("Sheet1".into(), 1, 1).unwrap();
+    assert!(structural.commit_source_backed().is_err());
+}
+
+#[test]
+fn source_backed_rk_and_mulrk_publication_retain_their_families() {
+    for (storage, replacement) in [(Storage::Rk, 8.0), (Storage::MulRk, 6.0)] {
+        let (bytes, reference) = fixed_numeric_family_package(storage);
+        let source = Snapshot::from_bytes(bytes).unwrap();
+        assert_eq!(
+            source
+                .worksheet("Sheet1".into())
+                .unwrap()
+                .unwrap()
+                .cell(reference)
+                .unwrap()
+                .unwrap()
+                .storage(),
+            storage
+        );
+        let mut edit = source.edit();
+        edit.set_numeric("Sheet1".into(), reference, replacement)
+            .unwrap();
+        let commit = edit.commit_source_backed().unwrap();
+        assert_eq!(commit.diagnostics().replacement_bytes(), 4);
+        assert_eq!(commit.diagnostics().splice_count(), 1);
+        let cell = commit
+            .snapshot()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(reference)
+            .unwrap()
+            .unwrap();
+        assert_eq!(cell.storage(), storage);
+        assert_eq!(cell.value(), &Value::Number(replacement));
+        assert_eq!(stream(commit.snapshot().bytes(), "Opaque"), b"untouched");
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .bytes(),
+            source.bytes()
+        );
+    }
+}
+
+#[test]
+fn source_backed_rk_accepts_signed_integer_boundaries_and_noncanonical_source_bytes() {
+    let rk_integer = |value: i32, divide_by_100: bool| {
+        (crate::utils::reinterpret_i32_as_u32(value) << 2) | if divide_by_100 { 0x03 } else { 0x02 }
+    };
+    let maximum = (1_i32 << 29) - 1;
+    let minimum = -(1_i32 << 29);
+    let cases = [
+        (rk_integer(1, false), 1.0, 2.0),
+        (rk_integer(-1, false), -1.0, -2.0),
+        (
+            rk_integer(maximum, false),
+            f64::from(maximum),
+            f64::from(maximum - 1),
+        ),
+        (
+            rk_integer(minimum, false),
+            f64::from(minimum),
+            f64::from(minimum + 1),
+        ),
+        (rk_integer(-123, true), -1.23, -1.24),
+        // An IEEE upper-word encoding of an integral value is valid but
+        // noncanonical relative to the signed integer form above.
+        (((1.0_f64.to_bits() >> 32) as u32) & 0xffff_fffc, 1.0, 2.0),
+    ];
+
+    for (raw, source_value, replacement) in cases {
+        let (bytes, reference) = raw_rk_family_package(Storage::Rk, &[raw]);
+        let source = Snapshot::from_bytes(bytes).unwrap();
+        let sheet = source.worksheet("Sheet1".into()).unwrap().unwrap();
+        assert_eq!(
+            sheet.cell(reference).unwrap().unwrap().value(),
+            &Value::Number(source_value)
+        );
+        let entry_index = unique_entry_index(&source.inner.sheets[0].entries, reference)
+            .unwrap()
+            .unwrap();
+        let entry = &source.inner.sheets[0].entries[entry_index];
+        let start = entry.value_offset.unwrap();
+        assert_eq!(
+            u32::from_le_bytes(
+                source.inner.workbook_stream[start..start + 4]
+                    .try_into()
+                    .unwrap()
+            ),
+            raw
+        );
+
+        let mut edit = source.edit();
+        edit.set_numeric("Sheet1".into(), reference, replacement)
+            .unwrap();
+        let commit = edit.commit_source_backed().unwrap();
+        let target_cell = commit
+            .snapshot()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(reference)
+            .unwrap()
+            .unwrap();
+        assert_eq!(target_cell.value(), &Value::Number(replacement));
+        let target_entry = &commit.snapshot().inner.sheets[0].entries[entry_index];
+        let target_start = target_entry.value_offset.unwrap();
+        let expected_replacement = encode_rk(replacement).unwrap();
+        assert_eq!(
+            u32::from_le_bytes(
+                commit.snapshot().inner.workbook_stream[target_start..target_start + 4]
+                    .try_into()
+                    .unwrap()
+            ),
+            expected_replacement
+        );
+        assert_eq!(commit.diagnostics().splice_count(), 1);
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .bytes(),
+            source.bytes()
+        );
+    }
+}
+
+#[test]
+fn source_backed_scaled_rk_rounds_only_exact_decodes() {
+    let rk_integer = |value: i32, divide_by_100: bool| {
+        (crate::utils::reinterpret_i32_as_u32(value) << 2) | if divide_by_100 { 0x03 } else { 0x02 }
+    };
+    let raw_029 = rk_integer(29, true);
+    let raw_negative = rk_integer(-999_997, true);
+    assert_eq!(
+        encode_rk(0.29),
+        Some(raw_029),
+        "rounded scaled RK must reproduce 0.29 exactly"
+    );
+    assert_eq!(
+        encode_rk(-9999.97),
+        Some(raw_negative),
+        "rounded scaled RK must reproduce -9999.97 exactly"
+    );
+
+    let maximum = (1_i32 << 29) - 1;
+    let minimum = -(1_i32 << 29);
+    assert_eq!(
+        encode_rk(f64::from(maximum) / 100.0),
+        Some(rk_integer(maximum, true))
+    );
+    assert_eq!(
+        encode_rk(f64::from(minimum) / 100.0),
+        Some(rk_integer(minimum, true))
+    );
+    // A nearby value that rounds to 29 must still refuse because its exact
+    // f64 bits are not the value decoded from the candidate RK field.
+    assert!(encode_rk(0.29000000000000004).is_none());
+
+    let cases = [
+        (rk_integer(1, false), 1.0, 0.29),
+        (rk_integer(-1, false), -1.0, -9999.97),
+        (raw_029, 0.29, 0.3),
+        (raw_negative, -9999.97, -9999.96),
+    ];
+    for (raw, source_value, replacement) in cases {
+        let (bytes, reference) = raw_rk_family_package(Storage::Rk, &[raw]);
+        let source = Snapshot::from_bytes(bytes).unwrap();
+        assert_eq!(
+            source
+                .worksheet("Sheet1".into())
+                .unwrap()
+                .unwrap()
+                .cell(reference)
+                .unwrap()
+                .unwrap()
+                .value(),
+            &Value::Number(source_value)
+        );
+        let mut edit = source.edit();
+        edit.set_numeric("Sheet1".into(), reference, replacement)
+            .unwrap();
+        let commit = edit.commit_source_backed().unwrap();
+        assert_eq!(
+            commit
+                .snapshot()
+                .worksheet("Sheet1".into())
+                .unwrap()
+                .unwrap()
+                .cell(reference)
+                .unwrap()
+                .unwrap()
+                .value(),
+            &Value::Number(replacement)
+        );
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .bytes(),
+            source.bytes()
+        );
+    }
+}
+
+#[test]
+fn source_backed_mulrk_accepts_signed_integer_fields_and_inverse() {
+    let rk_integer = |value: i32| (crate::utils::reinterpret_i32_as_u32(value) << 2) | 0x02;
+    let maximum = (1_i32 << 29) - 1;
+    let raw_values = [rk_integer(-1), rk_integer(maximum)];
+    let (bytes, first_reference) = raw_rk_family_package(Storage::MulRk, &raw_values);
+    let second_reference = Reference::new(
+        u32::from(first_reference.row()),
+        u32::from(first_reference.column()) + 1,
+    )
+    .unwrap();
+    let source = Snapshot::from_bytes(bytes).unwrap();
+    let sheet = source.worksheet("Sheet1".into()).unwrap().unwrap();
+    assert_eq!(
+        sheet.cell(first_reference).unwrap().unwrap().value(),
+        &Value::Number(-1.0)
+    );
+    assert_eq!(
+        sheet.cell(second_reference).unwrap().unwrap().value(),
+        &Value::Number(f64::from(maximum))
+    );
+
+    let mut edit = source.edit();
+    edit.set_numeric("Sheet1".into(), first_reference, -2.0)
+        .unwrap();
+    edit.set_numeric("Sheet1".into(), second_reference, f64::from(maximum - 1))
+        .unwrap();
+    let commit = edit.commit_source_backed().unwrap();
+    assert_eq!(commit.diagnostics().splice_count(), 2);
+    let target = commit
+        .snapshot()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        target.cell(first_reference).unwrap().unwrap().value(),
+        &Value::Number(-2.0)
+    );
+    assert_eq!(
+        target.cell(second_reference).unwrap().unwrap().value(),
+        &Value::Number(f64::from(maximum - 1))
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .bytes(),
+        source.bytes()
+    );
+}
+
+#[test]
+fn source_backed_noncanonical_rk_noop_keeps_exact_source_identity() {
+    let raw = ((1.0_f64.to_bits() >> 32) as u32) & 0xffff_fffc;
+    let (bytes, reference) = raw_rk_family_package(Storage::Rk, &[raw]);
+    let source = Snapshot::from_bytes(bytes).unwrap();
+    let mut edit = source.edit();
+    edit.set_numeric("Sheet1".into(), reference, 1.0).unwrap();
+    let commit = edit.commit_source_backed().unwrap();
+    assert!(commit.is_noop());
+    assert!(std::ptr::eq(
+        commit.snapshot().bytes().as_ptr(),
+        source.bytes().as_ptr()
+    ));
+    assert_eq!(commit.snapshot().bytes(), source.bytes());
+    assert_eq!(commit.diagnostics().splice_count(), 0);
+}
+
+#[test]
+fn source_backed_real_producer_rk_fixture_reopens_and_inverts() {
+    let source = Snapshot::from_bytes(
+        include_bytes!("../../../../test-data/poi/test-data/spreadsheet/54016.xls").to_vec(),
+    )
+    .unwrap();
+    let (sheet, reference, replacement) = source
+        .worksheets()
+        .find_map(|sheet| {
+            sheet.cells().find_map(|cell| {
+                let Value::Number(value) = cell.value() else {
+                    return None;
+                };
+                if !matches!(cell.storage(), Storage::Rk | Storage::MulRk) {
+                    return None;
+                }
+                [*value + 1.0, *value - 1.0]
+                    .into_iter()
+                    .find(|candidate| {
+                        candidate.to_bits() != value.to_bits() && encode_rk(*candidate).is_some()
+                    })
+                    .map(|candidate| (sheet.position(), cell.reference(), candidate))
+            })
+        })
+        .expect("POI 54016 fixture has an RK/MulRk cell with an RK replacement");
+    let mut edit = source.edit();
+    edit.set_numeric(Selector::Position(sheet), reference, replacement)
+        .unwrap();
+    let commit = edit.commit_source_backed().unwrap();
+    let reopened = Snapshot::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let cell = reopened
+        .worksheets()
+        .nth(sheet)
+        .unwrap()
+        .cell(reference)
+        .unwrap()
+        .unwrap();
+    assert_eq!(cell.value(), &Value::Number(replacement));
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(&commit.snapshot())
+            .unwrap()
+            .bytes(),
+        source.bytes()
+    );
+}
+
+#[test]
+fn source_backed_numeric_sink_reports_partial_output() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
+        .unwrap();
+    let commit = edit.commit_source_backed().unwrap();
+    let mut sink = PrefixFailingSink {
+        accepted: Vec::new(),
+        limit: 17,
+    };
+    let error = commit.write_to(&mut sink).unwrap_err();
+    assert!(matches!(error, OverlayError::IncompleteOutput { .. }));
+    assert_eq!(sink.accepted.len(), sink.limit);
+}
+
+struct PrefixFailingSink {
+    accepted: Vec<u8>,
+    limit: usize,
+}
+
+impl Write for PrefixFailingSink {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        if self.accepted.len() >= self.limit {
+            return Err(std::io::Error::other("test sink refusal"));
+        }
+        let remaining = self.limit - self.accepted.len();
+        let count = remaining.min(bytes.len());
+        self.accepted.extend_from_slice(&bytes[..count]);
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 #[test]
@@ -285,6 +915,21 @@ fn references_enforce_the_biff8_grid() {
 #[test]
 fn signed_packages_are_refused_before_editing() {
     assert!(Snapshot::from_bytes(signed_package()).is_err());
+}
+
+#[test]
+fn macro_packages_are_refused_by_source_backed_numeric_publication() {
+    let source = Snapshot::from_bytes(macro_package()).unwrap();
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
+        .unwrap();
+    assert!(edit.commit_source_backed().is_err());
+
+    let mut eager = source.edit();
+    eager
+        .set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
+        .unwrap();
+    assert!(eager.commit().is_ok());
 }
 
 #[test]
