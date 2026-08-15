@@ -592,6 +592,8 @@ enum Case {
     XlsNumericSourceBackedNumberEditSave,
     XlsNumericEagerRkMulrkEditSave,
     XlsNumericSourceBackedRkMulrkEditSave,
+    XlsNumericPlanOnlyNumberEditSave,
+    XlsNumericPlanOnlyRkMulrkEditSave,
     XlsVisibilityEagerEditSave,
     XlsVisibilitySourceBackedEditSave,
     XlsVisibilityEagerBatchEditSave,
@@ -939,6 +941,8 @@ impl Case {
             Self::XlsNumericSourceBackedRkMulrkEditSave => {
                 "xls_numeric_source_backed_rk_mulrk_edit_save"
             },
+            Self::XlsNumericPlanOnlyNumberEditSave => "xls_numeric_plan_only_number_edit_save",
+            Self::XlsNumericPlanOnlyRkMulrkEditSave => "xls_numeric_plan_only_rk_mulrk_edit_save",
             Self::XlsVisibilityEagerEditSave => "xls_visibility_eager_edit_save",
             Self::XlsVisibilitySourceBackedEditSave => "xls_visibility_source_backed_edit_save",
             Self::XlsVisibilityEagerBatchEditSave => "xls_visibility_eager_batch_edit_save",
@@ -1197,6 +1201,8 @@ impl Case {
                 | Self::XlsNumericSourceBackedNumberEditSave
                 | Self::XlsNumericEagerRkMulrkEditSave
                 | Self::XlsNumericSourceBackedRkMulrkEditSave
+                | Self::XlsNumericPlanOnlyNumberEditSave
+                | Self::XlsNumericPlanOnlyRkMulrkEditSave
         )
     }
 
@@ -5702,6 +5708,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "xls_numeric_source_backed_rk_mulrk_edit_save" => {
             Some(Case::XlsNumericSourceBackedRkMulrkEditSave)
         },
+        "xls_numeric_plan_only_number_edit_save" => Some(Case::XlsNumericPlanOnlyNumberEditSave),
+        "xls_numeric_plan_only_rk_mulrk_edit_save" => Some(Case::XlsNumericPlanOnlyRkMulrkEditSave),
         "xls_visibility_eager_edit_save" => Some(Case::XlsVisibilityEagerEditSave),
         "xls_visibility_source_backed_edit_save" => Some(Case::XlsVisibilitySourceBackedEditSave),
         "xls_visibility_eager_batch_edit_save" => Some(Case::XlsVisibilityEagerBatchEditSave),
@@ -6014,6 +6022,8 @@ fn print_usage() {
                                        xls_numeric_source_backed_number_edit_save,\n\
                                        xls_numeric_eager_rk_mulrk_edit_save,\n\
                                        xls_numeric_source_backed_rk_mulrk_edit_save,\n\
+                                       xls_numeric_plan_only_number_edit_save,\n\
+                                       xls_numeric_plan_only_rk_mulrk_edit_save,\n\
                                        xls_visibility_eager_edit_save,\n\
                                        xls_visibility_source_backed_edit_save,\n\
                                        xls_visibility_eager_batch_edit_save,\n\
@@ -10151,7 +10161,9 @@ fn run_case_with_config(
         Case::XlsNumericEagerNumberEditSave
         | Case::XlsNumericSourceBackedNumberEditSave
         | Case::XlsNumericEagerRkMulrkEditSave
-        | Case::XlsNumericSourceBackedRkMulrkEditSave => {
+        | Case::XlsNumericSourceBackedRkMulrkEditSave
+        | Case::XlsNumericPlanOnlyNumberEditSave
+        | Case::XlsNumericPlanOnlyRkMulrkEditSave => {
             Err("XLS numeric cases are dispatched by the fixed native-XLS runner".into())
         },
         Case::CfbOpen => run_cfb_open(corpus, warmup_iterations, samples),
@@ -26779,6 +26791,8 @@ mod tests {
         assert!(!Case::DEFAULT.contains(&Case::XlsCommentsSourceBackedEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsCommentsEagerBatchEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsCommentsSourceBackedBatchEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsNumericPlanOnlyNumberEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsNumericPlanOnlyRkMulrkEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxStreamingCreate));
         assert!(!Case::DEFAULT.contains(&Case::RtfStreamingCreate));
         assert!(!Case::DEFAULT.contains(&Case::RtfValidationReport));

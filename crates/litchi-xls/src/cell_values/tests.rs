@@ -5,7 +5,7 @@
 )]
 
 use super::*;
-use litchi_cfb::{OleFile, OleWriter};
+use litchi_cfb::{OleFile, OleWriter, SharedOleFile};
 use std::io::Write;
 
 fn package() -> Vec<u8> {
@@ -236,6 +236,65 @@ fn macro_package() -> Vec<u8> {
     output.into_inner()
 }
 
+fn empty_macro_storage_package() -> Vec<u8> {
+    let mut ole = OleFile::open(Cursor::new(package())).unwrap();
+    let workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let opaque = ole.open_stream(&["Opaque"]).unwrap();
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], &workbook).unwrap();
+    writer.create_stream(&["Opaque"], &opaque).unwrap();
+    writer.create_storage(&["_VBA_PROJECT_CUR"]).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn topology_with_clsids_package() -> Vec<u8> {
+    let mut ole = OleFile::open(Cursor::new(package())).unwrap();
+    let workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let opaque = ole.open_stream(&["Opaque"]).unwrap();
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], &workbook).unwrap();
+    writer.create_stream(&["Opaque"], &opaque).unwrap();
+    writer.create_storage(&["Metadata"]).unwrap();
+    writer
+        .create_stream(&["Metadata", "Payload"], b"metadata")
+        .unwrap();
+    writer.set_root_clsid([0x11; 16]);
+    writer.set_storage_clsid(&["Metadata"], [0x22; 16]).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn directory_signature(
+    bytes: &[u8],
+) -> Vec<(u32, String, u8, String, u32, u32, u32, u32, u64, bool)> {
+    let snapshot = Snapshot::from_bytes(bytes.to_vec()).unwrap();
+    let shared = SharedOleFile::open(Arc::new(SnapshotSource::new(
+        Arc::clone(&snapshot.inner.bytes),
+        snapshot.inner.source_version,
+    )))
+    .unwrap();
+    shared
+        .directory_entries()
+        .map(|entry| {
+            (
+                entry.sid,
+                entry.name.clone(),
+                entry.entry_type,
+                entry.clsid.clone(),
+                entry.sid_left,
+                entry.sid_right,
+                entry.sid_child,
+                entry.start_sector,
+                entry.size,
+                entry.is_minifat,
+            )
+        })
+        .collect()
+}
+
 fn stream(bytes: &[u8], name: &str) -> Vec<u8> {
     OleFile::open(Cursor::new(bytes))
         .unwrap()
@@ -363,6 +422,167 @@ fn source_backed_number_publication_preserves_the_artifact_contract() {
         commit.patch().inverse().apply(&applied).unwrap().bytes(),
         source.bytes()
     );
+}
+
+#[test]
+fn source_backed_numeric_plan_validates_without_retaining_target_snapshot() {
+    let cases = [
+        (Storage::Number, Reference::new(3, 2).unwrap(), 9.25),
+        (Storage::Rk, Reference::new(3, 2).unwrap(), 8.0),
+        (Storage::MulRk, Reference::new(3, 2).unwrap(), 6.0),
+    ];
+    for (storage, package_reference, replacement) in cases {
+        let (bytes, reference) = if storage == Storage::Number {
+            (package(), package_reference)
+        } else {
+            fixed_numeric_family_package(storage)
+        };
+        let source = Snapshot::from_bytes(bytes).unwrap();
+        let mut edit = source.edit();
+        edit.set_numeric("Sheet1".into(), reference, replacement)
+            .unwrap();
+        let plan = edit.commit_source_backed_plan().unwrap();
+        assert_eq!(plan.diagnostics().splice_count(), 1);
+        assert_eq!(
+            plan.diagnostics().replacement_bytes(),
+            if storage == Storage::Number { 8 } else { 4 }
+        );
+        assert_eq!(
+            plan.diagnostics().target_workbook_bytes(),
+            plan.diagnostics().source_workbook_bytes()
+        );
+
+        let mut output = Vec::new();
+        plan.write_to(&mut output).unwrap();
+        assert_eq!(stream(&output, "Opaque"), b"untouched");
+        let reopened = Snapshot::from_bytes(output).unwrap();
+        let cell = reopened
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(reference)
+            .unwrap()
+            .unwrap();
+        assert_eq!(cell.value(), &Value::Number(replacement));
+        assert_eq!(cell.storage(), storage);
+    }
+}
+
+#[test]
+fn source_backed_numeric_plan_preserves_complete_directory_topology_and_clsids() {
+    let source = Snapshot::from_bytes(topology_with_clsids_package()).unwrap();
+    let reference = Reference::new(3, 2).unwrap();
+    let before = directory_signature(source.bytes());
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), reference, 9.25).unwrap();
+    let plan = edit.commit_source_backed_plan().unwrap();
+
+    let mut output = Vec::new();
+    plan.write_to(&mut output).unwrap();
+    assert_eq!(directory_signature(&output), before);
+    assert_eq!(
+        OleFile::open(Cursor::new(&output))
+            .unwrap()
+            .open_stream(&["Metadata", "Payload"])
+            .unwrap(),
+        b"metadata"
+    );
+}
+
+#[test]
+fn source_backed_numeric_plan_rejects_stale_and_foreign_change_metadata() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let reference = Reference::new(3, 2).unwrap();
+
+    let mut stale_reference = source.edit();
+    stale_reference
+        .set_number("Sheet1".into(), reference, 9.25)
+        .unwrap();
+    stale_reference.changes[0].reference = Reference::new(3, 3).unwrap();
+    assert!(stale_reference.commit_source_backed_plan().is_err());
+
+    let foreign_entry = source.inner.sheets[0]
+        .entries
+        .iter()
+        .position(|entry| {
+            entry.cell.reference != reference && entry.cell.storage == Storage::Number
+        })
+        .unwrap();
+    let mut stale_entry = source.edit();
+    stale_entry
+        .set_number("Sheet1".into(), reference, 9.25)
+        .unwrap();
+    stale_entry.changes[0].entry = foreign_entry;
+    assert!(stale_entry.commit_source_backed_plan().is_err());
+}
+
+#[test]
+fn source_backed_numeric_plan_handles_noncanonical_noop_and_sink_failure() {
+    let raw = ((1.0_f64.to_bits() >> 32) as u32) & 0xffff_fffc;
+    let (bytes, reference) = raw_rk_family_package(Storage::Rk, &[raw]);
+    let source = Snapshot::from_bytes(bytes).unwrap();
+    let mut noop_edit = source.edit();
+    noop_edit
+        .set_numeric("Sheet1".into(), reference, 1.0)
+        .unwrap();
+    let noop = noop_edit.commit_source_backed_plan().unwrap();
+    assert!(noop.is_noop());
+    assert_eq!(noop.diagnostics().splice_count(), 0);
+    assert!(std::ptr::eq(
+        noop.source().bytes().as_ptr(),
+        source.bytes().as_ptr()
+    ));
+    assert_eq!(
+        noop.diagnostics().source_fingerprint(),
+        noop.diagnostics().target_fingerprint()
+    );
+    assert_eq!(
+        noop.diagnostics().source_version(),
+        noop.diagnostics().target_version()
+    );
+
+    let mut edit = source.edit();
+    edit.set_numeric("Sheet1".into(), reference, 2.0).unwrap();
+    let plan = edit.commit_source_backed_plan().unwrap();
+    let mut sink = PrefixFailingSink {
+        accepted: Vec::new(),
+        limit: 17,
+    };
+    let error = plan.write_to(&mut sink).unwrap_err();
+    assert!(matches!(error, OverlayError::IncompleteOutput { .. }));
+    assert_eq!(sink.accepted.len(), sink.limit);
+}
+
+#[test]
+fn source_backed_numeric_plan_refuses_structural_macro_and_signed_inputs() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let mut structural = source.edit();
+    structural.insert_rows("Sheet1".into(), 1, 1).unwrap();
+    assert!(structural.commit_source_backed_plan().is_err());
+
+    let source = Snapshot::from_bytes(macro_package()).unwrap();
+    let mut macro_edit = source.edit();
+    macro_edit
+        .set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
+        .unwrap();
+    assert!(macro_edit.commit_source_backed_plan().is_err());
+
+    let source = Snapshot::from_bytes(empty_macro_storage_package()).unwrap();
+    let mut empty_macro_edit = source.edit();
+    empty_macro_edit
+        .set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
+        .unwrap();
+    assert!(empty_macro_edit.commit_source_backed_plan().is_err());
+
+    let mut empty_macro_eager_edit = source.edit();
+    empty_macro_eager_edit
+        .set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
+        .unwrap();
+    assert!(empty_macro_eager_edit.commit_source_backed().is_err());
+
+    // Signed packages are rejected during Snapshot opening, so this also
+    // guards the plan path from accepting a marker through a different entry.
+    assert!(Snapshot::from_bytes(signed_package()).is_err());
 }
 
 #[test]

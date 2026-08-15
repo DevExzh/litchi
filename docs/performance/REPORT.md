@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **261 selectable cases**; 200 was the count before the
+HEAD harness contains **263 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -1016,7 +1016,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 261 selectable cases. Change
+The committed HEAD standalone harness provides 263 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1135,6 +1135,22 @@ run is single-process and warm, with no allocation, RSS, hardware-counter,
 physical-I/O, or cold-cache evidence. See
 [`0136`](changes/0136-xls-numeric-current-revision-baseline.md) and the linked
 raw schema-1 artifact.
+
+Change 0137 adds two opt-in plan-only native XLS numeric selectors, bringing
+the selectable matrix to 263 while preserving the default 36 cases / 198
+records. The plan-only Number and RK/MulRK paths include validated overlay-plan
+construction and composed semantic validation in the commit vector, then time
+complete `write_to` publication separately. They retain no complete target
+snapshot or target byte vector at commit, report zero target materialization and
+unsupported patch/inverse fields, and still publish complete sink bytes. Full
+reopen, topology/member identity, no-op and exact source/target fingerprint
+preflights, partial-sink, security/unsupported and 54016.xls forward producer
+gates remain untimed. Composed semantic validation may allocate/read a
+candidate Workbook model, so zero target-artifact bytes at commit is not a
+bounded total-memory claim. This
+is correctness/descriptive evidence only; no latency, allocation, RSS, I/O,
+memory, or speedup claim is accepted before balanced release ABBA. See
+[`0137`](changes/0137-xls-numeric-plan-only-publication.md).
 
 Change 0103 adds a separate pinned release ABBA capture for
 `cfb_file_same_length_overlay_atomic_save` on CPU 2 (five warm-ups and 30

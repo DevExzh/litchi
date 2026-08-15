@@ -360,7 +360,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**261 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**263 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -481,7 +481,9 @@ made without ABBA. See
 [`0134`](changes/0134-ods-source-cell-batch-sweep-evidence.md).
 
 The four 0135 selectors bring the current selectable matrix to 261 names while
-the default 36 cases / 198 records remain unchanged.
+the default 36 cases / 198 records remain unchanged. Change 0137 adds two
+additional opt-in plan-only selectors, bringing the selectable matrix to 263
+names without changing that default.
 
 Change 0135 adds four matched eager/source-backed native XLS fixed-width
 numeric selectors. The Number pair reuses `Untouched!E21` (`42` -> `43`) from
@@ -516,6 +518,24 @@ single-process run has no allocation, peak-memory/RSS, hardware-counter,
 physical-I/O, cold-cache, or fresh-process evidence. The raw schema-1 artifact,
 exact binary/result hashes, environment, commands, and interpretation are in
 [`0136`](changes/0136-xls-numeric-current-revision-baseline.md).
+
+Change 0137 adds matched plan-only Number and RK/MulRK selectors over the same
+corpora and edits. Their commit timer includes validated overlay-plan
+construction and composed semantic validation, while publication remains a
+separate complete `write_to` interval. The plan retains only the immutable
+source, checked overlay plan and bounded numeric splices; it retains and
+materializes no complete target artifact at commit. Evidence records zero
+`complete_target_materialized_bytes`, explicit false target-retention and
+target-materialization flags, and complete published sink bytes. Because this
+forward-only API does not expose the ordinary artifact patch, its evidence
+marks patch/inverse support false; exact source/target fingerprint preflights,
+forward reopen, topology, security, no-op, partial-sink and 54016.xls producer
+gates remain required. Composed semantic validation may allocate/read a
+candidate Workbook model, so zero retained target-artifact bytes is not a
+bounded total-memory claim. This
+is correctness/descriptive evidence only and does not claim a latency,
+allocation, RSS, I/O, or memory improvement before balanced release ABBA.
+See [`0137`](changes/0137-xls-numeric-plan-only-publication.md).
 
 The earlier five-case filesystem smoke exercises eager/source-backed OPC open,
 eager/source-backed one-Part atomic save, and same-length CFB atomic overlay
