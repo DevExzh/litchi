@@ -1361,16 +1361,20 @@ CFB now has a public bounded exact-range read with release ABBA evidence for a
 MiniFAT target and exact logical source-work evidence for the atomic overlay
 save scan reduction. Current-revision phase attribution assigns 135,680 bytes
 to open, 33,962,596 to plan/validation and 50,740,224 to atomic publication in
-each of 400 samples. This identifies fingerprint request coalescing as the next
-bounded experiment without weakening the two planning brackets or three
-save-time scans. These results
-remain substrate-only: no DOC/XLS/PPT
-semantic owner consumes the exact-range seam, FAT tail behavior is withheld,
-and matched before/after p99, high-latency range, allocation, peak-RSS, and
-storage-device evidence remain open. The atomic-save latency directions
-disagree, so its
-16.6222% logical-byte and 12.4280% logical-call reductions must not be read as
-a speedup.
+each of 400 samples. Change 0143 accepts the bounded follow-up without weakening
+the two planning brackets or three save-time scans: fingerprint-only requests
+are capped at 1 MiB while comparison/publication remain at 64 KiB. Clean
+CPU-2 `A1, B1, B2, A2` evidence reduces logical calls from 1,825 to 857 with
+unchanged 84,838,500 bytes and exact output. Warm p50 improves 3.3327%/1.3163%
+and advisory-cold p50 10.7679%/9.4641%; p95 and mean agree in both directions.
+The code-local fingerprint window grows by at most 983,040 bytes and a matched
+whole-process RSS boundary shows no candidate increase, but operation-only
+allocation/peak memory remains unmeasured. These results remain substrate-only:
+no DOC/XLS/PPT semantic owner consumes the exact-range seam, FAT tail behavior
+is withheld, and high-latency range, physical-cold and storage-device evidence
+remain open. The older Change 0103 `4N -> 3N` scan-removal ABBA still has
+disagreeing latency directions; only its exact logical-work reduction was
+accepted independently.
 
 Other high-priority gaps are physical cold-filesystem and real range-source
 matrices beyond the debug smoke and repeated tmpfs release capture, threshold

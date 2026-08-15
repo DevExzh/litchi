@@ -2,13 +2,13 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0142`](changes/0142-cfb-atomic-save-phase-attribution.md)
-(the newest accepted optimization result remains limited to four repeated source-backed ODP
-full-text projections; the latest release CFB selective-range evidence remains
+Evidence through: [`change 0143`](changes/0143-cfb-fingerprint-read-coalescing.md)
+(the newest accepted semantic-format optimization remains limited to four repeated
+source-backed ODP full-text projections; the latest release CFB selective-range evidence remains
 [`0094`](changes/0094-cfb-selective-read-evidence.md), and the latest accepted
-before/after release filesystem result remains
-[`0089`](changes/0089-filesystem-release-repeated-evidence.md); Change 0142 is
-current-revision attribution only)
+generic multi-format filesystem result remains
+[`0089`](changes/0089-filesystem-release-repeated-evidence.md); Change 0143 is
+the latest accepted before/after CFB filesystem result)
 
 This document records facts established by source inspection. It is not a
 performance-results report. A path is called a bottleneck only after the
@@ -43,13 +43,27 @@ process.
   task granularity and serial work, but does not justify adding parallelism or
   changing the execution API.
 
-The CFB read-amplification breakdown is now captured: open accounts for
-135,680 logical bytes, plan/validation for 33,962,596, and atomic publication
-for 50,740,224 in every sample. The next evidence-oriented priorities are a
-matched fingerprint-request coalescing experiment, operation-scoped
-allocation/RSS profiles for managed XLSX, and a CPU-pinned repeated scaling
-run with uncertainty. None should be treated as an optimization acceptance
-gate until matched controls and preservation gates exist.
+The CFB read-amplification breakdown is now captured and its bounded
+fingerprint-request hypothesis is accepted in Change 0143: logical bytes stay
+84,838,500 while calls fall from 1,825 to 857, with both clean ABBA directions
+improving warm and advisory-cold p50/p95/mean. The next evidence-oriented
+priorities are operation-scoped allocation profiles for CFB and managed XLSX,
+block-backed physical-cold/high-latency CFB evidence, and a CPU-pinned repeated
+scaling run with uncertainty. None should be treated as an optimization
+acceptance gate until matched controls and preservation gates exist.
+
+## CFB fingerprint read coalescing (change 0143)
+
+Complete CFB overlay fingerprints now use a right-sized request window capped
+at 1 MiB; comparison and publication remain at 64 KiB, the buffers do not
+overlap, and no fingerprint or stable-token validation stage is removed. A
+clean CPU-2 `A1, B1, B2, A2` release run with 200 samples per warm and
+advisory-cold state reduces exact logical requests 53.0411% (1,825 -> 857) with
+unchanged logical bytes, output hash and one-span publication. Warm p50 improves
+3.3327%/1.3163% and advisory-cold p50 10.7679%/9.4641%; p95 and mean agree in
+both directions. A matched whole-process RSS boundary found no candidate
+increase, but operation-only allocation/peak memory, physical I/O and proven
+cold-storage claims remain open.
 
 ## ODP repeated full-text projection (change 0140)
 
@@ -743,6 +757,14 @@ Confirmed source facts:
   -10.0141%, so no latency/speedup, RSS/allocation, physical-cold, or storage
   claim is accepted. Parent-wall and warm process-I/O counters remain
   descriptive only; see [change 0103](changes/0103-cfb-atomic-save-scan-evidence.md).
+- Complete CFB overlay fingerprint scans now coalesce positional requests with
+  a right-sized window capped at 1 MiB; comparison/emission stay at 64 KiB and
+  no scan is removed. Clean balanced release evidence reduces calls from 1,825
+  to 857 with unchanged 84,838,500 logical bytes and accepts p50/p95/mean in
+  both directions for warm and advisory-cold states. The maximum code-local
+  fingerprint buffer grows by 983,040 bytes; whole-process RSS is neutral in
+  the matched boundary, while operation-only allocation and physical-I/O
+  claims remain open. See [change 0143](changes/0143-cfb-fingerprint-read-coalescing.md).
 - PPT root slide-order capture now passes its package-owned validated
   `OleFile` to independent live-document inspection instead of rebuilding the
   CFB index. Large root-open p50 improves 8.78% and allocation calls fall
