@@ -437,6 +437,7 @@ enum PayloadKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CfbSelectiveTarget {
     Mini,
+    Mini4095,
     Fat,
 }
 
@@ -444,6 +445,7 @@ impl CfbSelectiveTarget {
     const fn name(self) -> &'static str {
         match self {
             Self::Mini => "minifat-36-byte",
+            Self::Mini4095 => "minifat-4095-byte",
             Self::Fat => "fat-4mib",
         }
     }
@@ -451,6 +453,7 @@ impl CfbSelectiveTarget {
     const fn target_bytes(self) -> usize {
         match self {
             Self::Mini => 36,
+            Self::Mini4095 => 4095,
             Self::Fat => 4 * 1024 * 1024,
         }
     }
@@ -549,6 +552,8 @@ enum Case {
     CfbSharedConcurrentReads,
     CfbSelectiveMiniLegacyRead,
     CfbSelectiveMiniSharedRead,
+    CfbSelectiveMini4095LegacyRead,
+    CfbSelectiveMini4095SharedRead,
     CfbSelectiveFatLegacyRead,
     CfbSelectiveFatSharedRead,
     DocFreshWriteTo,
@@ -872,6 +877,8 @@ impl Case {
             Self::CfbSharedConcurrentReads => "cfb_shared_concurrent_reads",
             Self::CfbSelectiveMiniLegacyRead => "cfb_selective_mini_legacy_read",
             Self::CfbSelectiveMiniSharedRead => "cfb_selective_mini_shared_read",
+            Self::CfbSelectiveMini4095LegacyRead => "cfb_selective_mini_4095_legacy_read",
+            Self::CfbSelectiveMini4095SharedRead => "cfb_selective_mini_4095_shared_read",
             Self::CfbSelectiveFatLegacyRead => "cfb_selective_fat_legacy_read",
             Self::CfbSelectiveFatSharedRead => "cfb_selective_fat_shared_read",
             Self::DocFreshWriteTo => "doc_fresh_write_to",
@@ -1406,6 +1413,8 @@ impl Case {
             self,
             Self::CfbSelectiveMiniLegacyRead
                 | Self::CfbSelectiveMiniSharedRead
+                | Self::CfbSelectiveMini4095LegacyRead
+                | Self::CfbSelectiveMini4095SharedRead
                 | Self::CfbSelectiveFatLegacyRead
                 | Self::CfbSelectiveFatSharedRead
         )
@@ -4208,7 +4217,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             .copied()
             .filter(|shape| matches!(shape, CorpusShape::ManySmall | CorpusShape::WideRoot))
         {
-            for target in [CfbSelectiveTarget::Mini, CfbSelectiveTarget::Fat] {
+            for target in [
+                CfbSelectiveTarget::Mini,
+                CfbSelectiveTarget::Mini4095,
+                CfbSelectiveTarget::Fat,
+            ] {
                 let corpus = build_cfb_selective_corpus(shape, target)?;
                 for case in options.cases.iter().copied().filter(|case| {
                     case.is_cfb_selective()
@@ -4218,6 +4231,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                                     case,
                                     Case::CfbSelectiveMiniLegacyRead
                                         | Case::CfbSelectiveMiniSharedRead
+                                )
+                            },
+                            CfbSelectiveTarget::Mini4095 => {
+                                matches!(
+                                    case,
+                                    Case::CfbSelectiveMini4095LegacyRead
+                                        | Case::CfbSelectiveMini4095SharedRead
                                 )
                             },
                             CfbSelectiveTarget::Fat => {
@@ -5377,6 +5397,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_file_source_selected_slide" => Some(Case::PptxFileSourceSelectedSlide),
         "cfb_selective_mini_legacy_read" => Some(Case::CfbSelectiveMiniLegacyRead),
         "cfb_selective_mini_shared_read" => Some(Case::CfbSelectiveMiniSharedRead),
+        "cfb_selective_mini_4095_legacy_read" => Some(Case::CfbSelectiveMini4095LegacyRead),
+        "cfb_selective_mini_4095_shared_read" => Some(Case::CfbSelectiveMini4095SharedRead),
         "cfb_selective_fat_legacy_read" => Some(Case::CfbSelectiveFatLegacyRead),
         "cfb_selective_fat_shared_read" => Some(Case::CfbSelectiveFatSharedRead),
         "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
@@ -5777,6 +5799,8 @@ fn print_usage() {
                                        cfb_shared_concurrent_reads,\n\
                                        cfb_selective_mini_legacy_read,\n\
                                        cfb_selective_mini_shared_read,\n\
+                                       cfb_selective_mini_4095_legacy_read,\n\
+                                       cfb_selective_mini_4095_shared_read,\n\
                                        cfb_selective_fat_legacy_read,\n\
                                        cfb_selective_fat_shared_read,\n\
                                        doc_fresh_write_to,xls_fresh_write_to,ppt_fresh_write_to,\n\
@@ -9940,6 +9964,8 @@ fn run_case_with_config(
         },
         Case::CfbSelectiveMiniLegacyRead
         | Case::CfbSelectiveMiniSharedRead
+        | Case::CfbSelectiveMini4095LegacyRead
+        | Case::CfbSelectiveMini4095SharedRead
         | Case::CfbSelectiveFatLegacyRead
         | Case::CfbSelectiveFatSharedRead => {
             Err("selective CFB case requires its dedicated corpus dispatcher".into())
@@ -24345,7 +24371,9 @@ fn run_cfb_selective_read(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let shared = matches!(
         case,
-        Case::CfbSelectiveMiniSharedRead | Case::CfbSelectiveFatSharedRead
+        Case::CfbSelectiveMiniSharedRead
+            | Case::CfbSelectiveMini4095SharedRead
+            | Case::CfbSelectiveFatSharedRead
     );
     let implementation = if shared {
         "shared-positional-exact-range"
@@ -24440,7 +24468,11 @@ fn run_cfb_selective_read(
         timing_scope: "open and selected read are separate stages; legacy materializes the full stream, while shared fills a newly allocated exact-length caller range; corpus construction and validation excluded",
         sink: "none",
         selected_target_kind: if corpus.target_payload.len() < 4096 {
-            "minifat-36-byte"
+            if corpus.target_payload.len() == 4095 {
+                "minifat-4095-byte"
+            } else {
+                "minifat-36-byte"
+            }
         } else {
             "fat-4mib"
         },
@@ -25682,7 +25714,11 @@ mod tests {
     #[test]
     fn selective_cfb_corpora_are_bounded_and_deterministic() {
         for shape in [CorpusShape::ManySmall, CorpusShape::WideRoot] {
-            for target in [CfbSelectiveTarget::Mini, CfbSelectiveTarget::Fat] {
+            for target in [
+                CfbSelectiveTarget::Mini,
+                CfbSelectiveTarget::Mini4095,
+                CfbSelectiveTarget::Fat,
+            ] {
                 let first = build_cfb_selective_corpus(shape, target).unwrap();
                 let second = build_cfb_selective_corpus(shape, target).unwrap();
                 assert_eq!(first.archive, second.archive);
@@ -25731,6 +25767,55 @@ mod tests {
             assert!(!evidence.open_range_sizes[0].is_empty());
             assert!(evidence.read_calls[0] > 0);
             assert!(!evidence.read_range_sizes[0].is_empty());
+        }
+    }
+
+    #[test]
+    fn selective_cfb_minifat_boundary_exposes_request_amplification() {
+        for shape in [CorpusShape::ManySmall, CorpusShape::WideRoot] {
+            let corpus = build_cfb_selective_corpus(shape, CfbSelectiveTarget::Mini4095).unwrap();
+            assert_eq!(corpus.manifest.target_payload_bytes, 4095);
+            assert_eq!(
+                corpus.manifest.target_payload_sha256,
+                sha256_hex(&corpus.target_payload)
+            );
+
+            let legacy =
+                run_cfb_selective_read(Case::CfbSelectiveMini4095LegacyRead, &corpus, 0, 1)
+                    .unwrap()
+                    .source
+                    .unwrap()
+                    .cfb_selective
+                    .unwrap()
+                    .legacy_or_positional;
+            let shared =
+                run_cfb_selective_read(Case::CfbSelectiveMini4095SharedRead, &corpus, 0, 1)
+                    .unwrap()
+                    .source
+                    .unwrap()
+                    .cfb_selective
+                    .unwrap()
+                    .legacy_or_positional;
+
+            assert_eq!(legacy.returned_payload_bytes, vec![4095]);
+            assert_eq!(shared.returned_payload_bytes, vec![4095]);
+            assert_eq!(
+                legacy.selected_payload_sha256,
+                corpus.manifest.target_payload_sha256
+            );
+            assert_eq!(
+                shared.selected_payload_sha256,
+                corpus.manifest.target_payload_sha256
+            );
+            assert!(legacy.read_bytes[0] > 4095);
+            assert_eq!(shared.read_bytes[0], 4095);
+            assert!(legacy.read_range_sizes[0].iter().sum::<u64>() > 4095);
+
+            // The 4095-byte stream occupies 64 logical 64-byte mini-sectors
+            // and exactly eight 512-byte physical sectors. A successful
+            // physical-run coalescer therefore submits one exact request.
+            assert_eq!(shared.read_calls, vec![1]);
+            assert_eq!(shared.read_range_sizes, vec![vec![4095]]);
         }
     }
 

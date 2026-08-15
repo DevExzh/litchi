@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **243 selectable cases**; 200 was the count before the
+HEAD harness contains **245 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -83,6 +83,7 @@ is still not broad program or CRUD coverage.
 | Targeted OPC raw publication | Four-cell ABBA p50 geomean **-84.98%**; few-large/incompressible **-71.70%**; matched cycles **-69.21%** | Initial peak heap **+37.18%**, one-shot RSS **+22.26%** from retained source/provenance and a changed-payload copy; the copy is removed by the shared-payload follow-up below |
 | Positional CFB/ZIP and explicit execution | Large-task p50 scaling at 12 CPUs: OPC **4.52x**, CFB **5.93x**; no hidden global Rayon | Many-small tasks regress at high worker counts; default/legacy paths remain serial |
 | CFB selective exact-range read | MiniFAT source bytes **261,184 -> 36** (many-small) and **2,096,192 -> 36** (wide-root), one request in each; read-stage p50 **-95.1%/-94.8%** and **-99.2%/-99.2%** across ABBA directions; read-stage p95 **-94.4%/-94.8%** and **-98.9%/-99.1%**; total p50 **-8.4%/-14.2%** and **-6.6%/-11.9%** | FAT retains one 4 MiB request/call and paired read/total p50 changes stay within 5% control drift. No p95/p99 FAT, MiniFAT p99, cold-filesystem, simulated high-latency range, allocation, peak-RSS, or DOC/XLS/PPT semantic claim |
+| CFB MiniFAT 4095-byte physical-run evidence | Focused matched legacy/positional controls record exact open/read/total timing, source calls/bytes/range sizes, 4095-byte payload hash, and request amplification across 64 logical mini-sectors | Correctness/request-amplification evidence only; no release latency, p99, cold/high-latency, allocation/RSS, physical-I/O, or native semantic claim |
 | Source-backed OPC and DOCX/XLSX/PPTX facades | EOCD structural-open source bytes **-73.6% to -98.5%**; ordinary payload overlap zero | No latency claim: later EntryId/cache-diagnostic changes confound comparison and some cells exceed 5% variance |
 | Source-backed PPTX selected-slide publication | Media-rich one-edit/save p50 **-97.12%**; atomic same-slide batch p50 **-97.45%**, materializations **229 -> 2**; atomic eight-slide batch p50 **-95.78%**, allocations **-32.54%**, materializations **229 -> 9**; byte-identical output | At most 32 existing slides with one bounded 256-selector shape-text operation each; MCE rewrites, relationships/topology changes and changed signed packages refuse before output |
 | Source-backed XLSX calculation-metadata publication | Media-rich one-edit/save p50 **-99.2519%** (133.67x), mean **-99.2507%**; instructions **-77.78%**; materializations **12 -> 1**; byte-identical output | Existing `xl/workbook.xml` calculation properties/features only; cells, formulas, cached results, chains, relationships and topology remain outside the capability |
@@ -1013,7 +1014,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 243 selectable cases. Change
+The committed HEAD standalone harness provides 245 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1023,6 +1024,15 @@ are correctness/coverage evidence only. Change 0094 has a pinned 30-warmup,
 and only modest total-p50 movement; FAT retains one 4 MiB read request/call.
 No p99, cold-filesystem, simulated high-latency range, allocation, peak-RSS,
 or DOC/XLS/PPT semantic claim is accepted. See the [compact ABBA summary](results/cfb-selective-range-abba-0106-summary.json).
+
+Change 0125 adds two matched 4095-byte MiniFAT boundary selectors, preserving
+the 36-case / 198-record default and bringing the selectable matrix to 245
+names. The focused gate records separate open/read/total timing, exact source
+calls/bytes/range sizes, and payload hashes; it expects legacy root-mini-stream
+amplification and one exact 4095-byte positional request over the 64 logical
+mini-sectors. This is correctness/request-amplification evidence only, with
+no release latency, tail, cold/high-latency, allocation/RSS, physical-I/O, or
+native semantic claim.
 
 Change 0119 adds three opt-in native PPT selected-shape controls and preserves
 the 36-case / 198-record default. The query-only and fresh-open-plus-query

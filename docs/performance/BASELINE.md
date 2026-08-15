@@ -225,6 +225,24 @@ evidence; it does not certify DOC/XLS/PPT semantic CRUD adoption. See the
 [change record](changes/0094-cfb-selective-read-evidence.md) and
 [compact ABBA summary](results/cfb-selective-range-abba-0106-summary.json).
 
+## CFB MiniFAT physical-run boundary evidence (change 0125)
+
+The current harness adds a matched 4095-byte MiniFAT boundary pair over the
+same 256- and 2,048-sibling shapes. This target is distinct from the accepted
+36-byte control: it occupies 64 logical 64-byte mini-sectors (eight regular
+512-byte sectors) and therefore exercises
+physical root-sector run coalescing. The legacy case materializes the complete
+root mini-stream; the positional case records exact source ranges while
+filling a 4095-byte caller buffer. Each sample keeps separate open/read/total
+timing arrays, source call/byte/range vectors, returned length, and payload
+hash. The focused test requires legacy source bytes to exceed 4095 and the
+positional source bytes to equal 4095 in one exact request.
+
+This is correctness and request-amplification evidence only. No latency,
+tail, physical-I/O, allocation, RSS, cold-cache, high-latency-source, or
+semantic native Office claim is accepted until release ABBA and resource
+attribution are available. See [change 0125](changes/0125-cfb-minifat-physical-run-evidence.md).
+
 ## CFB atomic-save scan evidence
 
 Change 0103 measures the same-length `cfb_file_same_length_overlay_atomic_save`
@@ -342,7 +360,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**243 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**245 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -410,6 +428,12 @@ decompression, allocation, RSS, or release claim is accepted. See
 [`0122`](changes/0122-odp-media-source-read-evidence.md),
 [`0123`](changes/0123-odp-unified-root-filesystem-evidence.md), and
 [`0124`](changes/0124-ods-unified-root-filesystem-evidence.md).
+
+Change 0125 adds two matched 4095-byte MiniFAT boundary selectors, bringing
+the current selectable matrix to 245 names while preserving the default
+36-case / 198-record tranche. Their focused evidence records exact source
+calls, bytes, physical range sizes, payload hash, and separate open/read/total
+timing; it makes no release speed claim.
 
 Five filesystem cases now exercise eager/source-backed OPC open, eager/source-
 backed one-Part atomic save, and same-length CFB atomic overlay save. A
