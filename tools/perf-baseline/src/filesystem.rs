@@ -910,19 +910,34 @@ fn run_one(
         }
     }
 
+    let warm_result = if cache_selection.warm() {
+        Some(filesystem_result(
+            case,
+            corpus,
+            warm_elapsed,
+            "warm",
+            expected_digest.clone(),
+            &sample_evidence,
+        )?)
+    } else {
+        None
+    };
+    let cold_result = if cache_selection.cold_requested() {
+        Some(filesystem_result(
+            case,
+            corpus,
+            cold_elapsed,
+            "cold-requested",
+            expected_digest,
+            &sample_evidence,
+        )?)
+    } else {
+        None
+    };
+
     Ok(Run {
-        warm_result: cache_selection.warm().then(|| {
-            filesystem_result(case, corpus, warm_elapsed, "warm", expected_digest.clone())
-        }),
-        cold_result: cache_selection.cold_requested().then(|| {
-            filesystem_result(
-                case,
-                corpus,
-                cold_elapsed,
-                "cold-requested",
-                expected_digest,
-            )
-        }),
+        warm_result,
+        cold_result,
         evidence: Evidence {
             case: case.name(),
             corpus: corpus.manifest.clone(),
@@ -987,11 +1002,17 @@ fn filesystem_result(
     elapsed: Vec<u64>,
     cache_state: &'static str,
     output_sha256: Option<String>,
-) -> super::CaseResult {
+    samples: &[SampleEvidence],
+) -> Result<super::CaseResult, Box<dyn Error>> {
     let mut result = super::result(case, corpus, elapsed, None);
     result.cache_state = Some(cache_state);
     result.output_sha256 = output_sha256;
-    result
+    result.operation_metrics = Some(crate::operation_metrics::aggregate(
+        samples,
+        cache_state,
+        &result.elapsed_ns.samples,
+    )?);
+    Ok(result)
 }
 
 fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<String, Box<dyn Error>> {
@@ -1208,22 +1229,25 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
     let after = process_metrics::Snapshot::read().ok();
     let process_delta = before.zip(after).map(|(before, after)| after.delta(before));
     let snapshot = counter.map_or_else(ReadMetrics::default, |counter| counter.snapshot());
-    let logical_read_counter_scope = if operation.is_pptx() {
-        if operation.is_source_pptx() {
-            "untimed_source_replay_only"
+    let logical_read_counter_scope =
+        if matches!(operation, Operation::OpcEagerOpen | Operation::OpcEagerSave) {
+            "not_applicable_eager_opc"
+        } else if operation.is_pptx() {
+            if operation.is_source_pptx() {
+                "untimed_source_replay_only"
+            } else {
+                "not_applicable_eager_pptx"
+            }
+        } else if operation.is_docx() {
+            if operation.is_source_docx() {
+                "untimed_source_replay_only"
+            } else {
+                "not_applicable_eager_docx"
+            }
         } else {
-            "not_applicable_eager_pptx"
+            "timed_read_at"
         }
-    } else if operation.is_docx() {
-        if operation.is_source_docx() {
-            "untimed_source_replay_only"
-        } else {
-            "not_applicable_eager_docx"
-        }
-    } else {
-        "timed_read_at"
-    }
-    .to_owned();
+        .to_owned();
     let pptx_source_replay = operation
         .is_source_pptx()
         .then(|| replay_pptx_source(&source, operation))
