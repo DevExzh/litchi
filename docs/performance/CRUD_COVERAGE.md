@@ -2,7 +2,7 @@
 
 Date: 2026-08-15
 
-This is a coverage map, not a completion claim. It compares the 257 selectable
+This is a coverage map, not a completion claim. It compares the 261 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -614,6 +614,20 @@ API does not accept a caller-provided `ReadAt`. Change 0095 accepts only the
 exact replacement-byte reduction; its balanced release ABBA establishes no
 speedup, and allocation, RSS and source-I/O remain open.
 
+Change 0135 adds four opt-in native XLS fixed-width numeric CRUD selectors.
+The Number pair edits `Untouched!E21` from 42 to 43; the RK/MulRK pair edits a
+standalone RK and both cells of one MulRK record in one transaction, preserving
+each source storage family. Eager and source-backed timing separates edit,
+`set_number`/`set_numeric`, commit, and complete sequential publication. The
+deterministic CFB corpora retain opaque siblings and metadata. Untimed gates
+cover source ingress, complete Snapshot/Workbook reopen and numeric readback,
+deterministic digests, untouched stream bytes/topology, source-backed equal
+Workbook lengths, patch apply/inverse/stale, exact no-op/fingerprint,
+signed/macro/protected/unsupported refusal, and an untimed 54016.xls
+real-producer reopen/inverse gate. Source-backed evidence reports complete
+target materialization on both paths and is explicitly not positional-I/O,
+bounded-memory, allocation/RSS, speedup, or broad-producer coverage.
+
 Change 0091 adds four opt-in native XLS worksheet-visibility cases over one
 deterministic CFB corpus with 66 worksheets, eight 256 KiB incompressible opaque
 streams, and opaque metadata: eager and source-backed one-owner edits plus
@@ -932,10 +946,23 @@ owners and 2,048 borrowed selectors first, then performs four bounded
 `cell_batch` calls (8,192 result slots) with black-boxed results. Independent
 source replay records exactly eight version observations and zero
 post-preparation payload reads per sweep, with ordered parity and digest/count
-gates outside timing. The selectable matrix is now 257 while the default
-36-case / 198-record tranche is unchanged; this is correctness/logical-read
+gates outside timing. At that stage the selectable matrix was 257 while the
+default 36-case / 198-record tranche was unchanged; this is correctness/logical-read
 evidence only, not a release speed or resource claim. See
 [`0134`](changes/0134-ods-source-cell-batch-sweep-evidence.md).
+
+Change 0135 brings the current selectable matrix to 261 names with four
+matched native XLS Number and RK/MulRK publication selectors, preserving the
+default 36 cases / 198 records. The Number control edits `Untouched!E21`
+42 -> 43; the packed control edits one standalone RK and both cells in one
+MulRK record transactionally. Complete target materialization, source ingress,
+full Snapshot/Workbook reopen, family/value readback, untouched CFB topology and
+member bytes, equal source-backed Workbook lengths, patch/inverse/stale,
+no-op/fingerprint, security/unsupported refusals, deterministic sink evidence,
+and the untimed 54016.xls real-producer reopen/inverse gate are explicit
+outside-timer checks. This adds correctness coverage only and claims no
+positional I/O, allocation/RSS, bounded artifact memory, speedup, or broad
+producer support.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

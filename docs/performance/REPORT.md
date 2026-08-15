@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **257 selectable cases**; 200 was the count before the
+HEAD harness contains **261 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -129,6 +129,7 @@ is still not broad program or CRUD coverage.
 | Native XLS validated-editor reuse | Large one-cell edit/save p50 **-7.72%**, mean **-7.90%** | Final exact owner parse, public Workbook reopen and typed readback remain; peak heap/RSS flat |
 | Native XLS fixed-width numeric inventory carry-forward | Large one-cell edit/save p50 **-7.83%**, mean **-7.37%**, p95 **-7.20%** | Exact byte-range proof plus complete public Workbook validation/readback remain; peak heap -5.54%, RSS flat; all nonnumeric/structural/resource edits retain full parse |
 | XLS comment/visibility source-splice publication | Existing matched eager/source-backed controls cover one/256-comment and one/64-visibility edits; source-backed owners now submit exact NOTE/TXO or `BoundSheet8` ranges | Replacement staging is 109/27,904 bytes instead of an 80,946-byte Workbook and 1/64 instead of 18,166; balanced ABBA accepts no latency speedup, while complete semantic/readback/security gates remain; allocation, RSS and physical I/O remain open |
+| XLS fixed-width numeric publication evidence | Four opt-in matched eager/source-backed Number and RK/MulRK selectors; deterministic `Untouched!E21` 42 -> 43 plus one standalone RK and one two-cell MulRK transaction | Separate edit/set/commit/publication/total vectors, complete target materialization on both paths, exact source-backed splice/replacement/span/fingerprint evidence, sink bytes/write counts/digests, full Snapshot/Workbook reopen, untouched CFB topology/member bytes, patch/inverse/stale, security/no-op/unsupported gates, and untimed 54016.xls reopen/inverse; correctness/coverage only with no positional-I/O, allocation/RSS, bounded-memory, speedup, or broad-producer claim |
 | Rejected XLS terminal-render handoff | Tiny changed save p50 **-7.55%**; large changed save **-0.39%** (neutral) | Fully reverted: repeated large exact no-op p50 **+22.00%**, mean **+16.69%** |
 | Common OLE2 publication stages and rejected handoffs | Current open/publication/finish/end-to-end p50: **1.382 / 7.979 / 5.473 / 26.086 ms**; inline recapture prototype end-to-end **-2.61%** p50 | Stages are non-additive; shared-payload, validated-render and inline recapture prototypes are all fully reverted |
 | Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
@@ -1015,7 +1016,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 257 selectable cases. Change
+The committed HEAD standalone harness provides 261 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1099,11 +1100,28 @@ selectors over the same two-sheet 32 by 32 media-rich corpus. Owners and
 four bounded `cell_batch` calls and 8,192 black-boxed result slots. An
 independent source replay records exactly eight version observations and zero
 post-preparation payload reads per four-call sweep. Ordered digest/count and
-source/member/media identity checks remain untimed. The selectable matrix is
-257 while the default 36 cases / 198 records remain unchanged. This is
+source/member/media identity checks remain untimed. At that stage the
+selectable matrix was 257 while the default 36 cases / 198 records remained
+unchanged. This is
 correctness/logical-read evidence only, with no release speed or resource claim
 without ABBA. See
 [`0134`](changes/0134-ods-source-cell-batch-sweep-evidence.md).
+
+Change 0135 adds four opt-in native XLS fixed-width numeric selectors and brings
+the current selectable matrix to 261 names while preserving the default
+36-case / 198-record tranche. The Number controls reuse the deterministic
+comments corpus `Untouched!E21` (`42` -> `43`); the RK/MulRK controls use one
+standalone RK and one two-cell MulRK record and edit all three values in one
+transaction. Timed vectors separate transaction creation, `set_number` or
+`set_numeric`, eager/source-backed commit, and complete publication to one
+preallocated sink. Untimed gates cover source ingress, expected outputs,
+complete Snapshot/Workbook reopen, storage-family/value readback, deterministic
+digests, untouched CFB topology/member bytes, equal Workbook lengths on the
+source-backed path, patch apply/inverse/stale, no-op/fingerprint,
+signed/macro/protected/unsupported refusal, and the 54016.xls real-producer
+reopen/inverse check. Source evidence reports complete target materialized
+bytes on both paths and explicitly does not claim bounded artifact memory or
+positional I/O; no speedup or broad-producer claim is accepted.
 
 Change 0103 adds a separate pinned release ABBA capture for
 `cfb_file_same_length_overlay_atomic_save` on CPU 2 (five warm-ups and 30
