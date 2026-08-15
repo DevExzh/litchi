@@ -6,7 +6,13 @@
 //! that mutation boundary.  The ZIP index and the validated semantic XML are
 //! retained, while unrelated package members stay cold until selected.
 
-use std::{fmt, sync::Arc};
+use std::{
+    fmt,
+    sync::{
+        Arc, OnceLock,
+        atomic::{AtomicUsize, Ordering},
+    },
+};
 
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
@@ -52,6 +58,8 @@ pub struct SourceBackedSpreadsheet {
     sheets: Vec<Sheet>,
     metadata: crate::metadata::Snapshot,
     settings: Option<Settings>,
+    cell_queries: AtomicUsize,
+    cell_locator: OnceLock<Option<super::cell_locator::CellLocator>>,
 }
 
 impl fmt::Debug for SourceBackedSpreadsheet {
@@ -245,6 +253,8 @@ impl SourceBackedSpreadsheet {
             sheets,
             metadata,
             settings,
+            cell_queries: AtomicUsize::new(0),
+            cell_locator: OnceLock::new(),
         })
     }
 
@@ -391,8 +401,33 @@ impl SourceBackedSpreadsheet {
         let value = self
             .sheets
             .iter()
-            .find(|sheet| sheet.name == sheet_name)
-            .map(|sheet| sheet.cell_view(row, column));
+            .position(|sheet| sheet.name == sheet_name)
+            .map(|sheet_index| {
+                let direct = || self.sheets[sheet_index].cell_view(row, column);
+
+                if let Some(locator) = self.cell_locator.get() {
+                    return locator.as_ref().map_or_else(direct, |locator| {
+                        locator.cell_view(&self.sheets, sheet_index, row, column)
+                    });
+                }
+
+                let previous = self
+                    .cell_queries
+                    .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
+                        Some(count.saturating_add(1))
+                    })
+                    .unwrap_or(usize::MAX);
+                if previous.saturating_add(1) >= super::cell_locator::BUILD_QUERY_THRESHOLD {
+                    let locator = self
+                        .cell_locator
+                        .get_or_init(|| super::cell_locator::CellLocator::try_build(&self.sheets));
+                    locator.as_ref().map_or_else(direct, |locator| {
+                        locator.cell_view(&self.sheets, sheet_index, row, column)
+                    })
+                } else {
+                    direct()
+                }
+            });
         self.check_source()?;
         Ok(value)
     }
@@ -590,6 +625,7 @@ mod tests {
     use crate::worksheet::{Cell, CellValue, Row, Sheet};
     use litchi_core::{OwnedSource, ReadAt, SourceVersion};
     use std::io::{Cursor, Read, Write};
+    use std::ptr;
     use std::sync::{
         Arc,
         atomic::{AtomicU64, AtomicUsize, Ordering},
@@ -687,6 +723,145 @@ mod tests {
         ));
         assert!(matches!(
             spreadsheet.materialize(),
+            Err(litchi_core::Error::SourceChanged { .. })
+        ));
+    }
+
+    #[test]
+    fn source_cell_locator_is_lazy_and_builds_at_threshold_without_source_reads() {
+        let source = Arc::new(CountingSource::new(package()));
+        let spreadsheet =
+            SourceBackedSpreadsheet::from_read_at(source.clone()).expect("source ODS");
+        let after_open = source.reads();
+
+        assert!(spreadsheet.cell_locator.get().is_none());
+        for _ in 0..(super::super::cell_locator::BUILD_QUERY_THRESHOLD - 1) {
+            assert!(matches!(
+                spreadsheet.cell("Sheet1", 0, 0),
+                Ok(Some(crate::worksheet::CellView::Stored(_)))
+            ));
+        }
+        assert!(spreadsheet.cell_locator.get().is_none());
+        assert_eq!(source.reads(), after_open);
+
+        assert!(matches!(
+            spreadsheet.cell("Sheet1", 0, 0),
+            Ok(Some(crate::worksheet::CellView::Stored(_)))
+        ));
+        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
+        assert_eq!(source.reads(), after_open);
+    }
+
+    #[test]
+    fn source_indexed_lookup_matches_linear_runs_for_repeated_empty_and_boundary_rows() {
+        let spreadsheet =
+            SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(package())))
+                .expect("source ODS");
+
+        for _ in 0..super::super::cell_locator::BUILD_QUERY_THRESHOLD {
+            assert!(spreadsheet.cell("Sheet1", 0, 0).unwrap().is_some());
+        }
+        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
+
+        for (sheet_name, row, column) in [
+            ("Sheet1", 0, 0),
+            ("Sheet1", 1, 1),
+            ("Sheet1", 2, 0),
+            ("Sheet1", 0, 2),
+            ("Sheet1", usize::MAX, usize::MAX),
+            ("Sheet2", 0, 0),
+        ] {
+            let sheet_index = spreadsheet
+                .sheets
+                .iter()
+                .position(|sheet| sheet.name == sheet_name)
+                .expect("fixture sheet");
+            let expected = spreadsheet.sheets[sheet_index].cell_view(row, column);
+            let actual = spreadsheet
+                .cell(sheet_name, row, column)
+                .expect("source cell")
+                .expect("fixture sheet");
+            match (expected, actual) {
+                (crate::worksheet::CellView::Missing, crate::worksheet::CellView::Missing) => {},
+                (
+                    crate::worksheet::CellView::Stored(expected),
+                    crate::worksheet::CellView::Stored(actual),
+                ) => assert!(ptr::eq(expected, actual)),
+                _ => panic!("indexed and direct cell views differ"),
+            }
+        }
+
+        assert_eq!(spreadsheet.cell("missing", 0, 0).unwrap(), None);
+    }
+
+    #[test]
+    fn source_cell_locator_zero_budget_falls_back_permanently_to_linear_lookup() {
+        let spreadsheet =
+            SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(package())))
+                .expect("source ODS");
+        let locator =
+            super::super::cell_locator::CellLocator::try_build_with_budget(&spreadsheet.sheets, 0);
+        assert!(locator.is_none());
+        assert!(spreadsheet.cell_locator.set(locator).is_ok());
+
+        for _ in 0..(super::super::cell_locator::BUILD_QUERY_THRESHOLD * 2) {
+            assert!(matches!(
+                spreadsheet.cell("Sheet1", 0, 0),
+                Ok(Some(crate::worksheet::CellView::Stored(_)))
+            ));
+        }
+        assert!(matches!(spreadsheet.cell_locator.get(), Some(None)));
+        assert_eq!(spreadsheet.cell_queries.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn source_concurrent_first_cell_locator_build_is_shared_and_preserves_identity() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<SourceBackedSpreadsheet>();
+
+        let spreadsheet = Arc::new(
+            SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(package())))
+                .expect("source ODS"),
+        );
+        let expected = match spreadsheet.sheets[0].cell_view(0, 0) {
+            crate::worksheet::CellView::Stored(cell) => ptr::from_ref(cell) as usize,
+            crate::worksheet::CellView::Missing => panic!("fixture cell"),
+        };
+
+        let threads = (0..8)
+            .map(|_| {
+                let spreadsheet = Arc::clone(&spreadsheet);
+                std::thread::spawn(move || {
+                    for _ in 0..super::super::cell_locator::BUILD_QUERY_THRESHOLD {
+                        let Ok(Some(crate::worksheet::CellView::Stored(cell))) =
+                            spreadsheet.cell("Sheet1", 0, 0)
+                        else {
+                            panic!("fixture cell");
+                        };
+                        assert_eq!(ptr::from_ref(cell) as usize, expected);
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        for thread in threads {
+            thread.join().expect("cell lookup thread");
+        }
+        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
+    }
+
+    #[test]
+    fn source_indexed_cell_lookup_rejects_stale_source() {
+        let source = Arc::new(MutableSource::new(package()));
+        let spreadsheet =
+            SourceBackedSpreadsheet::from_read_at(source.clone()).expect("source ODS");
+        for _ in 0..super::super::cell_locator::BUILD_QUERY_THRESHOLD {
+            assert!(spreadsheet.cell("Sheet1", 0, 0).unwrap().is_some());
+        }
+        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
+
+        source.bump();
+        assert!(matches!(
+            spreadsheet.cell("Sheet1", 0, 0),
             Err(litchi_core::Error::SourceChanged { .. })
         ));
     }
