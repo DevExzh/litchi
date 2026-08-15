@@ -328,7 +328,16 @@ return byte counts, request sizes, maximum in-flight reads, procfs I/O/fault/
 RSS counters, deterministic output hashes and byte lengths, and semantic
 reopen checks. The OPC corpus and expected one-Part output hashes, plus the
 CFB corpus and exact 36-byte-overlay output hash, are pinned and checked before
-samples; when both OPC save cases are selected, their per-state sample hashes
+samples. The CFB atomic-save case also divides its timed operation into three
+non-overlapping intervals: positional source/CFB open, overlay planning and
+complete candidate validation, and atomic publication. Each interval reports
+elapsed time plus logical `ReadAt` call/request/return deltas. The harness
+requires the three source-counter deltas to sum exactly to the whole operation
+and phase elapsed time not to exceed it. These are logical source-work and
+timing-attribution counters, not physical device I/O, copied bytes,
+allocations, or decompression evidence.
+
+When both OPC save cases are selected, their per-state sample hashes
 must also match. Save cases seed a pre-existing destination before both warm and cold measurements
 and publish through a same-filesystem sibling temporary file plus atomic
 rename; the CFB case uses the checked same-length stream-overlay publisher and

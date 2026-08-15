@@ -240,6 +240,8 @@ struct ChildResult {
     cfb_changed_spans: Option<u64>,
     cfb_published_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    cfb_phases: Option<CfbPhaseEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pptx_source_replay: Option<PptxSourceReplayEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     docx_source_replay: Option<DocxSourceReplayEvidence>,
@@ -390,6 +392,8 @@ pub(crate) struct SampleEvidence {
     pub cfb_changed_spans: Option<u64>,
     pub cfb_published_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub cfb_phases: Option<CfbPhaseEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pptx_source_replay: Option<PptxSourceReplayEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub docx_source_replay: Option<DocxSourceReplayEvidence>,
@@ -440,6 +444,27 @@ struct OperationDetails {
     opc_materialized_parts: Option<u64>,
     cfb_changed_spans: Option<u64>,
     cfb_published_bytes: Option<u64>,
+    cfb_phases: Option<CfbPhaseEvidence>,
+}
+
+/// Operation-local attribution for the three sequential stages of the CFB
+/// same-length atomic-save selector.
+///
+/// The counters are logical `ReadAt` deltas. They do not describe physical
+/// device I/O, copied bytes, or allocation work.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct CfbPhaseEvidence {
+    pub open: CfbPhaseSample,
+    pub plan: CfbPhaseSample,
+    pub atomic_publication: CfbPhaseSample,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub(crate) struct CfbPhaseSample {
+    pub elapsed_ns: u64,
+    pub logical_read_calls: u64,
+    pub logical_read_requested_bytes: u64,
+    pub logical_read_returned_bytes: u64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -959,6 +984,7 @@ fn record_sample(
     expected_digest: Option<&str>,
     stem: &str,
 ) -> Result<(), Box<dyn Error>> {
+    validate_cfb_phase_evidence(operation, &invocation.child)?;
     if operation.is_save() {
         if invocation.child.output_sha256.as_deref() != expected_digest {
             return Err(format!(
@@ -990,9 +1016,70 @@ fn record_sample(
         opc_materialized_parts: invocation.child.opc_materialized_parts,
         cfb_changed_spans: invocation.child.cfb_changed_spans,
         cfb_published_bytes: invocation.child.cfb_published_bytes,
+        cfb_phases: invocation.child.cfb_phases,
         pptx_source_replay: invocation.child.pptx_source_replay,
         docx_source_replay: invocation.child.docx_source_replay,
     });
+    Ok(())
+}
+
+fn validate_cfb_phase_evidence(
+    operation: Operation,
+    child: &ChildResult,
+) -> Result<(), Box<dyn Error>> {
+    let Some(phases) = child.cfb_phases.as_ref() else {
+        if operation.is_cfb() {
+            return Err("CFB filesystem sample omitted phase evidence".into());
+        }
+        return Ok(());
+    };
+    if !operation.is_cfb() {
+        return Err("non-CFB filesystem sample unexpectedly reported CFB phases".into());
+    }
+    let phase_values = [phases.open, phases.plan, phases.atomic_publication];
+    let sum = |name: &str, value: fn(&CfbPhaseSample) -> u64| {
+        phase_values.iter().try_fold(0_u64, |total, phase| {
+            total
+                .checked_add(value(phase))
+                .ok_or_else(|| io::Error::other(format!("CFB phase {name} total overflows u64")))
+        })
+    };
+    let elapsed = sum("elapsed", |phase| phase.elapsed_ns)?;
+    if elapsed > child.elapsed_ns {
+        return Err(format!(
+            "CFB phase elapsed total {elapsed} exceeds operation elapsed {}",
+            child.elapsed_ns
+        )
+        .into());
+    }
+    for (name, observed, expected) in [
+        (
+            "logical read calls",
+            sum("logical read calls", |phase| phase.logical_read_calls)?,
+            child.logical_read_calls,
+        ),
+        (
+            "logical requested bytes",
+            sum("logical requested bytes", |phase| {
+                phase.logical_read_requested_bytes
+            })?,
+            child.logical_read_requested_bytes,
+        ),
+        (
+            "logical returned bytes",
+            sum("logical returned bytes", |phase| {
+                phase.logical_read_returned_bytes
+            })?,
+            child.logical_read_bytes,
+        ),
+    ] {
+        if observed != expected {
+            return Err(format!(
+                "CFB phase {name} total {observed} differs from operation total {expected}"
+            )
+            .into());
+        }
+    }
     Ok(())
 }
 
@@ -1286,6 +1373,7 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         opc_materialized_parts: details.opc_materialized_parts,
         cfb_changed_spans: details.cfb_changed_spans,
         cfb_published_bytes: details.cfb_published_bytes,
+        cfb_phases: details.cfb_phases,
         pptx_source_replay,
         docx_source_replay,
     };
@@ -2189,6 +2277,13 @@ struct ReadMetrics {
     request_size_buckets: ReadSizeBuckets,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct ReadTotals {
+    calls: u64,
+    requested_bytes: u64,
+    returned_bytes: u64,
+}
+
 struct CountingReadAt {
     inner: Arc<dyn ReadAt>,
     calls: AtomicU64,
@@ -2230,6 +2325,14 @@ impl CountingReadAt {
             max_concurrent: self.max_concurrent.load(Ordering::SeqCst),
             request_sizes,
             request_size_buckets,
+        }
+    }
+
+    fn totals(&self) -> ReadTotals {
+        ReadTotals {
+            calls: self.calls.load(Ordering::SeqCst),
+            requested_bytes: self.requested_bytes.load(Ordering::SeqCst),
+            returned_bytes: self.returned_bytes.load(Ordering::SeqCst),
         }
     }
 }
@@ -2450,17 +2553,65 @@ fn run_cfb_overlay_save(
     destination: &Path,
     details: &mut OperationDetails,
 ) -> Result<Option<Arc<CountingReadAt>>, Box<dyn Error>> {
+    let open_started = Instant::now();
     let counter = Arc::new(CountingReadAt::new(Arc::new(FileSource::open(source)?)));
     let shared = SharedOleFile::open(counter.clone())?;
+    let open_elapsed_ns = u64::try_from(open_started.elapsed().as_nanos())?;
+    let after_open = counter.totals();
+
+    let plan_started = Instant::now();
     let overlay = SameLengthStreamOverlay::new(
         vec![super::OLE_COMMON_TARGET.to_owned()],
         Arc::from(FILESYSTEM_OLE_COMMON_REPLACEMENT.to_vec()),
     );
     let plan = shared.plan_same_length_stream_overlays(vec![overlay], OverlayLimits::default())?;
+    let plan_elapsed_ns = u64::try_from(plan_started.elapsed().as_nanos())?;
+    let after_plan = counter.totals();
+
+    let publication_started = Instant::now();
     let report = plan.save(destination)?;
+    let publication_elapsed_ns = u64::try_from(publication_started.elapsed().as_nanos())?;
+    let after_publication = counter.totals();
     details.cfb_changed_spans = Some(u64::try_from(report.changed_spans())?);
     details.cfb_published_bytes = Some(report.bytes());
+    details.cfb_phases = Some(CfbPhaseEvidence {
+        open: cfb_phase_sample(ReadTotals::default(), after_open, open_elapsed_ns)?,
+        plan: cfb_phase_sample(after_open, after_plan, plan_elapsed_ns)?,
+        atomic_publication: cfb_phase_sample(
+            after_plan,
+            after_publication,
+            publication_elapsed_ns,
+        )?,
+    });
     Ok(Some(counter))
+}
+
+fn cfb_phase_sample(
+    before: ReadTotals,
+    after: ReadTotals,
+    elapsed_ns: u64,
+) -> Result<CfbPhaseSample, Box<dyn Error>> {
+    let delta = |name: &str, before: u64, after: u64| {
+        after.checked_sub(before).ok_or_else(|| {
+            io::Error::other(format!(
+                "CFB phase counter {name} moved backwards from {before} to {after}"
+            ))
+        })
+    };
+    Ok(CfbPhaseSample {
+        elapsed_ns,
+        logical_read_calls: delta("calls", before.calls, after.calls)?,
+        logical_read_requested_bytes: delta(
+            "requested bytes",
+            before.requested_bytes,
+            after.requested_bytes,
+        )?,
+        logical_read_returned_bytes: delta(
+            "returned bytes",
+            before.returned_bytes,
+            after.returned_bytes,
+        )?,
+    })
 }
 
 fn verify_child_output(
