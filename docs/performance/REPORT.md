@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **271 selectable cases**; 200 was the count before the
+HEAD harness contains **273 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -1019,7 +1019,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 271 selectable cases. Change
+The committed HEAD standalone harness provides 273 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1034,6 +1034,15 @@ exact request and improve total p50/p95 in both 200-sample ABBA directions,
 while the exact-work FAT control stays near neutral. This is not real
 cold/network/device evidence. See the [exact-range summary](results/cfb-selective-range-abba-0106-summary.json)
 and [simulated-range summary](results/cfb-simulated-range-0144-summary.json).
+
+Change 0145 adds two opt-in PPTX cross-presentation slide-copy selectors with
+separate plan, commit, sequential OPC publication, and reopen diagnostics.
+Exact slide XML/media payloads, relationship topology, content types,
+untouched destination members, output semantics, source immutability, durable
+patches, and refusal paths are checked outside timing. This is correctness and
+sink-counter evidence only; no speedup, allocation, RSS, release-ABBA, or
+physical-I/O claim is made. See
+[`0145`](changes/0145-pptx-cross-slide-copy-evidence.md).
 
 Change 0119 adds three opt-in native PPT selected-shape controls and preserves
 the 36-case / 198-record default. The query-only and fresh-open-plus-query

@@ -272,6 +272,17 @@ ambient-network, production scheduling, allocation, RSS, or native DOC/XLS/PPT
 evidence. See the [compact summary](results/cfb-simulated-range-0144-summary.json)
 and [change record](changes/0144-cfb-simulated-range-source-evidence.md).
 
+## PPTX cross-presentation slide-copy evidence (change 0145)
+
+Two opt-in selectors exercise deterministic plain and media-rich cross-
+presentation slide-copy plans. Each reports plan, commit, and sequential OPC
+publication phases separately; reopen is retained as a non-publication
+diagnostic. Complete semantic/package topology, dependency-closure,
+collision-remap, source-immutability, durable-patch, stale/foreign, and refusal
+checks remain outside timing. This is correctness and sink-counter evidence
+only: no speedup, allocation, RSS, release-ABBA, or physical-I/O claim is made.
+See the [change record](changes/0145-pptx-cross-slide-copy-evidence.md).
+
 ## CFB MiniFAT physical-run boundary evidence (change 0125)
 
 The current harness adds a matched 4095-byte MiniFAT boundary pair over the
@@ -461,7 +472,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**271 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**273 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
