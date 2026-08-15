@@ -27,9 +27,10 @@ mod structural;
 use crate::records::{BoundSheetRecord, Encoding, SheetType};
 use crate::{Error, Result, SheetKind, Workbook};
 use litchi_biff::Records;
+use litchi_cfb::consts::STGTY_STORAGE;
 use litchi_cfb::{
-    ArtifactFingerprint, OverlayError, PublishReport, SameLengthStreamSplice, StreamSpliceLimits,
-    ValidatedOverlayPlan,
+    ArtifactFingerprint, ComposedOverlaySource, OverlayError, PublishReport,
+    SameLengthStreamSplice, StreamSpliceLimits, ValidatedOverlayPlan,
 };
 use litchi_core::binary;
 pub use litchi_core::patch::HistoryLimits;
@@ -43,7 +44,7 @@ use litchi_ole_common::object::{Editor as PackageEditor, Limits, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::BTreeMap;
 use std::fmt;
-use std::io::{Cursor, Read, Seek};
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::sync::{Arc, OnceLock};
 
 const BOF: u16 = 0x0809;
@@ -2449,6 +2450,42 @@ impl Transaction {
         commit_source_backed_numeric(self)
     }
 
+    /// Plans unchanged-family numeric edits without materializing a target
+    /// CFB artifact or retaining a target [`Snapshot`].
+    ///
+    /// This additive publication path accepts only existing `Number`, `RK`,
+    /// and `MulRk` value fields. It retains the immutable source snapshot and
+    /// a validated [`ValidatedOverlayPlan`] containing the compact exact
+    /// physical replacements derived from the numeric source splices. The
+    /// composed candidate is reopened
+    /// through the public [`Workbook`] reader over a positional source before
+    /// this method returns. The overlay plan performs exact source and target
+    /// fingerprint checks again whenever it is read or published.
+    ///
+    /// The result deliberately does not expose the ordinary reversible
+    /// [`Patch`], because that contract retains complete before/after CFB
+    /// artifacts. Callers that require an in-memory target snapshot or an
+    /// artifact inverse can continue to use [`Self::commit_source_backed`].
+    /// The plan removes the complete target CFB allocation; the bounded
+    /// semantic validation itself may still allocate the Workbook reader's
+    /// stream and parsed model while this method is running.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for unsupported staged operations, protected,
+    /// signed, encrypted, or macro-bearing sources, stale numeric ranges,
+    /// invalid RK values, CFB limits, failed public Workbook validation, or
+    /// source freshness/fingerprint changes.
+    pub fn commit_source_backed_plan(self) -> Result<SourceBackedPlanCommit> {
+        commit_source_backed_numeric_plan(self)
+    }
+
+    /// Alias for [`Self::commit_source_backed_plan`] emphasizing that the
+    /// returned target is evaluated lazily at publication time.
+    pub fn commit_source_backed_lazy(self) -> Result<SourceBackedPlanCommit> {
+        self.commit_source_backed_plan()
+    }
+
     /// Publishes a fully reopened snapshot and reversible exact-source patch.
     ///
     /// # Errors
@@ -3191,7 +3228,7 @@ impl SourceBackedCommit {
     ///
     /// A sink failure may leave a typed prefix in the sink. The returned
     /// [`OverlayError`] retains that partial-output progress.
-    pub fn write_to<W: std::io::Write>(
+    pub fn write_to<W: Write>(
         &self,
         writer: &mut W,
     ) -> std::result::Result<PublishReport, OverlayError> {
@@ -3199,7 +3236,7 @@ impl SourceBackedCommit {
     }
 
     /// Alias emphasizing the forward-only publication boundary.
-    pub fn publish_to_stream<W: std::io::Write>(
+    pub fn publish_to_stream<W: Write>(
         &self,
         writer: &mut W,
     ) -> std::result::Result<PublishReport, OverlayError> {
@@ -3223,6 +3260,106 @@ impl fmt::Debug for SourceBackedCommit {
             .field("snapshot", &self.snapshot)
             .field("plan", &self.plan)
             .field("patch", &self.patch)
+            .field("diagnostics", &self.diagnostics)
+            .finish()
+    }
+}
+
+/// Successful source-bound fixed-width numeric publication plan.
+///
+/// Unlike [`SourceBackedCommit`], this value never retains a rendered target
+/// [`Snapshot`], complete target `Vec<u8>`, or target artifact `Arc<[u8]>`.
+/// It keeps the immutable source and the checked CFB overlay plan. The plan
+/// owns the compact exact physical replacement spans derived from the numeric
+/// splices; logical path and expected-range descriptors are consumed during
+/// validation rather than duplicated here. The plan's positional source is
+/// rechecked for source freshness and both complete artifact fingerprints on
+/// every read, sequential publication, and atomic save.
+///
+/// The plan is intentionally forward-only. An exact artifact inverse would
+/// need a source-bound reverse plan rooted in the composed target; the
+/// existing [`Patch`] contract instead retains complete before/after
+/// artifacts. Use [`Transaction::commit_source_backed`] when that inverse
+/// contract is required.
+pub struct SourceBackedPlanCommit {
+    source: Snapshot,
+    plan: ValidatedOverlayPlan,
+    diagnostics: SourceBackedDiagnostics,
+}
+
+/// Explicit alias for callers that prefer the numeric-plan terminology.
+pub type SourceBackedNumericPlanCommit = SourceBackedPlanCommit;
+
+impl SourceBackedPlanCommit {
+    /// Exact immutable source snapshot used by this plan.
+    #[must_use]
+    pub const fn source(&self) -> &Snapshot {
+        &self.source
+    }
+
+    /// Underlying checked common CFB overlay plan.
+    #[must_use]
+    pub const fn plan(&self) -> &ValidatedOverlayPlan {
+        &self.plan
+    }
+
+    /// Content-free publication evidence.
+    #[must_use]
+    pub const fn diagnostics(&self) -> SourceBackedDiagnostics {
+        self.diagnostics
+    }
+
+    /// Whether every staged numeric replacement was an exact byte no-op.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.plan.is_noop()
+    }
+
+    /// Returns a checked positional view of the composed target without
+    /// materializing the complete artifact.
+    ///
+    /// The view performs complete source and target fingerprint checks before
+    /// it is returned and repeats source freshness checks on each positional
+    /// read.
+    pub fn composed_source(&self) -> std::result::Result<ComposedOverlaySource, OverlayError> {
+        self.plan.composed_source()
+    }
+
+    /// Streams the complete validated target to a sequential sink.
+    ///
+    /// A sink failure may leave a typed prefix in the sink; inspect the
+    /// returned [`OverlayError`] before deciding whether to retry.
+    pub fn write_to<W: Write>(
+        &self,
+        writer: &mut W,
+    ) -> std::result::Result<PublishReport, OverlayError> {
+        self.plan.write_to(writer)
+    }
+
+    /// Alias for [`Self::write_to`] emphasizing sequential publication.
+    pub fn publish_to_stream<W: Write>(
+        &self,
+        writer: &mut W,
+    ) -> std::result::Result<PublishReport, OverlayError> {
+        self.write_to(writer)
+    }
+
+    /// Publishes through the common synced sibling-temp and atomic-rename
+    /// path.
+    pub fn save<P: AsRef<std::path::Path>>(
+        &self,
+        path: P,
+    ) -> std::result::Result<PublishReport, OverlayError> {
+        self.plan.save(path)
+    }
+}
+
+impl fmt::Debug for SourceBackedPlanCommit {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SourceBackedPlanCommit")
+            .field("source", &self.source)
+            .field("plan", &self.plan)
             .field("diagnostics", &self.diagnostics)
             .finish()
     }
@@ -4870,6 +5007,193 @@ impl ReadAt for SnapshotSource {
     }
 }
 
+/// A seekable adapter for semantic validation over a lazy composed CFB view.
+///
+/// `Workbook` is intentionally kept generic over `Read + Seek`, while the
+/// CFB overlay plan exposes a positional `ReadAt` source. This adapter keeps
+/// those contracts separate and allocates no artifact-sized buffer.
+struct ComposedPositionalReader {
+    source: ComposedOverlaySource,
+    position: u64,
+}
+
+impl ComposedPositionalReader {
+    fn new(source: ComposedOverlaySource) -> Self {
+        Self {
+            source,
+            position: 0,
+        }
+    }
+}
+
+impl Read for ComposedPositionalReader {
+    fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+        let count = self.source.read_at(self.position, output)?;
+        self.position = self
+            .position
+            .checked_add(u64::try_from(count).map_err(|_error| {
+                std::io::Error::other("composed positional reader count exceeds u64")
+            })?)
+            .ok_or_else(|| std::io::Error::other("composed positional reader offset overflow"))?;
+        Ok(count)
+    }
+}
+
+impl Seek for ComposedPositionalReader {
+    fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+        let length = self.source.len()?;
+        let target = match position {
+            SeekFrom::Start(offset) => i128::from(offset),
+            SeekFrom::Current(offset) => i128::from(self.position) + i128::from(offset),
+            SeekFrom::End(offset) => i128::from(length) + i128::from(offset),
+        };
+        if target < 0 || target > i128::from(u64::MAX) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "composed positional reader seek is outside the source",
+            ));
+        }
+        self.position = u64::try_from(target).map_err(|_error| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "composed positional reader seek exceeds u64",
+            )
+        })?;
+        Ok(self.position)
+    }
+}
+
+fn commit_source_backed_numeric_plan(transaction: Transaction) -> Result<SourceBackedPlanCommit> {
+    let Transaction {
+        source,
+        changes,
+        structural_changes,
+        resource_changes,
+    } = transaction;
+
+    if !structural_changes.is_empty() || !resource_changes.is_empty() {
+        return Err(Error::UnsupportedFeature(
+            "source-backed numeric plan accepts no structural or resource edits".into(),
+        ));
+    }
+    if !changes_are_fixed_numeric(&source, &changes) {
+        return Err(Error::UnsupportedFeature(
+            "source-backed numeric plan requires unchanged Number, RK, or MulRk storage".into(),
+        ));
+    }
+
+    // Keep the source-side policy checks identical to the established
+    // source-backed publication contract. The target is checked again below
+    // over the composed positional reader.
+    let source_workbook = Workbook::new(Cursor::new(source.bytes()))?;
+    require_public_worksheet_coverage(&source_workbook, &source.inner.sheets)?;
+    require_unprotected_workbook(&source_workbook)?;
+    require_macro_free_workbook(&source_workbook)?;
+
+    let source_adapter: Arc<dyn ReadAt> = Arc::new(SnapshotSource::new(
+        Arc::clone(&source.inner.bytes),
+        source.inner.source_version,
+    ));
+    let publisher =
+        SourceBackedOverlayPublisher::open(source_adapter).map_err(source_backed_overlay_error)?;
+    let source_version = publisher
+        .source_version()
+        .map_err(source_backed_overlay_error)?;
+    if source_version != source.inner.source_version {
+        return Err(Error::UnsafeEdit(
+            "source-backed numeric plan lost its source lineage".into(),
+        ));
+    }
+    require_macro_free_container(&publisher)?;
+
+    let mut splices = Vec::new();
+    splices
+        .try_reserve_exact(changes.len())
+        .map_err(|_error| Error::Allocation("staging source-backed numeric plan splices"))?;
+    let mut replacement_bytes = 0_u64;
+    for change in &changes {
+        if !change_is_effective(&source, change) {
+            continue;
+        }
+        let splice = fixed_numeric_splice(&source, change)?;
+        replacement_bytes = replacement_bytes
+            .checked_add(u64::try_from(splice.replacement().len()).map_err(|_error| {
+                Error::InvalidData("numeric plan replacement length exceeds u64".into())
+            })?)
+            .ok_or_else(|| {
+                Error::InvalidData("numeric plan replacement bytes overflow u64".into())
+            })?;
+        splices.push(splice);
+    }
+
+    let splice_count = splices.len();
+    let plan = publisher
+        .plan_splices(splices, StreamSpliceLimits::default())
+        .map_err(source_backed_overlay_error)?;
+    let validated_target_version = if plan.is_noop() {
+        None
+    } else {
+        Some(verify_source_backed_numeric_plan_target(
+            &plan, &source, &changes,
+        )?)
+    };
+
+    // The semantic readback above is bracketed by a second complete source and
+    // target fingerprint check. If a mutable positional adapter changed bytes
+    // with a stable version token, this closes that window before publication.
+    let target_version = validated_target_version.unwrap_or(source_version);
+    let source_bytes = u64::try_from(source.bytes().len())
+        .map_err(|_error| Error::InvalidData("source CFB length exceeds u64".into()))?;
+    let source_workbook_bytes = u64::try_from(source.workbook_stream().len())
+        .map_err(|_error| Error::InvalidData("source Workbook length exceeds u64".into()))?;
+    let diagnostics = SourceBackedDiagnostics {
+        changed_cells: changes
+            .iter()
+            .filter(|change| change_is_effective(&source, change))
+            .count(),
+        touched_streams: usize::from(!plan.is_noop()),
+        splice_count,
+        replacement_bytes,
+        changed_spans: plan.changed_spans(),
+        source_bytes,
+        source_workbook_bytes,
+        target_workbook_bytes: source_workbook_bytes,
+        source_version,
+        target_version,
+        source_fingerprint: plan.source_fingerprint(),
+        target_fingerprint: plan.target_fingerprint(),
+    };
+    Ok(SourceBackedPlanCommit {
+        source,
+        plan,
+        diagnostics,
+    })
+}
+
+fn verify_source_backed_numeric_plan_target(
+    plan: &ValidatedOverlayPlan,
+    source: &Snapshot,
+    changes: &[Change],
+) -> Result<SourceVersion> {
+    let candidate = plan
+        .composed_source()
+        .map_err(source_backed_overlay_error)?;
+    let workbook = Workbook::new(ComposedPositionalReader::new(candidate))?;
+    require_public_worksheet_coverage(&workbook, &source.inner.sheets)?;
+    require_unprotected_workbook(&workbook)?;
+    require_macro_free_workbook(&workbook)?;
+    verify_public_numeric_readback(&workbook, source, changes)?;
+    drop(workbook);
+
+    // `composed_source` performs complete source/target fingerprint checks;
+    // invoking it after semantic parsing prevents a late stable-version
+    // mutation from being mistaken for the validated target.
+    plan.composed_source()
+        .map_err(source_backed_overlay_error)?
+        .version()
+        .map_err(Error::Io)
+}
+
 fn commit_source_backed_numeric(transaction: Transaction) -> Result<SourceBackedCommit> {
     let Transaction {
         source,
@@ -4910,6 +5234,7 @@ fn commit_source_backed_numeric(transaction: Transaction) -> Result<SourceBacked
             "source-backed numeric publication lost its source lineage".into(),
         ));
     }
+    require_macro_free_container(&publisher)?;
 
     let mut splices = Vec::new();
     splices
@@ -5010,6 +5335,11 @@ fn fixed_numeric_splice(source: &Snapshot, change: &Change) -> Result<SameLength
     {
         return Err(Error::UnsafeEdit(
             "source-backed numeric edit changed its BIFF storage family".into(),
+        ));
+    }
+    if entry.cell.reference != change.reference {
+        return Err(Error::UnsafeEdit(
+            "source-backed numeric edit changed its BIFF cell reference".into(),
         ));
     }
     let Value::Number(value) = change.value else {
@@ -5191,6 +5521,17 @@ fn require_macro_free_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Result
     {
         return Err(Error::UnsafeEdit(
             "macro-bearing XLS sources are not eligible for source-backed numeric edits".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn require_macro_free_container(publisher: &SourceBackedOverlayPublisher) -> Result<()> {
+    if publisher.shared().directory_entries().any(|entry| {
+        entry.entry_type == STGTY_STORAGE && entry.name.eq_ignore_ascii_case("_VBA_PROJECT_CUR")
+    }) {
+        return Err(Error::UnsafeEdit(
+            "macro-bearing XLS CFB storage is not eligible for source-backed numeric edits".into(),
         ));
     }
     Ok(())

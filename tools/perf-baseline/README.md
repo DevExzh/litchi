@@ -60,7 +60,7 @@ two worksheets),
 two bounded XLSX/RTF streaming-creation cases,
 six matched CFB selective-read cases,
 four matched native XLS existing-comment publication cases,
-four matched native XLS fixed-width numeric publication cases,
+six matched native XLS fixed-width numeric publication cases,
 four matched native XLS worksheet-visibility publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 24 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, 15 RTF semantic cases (13 transport/read/edit
@@ -71,7 +71,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 261
+provide their source-read counters. The current `Case` matrix exposes 263
 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -136,7 +136,8 @@ four-call sweep; semantic digest/count and complete source/member/media
 preservation gates remain untimed. These additions bring the selectable matrix
 to 257 names while leaving the default 36 cases / 198 records unchanged;
 the four opt-in fixed-width native XLS numeric selectors bring the current
-selectable matrix to 261 names while leaving that default unchanged;
+selectable matrix to 261 names while leaving that default unchanged; two
+additional plan-only native XLS numeric selectors bring it to 263 names;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 
@@ -638,7 +639,8 @@ Measure the matched native XLS fixed-width numeric publication controls:
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 10 --samples 100 \
   --case xls_numeric_eager_number_edit_save,xls_numeric_source_backed_number_edit_save,\
-xls_numeric_eager_rk_mulrk_edit_save,xls_numeric_source_backed_rk_mulrk_edit_save \
+xls_numeric_eager_rk_mulrk_edit_save,xls_numeric_source_backed_rk_mulrk_edit_save,\
+xls_numeric_plan_only_number_edit_save,xls_numeric_plan_only_rk_mulrk_edit_save \
   --json target/perf/xls-numeric-edit.json
 ```
 
@@ -647,23 +649,30 @@ comments corpus (`42` -> `43`). The RK/MulRK pair uses a separate deterministic
 native XLS corpus containing one standalone RK and one two-cell MulRK record;
 one transaction updates all three cells with exact integer-RK replacements.
 Each sample times transaction creation, `set_number`/`set_numeric`, the eager
-`commit` or source-backed `commit_source_backed`, and publication separately.
+`commit`, ordinary source-backed `commit_source_backed`, or forward-only
+`commit_source_backed_plan`, and publication separately. The plan-only commit
+includes composed semantic validation but retains no complete target artifact.
 `total_ns` and the top-level `elapsed_ns` distribution are arithmetic sums of
 those four separately timed phases, not a continuous wall-clock timer.
-Both publication paths write the complete target CFB to equivalently configured
-preallocated bounded `CountingSink`s (64 KiB maximum write); source-backed output avoids Workbook-stream
-reserialization but still retains a complete target snapshot. Source ingress,
-expected outputs, sink capacity, no-op/fingerprint, patch/inverse/stale,
+All publication paths write the complete target CFB to equivalently configured
+preallocated bounded `CountingSink`s (64 KiB maximum write); ordinary
+source-backed output avoids Workbook-stream reserialization but still retains a
+complete target snapshot. Plan-only output retains no target snapshot or target
+byte vector at commit and is explicitly forward-only without artifact
+patch/inverse. Source ingress, expected outputs, sink capacity,
+no-op/fingerprint, exact source/target fingerprint preflights,
 security/unsupported refusal, full `Snapshot`/`Workbook` reopen, untouched CFB
-topology/member bytes, and the untimed real-producer `54016.xls` reopen/inverse
-gate all run outside timing. Generic `source.read_calls`/`source.read_bytes`
-carry the owned source-ingress counters; `source.xls_numeric` reports the
-separate commit, publication, and total vectors, complete target materialized
-bytes on both paths, source-backed splice/replacement/span/fingerprint
-evidence, sink bytes, write counts, digests, and the explicit owned-input
-scope. These selectors are
+topology/member bytes, and the untimed real-producer `54016.xls` forward gate
+all run outside timing. Generic `source.read_calls`/`source.read_bytes` carry
+the owned source-ingress counters; `source.xls_numeric` reports the separate
+commit, publication, and total vectors, explicit target-retention/materialization
+flags, complete target materialized bytes for retained-target paths, source-backed
+splice/replacement/span/fingerprint evidence, sink bytes, write counts, digests,
+and the explicit owned-input scope. These selectors are
 correctness/coverage evidence only: no positional-I/O, allocation/RSS,
-bounded-artifact-memory, speedup, or broad-producer claim is made.
+bounded-artifact-memory, speedup, or broad-producer claim is made. Composed
+semantic validation may read and allocate a candidate `Workbook` model, so
+zero target-artifact bytes does not imply bounded total memory.
 
 Measure the matched native XLS worksheet-visibility publication controls:
 
@@ -1870,14 +1879,22 @@ candidate allocation or a performance advantage.
 
 Native XLS fixed-width numeric cases emit `output_sha256` and a
 `source.xls_numeric` object. It records the Number or RK/MulRK family, update
-count, separate edit/set/commit/publication/total vectors, complete target
-materialized bytes for both eager and source-backed paths, input/output CFB and
+count, separate edit/set/commit/publication/total vectors, input/output CFB and
 Workbook sizes, source-backed splice/replacement/span/fingerprint vectors, and
-sink bytes/write-count/digest vectors. Generic `source.read_calls` and
+sink bytes/write-count/digest vectors. The eager/source-backed selectors retain
+and report complete target materialization; the two plan-only selectors report
+`target_artifact_retained_at_commit: false`,
+`target_artifact_materialized_at_commit: false`, and zero
+`complete_target_materialized_bytes` while their sink vectors still prove full
+publication bytes. Their forward-only contract reports
+`patch_or_inverse_supported: false`. Generic `source.read_calls` and
 `source.read_bytes` carry the owned source-ingress counters. Its
 `owned_input_scope` explicitly
 describes complete in-memory CFB ingress; source-backed publication is not a
-bounded-artifact-memory or positional-I/O claim.
+bounded-artifact-memory or positional-I/O claim. Plan-only composed semantic
+validation may read and allocate a candidate `Workbook` model, so zero
+commit-boundary target-artifact bytes do not imply zero target-semantic
+allocation or bounded total memory.
 
 `docx_source_backed_one_edit_save` also emits `output_sha256`, source/sink
 distributions, and `ordinary_payload_materializations`. Its value is exactly

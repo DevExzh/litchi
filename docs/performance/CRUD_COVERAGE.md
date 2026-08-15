@@ -2,7 +2,7 @@
 
 Date: 2026-08-15
 
-This is a coverage map, not a completion claim. It compares the 261 selectable
+This is a coverage map, not a completion claim. It compares the 263 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -628,6 +628,21 @@ real-producer reopen/inverse gate. Source-backed evidence reports complete
 target materialization on both paths and is explicitly not positional-I/O,
 bounded-memory, allocation/RSS, speedup, or broad-producer coverage.
 
+Change 0137 adds two opt-in plan-only native XLS numeric CRUD selectors over
+the same Number and RK/MulRK corpora. Commit timing includes validated
+overlay-plan construction and composed semantic validation; complete
+publication remains a separate `write_to` interval. The forward-only plan
+retains no complete target snapshot or target byte vector and records false
+target-retention/materialization flags plus zero commit-boundary target bytes,
+while sink bytes prove complete output. Exact source/target fingerprint
+preflights, no-op, full forward reopen/readback, untouched topology/member
+identity, security/unsupported, partial-sink and 54016.xls producer gates stay
+outside timing; ordinary source-backed patch/inverse/stale semantics remain
+separate. Composed validation may allocate/read a candidate Workbook model, so
+the zero target-artifact field is not a bounded total-memory measurement. This
+adds correctness/descriptive coverage only; no plan-only performance claim is
+made before balanced release ABBA.
+
 Change 0091 adds four opt-in native XLS worksheet-visibility cases over one
 deterministic CFB corpus with 66 worksheets, eight 256 KiB incompressible opaque
 streams, and opaque metadata: eager and source-backed one-owner edits plus
@@ -963,6 +978,23 @@ and the untimed 54016.xls real-producer reopen/inverse gate are explicit
 outside-timer checks. This adds correctness coverage only and claims no
 positional I/O, allocation/RSS, bounded artifact memory, speedup, or broad
 producer support.
+
+Change 0137 brings the current selectable matrix to 263 names with two
+additional plan-only native XLS Number and RK/MulRK publication selectors. The
+timed commit vector includes plan construction and composed semantic
+validation; complete `write_to` publication remains a separate timed vector.
+The production plan retains no target snapshot or complete target byte vector,
+so evidence explicitly records false target-retention/materialization flags,
+zero commit-boundary target materialization, and unsupported patch/inverse
+semantics while sink bytes prove complete publication. Forward reopen,
+topology/member identity, no-op and exact source/target fingerprint
+preflights, partial-sink, security/unsupported and 54016.xls producer gates
+remain outside timing. Composed semantic validation may allocate/read a
+candidate Workbook model, so zero target-artifact bytes at commit is not a
+bounded total-memory claim. This
+is correctness/descriptive evidence only and makes no latency, memory,
+allocation, RSS, I/O, or speedup claim before balanced release ABBA. See
+[`0137`](changes/0137-xls-numeric-plan-only-publication.md).
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
