@@ -115,14 +115,22 @@ impl<'file> SharedOleBulkRead<'file> {
         let mut total_bytes = 0u64;
         for &path in paths {
             self.context.check()?;
-            let size = self.file.stream_len(path)?;
+            let entry = self.file.find_entry(path)?;
+            if entry.entry_type != crate::consts::STGTY_STREAM {
+                return Err(OleError::InvalidFormat("Not a stream".to_string()).into());
+            }
+            let size = entry.size;
             if size > max_bytes {
                 return Err(Self::too_large(size, max_bytes));
             }
             total_bytes = total_bytes.checked_add(size).ok_or_else(|| {
                 OleError::InvalidData("shared bulk stream sizes overflow u64".to_string())
             })?;
-            requests.push(StreamRequest { path, size });
+            requests.push(StreamRequest {
+                path,
+                size,
+                is_minifat: entry.is_minifat,
+            });
         }
         self.context.check()?;
         // Work units are declared stream bytes. Charge the complete request
@@ -142,6 +150,13 @@ impl<'file> SharedOleBulkRead<'file> {
             // explicit bounded resource. It drops before the next batch.
             let _in_flight = self.context.reserve(Resource::Memory, batch_bytes)?;
             let batch = &requests[next..end];
+            // A batch with multiple MiniFAT requests already needs a shared
+            // convergence point: serial execution would otherwise consume a
+            // direct read for the first target and cache for the next, while
+            // parallel execution would make the choice scheduler-dependent.
+            // A one-item MiniFAT batch keeps the prior bounded direct behavior
+            // and therefore does not retain an unaccounted root cache.
+            let force_minifat_cache = batch.iter().filter(|request| request.is_minifat).count() > 1;
             let parallel = limits.workers().get() > 1
                 && batch.len() > 1
                 && batch_bytes >= limits.min_parallel_bytes();
@@ -153,11 +168,14 @@ impl<'file> SharedOleBulkRead<'file> {
                 pool.install(|| {
                     batch
                         .par_iter()
-                        .map(|request| self.read_one(request))
+                        .map(|request| self.read_one(request, force_minifat_cache))
                         .collect::<Vec<_>>()
                 })
             } else {
-                batch.iter().map(|request| self.read_one(request)).collect()
+                batch
+                    .iter()
+                    .map(|request| self.read_one(request, force_minifat_cache))
+                    .collect()
             };
             self.context.check()?;
             for result in batch_results {
@@ -168,9 +186,19 @@ impl<'file> SharedOleBulkRead<'file> {
         Ok(results)
     }
 
-    fn read_one(&self, request: &StreamRequest<'_>) -> Result<Vec<u8>, SharedOleBulkError> {
+    fn read_one(
+        &self,
+        request: &StreamRequest<'_>,
+        force_minifat_cache: bool,
+    ) -> Result<Vec<u8>, SharedOleBulkError> {
         self.context.check()?;
-        let result = self.file.open_stream(request.path);
+        let result = if force_minifat_cache && request.is_minifat {
+            // Multi-target MiniFAT batches deliberately converge on one root
+            // cache. Single-target batches retain target-aware direct reads.
+            self.file.open_stream_force_cache(request.path)
+        } else {
+            self.file.open_stream(request.path)
+        };
         self.context.check()?;
         result.map_err(Into::into)
     }
@@ -208,6 +236,7 @@ impl<'file> SharedOleBulkRead<'file> {
 struct StreamRequest<'path> {
     path: &'path [&'path str],
     size: u64,
+    is_minifat: bool,
 }
 
 fn batch_end(

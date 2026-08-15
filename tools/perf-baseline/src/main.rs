@@ -29,7 +29,9 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use litchi_cfb::{OleError, OleFile, OleWriter, SharedOleFile, SharedOleFileLimits};
+use litchi_cfb::{
+    OleError, OleFile, OleWriter, SharedOleBulkError, SharedOleFile, SharedOleFileLimits,
+};
 use litchi_core::{
     Budget, CancellationSource, CheckStatus, ExecutionContext, ExecutionError, ExecutionLimits,
     Limits, ReadAt, SourceVersion, ValidateReport,
@@ -475,15 +477,18 @@ impl CfbSelectiveTarget {
     }
 }
 
-/// Bounded `SharedOleFile::open_stream` workloads.  The repeated and repeat-8
-/// forms intentionally keep one immutable owner alive so the first eligible
-/// MiniFAT open and subsequent cache path are observable through source
-/// counters without exposing private production cache state.
+/// Bounded `SharedOleFile::open_stream` workloads. The repeated and repeat-8
+/// forms intentionally keep one immutable owner alive so control, one-shot
+/// candidate, and target-aware same-SID policies remain distinguishable through
+/// source counters without exposing private production cache state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CfbOpenStreamOperation {
     OneShot,
     Repeat,
     Repeat8,
+    DifferentSid,
+    Bulk,
+    Concurrent,
 }
 
 impl CfbOpenStreamOperation {
@@ -492,6 +497,9 @@ impl CfbOpenStreamOperation {
             Self::OneShot => "one-shot",
             Self::Repeat => "repeat-3",
             Self::Repeat8 => "repeat-8",
+            Self::DifferentSid => "different-sid-a-b-a",
+            Self::Bulk => "bulk-a-b-a",
+            Self::Concurrent => "concurrent-same-target",
         }
     }
 
@@ -500,7 +508,17 @@ impl CfbOpenStreamOperation {
             Self::OneShot => 1,
             Self::Repeat => 3,
             Self::Repeat8 => 8,
+            Self::DifferentSid | Self::Bulk => 3,
+            Self::Concurrent => 2,
         }
+    }
+
+    const fn is_bulk(self) -> bool {
+        matches!(self, Self::Bulk)
+    }
+
+    const fn is_concurrent(self) -> bool {
+        matches!(self, Self::Concurrent)
     }
 }
 
@@ -620,9 +638,15 @@ enum Case {
     CfbOpenStreamMiniSharedOneShot,
     CfbOpenStreamMiniSharedRepeat,
     CfbOpenStreamMiniSharedRepeat8,
+    CfbOpenStreamMiniSharedDifferentSid,
+    CfbOpenStreamMiniSharedBulk,
+    CfbOpenStreamMiniSharedConcurrent,
     CfbOpenStreamMini4095SharedOneShot,
     CfbOpenStreamMini4095SharedRepeat,
     CfbOpenStreamMini4095SharedRepeat8,
+    CfbOpenStreamMini4095SharedDifferentSid,
+    CfbOpenStreamMini4095SharedBulk,
+    CfbOpenStreamMini4095SharedConcurrent,
     CfbOpenStreamSimulatedMiniSharedOneShot,
     CfbOpenStreamSimulatedMiniSharedRepeat,
     CfbOpenStreamSimulatedMiniSharedRepeat8,
@@ -989,9 +1013,21 @@ impl Case {
             Self::CfbOpenStreamMiniSharedOneShot => "cfb_open_stream_mini_shared_one_shot",
             Self::CfbOpenStreamMiniSharedRepeat => "cfb_open_stream_mini_shared_repeat",
             Self::CfbOpenStreamMiniSharedRepeat8 => "cfb_open_stream_mini_shared_repeat8",
+            Self::CfbOpenStreamMiniSharedDifferentSid => {
+                "cfb_open_stream_mini_shared_different_sid"
+            },
+            Self::CfbOpenStreamMiniSharedBulk => "cfb_open_stream_mini_shared_bulk",
+            Self::CfbOpenStreamMiniSharedConcurrent => "cfb_open_stream_mini_shared_concurrent",
             Self::CfbOpenStreamMini4095SharedOneShot => "cfb_open_stream_mini_4095_shared_one_shot",
             Self::CfbOpenStreamMini4095SharedRepeat => "cfb_open_stream_mini_4095_shared_repeat",
             Self::CfbOpenStreamMini4095SharedRepeat8 => "cfb_open_stream_mini_4095_shared_repeat8",
+            Self::CfbOpenStreamMini4095SharedDifferentSid => {
+                "cfb_open_stream_mini_4095_shared_different_sid"
+            },
+            Self::CfbOpenStreamMini4095SharedBulk => "cfb_open_stream_mini_4095_shared_bulk",
+            Self::CfbOpenStreamMini4095SharedConcurrent => {
+                "cfb_open_stream_mini_4095_shared_concurrent"
+            },
             Self::CfbOpenStreamSimulatedMiniSharedOneShot => {
                 "cfb_open_stream_simulated_mini_shared_one_shot"
             },
@@ -1232,9 +1268,15 @@ impl Case {
                 | Self::CfbOpenStreamMiniSharedOneShot
                 | Self::CfbOpenStreamMiniSharedRepeat
                 | Self::CfbOpenStreamMiniSharedRepeat8
+                | Self::CfbOpenStreamMiniSharedDifferentSid
+                | Self::CfbOpenStreamMiniSharedBulk
+                | Self::CfbOpenStreamMiniSharedConcurrent
                 | Self::CfbOpenStreamMini4095SharedOneShot
                 | Self::CfbOpenStreamMini4095SharedRepeat
                 | Self::CfbOpenStreamMini4095SharedRepeat8
+                | Self::CfbOpenStreamMini4095SharedDifferentSid
+                | Self::CfbOpenStreamMini4095SharedBulk
+                | Self::CfbOpenStreamMini4095SharedConcurrent
                 | Self::CfbOpenStreamSimulatedMiniSharedOneShot
                 | Self::CfbOpenStreamSimulatedMiniSharedRepeat
                 | Self::CfbOpenStreamSimulatedMiniSharedRepeat8
@@ -1621,9 +1663,15 @@ impl Case {
             Self::CfbOpenStreamMiniSharedOneShot
                 | Self::CfbOpenStreamMiniSharedRepeat
                 | Self::CfbOpenStreamMiniSharedRepeat8
+                | Self::CfbOpenStreamMiniSharedDifferentSid
+                | Self::CfbOpenStreamMiniSharedBulk
+                | Self::CfbOpenStreamMiniSharedConcurrent
                 | Self::CfbOpenStreamMini4095SharedOneShot
                 | Self::CfbOpenStreamMini4095SharedRepeat
                 | Self::CfbOpenStreamMini4095SharedRepeat8
+                | Self::CfbOpenStreamMini4095SharedDifferentSid
+                | Self::CfbOpenStreamMini4095SharedBulk
+                | Self::CfbOpenStreamMini4095SharedConcurrent
                 | Self::CfbOpenStreamSimulatedMiniSharedOneShot
                 | Self::CfbOpenStreamSimulatedMiniSharedRepeat
                 | Self::CfbOpenStreamSimulatedMiniSharedRepeat8
@@ -1650,12 +1698,18 @@ impl Case {
             Self::CfbOpenStreamMiniSharedOneShot
             | Self::CfbOpenStreamMiniSharedRepeat
             | Self::CfbOpenStreamMiniSharedRepeat8
+            | Self::CfbOpenStreamMiniSharedDifferentSid
+            | Self::CfbOpenStreamMiniSharedBulk
+            | Self::CfbOpenStreamMiniSharedConcurrent
             | Self::CfbOpenStreamSimulatedMiniSharedOneShot
             | Self::CfbOpenStreamSimulatedMiniSharedRepeat
             | Self::CfbOpenStreamSimulatedMiniSharedRepeat8 => Some(CfbSelectiveTarget::Mini),
             Self::CfbOpenStreamMini4095SharedOneShot
             | Self::CfbOpenStreamMini4095SharedRepeat
             | Self::CfbOpenStreamMini4095SharedRepeat8
+            | Self::CfbOpenStreamMini4095SharedDifferentSid
+            | Self::CfbOpenStreamMini4095SharedBulk
+            | Self::CfbOpenStreamMini4095SharedConcurrent
             | Self::CfbOpenStreamSimulatedMini4095SharedOneShot
             | Self::CfbOpenStreamSimulatedMini4095SharedRepeat
             | Self::CfbOpenStreamSimulatedMini4095SharedRepeat8 => {
@@ -1684,6 +1738,17 @@ impl Case {
             | Self::CfbOpenStreamSimulatedMiniSharedRepeat8
             | Self::CfbOpenStreamSimulatedMini4095SharedRepeat8 => {
                 Some(CfbOpenStreamOperation::Repeat8)
+            },
+            Self::CfbOpenStreamMiniSharedDifferentSid
+            | Self::CfbOpenStreamMini4095SharedDifferentSid => {
+                Some(CfbOpenStreamOperation::DifferentSid)
+            },
+            Self::CfbOpenStreamMiniSharedBulk | Self::CfbOpenStreamMini4095SharedBulk => {
+                Some(CfbOpenStreamOperation::Bulk)
+            },
+            Self::CfbOpenStreamMiniSharedConcurrent
+            | Self::CfbOpenStreamMini4095SharedConcurrent => {
+                Some(CfbOpenStreamOperation::Concurrent)
             },
             _ => None,
         }
@@ -2227,6 +2292,10 @@ struct CfbOpenStreamEvidence {
     implementation: &'static str,
     operation: &'static str,
     invocation_count: usize,
+    /// Ordered logical stream paths used by this workload.
+    invocation_stream_names: Vec<String>,
+    /// Number of streams requested in one bulk or concurrent batch.
+    requested_stream_count: usize,
     shape: &'static str,
     sibling_count: usize,
     sector_size: usize,
@@ -3165,11 +3234,47 @@ impl SelectiveReadMetrics {
     }
 }
 
+#[derive(Debug, Default)]
+struct ConcurrentReadGate {
+    entered: Mutex<usize>,
+    ready: Condvar,
+}
+
+impl ConcurrentReadGate {
+    fn mark_entered(&self) -> io::Result<()> {
+        let mut entered = self
+            .entered
+            .lock()
+            .map_err(|_| io::Error::other("CFB concurrent read gate is poisoned"))?;
+        *entered = entered
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("CFB concurrent read gate count overflowed"))?;
+        self.ready.notify_all();
+        Ok(())
+    }
+
+    fn wait_for_all(&self, workers: usize) -> io::Result<()> {
+        let mut entered = self
+            .entered
+            .lock()
+            .map_err(|_| io::Error::other("CFB concurrent read gate is poisoned"))?;
+        while *entered < workers {
+            entered = self
+                .ready
+                .wait(entered)
+                .map_err(|_| io::Error::other("CFB concurrent read gate is poisoned"))?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 struct SelectiveReadAt {
     bytes: Arc<Vec<u8>>,
     metrics: Arc<SelectiveReadMetrics>,
     version: SourceVersion,
+    gate: Option<Arc<ConcurrentReadGate>>,
+    direct_request_bytes: Option<usize>,
 }
 
 impl SelectiveReadAt {
@@ -3181,7 +3286,21 @@ impl SelectiveReadAt {
                 NEXT_INSTRUMENTED_SOURCE_ID.fetch_add(1, Ordering::Relaxed),
                 0,
             ),
+            gate: None,
+            direct_request_bytes: None,
         }
+    }
+
+    fn with_concurrent_gate(
+        bytes: Arc<Vec<u8>>,
+        metrics: Arc<SelectiveReadMetrics>,
+        gate: Arc<ConcurrentReadGate>,
+        direct_request_bytes: usize,
+    ) -> Self {
+        let mut source = Self::new(bytes, metrics);
+        source.gate = Some(gate);
+        source.direct_request_bytes = Some(direct_request_bytes);
+        source
     }
 }
 
@@ -3192,6 +3311,11 @@ impl ReadAt for SelectiveReadAt {
     }
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        if self.direct_request_bytes == Some(output.len())
+            && let Some(gate) = &self.gate
+        {
+            gate.wait_for_all(2)?;
+        }
         let start = usize::try_from(offset).unwrap_or(usize::MAX);
         let count = self
             .bytes
@@ -6361,12 +6485,24 @@ fn parse_case(value: &str) -> Option<Case> {
         "cfb_open_stream_mini_shared_one_shot" => Some(Case::CfbOpenStreamMiniSharedOneShot),
         "cfb_open_stream_mini_shared_repeat" => Some(Case::CfbOpenStreamMiniSharedRepeat),
         "cfb_open_stream_mini_shared_repeat8" => Some(Case::CfbOpenStreamMiniSharedRepeat8),
+        "cfb_open_stream_mini_shared_different_sid" => {
+            Some(Case::CfbOpenStreamMiniSharedDifferentSid)
+        },
+        "cfb_open_stream_mini_shared_bulk" => Some(Case::CfbOpenStreamMiniSharedBulk),
+        "cfb_open_stream_mini_shared_concurrent" => Some(Case::CfbOpenStreamMiniSharedConcurrent),
         "cfb_open_stream_mini_4095_shared_one_shot" => {
             Some(Case::CfbOpenStreamMini4095SharedOneShot)
         },
         "cfb_open_stream_mini_4095_shared_repeat" => Some(Case::CfbOpenStreamMini4095SharedRepeat),
         "cfb_open_stream_mini_4095_shared_repeat8" => {
             Some(Case::CfbOpenStreamMini4095SharedRepeat8)
+        },
+        "cfb_open_stream_mini_4095_shared_different_sid" => {
+            Some(Case::CfbOpenStreamMini4095SharedDifferentSid)
+        },
+        "cfb_open_stream_mini_4095_shared_bulk" => Some(Case::CfbOpenStreamMini4095SharedBulk),
+        "cfb_open_stream_mini_4095_shared_concurrent" => {
+            Some(Case::CfbOpenStreamMini4095SharedConcurrent)
         },
         "cfb_open_stream_simulated_mini_shared_one_shot" => {
             Some(Case::CfbOpenStreamSimulatedMiniSharedOneShot)
@@ -6822,9 +6958,15 @@ fn print_usage() {
                                        cfb_open_stream_mini_shared_one_shot,\n\
                                        cfb_open_stream_mini_shared_repeat,\n\
                                        cfb_open_stream_mini_shared_repeat8,\n\
+                                       cfb_open_stream_mini_shared_different_sid,\n\
+                                       cfb_open_stream_mini_shared_bulk,\n\
+                                       cfb_open_stream_mini_shared_concurrent,\n\
                                        cfb_open_stream_mini_4095_shared_one_shot,\n\
                                        cfb_open_stream_mini_4095_shared_repeat,\n\
                                        cfb_open_stream_mini_4095_shared_repeat8,\n\
+                                       cfb_open_stream_mini_4095_shared_different_sid,\n\
+                                       cfb_open_stream_mini_4095_shared_bulk,\n\
+                                       cfb_open_stream_mini_4095_shared_concurrent,\n\
                                        cfb_open_stream_simulated_mini_shared_one_shot,\n\
                                        cfb_open_stream_simulated_mini_shared_repeat,\n\
                                        cfb_open_stream_simulated_mini_shared_repeat8,\n\
@@ -11800,9 +11942,15 @@ fn run_case_with_config(
         Case::CfbOpenStreamMiniSharedOneShot
         | Case::CfbOpenStreamMiniSharedRepeat
         | Case::CfbOpenStreamMiniSharedRepeat8
+        | Case::CfbOpenStreamMiniSharedDifferentSid
+        | Case::CfbOpenStreamMiniSharedBulk
+        | Case::CfbOpenStreamMiniSharedConcurrent
         | Case::CfbOpenStreamMini4095SharedOneShot
         | Case::CfbOpenStreamMini4095SharedRepeat
         | Case::CfbOpenStreamMini4095SharedRepeat8
+        | Case::CfbOpenStreamMini4095SharedDifferentSid
+        | Case::CfbOpenStreamMini4095SharedBulk
+        | Case::CfbOpenStreamMini4095SharedConcurrent
         | Case::CfbOpenStreamSimulatedMiniSharedOneShot
         | Case::CfbOpenStreamSimulatedMiniSharedRepeat
         | Case::CfbOpenStreamSimulatedMiniSharedRepeat8
@@ -27674,6 +27822,58 @@ fn cfb_expected_direct_physical_range(
     Ok(Some([offset, end]))
 }
 
+fn cfb_root_cache_read_bytes(snapshot: &SelectiveReadSnapshot, root_bytes: u64) -> Option<u64> {
+    snapshot
+        .ranges
+        .iter()
+        .any(|&[offset, requested, returned]| {
+            offset == 512 && requested == root_bytes && returned == root_bytes
+        })
+        .then_some(root_bytes)
+}
+
+fn cfb_open_stream_names(corpus: &Corpus, operation: CfbOpenStreamOperation) -> Vec<String> {
+    match operation {
+        CfbOpenStreamOperation::OneShot
+        | CfbOpenStreamOperation::Repeat
+        | CfbOpenStreamOperation::Repeat8 => vec![corpus.target_name.clone(); operation.count()],
+        CfbOpenStreamOperation::DifferentSid | CfbOpenStreamOperation::Bulk => vec![
+            corpus.target_name.clone(),
+            cfb_entry_name(0),
+            corpus.target_name.clone(),
+        ],
+        CfbOpenStreamOperation::Concurrent => {
+            vec![corpus.target_name.clone(), corpus.target_name.clone()]
+        },
+    }
+}
+
+fn cfb_open_stream_expected_payload(
+    corpus: &Corpus,
+    name: &str,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    if name == corpus.target_name {
+        Ok(corpus.target_payload.clone())
+    } else if name == cfb_entry_name(0) {
+        Ok(payload_bytes(
+            PayloadKind::Incompressible,
+            0,
+            corpus.manifest.entry_bytes,
+        ))
+    } else {
+        Err(format!("unknown CFB open_stream workload path: {name}").into())
+    }
+}
+
+fn cfb_open_stream_expected_hash(corpus: &Corpus, name: &str) -> Result<String, Box<dyn Error>> {
+    Ok(sha256_hex(&cfb_open_stream_expected_payload(corpus, name)?))
+}
+
+#[cfg(test)]
+fn cfb_target_aware_repeat_formula(target_bytes: u64, invocations: usize) -> Vec<u64> {
+    vec![target_bytes; invocations]
+}
+
 fn run_cfb_open_stream(
     case: Case,
     corpus: &Corpus,
@@ -27686,7 +27886,14 @@ fn run_cfb_open_stream(
     let operation = case
         .cfb_open_stream_operation()
         .ok_or("CFB open_stream case has no operation")?;
+    if operation.is_bulk() {
+        return run_cfb_open_stream_bulk(case, corpus, warmup_iterations, samples);
+    }
+    if operation.is_concurrent() {
+        return run_cfb_open_stream_concurrent(case, corpus, warmup_iterations, samples);
+    }
     let invocation_count = operation.count();
+    let invocation_stream_names = cfb_open_stream_names(corpus, operation);
     let implementation = "shared-open-stream-read-at";
     let (sector_size, target_start_sector, target_is_minifat, root_ministream_bytes) =
         cfb_open_stream_identity(corpus)?;
@@ -27719,7 +27926,6 @@ fn run_cfb_open_stream(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let bytes = Arc::new(corpus.archive.clone());
         let metrics = Arc::new(SelectiveReadMetrics::default());
-        let path = [corpus.target_name.as_str()];
         let mut operation_durations = Vec::with_capacity(invocation_count);
         let mut operation_snapshots = Vec::with_capacity(invocation_count);
         let mut outputs = Vec::with_capacity(invocation_count);
@@ -27730,9 +27936,10 @@ fn run_cfb_open_stream(
         let open_snapshot = metrics.snapshot()?;
         metrics.reset()?;
         let source_version_before = ole.source_version()?;
-        for _ in 0..invocation_count {
+        for name in &invocation_stream_names {
             metrics.reset()?;
             let started = Instant::now();
+            let path = [name.as_str()];
             let output = ole.open_stream(&path)?;
             let duration = started.elapsed();
             let snapshot = metrics.snapshot()?;
@@ -27750,22 +27957,24 @@ fn run_cfb_open_stream(
         ) {
             return Err("CFB open_stream missing-path error variant was not preserved".into());
         }
-        if outputs.len() != invocation_count
-            || outputs
-                .iter()
-                .any(|output| output != &corpus.target_payload)
-        {
-            return Err("CFB open_stream output differs from deterministic target payload".into());
+        if outputs.len() != invocation_count {
+            return Err("CFB open_stream returned an unexpected output count".into());
+        }
+        for (name, output) in invocation_stream_names.iter().zip(&outputs) {
+            if output != &cfb_open_stream_expected_payload(corpus, name)? {
+                return Err(
+                    "CFB open_stream output differs from deterministic workload payload".into(),
+                );
+            }
         }
         let hashes = outputs
             .iter()
             .map(|output| sha256_hex(output))
             .collect::<Vec<_>>();
-        if hashes
-            .iter()
-            .any(|hash| hash != &corpus.manifest.target_payload_sha256)
-        {
-            return Err("CFB open_stream output hash differs from manifest".into());
+        for (name, hash) in invocation_stream_names.iter().zip(&hashes) {
+            if hash != &cfb_open_stream_expected_hash(corpus, name)? {
+                return Err("CFB open_stream output hash differs from manifest".into());
+            }
         }
         if let Some(expected) = expected_payload_sha256.as_deref() {
             if expected != corpus.manifest.target_payload_sha256 {
@@ -27847,9 +28056,9 @@ fn run_cfb_open_stream(
                 corpus.target_payload.len(),
             )?);
             root_cache_read_bytes.push(
-                operation_snapshots
-                    .get(1)
-                    .map(|snapshot| snapshot.read_bytes),
+                operation_snapshots.iter().find_map(|snapshot| {
+                    cfb_root_cache_read_bytes(snapshot, root_ministream_bytes)
+                }),
             );
             output_sha256.push(hashes);
             returned_payload_bytes.push(
@@ -27870,6 +28079,15 @@ fn run_cfb_open_stream(
         CfbOpenStreamOperation::Repeat | CfbOpenStreamOperation::Repeat8 => {
             "private MiniFAT cache state is not public; per-invocation source counters distinguish candidate direct-then-root materialization from baseline root materialization, and later zero-read phases are inferred cache hits"
         },
+        CfbOpenStreamOperation::DifferentSid => {
+            "private MiniFAT cache state is not public; the A-B-A source vector distinguishes root-only control from direct-target then root-cache takeover, while preserving sibling correctness"
+        },
+        CfbOpenStreamOperation::Bulk => {
+            "private MiniFAT cache state is not public; the public bulk-read source vector distinguishes root-only control from direct-target plus root-cache materialization"
+        },
+        CfbOpenStreamOperation::Concurrent => {
+            "private MiniFAT cache state is not public; a harness-only overlap gate makes two same-target callers deterministic while source counters distinguish root-only control from direct-target plus root-cache takeover"
+        },
     };
     let source = SourceSummary {
         cfb_open_stream: Some(CfbOpenStreamEvidence {
@@ -27878,6 +28096,8 @@ fn run_cfb_open_stream(
             implementation,
             operation: operation.name(),
             invocation_count,
+            invocation_stream_names,
+            requested_stream_count: invocation_count,
             shape: corpus.manifest.shape,
             sibling_count: corpus.manifest.entry_count,
             sector_size,
@@ -27892,6 +28112,426 @@ fn run_cfb_open_stream(
                 "minifat-36-byte"
             },
             cache_state_diagnostic,
+            source_version_check,
+            typed_refusal_verified: true,
+            expected_payload_sha256,
+            output_sha256,
+            returned_payload_bytes,
+            open_ns,
+            operation_ns,
+            per_operation_ns,
+            total_ns,
+            open_read_calls,
+            open_read_bytes,
+            open_read_range_sizes,
+            open_read_ranges,
+            logical_read_calls,
+            logical_read_bytes,
+            logical_read_range_sizes,
+            logical_read_ranges,
+            per_operation_read_calls,
+            per_operation_read_bytes,
+            per_operation_read_range_sizes,
+            per_operation_read_ranges,
+            root_cache_read_bytes,
+            expected_direct_physical_range,
+            simulation: None,
+        }),
+        ..SourceSummary::default()
+    };
+    Ok(result_with_source(case, corpus, elapsed, source))
+}
+
+fn run_cfb_open_stream_bulk(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let operation = CfbOpenStreamOperation::Bulk;
+    let invocation_stream_names = cfb_open_stream_names(corpus, operation);
+    let (sector_size, target_start_sector, target_is_minifat, root_ministream_bytes) =
+        cfb_open_stream_identity(corpus)?;
+    let limits = cfb_shared_limits(corpus)?;
+    let mut total_requested_bytes = 0usize;
+    for name in &invocation_stream_names {
+        total_requested_bytes = total_requested_bytes
+            .checked_add(cfb_open_stream_expected_payload(corpus, name)?.len())
+            .ok_or("CFB bulk workload bytes overflow")?;
+    }
+    let path_storage = invocation_stream_names
+        .iter()
+        .map(|name| vec![name.as_str()])
+        .collect::<Vec<_>>();
+    let paths = path_storage.iter().map(Vec::as_slice).collect::<Vec<_>>();
+    let input_bytes = u64::try_from(corpus.archive.len())?;
+    let work_bytes = u64::try_from(total_requested_bytes)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut open_ns = Vec::with_capacity(samples);
+    let mut operation_ns = Vec::with_capacity(samples);
+    let mut per_operation_ns = Vec::with_capacity(samples);
+    let mut total_ns = Vec::with_capacity(samples);
+    let mut open_read_calls = Vec::with_capacity(samples);
+    let mut open_read_bytes = Vec::with_capacity(samples);
+    let mut open_read_range_sizes = Vec::with_capacity(samples);
+    let mut open_read_ranges = Vec::with_capacity(samples);
+    let mut logical_read_calls = Vec::with_capacity(samples);
+    let mut logical_read_bytes = Vec::with_capacity(samples);
+    let mut logical_read_range_sizes = Vec::with_capacity(samples);
+    let mut logical_read_ranges = Vec::with_capacity(samples);
+    let mut per_operation_read_calls = Vec::with_capacity(samples);
+    let mut per_operation_read_bytes = Vec::with_capacity(samples);
+    let mut per_operation_read_range_sizes = Vec::with_capacity(samples);
+    let mut per_operation_read_ranges = Vec::with_capacity(samples);
+    let mut root_cache_read_bytes = Vec::with_capacity(samples);
+    let mut expected_direct_physical_range = Vec::with_capacity(samples);
+    let mut output_sha256 = Vec::with_capacity(samples);
+    let mut returned_payload_bytes = Vec::with_capacity(samples);
+    let mut expected_payload_sha256 = None;
+    let source_version_check =
+        "public SharedOleFile::source_version verified before and after bulk_read operations";
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let bytes = Arc::new(corpus.archive.clone());
+        let metrics = Arc::new(SelectiveReadMetrics::default());
+        let source = Arc::new(SelectiveReadAt::new(bytes, Arc::clone(&metrics)));
+        let open_started = Instant::now();
+        let ole = SharedOleFile::open_with_limits(source, limits)?;
+        let open_duration = open_started.elapsed();
+        let open_snapshot = metrics.snapshot()?;
+        metrics.reset()?;
+        let source_version_before = ole.source_version()?;
+        let context = execution_context(
+            1,
+            invocation_stream_names.len(),
+            work_bytes,
+            input_bytes,
+            work_bytes,
+        )?;
+        let started = Instant::now();
+        let outputs = ole.bulk_read(context).read_streams(&paths)?;
+        let operation_duration = started.elapsed();
+        let operation_snapshot = metrics.snapshot()?;
+        let source_version_after = ole.source_version()?;
+        if source_version_before != source_version_after {
+            return Err(
+                "CFB bulk open_stream source version changed across a stable operation".into(),
+            );
+        }
+        let missing_path = ["__litchi_open_stream_missing__"];
+        let missing_paths = [&missing_path[..]];
+        let missing_context = execution_context(1, 1, work_bytes, input_bytes, work_bytes)?;
+        if !matches!(
+            ole.bulk_read(missing_context).read_streams(&missing_paths),
+            Err(SharedOleBulkError::Ole(OleError::StreamNotFound))
+        ) {
+            return Err("CFB bulk missing-path error variant was not preserved".into());
+        }
+        if outputs.len() != invocation_stream_names.len() {
+            return Err("CFB bulk output count differs from workload".into());
+        }
+        for (name, output) in invocation_stream_names.iter().zip(&outputs) {
+            if output != &cfb_open_stream_expected_payload(corpus, name)? {
+                return Err("CFB bulk output differs from deterministic workload payload".into());
+            }
+        }
+        let hashes = invocation_stream_names
+            .iter()
+            .map(|name| cfb_open_stream_expected_hash(corpus, name))
+            .collect::<Result<Vec<_>, _>>()?;
+        if let Some(expected) = expected_payload_sha256.as_deref() {
+            if expected != corpus.manifest.target_payload_sha256 {
+                return Err("CFB bulk expected target hash changed across samples".into());
+            }
+        } else {
+            expected_payload_sha256 = Some(corpus.manifest.target_payload_sha256.clone());
+        }
+        let total_duration = open_duration
+            .checked_add(operation_duration)
+            .ok_or("CFB bulk combined duration overflows")?;
+        if open_snapshot.read_calls == 0 || operation_snapshot.read_calls == 0 {
+            return Err("CFB bulk workload performed no measured source reads".into());
+        }
+        if iteration >= warmup_iterations {
+            record_elapsed(&mut elapsed, iteration, warmup_iterations, total_duration)?;
+            open_ns.push(elapsed_ns(open_duration)?);
+            operation_ns.push(elapsed_ns(operation_duration)?);
+            per_operation_ns.push(vec![elapsed_ns(operation_duration)?]);
+            total_ns.push(elapsed_ns(total_duration)?);
+            open_read_calls.push(open_snapshot.read_calls);
+            open_read_bytes.push(open_snapshot.read_bytes);
+            open_read_range_sizes.push(open_snapshot.range_sizes);
+            open_read_ranges.push(open_snapshot.ranges);
+            logical_read_calls.push(operation_snapshot.read_calls);
+            logical_read_bytes.push(operation_snapshot.read_bytes);
+            logical_read_range_sizes.push(operation_snapshot.range_sizes.clone());
+            logical_read_ranges.push(operation_snapshot.ranges.clone());
+            per_operation_read_calls.push(vec![operation_snapshot.read_calls]);
+            per_operation_read_bytes.push(vec![operation_snapshot.read_bytes]);
+            per_operation_read_range_sizes.push(vec![operation_snapshot.range_sizes.clone()]);
+            per_operation_read_ranges.push(vec![operation_snapshot.ranges.clone()]);
+            root_cache_read_bytes.push(cfb_root_cache_read_bytes(
+                &operation_snapshot,
+                root_ministream_bytes,
+            ));
+            expected_direct_physical_range.push(None);
+            output_sha256.push(hashes);
+            returned_payload_bytes.push(
+                outputs
+                    .iter()
+                    .map(|output| u64::try_from(output.len()))
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
+        }
+    }
+    let expected_payload_sha256 =
+        expected_payload_sha256.ok_or("CFB bulk produced no expected payload hash")?;
+    let source = SourceSummary {
+        cfb_open_stream: Some(CfbOpenStreamEvidence {
+            timing_scope: "fresh validated open plus one bounded public bulk-read operation; corpus construction, refusal check, source snapshots, hashes, and output validation are excluded from elapsed_ns",
+            sink: "none",
+            implementation: "shared-open-stream-read-at",
+            operation: operation.name(),
+            invocation_count: 1,
+            invocation_stream_names,
+            requested_stream_count: 3,
+            shape: corpus.manifest.shape,
+            sibling_count: corpus.manifest.entry_count,
+            sector_size,
+            mini_sector_size: 64,
+            target_stream_name: corpus.target_name.clone(),
+            target_start_sector,
+            target_is_minifat,
+            root_ministream_bytes,
+            selected_target_kind: if corpus.target_payload.len() == 4095 {
+                "minifat-4095-byte"
+            } else {
+                "minifat-36-byte"
+            },
+            cache_state_diagnostic: "private MiniFAT cache state is not public; the public bulk-read source vector distinguishes root-only control from direct-target plus root-cache materialization",
+            source_version_check,
+            typed_refusal_verified: true,
+            expected_payload_sha256,
+            output_sha256,
+            returned_payload_bytes,
+            open_ns,
+            operation_ns,
+            per_operation_ns,
+            total_ns,
+            open_read_calls,
+            open_read_bytes,
+            open_read_range_sizes,
+            open_read_ranges,
+            logical_read_calls,
+            logical_read_bytes,
+            logical_read_range_sizes,
+            logical_read_ranges,
+            per_operation_read_calls,
+            per_operation_read_bytes,
+            per_operation_read_range_sizes,
+            per_operation_read_ranges,
+            root_cache_read_bytes,
+            expected_direct_physical_range,
+            simulation: None,
+        }),
+        ..SourceSummary::default()
+    };
+    Ok(result_with_source(case, corpus, elapsed, source))
+}
+
+fn run_cfb_open_stream_concurrent(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let operation = CfbOpenStreamOperation::Concurrent;
+    let invocation_stream_names = cfb_open_stream_names(corpus, operation);
+    let (sector_size, target_start_sector, target_is_minifat, root_ministream_bytes) =
+        cfb_open_stream_identity(corpus)?;
+    let limits = cfb_shared_limits(corpus)?;
+    let target_len = corpus.target_payload.len();
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut open_ns = Vec::with_capacity(samples);
+    let mut operation_ns = Vec::with_capacity(samples);
+    let mut per_operation_ns = Vec::with_capacity(samples);
+    let mut total_ns = Vec::with_capacity(samples);
+    let mut open_read_calls = Vec::with_capacity(samples);
+    let mut open_read_bytes = Vec::with_capacity(samples);
+    let mut open_read_range_sizes = Vec::with_capacity(samples);
+    let mut open_read_ranges = Vec::with_capacity(samples);
+    let mut logical_read_calls = Vec::with_capacity(samples);
+    let mut logical_read_bytes = Vec::with_capacity(samples);
+    let mut logical_read_range_sizes = Vec::with_capacity(samples);
+    let mut logical_read_ranges = Vec::with_capacity(samples);
+    let mut per_operation_read_calls = Vec::with_capacity(samples);
+    let mut per_operation_read_bytes = Vec::with_capacity(samples);
+    let mut per_operation_read_range_sizes = Vec::with_capacity(samples);
+    let mut per_operation_read_ranges = Vec::with_capacity(samples);
+    let mut root_cache_read_bytes = Vec::with_capacity(samples);
+    let mut expected_direct_physical_range = Vec::with_capacity(samples);
+    let mut output_sha256 = Vec::with_capacity(samples);
+    let mut returned_payload_bytes = Vec::with_capacity(samples);
+    let mut expected_payload_sha256 = None;
+    let source_version_check = "public SharedOleFile::source_version verified before and after overlapping open_stream operations";
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let bytes = Arc::new(corpus.archive.clone());
+        let metrics = Arc::new(SelectiveReadMetrics::default());
+        let gate = Arc::new(ConcurrentReadGate::default());
+        let source = Arc::new(SelectiveReadAt::with_concurrent_gate(
+            bytes,
+            Arc::clone(&metrics),
+            Arc::clone(&gate),
+            target_len,
+        ));
+        let open_started = Instant::now();
+        let ole = SharedOleFile::open_with_limits(source, limits)?;
+        let open_duration = open_started.elapsed();
+        let open_snapshot = metrics.snapshot()?;
+        metrics.reset()?;
+        let source_version_before = ole.source_version()?;
+        let start = Arc::new(Barrier::new(3));
+        let target_name = corpus.target_name.clone();
+        let started = Instant::now();
+        let (first, second) = std::thread::scope(|scope| {
+            let first_start = Arc::clone(&start);
+            let first_gate = Arc::clone(&gate);
+            let first_ole = &ole;
+            let first_name = target_name.as_str();
+            let first_task = scope.spawn(move || -> Result<_, String> {
+                first_start.wait();
+                first_gate
+                    .mark_entered()
+                    .map_err(|error| error.to_string())?;
+                let operation_started = Instant::now();
+                let output = first_ole
+                    .open_stream(&[first_name])
+                    .map_err(|error| error.to_string())?;
+                Ok((output, operation_started.elapsed()))
+            });
+            let second_start = Arc::clone(&start);
+            let second_gate = Arc::clone(&gate);
+            let second_ole = &ole;
+            let second_name = target_name.as_str();
+            let second_task = scope.spawn(move || -> Result<_, String> {
+                second_start.wait();
+                second_gate
+                    .mark_entered()
+                    .map_err(|error| error.to_string())?;
+                let operation_started = Instant::now();
+                let output = second_ole
+                    .open_stream(&[second_name])
+                    .map_err(|error| error.to_string())?;
+                Ok((output, operation_started.elapsed()))
+            });
+            start.wait();
+            (
+                first_task
+                    .join()
+                    .map_err(|_| "first CFB concurrent worker panicked".to_owned())
+                    .and_then(|result| result),
+                second_task
+                    .join()
+                    .map_err(|_| "second CFB concurrent worker panicked".to_owned())
+                    .and_then(|result| result),
+            )
+        });
+        let (first, first_duration) = first.map_err(io::Error::other)?;
+        let (second, second_duration) = second.map_err(io::Error::other)?;
+        let operation_duration = started.elapsed();
+        let source_version_after = ole.source_version()?;
+        if source_version_before != source_version_after {
+            return Err(
+                "CFB concurrent open_stream source version changed across a stable operation"
+                    .into(),
+            );
+        }
+        if !matches!(
+            ole.open_stream(&["__litchi_open_stream_missing__"]),
+            Err(OleError::StreamNotFound)
+        ) {
+            return Err("CFB concurrent missing-path error variant was not preserved".into());
+        }
+        if first != corpus.target_payload || second != corpus.target_payload {
+            return Err("CFB concurrent output differs from deterministic target payload".into());
+        }
+        let operation_snapshot = metrics.snapshot()?;
+        if open_snapshot.read_calls == 0 || operation_snapshot.read_calls == 0 {
+            return Err("CFB concurrent workload performed no measured source reads".into());
+        }
+        let hashes = vec![
+            corpus.manifest.target_payload_sha256.clone(),
+            corpus.manifest.target_payload_sha256.clone(),
+        ];
+        if let Some(expected) = expected_payload_sha256.as_deref() {
+            if expected != corpus.manifest.target_payload_sha256 {
+                return Err("CFB concurrent expected target hash changed across samples".into());
+            }
+        } else {
+            expected_payload_sha256 = Some(corpus.manifest.target_payload_sha256.clone());
+        }
+        let total_duration = open_duration
+            .checked_add(operation_duration)
+            .ok_or("CFB concurrent combined duration overflows")?;
+        if iteration >= warmup_iterations {
+            record_elapsed(&mut elapsed, iteration, warmup_iterations, total_duration)?;
+            open_ns.push(elapsed_ns(open_duration)?);
+            operation_ns.push(elapsed_ns(operation_duration)?);
+            per_operation_ns.push(vec![
+                elapsed_ns(first_duration)?,
+                elapsed_ns(second_duration)?,
+            ]);
+            total_ns.push(elapsed_ns(total_duration)?);
+            open_read_calls.push(open_snapshot.read_calls);
+            open_read_bytes.push(open_snapshot.read_bytes);
+            open_read_range_sizes.push(open_snapshot.range_sizes);
+            open_read_ranges.push(open_snapshot.ranges);
+            logical_read_calls.push(operation_snapshot.read_calls);
+            logical_read_bytes.push(operation_snapshot.read_bytes);
+            logical_read_range_sizes.push(operation_snapshot.range_sizes.clone());
+            logical_read_ranges.push(operation_snapshot.ranges.clone());
+            per_operation_read_calls.push(vec![operation_snapshot.read_calls]);
+            per_operation_read_bytes.push(vec![operation_snapshot.read_bytes]);
+            per_operation_read_range_sizes.push(vec![operation_snapshot.range_sizes.clone()]);
+            per_operation_read_ranges.push(vec![operation_snapshot.ranges.clone()]);
+            root_cache_read_bytes.push(cfb_root_cache_read_bytes(
+                &operation_snapshot,
+                root_ministream_bytes,
+            ));
+            expected_direct_physical_range.push(None);
+            output_sha256.push(hashes);
+            returned_payload_bytes.push(vec![
+                u64::try_from(first.len())?,
+                u64::try_from(second.len())?,
+            ]);
+        }
+    }
+    let expected_payload_sha256 =
+        expected_payload_sha256.ok_or("CFB concurrent produced no expected payload hash")?;
+    let source = SourceSummary {
+        cfb_open_stream: Some(CfbOpenStreamEvidence {
+            timing_scope: "fresh validated open plus two overlapping same-target open_stream operations; a harness-only source gate releases the direct target reads after both workers enter; corpus construction, refusal check, source snapshots, hashes, and output validation are excluded from elapsed_ns",
+            sink: "none",
+            implementation: "shared-open-stream-read-at",
+            operation: operation.name(),
+            invocation_count: 2,
+            invocation_stream_names,
+            requested_stream_count: 2,
+            shape: corpus.manifest.shape,
+            sibling_count: corpus.manifest.entry_count,
+            sector_size,
+            mini_sector_size: 64,
+            target_stream_name: corpus.target_name.clone(),
+            target_start_sector,
+            target_is_minifat,
+            root_ministream_bytes,
+            selected_target_kind: if corpus.target_payload.len() == 4095 {
+                "minifat-4095-byte"
+            } else {
+                "minifat-36-byte"
+            },
+            cache_state_diagnostic: "private MiniFAT cache state is not public; the harness-only overlap gate makes same-target caller interleaving reproducible while aggregate source counters distinguish root-only control from direct-target plus root-cache takeover",
             source_version_check,
             typed_refusal_verified: true,
             expected_payload_sha256,
@@ -28114,7 +28754,17 @@ fn run_cfb_open_stream_simulated(
                     .map_or(&[][..], |phase| phase.physical_ranges.as_slice()),
                 corpus.target_payload.len(),
             )?);
-            root_cache_read_bytes.push(per_operation.get(1).map(|phase| phase.logical_read_bytes));
+            root_cache_read_bytes.push(per_operation.iter().find_map(|phase| {
+                phase
+                    .physical_ranges
+                    .iter()
+                    .any(|&[offset, requested, returned]| {
+                        offset == 512
+                            && requested == root_ministream_bytes
+                            && returned == root_ministream_bytes
+                    })
+                    .then_some(phase.logical_read_bytes)
+            }));
             output_sha256.push(hashes);
             returned_payload_bytes.push(
                 outputs
@@ -28138,6 +28788,15 @@ fn run_cfb_open_stream_simulated(
         CfbOpenStreamOperation::Repeat | CfbOpenStreamOperation::Repeat8 => {
             "private MiniFAT cache state is not public; per-invocation source counters distinguish candidate direct-then-root materialization from baseline root materialization, and later zero-read phases are inferred cache hits"
         },
+        CfbOpenStreamOperation::DifferentSid => {
+            "private MiniFAT cache state is not public; the A-B-A source vector distinguishes root-only control from direct-target then root-cache takeover, while preserving sibling correctness"
+        },
+        CfbOpenStreamOperation::Bulk => {
+            "private MiniFAT cache state is not public; the public bulk-read source vector distinguishes root-only control from direct-target plus root-cache materialization"
+        },
+        CfbOpenStreamOperation::Concurrent => {
+            "private MiniFAT cache state is not public; a harness-only overlap gate makes two same-target callers deterministic while source counters distinguish root-only control from direct-target plus root-cache takeover"
+        },
     };
     let source = SourceSummary {
         cfb_open_stream: Some(CfbOpenStreamEvidence {
@@ -28146,6 +28805,8 @@ fn run_cfb_open_stream_simulated(
             implementation,
             operation: operation.name(),
             invocation_count,
+            invocation_stream_names: cfb_open_stream_names(corpus, operation),
+            requested_stream_count: invocation_count,
             shape: corpus.manifest.shape,
             sibling_count: corpus.manifest.entry_count,
             sector_size,
@@ -29525,38 +30186,39 @@ mod tests {
     use litchi_core::ReadAt;
 
     use super::{
-        Case, CfbSelectiveSimulationPhase, CfbSelectiveTarget, CorpusShape, CountingSeekSink,
-        CountingSink, HashingDiscardSink, InstrumentedSource, ODF_REPAIR_LOCAL_EXTRA,
-        ODF_REPAIR_PUBLICATION_SCRATCH_BYTES, ODP_TEXT_BOX_BATCH_COUNT, ODT_RESOURCE_BATCH_COUNT,
-        OpcCacheMode, PPT_PICTURE_BYTES, PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR,
-        PPT_REPEATED_QUERY_COUNT, PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT,
-        PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
-        RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
-        SimulatedRangeSource, SinkSummary, SourceBackedPackage, WindowedHashingSink,
-        WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
-        XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape, XlsxShape,
-        build_cfb_corpus, build_cfb_selective_corpus, build_docx_source_edit_corpus,
-        build_odf_repair_corpus, build_odp_media_corpus, build_odp_text_box_batch_corpus,
-        build_ods_media_corpus, build_odt_media_corpus, build_odt_resource_batch_corpus,
-        build_ole_common_corpus, build_opc_corpus, build_ppt_pictures_corpus,
-        build_pptx_cross_copy_corpus, build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus,
-        build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
-        build_semantic_odt_corpus, build_semantic_pptx_corpus, build_semantic_rtf_corpus,
-        build_streaming_corpus, build_writer_corpus, build_xls_comments_edit_corpus,
-        build_xls_visibility_edit_corpus, build_xlsx_auto_filter_edit_corpus,
-        build_xlsx_calculation_metadata_edit_corpus, build_xlsx_cell_crud_corpus,
-        build_xlsx_conditional_formatting_edit_corpus, build_xlsx_corpus,
-        build_xlsx_data_validation_edit_corpus, build_xlsx_defined_names_edit_corpus,
-        build_xlsx_merge_edit_corpus, build_xlsx_page_break_edit_corpus,
-        build_xlsx_page_margin_edit_corpus, build_xlsx_page_setup_edit_corpus,
-        build_xlsx_print_options_edit_corpus, build_xlsx_sheet_protection_edit_corpus,
-        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
-        parse_case, payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
-        run_cfb_open_stream, run_cfb_open_stream_simulated, run_cfb_selective_read,
-        run_cfb_selective_simulated_read, run_docx_source_backed_one_edit_save,
-        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
-        run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
-        run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
+        Case, CfbOpenStreamOperation, CfbSelectiveSimulationPhase, CfbSelectiveTarget, CorpusShape,
+        CountingSeekSink, CountingSink, HashingDiscardSink, InstrumentedSource,
+        ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES, ODP_TEXT_BOX_BATCH_COUNT,
+        ODT_RESOURCE_BATCH_COUNT, OpcCacheMode, PPT_PICTURE_BYTES, PPT_PICTURE_COUNT,
+        PPT_PICTURES_CORPUS_GENERATOR, PPT_REPEATED_QUERY_COUNT, PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT,
+        PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
+        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
+        SimulatedCursor, SimulatedRangeMetrics, SimulatedRangeSource, SinkSummary,
+        SourceBackedPackage, WindowedHashingSink, WriteSizeBuckets, WriterShape,
+        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
+        XlsxCellCrudShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
+        build_docx_source_edit_corpus, build_odf_repair_corpus, build_odp_media_corpus,
+        build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
+        build_odt_resource_batch_corpus, build_ole_common_corpus, build_opc_corpus,
+        build_ppt_pictures_corpus, build_pptx_cross_copy_corpus, build_pptx_source_edit_corpus,
+        build_rtf_lifecycle_corpus, build_semantic_docx_corpus, build_semantic_odp_corpus,
+        build_semantic_ods_corpus, build_semantic_odt_corpus, build_semantic_pptx_corpus,
+        build_semantic_rtf_corpus, build_streaming_corpus, build_writer_corpus,
+        build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
+        build_xlsx_auto_filter_edit_corpus, build_xlsx_calculation_metadata_edit_corpus,
+        build_xlsx_cell_crud_corpus, build_xlsx_conditional_formatting_edit_corpus,
+        build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
+        build_xlsx_defined_names_edit_corpus, build_xlsx_merge_edit_corpus,
+        build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
+        build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
+        build_xlsx_sheet_protection_edit_corpus, cfb_open_stream_expected_payload,
+        cfb_target_aware_repeat_formula, expected_opc_overlay_output, ole_common_changed_output,
+        opc_overlay_replacement_payload, parse_case, payload_bytes, resolve_execution_workers,
+        run_case, run_case_with_config, run_cfb_open_stream, run_cfb_open_stream_simulated,
+        run_cfb_selective_read, run_cfb_selective_simulated_read,
+        run_docx_source_backed_one_edit_save, run_opc_source_cache_budget_boundary,
+        run_opc_source_cache_contention, run_opc_source_overlay_one_part_save, run_ppt_pictures,
+        run_pptx_batch_edit_save, run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_one_edit_save, run_scaling_case, run_streaming_creation,
         run_xls_comments_edit_save, run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
@@ -29964,8 +30626,128 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 285);
+        assert_eq!(selectable_count, 291);
         assert_eq!(Case::DEFAULT.len(), 36);
+    }
+
+    #[test]
+    fn cfb_open_stream_target_aware_formulas_are_exact() {
+        let l = 36_u64;
+        assert_eq!(cfb_target_aware_repeat_formula(l, 1), vec![l]);
+        assert_eq!(cfb_target_aware_repeat_formula(l, 3), vec![l, l, l]);
+        assert_eq!(
+            cfb_target_aware_repeat_formula(l, 8),
+            vec![l, l, l, l, l, l, l, l]
+        );
+    }
+
+    #[test]
+    fn cfb_open_stream_extended_selectors_preserve_payloads() {
+        for shape in [CorpusShape::ManySmall, CorpusShape::WideRoot] {
+            for target in [CfbSelectiveTarget::Mini, CfbSelectiveTarget::Mini4095] {
+                let corpus = build_cfb_selective_corpus(shape, target).unwrap();
+                let (expected_root_bytes, target_start) = match (shape, target) {
+                    (CorpusShape::ManySmall, CfbSelectiveTarget::Mini) => {
+                        (261_184_u64, 261_632_u64)
+                    },
+                    (CorpusShape::ManySmall, CfbSelectiveTarget::Mini4095) => {
+                        (265_216_u64, 261_632_u64)
+                    },
+                    (CorpusShape::WideRoot, CfbSelectiveTarget::Mini) => {
+                        (2_096_192_u64, 2_096_640_u64)
+                    },
+                    (CorpusShape::WideRoot, CfbSelectiveTarget::Mini4095) => {
+                        (2_100_224_u64, 2_096_640_u64)
+                    },
+                    (_, CfbSelectiveTarget::Fat) => unreachable!(),
+                    _ => unreachable!(),
+                };
+                let cases = match target {
+                    CfbSelectiveTarget::Mini => [
+                        Case::CfbOpenStreamMiniSharedDifferentSid,
+                        Case::CfbOpenStreamMiniSharedBulk,
+                        Case::CfbOpenStreamMiniSharedConcurrent,
+                    ],
+                    CfbSelectiveTarget::Mini4095 => [
+                        Case::CfbOpenStreamMini4095SharedDifferentSid,
+                        Case::CfbOpenStreamMini4095SharedBulk,
+                        Case::CfbOpenStreamMini4095SharedConcurrent,
+                    ],
+                    CfbSelectiveTarget::Fat => unreachable!(),
+                };
+                for case in cases {
+                    assert_eq!(parse_case(case.name()), Some(case));
+                    let evidence = run_cfb_open_stream(case, &corpus, 0, 1)
+                        .unwrap()
+                        .source
+                        .unwrap()
+                        .cfb_open_stream
+                        .unwrap();
+                    assert!(evidence.typed_refusal_verified);
+                    assert_eq!(evidence.shape, shape.name());
+                    assert_eq!(evidence.root_ministream_bytes, expected_root_bytes);
+                    assert_eq!(
+                        evidence.requested_stream_count,
+                        case.cfb_open_stream_operation().unwrap().count()
+                    );
+                    assert_eq!(evidence.output_sha256.len(), 1);
+                    assert_eq!(evidence.returned_payload_bytes.len(), 1);
+                    assert_eq!(
+                        evidence.output_sha256[0].len(),
+                        evidence.requested_stream_count
+                    );
+                    assert_eq!(
+                        evidence.returned_payload_bytes[0],
+                        evidence
+                            .invocation_stream_names
+                            .iter()
+                            .map(|name| cfb_open_stream_expected_payload(&corpus, name)
+                                .unwrap()
+                                .len() as u64)
+                            .collect::<Vec<_>>()
+                    );
+
+                    let target_len = corpus.target_payload.len() as u64;
+                    let direct = [target_start, target_len, target_len];
+                    let cache = [512_u64, expected_root_bytes, expected_root_bytes];
+                    let ranges = &evidence.per_operation_read_ranges[0];
+                    match case.cfb_open_stream_operation().unwrap() {
+                        CfbOpenStreamOperation::DifferentSid => {
+                            assert!(
+                                ranges == &vec![vec![cache], vec![], vec![]]
+                                    || ranges == &vec![vec![direct], vec![cache], vec![]],
+                                "unexpected different-SID source vector for {shape:?}/{target:?}: {ranges:?}"
+                            );
+                        },
+                        CfbOpenStreamOperation::Bulk => {
+                            let mut actual = ranges.iter().flatten().copied().collect::<Vec<_>>();
+                            actual.sort_unstable();
+                            let mut direct_and_cache = vec![direct, cache];
+                            direct_and_cache.sort_unstable();
+                            assert!(
+                                actual == vec![cache] || actual == direct_and_cache,
+                                "unexpected bulk source multiset for {shape:?}/{target:?}: {actual:?}"
+                            );
+                        },
+                        CfbOpenStreamOperation::Concurrent => {
+                            let mut actual = ranges.iter().flatten().copied().collect::<Vec<_>>();
+                            actual.sort_unstable();
+                            let mut direct_and_cache = vec![direct, cache];
+                            direct_and_cache.sort_unstable();
+                            let mut direct_twice = vec![direct, direct];
+                            direct_twice.sort_unstable();
+                            assert!(
+                                actual == vec![cache]
+                                    || actual == direct_and_cache
+                                    || actual == direct_twice,
+                                "unexpected concurrent source multiset for {shape:?}/{target:?}: {actual:?}"
+                            );
+                        },
+                        _ => unreachable!(),
+                    }
+                }
+            }
+        }
     }
 
     #[test]
@@ -30045,38 +30827,71 @@ mod tests {
                     assert_eq!(evidence.per_operation_read_calls[0].len(), invocation_count);
                     assert_eq!(evidence.per_operation_read_bytes[0].len(), invocation_count);
                     let target_len = corpus.target_payload.len() as u64;
-                    let expected_calls = match invocation_count {
-                        1 => vec![1],
-                        3 => vec![1, 1, 0],
-                        8 => vec![1, 1, 0, 0, 0, 0, 0, 0],
-                        _ => unreachable!(),
-                    };
-                    let expected_bytes = match invocation_count {
-                        1 => vec![target_len],
-                        3 => vec![target_len, expected_root_bytes, 0],
-                        8 => vec![target_len, expected_root_bytes, 0, 0, 0, 0, 0, 0],
-                        _ => unreachable!(),
-                    };
-                    assert_eq!(evidence.per_operation_read_calls[0], expected_calls);
-                    assert_eq!(evidence.per_operation_read_bytes[0], expected_bytes);
                     let expected_direct = vec![[expected_direct_start, target_len, target_len]];
                     let expected_root = vec![[512, expected_root_bytes, expected_root_bytes]];
-                    let expected_ranges = match invocation_count {
-                        1 => vec![expected_direct.clone()],
-                        3 => vec![expected_direct.clone(), expected_root.clone(), vec![]],
-                        8 => vec![
-                            expected_direct.clone(),
-                            expected_root.clone(),
-                            vec![],
-                            vec![],
-                            vec![],
-                            vec![],
-                            vec![],
-                            vec![],
-                        ],
+                    let (control_calls, control_bytes, control_ranges) = match invocation_count {
+                        1 => (
+                            vec![1],
+                            vec![expected_root_bytes],
+                            vec![expected_root.clone()],
+                        ),
+                        3 => (
+                            vec![1, 0, 0],
+                            vec![expected_root_bytes, 0, 0],
+                            vec![expected_root.clone(), vec![], vec![]],
+                        ),
+                        8 => (
+                            vec![1, 0, 0, 0, 0, 0, 0, 0],
+                            vec![expected_root_bytes, 0, 0, 0, 0, 0, 0, 0],
+                            vec![
+                                expected_root.clone(),
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                            ],
+                        ),
                         _ => unreachable!(),
                     };
-                    assert_eq!(evidence.per_operation_read_ranges[0], expected_ranges);
+                    let (current_calls, current_bytes, current_ranges) = match invocation_count {
+                        1 => (vec![1], vec![target_len], vec![expected_direct.clone()]),
+                        3 => (
+                            vec![1, 1, 0],
+                            vec![target_len, expected_root_bytes, 0],
+                            vec![expected_direct.clone(), expected_root.clone(), vec![]],
+                        ),
+                        8 => (
+                            vec![1, 1, 0, 0, 0, 0, 0, 0],
+                            vec![target_len, expected_root_bytes, 0, 0, 0, 0, 0, 0],
+                            vec![
+                                expected_direct.clone(),
+                                expected_root.clone(),
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                            ],
+                        ),
+                        _ => unreachable!(),
+                    };
+                    let candidate_calls = vec![1; invocation_count];
+                    let candidate_bytes = vec![target_len; invocation_count];
+                    let candidate_ranges = vec![expected_direct.clone(); invocation_count];
+                    let actual = (
+                        evidence.per_operation_read_calls[0].clone(),
+                        evidence.per_operation_read_bytes[0].clone(),
+                        evidence.per_operation_read_ranges[0].clone(),
+                    );
+                    assert!(
+                        actual == (control_calls, control_bytes, control_ranges)
+                            || actual == (current_calls, current_bytes, current_ranges)
+                            || actual == (candidate_calls, candidate_bytes, candidate_ranges)
+                    );
                     assert_eq!(
                         evidence.per_operation_read_range_sizes[0].len(),
                         invocation_count
@@ -30086,23 +30901,31 @@ mod tests {
                         invocation_count
                     );
                     assert_eq!(evidence.expected_direct_physical_range.len(), 1);
+                    let expected_direct_range =
+                        if evidence.per_operation_read_bytes[0].first() == Some(&target_len) {
+                            Some([expected_direct_start, expected_direct_start + target_len])
+                        } else {
+                            None
+                        };
                     assert_eq!(
                         evidence.expected_direct_physical_range[0],
-                        Some([expected_direct_start, expected_direct_start + target_len])
+                        expected_direct_range
                     );
                     assert_events(&evidence.open_read_ranges[0]);
                     assert_events(&evidence.logical_read_ranges[0]);
                     for ranges in &evidence.per_operation_read_ranges[0] {
                         assert_events(ranges);
                     }
-                    if invocation_count == 1 {
-                        assert_eq!(evidence.root_cache_read_bytes, vec![None]);
-                    } else {
-                        assert_eq!(
-                            evidence.root_cache_read_bytes,
-                            vec![Some(expected_root_bytes)]
-                        );
-                    }
+                    let root_expected = match evidence.per_operation_read_bytes[0].as_slice() {
+                        bytes if bytes.first() == Some(&expected_root_bytes) => {
+                            Some(expected_root_bytes)
+                        },
+                        bytes if bytes.get(1) == Some(&expected_root_bytes) => {
+                            Some(expected_root_bytes)
+                        },
+                        _ => None,
+                    };
+                    assert_eq!(evidence.root_cache_read_bytes, vec![root_expected]);
                 }
             }
         }
@@ -30194,46 +31017,107 @@ mod tests {
                     assert_eq!(sample.open.physical_ranges, evidence.open_read_ranges[0]);
                     assert_eq!(evidence.root_ministream_bytes, expected_root_bytes);
                     let target_len = corpus.target_payload.len() as u64;
-                    let expected_calls = match invocation_count {
-                        1 => vec![1],
-                        3 => vec![1, 1, 0],
-                        8 => vec![1, 1, 0, 0, 0, 0, 0, 0],
-                        _ => unreachable!(),
-                    };
-                    let expected_bytes = match invocation_count {
-                        1 => vec![target_len],
-                        3 => vec![target_len, expected_root_bytes, 0],
-                        8 => vec![target_len, expected_root_bytes, 0, 0, 0, 0, 0, 0],
-                        _ => unreachable!(),
-                    };
-                    assert_eq!(evidence.per_operation_read_calls[0], expected_calls);
-                    assert_eq!(evidence.per_operation_read_bytes[0], expected_bytes);
                     let expected_direct = vec![[expected_direct_start, target_len, target_len]];
-                    assert_eq!(sample.per_operation[0].physical_ranges, expected_direct);
-                    if invocation_count == 1 {
-                        assert_eq!(evidence.root_cache_read_bytes, vec![None]);
+                    let mut expected_root_ranges = Vec::new();
+                    let mut offset = 512_u64;
+                    let mut remaining = expected_root_bytes;
+                    while remaining != 0 {
+                        let requested = remaining.min(4_096);
+                        expected_root_ranges.push([offset, requested, requested]);
+                        offset += requested;
+                        remaining -= requested;
+                    }
+                    let actual = (
+                        evidence.per_operation_read_calls[0].clone(),
+                        evidence.per_operation_read_bytes[0].clone(),
+                        evidence.per_operation_read_ranges[0]
+                            .iter()
+                            .map(|ranges| ranges.clone())
+                            .collect::<Vec<_>>(),
+                    );
+                    let control = match invocation_count {
+                        1 => (
+                            vec![1],
+                            vec![expected_root_bytes],
+                            vec![expected_root_ranges.clone()],
+                        ),
+                        3 => (
+                            vec![1, 0, 0],
+                            vec![expected_root_bytes, 0, 0],
+                            vec![expected_root_ranges.clone(), vec![], vec![]],
+                        ),
+                        8 => (
+                            vec![1, 0, 0, 0, 0, 0, 0, 0],
+                            vec![expected_root_bytes, 0, 0, 0, 0, 0, 0, 0],
+                            vec![
+                                expected_root_ranges.clone(),
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                            ],
+                        ),
+                        _ => unreachable!(),
+                    };
+                    let current = match invocation_count {
+                        1 => (vec![1], vec![target_len], vec![expected_direct.clone()]),
+                        3 => (
+                            vec![1, 1, 0],
+                            vec![target_len, expected_root_bytes, 0],
+                            vec![
+                                expected_direct.clone(),
+                                expected_root_ranges.clone(),
+                                vec![],
+                            ],
+                        ),
+                        8 => (
+                            vec![1, 1, 0, 0, 0, 0, 0, 0],
+                            vec![target_len, expected_root_bytes, 0, 0, 0, 0, 0, 0],
+                            vec![
+                                expected_direct.clone(),
+                                expected_root_ranges.clone(),
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                                vec![],
+                            ],
+                        ),
+                        _ => unreachable!(),
+                    };
+                    let candidate = (
+                        vec![1; invocation_count],
+                        vec![target_len; invocation_count],
+                        vec![expected_direct.clone(); invocation_count],
+                    );
+                    assert!(actual == control || actual == current || actual == candidate);
+                    if actual.1.first() == Some(&target_len) {
+                        assert_eq!(sample.per_operation[0].physical_ranges, expected_direct);
                     } else {
-                        let mut expected_root_ranges = Vec::new();
-                        let mut offset = 512_u64;
-                        let mut remaining = expected_root_bytes;
-                        while remaining != 0 {
-                            let requested = remaining.min(4_096);
-                            expected_root_ranges.push([offset, requested, requested]);
-                            offset += requested;
-                            remaining -= requested;
-                        }
                         assert_eq!(
-                            sample.per_operation[1].physical_ranges,
+                            sample.per_operation[0].physical_ranges,
                             expected_root_ranges
                         );
-                        assert_eq!(
-                            evidence.root_cache_read_bytes,
-                            vec![Some(expected_root_bytes)]
-                        );
                     }
+                    let expected_root =
+                        if actual.1.iter().any(|bytes| *bytes == expected_root_bytes) {
+                            Some(expected_root_bytes)
+                        } else {
+                            None
+                        };
+                    assert_eq!(evidence.root_cache_read_bytes, vec![expected_root]);
+                    let expected_direct_range = if actual.1.first() == Some(&target_len) {
+                        Some([expected_direct_start, expected_direct_start + target_len])
+                    } else {
+                        None
+                    };
                     assert_eq!(
                         evidence.expected_direct_physical_range[0],
-                        Some([expected_direct_start, expected_direct_start + target_len])
+                        expected_direct_range
                     );
                     assert_phase(&sample.aggregate);
                     assert!(sample.aggregate.logical_read_calls > 0);

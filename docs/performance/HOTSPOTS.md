@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0147`](changes/0147-cfb-open-stream-release-abba.md)
+Evidence through: [`change 0148`](changes/0148-cfb-same-target-repeat-policy.md)
 (the newest accepted semantic-format optimization remains limited to four repeated
 source-backed ODP full-text projections; the latest release CFB selective-range
 evidence is the configured simulator result in
@@ -10,8 +10,11 @@ evidence is the configured simulator result in
 [`0146`](changes/0146-cfb-open-stream-evidence.md) adds `open_stream`-specific
 correctness/counter instrumentation and
 [`0147`](changes/0147-cfb-open-stream-release-abba.md) accepts only its
-configured-simulator one-shot result while retaining the repeat tradeoff,
-and [`0094`](changes/0094-cfb-selective-read-evidence.md) retains the non-simulated
+configured-simulator one-shot result while retaining the repeat tradeoff, and
+[`0148`](changes/0148-cfb-same-target-repeat-policy.md) adds correctness/source-
+event coverage for different-SID A-B-A, public bulk A-B-A, and overlapping
+same-target calls, while
+[`0094`](changes/0094-cfb-selective-read-evidence.md) retains the non-simulated
 exact-range result, and the latest accepted
 generic multi-format filesystem result remains
 [`0089`](changes/0089-filesystem-release-repeated-evidence.md); Change 0143 is
@@ -723,6 +726,13 @@ Confirmed source facts:
   4095-byte request, exposing physical-run coalescing without
   making a latency or resource claim. Release ABBA, tails, cold/high-latency,
   allocation/RSS, and native semantic consumers remain open.
+- Change 0148 extends the current `open_stream` harness with correctness/source-
+  event selectors for different-SID A-B-A, public bulk A-B-A, and overlapping
+  same-target calls at 36- and 4095-byte MiniFAT targets. The selectors cover
+  source ranges, ordered workload outputs, source-version stability, and typed
+  refusal only; failure/retry, ineligible-root, FAT, native semantic, resource,
+  and performance acceptance remain open. See
+  [`0148`](changes/0148-cfb-same-target-repeat-policy.md).
 - Change 0126 adds eight ordinary-root DOCX filesystem selectors over the
   unchanged 200-paragraph/eight-incompressible-2 MiB-media corpus. The eager
   control times `fs::read` plus `Document::from_bytes`; the source control
@@ -1122,9 +1132,10 @@ changes. Remaining gaps are:
 - CFB `open_stream` now has direct one-shot and sequential repeat selectors for
   36-byte and 4,095-byte MiniFAT targets. Change 0147 accepts the configured
   simulator's one-shot timing and exact source-work result, but repeats add one
-  target-sized request before root-cache materialization. Allocation/RSS,
-  physical-I/O, bulk, concurrency, failure/retry, ineligible-root, FAT, and
-  native semantic evidence remain open.
+  target-sized request before root-cache materialization. Change 0148 adds
+  correctness/source-event coverage for different-SID A-B-A, public bulk A-B-A,
+  and overlapping same-target calls. Failure/retry, ineligible-root, FAT,
+  native semantic, resource, and performance acceptance remain open.
 - Decompressed and recompressed byte observers. Positional range-request
   distributions now exist for OPC and XLSX, but not yet for every format/source.
 - Broad hardware-counter evidence. A matched targeted-OPC run is committed now

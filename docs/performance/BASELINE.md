@@ -317,6 +317,22 @@ native-format, or cross-format claim is accepted. See the
 [release record](changes/0147-cfb-open-stream-release-abba.md) and
 [compact summary](results/cfb-open-stream-abba-0147-summary.json).
 
+## CFB target-aware repeat-policy harness (change 0148)
+
+The current 291-name harness adds six production-only selectors for different-
+SID A-B-A, public bulk A-B-A, and overlapping same-target calls at 36-byte and
+4095-byte MiniFAT targets. Their correctness/source-event records retain
+ordered workload names, output hashes and lengths, exact positional ranges,
+source-version stability, and typed missing-stream refusal. The runner accepts
+the control root-only vector, the prior direct-then-root vector, and the
+target-aware same-SID repeat vector; concurrent overlap uses only a harness-side
+entry gate, and bulk calls the public `bulk_read` API.
+
+This is correctness/source-event evidence only. Failure/retry, ineligible-root,
+FAT, native semantic, resource, and performance acceptance remain open; no
+release, latency, allocation, RSS, physical-I/O, or generic CRUD claim is made.
+See [change 0148](changes/0148-cfb-same-target-repeat-policy.md).
+
 ## CFB MiniFAT physical-run boundary evidence (change 0125)
 
 The current harness adds a matched 4095-byte MiniFAT boundary pair over the
@@ -506,7 +522,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**285 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**291 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
