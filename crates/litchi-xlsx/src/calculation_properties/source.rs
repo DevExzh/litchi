@@ -11,7 +11,6 @@ use super::patch::{Commit, Patch};
 use super::snapshot::{Snapshot, same_properties};
 use super::{Features, Limits, Properties, inspect, rewrite};
 use crate::error::{Error, Result, invalid};
-use crate::source_provenance::SourceProvenance;
 
 /// An owning source-backed editor for workbook calculation metadata.
 ///
@@ -86,28 +85,15 @@ impl SourceBackedEditor {
         writer: W,
         commit: &Commit,
     ) -> Result<Snapshot> {
-        let before = commit.patch().before();
-        let current = match before.matches_source_backed(&self.package)? {
-            SourceProvenance::Matched => None,
-            SourceProvenance::Mismatched => {
-                return Err(Error::PatchConflict {
-                    part: before.workbook_part_name().to_string(),
-                });
-            },
-            SourceProvenance::Unavailable => Some(Snapshot::load_source_backed_with_limits(
-                &self.package,
-                &self.snapshot.limits(),
-            )?),
-        };
-        if let Some(current) = &current
-            && !current.same_source(before)
-        {
+        let current =
+            Snapshot::load_source_backed_with_limits(&self.package, &self.snapshot.limits())?;
+        if !current.same_source(commit.patch().before()) {
             return Err(Error::PatchConflict {
                 part: current.workbook_part_name().to_string(),
             });
         }
         let target = if commit.patch().is_empty() {
-            current.unwrap_or_else(|| before.clone())
+            current
         } else {
             commit.patch().after().clone()
         };

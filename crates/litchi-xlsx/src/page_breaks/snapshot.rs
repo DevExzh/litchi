@@ -8,7 +8,6 @@ use litchi_opc::{OpcPackage, PackURI, Part, Relationship, SourceBackedPackage, T
 
 use super::PageBreaks;
 use crate::error::{Error, Result, invalid};
-use crate::source_provenance::{SourceBinding, SourceProvenance};
 use crate::workbook::source::validate_sheet_graph;
 use crate::{Selector, Workbook, WorksheetKind, raw};
 
@@ -19,7 +18,6 @@ pub struct Snapshot {
     sheet_name: Box<str>,
     sheet_position: usize,
     source: SourceState,
-    binding: SourceBinding,
 }
 
 impl Snapshot {
@@ -71,7 +69,6 @@ impl Snapshot {
             worksheet.content_type(),
             worksheet.blob_arc(),
             relationship,
-            SourceBinding::default(),
         )
     }
 
@@ -104,7 +101,7 @@ impl Snapshot {
         let owner = current_owner_relationship(package.rels())
             .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?;
 
-        let snapshot = Self::from_parts(
+        Self::from_parts(
             &catalog_sheet.name,
             sheet_position,
             workbook.partname().clone(),
@@ -115,12 +112,7 @@ impl Snapshot {
             worksheet.content_type(),
             worksheet_xml,
             relationship,
-            SourceBinding::default(),
-        )?;
-        Ok(Self {
-            binding: SourceBinding::capture(package)?,
-            ..snapshot
-        })
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -135,14 +127,12 @@ impl Snapshot {
         worksheet_content_type: &str,
         worksheet_xml: Arc<Vec<u8>>,
         sheet_relationship: &Relationship,
-        binding: SourceBinding,
     ) -> Result<Self> {
         let value = super::parse(worksheet_xml.as_slice())?;
         Ok(Self {
             value,
             sheet_name: copy_boxed(sheet_name, "page-break sheet name")?,
             sheet_position,
-            binding,
             source: SourceState {
                 workbook: PartState::new(
                     workbook_uri,
@@ -210,15 +200,6 @@ impl Snapshot {
         self.sheet_name == other.sheet_name
             && self.sheet_position == other.sheet_position
             && self.source == other.source
-            && self.binding.same_or_unavailable(&other.binding)
-    }
-
-    /// Check the retained source lineage and revision without reloading XML.
-    pub(super) fn matches_source_backed(
-        &self,
-        package: &SourceBackedPackage,
-    ) -> Result<SourceProvenance> {
-        self.binding.check(package)
     }
 
     pub(super) fn matches_current_source(&self, package: &OpcPackage) -> bool {

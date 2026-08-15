@@ -336,15 +336,6 @@ fn foreign_changed_and_retargeted_sources_are_rejected() {
     ));
     assert!(output.is_empty());
 
-    let foreign_identical_editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
-    output.clear();
-    assert!(matches!(
-        foreign_identical_editor.publish_commit_to_stream(&mut output, &commit),
-        Err(Error::PatchConflict { .. })
-    ));
-    assert!(output.is_empty());
-
     let source = Arc::new(VersionedSource::new(bytes.clone()));
     let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
     let commit = changed_commit(&editor);
