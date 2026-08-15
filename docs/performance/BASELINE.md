@@ -537,6 +537,24 @@ is correctness/descriptive evidence only and does not claim a latency,
 allocation, RSS, I/O, or memory improvement before balanced release ABBA.
 See [`0137`](changes/0137-xls-numeric-plan-only-publication.md).
 
+Change 0138 records the balanced CPU-2 release comparison for those two
+plan-only selectors. Each family ran one process per leg in strict `A1, B1,
+B2, A2` order with 20 warmups and 200 samples; A is ordinary source-backed
+publication and B is plan-only. Number total p50 improves 27.57% and 28.58%
+in the two paired directions; RK/MulRK improves 24.90% and 24.56%. P95,
+p99 and mean move in the same direction for both families. The commit phase
+also agrees; publication is near-neutral and is not claimed independently.
+Matched three-warmup/30-sample `/usr/bin/time -v` legs show process VmHWM
+falling 10.73% and 10.66% for Number in both directions, while RK/MulRK
+directions disagree. Valid heaptrack 1.5.0 profiles report whole-process
+allocation/temporary totals and identical 205.56/154.93 MiB peak heaps for
+the Number/RK families' A/B pairs; no operation-only allocation or peak-heap
+improvement is accepted. The plan-only latency result is accepted only for
+these two deterministic fixed-width families and this release configuration;
+no bounded-total-memory, physical-I/O or cold-cache claim is made. See
+[`0138`](changes/0138-xls-numeric-plan-only-release-abba.md) and its schema-1
+raw artifacts.
+
 The earlier five-case filesystem smoke exercises eager/source-backed OPC open,
 eager/source-backed one-Part atomic save, and same-length CFB atomic overlay
 save. A

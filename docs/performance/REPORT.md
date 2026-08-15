@@ -130,6 +130,7 @@ is still not broad program or CRUD coverage.
 | Native XLS fixed-width numeric inventory carry-forward | Large one-cell edit/save p50 **-7.83%**, mean **-7.37%**, p95 **-7.20%** | Exact byte-range proof plus complete public Workbook validation/readback remain; peak heap -5.54%, RSS flat; all nonnumeric/structural/resource edits retain full parse |
 | XLS comment/visibility source-splice publication | Existing matched eager/source-backed controls cover one/256-comment and one/64-visibility edits; source-backed owners now submit exact NOTE/TXO or `BoundSheet8` ranges | Replacement staging is 109/27,904 bytes instead of an 80,946-byte Workbook and 1/64 instead of 18,166; balanced ABBA accepts no latency speedup, while complete semantic/readback/security gates remain; allocation, RSS and physical I/O remain open |
 | XLS fixed-width numeric publication evidence | CPU-2-pinned current-revision p50/p95/p99: eager Number 31.492/34.116/35.916 ms, source-backed Number 146.410/149.108/150.693 ms; eager RK/MulRK 0.100/0.120/0.127 ms, source-backed 1.627/1.659/1.690 ms | Source-backed/eager p50 ratios are descriptively 4.65x/16.25x and both retain the complete 16,995,840/202,752-byte target. This is a before baseline only, with byte-identical family outputs and complete correctness gates; no optimization, regression, allocation/RSS, bounded-memory, physical-I/O, cold-cache, or broad-producer claim |
+| XLS plan-only fixed-width numeric publication | Balanced CPU-2 release A1/B1/B2/A2: Number total p50 **-27.57%/-28.58%**, p95 **-27.52%/-28.75%**; RK/MulRK p50 **-24.90%/-24.56%**, p95 **-25.66%/-24.71%**; all paired p99/mean directions agree | Accepted for complete-operation latency in the two deterministic families. Number process VmHWM is **-10.73%/-10.66%** in matched three-warmup/30-sample legs; RK/MulRK RSS disagrees. Valid heaptrack A/B profiles show whole-process allocation reductions but identical peak heap; no operation-only allocation, bounded-memory, physical-I/O or cold-cache claim |
 | Rejected XLS terminal-render handoff | Tiny changed save p50 **-7.55%**; large changed save **-0.39%** (neutral) | Fully reverted: repeated large exact no-op p50 **+22.00%**, mean **+16.69%** |
 | Common OLE2 publication stages and rejected handoffs | Current open/publication/finish/end-to-end p50: **1.382 / 7.979 / 5.473 / 26.086 ms**; inline recapture prototype end-to-end **-2.61%** p50 | Stages are non-additive; shared-payload, validated-render and inline recapture prototypes are all fully reverted |
 | Native DOC batched stream publication | Large one-paragraph edit/save p50 **-10.52%**, mean **-10.48%** | Ordinary two-stream replacement only; final strict revision and independent document reopens remain |
@@ -1151,6 +1152,22 @@ bounded total-memory claim. This
 is correctness/descriptive evidence only; no latency, allocation, RSS, I/O,
 memory, or speedup claim is accepted before balanced release ABBA. See
 [`0137`](changes/0137-xls-numeric-plan-only-publication.md).
+
+Change 0138 is the balanced release acceptance record for the plan-only
+candidate. A clean exact-revision release binary ran Number and RK/MulRK in
+strict `A1, B1, B2, A2` order, one process at a time, with 20 warmups and 200
+samples. The complete-operation p50/p95/p99/mean candidate/control directions
+all agree: Number p50 improves 27.57% and 28.58%, and RK/MulRK 24.90% and
+24.56%. Commit phase directions agree as well; publication is near-neutral and
+is not accepted in isolation. A matched `/usr/bin/time -v` 3-warmup/30-sample
+capture records process VmHWM reductions of 10.73% and 10.66% for Number in
+both directions, but disagreeing RK/MulRK RSS. Valid heaptrack A/B profiles
+show whole-process allocation reductions but identical 205.56/154.93 MiB
+peak heaps for Number/RK, so no operation-only allocation or peak-heap claim
+is accepted. Exact family output hashes and complete plan-only
+zero-target-artifact/correctness gates hold on every leg. See
+[`0138`](changes/0138-xls-numeric-plan-only-release-abba.md) and the linked
+schema-1 raw results.
 
 Change 0103 adds a separate pinned release ABBA capture for
 `cfb_file_same_length_overlay_atomic_save` on CPU 2 (five warm-ups and 30

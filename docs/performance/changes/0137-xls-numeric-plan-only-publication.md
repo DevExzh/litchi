@@ -59,3 +59,12 @@ records the relevant resource evidence.
 Focused selector tests, strict Clippy/deprecation gates, the full harness, and
 an independent adversarial review must run after the production plan API is
 frozen. No selector is added to the default 36-case / 198-record matrix.
+
+## Post-ABBA status
+
+The balanced release acceptance and resource evidence for this candidate is
+recorded separately in [change 0138](0138-xls-numeric-plan-only-release-abba.md).
+The plan-only latency result is accepted only for the two measured deterministic
+fixed-width families and the recorded release configuration; process-level RSS
+is accepted for Number only, and no allocation, bounded-total-memory,
+physical-I/O, cold-cache or broad-producer claim is implied.
