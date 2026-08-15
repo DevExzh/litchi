@@ -8,6 +8,7 @@ use litchi_opc::{OpcPackage, PackURI, Part, PartView, SourceBackedPackage, Targe
 
 use super::{Features, Limits, Properties, inspect};
 use crate::error::{Error, Result, invalid};
+use crate::source_provenance::{SourceBinding, SourceProvenance};
 
 /// The semantic and exact physical state of workbook calculation metadata.
 #[derive(Clone, Debug)]
@@ -15,6 +16,7 @@ pub struct Snapshot {
     properties: Option<Properties>,
     features: Option<Features>,
     source: SourceState,
+    binding: SourceBinding,
     limits: Limits,
 }
 
@@ -44,6 +46,7 @@ impl Snapshot {
             properties,
             features,
             source,
+            binding: SourceBinding::default(),
             limits: *limits,
         })
     }
@@ -65,12 +68,15 @@ impl Snapshot {
             (inspection.properties, inspection.features)
         };
         let source = SourceState::capture_source_backed(package, &workbook, bytes)?;
-        Ok(Self {
+        let mut snapshot = Self {
             properties,
             features,
             source,
+            binding: SourceBinding::default(),
             limits: *limits,
-        })
+        };
+        snapshot.binding = SourceBinding::capture(package)?;
+        Ok(snapshot)
     }
 
     pub(super) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
@@ -89,6 +95,7 @@ impl Snapshot {
             properties,
             features,
             source: state,
+            binding: source.binding.clone(),
             limits: source.limits,
         })
     }
@@ -146,7 +153,15 @@ impl Snapshot {
     }
 
     pub(crate) fn same_source(&self, other: &Self) -> bool {
-        self.source == other.source
+        self.source == other.source && self.binding.same_or_unavailable(&other.binding)
+    }
+
+    /// Check the retained source lineage and revision without reloading XML.
+    pub(crate) fn matches_source_backed(
+        &self,
+        package: &SourceBackedPackage,
+    ) -> Result<SourceProvenance> {
+        self.binding.check(package)
     }
 
     /// Compare the retained owner and workbook part without processing XML.
