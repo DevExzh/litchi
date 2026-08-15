@@ -2,7 +2,7 @@
 
 Date: 2026-08-15
 
-This is a coverage map, not a completion claim. It compares the 245 selectable
+This is a coverage map, not a completion claim. It compares the 253 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -897,6 +897,25 @@ sizes, returned length, and payload hash; the focused gate expects legacy
 root-mini-stream amplification and one exact 4095-byte positional request.
 This is generic CFB correctness/request-amplification evidence only, not
 semantic DOC/XLS/PPT CRUD or a latency/resource claim.
+
+Change 0126 adds eight ordinary-root DOCX filesystem/source controls, bringing
+the selectable matrix to 253 names while preserving the default 36 cases / 198
+records: eager/source open, paragraph-count, full paragraph listing, and full
+text. The fixed source-edit corpus remains the unchanged 200-paragraph,
+eight-incompressible-2 MiB-media archive. Open timing compares `fs::read` plus
+`Document::from_bytes` with `Document::open(path)`; query roots are prepared
+outside timing and only the exact root query is timed. Untimed eager/source
+parity covers paragraph/full-text/table/element/metadata projections. Exact
+source SHA plus logical OPC part/relationship/content-type/blob-hash gates
+cover package preservation, including all media hashes and source
+immutability. Independent typed source replays record calls, bytes,
+request sizes, compressed-range coverage and materializations, classifying
+zero payload overlap at open, complete main-document range coverage during
+query-selector preparation, and zero main/media/unselected/core overlap during
+the query.
+This is correctness/logical-range evidence only, with no latency,
+physical-I/O, decompression, allocation, RSS, cold-cache, ABBA, broad-security,
+or Markdown-performance claim.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

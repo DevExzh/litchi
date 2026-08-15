@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0125`](changes/0125-cfb-minifat-physical-run-evidence.md)
+Evidence through: [`change 0126`](changes/0126-docx-root-source-path-evidence.md)
 (current-HEAD CFB MiniFAT request-amplification observation; the latest
 release CFB selective-range evidence remains [`0094`](changes/0094-cfb-selective-read-evidence.md),
 and release filesystem evidence is [`0089`](changes/0089-filesystem-release-repeated-evidence.md))
@@ -663,6 +663,20 @@ Confirmed source facts:
   4095-byte request, exposing physical-run coalescing without
   making a latency or resource claim. Release ABBA, tails, cold/high-latency,
   allocation/RSS, and native semantic consumers remain open.
+- Change 0126 adds eight ordinary-root DOCX filesystem selectors over the
+  unchanged 200-paragraph/eight-incompressible-2 MiB-media corpus. The eager
+  control times `fs::read` plus `Document::from_bytes`; the source control
+  times `Document::open(path)`; prepared-root query selectors time only their
+  exact query. Untimed parity covers semantic projections and metadata; exact
+  source SHA plus logical OPC part/relationship/content-type/blob-hash gates
+  cover package preservation, including media hashes and source immutability.
+  A separate typed source replay classifies zero payload overlap at open,
+  complete compressed main-document range coverage during query-selector preparation, and
+  zero main/media/unselected/core overlap during the query, while recording
+  calls, bytes, request sizes, coverage and materializations. This is
+  correctness/logical-range evidence only; latency, physical-I/O,
+  decompression, allocation, RSS, cold-cache, ABBA, broad-security and
+  Markdown-performance claims remain open.
 - Open eagerly materializes FAT, directory, MiniFAT, and allocation topology,
   while ordinary large stream payloads remain lazy.
 - MiniFAT now parses directly into its final `Vec<u32>`; FAT/DIFAT/MiniFAT use

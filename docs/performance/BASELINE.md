@@ -360,7 +360,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**245 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**253 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -435,8 +435,29 @@ the current selectable matrix to 245 names while preserving the default
 calls, bytes, physical range sizes, payload hash, and separate open/read/total
 timing; it makes no release speed claim.
 
-Five filesystem cases now exercise eager/source-backed OPC open, eager/source-
-backed one-Part atomic save, and same-length CFB atomic overlay save. A
+Change 0126 adds eight ordinary-root DOCX filesystem selectors, bringing the
+selectable matrix from 245 to 253 names while preserving the default 36-case /
+198-record tranche. The fixed corpus is the existing 200-paragraph,
+eight-incompressible-2 MiB-media source-edit corpus and its bytes/hash are
+unchanged. Eager open times `fs::read` plus `Document::from_bytes` while source
+open times `Document::open(path)`; query roots are prepared outside timing and
+only the named paragraph-count, paragraph-list, or full-text query is timed.
+An independent untimed typed DOCX source replay records calls, bytes, request
+sizes, compressed-range coverage, and materializations: open has zero
+main/media/unselected/core payload overlap; for query selectors, preparation
+completely covers the compressed main-document range; and the query has zero
+subsequent main/media/unselected/core overlap. Untimed parity covers paragraphs, full
+text, tables, elements, and metadata; exact source SHA plus logical OPC
+part/relationship/content-type/blob-hash gates cover package preservation,
+including media hashes and source immutability. This is
+correctness/logical-range evidence only; it makes no latency, physical-I/O,
+decompression, allocation, RSS, cold-cache, ABBA, broad-security, or Markdown
+performance claim. See
+[`0126`](changes/0126-docx-root-source-path-evidence.md).
+
+The earlier five-case filesystem smoke exercises eager/source-backed OPC open,
+eager/source-backed one-Part atomic save, and same-length CFB atomic overlay
+save. A
 one-sample debug correctness/counter smoke covers warm and cold-requested modes
 (10 result records and five evidence records). Source OPC open makes 13 logical
 reads totaling 1,008 bytes and materializes no Parts; eager open materializes
