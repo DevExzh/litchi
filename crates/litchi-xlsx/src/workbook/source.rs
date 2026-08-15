@@ -5,12 +5,11 @@
 //! payloads deferred. It exposes only semantic catalog and worksheet reads.
 //!
 //! Managed [`ExecutionContext`] opens are supported for this read-only
-//! facade. The focused source-backed edit modules elsewhere in this crate
-//! still materialize their immutable edit snapshots through the compatibility
-//! owned-`Arc` path; they do not expose managed-package constructors here. That
-//! boundary is deliberate until those snapshots can retain
-//! [`litchi_opc::PartData`] (or a
-//! bounded owned copy) without detaching a managed reservation.
+//! facade. Focused source-backed editors retain managed
+//! [`litchi_opc::PartData`] handles in their immutable snapshots and expose
+//! their own managed constructors; owning-package patch application remains a
+//! separate, explicitly fallible boundary when it would require detaching an
+//! allocation from that reservation.
 
 use std::collections::HashMap;
 #[cfg(any(unix, windows))]

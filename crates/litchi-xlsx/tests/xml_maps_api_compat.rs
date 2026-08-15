@@ -39,7 +39,7 @@ fn legacy_value() -> XmlMapInfo {
 
 fn legacy_inherent_round_trip(value: &XmlMapInfo) -> Result<XmlMapInfo> {
     let xml = value.to_xml(false)?;
-    Ok(XmlMapInfo::parse(&xml)?)
+    XmlMapInfo::parse(&xml)
 }
 
 #[test]

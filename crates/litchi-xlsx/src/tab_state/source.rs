@@ -3,8 +3,8 @@
 use std::io::Write;
 use std::sync::Arc;
 
-use litchi_core::{ReadAt, Selector as CoreSelector};
-use litchi_opc::{ReadLimits, SourceBackedPackage};
+use litchi_core::{ExecutionContext, ReadAt, Selector as CoreSelector};
+use litchi_opc::{ReadLimits, SourceBackedPackage, SourceCacheLimits};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -45,19 +45,97 @@ impl SourceBackedEditor {
         source: Arc<dyn ReadAt>,
         read_limits: ReadLimits,
     ) -> Result<Self> {
-        Ok(Self {
-            package: SourceBackedPackage::from_read_at_with_limits(source, read_limits)?,
+        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
+            source,
+            read_limits,
+        )?)
+    }
+
+    /// Open with an explicit finite deferred-payload cache policy.
+    pub fn from_read_at_with_cache_limits(
+        source: Arc<dyn ReadAt>,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
+            source,
+            cache_limits,
+        )?)
+    }
+
+    /// Open with explicit read and finite cache policies.
+    pub fn from_read_at_with_limits_and_cache_limits(
+        source: Arc<dyn ReadAt>,
+        read_limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+                source,
+                read_limits,
+                cache_limits,
+            )?,
+        )
+    }
+
+    /// Open with an explicit caller-owned execution context and the default cache.
+    pub fn from_read_at_with_execution_context(
+        source: Arc<dyn ReadAt>,
+        read_limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            read_limits,
+            context,
+        )?)
+    }
+
+    /// Open with explicit read and execution policies.
+    pub fn from_read_at_with_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        read_limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_execution_context(source, read_limits, context)
+    }
+
+    /// Open with explicit read, cache, and caller-owned execution policies.
+    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        read_limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                read_limits,
+                cache_limits,
+                context,
+            )?,
+        )
+    }
+
+    /// Build an editor from a validated deferred OPC package.
+    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
+        package.check_execution()?;
+        let editor = Self {
+            package,
             origin: Arc::new(()),
-        })
+        };
+        editor.package.check_execution()?;
+        Ok(editor)
     }
 
     /// Capture exact source-bound workbook tab state.
     pub fn snapshot(&self) -> Result<Snapshot> {
+        self.package.check_execution()?;
         Snapshot::load_source_backed(&self.package, Arc::clone(&self.origin))
     }
 
     /// Begin an isolated existing-tab edit.
     pub fn edit(&self) -> Result<SourceEdit<'_>> {
+        self.package.check_execution()?;
         SourceEdit::new(&self.package, self.snapshot()?)
     }
 
@@ -77,6 +155,7 @@ impl SourceBackedEditor {
         writer: W,
         commit: &Commit,
     ) -> Result<Snapshot> {
+        self.package.check_execution()?;
         let before = commit.patch().before();
         if !before.belongs_to(&self.origin)
             || !before.matches_source_backed(&self.package, Some(&self.origin))?
@@ -99,7 +178,7 @@ impl SourceBackedEditor {
             target.workbook_xml().to_vec(),
         ));
         for part in target.touched() {
-            overlays.push((part.part.uri.clone(), part.part.bytes.as_slice().to_vec()));
+            overlays.push((part.part.uri.clone(), part.part.bytes.as_bytes().to_vec()));
         }
         self.package
             .write_part_overlays_to_stream(writer, overlays)?;
@@ -172,6 +251,7 @@ impl<'a> SourceEdit<'a> {
 
     /// Validate, bind the exact touched closure, and freeze the edit.
     pub fn commit(self) -> Result<Commit> {
+        self.package.check_execution()?;
         let visibility_changed = self
             .staged_visibility
             .iter()
@@ -231,7 +311,7 @@ impl<'a> SourceEdit<'a> {
             self.before
         };
         for part in before.touched() {
-            let audit = audit_xml(part.part.bytes.as_slice(), XmlOwner::Sheet)?;
+            let audit = audit_xml(part.part.bytes.as_bytes(), XmlOwner::Sheet)?;
             if audit.alternate_content {
                 return Err(Error::TabEditBlocked {
                     sheet: before.tabs()[part.position].name().to_owned(),
@@ -282,7 +362,7 @@ impl<'a> SourceEdit<'a> {
         for part in before.touched() {
             let selected = part.position == active;
             let bytes = raw::sheet_view_edit::rewrite(
-                part.part.bytes.as_slice(),
+                part.part.bytes.as_bytes(),
                 selected,
                 raw::sheet_view_edit::Context {
                     sheet: before.tabs()[part.position].name(),
@@ -292,6 +372,7 @@ impl<'a> SourceEdit<'a> {
             touched.push((part.position, bytes));
         }
         let after = Snapshot::rewritten(&before, workbook, touched)?;
+        self.package.check_execution()?;
         if after.active_position() != active
             || after
                 .tabs()

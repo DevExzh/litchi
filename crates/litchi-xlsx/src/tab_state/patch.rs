@@ -60,11 +60,11 @@ impl Patch {
         let mut candidate = package.clone();
         candidate
             .get_part_mut(self.after.workbook_part_name())?
-            .set_blob_shared(self.after.workbook_source_arc());
+            .set_blob_shared(self.after.workbook_source_arc()?);
         for part in self.after.touched() {
             candidate
                 .get_part_mut(&part.part.uri)?
-                .set_blob_shared(Arc::clone(&part.part.bytes));
+                .set_blob_shared(part.part.bytes.detached_arc()?);
         }
         let resulting = Snapshot::load_owned_target(&candidate, &self.after)?;
         if !resulting.same_source(&self.after) || !resulting.same_semantics(&self.after) {
@@ -74,8 +74,6 @@ impl Patch {
         Ok(())
     }
 }
-
-use std::sync::Arc;
 
 /// Successful source-backed tab-state publication plan.
 #[derive(Debug)]

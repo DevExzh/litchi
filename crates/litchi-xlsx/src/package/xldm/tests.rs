@@ -69,6 +69,10 @@ fn build_test_storage(entries: &[(&str, &[u8])]) -> Vec<u8> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::module_inception,
+    reason = "the nested module scopes executable tests beside shared fixture helpers"
+)]
 mod tests {
     use super::*;
 

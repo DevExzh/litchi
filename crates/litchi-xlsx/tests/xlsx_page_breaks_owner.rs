@@ -11,7 +11,7 @@ const ROW_XML: &[u8] = b"<rowBreaks count=\"1\" manualBreakCount=\"1\"><brk id=\
 #[test]
 fn package_transaction_round_trips_and_inverts_exactly() {
     let mut package = Package::create().unwrap();
-    let source = package.page_breaks("Sheet1").unwrap().source_arc();
+    let source = package.page_breaks("Sheet1").unwrap().source_arc().unwrap();
 
     let mut edit = package.edit_page_breaks("Sheet1").unwrap();
     assert!(
@@ -45,13 +45,13 @@ fn package_transaction_round_trips_and_inverts_exactly() {
 #[test]
 fn no_op_shares_source_and_stale_patch_is_rejected() {
     let mut package = Package::create().unwrap();
-    let source = package.page_breaks(0usize).unwrap().source_arc();
+    let source = package.page_breaks(0usize).unwrap().source_arc().unwrap();
     let commit = package.edit_page_breaks(0usize).unwrap().commit().unwrap();
     assert!(!commit.changed());
     assert_eq!(commit.diagnostics().touched_worksheets(), 0);
     assert!(std::sync::Arc::ptr_eq(
         &source,
-        &commit.snapshot().source_arc()
+        &commit.snapshot().source_arc().unwrap()
     ));
 
     let mut changed = package.clone();

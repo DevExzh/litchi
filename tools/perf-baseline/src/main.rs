@@ -3056,12 +3056,57 @@ struct XlsxCellValuesSourceSummary {
     cache_budget_memory_used: Vec<u64>,
     cache_budget_reserved_bytes: Vec<u64>,
     cache_budget_reservation_failures: Vec<u64>,
+    pre_publication_budget: Vec<XlsxCellValuesBudgetSnapshot>,
+    post_publication_budget: Vec<XlsxCellValuesBudgetSnapshot>,
     budget_used_after_package_drop: Vec<u64>,
     budget_used_after_handles_drop: Vec<u64>,
+    budget_objects_used_after_handles_drop: Vec<u64>,
     output_sha256: Vec<String>,
     semantic_sha256: Vec<String>,
     untouched_member_count: usize,
     untouched_member_sha256: Vec<String>,
+    output_budget_refusal: XlsxCellValuesOutputRefusalEvidence,
+}
+
+/// Resource dimensions observed around managed cell-value publication.
+///
+/// The pre-publication snapshot is copied from the package's
+/// `SourceCacheDiagnostics`. The post-publication snapshot reads the shared
+/// `Budget` immediately after the consuming publisher returns. Catalog/cache
+/// reservations are unavailable at that point because the package has already
+/// been consumed, so those fields are serialized as `null`; live commit
+/// handles (if any) remain represented by `objects_used`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+struct XlsxCellValuesBudgetSnapshot {
+    input_bytes_used: u64,
+    input_bytes_limit: Option<u64>,
+    output_bytes_used: u64,
+    output_bytes_limit: Option<u64>,
+    work_used: u64,
+    work_limit: Option<u64>,
+    objects_used: u64,
+    objects_limit: Option<u64>,
+    catalog_reserved_objects: Option<u64>,
+    cache_reserved_objects: Option<u64>,
+}
+
+/// Untimed managed-output refusal evidence paired with each managed scalar
+/// cell control.  The refusal is deliberately bounded at the first
+/// sequential publication request: a one-byte-under request budget must
+/// reject before the sink receives any bytes, even though the complete XLSX
+/// artifact is much larger than the 64 KiB publication window.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+struct XlsxCellValuesOutputRefusalEvidence {
+    successful_output_ceiling: u64,
+    first_output_request_bytes: u64,
+    one_under_output_limit: u64,
+    accepted_output_bytes: u64,
+    source_read_calls: u64,
+    source_read_bytes: u64,
+    output_bytes_used: u64,
+    typed_output_resource_refusal: bool,
+    zero_output_verified: bool,
+    source_identity_preserved: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -3078,13 +3123,17 @@ struct XlsxCellValuesIterationEvidence {
     reopen_ns: u64,
     source: SourceSnapshot,
     diagnostics: SourceCacheDiagnostics,
+    pre_publication_budget: XlsxCellValuesBudgetSnapshot,
+    post_publication_budget: XlsxCellValuesBudgetSnapshot,
     payload_materializations: u64,
     budget_used_after_package_drop: u64,
     budget_used_after_handles_drop: u64,
+    budget_objects_used_after_handles_drop: u64,
     output_sha256: String,
     semantic_sha256: String,
     untouched_member_count: usize,
     untouched_member_sha256: String,
+    output_budget_refusal: XlsxCellValuesOutputRefusalEvidence,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -3888,6 +3937,30 @@ impl Write for CountingSink {
     }
 }
 
+/// Untimed probe used to discover the first bounded source-publication
+/// request. It deliberately accepts no bytes and returns a sink error after
+/// recording the request size; the actual typed OutputBytes refusal is then
+/// replayed against a fresh source and context.
+#[derive(Debug, Default)]
+struct FirstWriteProbe {
+    first_write_bytes: Option<usize>,
+}
+
+impl Write for FirstWriteProbe {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.first_write_bytes.is_none() {
+            self.first_write_bytes = Some(bytes.len());
+        }
+        Err(io::Error::other(
+            "XLSX managed output refusal probe intentionally stopped publication",
+        ))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 struct PrefixFailSink {
     accepted: u64,
@@ -4521,6 +4594,7 @@ impl SourceSummary {
                 cache_budget_managed: evidence.diagnostics.budget_managed,
                 cache_budget_memory_limit: evidence.diagnostics.budget_memory_limit,
                 untouched_member_count: evidence.untouched_member_count,
+                output_budget_refusal: evidence.output_budget_refusal.clone(),
                 ..XlsxCellValuesSourceSummary::default()
             });
         if summary.implementation != evidence.implementation
@@ -4531,6 +4605,7 @@ impl SourceSummary {
             || summary.cache_budget_managed != evidence.diagnostics.budget_managed
             || summary.cache_budget_memory_limit != evidence.diagnostics.budget_memory_limit
             || summary.untouched_member_count != evidence.untouched_member_count
+            || summary.output_budget_refusal != evidence.output_budget_refusal
         {
             return Err("XLSX cell-values source evidence mixed incompatible controls".into());
         }
@@ -4603,11 +4678,20 @@ impl SourceSummary {
             .cache_budget_reservation_failures
             .push(evidence.diagnostics.budget_reservation_failures);
         summary
+            .pre_publication_budget
+            .push(evidence.pre_publication_budget);
+        summary
+            .post_publication_budget
+            .push(evidence.post_publication_budget);
+        summary
             .budget_used_after_package_drop
             .push(evidence.budget_used_after_package_drop);
         summary
             .budget_used_after_handles_drop
             .push(evidence.budget_used_after_handles_drop);
+        summary
+            .budget_objects_used_after_handles_drop
+            .push(evidence.budget_objects_used_after_handles_drop);
         summary.output_sha256.push(evidence.output_sha256);
         summary.semantic_sha256.push(evidence.semantic_sha256);
         summary
@@ -21708,6 +21792,27 @@ fn run_xlsx_cell_values_edit_save(
     let expected_budget_limit = managed
         .then(|| payload_budget_u64.ok_or("XLSX managed cell CRUD payload budget is missing"))
         .transpose()?;
+    let output_budget_refusal = if managed {
+        let payload_ranges = payload_ranges
+            .as_ref()
+            .ok_or("XLSX managed cell CRUD payload ranges are missing")?;
+        let payload_budget =
+            payload_budget.ok_or("XLSX managed cell CRUD payload budget is missing")?;
+        let cache_limits = cache_limits
+            .as_ref()
+            .copied()
+            .ok_or("XLSX managed cell CRUD cache limits are missing")?;
+        Some(xlsx_cell_values_output_refusal_replay(
+            corpus,
+            &updates,
+            maximum,
+            payload_ranges,
+            payload_budget,
+            cache_limits,
+        )?)
+    } else {
+        None
+    };
     let mut elapsed = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
@@ -21738,7 +21843,7 @@ fn run_xlsx_cell_values_edit_save(
             let (editor, budget) = if managed {
                 let payload_budget =
                     payload_budget.ok_or("XLSX managed cell CRUD payload budget is missing")?;
-                let (budget, context) = xlsx_cell_values_managed_context(payload_budget)?;
+                let (budget, context) = xlsx_cell_values_managed_context(payload_budget, maximum)?;
                 let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
                     read_at,
                     ReadLimits::default(),
@@ -21763,7 +21868,14 @@ fn run_xlsx_cell_values_edit_save(
             let plan_duration = plan_started.elapsed();
             let plan_ns = elapsed_ns(plan_duration)?;
             duration += plan_duration;
-            let (diagnostics, commit_ns, publication_ns, budget_used_after_package_drop) = {
+            let (
+                diagnostics,
+                pre_publication_budget,
+                post_publication_budget,
+                commit_ns,
+                publication_ns,
+                budget_used_after_package_drop,
+            ) = {
                 let commit_started = Instant::now();
                 for coordinate in &updates {
                     edit.set(
@@ -21800,6 +21912,15 @@ fn run_xlsx_cell_values_edit_save(
                         "XLSX source CRUD materialized fewer worksheets than touched".into(),
                     );
                 }
+                let pre_publication_budget = xlsx_cell_values_budget_snapshot(diagnostics);
+                if !managed
+                    && (!xlsx_cell_values_is_zero_budget_snapshot(pre_publication_budget)
+                        || output_budget_refusal.is_some())
+                {
+                    return Err(
+                        "XLSX unmanaged cell CRUD reported nonzero managed budget evidence".into(),
+                    );
+                }
                 let publication_started = Instant::now();
                 {
                     let _published = editor.publish_multi_commit_to_stream(&mut sink, &commit)?;
@@ -21807,9 +21928,13 @@ fn run_xlsx_cell_values_edit_save(
                 let publication_duration = publication_started.elapsed();
                 let publication_ns = elapsed_ns(publication_duration)?;
                 duration += publication_duration;
+                let post_publication_budget =
+                    xlsx_cell_values_post_publication_budget_snapshot(budget.as_ref());
                 let budget_used_after_package_drop = opc_cache_budget_used(budget.as_ref());
                 (
                     diagnostics,
+                    pre_publication_budget,
+                    post_publication_budget,
                     commit_ns,
                     publication_ns,
                     budget_used_after_package_drop,
@@ -21819,8 +21944,28 @@ fn run_xlsx_cell_values_edit_save(
                 return Err("XLSX managed cell CRUD retained no payload reservation".into());
             }
             let budget_used_after_handles_drop = opc_cache_budget_used(budget.as_ref());
-            if managed && budget_used_after_handles_drop != 0 {
-                return Err("XLSX managed cell CRUD Budget did not release to zero".into());
+            let budget_objects_used_after_handles_drop =
+                opc_cache_budget_objects_used(budget.as_ref());
+            if managed
+                && (budget_used_after_handles_drop != 0
+                    || budget_objects_used_after_handles_drop != 0)
+            {
+                return Err(
+                    "XLSX managed cell CRUD Budget did not release Memory and Objects to zero"
+                        .into(),
+                );
+            }
+            if !managed
+                && (budget_used_after_handles_drop != 0
+                    || budget_objects_used_after_handles_drop != 0)
+            {
+                return Err("XLSX unmanaged cell CRUD reported budget usage".into());
+            }
+            if !managed && !xlsx_cell_values_is_zero_budget_snapshot(post_publication_budget) {
+                return Err(
+                    "XLSX unmanaged cell CRUD reported nonzero post-publication budget evidence"
+                        .into(),
+                );
             }
             source_metrics = Some(
                 backing
@@ -21852,13 +21997,17 @@ fn run_xlsx_cell_values_edit_save(
                     .copied()
                     .expect("source metrics captured"),
                 diagnostics,
+                pre_publication_budget,
+                post_publication_budget,
                 payload_materializations: diagnostics.successful_loads,
                 budget_used_after_package_drop,
                 budget_used_after_handles_drop,
+                budget_objects_used_after_handles_drop,
                 output_sha256: String::new(),
                 semantic_sha256: String::new(),
                 untouched_member_count: 0,
                 untouched_member_sha256: String::new(),
+                output_budget_refusal: output_budget_refusal.clone().unwrap_or_default(),
             });
         } else {
             let open_started = Instant::now();
@@ -22303,6 +22452,7 @@ fn xlsx_cell_values_payload_budget(
 
 fn xlsx_cell_values_managed_context(
     payload_budget: usize,
+    output_budget: u64,
 ) -> Result<(Budget, ExecutionContext), Box<dyn Error>> {
     let memory = u64::try_from(payload_budget.max(1))?;
     let workers = NonZeroUsize::new(1).ok_or("XLSX managed worker count is zero")?;
@@ -22314,11 +22464,212 @@ fn xlsx_cell_values_managed_context(
     )?;
     let budget = Budget::root(
         "litchi-perf-xlsx-cell-values-managed",
-        Limits::new(memory, u64::MAX, u64::MAX, 1_000_000, 256, u64::MAX),
+        Limits::new(memory, u64::MAX, output_budget, 1_000_000, 256, u64::MAX),
     );
     let (_cancellation_source, cancellation) = CancellationSource::pair();
     let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
     Ok((budget, context))
+}
+
+fn xlsx_cell_values_budget_snapshot(
+    diagnostics: SourceCacheDiagnostics,
+) -> XlsxCellValuesBudgetSnapshot {
+    XlsxCellValuesBudgetSnapshot {
+        input_bytes_used: diagnostics.budget_input_bytes_used,
+        input_bytes_limit: diagnostics.budget_input_bytes_limit,
+        output_bytes_used: diagnostics.budget_output_bytes_used,
+        output_bytes_limit: diagnostics.budget_output_bytes_limit,
+        work_used: diagnostics.budget_work_used,
+        work_limit: diagnostics.budget_work_limit,
+        objects_used: diagnostics.budget_objects_used,
+        objects_limit: diagnostics.budget_objects_limit,
+        catalog_reserved_objects: Some(diagnostics.budget_catalog_reserved_objects),
+        cache_reserved_objects: Some(diagnostics.budget_cache_reserved_objects),
+    }
+}
+
+fn xlsx_cell_values_post_publication_budget_snapshot(
+    budget: Option<&Budget>,
+) -> XlsxCellValuesBudgetSnapshot {
+    let Some(budget) = budget else {
+        return XlsxCellValuesBudgetSnapshot::default();
+    };
+    // `publish_multi_commit_to_stream` consumes the editor, so its package
+    // catalog and cache reservations are no longer observable at this point.
+    // Keep them as `None` instead of presenting an inferred zero; any live
+    // commit/snapshot handles remain represented by `objects_used`.
+    XlsxCellValuesBudgetSnapshot {
+        input_bytes_used: budget.used(Resource::InputBytes),
+        input_bytes_limit: Some(budget.limit(Resource::InputBytes)),
+        output_bytes_used: budget.used(Resource::OutputBytes),
+        output_bytes_limit: Some(budget.limit(Resource::OutputBytes)),
+        work_used: budget.used(Resource::Work),
+        work_limit: Some(budget.limit(Resource::Work)),
+        objects_used: budget.used(Resource::Objects),
+        objects_limit: Some(budget.limit(Resource::Objects)),
+        catalog_reserved_objects: None,
+        cache_reserved_objects: None,
+    }
+}
+
+fn xlsx_cell_values_is_zero_budget_snapshot(snapshot: XlsxCellValuesBudgetSnapshot) -> bool {
+    snapshot.input_bytes_used == 0
+        && snapshot.input_bytes_limit.is_none()
+        && snapshot.output_bytes_used == 0
+        && snapshot.output_bytes_limit.is_none()
+        && snapshot.work_used == 0
+        && snapshot.work_limit.is_none()
+        && snapshot.objects_used == 0
+        && snapshot.objects_limit.is_none()
+        && snapshot
+            .catalog_reserved_objects
+            .is_none_or(|value| value == 0)
+        && snapshot
+            .cache_reserved_objects
+            .is_none_or(|value| value == 0)
+}
+
+fn xlsx_cell_values_is_output_resource_refusal(error: &litchi_xlsx::Error) -> bool {
+    match error {
+        litchi_xlsx::Error::Package(OpcError::Execution(ExecutionError::ResourceLimit(limit))) => {
+            limit.resource == Resource::OutputBytes
+        },
+        litchi_xlsx::Error::Package(OpcError::IncompleteOutput { written, source }) => {
+            *written == 0
+                && matches!(
+                    source.as_ref(),
+                    OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                        if limit.resource == Resource::OutputBytes
+                )
+        },
+        _ => false,
+    }
+}
+
+fn xlsx_cell_values_output_refusal_replay(
+    corpus: &Corpus,
+    updates: &[XlsxCoordinate],
+    successful_output_ceiling: u64,
+    payload_ranges: &[Range<u64>],
+    payload_budget: usize,
+    cache_limits: SourceCacheLimits,
+) -> Result<XlsxCellValuesOutputRefusalEvidence, Box<dyn Error>> {
+    let probe_source = Arc::new(InstrumentedSource::new(
+        corpus.archive.clone(),
+        payload_ranges.to_vec(),
+    ));
+    let probe_version = probe_source.version()?;
+    let (probe_budget, probe_context) =
+        xlsx_cell_values_managed_context(payload_budget, successful_output_ceiling)?;
+    let probe_editor =
+        litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            probe_source.clone(),
+            ReadLimits::default(),
+            cache_limits,
+            probe_context,
+        )?;
+    let selectors = xlsx_update_sheet_selectors(updates);
+    let mut probe_edit = probe_editor.edit_sheets(selectors)?;
+    for coordinate in updates {
+        probe_edit.set(
+            coordinate.sheet,
+            litchi_xlsx::Address::at(
+                u32::try_from(coordinate.row)?,
+                u32::try_from(coordinate.column)?,
+            )?,
+            xlsx_value(*coordinate) + 1,
+        )?;
+    }
+    let probe_commit = probe_edit.commit()?;
+    let mut probe_sink = FirstWriteProbe::default();
+    let _probe_error = probe_editor.publish_multi_commit_to_stream(&mut probe_sink, &probe_commit);
+    let first_output_request_bytes = u64::try_from(
+        probe_sink
+            .first_write_bytes
+            .ok_or("XLSX managed output refusal probe observed no publication request")?,
+    )?;
+    let probe_version_after = probe_source.version()?;
+    if probe_version != probe_version_after {
+        return Err("XLSX managed output refusal probe changed source identity".into());
+    }
+    drop(probe_commit);
+    if probe_budget.used(Resource::OutputBytes) != 0 {
+        return Err("XLSX managed output refusal probe charged rejected output".into());
+    }
+    if probe_budget.used(Resource::Memory) != 0 {
+        return Err("XLSX managed output refusal probe retained payload memory".into());
+    }
+    let one_under_output_limit = first_output_request_bytes
+        .checked_sub(1)
+        .ok_or("XLSX managed output refusal probe observed an empty request")?;
+
+    let refusal_source = Arc::new(InstrumentedSource::new(
+        corpus.archive.clone(),
+        payload_ranges.to_vec(),
+    ));
+    let refusal_version = refusal_source.version()?;
+    let (refusal_budget, refusal_context) =
+        xlsx_cell_values_managed_context(payload_budget, one_under_output_limit)?;
+    let refusal_editor =
+        litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            refusal_source.clone(),
+            ReadLimits::default(),
+            cache_limits,
+            refusal_context,
+        )?;
+    let selectors = xlsx_update_sheet_selectors(updates);
+    let mut refusal_edit = refusal_editor.edit_sheets(selectors)?;
+    for coordinate in updates {
+        refusal_edit.set(
+            coordinate.sheet,
+            litchi_xlsx::Address::at(
+                u32::try_from(coordinate.row)?,
+                u32::try_from(coordinate.column)?,
+            )?,
+            xlsx_value(*coordinate) + 1,
+        )?;
+    }
+    let refusal_commit = refusal_edit.commit()?;
+    let mut output = Vec::new();
+    let error = refusal_editor
+        .publish_multi_commit_to_stream(&mut output, &refusal_commit)
+        .err()
+        .ok_or("XLSX one-under OutputBytes replay unexpectedly succeeded")?;
+    let refusal_version_after = refusal_source.version()?;
+    let typed_output_resource_refusal = xlsx_cell_values_is_output_resource_refusal(&error);
+    let zero_output_verified = output.is_empty();
+    let source_identity_preserved = refusal_version == refusal_version_after;
+    let source_read_calls = refusal_source.snapshot().read_calls;
+    let source_read_bytes = refusal_source.snapshot().read_bytes;
+    let output_bytes_used = refusal_budget.used(Resource::OutputBytes);
+    drop(refusal_commit);
+    if !typed_output_resource_refusal {
+        return Err(format!(
+            "XLSX one-under OutputBytes replay returned an untyped error: {error}"
+        )
+        .into());
+    }
+    if !zero_output_verified {
+        return Err("XLSX one-under OutputBytes replay accepted output".into());
+    }
+    if !source_identity_preserved {
+        return Err("XLSX one-under OutputBytes replay changed source identity".into());
+    }
+    if output_bytes_used != 0 {
+        return Err("XLSX one-under OutputBytes replay charged rejected output".into());
+    }
+    Ok(XlsxCellValuesOutputRefusalEvidence {
+        successful_output_ceiling,
+        first_output_request_bytes,
+        one_under_output_limit,
+        accepted_output_bytes: u64::try_from(output.len())?,
+        source_read_calls,
+        source_read_bytes,
+        output_bytes_used,
+        typed_output_resource_refusal,
+        zero_output_verified,
+        source_identity_preserved,
+    })
 }
 
 fn xlsx_source_layout(
@@ -22938,6 +23289,10 @@ fn opc_cache_package(
 
 fn opc_cache_budget_used(budget: Option<&Budget>) -> u64 {
     budget.map_or(0, |budget| budget.used(Resource::Memory))
+}
+
+fn opc_cache_budget_objects_used(budget: Option<&Budget>) -> u64 {
+    budget.map_or(0, |budget| budget.used(Resource::Objects))
 }
 
 fn opc_cache_assert_diagnostics_mode(
@@ -31030,10 +31385,7 @@ mod tests {
                     let actual = (
                         evidence.per_operation_read_calls[0].clone(),
                         evidence.per_operation_read_bytes[0].clone(),
-                        evidence.per_operation_read_ranges[0]
-                            .iter()
-                            .map(|ranges| ranges.clone())
-                            .collect::<Vec<_>>(),
+                        evidence.per_operation_read_ranges[0].to_vec(),
                     );
                     let control = match invocation_count {
                         1 => (
@@ -31103,12 +31455,11 @@ mod tests {
                             expected_root_ranges
                         );
                     }
-                    let expected_root =
-                        if actual.1.iter().any(|bytes| *bytes == expected_root_bytes) {
-                            Some(expected_root_bytes)
-                        } else {
-                            None
-                        };
+                    let expected_root = if actual.1.contains(&expected_root_bytes) {
+                        Some(expected_root_bytes)
+                    } else {
+                        None
+                    };
                     assert_eq!(evidence.root_cache_read_bytes, vec![expected_root]);
                     let expected_direct_range = if actual.1.first() == Some(&target_len) {
                         Some([expected_direct_start, expected_direct_start + target_len])
@@ -34036,6 +34387,7 @@ mod tests {
             assert_eq!(measured.case, case.name());
             assert_eq!(measured.elapsed_ns.samples.len(), 1);
             assert!(measured.output_sha256.is_some());
+            let measured_json = serde_json::to_value(&measured).unwrap();
             let sink = measured.sink.unwrap();
             assert!(sink.largest_write <= 64 * 1024, "{}", case.name());
             if case.is_xlsx_cell_values_edit_save() {
@@ -34045,6 +34397,64 @@ mod tests {
                 );
             }
             if case.is_xlsx_cell_values_source_backed() {
+                let json_evidence = &measured_json["source"]["xlsx_cell_values"];
+                assert!(json_evidence.is_object(), "{}", case.name());
+                assert!(json_evidence["pre_publication_budget"].is_array());
+                assert!(json_evidence["post_publication_budget"].is_array());
+                assert!(json_evidence["budget_objects_used_after_handles_drop"].is_array());
+                assert!(json_evidence["output_budget_refusal"].is_object());
+                let json_pre = &json_evidence["pre_publication_budget"][0];
+                let json_post = &json_evidence["post_publication_budget"][0];
+                for key in [
+                    "input_bytes_used",
+                    "input_bytes_limit",
+                    "output_bytes_used",
+                    "output_bytes_limit",
+                    "work_used",
+                    "work_limit",
+                    "objects_used",
+                    "objects_limit",
+                    "catalog_reserved_objects",
+                    "cache_reserved_objects",
+                ] {
+                    assert!(json_pre.get(key).is_some(), "missing pre key {key}");
+                    assert!(json_post.get(key).is_some(), "missing post key {key}");
+                }
+                assert!(json_post["input_bytes_used"].is_u64());
+                assert!(json_post["output_bytes_used"].is_u64());
+                assert!(json_post["work_used"].is_u64());
+                assert!(json_post["objects_used"].is_u64());
+                assert!(json_post["catalog_reserved_objects"].is_null());
+                assert!(json_post["cache_reserved_objects"].is_null());
+                for key in [
+                    "successful_output_ceiling",
+                    "first_output_request_bytes",
+                    "one_under_output_limit",
+                    "accepted_output_bytes",
+                    "source_read_calls",
+                    "source_read_bytes",
+                    "output_bytes_used",
+                ] {
+                    assert!(
+                        json_evidence["output_budget_refusal"][key].is_u64(),
+                        "missing numeric refusal key {key}"
+                    );
+                }
+                for key in [
+                    "typed_output_resource_refusal",
+                    "zero_output_verified",
+                    "source_identity_preserved",
+                ] {
+                    assert!(
+                        json_evidence["output_budget_refusal"][key].is_boolean(),
+                        "missing boolean refusal key {key}"
+                    );
+                }
+                assert_eq!(json_evidence["budget_used_after_handles_drop"][0], 0);
+                assert_eq!(
+                    json_evidence["budget_objects_used_after_handles_drop"][0],
+                    0
+                );
                 let source = measured.source.as_ref().expect("source evidence");
                 let evidence = source
                     .xlsx_cell_values
@@ -34062,13 +34472,142 @@ mod tests {
                     case.name()
                 );
                 if case.is_xlsx_cell_values_managed() {
+                    for key in [
+                        "input_bytes_used",
+                        "input_bytes_limit",
+                        "output_bytes_used",
+                        "output_bytes_limit",
+                        "work_used",
+                        "work_limit",
+                        "objects_used",
+                        "objects_limit",
+                        "catalog_reserved_objects",
+                        "cache_reserved_objects",
+                    ] {
+                        assert!(json_pre[key].is_u64(), "managed pre key is not u64: {key}");
+                    }
+                    for key in [
+                        "input_bytes_used",
+                        "input_bytes_limit",
+                        "output_bytes_used",
+                        "output_bytes_limit",
+                        "work_used",
+                        "work_limit",
+                        "objects_used",
+                        "objects_limit",
+                    ] {
+                        assert!(
+                            json_post[key].is_u64(),
+                            "managed post key is not u64: {key}"
+                        );
+                    }
                     assert!(
                         evidence.budget_used_after_package_drop[0] > 0,
                         "{} did not retain a managed payload reservation",
                         case.name()
                     );
+                    assert_eq!(evidence.pre_publication_budget.len(), 1);
+                    assert_eq!(evidence.post_publication_budget.len(), 1);
+                    let pre = evidence.pre_publication_budget[0];
+                    let post = evidence.post_publication_budget[0];
+                    assert_eq!(pre.output_bytes_used, 0, "{}", case.name());
+                    assert_eq!(pre.input_bytes_limit, Some(u64::MAX));
+                    assert_eq!(pre.work_limit, Some(u64::MAX));
+                    assert_eq!(pre.objects_limit, Some(1_000_000));
+                    assert!(pre.input_bytes_used > 0, "{}", case.name());
+                    assert!(pre.work_used > 0, "{}", case.name());
+                    assert!(pre.objects_used > 0, "{}", case.name());
+                    assert!(pre.catalog_reserved_objects.is_some());
+                    assert!(pre.cache_reserved_objects.is_some());
+                    assert!(
+                        pre.output_bytes_limit.is_some_and(|limit| limit > 0),
+                        "{} has no finite OutputBytes limit",
+                        case.name()
+                    );
+                    assert_eq!(pre.output_bytes_limit, post.output_bytes_limit);
+                    assert_eq!(post.output_bytes_used, sink.accepted_bytes);
+                    assert!(post.output_bytes_used > 0, "{}", case.name());
+                    assert!(post.input_bytes_used >= pre.input_bytes_used);
+                    assert!(post.work_used >= pre.work_used);
+                    assert_eq!(post.input_bytes_limit, pre.input_bytes_limit);
+                    assert_eq!(post.work_limit, pre.work_limit);
+                    assert_eq!(post.objects_limit, pre.objects_limit);
+                    assert!(post.objects_used > 0, "{}", case.name());
+                    assert!(post.catalog_reserved_objects.is_none());
+                    assert!(post.cache_reserved_objects.is_none());
+                    let refusal = &evidence.output_budget_refusal;
+                    assert_eq!(
+                        refusal.successful_output_ceiling,
+                        pre.output_bytes_limit.unwrap()
+                    );
+                    assert!(refusal.first_output_request_bytes > 0);
+                    assert_eq!(
+                        refusal.one_under_output_limit + 1,
+                        refusal.first_output_request_bytes
+                    );
+                    assert_eq!(refusal.accepted_output_bytes, 0);
+                    assert_eq!(refusal.output_bytes_used, 0);
+                    assert!(refusal.typed_output_resource_refusal);
+                    assert!(refusal.zero_output_verified);
+                    assert!(refusal.source_identity_preserved);
+                    assert!(refusal.source_read_calls > 0);
+                    assert!(refusal.source_read_bytes > 0);
+                } else {
+                    assert_eq!(evidence.pre_publication_budget.len(), 1);
+                    assert_eq!(evidence.post_publication_budget.len(), 1);
+                    let pre = evidence.pre_publication_budget[0];
+                    let post = evidence.post_publication_budget[0];
+                    assert!(super::xlsx_cell_values_is_zero_budget_snapshot(pre));
+                    assert!(super::xlsx_cell_values_is_zero_budget_snapshot(post));
+                    assert_eq!(pre.catalog_reserved_objects, Some(0));
+                    assert_eq!(pre.cache_reserved_objects, Some(0));
+                    assert_eq!(evidence.output_budget_refusal, Default::default());
+                    for key in [
+                        "input_bytes_used",
+                        "output_bytes_used",
+                        "work_used",
+                        "objects_used",
+                    ] {
+                        assert_eq!(json_pre[key], 0, "unmanaged pre usage is nonzero: {key}");
+                        assert_eq!(json_post[key], 0, "unmanaged post usage is nonzero: {key}");
+                    }
+                    for key in [
+                        "input_bytes_limit",
+                        "output_bytes_limit",
+                        "work_limit",
+                        "objects_limit",
+                    ] {
+                        assert!(json_pre[key].is_null(), "unmanaged pre limit is set: {key}");
+                        assert!(
+                            json_post[key].is_null(),
+                            "unmanaged post limit is set: {key}"
+                        );
+                    }
+                    assert_eq!(json_pre["catalog_reserved_objects"], 0);
+                    assert_eq!(json_pre["cache_reserved_objects"], 0);
+                    assert!(json_post["catalog_reserved_objects"].is_null());
+                    assert!(json_post["cache_reserved_objects"].is_null());
+                    for key in [
+                        "successful_output_ceiling",
+                        "first_output_request_bytes",
+                        "one_under_output_limit",
+                        "accepted_output_bytes",
+                        "source_read_calls",
+                        "source_read_bytes",
+                        "output_bytes_used",
+                    ] {
+                        assert_eq!(json_evidence["output_budget_refusal"][key], 0);
+                    }
+                    for key in [
+                        "typed_output_resource_refusal",
+                        "zero_output_verified",
+                        "source_identity_preserved",
+                    ] {
+                        assert_eq!(json_evidence["output_budget_refusal"][key], false);
+                    }
                 }
                 assert_eq!(evidence.budget_used_after_handles_drop, vec![0]);
+                assert_eq!(evidence.budget_objects_used_after_handles_drop, vec![0]);
                 assert_eq!(evidence.cache_budget_reservation_failures, vec![0]);
                 assert!(evidence.untouched_member_count > 0);
                 assert_eq!(evidence.output_sha256.len(), 1);

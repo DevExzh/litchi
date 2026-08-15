@@ -5,12 +5,19 @@
 
 use std::io;
 use std::io::Write;
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, ReadAt,
+    Resource, SourceVersion,
+};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, ReadLimits, TargetMode};
+use litchi_opc::{
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, ReadLimits, SourceCacheLimits,
+    TargetMode,
+};
 use litchi_xlsx::data_validation::{
     Collection, Formula, ListSource, Source, SourceBackedEditor, SourceEdit, Sqref, Validation,
     ValidationOperator, ValidationType, replace_data_validation_collections,
@@ -168,6 +175,32 @@ fn ordinary_fixture(signed: bool) -> Vec<u8> {
     )
 }
 
+fn part_len(bytes: &[u8], member: &str) -> u64 {
+    OpcPackage::from_bytes(bytes)
+        .unwrap()
+        .get_part(&PackURI::new(member).unwrap())
+        .unwrap()
+        .blob()
+        .len() as u64
+}
+
+fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "xlsx-data-validation-managed-test",
+        Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroU64::new(memory.max(1)).unwrap(),
+        0,
+    )
+    .unwrap();
+    let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+    (budget, cancellation_source, context)
+}
+
 fn target_collections() -> Vec<Collection> {
     let mut rule = Validation::new(
         Source::Core,
@@ -272,6 +305,79 @@ fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
             .unwrap(),
         target_collections()
     );
+}
+
+#[test]
+fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
+    let source_bytes = ordinary_fixture(false);
+    let exact = part_len(&source_bytes, MAIN) + part_len(&source_bytes, SHEET);
+    let (budget, _cancellation_source, context) = managed_context(exact);
+    let editor =
+        SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            Arc::new(VersionedSource::new(source_bytes.clone())),
+            ReadLimits::default(),
+            SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
+            context,
+        )
+        .unwrap();
+    let snapshot = editor.snapshot("Sheet1").unwrap();
+    assert!(snapshot.collections().is_empty());
+    assert_eq!(budget.used(Resource::Memory), exact);
+    drop(snapshot);
+
+    let commit = changed_commit(&editor);
+    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    commit.patch().apply(&mut replay).unwrap();
+    assert!(matches!(
+        commit.patch().inverse().apply(&mut replay),
+        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
+    ));
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let published = OpcPackage::from_bytes(&output).unwrap();
+    assert_eq!(
+        litchi_xlsx::data_validation::Snapshot::load(&published, "Sheet1")
+            .unwrap()
+            .collections(),
+        target_collections()
+    );
+    assert_eq!(
+        published
+            .get_part(&PackURI::new(UNUSED).unwrap())
+            .unwrap()
+            .blob(),
+        OpcPackage::from_bytes(&source_bytes)
+            .unwrap()
+            .get_part(&PackURI::new(UNUSED).unwrap())
+            .unwrap()
+            .blob()
+    );
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_one_under_budget_refuses_before_selected_payload_retention() {
+    let source_bytes = ordinary_fixture(false);
+    let exact = part_len(&source_bytes, MAIN) + part_len(&source_bytes, SHEET);
+    let (budget, _cancellation_source, context) = managed_context(exact - 1);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(source_bytes)),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    assert!(matches!(
+        editor.snapshot("Sheet1"),
+        Err(Error::Package(OpcError::Execution(
+            ExecutionError::ResourceLimit(_)
+        )))
+    ));
+    assert_eq!(editor.cache_diagnostics().successful_loads, 1);
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
 }
 
 #[test]

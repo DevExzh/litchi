@@ -2,12 +2,14 @@
 
 use std::sync::Arc;
 
+use litchi_core::{ExecutionContext, ExecutionError};
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{OpcPackage, PackURI, Part, PartView, SourceBackedPackage, TargetMode};
 
 use super::{Features, Limits, Properties, inspect};
 use crate::error::{Error, Result, invalid};
+use crate::source_payload::SourcePayload;
 
 /// The semantic and exact physical state of workbook calculation metadata.
 #[derive(Clone, Debug)]
@@ -16,6 +18,7 @@ pub struct Snapshot {
     features: Option<Features>,
     source: SourceState,
     limits: Limits,
+    context: Option<ExecutionContext>,
 }
 
 impl Snapshot {
@@ -45,6 +48,7 @@ impl Snapshot {
             features,
             source,
             limits: *limits,
+            context: None,
         })
     }
 
@@ -52,25 +56,35 @@ impl Snapshot {
         package: &SourceBackedPackage,
         limits: &Limits,
     ) -> Result<Self> {
+        package.check_execution()?;
+        let source_version = package.source_version()?;
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
-        let bytes = workbook.data()?.into_arc()?;
+        let bytes = SourcePayload::from_part_data(package, workbook.data()?)?;
         if bytes.len() > limits.max_raw_bytes() {
             return Err(invalid(
                 "workbook calculation metadata exceeds raw byte limit",
             ));
         }
         let (properties, features) = {
-            let inspection = inspect(bytes.as_slice(), limits)?;
+            let inspection = inspect(bytes.as_bytes(), limits)?;
             (inspection.properties, inspection.features)
         };
         let source = SourceState::capture_source_backed(package, &workbook, bytes)?;
-        Ok(Self {
+        let snapshot = Self {
             properties,
             features,
             source,
             limits: *limits,
-        })
+            context: package.execution_context(),
+        };
+        package.check_execution()?;
+        if package.source_version()? != source_version {
+            return Err(invalid(
+                "calculation metadata source version changed during snapshot",
+            ));
+        }
+        Ok(snapshot)
     }
 
     pub(super) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
@@ -84,12 +98,13 @@ impl Snapshot {
             (inspection.properties, inspection.features)
         };
         let mut state = source.source.clone();
-        state.bytes = Arc::new(bytes);
+        state.bytes = SourcePayload::Owned(Arc::new(bytes));
         Ok(Self {
             properties,
             features,
             source: state,
             limits: source.limits,
+            context: source.context.clone(),
         })
     }
 
@@ -118,13 +133,28 @@ impl Snapshot {
     /// Exact source workbook XML.
     #[must_use]
     pub fn source_xml(&self) -> &[u8] {
-        self.source.bytes.as_slice()
+        self.source.bytes.as_bytes()
     }
 
     /// Shared ownership of the exact source workbook XML.
-    #[must_use]
-    pub fn source_arc(&self) -> Arc<Vec<u8>> {
-        Arc::clone(&self.source.bytes)
+    ///
+    /// Managed source payloads return
+    /// [`litchi_opc::OpcError::ManagedPartDataArcEscape`] rather than silently
+    /// detaching their execution-budget reservation.
+    pub fn source_arc(&self) -> Result<Arc<Vec<u8>>> {
+        self.source.bytes.detached_arc()
+    }
+
+    pub(crate) fn check_execution(&self) -> Result<()> {
+        let Some(context) = self.context.as_ref() else {
+            return Ok(());
+        };
+        context.check().map_err(|error| {
+            Error::Package(match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                error => litchi_opc::OpcError::Execution(error),
+            })
+        })
     }
 
     /// Resolved package part containing the workbook root.
@@ -156,7 +186,7 @@ impl Snapshot {
         };
         workbook.partname() == &self.source.part_name
             && workbook.content_type() == self.source.content_type
-            && workbook.blob() == self.source.bytes.as_slice()
+            && workbook.blob() == self.source.bytes.as_bytes()
             && current_owner_relationship(package.rels())
                 .is_some_and(|relationship| self.source.owner_relationship.matches(relationship))
     }
@@ -182,7 +212,7 @@ impl Eq for Snapshot {}
 pub(crate) struct SourceState {
     part_name: PackURI,
     content_type: String,
-    bytes: Arc<Vec<u8>>,
+    bytes: SourcePayload,
     owner_relationship: SourceRelationship,
 }
 
@@ -194,7 +224,7 @@ impl SourceState {
                 workbook.content_type(),
                 "calculation metadata workbook content type",
             )?,
-            bytes: workbook.blob_arc(),
+            bytes: SourcePayload::Owned(workbook.blob_arc()),
             owner_relationship: SourceRelationship::capture(
                 current_owner_relationship(package.rels())
                     .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?,
@@ -205,7 +235,7 @@ impl SourceState {
     fn capture_source_backed(
         package: &SourceBackedPackage,
         workbook: &PartView<'_>,
-        bytes: Arc<Vec<u8>>,
+        bytes: SourcePayload,
     ) -> Result<Self> {
         Ok(Self {
             part_name: workbook.partname().clone(),

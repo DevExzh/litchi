@@ -91,9 +91,15 @@ impl Snapshot {
     }
 
     /// Shared exact selected worksheet XML.
-    #[must_use]
-    pub fn source_arc(&self) -> Arc<Vec<u8>> {
+    ///
+    /// Managed snapshots return `ManagedPartDataArcEscape` instead of
+    /// detaching the payload reservation.
+    pub fn source_arc(&self) -> Result<Arc<Vec<u8>>> {
         self.closure.source_arc()
+    }
+
+    pub(super) fn check_execution(&self) -> Result<()> {
+        self.closure.check_execution()
     }
 
     pub(super) fn differential_format_count(&self) -> usize {

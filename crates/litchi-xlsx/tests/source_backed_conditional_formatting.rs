@@ -5,12 +5,18 @@
 
 use std::collections::BTreeMap;
 use std::io::{self, Write};
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
+    SourceVersion,
+};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
+use litchi_opc::{
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
+};
 use litchi_xlsx::Error;
 use litchi_xlsx::conditional_formatting::{
     DifferentialRef, Formatting, Kind, Range, Rule, Snapshot, SourceBackedEditor,
@@ -255,6 +261,32 @@ fn initial_owners(namespace: &str) -> String {
     .replace("<conditionalFormatting", &format!("<conditionalFormatting xmlns=\"{namespace}\""))
 }
 
+fn part_len(bytes: &[u8], member: &str) -> u64 {
+    OpcPackage::from_bytes(bytes)
+        .unwrap()
+        .get_part(&PackURI::new(member).unwrap())
+        .unwrap()
+        .blob()
+        .len() as u64
+}
+
+fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "xlsx-conditional-formatting-managed-test",
+        Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroU64::new(memory.max(1)).unwrap(),
+        0,
+    )
+    .unwrap();
+    let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+    (budget, cancellation_source, context)
+}
+
 fn relationships(relationships: &litchi_opc::Relationships) -> Vec<String> {
     let mut values = relationships
         .iter()
@@ -413,6 +445,65 @@ fn publication_reopens_and_preserves_every_unselected_part_and_relationship() {
             assert_eq!(output_raw.get(&name), Some(&member), "raw member {name}");
         }
     }
+}
+
+#[test]
+fn managed_snapshot_changed_publication_retains_styles_and_releases_budget() {
+    let source_bytes = fixture(&worksheet_xml(SML, ""), false, false);
+    let exact = part_len(&source_bytes, MAIN)
+        + part_len(&source_bytes, SHEET)
+        + part_len(&source_bytes, STYLES);
+    let (budget, _cancellation_source, context) = managed_context(exact);
+    let editor =
+        SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            Arc::new(VersionedSource::new(source_bytes.clone())),
+            litchi_xlsx::ReadLimits::default(),
+            SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
+            context,
+        )
+        .unwrap();
+    let snapshot = editor.snapshot("Sheet1").unwrap();
+    assert!(snapshot.collections().is_empty());
+    assert_eq!(budget.used(Resource::Memory), exact);
+    drop(snapshot);
+
+    let expected = vec![expression("A1:C9", 1, "$A1>5", Some(1))];
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.set_collections(expected.clone()).unwrap();
+    let commit = edit.commit().unwrap();
+    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    commit.patch().apply(&mut replay).unwrap();
+    assert_eq!(
+        Snapshot::load(&replay, "Sheet1").unwrap().collections(),
+        expected.as_slice()
+    );
+    assert!(matches!(
+        commit.patch().inverse().apply(&mut replay),
+        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
+    ));
+
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let published = OpcPackage::from_bytes(&output).unwrap();
+    assert_eq!(
+        Snapshot::load(&published, "Sheet1").unwrap().collections(),
+        expected.as_slice()
+    );
+    assert_eq!(
+        published
+            .get_part(&PackURI::new(MEDIA).unwrap())
+            .unwrap()
+            .blob(),
+        OpcPackage::from_bytes(&source_bytes)
+            .unwrap()
+            .get_part(&PackURI::new(MEDIA).unwrap())
+            .unwrap()
+            .blob()
+    );
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
 }
 
 #[test]

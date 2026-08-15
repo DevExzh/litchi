@@ -186,7 +186,7 @@ mod tests {
         assert!(!commit.changed());
         assert!(std::sync::Arc::ptr_eq(
             &source,
-            &commit.snapshot().source_arc()
+            &commit.snapshot().source_arc().unwrap()
         ));
         assert!(package.is_signed());
     }

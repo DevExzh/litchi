@@ -283,7 +283,11 @@ fn signed_no_op_is_exact_but_changed_metadata_is_refused() {
         )
         .unwrap();
     let mut package = Package::from_opc(raw).expect("signed package");
-    let source = package.calculation_metadata().unwrap().source_arc();
+    let source = package
+        .calculation_metadata()
+        .unwrap()
+        .source_arc()
+        .unwrap();
     let no_op = package
         .edit_calculation_metadata()
         .unwrap()
@@ -291,7 +295,10 @@ fn signed_no_op_is_exact_but_changed_metadata_is_refused() {
         .expect("signed no-op");
     assert!(!no_op.changed());
     assert!(no_op.patch().is_empty());
-    assert!(Arc::ptr_eq(&source, &no_op.snapshot().source_arc()));
+    assert!(Arc::ptr_eq(
+        &source,
+        &no_op.snapshot().source_arc().unwrap()
+    ));
 
     let mut changed = package.edit_calculation_metadata().unwrap();
     changed.set_properties(Properties::new().with_calculation_id(Some(1)));
