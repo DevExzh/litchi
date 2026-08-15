@@ -3149,7 +3149,6 @@ fn write_exact_snapshot<W: Write>(
                         "source-backed OPC source ended during publication",
                     )));
                 }
-                source.ensure_current()?;
                 if let Some(context) = context {
                     context.check().map_err(map_execution_error)?;
                 }
@@ -3305,6 +3304,7 @@ mod tests {
         bytes: Vec<u8>,
         revision: AtomicU64,
         reads: AtomicUsize,
+        versions: AtomicUsize,
         read_bytes: AtomicU64,
         max_read: usize,
     }
@@ -3315,6 +3315,7 @@ mod tests {
                 bytes,
                 revision: AtomicU64::new(0),
                 reads: AtomicUsize::new(0),
+                versions: AtomicUsize::new(0),
                 read_bytes: AtomicU64::new(0),
                 max_read: usize::MAX,
             }
@@ -3352,6 +3353,7 @@ mod tests {
         }
 
         fn version(&self) -> std::io::Result<SourceVersion> {
+            self.versions.fetch_add(1, Ordering::SeqCst);
             Ok(SourceVersion::new(42, self.revision.load(Ordering::SeqCst)))
         }
     }
@@ -5889,6 +5891,28 @@ mod tests {
             .write_part_overlay_to_stream(&mut output, &target, b"malformed but unchanged".to_vec())
             .unwrap();
         assert_eq!(output, source_bytes);
+    }
+
+    #[test]
+    fn exact_source_publication_checks_one_fewer_version_per_copy_chunk() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"exact source publication",
+            false,
+        )));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let versions_before = source.versions.load(Ordering::SeqCst);
+        let mut output = Vec::new();
+
+        package
+            .write_part_overlays_to_stream(&mut output, Vec::new())
+            .unwrap();
+
+        // This fixture fits in one publication chunk. The initial check,
+        // read pre/post checks, sink write/flush checks, and final check are
+        // the complete freshness contract; the removed post-read check would
+        // make this seven instead of six observations.
+        assert_eq!(source.versions.load(Ordering::SeqCst) - versions_before, 6);
     }
 
     #[test]
