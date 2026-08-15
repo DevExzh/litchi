@@ -19,6 +19,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 const PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
+const FINGERPRINT_CHUNK_BYTES: usize = 1024 * 1024;
+const FINGERPRINT_CHUNK_BYTES_U64: u64 = 1024 * 1024;
 
 /// SHA-256 identity of a complete source or composed CFB artifact.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -552,6 +554,7 @@ impl SharedOleFile {
         }
         spans.sort_unstable_by_key(|span| span.offset);
         validate_and_coalesce_spans(&source, limits, &mut spans)?;
+        drop(comparison);
 
         let (source_fingerprint, target_fingerprint) = fingerprints(&source, &spans)?;
         validate_composed_artifact(&source, &spans, &selections)?;
@@ -747,6 +750,7 @@ impl ValidatedOverlayPlan {
         // chunk that has already been hashed and accepted by the sink. Atomic
         // `save` skips only this duplicate because it performs the same full
         // check after flush/fsync and immediately before rename.
+        drop(buffer);
         if post_emission_preflight {
             if let Err(error) = self.preflight_fingerprints() {
                 return Err(with_progress(error, accepted, self.source.length, false));
@@ -1059,7 +1063,7 @@ fn fingerprints(
     spans: &[PhysicalSpan],
 ) -> Result<(ArtifactFingerprint, ArtifactFingerprint), OverlayError> {
     source.ensure_length()?;
-    let mut buffer = publication_buffer()?;
+    let mut buffer = fingerprint_buffer(source.length)?;
     let mut source_hasher = Sha256::new();
     let mut target_hasher = Sha256::new();
     let mut offset = 0_u64;
@@ -1182,14 +1186,22 @@ pub(crate) fn sector_offset(sector: u32, sector_size: usize) -> Result<u64, Over
 }
 
 fn publication_buffer() -> Result<Vec<u8>, OverlayError> {
+    fixed_buffer(PUBLICATION_CHUNK_BYTES, "CFB overlay publication buffer")
+}
+
+fn fingerprint_buffer(source_length: u64) -> Result<Vec<u8>, OverlayError> {
+    let bytes = usize::try_from(source_length.min(FINGERPRINT_CHUNK_BYTES_U64))
+        .map_err(|_| unavailable("CFB overlay fingerprint buffer length does not fit usize"))?;
+    debug_assert!(bytes <= FINGERPRINT_CHUNK_BYTES);
+    fixed_buffer(bytes, "CFB overlay fingerprint buffer")
+}
+
+fn fixed_buffer(bytes: usize, resource: &'static str) -> Result<Vec<u8>, OverlayError> {
     let mut buffer = Vec::new();
     buffer
-        .try_reserve_exact(PUBLICATION_CHUNK_BYTES)
-        .map_err(|source| OverlayError::Allocation {
-            resource: "CFB overlay publication buffer",
-            source,
-        })?;
-    buffer.resize(PUBLICATION_CHUNK_BYTES, 0);
+        .try_reserve_exact(bytes)
+        .map_err(|source| OverlayError::Allocation { resource, source })?;
+    buffer.resize(bytes, 0);
     Ok(buffer)
 }
 

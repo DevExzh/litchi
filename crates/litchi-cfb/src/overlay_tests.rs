@@ -71,6 +71,10 @@ fn publication_chunks(file_size: u64) -> usize {
     usize::try_from(file_size).unwrap().div_ceil(65_536)
 }
 
+fn fingerprint_chunks(file_size: u64) -> usize {
+    usize::try_from(file_size).unwrap().div_ceil(1024 * 1024)
+}
+
 #[test]
 fn overlays_minifat_and_fat_cutover_and_preserves_unselected_bytes() {
     let source = sample_bytes();
@@ -381,6 +385,7 @@ struct MutableSource {
     bytes: Mutex<Vec<u8>>,
     revision: AtomicU64,
     reads: AtomicUsize,
+    request_sizes: Mutex<Vec<usize>>,
     fail_read: AtomicUsize,
     mutate_after_read: AtomicUsize,
     overreport: AtomicBool,
@@ -392,6 +397,7 @@ impl MutableSource {
             bytes: Mutex::new(bytes),
             revision: AtomicU64::new(0),
             reads: AtomicUsize::new(0),
+            request_sizes: Mutex::new(Vec::new()),
             fail_read: AtomicUsize::new(usize::MAX),
             mutate_after_read: AtomicUsize::new(usize::MAX),
             overreport: AtomicBool::new(false),
@@ -414,6 +420,7 @@ impl ReadAt for MutableSource {
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
         let call = self.reads.fetch_add(1, Ordering::SeqCst) + 1;
+        self.request_sizes.lock().unwrap().push(output.len());
         if call == self.fail_read.load(Ordering::SeqCst) {
             if self.overreport.load(Ordering::SeqCst) {
                 return Ok(output.len() + 1);
@@ -454,14 +461,47 @@ fn direct_write_to_retains_three_complete_source_scans() {
     let mut output = Vec::new();
     plan.write_to(&mut output).unwrap();
 
-    // Direct sequential publication retains its initial preflight, emission
-    // scan, and post-emission preflight. The output-time source hash is part
-    // of emission and does not add a positional read.
+    // Direct sequential publication retains its initial fingerprint preflight,
+    // 64 KiB emission scan, and post-emission fingerprint preflight. The
+    // output-time source hash is part of emission and does not add a read.
     assert_eq!(
         source.reads.load(Ordering::SeqCst),
-        publication_chunks(file.file_size()) * 3
+        fingerprint_chunks(file.file_size()) * 2 + publication_chunks(file.file_size())
     );
     assert_eq!(output.len() as u64, file.file_size());
+}
+
+#[test]
+fn fingerprint_requests_are_coalesced_without_widening_publication_chunks() {
+    let source = Arc::new(MutableSource::new(sample_bytes()));
+    let file = SharedOleFile::open(source.clone()).unwrap();
+    let plan = file
+        .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x66, 4_096)], limits())
+        .unwrap();
+    source.reads.store(0, Ordering::SeqCst);
+    source.request_sizes.lock().unwrap().clear();
+
+    let mut output = Vec::new();
+    plan.write_to(&mut output).unwrap();
+
+    let requests = source.request_sizes.lock().unwrap().clone();
+    let file_size = usize::try_from(file.file_size()).unwrap();
+    let fingerprint_request = file_size.min(1024 * 1024);
+    let fingerprint_requests = fingerprint_chunks(file.file_size());
+    let publication_requests = publication_chunks(file.file_size());
+    assert_eq!(
+        requests.len(),
+        fingerprint_requests * 2 + publication_requests
+    );
+    let before = &requests[..fingerprint_requests];
+    let emission = &requests[fingerprint_requests..fingerprint_requests + publication_requests];
+    let after = &requests[fingerprint_requests + publication_requests..];
+    assert_eq!(before, after);
+    assert_eq!(before.first(), Some(&fingerprint_request));
+    assert!(before.iter().all(|request| *request <= 1024 * 1024));
+    assert!(emission.iter().all(|request| *request <= 65_536));
+    assert!(emission.contains(&65_536));
+    assert_eq!(output.len(), file_size);
 }
 
 #[test]
@@ -485,13 +525,11 @@ fn atomic_save_skips_only_the_duplicate_post_emission_source_scan() {
 
     let report = plan.save(&destination).unwrap();
 
-    // Atomic save retains the initial preflight, emission scan, and the
-    // mandatory post-flush/fsync pre-rename preflight: 3N instead of the
-    // former 4N sequence that repeated the post-emission preflight inside the
-    // shared writer.
+    // Atomic save retains the initial fingerprint preflight, 64 KiB emission
+    // scan, and mandatory post-flush/fsync pre-rename fingerprint preflight.
     assert_eq!(
         source.reads.load(Ordering::SeqCst),
-        publication_chunks(file.file_size()) * 3
+        fingerprint_chunks(file.file_size()) * 2 + publication_chunks(file.file_size())
     );
     assert_eq!(report.bytes(), file.file_size());
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
@@ -537,8 +575,10 @@ fn hostile_read_during_emission_reports_exact_sink_prefix() {
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x61, 4_096)], limits())
         .unwrap();
     source.reads.store(0, Ordering::SeqCst);
-    let chunks = usize::try_from(file.file_size()).unwrap().div_ceil(65_536);
-    source.fail_read.store(chunks + 2, Ordering::SeqCst);
+    let preflight_chunks = fingerprint_chunks(file.file_size());
+    source
+        .fail_read
+        .store(preflight_chunks + 2, Ordering::SeqCst);
     let mut output = Vec::new();
     assert!(matches!(
         plan.write_to(&mut output),
@@ -561,9 +601,11 @@ fn hostile_read_overreport_during_emission_reports_the_exact_sink_prefix() {
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x62, 4_096)], limits())
         .unwrap();
     source.reads.store(0, Ordering::SeqCst);
-    let chunks = usize::try_from(file.file_size()).unwrap().div_ceil(65_536);
+    let preflight_chunks = fingerprint_chunks(file.file_size());
     source.overreport.store(true, Ordering::SeqCst);
-    source.fail_read.store(chunks + 2, Ordering::SeqCst);
+    source
+        .fail_read
+        .store(preflight_chunks + 2, Ordering::SeqCst);
     let mut output = Vec::new();
     assert!(matches!(
         plan.write_to(&mut output),
@@ -587,10 +629,12 @@ fn stable_token_mutation_of_an_emitted_chunk_is_caught_before_success() {
         .unwrap();
     source.reads.store(0, Ordering::SeqCst);
     let length = file.file_size();
-    let chunks = usize::try_from(length).unwrap().div_ceil(65_536);
-    // The first `chunks` reads are the preflight. Mutate the first source
+    let preflight_chunks = fingerprint_chunks(length);
+    // The first reads are the coalesced preflight. Mutate the first source
     // chunk only after its bytes have been copied for emission.
-    source.mutate_after_read.store(chunks + 1, Ordering::SeqCst);
+    source
+        .mutate_after_read
+        .store(preflight_chunks + 1, Ordering::SeqCst);
 
     let mut output = Vec::new();
     assert!(matches!(
@@ -674,20 +718,23 @@ fn atomic_path_late_stable_token_mutation_leaves_destination_unchanged() {
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x53, 4_096)], limits())
         .unwrap();
     source.reads.store(0, Ordering::SeqCst);
-    let chunks = publication_chunks(file.file_size());
-    // The last emission read is the 2N-th read. Mutate only after that read so
-    // the output-time source hash has already accepted the original bytes; the
-    // mandatory final preflight must then observe the changed byte before
-    // rename, without the removed inner duplicate.
+    let fingerprint_reads = fingerprint_chunks(file.file_size());
+    let publication_reads = publication_chunks(file.file_size());
+    // Mutate only after the last emission read so the output-time source hash
+    // has already accepted the original bytes; the mandatory final preflight
+    // must then observe the changed byte before rename.
     source
         .mutate_after_read
-        .store(chunks.saturating_mul(2), Ordering::SeqCst);
+        .store(fingerprint_reads + publication_reads, Ordering::SeqCst);
 
     assert!(matches!(
         plan.save(&destination),
         Err(OverlayError::SourceFingerprintChanged { .. })
     ));
-    assert_eq!(source.reads.load(Ordering::SeqCst), chunks * 3);
+    assert_eq!(
+        source.reads.load(Ordering::SeqCst),
+        fingerprint_reads * 2 + publication_reads
+    );
     assert_eq!(std::fs::read(&destination).unwrap(), b"old destination");
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
     std::fs::remove_file(destination).unwrap();
