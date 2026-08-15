@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "policy_id": "litchi-hosted-default-matrix-v1",
+  "schema_version": 2,
+  "policy_id": "litchi-hosted-default-matrix-v2",
   "minimum_samples": 15,
   "expected_result_count": 198,
   "expected_result_keys_sha256": "3b57c3b5aef77f5149d520fd885194d1fd8734460b28bff9d317d1cd840c246f",
@@ -115,7 +115,8 @@
   },
   "latency_thresholds_percent": {
     "p50": 5.0,
-    "p95": 10.0
+    "p95": 10.0,
+    "p99": 15.0
   },
   "metric_classes": [
     {
@@ -128,7 +129,8 @@
         "*allocation_calls",
         "*allocations",
         "*allocated_bytes"
-      ]
+      ],
+      "presence": "optional"
     },
     {
       "name": "rss",
@@ -138,7 +140,8 @@
         "**/*resident_set*",
         "*rss*",
         "*resident_set*"
-      ]
+      ],
+      "presence": "optional"
     },
     {
       "name": "work",
@@ -170,7 +173,8 @@
         "*work_units",
         "*max_in_flight*",
         "*maximum_in_flight*"
-      ]
+      ],
+      "presence": "optional"
     }
   ]
 }

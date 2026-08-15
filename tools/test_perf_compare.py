@@ -23,8 +23,8 @@ def policy():
         corpus, sort_keys=True, separators=(",", ":"), allow_nan=False
     )
     return {
-        "schema_version": 1,
-        "policy_id": "test-policy-v1",
+        "schema_version": 2,
+        "policy_id": "test-policy-v2",
         "minimum_samples": 5,
         "expected_result_count": 1,
         "expected_result_keys_sha256": perf_compare.result_key_manifest_sha256(
@@ -43,22 +43,25 @@ def policy():
         ],
         "nullable_build_identity_fields": [],
         "expected_configuration": {"samples_per_case": 5},
-        "latency_thresholds_percent": {"p50": 5.0, "p95": 8.0},
+        "latency_thresholds_percent": {"p50": 5.0, "p95": 8.0, "p99": 12.0},
         "metric_classes": [
             {
                 "name": "allocation",
                 "max_regression_percent": 3.0,
                 "path_globs": ["**/allocation_calls"],
+                "presence": "optional",
             },
             {
                 "name": "rss",
                 "max_regression_percent": 4.0,
                 "path_globs": ["**/*rss_bytes"],
+                "presence": "optional",
             },
             {
                 "name": "work",
                 "max_regression_percent": 5.0,
                 "path_globs": ["source/read_calls", "**/instructions"],
+                "presence": "optional",
             },
         ],
     }
@@ -103,6 +106,7 @@ def report(value=100, revision="baseline", corpus_sha="abc"):
                     "samples": samples,
                     "p50": value,
                     "p95": value,
+                    "p99": value,
                 },
                 "metrics": {
                     "allocation_calls": [1000] * 5,
@@ -135,7 +139,18 @@ class PerfCompareTests(unittest.TestCase):
         self.assertEqual(manifest["case_count"], 36)
         self.assertEqual(manifest["source_report_samples_per_case"], 1)
         self.assertEqual(manifest["source_report_warmup_iterations_per_case"], 0)
+        self.assertEqual(checked_policy["schema_version"], 2)
         self.assertEqual(manifest["default_cases"], checked_policy["required_cases"])
+        self.assertEqual(
+            set(checked_policy["latency_thresholds_percent"]),
+            {"p50", "p95", "p99"},
+        )
+        self.assertTrue(
+            all(
+                metric_class["presence"] == "optional"
+                for metric_class in checked_policy["metric_classes"]
+            )
+        )
         for field, expected in manifest["identity_configuration"].items():
             self.assertEqual(
                 checked_policy["expected_configuration"][field], expected, field
@@ -179,7 +194,7 @@ class PerfCompareTests(unittest.TestCase):
         result = perf_compare.compare_reports(baseline, current, policy())
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["summary"]["matched_results"], 1)
-        self.assertEqual(result["summary"]["compared_metrics"], 6)
+        self.assertEqual(result["summary"]["compared_metrics"], 7)
         self.assertFalse(result["regressions"])
 
     def test_additive_sink_histogram_field_is_comparator_compatible(self):
@@ -203,13 +218,13 @@ class PerfCompareTests(unittest.TestCase):
         self.assertEqual(sink["largest_write"], 2)
         result = perf_compare.compare_reports(report(), current, policy())
         self.assertEqual(result["status"], "pass")
-        self.assertEqual(result["summary"]["compared_metrics"], 6)
+        self.assertEqual(result["summary"]["compared_metrics"], 7)
 
     def test_p50_and_p95_regressions_are_reported(self):
         result = perf_compare.compare_reports(report(), report(120, "current"), policy())
         self.assertEqual(result["status"], "regression")
         metrics = {item["metric"] for item in result["regressions"]}
-        self.assertEqual(metrics, {"elapsed_ns.p50", "elapsed_ns.p95"})
+        self.assertEqual(metrics, {"elapsed_ns.p50", "elapsed_ns.p95", "elapsed_ns.p99"})
 
     def test_optional_resource_regression_is_reported(self):
         current = report(revision="current")
@@ -334,6 +349,130 @@ class PerfCompareTests(unittest.TestCase):
         current["results"][0]["elapsed_ns"]["p95"] = 999
         with self.assertRaisesRegex(perf_compare.ComparisonInputError, "disagrees"):
             perf_compare.compare_reports(report(), current, policy())
+
+    def test_p99_is_required_and_must_agree_with_samples(self):
+        current = report(revision="current")
+        del current["results"][0]["elapsed_ns"]["p99"]
+        with self.assertRaisesRegex(perf_compare.ComparisonInputError, "p99"):
+            perf_compare.compare_reports(report(), current, policy())
+
+        current = report(revision="current")
+        current["results"][0]["elapsed_ns"]["p99"] = 999
+        with self.assertRaisesRegex(perf_compare.ComparisonInputError, "p99.*disagrees"):
+            perf_compare.compare_reports(report(), current, policy())
+
+    def test_p99_rejects_nonfinite_and_overflow_values(self):
+        for invalid in (math.nan, math.inf, -math.inf, 10**10000):
+            with self.subTest(invalid=invalid):
+                current = report(revision="current")
+                current["results"][0]["elapsed_ns"]["p99"] = invalid
+                with self.assertRaises(perf_compare.ComparisonInputError):
+                    perf_compare.compare_reports(report(), current, policy())
+
+    def test_reported_percentiles_must_be_non_decreasing(self):
+        current = report(revision="current")
+        elapsed = current["results"][0]["elapsed_ns"]
+        elapsed["p50"] = 100.4
+        elapsed["p95"] = 100.3
+        elapsed["p99"] = 100.2
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "reported percentiles.*non-decreasing"
+        ):
+            perf_compare.compare_reports(report(), current, policy())
+
+    def test_policy_and_report_schema_versions_are_strictly_typed(self):
+        for invalid in (True, 1.0):
+            with self.subTest(policy_schema=invalid):
+                comparison_policy = policy()
+                comparison_policy["schema_version"] = invalid
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError,
+                    "policy.schema_version must be an integer",
+                ):
+                    perf_compare.compare_reports(
+                        report(), report(revision="current"), comparison_policy
+                    )
+
+            with self.subTest(report_schema=invalid):
+                current = report(revision="current")
+                current["schema_version"] = invalid
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError,
+                    "current.schema_version must be an integer",
+                ):
+                    perf_compare.compare_reports(report(), current, policy())
+
+        legacy_policy = policy()
+        legacy_policy["schema_version"] = 1
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "unsupported policy.schema_version"
+        ):
+            perf_compare.compare_reports(
+                report(), report(revision="current"), legacy_policy
+            )
+
+    def test_required_metric_class_must_be_present_on_both_sides(self):
+        comparison_policy = policy()
+        comparison_policy["metric_classes"].append(
+            {
+                "name": "required_work",
+                "max_regression_percent": 5.0,
+                "path_globs": ["metrics/required_work"],
+                "presence": "required",
+            }
+        )
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["metrics"]["required_work"] = [7] * 5
+        current["results"][0]["metrics"]["required_work"] = [7] * 5
+        result = perf_compare.compare_reports(baseline, current, comparison_policy)
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["summary"]["compared_metrics"], 8)
+
+        del current["results"][0]["metrics"]["required_work"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "missing required metrics"
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+    def test_required_metric_vector_is_validated_and_short_vectors_fail_closed(self):
+        comparison_policy = policy()
+        comparison_policy["metric_classes"].append(
+            {
+                "name": "required_work",
+                "max_regression_percent": 5.0,
+                "path_globs": ["metrics/required_work"],
+                "presence": "required",
+            }
+        )
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline, current):
+            item["results"][0]["metrics"]["required_work"] = [7] * 4
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "required metric.*minimum is 5"
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+    def test_policy_schema_requires_explicit_metric_presence(self):
+        comparison_policy = policy()
+        comparison_policy["metric_classes"][0].pop("presence")
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "presence is required"
+        ):
+            perf_compare.compare_reports(
+                report(), report(revision="current"), comparison_policy
+            )
+
+    def test_metric_presence_policy_is_strict(self):
+        comparison_policy = policy()
+        comparison_policy["metric_classes"][0]["presence"] = "sometimes"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "presence must be 'required' or 'optional'"
+        ):
+            perf_compare.compare_reports(
+                report(), report(revision="current"), comparison_policy
+            )
 
     def test_optional_metric_presence_must_match(self):
         current = report(revision="current")

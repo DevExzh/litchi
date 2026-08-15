@@ -2,9 +2,10 @@
 """Fail-closed comparison of two litchi performance JSON reports.
 
 The comparator intentionally uses only the Python standard library.  A policy
-pins the accepted report shape, identity fields, sample floor, and regression
-thresholds.  Exit status is 0 for a passing comparison, 1 for measured
-regressions, and 2 for invalid or incomparable input.
+pins the accepted report shape, identity fields, sample floor, percentile
+validation, metric presence, and regression thresholds.  Exit status is 0 for
+a passing comparison, 1 for measured regressions, and 2 for invalid or
+incomparable input.
 """
 
 from __future__ import annotations
@@ -21,8 +22,8 @@ from typing import Any, Iterable
 
 
 COMPARATOR_NAME = "litchi-perf-compare"
-COMPARATOR_VERSION = "1.0.0"
-SUPPORTED_POLICY_SCHEMA = 1
+COMPARATOR_VERSION = "1.2.0"
+SUPPORTED_POLICY_SCHEMA = 2
 SUPPORTED_REPORT_SCHEMA = 1
 
 
@@ -46,6 +47,15 @@ def _require_object(value: Any, location: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ComparisonInputError(f"{location} must be an object")
     return value
+
+
+def _require_schema_version(value: Any, location: str, expected: int) -> None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ComparisonInputError(f"{location} must be an integer")
+    if value != expected:
+        raise ComparisonInputError(
+            f"unsupported {location} {value!r}; expected {expected}"
+        )
 
 
 def _finite_number(value: Any, location: str, *, positive: bool = False) -> float:
@@ -110,11 +120,9 @@ def validate_policy(raw: Any) -> dict[str, Any]:
         raise ComparisonInputError(
             f"policy keys mismatch: missing={missing}, unknown={unknown}"
         )
-    if policy["schema_version"] != SUPPORTED_POLICY_SCHEMA:
-        raise ComparisonInputError(
-            f"unsupported policy schema {policy['schema_version']!r}; "
-            f"expected {SUPPORTED_POLICY_SCHEMA}"
-        )
+    _require_schema_version(
+        policy["schema_version"], "policy.schema_version", SUPPORTED_POLICY_SCHEMA
+    )
     if not isinstance(policy["policy_id"], str) or not policy["policy_id"]:
         raise ComparisonInputError("policy.policy_id must be a non-empty string")
     minimum_samples = policy["minimum_samples"]
@@ -190,9 +198,9 @@ def validate_policy(raw: Any) -> dict[str, Any]:
         policy["latency_thresholds_percent"],
         "policy.latency_thresholds_percent",
     )
-    if set(latency) != {"p50", "p95"}:
+    if set(latency) != {"p50", "p95", "p99"}:
         raise ComparisonInputError(
-            "policy.latency_thresholds_percent must contain exactly p50 and p95"
+            "policy.latency_thresholds_percent must contain exactly p50, p95, and p99"
         )
     for name, value in latency.items():
         _finite_number(value, f"policy.latency_thresholds_percent.{name}")
@@ -202,9 +210,24 @@ def validate_policy(raw: Any) -> dict[str, Any]:
     class_names: set[str] = set()
     for index, item in enumerate(classes):
         metric_class = _require_object(item, f"policy.metric_classes[{index}]")
-        if set(metric_class) != {"name", "max_regression_percent", "path_globs"}:
+        required_class_keys = {
+            "name",
+            "max_regression_percent",
+            "path_globs",
+        }
+        allowed_class_keys = required_class_keys | {"presence"}
+        class_keys = set(metric_class)
+        if (
+            not class_keys <= allowed_class_keys
+            or not required_class_keys <= class_keys
+        ):
             raise ComparisonInputError(
                 f"policy.metric_classes[{index}] has invalid keys"
+            )
+        if "presence" not in metric_class:
+            raise ComparisonInputError(
+                f"policy.metric_classes[{index}].presence is required by policy schema "
+                f"{SUPPORTED_POLICY_SCHEMA}"
             )
         name = metric_class["name"]
         if not isinstance(name, str) or not name or name in class_names:
@@ -222,6 +245,11 @@ def validate_policy(raw: Any) -> dict[str, Any]:
         ):
             raise ComparisonInputError(
                 f"policy.metric_classes[{index}].path_globs must be non-empty strings"
+            )
+        presence = metric_class["presence"]
+        if not isinstance(presence, str) or presence not in {"required", "optional"}:
+            raise ComparisonInputError(
+                f"policy.metric_classes[{index}].presence must be 'required' or 'optional'"
             )
     return policy
 
@@ -287,10 +315,11 @@ def _validate_report_identity(
 ) -> None:
     for label, report in (("baseline", baseline), ("current", current)):
         _reject_nonfinite_tree(report, label)
-        if report.get("schema_version") != SUPPORTED_REPORT_SCHEMA:
-            raise ComparisonInputError(
-                f"{label}.schema_version must be {SUPPORTED_REPORT_SCHEMA}"
-            )
+        _require_schema_version(
+            report.get("schema_version"),
+            f"{label}.schema_version",
+            SUPPORTED_REPORT_SCHEMA,
+        )
         if report.get("tool") != policy["tool_identity"]:
             raise ComparisonInputError(
                 f"{label}.tool does not match the policy tool identity"
@@ -401,7 +430,12 @@ def _latencies(
         _finite_number(value, f"{location}.elapsed_ns.samples[{index}]", positive=True)
         for index, value in enumerate(samples_raw)
     ]
-    values = {"p50": _percentile(samples, 50), "p95": _percentile(samples, 95)}
+    values = {
+        "p50": _percentile(samples, 50),
+        "p95": _percentile(samples, 95),
+        "p99": _percentile(samples, 99),
+    }
+    reported_values: dict[str, float] = {}
     for name, computed in values.items():
         reported = _finite_number(elapsed.get(name), f"{location}.elapsed_ns.{name}")
         if abs(reported - computed) > 0.5:
@@ -409,6 +443,19 @@ def _latencies(
                 f"{location}.elapsed_ns.{name}={reported} disagrees with "
                 f"samples ({computed})"
             )
+        reported_values[name] = reported
+    if not values["p50"] <= values["p95"] <= values["p99"]:
+        raise ComparisonInputError(
+            f"{location}.elapsed_ns percentiles must be non-decreasing"
+        )
+    if not (
+        reported_values["p50"]
+        <= reported_values["p95"]
+        <= reported_values["p99"]
+    ):
+        raise ComparisonInputError(
+            f"{location}.elapsed_ns reported percentiles must be non-decreasing"
+        )
     return values
 
 
@@ -427,23 +474,25 @@ def _metric_class_for_path(
     if len(matching) > 1:
         names = [item["name"] for item in matching]
         raise ComparisonInputError(
-            f"optional metric {path!r} matches multiple classes: {names}"
+            f"metric {path!r} matches multiple classes: {names}"
         )
     return matching[0] if matching else None
 
 
-def _walk_optional_metrics(
+def _walk_metrics(
     value: Any,
     path: str,
     policy: dict[str, Any],
-    selected: dict[str, tuple[str, float, float]],
+    selected: dict[str, tuple[str, float, float, str]],
 ) -> None:
     metric_class = _metric_class_for_path(path, policy)
     if metric_class is not None:
+        presence = metric_class["presence"]
+        metric_label = f"{presence} metric"
         if isinstance(value, list):
             if len(value) < policy["minimum_samples"]:
                 raise ComparisonInputError(
-                    f"optional metric {path} has {len(value)} samples; "
+                    f"{metric_label} {path} has {len(value)} samples; "
                     f"minimum is {policy['minimum_samples']}"
                 )
             samples = [
@@ -455,32 +504,64 @@ def _walk_optional_metrics(
             metric_value = _finite_number(value, path)
         else:
             raise ComparisonInputError(
-                f"optional metric {path} must be a numeric scalar or sample vector"
+                f"{metric_label} {path} must be a numeric scalar or sample vector"
             )
         selected[path] = (
             metric_class["name"],
             metric_value,
             float(metric_class["max_regression_percent"]),
+            presence,
         )
         return
     if isinstance(value, dict):
         for key, item in value.items():
             child = f"{path}.{key}" if path else key
-            _walk_optional_metrics(item, child, policy, selected)
+            _walk_metrics(item, child, policy, selected)
     elif isinstance(value, list):
         for index, item in enumerate(value):
-            _walk_optional_metrics(item, f"{path}[{index}]", policy, selected)
+            _walk_metrics(item, f"{path}[{index}]", policy, selected)
 
 
 def _optional_metrics(
     result: dict[str, Any], policy: dict[str, Any]
-) -> dict[str, tuple[str, float, float]]:
-    selected: dict[str, tuple[str, float, float]] = {}
+) -> dict[str, tuple[str, float, float, str]]:
+    selected: dict[str, tuple[str, float, float, str]] = {}
     for root, value in result.items():
         if root in {"case", "corpus", "elapsed_ns", "output_sha256"}:
             continue
-        _walk_optional_metrics(value, root, policy, selected)
-    return selected
+        _walk_metrics(value, root, policy, selected)
+    return {
+        path: metric
+        for path, metric in selected.items()
+        if metric[3] == "optional"
+    }
+
+
+def _required_metrics(
+    result: dict[str, Any], policy: dict[str, Any]
+) -> dict[str, tuple[str, float, float, str]]:
+    selected: dict[str, tuple[str, float, float, str]] = {}
+    for root, value in result.items():
+        if root in {"case", "corpus", "elapsed_ns", "output_sha256"}:
+            continue
+        _walk_metrics(value, root, policy, selected)
+    required = {
+        path: metric
+        for path, metric in selected.items()
+        if metric[3] == "required"
+    }
+    required_classes = {
+        metric_class["name"]
+        for metric_class in policy["metric_classes"]
+        if metric_class["presence"] == "required"
+    }
+    present_classes = {metric[0] for metric in required.values()}
+    missing_classes = sorted(required_classes - present_classes)
+    if missing_classes:
+        raise ComparisonInputError(
+            "missing required metrics: " + ", ".join(missing_classes)
+        )
+    return required
 
 
 def _delta_percent(baseline: float, current: float) -> float:
@@ -574,7 +655,7 @@ def compare_reports(
         before_latency = _latencies(before_result, f"baseline.{case}", minimum_samples)
         after_latency = _latencies(after_result, f"current.{case}", minimum_samples)
         corpus = before_result["corpus"]
-        for percentile in ("p50", "p95"):
+        for percentile in ("p50", "p95", "p99"):
             comparisons.append(
                 _comparison_record(
                     case=case,
@@ -586,6 +667,15 @@ def compare_reports(
                     threshold=float(latency_thresholds[percentile]),
                 )
             )
+        before_required = _required_metrics(before_result, policy)
+        after_required = _required_metrics(after_result, policy)
+        if set(before_required) != set(after_required):
+            missing = sorted(set(before_required) - set(after_required))
+            extra = sorted(set(after_required) - set(before_required))
+            raise ComparisonInputError(
+                f"required metric mismatch for {case!r}: "
+                f"missing_current={missing}, extra_current={extra}"
+            )
         before_optional = _optional_metrics(before_result, policy)
         after_optional = _optional_metrics(after_result, policy)
         if set(before_optional) != set(after_optional):
@@ -595,10 +685,42 @@ def compare_reports(
                 f"optional metric mismatch for {case!r}: "
                 f"missing_current={missing}, extra_current={extra}"
             )
+        for path in sorted(before_required):
+            before_class, before_value, before_threshold, before_presence = (
+                before_required[path]
+            )
+            after_class, after_value, after_threshold, after_presence = after_required[
+                path
+            ]
+            if (before_class, before_threshold, before_presence) != (
+                after_class,
+                after_threshold,
+                after_presence,
+            ):
+                raise ComparisonInputError(f"metric policy mismatch for {case}.{path}")
+            comparisons.append(
+                _comparison_record(
+                    case=case,
+                    corpus=corpus,
+                    metric=path,
+                    metric_class=before_class,
+                    baseline=before_value,
+                    current=after_value,
+                    threshold=before_threshold,
+                )
+            )
         for path in sorted(before_optional):
-            before_class, before_value, before_threshold = before_optional[path]
-            after_class, after_value, after_threshold = after_optional[path]
-            if (before_class, before_threshold) != (after_class, after_threshold):
+            before_class, before_value, before_threshold, before_presence = (
+                before_optional[path]
+            )
+            after_class, after_value, after_threshold, after_presence = after_optional[
+                path
+            ]
+            if (before_class, before_threshold, before_presence) != (
+                after_class,
+                after_threshold,
+                after_presence,
+            ):
                 raise ComparisonInputError(f"metric policy mismatch for {case}.{path}")
             comparisons.append(
                 _comparison_record(
