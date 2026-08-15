@@ -706,6 +706,12 @@ enum Case {
     OdpFileSourceOpen,
     OdpFileEagerSelectedSlide,
     OdpFileSourceSelectedSlide,
+    OdsFileEagerOpen,
+    OdsFileSourceOpen,
+    OdsFileEagerSelectedCell,
+    OdsFileSourceSelectedCell,
+    OdsFileEagerSelectedMedia,
+    OdsFileSourceSelectedMedia,
 }
 
 impl Case {
@@ -1035,6 +1041,12 @@ impl Case {
             Self::OdpFileSourceOpen => "odp_file_source_open",
             Self::OdpFileEagerSelectedSlide => "odp_file_eager_selected_slide",
             Self::OdpFileSourceSelectedSlide => "odp_file_source_selected_slide",
+            Self::OdsFileEagerOpen => "ods_file_eager_open",
+            Self::OdsFileSourceOpen => "ods_file_source_open",
+            Self::OdsFileEagerSelectedCell => "ods_file_eager_selected_cell",
+            Self::OdsFileSourceSelectedCell => "ods_file_source_selected_cell",
+            Self::OdsFileEagerSelectedMedia => "ods_file_eager_selected_media",
+            Self::OdsFileSourceSelectedMedia => "ods_file_source_selected_media",
         }
     }
 
@@ -1438,6 +1450,18 @@ impl Case {
                 | Self::OdpFileSourceOpen
                 | Self::OdpFileEagerSelectedSlide
                 | Self::OdpFileSourceSelectedSlide
+        )
+    }
+
+    const fn is_ods_root_file(self) -> bool {
+        matches!(
+            self,
+            Self::OdsFileEagerOpen
+                | Self::OdsFileSourceOpen
+                | Self::OdsFileEagerSelectedCell
+                | Self::OdsFileSourceSelectedCell
+                | Self::OdsFileEagerSelectedMedia
+                | Self::OdsFileSourceSelectedMedia
         )
     }
 
@@ -1893,6 +1917,8 @@ struct SourceSummary {
     odp_media: Option<OdpMediaSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odp_root: Option<OdpRootSourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ods_root: Option<OdsRootSourceSummary>,
 }
 
 /// Positional-read evidence for the native PPT lazy `Pictures` selectors.
@@ -1987,6 +2013,56 @@ struct OdpRootSourceSummary {
     target_slide: usize,
     canonical_semantic_sha256: String,
     metadata_sha256: String,
+    selected_media_path: String,
+    selected_media_compressed_range_bytes: u64,
+    selected_media_uncompressed_bytes: u64,
+    selected_media_uncompressed_payload_sha256: String,
+    pictures_count: usize,
+    pictures_compressed_range_bytes: u64,
+    pictures_uncompressed_payload_bytes: u64,
+    pictures_uncompressed_payload_sha256: String,
+    source_read_calls: Vec<u64>,
+    source_read_bytes: Vec<u64>,
+    source_read_range_overlap_bytes: Vec<u64>,
+    pictures_read_calls: Vec<u64>,
+    pictures_read_compressed_range_bytes: Vec<u64>,
+    selected_media_read_calls: Vec<u64>,
+    selected_media_read_bytes: Vec<u64>,
+    selected_media_read_prior_range_overlap_bytes: Vec<u64>,
+    selected_media_read_compressed_range_overlap_bytes: Vec<u64>,
+    selected_media_read_non_picture_overlap_bytes: Vec<u64>,
+}
+
+/// Matched ODS filesystem/root and typed selected-owner evidence. Root open
+/// controls time only `litchi::Workbook::{from_bytes,open}` construction;
+/// selected-cell/media controls open typed owners outside the timer and time
+/// only the selected query. Source counters are populated by independent
+/// untimed `SourceBackedSpreadsheet` replays. Compressed member ranges and
+/// uncompressed media payload sizes remain distinct fields; this evidence
+/// records all-Pictures overlap from one selected-media replay and exact
+/// selected-range overlap from a second replay instrumented with only the
+/// selected compressed member range.
+/// intentionally makes no physical-I/O, decompression, allocation, RSS, or
+/// release claim.
+#[derive(Clone, Debug, Default, Serialize)]
+struct OdsRootSourceSummary {
+    implementation: &'static str,
+    phase: &'static str,
+    timing_scope: &'static str,
+    timed_root_adapter: &'static str,
+    typed_query_adapter: &'static str,
+    read_evidence_adapter: &'static str,
+    read_evidence_scope: &'static str,
+    source_path_bytes: u64,
+    source_path_sha256: String,
+    worksheet_names: Vec<String>,
+    worksheet_count: usize,
+    canonical_text_sha256: String,
+    metadata_sha256: String,
+    target_sheet: String,
+    target_row: usize,
+    target_column: usize,
+    target_cell_text_sha256: String,
     selected_media_path: String,
     selected_media_compressed_range_bytes: u64,
     selected_media_uncompressed_bytes: u64,
@@ -4065,6 +4141,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_odp()
                     && !case.uses_odp_media()
                     && !case.is_odp_root_file()
+                    && !case.is_ods_root_file()
                     && !case.uses_odp_text_box_batch()
                     && !case.is_opc_source_overlay_save()
                     && !case.is_opc_source_cache_evidence()
@@ -4834,6 +4911,24 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options.cases.iter().any(|case| case.is_ods_root_file()) {
+        let corpus = build_ods_media_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_ods_root_file())
+        {
+            results.push(run_case_with_config(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
+        }
+    }
+
     if options
         .cases
         .iter()
@@ -5548,6 +5643,12 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_file_source_open" => Some(Case::OdpFileSourceOpen),
         "odp_file_eager_selected_slide" => Some(Case::OdpFileEagerSelectedSlide),
         "odp_file_source_selected_slide" => Some(Case::OdpFileSourceSelectedSlide),
+        "ods_file_eager_open" => Some(Case::OdsFileEagerOpen),
+        "ods_file_source_open" => Some(Case::OdsFileSourceOpen),
+        "ods_file_eager_selected_cell" => Some(Case::OdsFileEagerSelectedCell),
+        "ods_file_source_selected_cell" => Some(Case::OdsFileSourceSelectedCell),
+        "ods_file_eager_selected_media" => Some(Case::OdsFileEagerSelectedMedia),
+        "ods_file_source_selected_media" => Some(Case::OdsFileSourceSelectedMedia),
         _ => None,
     }
 }
@@ -5784,7 +5885,10 @@ fn print_usage() {
                                        odp_media_eager_open,odp_media_source_backed_open,\n\
                                        odp_media_eager_one_slide,odp_media_source_backed_one_slide,\n\
                                        odp_file_eager_open,odp_file_source_open,\n\
-                                       odp_file_eager_selected_slide,odp_file_source_selected_slide\n\
+                                       odp_file_eager_selected_slide,odp_file_source_selected_slide,\n\
+                                       ods_file_eager_open,ods_file_source_open,\n\
+                                       ods_file_eager_selected_cell,ods_file_source_selected_cell,\n\
+                                       ods_file_eager_selected_media,ods_file_source_selected_media\n\
            --shape LIST                tiny,many-small,few-large,wide-root\n\
            --payload LIST              compressible,incompressible\n\
            --writer-shape LIST         tiny,large,payload-heavy\n\
@@ -10095,6 +10199,14 @@ fn run_case_with_config(
         | Case::OdpFileEagerSelectedSlide
         | Case::OdpFileSourceSelectedSlide => {
             run_odp_root_file_access(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdsFileEagerOpen
+        | Case::OdsFileSourceOpen
+        | Case::OdsFileEagerSelectedCell
+        | Case::OdsFileSourceSelectedCell
+        | Case::OdsFileEagerSelectedMedia
+        | Case::OdsFileSourceSelectedMedia => {
+            run_ods_root_file_access(case, corpus, warmup_iterations, samples)
         },
         Case::OpcOpenSessionScaling | Case::CfbBulkReadScaling => {
             Err("scaling case requires an explicit worker count".into())
@@ -16744,6 +16856,675 @@ fn run_odp_root_file_access(
             elapsed,
             SourceSummary {
                 odp_root: Some(source_summary),
+                ..SourceSummary::default()
+            },
+        ))
+    })();
+    let cleanup = fs::remove_file(&source_path);
+    match (result, cleanup) {
+        (Ok(result), Ok(())) => Ok(result),
+        (Ok(_), Err(error)) => Err(error.into()),
+        (Err(error), _) => Err(error),
+    }
+}
+
+fn ods_root_file_case_parameters(
+    case: Case,
+) -> Result<(&'static str, &'static str, bool, bool), Box<dyn Error>> {
+    match case {
+        Case::OdsFileEagerOpen => Ok(("eager_root", "workbook_open", false, false)),
+        Case::OdsFileSourceOpen => Ok(("source_backed_root", "workbook_open", false, false)),
+        Case::OdsFileEagerSelectedCell => Ok(("eager_typed", "selected_cell_query", true, false)),
+        Case::OdsFileSourceSelectedCell => {
+            Ok(("source_backed_typed", "selected_cell_query", true, false))
+        },
+        Case::OdsFileEagerSelectedMedia => Ok(("eager_typed", "selected_media_query", true, true)),
+        Case::OdsFileSourceSelectedMedia => {
+            Ok(("source_backed_typed", "selected_media_query", true, true))
+        },
+        _ => Err("non-root ODS case passed to ODS root case parameters".into()),
+    }
+}
+
+fn ods_root_text_digest(text: &str) -> String {
+    sha256_hex(text.as_bytes())
+}
+
+fn ods_root_metadata_digest(metadata: &litchi_core::Metadata) -> Result<String, Box<dyn Error>> {
+    Ok(sha256_hex(&serde_json::to_vec(metadata)?))
+}
+
+fn ods_root_typed_cell(
+    spreadsheet: &litchi_ods::Spreadsheet,
+    sheet: &str,
+    row: usize,
+    column: usize,
+) -> Result<String, Box<dyn Error>> {
+    let cell = spreadsheet
+        .cell(sheet, row, column)
+        .ok_or("ODS selected cell is missing")?;
+    let litchi_ods::CellView::Stored(cell) = cell else {
+        return Err("ODS selected cell is not stored".into());
+    };
+    Ok(cell.text.clone())
+}
+
+fn ods_root_source_cell(
+    spreadsheet: &litchi_ods::SourceBackedSpreadsheet,
+    sheet: &str,
+    row: usize,
+    column: usize,
+) -> Result<String, Box<dyn Error>> {
+    let cell = spreadsheet
+        .cell(sheet, row, column)?
+        .ok_or("ODS source selected cell is missing")?;
+    let litchi_ods::CellView::Stored(cell) = cell else {
+        return Err("ODS source selected cell is not stored".into());
+    };
+    Ok(cell.text.to_owned())
+}
+
+fn create_ods_root_source_file(archive: &[u8]) -> Result<PathBuf, Box<dyn Error>> {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("ODS root source timestamp is before epoch: {error}"))?
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!(
+        "litchi-perf-baseline-ods-root-{}-{stamp}.ods",
+        std::process::id()
+    ));
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)?;
+    file.write_all(archive)?;
+    file.flush()?;
+    Ok(path)
+}
+
+fn ods_media_payload_inventory(
+    corpus: &Corpus,
+) -> Result<(Vec<(String, Range<u64>)>, Range<u64>), Box<dyn Error>> {
+    let mut media = zip_member_ranges(&corpus.archive)?
+        .into_iter()
+        .filter(|(name, _range)| name.starts_with("Pictures/"))
+        .collect::<Vec<_>>();
+    media.sort_by(|left, right| left.0.cmp(&right.0));
+    if media.len() != ODS_MEDIA_ENTRY_COUNT {
+        return Err("ODS media source evidence found an unexpected Pictures count".into());
+    }
+    let selected_path = ods_media_path(ODS_MEDIA_ENTRY_COUNT / 2);
+    let selected = media
+        .iter()
+        .find(|(name, _range)| name == &selected_path)
+        .map(|(_name, range)| range.clone())
+        .ok_or("ODS selected media source range is missing")?;
+    Ok((media, selected))
+}
+
+fn ods_media_payload_digest() -> String {
+    let mut digest = Sha256::new();
+    for index in 0..ODS_MEDIA_ENTRY_COUNT {
+        digest.update((index as u64).to_le_bytes());
+        digest.update(ods_media_payload(index));
+    }
+    fingerprint_hex(&digest.finalize().into())
+}
+
+fn ods_media_instrumented_source(
+    archive: &[u8],
+    picture_ranges: &[Range<u64>],
+) -> Arc<InstrumentedSource> {
+    let mut source = InstrumentedSource::new(archive.to_vec(), picture_ranges.to_vec());
+    source.track_read_ranges = true;
+    Arc::new(source)
+}
+
+fn verify_ods_source_phase(snapshot: SourceSnapshot, phase: &str) -> Result<(), Box<dyn Error>> {
+    match phase {
+        "workbook_open" => {
+            if snapshot.read_calls == 0 || snapshot.read_bytes == 0 {
+                return Err("ODS source-backed open replay has no logical reads".into());
+            }
+            if snapshot.ordinary_payload_read_calls != 0
+                || snapshot.ordinary_payload_read_bytes != 0
+            {
+                return Err(
+                    "ODS source-backed open replay read unrelated Pictures payload bytes".into(),
+                );
+            }
+        },
+        "selected_cell_query" => {
+            if snapshot.read_calls != 0 || snapshot.read_bytes != 0 {
+                return Err(
+                    "ODS source-backed selected-cell replay performed a source read".into(),
+                );
+            }
+        },
+        "selected_media_query" => {
+            if snapshot.ordinary_payload_read_calls == 0
+                || snapshot.ordinary_payload_read_bytes == 0
+            {
+                return Err("ODS source-backed selected-media replay read no media range".into());
+            }
+        },
+        _ => return Err("unknown ODS source evidence phase".into()),
+    }
+    Ok(())
+}
+
+fn collect_ods_source_phase(
+    archive: &[u8],
+    picture_ranges: &[Range<u64>],
+    phase: &str,
+    target_sheet: &str,
+    target_row: usize,
+    target_column: usize,
+) -> Result<SourceSnapshot, Box<dyn Error>> {
+    let source = ods_media_instrumented_source(archive, picture_ranges);
+    let spreadsheet = litchi_ods::SourceBackedSpreadsheet::from_read_at(source.clone())?;
+    if phase != "workbook_open" {
+        source.reset();
+    }
+    match phase {
+        "workbook_open" => {},
+        "selected_cell_query" => {
+            let text = ods_root_source_cell(&spreadsheet, target_sheet, target_row, target_column)?;
+            if text != semantic_ods_text(1, target_row, target_column, false) {
+                return Err("ODS source selected-cell replay differs from corpus".into());
+            }
+        },
+        "selected_media_query" => {
+            return Err("ODS selected-media replay requires exact selected-range tracking".into());
+        },
+        _ => return Err("unknown ODS source evidence phase".into()),
+    }
+    Ok(source.snapshot())
+}
+
+fn collect_ods_media_selected_media(
+    archive: &[u8],
+    picture_ranges: &[Range<u64>],
+    selected_range: Range<u64>,
+    selected_media_path: &str,
+    selected_media_payload: &[u8],
+) -> Result<(SourceSnapshot, SourceSnapshot), Box<dyn Error>> {
+    let all_source = ods_media_instrumented_source(archive, picture_ranges);
+    let all_spreadsheet = litchi_ods::SourceBackedSpreadsheet::from_read_at(all_source.clone())?;
+    all_source.reset();
+    let payload = all_spreadsheet
+        .media_data(selected_media_path)?
+        .ok_or("ODS source selected media member is missing")?;
+    if payload != selected_media_payload {
+        return Err("ODS source selected media payload differs from corpus".into());
+    }
+    let all_snapshot = all_source.snapshot();
+
+    let selected_source = ods_media_instrumented_source(archive, &[selected_range]);
+    let selected_spreadsheet =
+        litchi_ods::SourceBackedSpreadsheet::from_read_at(selected_source.clone())?;
+    selected_source.reset();
+    let payload = selected_spreadsheet
+        .media_data(selected_media_path)?
+        .ok_or("ODS selected-range media member is missing")?;
+    if payload != selected_media_payload {
+        return Err("ODS selected-range media payload differs from corpus".into());
+    }
+    Ok((all_snapshot, selected_source.snapshot()))
+}
+
+struct OdsRootExpectations<'a> {
+    source_path: &'a std::path::Path,
+    corpus: &'a Corpus,
+    worksheet_names: &'a [String],
+    worksheet_count: usize,
+    text: &'a str,
+    metadata_sha256: &'a str,
+    typed: &'a litchi_ods::Spreadsheet,
+    target_sheet: &'a str,
+    target_row: usize,
+    target_column: usize,
+    cell_text: &'a str,
+    selected_media_path: &'a str,
+    selected_media_payload: &'a [u8],
+}
+
+struct OdsTypedQueryProjection {
+    worksheet_names: Vec<String>,
+    worksheet_count: usize,
+    text: String,
+    metadata_sha256: String,
+    cell_text: String,
+}
+
+fn verify_ods_typed_query_projection(
+    actual: OdsTypedQueryProjection,
+    expected: &OdsRootExpectations<'_>,
+) -> Result<(), Box<dyn Error>> {
+    if actual.worksheet_names != expected.worksheet_names {
+        return Err("ODS typed query worksheet names differ from eager oracle".into());
+    }
+    if actual.worksheet_count != expected.worksheet_count {
+        return Err("ODS typed query worksheet count differs from eager oracle".into());
+    }
+    if actual.text != expected.text {
+        return Err("ODS typed query text differs from eager oracle".into());
+    }
+    if actual.metadata_sha256 != expected.metadata_sha256 {
+        return Err("ODS typed query metadata differs from eager oracle".into());
+    }
+    if actual.cell_text != expected.cell_text {
+        return Err("ODS typed query selected cell differs from eager oracle".into());
+    }
+    Ok(())
+}
+
+fn ods_typed_query_projection(
+    owner: &litchi_ods::Spreadsheet,
+    expected: &OdsRootExpectations<'_>,
+) -> Result<OdsTypedQueryProjection, Box<dyn Error>> {
+    Ok(OdsTypedQueryProjection {
+        worksheet_names: owner.sheet_names(),
+        worksheet_count: owner.sheet_count(),
+        text: owner.text()?,
+        metadata_sha256: ods_root_metadata_digest(owner.metadata())?,
+        cell_text: ods_root_typed_cell(
+            owner,
+            expected.target_sheet,
+            expected.target_row,
+            expected.target_column,
+        )?,
+    })
+}
+
+fn ods_source_query_projection(
+    owner: &litchi_ods::SourceBackedSpreadsheet,
+    expected: &OdsRootExpectations<'_>,
+) -> Result<OdsTypedQueryProjection, Box<dyn Error>> {
+    Ok(OdsTypedQueryProjection {
+        worksheet_names: owner.sheet_names()?,
+        worksheet_count: owner.sheet_count()?,
+        text: owner.text()?,
+        metadata_sha256: ods_root_metadata_digest(owner.metadata()?)?,
+        cell_text: ods_root_source_cell(
+            owner,
+            expected.target_sheet,
+            expected.target_row,
+            expected.target_column,
+        )?,
+    })
+}
+
+fn verify_ods_source_identity_postconditions(
+    expected: &OdsRootExpectations<'_>,
+) -> Result<(), Box<dyn Error>> {
+    let bytes = fs::read(expected.source_path)?;
+    if bytes != expected.corpus.archive
+        || sha256_hex(&bytes) != expected.corpus.manifest.archive_sha256
+        || bytes.len() != expected.corpus.manifest.archive_bytes
+    {
+        return Err("ODS unified root source file differs from deterministic archive".into());
+    }
+    if ArchiveReader::new(&bytes)?.file_names().count()
+        != expected.corpus.manifest.archive_member_count
+    {
+        return Err("ODS unified root archive member count differs from corpus".into());
+    }
+    verify_ods_media_archive(&bytes, false)?;
+    let package = litchi_odf_common::core::OwnedPackage::from_bytes(bytes)?;
+    if package.package()?.get_file(expected.selected_media_path)? != expected.selected_media_payload
+    {
+        return Err("ODS unified root selected media payload differs from corpus".into());
+    }
+    Ok(())
+}
+
+fn verify_ods_root_postconditions(
+    workbook: &litchi::Workbook,
+    expected: &OdsRootExpectations<'_>,
+) -> Result<(), Box<dyn Error>> {
+    let names = workbook
+        .worksheet_names()
+        .map_err(|error| error.to_string())?;
+    if names != expected.worksheet_names {
+        return Err("ODS unified root worksheet names differ from eager oracle".into());
+    }
+    if workbook
+        .worksheet_count()
+        .map_err(|error| error.to_string())?
+        != expected.worksheet_count
+    {
+        return Err("ODS unified root worksheet count differs from eager oracle".into());
+    }
+    let text = workbook.text().map_err(|error| error.to_string())?;
+    if text != expected.text {
+        return Err("ODS unified root text differs from eager oracle".into());
+    }
+    if ods_root_metadata_digest(&workbook.metadata().map_err(|error| error.to_string())?)?
+        != expected.metadata_sha256
+    {
+        return Err("ODS unified root metadata differs from eager oracle".into());
+    }
+
+    verify_semantic_ods(expected.typed, SemanticShape::Medium, false)?;
+    let typed_cell = ods_root_typed_cell(
+        expected.typed,
+        expected.target_sheet,
+        expected.target_row,
+        expected.target_column,
+    )?;
+    if typed_cell != expected.cell_text {
+        return Err("ODS typed selected cell differs from canonical oracle".into());
+    }
+    if expected.cell_text
+        != semantic_ods_text(1, expected.target_row, expected.target_column, false)
+    {
+        return Err("ODS typed selected cell differs from deterministic corpus".into());
+    }
+
+    verify_ods_source_identity_postconditions(expected)?;
+    Ok(())
+}
+
+fn run_ods_root_file_access(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != ODS_MEDIA_CORPUS_GENERATOR {
+        return Err("ODS root filesystem cases require the fixed media-rich corpus".into());
+    }
+    let (implementation, phase, query, media_query) = ods_root_file_case_parameters(case)?;
+    let target_sheet = semantic_ods_sheet_name(1);
+    let target_row = SemanticShape::Medium.ods_rows_per_sheet() / 2;
+    let target_column = SemanticShape::Medium.ods_columns_per_sheet() / 2;
+    let selected_media_path = ods_media_path(ODS_MEDIA_ENTRY_COUNT / 2);
+    let selected_media_payload = ods_media_payload(ODS_MEDIA_ENTRY_COUNT / 2);
+    let expected_root =
+        litchi::Workbook::from_bytes(corpus.archive.clone()).map_err(|error| error.to_string())?;
+    let expected_names = expected_root
+        .worksheet_names()
+        .map_err(|error| error.to_string())?;
+    let expected_count = expected_root
+        .worksheet_count()
+        .map_err(|error| error.to_string())?;
+    let expected_text = expected_root.text().map_err(|error| error.to_string())?;
+    let expected_metadata_sha256 = ods_root_metadata_digest(
+        &expected_root
+            .metadata()
+            .map_err(|error| error.to_string())?,
+    )?;
+    let expected_typed = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+    let expected_cell_text =
+        ods_root_typed_cell(&expected_typed, &target_sheet, target_row, target_column)?;
+    let (picture_members, selected_range) = ods_media_payload_inventory(corpus)?;
+    let picture_ranges = picture_members
+        .iter()
+        .map(|(_name, range)| range.clone())
+        .collect::<Vec<_>>();
+    let selected_media_compressed_range_bytes =
+        selected_range.end.saturating_sub(selected_range.start);
+    let pictures_compressed_range_bytes =
+        picture_members
+            .iter()
+            .try_fold(0_u64, |total, (_name, range)| {
+                total
+                    .checked_add(range.end.saturating_sub(range.start))
+                    .ok_or("ODS compressed Pictures byte count overflows u64")
+            })?;
+    let pictures_uncompressed_payload_bytes = u64::try_from(
+        ODS_MEDIA_ENTRY_COUNT
+            .checked_mul(ODS_MEDIA_ENTRY_BYTES)
+            .ok_or("ODS uncompressed Pictures byte count overflows usize")?,
+    )?;
+    let source_path = create_ods_root_source_file(&corpus.archive)?;
+    let expectations = OdsRootExpectations {
+        source_path: &source_path,
+        corpus,
+        worksheet_names: &expected_names,
+        worksheet_count: expected_count,
+        text: &expected_text,
+        metadata_sha256: &expected_metadata_sha256,
+        typed: &expected_typed,
+        target_sheet: &target_sheet,
+        target_row,
+        target_column,
+        cell_text: &expected_cell_text,
+        selected_media_path: &selected_media_path,
+        selected_media_payload: &selected_media_payload,
+    };
+    let result = (|| {
+        let mut elapsed = Vec::with_capacity(samples);
+        let mut source_summary = OdsRootSourceSummary {
+            implementation,
+            phase,
+            timing_scope: if media_query {
+                "selected_media_query_after_untimed_typed_owner_open"
+            } else if query {
+                "selected_cell_query_after_untimed_typed_owner_open"
+            } else {
+                "unified_root_workbook_open"
+            },
+            timed_root_adapter: match implementation {
+                "source_backed_root" => "litchi::Workbook::open(Path)",
+                "eager_root" => "litchi::Workbook::from_bytes(Vec<u8>)",
+                _ => "not_applicable",
+            },
+            typed_query_adapter: if media_query {
+                if implementation == "source_backed_typed" {
+                    "litchi_ods::SourceBackedSpreadsheet::media_data"
+                } else {
+                    "OwnedPackage::get_file (owned Spreadsheet preparation outside timer)"
+                }
+            } else if query {
+                if implementation == "source_backed_typed" {
+                    "litchi_ods::SourceBackedSpreadsheet::cell"
+                } else {
+                    "litchi_ods::Spreadsheet::cell"
+                }
+            } else {
+                "not_applicable"
+            },
+            read_evidence_adapter: if implementation.starts_with("source_backed") {
+                "litchi_ods::SourceBackedSpreadsheet+harness::InstrumentedSource"
+            } else {
+                "not_applicable"
+            },
+            read_evidence_scope: if implementation.starts_with("source_backed") {
+                "separate_untimed_direct_typed_replay_per_measured_sample"
+            } else {
+                "not_applicable"
+            },
+            source_path_bytes: u64::try_from(corpus.archive.len())?,
+            source_path_sha256: corpus.manifest.archive_sha256.clone(),
+            worksheet_names: expected_names.clone(),
+            worksheet_count: expected_count,
+            canonical_text_sha256: ods_root_text_digest(&expected_text),
+            metadata_sha256: expected_metadata_sha256.clone(),
+            target_sheet: target_sheet.clone(),
+            target_row,
+            target_column,
+            target_cell_text_sha256: sha256_hex(expected_cell_text.as_bytes()),
+            selected_media_path: selected_media_path.clone(),
+            selected_media_compressed_range_bytes,
+            selected_media_uncompressed_bytes: u64::try_from(selected_media_payload.len())?,
+            selected_media_uncompressed_payload_sha256: sha256_hex(&selected_media_payload),
+            pictures_count: picture_members.len(),
+            pictures_compressed_range_bytes,
+            pictures_uncompressed_payload_bytes,
+            pictures_uncompressed_payload_sha256: ods_media_payload_digest(),
+            ..OdsRootSourceSummary::default()
+        };
+
+        for iteration in 0..iteration_count(warmup_iterations, samples)? {
+            let duration = match implementation {
+                "source_backed_root" => {
+                    let started = Instant::now();
+                    let workbook =
+                        litchi::Workbook::open(&source_path).map_err(|error| error.to_string())?;
+                    let duration = started.elapsed();
+                    verify_ods_root_postconditions(&workbook, &expectations)?;
+                    duration
+                },
+                "eager_root" => {
+                    let owned = corpus.archive.clone();
+                    let started = Instant::now();
+                    let workbook =
+                        litchi::Workbook::from_bytes(owned).map_err(|error| error.to_string())?;
+                    let duration = started.elapsed();
+                    verify_ods_root_postconditions(&workbook, &expectations)?;
+                    duration
+                },
+                "source_backed_typed" => {
+                    let owner = litchi_ods::SourceBackedSpreadsheet::from_path(&source_path)?;
+                    let started = Instant::now();
+                    let value = if media_query {
+                        owner
+                            .media_data(&selected_media_path)?
+                            .ok_or("ODS source selected media member is missing")?
+                    } else {
+                        ods_root_source_cell(&owner, &target_sheet, target_row, target_column)?
+                            .into_bytes()
+                    };
+                    let duration = started.elapsed();
+                    if media_query {
+                        if value != selected_media_payload {
+                            return Err("ODS source selected media query differs".into());
+                        }
+                    } else if String::from_utf8(value)? != expected_cell_text {
+                        return Err("ODS source selected cell query differs".into());
+                    }
+                    verify_ods_typed_query_projection(
+                        ods_source_query_projection(&owner, &expectations)?,
+                        &expectations,
+                    )?;
+                    verify_ods_source_identity_postconditions(&expectations)?;
+                    duration
+                },
+                "eager_typed" => {
+                    let owner = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                    if media_query {
+                        verify_ods_typed_query_projection(
+                            ods_typed_query_projection(&owner, &expectations)?,
+                            &expectations,
+                        )?;
+                        verify_ods_source_identity_postconditions(&expectations)?;
+                        let owned = owner.into_bytes();
+                        let package = litchi_odf_common::core::OwnedPackage::from_bytes(owned)?;
+                        let package = package.package()?;
+                        let started = Instant::now();
+                        let value = package.get_file(&selected_media_path)?;
+                        let duration = started.elapsed();
+                        if value != selected_media_payload {
+                            return Err("ODS eager selected media query differs".into());
+                        }
+                        duration
+                    } else {
+                        let started = Instant::now();
+                        let value =
+                            ods_root_typed_cell(&owner, &target_sheet, target_row, target_column)?;
+                        let duration = started.elapsed();
+                        if value != expected_cell_text {
+                            return Err("ODS eager selected cell query differs".into());
+                        }
+                        verify_ods_typed_query_projection(
+                            ods_typed_query_projection(&owner, &expectations)?,
+                            &expectations,
+                        )?;
+                        verify_ods_source_identity_postconditions(&expectations)?;
+                        duration
+                    }
+                },
+                _ => return Err("unknown ODS root implementation".into()),
+            };
+            record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        }
+
+        if implementation.starts_with("source_backed") {
+            let mut exact_phase = None;
+            for _ in 0..samples {
+                let (snapshot, selected_snapshot) = if phase == "selected_media_query" {
+                    collect_ods_media_selected_media(
+                        &corpus.archive,
+                        &picture_ranges,
+                        selected_range.clone(),
+                        &selected_media_path,
+                        &selected_media_payload,
+                    )?
+                } else {
+                    let snapshot = collect_ods_source_phase(
+                        &corpus.archive,
+                        &picture_ranges,
+                        phase,
+                        &target_sheet,
+                        target_row,
+                        target_column,
+                    )?;
+                    (snapshot, snapshot)
+                };
+                verify_ods_source_phase(snapshot, phase)?;
+                if phase == "selected_media_query" {
+                    verify_ods_source_phase(selected_snapshot, phase)?;
+                    if snapshot.ordinary_payload_read_bytes != selected_media_compressed_range_bytes
+                        || selected_snapshot.ordinary_payload_read_bytes
+                            != selected_media_compressed_range_bytes
+                    {
+                        return Err(
+                            "ODS selected-media replay did not cover exactly one compressed member range"
+                                .into(),
+                        );
+                    }
+                }
+                let exact_snapshots = (snapshot, selected_snapshot);
+                if let Some(expected) = &exact_phase {
+                    if expected != &exact_snapshots {
+                        return Err("ODS source phase counters are not deterministic".into());
+                    }
+                } else {
+                    exact_phase = Some(exact_snapshots);
+                }
+                source_summary.source_read_calls.push(snapshot.read_calls);
+                source_summary.source_read_bytes.push(snapshot.read_bytes);
+                source_summary
+                    .source_read_range_overlap_bytes
+                    .push(snapshot.read_range_overlap_bytes);
+                source_summary
+                    .pictures_read_calls
+                    .push(snapshot.ordinary_payload_read_calls);
+                source_summary
+                    .pictures_read_compressed_range_bytes
+                    .push(snapshot.ordinary_payload_read_bytes);
+                if phase == "selected_media_query" {
+                    source_summary
+                        .selected_media_read_calls
+                        .push(selected_snapshot.read_calls);
+                    source_summary
+                        .selected_media_read_bytes
+                        .push(selected_snapshot.read_bytes);
+                    source_summary
+                        .selected_media_read_prior_range_overlap_bytes
+                        .push(selected_snapshot.read_range_overlap_bytes);
+                    source_summary
+                        .selected_media_read_compressed_range_overlap_bytes
+                        .push(selected_snapshot.ordinary_payload_read_bytes);
+                    source_summary
+                        .selected_media_read_non_picture_overlap_bytes
+                        .push(
+                            selected_snapshot
+                                .read_bytes
+                                .saturating_sub(selected_snapshot.ordinary_payload_read_bytes),
+                        );
+                }
+            }
+        }
+
+        Ok(result_with_source(
+            case,
+            corpus,
+            elapsed,
+            SourceSummary {
+                ods_root: Some(source_summary),
                 ..SourceSummary::default()
             },
         ))
@@ -27087,6 +27868,146 @@ mod tests {
                 vec![selected_compressed_bytes; 2]
             );
         }
+    }
+
+    #[test]
+    fn media_rich_ods_unified_root_file_selectors_are_matched_and_lazy() {
+        for (name, case) in [
+            ("ods_file_eager_open", Case::OdsFileEagerOpen),
+            ("ods_file_source_open", Case::OdsFileSourceOpen),
+            (
+                "ods_file_eager_selected_cell",
+                Case::OdsFileEagerSelectedCell,
+            ),
+            (
+                "ods_file_source_selected_cell",
+                Case::OdsFileSourceSelectedCell,
+            ),
+            (
+                "ods_file_eager_selected_media",
+                Case::OdsFileEagerSelectedMedia,
+            ),
+            (
+                "ods_file_source_selected_media",
+                Case::OdsFileSourceSelectedMedia,
+            ),
+        ] {
+            assert_eq!(parse_case(name), Some(case));
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        let corpus = build_ods_media_corpus().unwrap();
+        let eager_open = run_case(Case::OdsFileEagerOpen, &corpus, 0, 2)
+            .unwrap()
+            .source
+            .unwrap()
+            .ods_root
+            .unwrap();
+        let source_open = run_case(Case::OdsFileSourceOpen, &corpus, 0, 2)
+            .unwrap()
+            .source
+            .unwrap()
+            .ods_root
+            .unwrap();
+        let eager_cell = run_case(Case::OdsFileEagerSelectedCell, &corpus, 0, 2)
+            .unwrap()
+            .source
+            .unwrap()
+            .ods_root
+            .unwrap();
+        let source_cell = run_case(Case::OdsFileSourceSelectedCell, &corpus, 0, 2)
+            .unwrap()
+            .source
+            .unwrap()
+            .ods_root
+            .unwrap();
+        let eager_media = run_case(Case::OdsFileEagerSelectedMedia, &corpus, 0, 2)
+            .unwrap()
+            .source
+            .unwrap()
+            .ods_root
+            .unwrap();
+        let source_media = run_case(Case::OdsFileSourceSelectedMedia, &corpus, 0, 2)
+            .unwrap()
+            .source
+            .unwrap()
+            .ods_root
+            .unwrap();
+
+        assert_eq!(eager_open.worksheet_names, source_open.worksheet_names);
+        assert_eq!(eager_open.worksheet_count, source_open.worksheet_count);
+        assert_eq!(
+            eager_open.canonical_text_sha256,
+            source_open.canonical_text_sha256
+        );
+        assert_eq!(eager_open.metadata_sha256, source_open.metadata_sha256);
+        assert_eq!(
+            eager_open.source_path_sha256,
+            corpus.manifest.archive_sha256
+        );
+        assert_eq!(
+            source_open.source_path_sha256,
+            corpus.manifest.archive_sha256
+        );
+        assert_eq!(
+            eager_cell.target_cell_text_sha256,
+            source_cell.target_cell_text_sha256
+        );
+        assert_eq!(
+            eager_media.selected_media_path,
+            source_media.selected_media_path
+        );
+        assert_eq!(
+            eager_media.selected_media_uncompressed_payload_sha256,
+            source_media.selected_media_uncompressed_payload_sha256
+        );
+        assert_eq!(
+            eager_media.selected_media_compressed_range_bytes,
+            source_media.selected_media_compressed_range_bytes
+        );
+        for eager in [eager_open, eager_cell, eager_media] {
+            assert!(eager.source_read_calls.is_empty());
+            assert!(eager.pictures_read_calls.is_empty());
+            assert!(eager.selected_media_read_calls.is_empty());
+        }
+        assert_eq!(source_open.source_read_calls.len(), 2);
+        assert_eq!(source_cell.source_read_calls, vec![0, 0]);
+        assert_eq!(source_cell.pictures_read_compressed_range_bytes, vec![0, 0]);
+        assert_eq!(source_cell.selected_media_read_calls.len(), 0);
+        assert_eq!(source_media.pictures_read_calls.len(), 2);
+        assert_eq!(source_media.selected_media_read_calls.len(), 2);
+        assert_eq!(source_media.selected_media_read_bytes.len(), 2);
+        assert_eq!(
+            source_media.selected_media_read_compressed_range_overlap_bytes,
+            vec![source_media.selected_media_compressed_range_bytes; 2]
+        );
+        assert_eq!(
+            source_media.pictures_read_compressed_range_bytes,
+            vec![source_media.selected_media_compressed_range_bytes; 2]
+        );
+        // ZIP framing/catalog bytes may sit outside the compressed payload
+        // range. The exact no-unrelated-media proof is the Pictures overlap
+        // above; retain the outside-Pictures accounting without treating it
+        // as a payload or media-materialization claim.
+        for ((&read_bytes, &pictures_bytes), &non_picture_bytes) in source_media
+            .selected_media_read_bytes
+            .iter()
+            .zip(&source_media.selected_media_read_compressed_range_overlap_bytes)
+            .zip(&source_media.selected_media_read_non_picture_overlap_bytes)
+        {
+            assert_eq!(non_picture_bytes, read_bytes.saturating_sub(pictures_bytes));
+        }
+        assert_eq!(
+            source_media
+                .selected_media_read_prior_range_overlap_bytes
+                .len(),
+            2
+        );
+        assert_eq!(
+            source_media.selected_media_read_prior_range_overlap_bytes[0],
+            source_media.selected_media_read_prior_range_overlap_bytes[1]
+        );
     }
 
     #[test]

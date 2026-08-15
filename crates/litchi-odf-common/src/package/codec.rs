@@ -1,6 +1,7 @@
 //! Archive access and neutral `manifest.xml` codecs.
 
 use super::model::{Archive, ArchiveNames, ArchiveReaderKind, Entry, Manifest, PreparedArchive};
+use super::path::validate_manifest_path;
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -144,6 +145,7 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest> {
                 let (path, entry) = parse_entry(&reader, &element)?.ok_or_else(|| {
                     Error::InvalidFormat("Manifest file entry has no full path".to_string())
                 })?;
+                validate_manifest_path(&path)?;
                 if entries.insert(path.clone(), entry).is_some() {
                     return Err(Error::InvalidFormat(format!(
                         "Duplicate manifest file entry '{path}'"
@@ -155,6 +157,7 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest> {
                 let (path, entry) = parse_entry(&reader, &element)?.ok_or_else(|| {
                     Error::InvalidFormat("Manifest file entry has no full path".to_string())
                 })?;
+                validate_manifest_path(&path)?;
                 if entries.insert(path.clone(), entry).is_some() {
                     return Err(Error::InvalidFormat(format!(
                         "Duplicate manifest file entry '{path}'"

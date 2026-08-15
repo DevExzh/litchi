@@ -342,7 +342,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**229 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**243 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -388,8 +388,8 @@ claim before a frozen release ABBA run. See
 [`0120`](changes/0120-pptx-root-source-path-evidence.md).
 
 Change 0121 adds two opt-in native PPT repeated selected-shape controls,
-bringing the current matrix to 229 names while preserving the default
-36-case / 198-record tranche. Each matched eager/source-backed control keeps
+bringing the matrix to 229 names at that point (before changes 0122-0124) while
+preserving the default 36-case / 198-record tranche. Each matched eager/source-backed control keeps
 one prepared owner and issues eight identical selected-shape queries; source
 timing uses an uninstrumented source and separate replays record exact logical
 calls, bytes, prior-covered bytes per later logical read, and a canonical
@@ -398,6 +398,18 @@ production regression binds 74 calls / 8,310 bytes for legacy
 two-query CFB reconstruction and 66 calls / 3,190 bytes with a retained parsed
 CFB index. These are logical-I/O and correctness figures only, not latency or
 resource claims.
+
+Changes 0122, 0123, and 0124 add four ODP media-rich, four ODP unified-root
+filesystem, and six ODS unified-root/source selectors respectively. They move
+the selectable matrix from 229 to 233, 237, and finally 243 names while
+preserving the default 36-case / 198-record tranche. These are correctness and
+logical compressed-range evidence only: corpus/file publication and owner
+preparation stay outside each named timer, and complete semantic, metadata,
+member, media, and hash parity remains untimed. No latency, physical-I/O,
+decompression, allocation, RSS, or release claim is accepted. See
+[`0122`](changes/0122-odp-media-source-read-evidence.md),
+[`0123`](changes/0123-odp-unified-root-filesystem-evidence.md), and
+[`0124`](changes/0124-ods-unified-root-filesystem-evidence.md).
 
 Five filesystem cases now exercise eager/source-backed OPC open, eager/source-
 backed one-Part atomic save, and same-length CFB atomic overlay save. A

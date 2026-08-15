@@ -16,6 +16,7 @@ phf = { workspace = true }
 quick-xml = { workspace = true }
 serde_json = { workspace = true }
 smallvec = { workspace = true }
+zeroize = { workspace = true }
 
 [dev-dependencies]
 zip = { version = "8", default-features = false, features = ["deflate"] }

@@ -179,7 +179,9 @@ impl Manifest {
                         ));
                     }
                     let attributes = manifest_attributes(&reader, &element)?;
-                    current_path = Some(required(&attributes, b"full-path")?.to_string());
+                    let path = required(&attributes, b"full-path")?;
+                    common_package::validate_manifest_path(path)?;
+                    current_path = Some(path.to_string());
                 },
                 Event::Empty(element)
                     if is_manifest_element(&namespace, &element, b"file-entry") =>

@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **229 selectable cases**; 200 was the count before the
+HEAD harness contains **243 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -1013,7 +1013,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 229 selectable cases. Change
+The committed HEAD standalone harness provides 243 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1032,14 +1032,25 @@ correctness and fixture-scoped logical-read evidence only, with no accepted
 latency, physical-I/O, allocation/RSS, cold-cache, or publication claim.
 
 Change 0121 adds two opt-in native PPT repeated selected-shape selectors,
-bringing the current matrix to 229 names while preserving the default 36-case
-/ 198-record tranche. The matched eager/source-backed controls retain one
+bringing the matrix to 229 names at that point (before changes 0122-0124) while
+preserving the default 36-case / 198-record tranche. The matched eager/source-backed controls retain one
 prepared owner for eight identical queries; source timing uses an
 uninstrumented source and independent replays report exact logical calls,
 bytes, prior-covered range bytes, and a canonical semantic digest. The frozen
 production two-query regression binds 74 calls / 8,310 bytes for legacy CFB
 reconstruction and 66 calls / 3,190 bytes with a retained parsed CFB index.
 This is logical-I/O/correctness evidence, not a latency or resource claim.
+
+Changes 0122, 0123, and 0124 add four ODP media-rich, four ODP unified-root
+filesystem, and six ODS unified-root/source selectors respectively. They move
+the selectable matrix from 229 to 233, 237, and finally 243 names while
+preserving the default 36-case / 198-record tranche. Each change keeps corpus
+and owner preparation outside the named timing boundary, verifies complete
+semantic/metadata/member/hash parity, and reports only correctness and logical
+compressed-range evidence; no latency, physical-I/O, decompression,
+allocation, RSS, or release claim is accepted. See [`change 0122`](changes/0122-odp-media-source-read-evidence.md),
+[`change 0123`](changes/0123-odp-unified-root-filesystem-evidence.md), and
+[`change 0124`](changes/0124-ods-unified-root-filesystem-evidence.md).
 
 Change 0103 adds a separate pinned release ABBA capture for
 `cfb_file_same_length_overlay_atomic_save` on CPU 2 (five warm-ups and 30

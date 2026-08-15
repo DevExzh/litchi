@@ -40,6 +40,10 @@ pub(super) enum WorkbookImpl {
     #[cfg(feature = "ods")]
     Ods(std::cell::RefCell<litchi_ods::Spreadsheet>),
 
+    /// Filesystem-backed ODS with deferred package-member reads.
+    #[cfg(all(feature = "ods", any(unix, windows)))]
+    OdsSource(litchi_ods::SourceBackedSpreadsheet),
+
     // For other formats, we just indicate they're not yet fully unified
     #[cfg(any(feature = "xls", any(feature = "xlsx", feature = "xlsb")))]
     #[allow(dead_code, reason = "placeholder for formats not yet fully unified")]

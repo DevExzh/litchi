@@ -168,6 +168,168 @@ pub(crate) fn detect_prepared_ods(
     }
 }
 
+/// Result of the private source-backed ODS path probe.
+#[cfg(all(feature = "ods", any(unix, windows)))]
+#[allow(
+    dead_code,
+    reason = "OOXML precedence variants are only constructed when an OOXML probe feature is enabled"
+)]
+pub(crate) enum OdsSourcePathDetection {
+    /// A validated, source-retaining ODS owner.
+    Ods(Box<litchi_ods::SourceBackedSpreadsheet>),
+    /// A recognized OOXML family whose owner is enabled in this build,
+    /// together with bytes read from the same pinned filesystem source.
+    OtherOoxml {
+        format: litchi_core::detection::FileFormat,
+        bytes: Vec<u8>,
+    },
+    /// A recognized OOXML family whose owner is disabled in this build.
+    DisabledOtherOoxml(litchi_core::detection::FileFormat),
+    /// A non-ODS source retained from the same pinned filesystem source for
+    /// the existing byte-backed detector and OLE/OOXML precedence.
+    Bytes(Vec<u8>),
+}
+
+/// Open a filesystem ODS through one positional source-backed owner after
+/// giving valid OOXML the existing precedence.  The byte-backed
+/// [`DetectedFormat`] API remains unchanged; this helper is only used by the
+/// unified filesystem workbook facade.
+#[cfg(all(feature = "ods", any(unix, windows)))]
+pub(crate) fn detect_ods_source_path(
+    path: &std::path::Path,
+) -> litchi_core::Result<OdsSourcePathDetection> {
+    use litchi_core::ReadAt;
+    use std::sync::Arc;
+
+    let source: Arc<dyn ReadAt> = Arc::new(litchi_core::FileSource::open(path)?);
+    let source_version = source.version()?;
+
+    let odf_format = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?;
+    let is_ods = odf_format == Some(litchi_core::detection::FileFormat::Ods);
+
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    if is_ods {
+        let mut signature = [0_u8; 4];
+        let read = source.read_at(0, &mut signature)?;
+        let zip_magic = read == signature.len()
+            && litchi_core::detection::simd_utils::signature_matches(
+                &signature,
+                litchi_core::detection::utils::ZIP_SIGNATURE,
+            );
+        let ooxml_format = if zip_magic {
+            match crate::opc::SourceBackedPackage::from_read_at_with_limits(
+                Arc::clone(&source),
+                crate::opc::ReadLimits::default(),
+            ) {
+                Ok(package) => {
+                    crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(
+                        &package,
+                    )
+                },
+                Err(_) => {
+                    ensure_path_source_current(source.as_ref(), source_version)?;
+                    None
+                },
+            }
+        } else {
+            None
+        };
+        if let Some(format) = ooxml_format {
+            let enabled = match format {
+                #[cfg(feature = "docx")]
+                litchi_core::detection::FileFormat::Docx => true,
+                #[cfg(feature = "pptx")]
+                litchi_core::detection::FileFormat::Pptx => true,
+                #[cfg(feature = "xlsx")]
+                litchi_core::detection::FileFormat::Xlsx => true,
+                #[cfg(feature = "xlsb")]
+                litchi_core::detection::FileFormat::Xlsb => true,
+                _ => false,
+            };
+            return if enabled {
+                Ok(OdsSourcePathDetection::OtherOoxml {
+                    format,
+                    bytes: read_path_source_bytes(source.as_ref(), source_version)?,
+                })
+            } else {
+                ensure_path_source_current(source.as_ref(), source_version)?;
+                Ok(OdsSourcePathDetection::DisabledOtherOoxml(format))
+            };
+        }
+    }
+
+    if is_ods {
+        let ods = litchi_ods::SourceBackedSpreadsheet::from_read_at(source)?;
+        let owner_version = ods.source_version()?;
+        if owner_version != source_version {
+            return Err(litchi_core::Error::SourceChanged {
+                expected: source_version,
+                observed: owner_version,
+            });
+        }
+        return Ok(OdsSourcePathDetection::Ods(Box::new(ods)));
+    }
+
+    read_path_source_bytes(source.as_ref(), source_version).map(OdsSourcePathDetection::Bytes)
+}
+
+#[cfg(all(feature = "ods", any(unix, windows)))]
+fn ensure_path_source_current(
+    source: &dyn litchi_core::ReadAt,
+    expected: litchi_core::SourceVersion,
+) -> litchi_core::Result<()> {
+    let observed = source.version()?;
+    if observed == expected {
+        Ok(())
+    } else {
+        Err(litchi_core::Error::SourceChanged { expected, observed })
+    }
+}
+
+#[cfg(all(feature = "ods", any(unix, windows)))]
+fn read_path_source_bytes(
+    source: &dyn litchi_core::ReadAt,
+    expected: litchi_core::SourceVersion,
+) -> litchi_core::Result<Vec<u8>> {
+    ensure_path_source_current(source, expected)?;
+    let length = source.len()?;
+    ensure_path_source_current(source, expected)?;
+
+    let limits = litchi_odf_common::core::SourcePackageLimits::default();
+    if length > limits.max_source_bytes() {
+        return Err(litchi_core::Error::ResourceLimit(
+            litchi_core::ResourceLimit {
+                resource: litchi_core::Resource::InputBytes,
+                observed: length,
+                limit: limits.max_source_bytes(),
+                scope: std::sync::Arc::from("unified filesystem workbook"),
+            },
+        ));
+    }
+    let length = usize::try_from(length).map_err(|_| {
+        litchi_core::Error::InvalidFormat(
+            "filesystem source exceeds platform allocation limits".to_string(),
+        )
+    })?;
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(length)
+        .map_err(|source| litchi_core::Error::Allocation {
+            resource: "unified filesystem workbook source bytes",
+            source,
+        })?;
+    bytes.resize(length, 0);
+    if let Err(error) = source.read_exact_at(0, &mut bytes) {
+        return match ensure_path_source_current(source, expected) {
+            Err(changed @ litchi_core::Error::SourceChanged { .. }) => Err(changed),
+            Err(other) => Err(other),
+            Ok(()) => Err(error.into()),
+        };
+    }
+    ensure_path_source_current(source, expected)?;
+    Ok(bytes)
+}
+
 /// Prepare an ODP package for the unified presentation facade while keeping
 /// the public smart-detection enum source-compatible. As with ODS, it first
 /// performs the bounded OOXML probe when any OOXML probe feature is enabled so

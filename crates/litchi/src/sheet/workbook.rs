@@ -9,6 +9,69 @@ use litchi_core::{Error, Metadata};
 use litchi_ole_common::property_set::PropertySetReader;
 use std::path::Path;
 
+const MAX_WORKBOOK_PATH_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
+#[allow(
+    dead_code,
+    reason = "used by the non-positional filesystem fallback; positional ODS paths use their retained source bytes"
+)]
+fn read_path_bytes(path: impl AsRef<Path>) -> Result<Vec<u8>> {
+    use std::{fs::File, io::Read};
+
+    let mut file = File::open(path)
+        .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?;
+    let length = file
+        .metadata()
+        .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?
+        .len();
+    if length > MAX_WORKBOOK_PATH_BYTES {
+        return Err(Box::new(Error::ResourceLimit(litchi_core::ResourceLimit {
+            resource: litchi_core::Resource::InputBytes,
+            observed: length,
+            limit: MAX_WORKBOOK_PATH_BYTES,
+            scope: std::sync::Arc::from("unified filesystem workbook"),
+        })));
+    }
+    let length = usize::try_from(length).map_err(|_| {
+        Box::new(Error::InvalidFormat(
+            "filesystem source exceeds platform allocation limits".to_string(),
+        )) as Box<dyn std::error::Error + Send + Sync>
+    })?;
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(length).map_err(|source| {
+        Box::new(Error::Allocation {
+            resource: "unified filesystem workbook source bytes",
+            source,
+        }) as Box<dyn std::error::Error + Send + Sync>
+    })?;
+    bytes.resize(length, 0);
+    file.read_exact(&mut bytes)
+        .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?;
+
+    // Avoid silently accepting a file that grew after the bounded allocation.
+    let mut extra = [0_u8; 1];
+    if file
+        .read(&mut extra)
+        .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?
+        != 0
+    {
+        let observed = (length as u64).saturating_add(1);
+        return if observed > MAX_WORKBOOK_PATH_BYTES {
+            Err(Box::new(Error::ResourceLimit(litchi_core::ResourceLimit {
+                resource: litchi_core::Resource::InputBytes,
+                observed,
+                limit: MAX_WORKBOOK_PATH_BYTES,
+                scope: std::sync::Arc::from("unified filesystem workbook"),
+            })))
+        } else {
+            Err(Box::new(Error::InvalidFormat(format!(
+                "filesystem source grew during bounded read (observed at least {observed} bytes)"
+            ))))
+        };
+    }
+    Ok(bytes)
+}
+
 #[cfg(any(
     feature = "numbers",
     any(feature = "xlsx", feature = "xlsb"),
@@ -98,11 +161,36 @@ impl Workbook {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        // Read once into owned memory; detection transfers that ownership into
-        // the selected format path.
-        let bytes = std::fs::read(path.as_ref())
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-        Self::from_bytes(bytes)
+        #[cfg(all(feature = "ods", any(unix, windows)))]
+        {
+            match crate::detection_smart::detected::detect_ods_source_path(path.as_ref())? {
+                crate::detection_smart::detected::OdsSourcePathDetection::Ods(ods) => {
+                    let metadata = ods.metadata()?.clone();
+                    Ok(Self {
+                        inner: WorkbookImpl::OdsSource(*ods),
+                        cached_metadata: metadata,
+                    })
+                },
+                crate::detection_smart::detected::OdsSourcePathDetection::OtherOoxml {
+                    format: _,
+                    bytes,
+                }
+                | crate::detection_smart::detected::OdsSourcePathDetection::Bytes(bytes) => {
+                    Self::from_bytes(bytes)
+                },
+                crate::detection_smart::detected::OdsSourcePathDetection::DisabledOtherOoxml(_) => {
+                    Err(Box::new(Error::NotOfficeFile) as Box<dyn std::error::Error + Send + Sync>)
+                },
+            }
+        }
+
+        #[cfg(not(all(feature = "ods", any(unix, windows))))]
+        {
+            // Read once into owned memory; detection transfers that ownership
+            // into the selected format path.
+            let bytes = read_path_bytes(path.as_ref())?;
+            Self::from_bytes(bytes)
+        }
     }
 
     /// Create a workbook from bytes.
@@ -132,9 +220,10 @@ impl Workbook {
             Ok(prepared) => {
                 let ods = litchi_ods::Spreadsheet::from_prepared_package(prepared)
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                let metadata = ods.metadata().clone();
                 return Ok(Self {
                     inner: WorkbookImpl::Ods(std::cell::RefCell::new(ods)),
-                    cached_metadata: Metadata::default(),
+                    cached_metadata: metadata,
                 });
             },
             Err(bytes) => bytes,
@@ -214,10 +303,8 @@ impl Workbook {
             DetectedFormat::Ods(data) => {
                 let ods = litchi_ods::Spreadsheet::from_bytes(data)
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-                (
-                    WorkbookImpl::Ods(std::cell::RefCell::new(ods)),
-                    Metadata::default(),
-                )
+                let metadata = ods.metadata().clone();
+                (WorkbookImpl::Ods(std::cell::RefCell::new(ods)), metadata)
             },
 
             #[cfg(feature = "ods")]
@@ -283,15 +370,10 @@ impl Workbook {
             WorkbookImpl::XlsMem(xls) => Ok(xls.worksheet_names().to_vec()),
 
             #[cfg(feature = "ods")]
-            WorkbookImpl::Ods(spreadsheet) => {
-                // Keep the parsed package alive for the dedicated ODS facade;
-                // worksheet enumeration is not exposed at this boundary yet.
-                let _ = spreadsheet;
-                Err(Box::new(Error::Unsupported(
-                "litchi-ods::Spreadsheet currently exposes package/XML and RDF APIs; worksheet enumeration is not yet exposed by its facade"
-                    .to_string(),
-                )) as Box<dyn std::error::Error + Send + Sync>)
-            },
+            WorkbookImpl::Ods(spreadsheet) => Ok(spreadsheet.borrow().sheet_names()),
+
+            #[cfg(all(feature = "ods", any(unix, windows)))]
+            WorkbookImpl::OdsSource(spreadsheet) => Ok(spreadsheet.sheet_names()?),
 
             #[cfg(any(feature = "xls", any(feature = "xlsx", feature = "xlsb")))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
@@ -324,13 +406,9 @@ impl Workbook {
             #[cfg(feature = "xls")]
             WorkbookImpl::XlsMem(xls) => Ok(xls.worksheet_count()),
             #[cfg(feature = "ods")]
-            WorkbookImpl::Ods(spreadsheet) => {
-                let _ = spreadsheet;
-                Err(Box::new(Error::Unsupported(
-                "litchi-ods::Spreadsheet currently exposes package/XML and RDF APIs; worksheet enumeration is not yet exposed by its facade"
-                    .to_string(),
-                )) as Box<dyn std::error::Error + Send + Sync>)
-            },
+            WorkbookImpl::Ods(spreadsheet) => Ok(spreadsheet.borrow().sheet_count()),
+            #[cfg(all(feature = "ods", any(unix, windows)))]
+            WorkbookImpl::OdsSource(spreadsheet) => Ok(spreadsheet.sheet_count()?),
             #[cfg(any(feature = "xls", any(feature = "xlsx", feature = "xlsb")))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
                 "Unsupported workbook type in this build".to_string(),
@@ -441,13 +519,10 @@ impl Workbook {
             },
 
             #[cfg(feature = "ods")]
-            WorkbookImpl::Ods(spreadsheet) => {
-                let _ = spreadsheet;
-                Err(Box::new(Error::Unsupported(
-                "litchi-ods::Spreadsheet currently exposes package/XML and RDF APIs; text extraction is not yet exposed by its facade"
-                    .to_string(),
-                )) as Box<dyn std::error::Error + Send + Sync>)
-            },
+            WorkbookImpl::Ods(spreadsheet) => Ok(spreadsheet.borrow().text()?),
+
+            #[cfg(all(feature = "ods", any(unix, windows)))]
+            WorkbookImpl::OdsSource(spreadsheet) => Ok(spreadsheet.text()?),
 
             #[cfg(any(feature = "xls", any(feature = "xlsx", feature = "xlsb")))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
@@ -473,6 +548,10 @@ impl Workbook {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn metadata(&self) -> Result<Metadata> {
+        #[cfg(all(feature = "ods", any(unix, windows)))]
+        if let WorkbookImpl::OdsSource(spreadsheet) = &self.inner {
+            return Ok(spreadsheet.metadata()?.clone());
+        }
         Ok(self.cached_metadata.clone())
     }
 
@@ -486,6 +565,127 @@ impl Workbook {
             application: Some("Numbers".to_owned()),
             ..Metadata::default()
         }
+    }
+}
+
+#[cfg(all(test, feature = "ods", any(unix, windows)))]
+mod source_ods_path_tests {
+    use super::{Workbook, WorkbookImpl};
+    use litchi_core::Error;
+
+    const MIME: &str = "application/vnd.oasis.opendocument.spreadsheet";
+    const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+    const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+    const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+
+    fn package(title: &str) -> Vec<u8> {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:spreadsheet><table:table table:name="Sheet1"><table:table-row table:number-rows-repeated="2"><table:table-cell table:number-columns-repeated="2" office:value-type="string"><text:p>hello</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>world</text:p></table:table-cell></table:table-row></table:table><table:table table:name="Sheet2"/></office:spreadsheet></office:body></office:document-content>"#
+        );
+        let metadata = format!(
+            r#"<office:document-meta xmlns:office="{OFFICE}" xmlns:dc="http://purl.org/dc/elements/1.1/"><office:meta><dc:title>{title}</dc:title></office:meta></office:document-meta>"#
+        );
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer.set_mimetype(MIME).unwrap();
+        writer.add_file("content.xml", content.as_bytes()).unwrap();
+        writer.add_file("meta.xml", metadata.as_bytes()).unwrap();
+        writer
+            .add_file_with_media_type("Pictures/sample.bin", b"media", "application/octet-stream")
+            .unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
+    #[test]
+    fn filesystem_ods_uses_source_owner_and_matches_byte_projection() {
+        let bytes = package("source");
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), &bytes).unwrap();
+
+        let source = Workbook::open(path.path()).expect("source ODS");
+        assert!(matches!(&source.inner, WorkbookImpl::OdsSource(_)));
+        let eager = Workbook::from_bytes(bytes).expect("eager ODS");
+        assert_eq!(
+            source.worksheet_names().unwrap(),
+            eager.worksheet_names().unwrap()
+        );
+        assert_eq!(
+            source.worksheet_count().unwrap(),
+            eager.worksheet_count().unwrap()
+        );
+        assert_eq!(source.text().unwrap(), eager.text().unwrap());
+        assert_eq!(source.metadata().unwrap().title, Some("source".to_string()));
+        assert_eq!(eager.metadata().unwrap().title, Some("source".to_string()));
+    }
+
+    #[test]
+    fn source_root_metadata_reports_source_change() {
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), package("before")).unwrap();
+        let workbook = Workbook::open(path.path()).expect("source ODS");
+        assert_eq!(
+            workbook.metadata().unwrap().title,
+            Some("before".to_string())
+        );
+        std::fs::write(path.path(), package("after with a different size")).unwrap();
+        assert!(matches!(
+            workbook.metadata(),
+            Err(error) if error.downcast_ref::<Error>().is_some_and(|error| matches!(error, Error::SourceChanged { .. }))
+        ));
+    }
+
+    #[test]
+    fn source_root_rejects_malformed_ods_body() {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer.set_mimetype(MIME).unwrap();
+        writer
+            .add_file("content.xml", b"<not-an-ods-document/>")
+            .unwrap();
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), writer.finish_to_bytes().unwrap()).unwrap();
+        let error = match Workbook::open(path.path()) {
+            Ok(_) => panic!("malformed ODS body was accepted"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("ODS"));
+    }
+
+    #[test]
+    fn filesystem_fallback_retains_bytes_from_the_open_source() {
+        let bytes = b"not an office package".to_vec();
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), &bytes).unwrap();
+        let detected = crate::detection_smart::detected::detect_ods_source_path(path.path())
+            .expect("source fallback probe");
+        match detected {
+            crate::detection_smart::detected::OdsSourcePathDetection::Bytes(actual) => {
+                assert_eq!(actual, bytes)
+            },
+            _ => panic!("non-ODS fallback did not retain source bytes"),
+        }
+    }
+
+    #[test]
+    fn source_root_preserves_repeated_text_semantics() {
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), package("media")).unwrap();
+        let workbook = Workbook::open(path.path()).expect("source ODS");
+        assert_eq!(
+            workbook.text().unwrap(),
+            "hello\thello\tworld\nhello\thello\tworld\n"
+        );
+    }
+}
+
+#[cfg(all(test, not(all(feature = "ods", any(unix, windows)))))]
+mod bounded_path_read_tests {
+    use super::read_path_bytes;
+
+    #[test]
+    fn non_positional_path_reader_retains_exact_bytes() {
+        let bytes = b"bounded workbook path bytes";
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), bytes).unwrap();
+        assert_eq!(read_path_bytes(path.path()).unwrap(), bytes);
     }
 }
 
@@ -608,6 +808,16 @@ mod ooxml_odf_polyglot_tests {
         assert_eq!(workbook.worksheet_names().unwrap(), ["Sheet1"]);
     }
 
+    #[cfg(all(feature = "xlsx", any(unix, windows)))]
+    #[test]
+    fn filesystem_ooxml_first_precedence_survives_an_odf_local_mimetype_marker() {
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), dual_marker_xlsx()).unwrap();
+        let workbook = Workbook::open(path.path())
+            .expect("filesystem OOXML-first precedence should select XLSX");
+        assert_eq!(workbook.worksheet_names().unwrap(), ["Sheet1"]);
+    }
+
     #[cfg(all(feature = "xlsb", not(feature = "xlsx")))]
     #[test]
     fn disabled_xlsx_owner_keeps_smart_precedence() {
@@ -618,6 +828,18 @@ mod ooxml_odf_polyglot_tests {
         let error = Workbook::from_bytes(bytes)
             .err()
             .expect("disabled XLSX owner must not fall through to ODS");
+        assert_eq!(error.to_string(), "Not a valid Office file");
+    }
+
+    #[cfg(all(feature = "xlsb", not(feature = "xlsx"), any(unix, windows)))]
+    #[test]
+    fn filesystem_disabled_xlsx_owner_keeps_smart_precedence() {
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), dual_marker_xlsx()).unwrap();
+        let error = match Workbook::open(path.path()) {
+            Ok(_) => panic!("disabled XLSX owner fell through to ODS"),
+            Err(error) => error,
+        };
         assert_eq!(error.to_string(), "Not a valid Office file");
     }
 

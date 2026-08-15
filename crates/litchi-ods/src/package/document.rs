@@ -100,6 +100,17 @@ impl Package {
         Self::from_prepared_package(prepared)
     }
 
+    /// Adopt an already materialized, validated archive without copying its
+    /// bytes.  This is the explicit handoff from the positional source owner
+    /// to the established mutable package facade.
+    pub(crate) fn from_owned_package(archive: OwnedPackage) -> Result<Self> {
+        let package = family::Package::from_owned_package(archive, MIMETYPE, BODY_MARKER, "ODS")?;
+        crate::authoring::validate_content_xml(package.content_xml())?;
+        Ok(Self {
+            inner: Arc::new(package),
+        })
+    }
+
     /// Adopt shared ODS bytes for an internal source-bound transaction.
     pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
         let package = family::Package::from_shared_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS")?;
