@@ -499,6 +499,14 @@ enum Case {
     PptxFileSourceSlideCount,
     PptxFileEagerSelectedSlide,
     PptxFileSourceSelectedSlide,
+    DocxFileEagerOpen,
+    DocxFileSourceOpen,
+    DocxFileEagerParagraphCount,
+    DocxFileSourceParagraphCount,
+    DocxFileEagerListParagraphs,
+    DocxFileSourceListParagraphs,
+    DocxFileEagerFullText,
+    DocxFileSourceFullText,
     DocxSourceBackedOneEditSave,
     PptxSourceBackedOneEditSave,
     PptxEagerBatchEditSave,
@@ -788,6 +796,14 @@ impl Case {
             Self::PptxFileSourceSlideCount => "pptx_file_source_slide_count",
             Self::PptxFileEagerSelectedSlide => "pptx_file_eager_selected_slide",
             Self::PptxFileSourceSelectedSlide => "pptx_file_source_selected_slide",
+            Self::DocxFileEagerOpen => "docx_file_eager_open",
+            Self::DocxFileSourceOpen => "docx_file_source_open",
+            Self::DocxFileEagerParagraphCount => "docx_file_eager_paragraph_count",
+            Self::DocxFileSourceParagraphCount => "docx_file_source_paragraph_count",
+            Self::DocxFileEagerListParagraphs => "docx_file_eager_list_paragraphs",
+            Self::DocxFileSourceListParagraphs => "docx_file_source_list_paragraphs",
+            Self::DocxFileEagerFullText => "docx_file_eager_full_text",
+            Self::DocxFileSourceFullText => "docx_file_source_full_text",
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
             Self::PptxEagerBatchEditSave => "pptx_eager_batch_edit_save",
@@ -1449,6 +1465,14 @@ impl Case {
                 | Self::PptxFileSourceSlideCount
                 | Self::PptxFileEagerSelectedSlide
                 | Self::PptxFileSourceSelectedSlide
+                | Self::DocxFileEagerOpen
+                | Self::DocxFileSourceOpen
+                | Self::DocxFileEagerParagraphCount
+                | Self::DocxFileSourceParagraphCount
+                | Self::DocxFileEagerListParagraphs
+                | Self::DocxFileSourceListParagraphs
+                | Self::DocxFileEagerFullText
+                | Self::DocxFileSourceFullText
         )
     }
 
@@ -5395,6 +5419,14 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_file_source_slide_count" => Some(Case::PptxFileSourceSlideCount),
         "pptx_file_eager_selected_slide" => Some(Case::PptxFileEagerSelectedSlide),
         "pptx_file_source_selected_slide" => Some(Case::PptxFileSourceSelectedSlide),
+        "docx_file_eager_open" => Some(Case::DocxFileEagerOpen),
+        "docx_file_source_open" => Some(Case::DocxFileSourceOpen),
+        "docx_file_eager_paragraph_count" => Some(Case::DocxFileEagerParagraphCount),
+        "docx_file_source_paragraph_count" => Some(Case::DocxFileSourceParagraphCount),
+        "docx_file_eager_list_paragraphs" => Some(Case::DocxFileEagerListParagraphs),
+        "docx_file_source_list_paragraphs" => Some(Case::DocxFileSourceListParagraphs),
+        "docx_file_eager_full_text" => Some(Case::DocxFileEagerFullText),
+        "docx_file_source_full_text" => Some(Case::DocxFileSourceFullText),
         "cfb_selective_mini_legacy_read" => Some(Case::CfbSelectiveMiniLegacyRead),
         "cfb_selective_mini_shared_read" => Some(Case::CfbSelectiveMiniSharedRead),
         "cfb_selective_mini_4095_legacy_read" => Some(Case::CfbSelectiveMini4095LegacyRead),
@@ -5762,6 +5794,10 @@ fn print_usage() {
                                        pptx_file_eager_list_slides,pptx_file_source_list_slides,\n\
                                        pptx_file_eager_slide_count,pptx_file_source_slide_count,\n\
                                        pptx_file_eager_selected_slide,pptx_file_source_selected_slide,\n\
+                                       docx_file_eager_open,docx_file_source_open,\n\
+                                       docx_file_eager_paragraph_count,docx_file_source_paragraph_count,\n\
+                                       docx_file_eager_list_paragraphs,docx_file_source_list_paragraphs,\n\
+                                       docx_file_eager_full_text,docx_file_source_full_text,\n\
                                        docx_source_backed_one_edit_save,\n\
                                        pptx_source_backed_one_edit_save,\n\
                                        pptx_eager_batch_edit_save,\n\
@@ -9888,7 +9924,15 @@ fn run_case_with_config(
         | Case::PptxFileEagerSlideCount
         | Case::PptxFileSourceSlideCount
         | Case::PptxFileEagerSelectedSlide
-        | Case::PptxFileSourceSelectedSlide => {
+        | Case::PptxFileSourceSelectedSlide
+        | Case::DocxFileEagerOpen
+        | Case::DocxFileSourceOpen
+        | Case::DocxFileEagerParagraphCount
+        | Case::DocxFileSourceParagraphCount
+        | Case::DocxFileEagerListParagraphs
+        | Case::DocxFileSourceListParagraphs
+        | Case::DocxFileEagerFullText
+        | Case::DocxFileSourceFullText => {
             Err("filesystem cases are dispatched by the child-process evidence runner".into())
         },
         Case::DocxSourceBackedOneEditSave => {
@@ -25876,6 +25920,28 @@ mod tests {
         assert!(!Case::DEFAULT.contains(&Case::PptxValidationReport));
         assert!(!Case::DEFAULT.contains(&Case::OdfValidationReport));
         assert!(!Case::DEFAULT.contains(&Case::OdfMimetypeRepairPlan));
+    }
+
+    #[test]
+    fn docx_root_filesystem_matrix_is_opt_in_and_complete() {
+        let names = [
+            "docx_file_eager_open",
+            "docx_file_source_open",
+            "docx_file_eager_paragraph_count",
+            "docx_file_source_paragraph_count",
+            "docx_file_eager_list_paragraphs",
+            "docx_file_source_list_paragraphs",
+            "docx_file_eager_full_text",
+            "docx_file_source_full_text",
+        ];
+        for name in names {
+            let case = parse_case(name).expect("DOCX root selector parses");
+            assert_eq!(case.name(), name);
+            assert!(case.is_filesystem());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        assert_eq!(names.len(), 8);
+        assert_eq!(Case::DEFAULT.len(), 36);
     }
 
     #[test]

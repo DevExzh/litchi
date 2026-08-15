@@ -68,9 +68,10 @@ ODF `mimetype` repair-plan case are opt-in. Eight additional native PPT
 `Pictures` selectors are available for matched eager/source-backed open,
 cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
-use an uninstrumented `litchi_core::OwnedSource`; independent untimed
-`InstrumentedSource` replays provide the source-read counters. The current
-`Case` matrix exposes 245 selectable case names in total. Eight additional
+for those native-PPT `Pictures` selectors use an uninstrumented
+`litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
+provide their source-read counters. The current `Case` matrix exposes 253
+selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
 default 36 cases / 198 records. Two repeated native-PPT selected-shape query
@@ -99,6 +100,23 @@ and `cfb_selective_mini_4095_shared_read`) exercise a distinct 4095-byte
 boundary target alongside the existing 36-byte control. Together these CFB
 additions bring the selectable matrix to 245 names while leaving the default
 36 cases / 198 records unchanged;
+eight ordinary-root DOCX filesystem selectors (`docx_file_{eager,source}_{open,
+paragraph_count,list_paragraphs,full_text}`) are also opt-in over the fixed
+200-paragraph/eight-incompressible-2 MiB-media corpus. Root-open timing covers
+`fs::read` plus eager `Document::from_bytes` versus source `Document::open`;
+query roots are prepared outside timing and the timer covers only the named
+root query. Independent untimed `litchi_docx::source_backed::Package` replays
+record catalog/open reads and, for query selectors, complete coverage of the
+compressed main-document range during document preparation plus zero
+media/unselected/core overlap during the query. Request sizes, range coverage,
+materializations, and an explicit classification are also recorded. Full
+eager/source semantic parity, exact source hash, logical OPC
+part/relationship/content-type/blob-hash gates, media hashes, and source
+immutability remain verification outside timing. This is correctness and
+logical compressed-range evidence only: it makes no latency, physical-I/O,
+decompression, allocation, RSS, cold-cache, ABBA, security, or Markdown claim.
+Together these additions bring the selectable matrix to 253 names while
+leaving the default 36 cases / 198 records unchanged;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 

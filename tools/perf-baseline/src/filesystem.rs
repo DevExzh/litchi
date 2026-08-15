@@ -24,6 +24,7 @@ use litchi_core::{FileSource, ReadAt, SourceVersion};
 use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use soapberry_zip::ZipArchive;
 
 use crate::process_metrics;
 
@@ -42,7 +43,11 @@ const CFB_FILE_EXPECTED_OUTPUT_SHA256: &str =
 const FILESYSTEM_OLE_COMMON_REPLACEMENT: &[u8] = b"litchi-ole-common-modified-stream-v1";
 const PPTX_FILE_SELECTED_POSITION: usize = super::PPTX_SOURCE_SLIDE_COUNT / 2;
 const PPTX_FILE_CORPUS_GENERATOR: &str = super::PPTX_SOURCE_EDIT_CORPUS_GENERATOR;
+const DOCX_FILE_CORPUS_GENERATOR: &str = super::DOCX_SOURCE_EDIT_CORPUS_GENERATOR;
+const DOCX_FILE_SOURCE_SHA256: &str =
+    "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4";
 static NEXT_PPTX_REPLAY_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
+static NEXT_DOCX_REPLAY_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct CacheSelection {
@@ -236,6 +241,8 @@ struct ChildResult {
     cfb_published_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pptx_source_replay: Option<PptxSourceReplayEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    docx_source_replay: Option<DocxSourceReplayEvidence>,
 }
 
 /// Untimed source-backed replay evidence for the ordinary-root PPTX cases.
@@ -270,6 +277,59 @@ pub(crate) struct PptxSourceReplayEvidence {
     pub media_payload_read_calls: u64,
     pub media_payload_read_bytes: u64,
     pub media_payload_covered_bytes: u64,
+    pub semantic_sha256: String,
+    pub classification: String,
+}
+
+/// Untimed source-backed replay evidence for the ordinary-root DOCX cases.
+///
+/// The replay is independent from the timed `Document::open` facade
+/// operation. It classifies logical `ReadAt` ranges against the compressed
+/// main-document, media, unselected ordinary-part, and core-properties
+/// ranges. Catalog/XML relationship reads remain in generic totals and are
+/// not presented as payload I/O.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct DocxSourceReplayEvidence {
+    pub implementation: String,
+    pub operation: String,
+    pub source_bytes: u64,
+    pub source_sha256: String,
+    pub paragraph_count: usize,
+    pub open_read_calls: u64,
+    pub open_read_bytes: u64,
+    pub open_read_request_sizes: Vec<u64>,
+    pub open_main_payload_overlap_bytes: u64,
+    pub open_media_payload_overlap_bytes: u64,
+    pub open_unselected_payload_overlap_bytes: u64,
+    pub open_core_payload_overlap_bytes: u64,
+    pub open_main_payload_covered_bytes: u64,
+    pub open_media_payload_covered_bytes: u64,
+    pub open_unselected_payload_covered_bytes: u64,
+    pub open_core_payload_covered_bytes: u64,
+    pub preparation_read_calls: u64,
+    pub preparation_read_bytes: u64,
+    pub preparation_read_request_sizes: Vec<u64>,
+    pub preparation_main_payload_overlap_bytes: u64,
+    pub preparation_main_payload_covered_bytes: u64,
+    pub preparation_main_payload_fully_covered: bool,
+    pub preparation_media_payload_overlap_bytes: u64,
+    pub preparation_unselected_payload_overlap_bytes: u64,
+    pub preparation_core_payload_overlap_bytes: u64,
+    pub preparation_media_payload_covered_bytes: u64,
+    pub preparation_unselected_payload_covered_bytes: u64,
+    pub preparation_core_payload_covered_bytes: u64,
+    pub query_read_calls: u64,
+    pub query_read_bytes: u64,
+    pub query_read_request_sizes: Vec<u64>,
+    pub query_main_payload_overlap_bytes: u64,
+    pub query_media_payload_overlap_bytes: u64,
+    pub query_unselected_payload_overlap_bytes: u64,
+    pub query_core_payload_overlap_bytes: u64,
+    pub query_main_payload_covered_bytes: u64,
+    pub query_media_payload_covered_bytes: u64,
+    pub query_unselected_payload_covered_bytes: u64,
+    pub query_core_payload_covered_bytes: u64,
+    pub materializations: u64,
     pub semantic_sha256: String,
     pub classification: String,
 }
@@ -331,6 +391,8 @@ pub(crate) struct SampleEvidence {
     pub cfb_published_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pptx_source_replay: Option<PptxSourceReplayEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub docx_source_replay: Option<DocxSourceReplayEvidence>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
@@ -395,6 +457,14 @@ enum Operation {
     PptxSourceSlideCount,
     PptxEagerSelectedSlide,
     PptxSourceSelectedSlide,
+    DocxEagerOpen,
+    DocxSourceOpen,
+    DocxEagerParagraphCount,
+    DocxSourceParagraphCount,
+    DocxEagerListParagraphs,
+    DocxSourceListParagraphs,
+    DocxEagerFullText,
+    DocxSourceFullText,
 }
 
 impl Operation {
@@ -413,6 +483,14 @@ impl Operation {
             "pptx_file_source_slide_count" => Some(Self::PptxSourceSlideCount),
             "pptx_file_eager_selected_slide" => Some(Self::PptxEagerSelectedSlide),
             "pptx_file_source_selected_slide" => Some(Self::PptxSourceSelectedSlide),
+            "docx_file_eager_open" => Some(Self::DocxEagerOpen),
+            "docx_file_source_open" => Some(Self::DocxSourceOpen),
+            "docx_file_eager_paragraph_count" => Some(Self::DocxEagerParagraphCount),
+            "docx_file_source_paragraph_count" => Some(Self::DocxSourceParagraphCount),
+            "docx_file_eager_list_paragraphs" => Some(Self::DocxEagerListParagraphs),
+            "docx_file_source_list_paragraphs" => Some(Self::DocxSourceListParagraphs),
+            "docx_file_eager_full_text" => Some(Self::DocxEagerFullText),
+            "docx_file_source_full_text" => Some(Self::DocxSourceFullText),
             _ => None,
         }
     }
@@ -432,6 +510,14 @@ impl Operation {
             Self::PptxSourceSlideCount => super::Case::PptxFileSourceSlideCount,
             Self::PptxEagerSelectedSlide => super::Case::PptxFileEagerSelectedSlide,
             Self::PptxSourceSelectedSlide => super::Case::PptxFileSourceSelectedSlide,
+            Self::DocxEagerOpen => super::Case::DocxFileEagerOpen,
+            Self::DocxSourceOpen => super::Case::DocxFileSourceOpen,
+            Self::DocxEagerParagraphCount => super::Case::DocxFileEagerParagraphCount,
+            Self::DocxSourceParagraphCount => super::Case::DocxFileSourceParagraphCount,
+            Self::DocxEagerListParagraphs => super::Case::DocxFileEagerListParagraphs,
+            Self::DocxSourceListParagraphs => super::Case::DocxFileSourceListParagraphs,
+            Self::DocxEagerFullText => super::Case::DocxFileEagerFullText,
+            Self::DocxSourceFullText => super::Case::DocxFileSourceFullText,
         }
     }
 
@@ -458,6 +544,56 @@ impl Operation {
                 | Self::PptxEagerSelectedSlide
                 | Self::PptxSourceSelectedSlide
         )
+    }
+
+    const fn is_docx(self) -> bool {
+        matches!(
+            self,
+            Self::DocxEagerOpen
+                | Self::DocxSourceOpen
+                | Self::DocxEagerParagraphCount
+                | Self::DocxSourceParagraphCount
+                | Self::DocxEagerListParagraphs
+                | Self::DocxSourceListParagraphs
+                | Self::DocxEagerFullText
+                | Self::DocxSourceFullText
+        )
+    }
+
+    const fn is_source_docx(self) -> bool {
+        matches!(
+            self,
+            Self::DocxSourceOpen
+                | Self::DocxSourceParagraphCount
+                | Self::DocxSourceListParagraphs
+                | Self::DocxSourceFullText
+        )
+    }
+
+    const fn is_docx_query(self) -> bool {
+        matches!(
+            self,
+            Self::DocxEagerParagraphCount
+                | Self::DocxSourceParagraphCount
+                | Self::DocxEagerListParagraphs
+                | Self::DocxSourceListParagraphs
+                | Self::DocxEagerFullText
+                | Self::DocxSourceFullText
+        )
+    }
+
+    const fn docx_query_name(self) -> Option<&'static str> {
+        match self {
+            Self::DocxEagerOpen | Self::DocxSourceOpen => None,
+            Self::DocxEagerParagraphCount | Self::DocxSourceParagraphCount => {
+                Some("paragraph_count")
+            },
+            Self::DocxEagerListParagraphs | Self::DocxSourceListParagraphs => {
+                Some("list_paragraphs")
+            },
+            Self::DocxEagerFullText | Self::DocxSourceFullText => Some("full_text"),
+            _ => None,
+        }
     }
 
     const fn is_source_pptx(self) -> bool {
@@ -528,7 +664,15 @@ pub(crate) fn run_selected(
             .any(|(_, operation)| operation.is_pptx())
             .then(super::build_pptx_source_edit_corpus)
             .transpose()?;
+        let docx = selected
+            .iter()
+            .any(|(_, operation)| operation.is_docx())
+            .then(super::build_docx_source_edit_corpus)
+            .transpose()?;
         assert_pinned_corpora(&opc, &cfb)?;
+        if let Some(docx) = docx.as_ref() {
+            assert_pinned_docx_corpus(docx)?;
+        }
         let mut runs = Vec::with_capacity(selected.len());
         let mut opc_save_hashes: Option<Vec<(String, String)>> = None;
         for (case, operation) in selected {
@@ -537,6 +681,9 @@ pub(crate) fn run_selected(
             } else if operation.is_pptx() {
                 pptx.as_ref()
                     .ok_or("PPTX filesystem corpus was not prepared")?
+            } else if operation.is_docx() {
+                docx.as_ref()
+                    .ok_or("DOCX filesystem corpus was not prepared")?
             } else {
                 &opc
             };
@@ -587,6 +734,20 @@ pub(crate) fn run_selected(
         (Ok(_), Err(error)) => Err(error.into()),
         (Err(error), _) => Err(error),
     }
+}
+
+fn assert_pinned_docx_corpus(corpus: &super::Corpus) -> Result<(), Box<dyn Error>> {
+    if corpus.manifest.generator != DOCX_FILE_CORPUS_GENERATOR {
+        return Err("DOCX filesystem corpus has the wrong generator".into());
+    }
+    if corpus.manifest.archive_sha256 != DOCX_FILE_SOURCE_SHA256 {
+        return Err(format!(
+            "DOCX filesystem source hash drifted: expected {DOCX_FILE_SOURCE_SHA256}, got {}",
+            corpus.manifest.archive_sha256
+        )
+        .into());
+    }
+    Ok(())
 }
 
 fn assert_pinned_corpora(opc: &super::Corpus, cfb: &super::Corpus) -> Result<(), Box<dyn Error>> {
@@ -646,6 +807,8 @@ fn run_one(
     let stem = case.name();
     let source_path = if operation.is_pptx() {
         root.join(format!("{stem}.pptx"))
+    } else if operation.is_docx() {
+        root.join(format!("{stem}.docx"))
     } else {
         root.join(format!("{stem}.source"))
     };
@@ -813,6 +976,7 @@ fn record_sample(
         cfb_changed_spans: invocation.child.cfb_changed_spans,
         cfb_published_bytes: invocation.child.cfb_published_bytes,
         pptx_source_replay: invocation.child.pptx_source_replay,
+        docx_source_replay: invocation.child.docx_source_replay,
     });
     Ok(())
 }
@@ -849,7 +1013,15 @@ fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<Strin
         | Operation::PptxEagerSlideCount
         | Operation::PptxSourceSlideCount
         | Operation::PptxEagerSelectedSlide
-        | Operation::PptxSourceSelectedSlide => Err("open operation has no output digest".into()),
+        | Operation::PptxSourceSelectedSlide
+        | Operation::DocxEagerOpen
+        | Operation::DocxSourceOpen
+        | Operation::DocxEagerParagraphCount
+        | Operation::DocxSourceParagraphCount
+        | Operation::DocxEagerListParagraphs
+        | Operation::DocxSourceListParagraphs
+        | Operation::DocxEagerFullText
+        | Operation::DocxSourceFullText => Err("open operation has no output digest".into()),
     }
 }
 
@@ -977,6 +1149,15 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
     } else {
         None
     };
+    let prepared_docx = if operation.is_docx_query() {
+        if operation.is_source_docx() {
+            Some(litchi::Document::open(&source)?)
+        } else {
+            Some(litchi::Document::from_bytes(fs::read(&source)?)?)
+        }
+    } else {
+        None
+    };
     let before = process_metrics::Snapshot::read().ok();
     let started = Instant::now();
     let mut details = OperationDetails::default();
@@ -1011,6 +1192,17 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
             run_pptx_operation(operation, &source, prepared_pptx.as_ref())?;
             None
         },
+        Operation::DocxEagerOpen
+        | Operation::DocxSourceOpen
+        | Operation::DocxEagerParagraphCount
+        | Operation::DocxSourceParagraphCount
+        | Operation::DocxEagerListParagraphs
+        | Operation::DocxSourceListParagraphs
+        | Operation::DocxEagerFullText
+        | Operation::DocxSourceFullText => {
+            run_docx_operation(operation, &source, prepared_docx.as_ref())?;
+            None
+        },
     };
     let elapsed_ns = u64::try_from(started.elapsed().as_nanos())?;
     let after = process_metrics::Snapshot::read().ok();
@@ -1022,6 +1214,12 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         } else {
             "not_applicable_eager_pptx"
         }
+    } else if operation.is_docx() {
+        if operation.is_source_docx() {
+            "untimed_source_replay_only"
+        } else {
+            "not_applicable_eager_docx"
+        }
     } else {
         "timed_read_at"
     }
@@ -1029,6 +1227,10 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
     let pptx_source_replay = operation
         .is_source_pptx()
         .then(|| replay_pptx_source(&source, operation))
+        .transpose()?;
+    let docx_source_replay = operation
+        .is_source_docx()
+        .then(|| replay_docx_source(&source, operation))
         .transpose()?;
 
     // Correctness and hashing are intentionally after the timed operation and
@@ -1061,6 +1263,7 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         cfb_changed_spans: details.cfb_changed_spans,
         cfb_published_bytes: details.cfb_published_bytes,
         pptx_source_replay,
+        docx_source_replay,
     };
     serde_json::to_writer(io::stdout().lock(), &result)?;
     Ok(true)
@@ -1072,6 +1275,9 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
 fn filesystem_corpus(operation: Operation) -> Result<super::Corpus, Box<dyn Error>> {
     if operation.is_pptx() {
         return super::build_pptx_source_edit_corpus();
+    }
+    if operation.is_docx() {
+        return super::build_docx_source_edit_corpus();
     }
     let opc = super::build_opc_corpus(OPC_FILE_SHAPE, OPC_FILE_PAYLOAD)?;
     if operation.is_cfb() {
@@ -1280,7 +1486,7 @@ impl ReadAt for PptxReplaySource {
 fn checked_counter_add(value: &mut u64, amount: u64, label: &str) -> io::Result<()> {
     *value = value
         .checked_add(amount)
-        .ok_or_else(|| io::Error::other(format!("PPTX replay {label} overflow")))?;
+        .ok_or_else(|| io::Error::other(format!("source replay {label} overflow")))?;
     Ok(())
 }
 
@@ -1569,6 +1775,386 @@ fn replay_pptx_source(
     })
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct DocxReplayCounters {
+    read_calls: u64,
+    read_bytes: u64,
+    main_payload_overlap_bytes: u64,
+    media_payload_overlap_bytes: u64,
+    unselected_payload_overlap_bytes: u64,
+    core_payload_overlap_bytes: u64,
+}
+
+#[derive(Clone, Debug)]
+struct DocxReplaySnapshot {
+    counters: DocxReplayCounters,
+    request_sizes: Vec<u64>,
+    read_ranges: Vec<Range<u64>>,
+}
+
+#[derive(Clone, Debug)]
+struct DocxReplayRanges {
+    main: Range<u64>,
+    media: Vec<Range<u64>>,
+    unselected: Vec<Range<u64>>,
+    core: Vec<Range<u64>>,
+}
+
+#[derive(Debug)]
+struct DocxReplaySource {
+    bytes: Arc<Vec<u8>>,
+    version: SourceVersion,
+    ranges: DocxReplayRanges,
+    counters: Mutex<DocxReplayCounters>,
+    request_sizes: Mutex<Vec<u64>>,
+    read_ranges: Mutex<Vec<Range<u64>>>,
+}
+
+impl DocxReplaySource {
+    fn new(bytes: Arc<Vec<u8>>, ranges: DocxReplayRanges) -> Self {
+        Self {
+            bytes,
+            version: SourceVersion::new(
+                NEXT_DOCX_REPLAY_SOURCE_ID.fetch_add(1, Ordering::Relaxed),
+                0,
+            ),
+            ranges,
+            counters: Mutex::new(DocxReplayCounters::default()),
+            request_sizes: Mutex::new(Vec::new()),
+            read_ranges: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn record(&self, offset: u64, count: usize) -> io::Result<()> {
+        let count = u64::try_from(count)
+            .map_err(|_| io::Error::other("DOCX replay read length does not fit u64"))?;
+        let end = offset
+            .checked_add(count)
+            .ok_or_else(|| io::Error::other("DOCX replay read range overflows u64"))?;
+        let request = offset..end;
+        let mut counters = self
+            .counters
+            .lock()
+            .map_err(|_| io::Error::other("DOCX replay counters are poisoned"))?;
+        checked_counter_add(&mut counters.read_calls, 1, "DOCX read calls")?;
+        checked_counter_add(&mut counters.read_bytes, count, "DOCX read bytes")?;
+        checked_counter_add(
+            &mut counters.main_payload_overlap_bytes,
+            overlap_len(&request, &self.ranges.main),
+            "DOCX main payload overlap",
+        )?;
+        checked_counter_add(
+            &mut counters.media_payload_overlap_bytes,
+            overlap_with_ranges(&request, &self.ranges.media),
+            "DOCX media payload overlap",
+        )?;
+        checked_counter_add(
+            &mut counters.unselected_payload_overlap_bytes,
+            overlap_with_ranges(&request, &self.ranges.unselected),
+            "DOCX unselected payload overlap",
+        )?;
+        checked_counter_add(
+            &mut counters.core_payload_overlap_bytes,
+            overlap_with_ranges(&request, &self.ranges.core),
+            "DOCX core payload overlap",
+        )?;
+        drop(counters);
+        self.request_sizes
+            .lock()
+            .map_err(|_| io::Error::other("DOCX replay request sizes are poisoned"))?
+            .push(count);
+        self.read_ranges
+            .lock()
+            .map_err(|_| io::Error::other("DOCX replay read ranges are poisoned"))?
+            .push(request);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> io::Result<DocxReplaySnapshot> {
+        let counters = *self
+            .counters
+            .lock()
+            .map_err(|_| io::Error::other("DOCX replay counters are poisoned"))?;
+        let request_sizes = self
+            .request_sizes
+            .lock()
+            .map_err(|_| io::Error::other("DOCX replay request sizes are poisoned"))?
+            .clone();
+        let read_ranges = self
+            .read_ranges
+            .lock()
+            .map_err(|_| io::Error::other("DOCX replay read ranges are poisoned"))?
+            .clone();
+        Ok(DocxReplaySnapshot {
+            counters,
+            request_sizes,
+            read_ranges,
+        })
+    }
+}
+
+impl ReadAt for DocxReplaySource {
+    fn len(&self) -> io::Result<u64> {
+        u64::try_from(self.bytes.len())
+            .map_err(|_| io::Error::other("DOCX replay source length does not fit u64"))
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let start = match usize::try_from(offset) {
+            Ok(start) => start,
+            Err(_) => {
+                self.record(offset, 0)?;
+                return Ok(0);
+            },
+        };
+        let count = self
+            .bytes
+            .get(start..)
+            .map_or(0, |remaining| remaining.len().min(output.len()));
+        if count != 0 {
+            output[..count].copy_from_slice(&self.bytes[start..start + count]);
+        }
+        self.record(offset, count)?;
+        Ok(count)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(self.version)
+    }
+}
+
+fn docx_replay_phase(
+    before: &DocxReplaySnapshot,
+    after: &DocxReplaySnapshot,
+    ranges: &DocxReplayRanges,
+) -> DocxReplayPhase {
+    let counters = DocxReplayCounters {
+        read_calls: after.counters.read_calls - before.counters.read_calls,
+        read_bytes: after.counters.read_bytes - before.counters.read_bytes,
+        main_payload_overlap_bytes: after.counters.main_payload_overlap_bytes
+            - before.counters.main_payload_overlap_bytes,
+        media_payload_overlap_bytes: after.counters.media_payload_overlap_bytes
+            - before.counters.media_payload_overlap_bytes,
+        unselected_payload_overlap_bytes: after.counters.unselected_payload_overlap_bytes
+            - before.counters.unselected_payload_overlap_bytes,
+        core_payload_overlap_bytes: after.counters.core_payload_overlap_bytes
+            - before.counters.core_payload_overlap_bytes,
+    };
+    let request_sizes = after.request_sizes[before.request_sizes.len()..].to_vec();
+    let read_ranges = &after.read_ranges[before.read_ranges.len()..];
+    let main_payload_covered_bytes =
+        covered_bytes(std::slice::from_ref(&ranges.main), read_ranges).unwrap_or_default();
+    let media_payload_covered_bytes = covered_bytes(&ranges.media, read_ranges).unwrap_or_default();
+    let unselected_payload_covered_bytes =
+        covered_bytes(&ranges.unselected, read_ranges).unwrap_or_default();
+    let core_payload_covered_bytes = covered_bytes(&ranges.core, read_ranges).unwrap_or_default();
+    let main_payload_fully_covered = range_fully_covered(&ranges.main, read_ranges);
+    DocxReplayPhase {
+        counters,
+        request_sizes,
+        main_payload_covered_bytes,
+        main_payload_fully_covered,
+        media_payload_covered_bytes,
+        unselected_payload_covered_bytes,
+        core_payload_covered_bytes,
+    }
+}
+
+#[derive(Clone, Debug)]
+struct DocxReplayPhase {
+    counters: DocxReplayCounters,
+    request_sizes: Vec<u64>,
+    main_payload_covered_bytes: u64,
+    main_payload_fully_covered: bool,
+    media_payload_covered_bytes: u64,
+    unselected_payload_covered_bytes: u64,
+    core_payload_covered_bytes: u64,
+}
+
+fn docx_replay_ranges(bytes: &[u8]) -> Result<DocxReplayRanges, Box<dyn Error>> {
+    let archive = ZipArchive::from_slice(bytes)?;
+    let mut main = None;
+    let mut media = Vec::new();
+    let mut unselected = Vec::new();
+    let mut core = Vec::new();
+    for header in archive.entries() {
+        let header = header?;
+        let name = header.file_path().try_normalize()?.as_ref().to_owned();
+        let entry = archive.get_entry(header.wayfinder())?;
+        let (start, end) = entry.compressed_data_range();
+        let range = start..end;
+        if name == "word/document.xml" {
+            if main.replace(range).is_some() {
+                return Err("DOCX replay found duplicate main-document member".into());
+            }
+        } else if name.starts_with("word/media/") {
+            media.push(range);
+        } else if name == "docProps/core.xml" {
+            core.push(range);
+        } else if name != "[Content_Types].xml" && !name.ends_with(".rels") {
+            unselected.push(range);
+        }
+    }
+    Ok(DocxReplayRanges {
+        main: main.ok_or("DOCX replay is missing word/document.xml")?,
+        media,
+        unselected,
+        core,
+    })
+}
+
+fn replay_docx_source(
+    source: &Path,
+    operation: Operation,
+) -> Result<DocxSourceReplayEvidence, Box<dyn Error>> {
+    let bytes = Arc::new(fs::read(source)?);
+    let ranges = docx_replay_ranges(&bytes)?;
+    let replay = Arc::new(DocxReplaySource::new(Arc::clone(&bytes), ranges.clone()));
+    let package = litchi_docx::source_backed::Package::from_read_at(replay.clone())?;
+    let open = replay.snapshot()?;
+    let mut semantic = Sha256::new();
+    let mut paragraph_count = super::SemanticShape::Medium.docx_paragraphs();
+    let (preparation, query) = if operation.is_docx_query() {
+        let document = package.document()?;
+        let prepared = replay.snapshot()?;
+        match operation {
+            Operation::DocxSourceParagraphCount => {
+                paragraph_count = document.paragraph_count()?;
+                semantic.update(paragraph_count.to_le_bytes());
+            },
+            Operation::DocxSourceListParagraphs => {
+                let paragraphs = document.paragraphs()?;
+                paragraph_count = paragraphs.len();
+                for paragraph in paragraphs {
+                    let text = paragraph.text()?;
+                    semantic.update(text.as_bytes());
+                    semantic.update([0]);
+                }
+            },
+            Operation::DocxSourceFullText => {
+                let text = document.extract_text()?;
+                paragraph_count = document.paragraph_count()?;
+                semantic.update(text.as_bytes());
+            },
+            _ => return Err("non-query DOCX operation passed to source replay".into()),
+        }
+        let queried = replay.snapshot()?;
+        (
+            docx_replay_phase(&open, &prepared, &ranges),
+            docx_replay_phase(&prepared, &queried, &ranges),
+        )
+    } else {
+        (
+            DocxReplayPhase {
+                counters: DocxReplayCounters::default(),
+                request_sizes: Vec::new(),
+                main_payload_covered_bytes: 0,
+                main_payload_fully_covered: false,
+                media_payload_covered_bytes: 0,
+                unselected_payload_covered_bytes: 0,
+                core_payload_covered_bytes: 0,
+            },
+            DocxReplayPhase {
+                counters: DocxReplayCounters::default(),
+                request_sizes: Vec::new(),
+                main_payload_covered_bytes: 0,
+                main_payload_fully_covered: false,
+                media_payload_covered_bytes: 0,
+                unselected_payload_covered_bytes: 0,
+                core_payload_covered_bytes: 0,
+            },
+        )
+    };
+    let open_phase = docx_replay_phase(
+        &DocxReplaySnapshot {
+            counters: DocxReplayCounters::default(),
+            request_sizes: Vec::new(),
+            read_ranges: Vec::new(),
+        },
+        &open,
+        &ranges,
+    );
+    let diagnostics = package.cache_diagnostics();
+    let classification = if open_phase.counters.main_payload_overlap_bytes == 0
+        && open_phase.counters.media_payload_overlap_bytes == 0
+        && open_phase.counters.unselected_payload_overlap_bytes == 0
+        && open_phase.counters.core_payload_overlap_bytes == 0
+        && (!operation.is_docx_query()
+            || (preparation.counters.main_payload_overlap_bytes != 0
+                && preparation.main_payload_fully_covered
+                && preparation.counters.media_payload_overlap_bytes == 0
+                && preparation.counters.unselected_payload_overlap_bytes == 0
+                && preparation.counters.core_payload_overlap_bytes == 0
+                && query.counters.main_payload_overlap_bytes == 0
+                && query.counters.media_payload_overlap_bytes == 0
+                && query.counters.unselected_payload_overlap_bytes == 0
+                && query.counters.core_payload_overlap_bytes == 0))
+    {
+        if operation.is_docx_query() {
+            "semantic-query:one-complete-main-range-preparation-zero-query-unselected-media-core"
+        } else {
+            "catalog-only:zero-main-media-unselected-core-overlap"
+        }
+    } else {
+        "classification-failed"
+    }
+    .to_owned();
+    if classification == "classification-failed" {
+        return Err(format!(
+            "DOCX source replay violated {} payload-range classification",
+            operation.case().name()
+        )
+        .into());
+    }
+    let semantic_digest = semantic.finalize();
+    Ok(DocxSourceReplayEvidence {
+        implementation: "litchi_docx::source_backed::Package".to_owned(),
+        operation: operation.docx_query_name().unwrap_or("open").to_owned(),
+        source_bytes: u64::try_from(bytes.len())?,
+        source_sha256: super::sha256_hex(&bytes),
+        paragraph_count,
+        open_read_calls: open_phase.counters.read_calls,
+        open_read_bytes: open_phase.counters.read_bytes,
+        open_read_request_sizes: open_phase.request_sizes,
+        open_main_payload_overlap_bytes: open_phase.counters.main_payload_overlap_bytes,
+        open_media_payload_overlap_bytes: open_phase.counters.media_payload_overlap_bytes,
+        open_unselected_payload_overlap_bytes: open_phase.counters.unselected_payload_overlap_bytes,
+        open_core_payload_overlap_bytes: open_phase.counters.core_payload_overlap_bytes,
+        open_main_payload_covered_bytes: open_phase.main_payload_covered_bytes,
+        open_media_payload_covered_bytes: open_phase.media_payload_covered_bytes,
+        open_unselected_payload_covered_bytes: open_phase.unselected_payload_covered_bytes,
+        open_core_payload_covered_bytes: open_phase.core_payload_covered_bytes,
+        preparation_read_calls: preparation.counters.read_calls,
+        preparation_read_bytes: preparation.counters.read_bytes,
+        preparation_read_request_sizes: preparation.request_sizes,
+        preparation_main_payload_overlap_bytes: preparation.counters.main_payload_overlap_bytes,
+        preparation_main_payload_covered_bytes: preparation.main_payload_covered_bytes,
+        preparation_main_payload_fully_covered: preparation.main_payload_fully_covered,
+        preparation_media_payload_overlap_bytes: preparation.counters.media_payload_overlap_bytes,
+        preparation_unselected_payload_overlap_bytes: preparation
+            .counters
+            .unselected_payload_overlap_bytes,
+        preparation_core_payload_overlap_bytes: preparation.counters.core_payload_overlap_bytes,
+        preparation_media_payload_covered_bytes: preparation.media_payload_covered_bytes,
+        preparation_unselected_payload_covered_bytes: preparation.unselected_payload_covered_bytes,
+        preparation_core_payload_covered_bytes: preparation.core_payload_covered_bytes,
+        query_read_calls: query.counters.read_calls,
+        query_read_bytes: query.counters.read_bytes,
+        query_read_request_sizes: query.request_sizes,
+        query_main_payload_overlap_bytes: query.counters.main_payload_overlap_bytes,
+        query_media_payload_overlap_bytes: query.counters.media_payload_overlap_bytes,
+        query_unselected_payload_overlap_bytes: query.counters.unselected_payload_overlap_bytes,
+        query_core_payload_overlap_bytes: query.counters.core_payload_overlap_bytes,
+        query_main_payload_covered_bytes: query.main_payload_covered_bytes,
+        query_media_payload_covered_bytes: query.media_payload_covered_bytes,
+        query_unselected_payload_covered_bytes: query.unselected_payload_covered_bytes,
+        query_core_payload_covered_bytes: query.core_payload_covered_bytes,
+        materializations: diagnostics.successful_loads,
+        semantic_sha256: super::sha256_hex(&semantic_digest[..]),
+        classification,
+    })
+}
+
 #[derive(Clone, Debug, Default)]
 struct ReadMetrics {
     calls: u64,
@@ -1749,6 +2335,43 @@ fn run_pptx_operation(
     Ok(())
 }
 
+fn run_docx_operation(
+    operation: Operation,
+    source: &Path,
+    prepared: Option<&litchi::Document>,
+) -> Result<(), Box<dyn Error>> {
+    match operation {
+        Operation::DocxEagerOpen => {
+            let document = litchi::Document::from_bytes(fs::read(source)?)?;
+            std::hint::black_box(document);
+        },
+        Operation::DocxSourceOpen => {
+            // This is the candidate path under measurement. The root facade
+            // must adopt the filesystem source rather than replaying a byte
+            // buffer through the eager compatibility path.
+            let document = litchi::Document::open(source)?;
+            std::hint::black_box(document);
+        },
+        Operation::DocxEagerParagraphCount | Operation::DocxSourceParagraphCount => {
+            let document = prepared.ok_or("DOCX paragraph-count operation has no prepared root")?;
+            let count = document.paragraph_count()?;
+            std::hint::black_box(count);
+        },
+        Operation::DocxEagerListParagraphs | Operation::DocxSourceListParagraphs => {
+            let document = prepared.ok_or("DOCX list-paragraphs operation has no prepared root")?;
+            let paragraphs = document.paragraphs()?;
+            std::hint::black_box(paragraphs);
+        },
+        Operation::DocxEagerFullText | Operation::DocxSourceFullText => {
+            let document = prepared.ok_or("DOCX full-text operation has no prepared root")?;
+            let text = document.text()?;
+            std::hint::black_box(text);
+        },
+        _ => return Err("non-DOCX operation passed to run_docx_operation".into()),
+    }
+    Ok(())
+}
+
 fn run_opc_eager_save(
     source: &Path,
     destination: &Path,
@@ -1877,6 +2500,14 @@ fn verify_child_output(
         | Operation::PptxSourceSlideCount
         | Operation::PptxEagerSelectedSlide
         | Operation::PptxSourceSelectedSlide => verify_pptx_operation(source, corpus),
+        Operation::DocxEagerOpen
+        | Operation::DocxSourceOpen
+        | Operation::DocxEagerParagraphCount
+        | Operation::DocxSourceParagraphCount
+        | Operation::DocxEagerListParagraphs
+        | Operation::DocxSourceListParagraphs
+        | Operation::DocxEagerFullText
+        | Operation::DocxSourceFullText => verify_docx_operation(source, corpus),
     }
 }
 
@@ -1902,6 +2533,145 @@ fn verify_pptx_operation(source: &Path, corpus: &super::Corpus) -> Result<(), Bo
         return Err("PPTX filesystem corpus slide count differs from specification".into());
     }
     Ok(())
+}
+
+fn verify_docx_operation(source: &Path, corpus: &super::Corpus) -> Result<(), Box<dyn Error>> {
+    if corpus.manifest.generator != DOCX_FILE_CORPUS_GENERATOR {
+        return Err("DOCX filesystem source has the wrong corpus generator".into());
+    }
+    let bytes = fs::read(source)?;
+    if bytes.len() != corpus.manifest.archive_bytes {
+        return Err("DOCX filesystem source length differs from corpus manifest".into());
+    }
+    let source_sha256 = super::sha256_hex(&bytes);
+    if source_sha256 != corpus.manifest.archive_sha256 {
+        return Err("DOCX filesystem source hash differs from corpus manifest".into());
+    }
+    let eager = litchi::Document::from_bytes(bytes.clone())?;
+    let source_backed = litchi::Document::open(source)?;
+    if docx_document_signature(&eager)? != docx_document_signature(&source_backed)? {
+        return Err("DOCX eager/source ordinary-root semantic signatures differ".into());
+    }
+    if eager.paragraph_count()? != super::SemanticShape::Medium.docx_paragraphs() {
+        return Err("DOCX filesystem corpus paragraph count differs from specification".into());
+    }
+    if docx_archive_signature(&bytes)? != docx_archive_signature(&corpus.archive)? {
+        return Err("DOCX filesystem archive topology or payload hashes differ".into());
+    }
+    assert_source_sha256(source, &source_sha256)?;
+    Ok(())
+}
+
+fn docx_document_signature(document: &litchi::Document) -> Result<String, Box<dyn Error>> {
+    let paragraphs = document
+        .paragraphs()?
+        .into_iter()
+        .map(|paragraph| paragraph.text())
+        .collect::<Result<Vec<_>, _>>()?;
+    let tables = document
+        .tables()?
+        .into_iter()
+        .map(|table| docx_table_projection(&table))
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+    let elements = document
+        .elements()?
+        .into_iter()
+        .map(|element| {
+            if let Some(paragraph) = element.as_paragraph() {
+                return Ok(("paragraph", paragraph.text()?));
+            }
+            if let Some(table) = element.as_table() {
+                return Ok((
+                    "table",
+                    serde_json::to_string(&docx_table_projection(table)?)?,
+                ));
+            }
+            Err("DOCX element has no supported projection".into())
+        })
+        .collect::<Result<Vec<(&str, String)>, Box<dyn Error>>>()?;
+    let metadata = serde_json::to_vec(&document.metadata()?)?;
+    Ok(super::sha256_hex(&serde_json::to_vec(&(
+        document.paragraph_count()?,
+        document.text()?,
+        paragraphs,
+        tables,
+        elements,
+        metadata,
+    ))?))
+}
+
+fn docx_table_projection(
+    table: &litchi::document::Table,
+) -> Result<(usize, Vec<(usize, Vec<String>)>), Box<dyn Error>> {
+    let row_count = table.row_count()?;
+    let rows = table.rows()?;
+    if rows.len() != row_count {
+        return Err("DOCX table row count disagrees with its row projection".into());
+    }
+    let rows = rows
+        .into_iter()
+        .map(|row| {
+            let cell_count = row.cell_count()?;
+            let cells = row
+                .cells()?
+                .into_iter()
+                .map(|cell| cell.text())
+                .collect::<Result<Vec<_>, _>>()?;
+            if cells.len() != cell_count {
+                return Err("DOCX table cell count disagrees with its cell projection".into());
+            }
+            Ok((cell_count, cells))
+        })
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+    Ok((row_count, rows))
+}
+
+fn docx_archive_signature(bytes: &[u8]) -> Result<String, Box<dyn Error>> {
+    let package = OpcPackage::from_bytes(bytes)?;
+    let mut parts = package
+        .iter_parts()
+        .map(|part| {
+            let mut relationships = part
+                .rels()
+                .iter()
+                .map(|relationship| {
+                    (
+                        relationship.r_id().to_owned(),
+                        relationship.reltype().to_owned(),
+                        relationship.target_ref().to_owned(),
+                        relationship.is_external(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            relationships.sort();
+            Ok((
+                part.partname().to_string(),
+                part.content_type().to_owned(),
+                relationships,
+                super::sha256_hex(part.blob()),
+            ))
+        })
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+    parts.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut package_relationships = package
+        .rels()
+        .iter()
+        .map(|relationship| {
+            (
+                relationship.r_id().to_owned(),
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.is_external(),
+            )
+        })
+        .collect::<Vec<_>>();
+    package_relationships.sort();
+    Ok(super::sha256_hex(&serde_json::to_vec(&(
+        bytes.len(),
+        package.part_count(),
+        package_relationships,
+        parts,
+    ))?))
 }
 
 fn pptx_presentation_signature(
@@ -1980,7 +2750,9 @@ fn filesystem_root(requested_root: Option<&Path>) -> io::Result<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::{fs, sync::Arc};
+
+    use litchi_core::ReadAt;
 
     use super::{CacheSelection, ChildMode, ColdAdvice, Operation, ReadSizeBuckets};
 
@@ -2000,6 +2772,14 @@ mod tests {
             "pptx_file_source_slide_count",
             "pptx_file_eager_selected_slide",
             "pptx_file_source_selected_slide",
+            "docx_file_eager_open",
+            "docx_file_source_open",
+            "docx_file_eager_paragraph_count",
+            "docx_file_source_paragraph_count",
+            "docx_file_eager_list_paragraphs",
+            "docx_file_source_list_paragraphs",
+            "docx_file_eager_full_text",
+            "docx_file_source_full_text",
         ] {
             assert!(Operation::parse(name).is_some(), "{name}");
         }
@@ -2019,6 +2799,26 @@ mod tests {
         assert_eq!(
             Operation::PptxEagerSlideCount.pptx_query_name(),
             Some("slide_count")
+        );
+    }
+
+    #[test]
+    fn docx_root_operation_scopes_are_explicit() {
+        assert!(Operation::DocxEagerOpen.is_docx());
+        assert!(Operation::DocxSourceFullText.is_source_docx());
+        assert!(Operation::DocxSourceFullText.is_docx_query());
+        assert!(!Operation::DocxSourceOpen.is_docx_query());
+        assert_eq!(
+            Operation::DocxSourceParagraphCount.docx_query_name(),
+            Some("paragraph_count")
+        );
+        assert_eq!(
+            Operation::DocxSourceListParagraphs.docx_query_name(),
+            Some("list_paragraphs")
+        );
+        assert_eq!(
+            Operation::DocxSourceFullText.docx_query_name(),
+            Some("full_text")
         );
     }
 
@@ -2055,6 +2855,36 @@ mod tests {
             super::fully_covered_range_count(&[0..10, 20..30], &[0..10, 20..25]),
             1
         );
+    }
+
+    #[test]
+    fn docx_replay_coverage_tracks_each_payload_class() {
+        let ranges = super::DocxReplayRanges {
+            main: 100..120,
+            media: std::iter::once(200..220).collect(),
+            unselected: std::iter::once(300..330).collect(),
+            core: std::iter::once(400..410).collect(),
+        };
+        let source = super::DocxReplaySource::new(Arc::new(vec![0; 512]), ranges.clone());
+        let before = source.snapshot().unwrap();
+        let mut main = [0_u8; 20];
+        let mut media = [0_u8; 20];
+        source.read_at(100, &mut main).unwrap();
+        source.read_at(200, &mut media).unwrap();
+        let after = source.snapshot().unwrap();
+        let phase = super::docx_replay_phase(&before, &after, &ranges);
+        assert_eq!(phase.counters.read_calls, 2);
+        assert_eq!(phase.counters.read_bytes, 40);
+        assert_eq!(phase.counters.main_payload_overlap_bytes, 20);
+        assert_eq!(phase.counters.media_payload_overlap_bytes, 20);
+        assert_eq!(phase.counters.unselected_payload_overlap_bytes, 0);
+        assert_eq!(phase.counters.core_payload_overlap_bytes, 0);
+        assert_eq!(phase.main_payload_covered_bytes, 20);
+        assert!(phase.main_payload_fully_covered);
+        assert_eq!(phase.media_payload_covered_bytes, 20);
+        assert_eq!(phase.unselected_payload_covered_bytes, 0);
+        assert_eq!(phase.core_payload_covered_bytes, 0);
+        assert_eq!(phase.request_sizes, vec![20, 20]);
     }
 
     #[test]
@@ -2103,6 +2933,7 @@ mod tests {
             super::OPC_FILE_EXPECTED_OUTPUT_SHA256,
             super::CFB_FILE_SOURCE_SHA256,
             super::CFB_FILE_EXPECTED_OUTPUT_SHA256,
+            super::DOCX_FILE_SOURCE_SHA256,
         ] {
             assert_eq!(hash.len(), 64);
             assert!(hash.bytes().all(|byte| byte.is_ascii_hexdigit()));

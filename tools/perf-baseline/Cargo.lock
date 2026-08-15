@@ -916,6 +916,7 @@ version = "0.0.1"
 dependencies = [
  "fast-float2",
  "litchi-core",
+ "litchi-docx",
  "litchi-drawingml",
  "litchi-odf-common",
  "litchi-odp",
