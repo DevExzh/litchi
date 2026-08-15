@@ -996,6 +996,22 @@ is correctness/descriptive evidence only and makes no latency, memory,
 allocation, RSS, I/O, or speedup claim before balanced release ABBA. See
 [`0137`](changes/0137-xls-numeric-plan-only-publication.md).
 
+Change 0138 supplies the balanced release evidence for the two plan-only
+selectors. Number and RK/MulRK each run strict one-process `A1, B1, B2, A2`
+legs on CPU 2 with 20 warmups and 200 samples; complete-operation p50, p95,
+p99 and mean all improve in both paired directions. Number p50 improves
+27.57%/28.58% and RK/MulRK 24.90%/24.56%. Matched process-level VmHWM
+captures (three warmups/30 samples) agree for Number (-10.73%/-10.66%) but
+disagree for RK/MulRK. Valid heaptrack profiles report whole-process
+allocation totals and unchanged peak heap in each sampled A/B pair. Exact
+output digests, complete sink bytes, zero plan-only target-artifact fields,
+forward reopen/readback, topology, security, no-op, partial-sink and
+real-producer gates remain green. This is an accepted latency result for
+these deterministic fixed-width families only; it does not claim operation-
+only allocation, bounded total memory, physical I/O, cold-cache behavior or
+broad producer coverage. See
+[`0138`](changes/0138-xls-numeric-plan-only-release-abba.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.
