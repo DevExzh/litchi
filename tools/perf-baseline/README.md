@@ -40,7 +40,8 @@ substrate records, nine writer records, and 45 XLSX records). The six simulated
 range cases, two execution-scaling cases, one low-level source-overlay save
 case, one source-backed DOCX semantic publication case, one source-backed
 media-rich PPTX semantic publication case, four matched same-slide/multi-slide
-PPTX batch cases, two matched cross-slide ODP text-box publication cases, one
+PPTX batch cases, two opt-in PPTX cross-presentation slide-copy evidence
+selectors, two matched cross-slide ODP text-box publication cases, one
 matched ODT embedded-resource publication pair, one matched ODT mixed
 model-content publication pair, one XLSX commit/read attribution case,
 two matched XLSX calculation-metadata publication cases, two matched XLSX
@@ -72,7 +73,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 271
+provide their source-read counters. The current `Case` matrix exposes 273
 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -176,6 +177,15 @@ native semantic performance claim. Together these additions bring the
 selectable matrix to 271 names while leaving the default 36 cases / 198 records
 unchanged. Change 0144 documents the evidence boundary and the separate clean
 release result.
+Two additional opt-in PPTX cross-presentation slide-copy selectors
+(`pptx_cross_copy_plain` and `pptx_cross_copy_media_rich`) use deterministic
+three-slide source/two-slide destination packages. They report plan, commit,
+and OPC sequential publication timings separately, with reopen timing retained
+as a non-publication diagnostic. Complete semantic/package/dependency-closure,
+collision-remap, source-immutability, durable-patch, and stale/foreign/refusal
+gates are untimed. The selectors bring the current selectable matrix to 273
+names while leaving the default 36 cases / 198 records unchanged. They make no
+speedup, allocation, RSS, release-ABBA, or physical-I/O claim.
 
 The validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
@@ -453,6 +463,26 @@ Both paths replace all eight text boxes on slides 0, 28, 57, 85, 114, 142,
 and eight selected slides, then regenerates only those eight slide members.
 Complete semantic, topology, relationship, raw unselected-member, media,
 patch/inverse, source-version, output-hash, and sink checks remain untimed.
+
+Measure the opt-in PPTX cross-presentation slide-copy evidence selectors:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 5 \
+  --case pptx_cross_copy_plain,pptx_cross_copy_media_rich \
+  --json target/perf/pptx-cross-slide-copy.json
+```
+
+The plain selector copies source slide 3 into destination slide 2 at zero-based
+position 1 without media; the media-rich selector adds eight deterministic 2
+MiB PNG resources to the source and destination packages so the copied
+dependency closure exercises deterministic collision-avoidance remapping. Both selectors use the public
+`Snapshot::plan_cross_slide_copy`, `Package::apply_cross_slide_copy_plan`, and
+`OpcPackage::to_stream` APIs. The timer reports plan, commit, and sequential
+publication phases separately; setup, reopen, semantic/package/closure,
+source-immutability, collision, durable-patch, stale/foreign/refusal, and
+output-hash checks remain untimed. This is correctness/evidence only and makes
+no performance claim.
 
 Measure the matched XLSX calculation-metadata publication controls:
 
@@ -1098,10 +1128,12 @@ The seekable stream is instrumented with the existing `sink` schema field.
 DOCX also accepts a forward-only `Write` sink; production correctness tests
 cover that contract while the frozen before/after benchmark keeps the same
 seekable counter implementation in both binaries.
-PPTX uses `Package::from_bytes`/`from_vec`, presentation slide/text views,
-opened-presentation transactions, and `to_bytes`. PPTX currently has no public
-writer-sink API, so PPTX save records intentionally leave `sink` as `null`
-rather than claiming unobservable write behavior.
+PPTX semantic save controls use `Package::from_bytes`/`from_vec`, presentation
+slide/text views, opened-presentation transactions, and `to_bytes`; those
+legacy controls intentionally leave `sink` as `null`. The cross-presentation
+slide-copy evidence selectors use the public `OpcPackage::to_stream` writer
+through a bounded sequential sink and report its counters explicitly, without
+extending the claim to the other PPTX save paths.
 
 ## Opt-in RTF semantic corpus matrix
 
