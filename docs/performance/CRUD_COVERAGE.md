@@ -2,7 +2,7 @@
 
 Date: 2026-08-15
 
-This is a coverage map, not a completion claim. It compares the 253 selectable
+This is a coverage map, not a completion claim. It compares the 255 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -916,6 +916,15 @@ the query.
 This is correctness/logical-range evidence only, with no latency,
 physical-I/O, decompression, allocation, RSS, cold-cache, ABBA, broad-security,
 or Markdown-performance claim.
+
+Change 0127 adds matched eager/source-backed ODS repeated-cell sweep selectors
+over the existing two-sheet 32 by 32 media-rich corpus. Four identical sweeps
+cross the adaptive locator threshold; source preparation counters and zero-read
+post-preparation replay evidence are retained per measured sample. Semantic
+digest/count and complete source/member/media preservation checks remain
+untimed. The selectors bring the selectable matrix to 255 names while the
+default 36 cases / 198 records remain unchanged; no latency or resource claim
+is made pending a clean release ABBA run.
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

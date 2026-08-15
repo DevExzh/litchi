@@ -128,6 +128,7 @@ const XLS_VISIBILITY_OPAQUE_STREAM_COUNT: usize = 8;
 const XLS_VISIBILITY_OPAQUE_STREAM_BYTES: usize = 256 * 1024;
 const ODS_MEDIA_ENTRY_COUNT: usize = 8;
 const ODS_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
+const ODS_CELL_SWEEP_REPETITIONS: usize = 4;
 const DOCX_SOURCE_MEDIA_ENTRY_COUNT: usize = 8;
 const DOCX_SOURCE_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const PPTX_SOURCE_MEDIA_ENTRY_COUNT: usize = 8;
@@ -725,6 +726,8 @@ enum Case {
     OdsFileSourceSelectedCell,
     OdsFileEagerSelectedMedia,
     OdsFileSourceSelectedMedia,
+    OdsFileEagerCellSweep,
+    OdsFileSourceCellSweep,
 }
 
 impl Case {
@@ -1070,6 +1073,8 @@ impl Case {
             Self::OdsFileSourceSelectedCell => "ods_file_source_selected_cell",
             Self::OdsFileEagerSelectedMedia => "ods_file_eager_selected_media",
             Self::OdsFileSourceSelectedMedia => "ods_file_source_selected_media",
+            Self::OdsFileEagerCellSweep => "ods_file_eager_cell_sweep",
+            Self::OdsFileSourceCellSweep => "ods_file_source_cell_sweep",
         }
     }
 
@@ -1495,6 +1500,8 @@ impl Case {
                 | Self::OdsFileSourceSelectedCell
                 | Self::OdsFileEagerSelectedMedia
                 | Self::OdsFileSourceSelectedMedia
+                | Self::OdsFileEagerCellSweep
+                | Self::OdsFileSourceCellSweep
         )
     }
 
@@ -1952,6 +1959,8 @@ struct SourceSummary {
     odp_root: Option<OdpRootSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ods_root: Option<OdsRootSourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ods_cell_sweep: Option<OdsCellSweepSummary>,
 }
 
 /// Positional-read evidence for the native PPT lazy `Pictures` selectors.
@@ -2114,6 +2123,40 @@ struct OdsRootSourceSummary {
     selected_media_read_prior_range_overlap_bytes: Vec<u64>,
     selected_media_read_compressed_range_overlap_bytes: Vec<u64>,
     selected_media_read_non_picture_overlap_bytes: Vec<u64>,
+}
+
+/// Matched ODS source-backed repeated-cell evidence. Owners are fully opened
+/// before the timed sweep; semantic digest/count verification and the
+/// instrumented source replay are outside the timed interval. The source
+/// replay resets counters after owner preparation and must observe no reads
+/// while repeating the same deterministic query coordinates.
+#[derive(Clone, Debug, Default, Serialize)]
+struct OdsCellSweepSummary {
+    implementation: &'static str,
+    phase: &'static str,
+    timing_scope: &'static str,
+    source_evidence_scope: &'static str,
+    query_count: usize,
+    sweep_repetitions: usize,
+    worksheet_count: usize,
+    stored_cell_count: usize,
+    canonical_cell_digest_sha256: String,
+    source_path_bytes: u64,
+    source_path_sha256: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_sweep_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_sweep_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_sweep_read_range_overlap_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    sweep_stored_cell_counts: Vec<usize>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    sweep_cell_digest_sha256: Vec<String>,
 }
 
 /// Untimed correctness counters paired with the ODT mixed model-content
@@ -5703,6 +5746,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_file_source_selected_cell" => Some(Case::OdsFileSourceSelectedCell),
         "ods_file_eager_selected_media" => Some(Case::OdsFileEagerSelectedMedia),
         "ods_file_source_selected_media" => Some(Case::OdsFileSourceSelectedMedia),
+        "ods_file_eager_cell_sweep" => Some(Case::OdsFileEagerCellSweep),
+        "ods_file_source_cell_sweep" => Some(Case::OdsFileSourceCellSweep),
         _ => None,
     }
 }
@@ -5948,7 +5993,8 @@ fn print_usage() {
                                        odp_file_eager_selected_slide,odp_file_source_selected_slide,\n\
                                        ods_file_eager_open,ods_file_source_open,\n\
                                        ods_file_eager_selected_cell,ods_file_source_selected_cell,\n\
-                                       ods_file_eager_selected_media,ods_file_source_selected_media\n\
+                                       ods_file_eager_selected_media,ods_file_source_selected_media,\n\
+                                       ods_file_eager_cell_sweep,ods_file_source_cell_sweep\n\
            --shape LIST                tiny,many-small,few-large,wide-root\n\
            --payload LIST              compressible,incompressible\n\
            --writer-shape LIST         tiny,large,payload-heavy\n\
@@ -10277,6 +10323,9 @@ fn run_case_with_config(
         | Case::OdsFileEagerSelectedMedia
         | Case::OdsFileSourceSelectedMedia => {
             run_ods_root_file_access(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdsFileEagerCellSweep | Case::OdsFileSourceCellSweep => {
+            run_ods_cell_sweep(case, corpus, warmup_iterations, samples)
         },
         Case::OpcOpenSessionScaling | Case::CfbBulkReadScaling => {
             Err("scaling case requires an explicit worker count".into())
@@ -16977,6 +17026,290 @@ fn ods_root_typed_cell(
         return Err("ODS selected cell is not stored".into());
     };
     Ok(cell.text.clone())
+}
+
+#[derive(Clone, Copy, Debug)]
+struct OdsCellSweepCoordinate {
+    sheet: usize,
+    row: usize,
+    column: usize,
+}
+
+fn ods_cell_sweep_coordinates() -> Vec<OdsCellSweepCoordinate> {
+    let shape = SemanticShape::Medium;
+    (0..shape.ods_sheet_count())
+        .flat_map(|sheet| {
+            (0..shape.ods_rows_per_sheet()).flat_map(move |row| {
+                (0..shape.ods_columns_per_sheet()).map(move |column| OdsCellSweepCoordinate {
+                    sheet,
+                    row,
+                    column,
+                })
+            })
+        })
+        .collect()
+}
+
+fn ods_cell_sweep_digest_field(digest: &mut Sha256, value: Option<&str>) -> usize {
+    match value {
+        Some(value) => {
+            digest.update([1]);
+            digest.update((value.len() as u64).to_le_bytes());
+            digest.update(value.as_bytes());
+            1
+        },
+        None => {
+            digest.update([0]);
+            0
+        },
+    }
+}
+
+fn ods_owned_cell_sweep_digest(
+    spreadsheet: &litchi_ods::Spreadsheet,
+    sheet_names: &[String],
+    coordinates: &[OdsCellSweepCoordinate],
+) -> Result<(usize, String), Box<dyn Error>> {
+    let mut digest = Sha256::new();
+    let mut stored_cells = 0usize;
+    for _ in 0..ODS_CELL_SWEEP_REPETITIONS {
+        for coordinate in coordinates {
+            digest.update((coordinate.sheet as u64).to_le_bytes());
+            digest.update((coordinate.row as u64).to_le_bytes());
+            digest.update((coordinate.column as u64).to_le_bytes());
+            let value = match spreadsheet.cell(
+                &sheet_names[coordinate.sheet],
+                coordinate.row,
+                coordinate.column,
+            ) {
+                Some(litchi_ods::CellView::Stored(cell)) => Some(cell.text.as_str()),
+                Some(litchi_ods::CellView::Missing) | None => None,
+            };
+            stored_cells = stored_cells
+                .checked_add(ods_cell_sweep_digest_field(&mut digest, value))
+                .ok_or("ODS owned sweep stored-cell count overflows usize")?;
+        }
+    }
+    Ok((stored_cells, fingerprint_hex(&digest.finalize().into())))
+}
+
+fn ods_source_cell_sweep_digest(
+    spreadsheet: &litchi_ods::SourceBackedSpreadsheet,
+    sheet_names: &[String],
+    coordinates: &[OdsCellSweepCoordinate],
+) -> Result<(usize, String), Box<dyn Error>> {
+    let mut digest = Sha256::new();
+    let mut stored_cells = 0usize;
+    for _ in 0..ODS_CELL_SWEEP_REPETITIONS {
+        for coordinate in coordinates {
+            digest.update((coordinate.sheet as u64).to_le_bytes());
+            digest.update((coordinate.row as u64).to_le_bytes());
+            digest.update((coordinate.column as u64).to_le_bytes());
+            let value = match spreadsheet.cell(
+                &sheet_names[coordinate.sheet],
+                coordinate.row,
+                coordinate.column,
+            )? {
+                Some(litchi_ods::CellView::Stored(cell)) => Some(cell.text.as_str()),
+                Some(litchi_ods::CellView::Missing) | None => None,
+            };
+            stored_cells = stored_cells
+                .checked_add(ods_cell_sweep_digest_field(&mut digest, value))
+                .ok_or("ODS source sweep stored-cell count overflows usize")?;
+        }
+    }
+    Ok((stored_cells, fingerprint_hex(&digest.finalize().into())))
+}
+
+fn run_ods_owned_cell_sweep(
+    spreadsheet: &litchi_ods::Spreadsheet,
+    sheet_names: &[String],
+    coordinates: &[OdsCellSweepCoordinate],
+) -> Result<(), Box<dyn Error>> {
+    for _ in 0..ODS_CELL_SWEEP_REPETITIONS {
+        for coordinate in coordinates {
+            let value = spreadsheet.cell(
+                &sheet_names[coordinate.sheet],
+                coordinate.row,
+                coordinate.column,
+            );
+            std::hint::black_box(value);
+        }
+    }
+    Ok(())
+}
+
+fn run_ods_source_cell_sweep(
+    spreadsheet: &litchi_ods::SourceBackedSpreadsheet,
+    sheet_names: &[String],
+    coordinates: &[OdsCellSweepCoordinate],
+) -> Result<(), Box<dyn Error>> {
+    for _ in 0..ODS_CELL_SWEEP_REPETITIONS {
+        for coordinate in coordinates {
+            let value = spreadsheet.cell(
+                &sheet_names[coordinate.sheet],
+                coordinate.row,
+                coordinate.column,
+            )?;
+            std::hint::black_box(value);
+        }
+    }
+    Ok(())
+}
+
+fn run_ods_cell_sweep(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !matches!(
+        case,
+        Case::OdsFileEagerCellSweep | Case::OdsFileSourceCellSweep
+    ) {
+        return Err("non-sweep ODS case passed to cell-sweep runner".into());
+    }
+    if corpus.manifest.generator != ODS_MEDIA_CORPUS_GENERATOR {
+        return Err("ODS cell-sweep cases require the fixed media-rich corpus".into());
+    }
+    let coordinates = ods_cell_sweep_coordinates();
+    let sheet_names = (0..SemanticShape::Medium.ods_sheet_count())
+        .map(semantic_ods_sheet_name)
+        .collect::<Vec<_>>();
+    let expected_stored_cells = coordinates
+        .len()
+        .checked_mul(ODS_CELL_SWEEP_REPETITIONS)
+        .ok_or("ODS cell-sweep query count overflows usize")?;
+    let expected = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+    let (expected_stored, expected_digest) =
+        ods_owned_cell_sweep_digest(&expected, &sheet_names, &coordinates)?;
+    if expected_stored != expected_stored_cells {
+        return Err("ODS eager cell-sweep oracle has missing cells".into());
+    }
+    let source_path = create_ods_root_source_file(&corpus.archive)?;
+    let result = (|| {
+        let mut elapsed = Vec::with_capacity(samples);
+        let mut summary = OdsCellSweepSummary {
+            implementation: if matches!(case, Case::OdsFileSourceCellSweep) {
+                "source_backed"
+            } else {
+                "eager"
+            },
+            phase: "repeated_cell_sweep",
+            timing_scope: "typed_owner_open_outside_timer; adaptive_locator_transition_and_repeated_cell_queries_inside_timer",
+            source_evidence_scope: if matches!(case, Case::OdsFileSourceCellSweep) {
+                "separate_untimed_instrumented_replay_after_owner_preparation_per_measured_sample"
+            } else {
+                "not_applicable"
+            },
+            query_count: coordinates.len(),
+            sweep_repetitions: ODS_CELL_SWEEP_REPETITIONS,
+            worksheet_count: sheet_names.len(),
+            stored_cell_count: coordinates.len(),
+            canonical_cell_digest_sha256: expected_digest.clone(),
+            source_path_bytes: u64::try_from(corpus.archive.len())?,
+            source_path_sha256: corpus.manifest.archive_sha256.clone(),
+            ..OdsCellSweepSummary::default()
+        };
+
+        for iteration in 0..iteration_count(warmup_iterations, samples)? {
+            let duration;
+            let (stored_cells, digest) = match case {
+                Case::OdsFileEagerCellSweep => {
+                    let owner = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                    let started = Instant::now();
+                    run_ods_owned_cell_sweep(&owner, &sheet_names, &coordinates)?;
+                    duration = started.elapsed();
+                    ods_owned_cell_sweep_digest(&owner, &sheet_names, &coordinates)?
+                },
+                Case::OdsFileSourceCellSweep => {
+                    let owner = litchi_ods::SourceBackedSpreadsheet::from_path(&source_path)?;
+                    let started = Instant::now();
+                    run_ods_source_cell_sweep(&owner, &sheet_names, &coordinates)?;
+                    duration = started.elapsed();
+                    ods_source_cell_sweep_digest(&owner, &sheet_names, &coordinates)?
+                },
+                _ => return Err("non-sweep ODS case passed to measured loop".into()),
+            };
+            if stored_cells != expected_stored_cells || digest != expected_digest {
+                return Err("ODS cell-sweep result differs from eager oracle".into());
+            }
+            let source_bytes = fs::read(&source_path)?;
+            if source_bytes != corpus.archive
+                || sha256_hex(&source_bytes) != corpus.manifest.archive_sha256
+                || source_bytes.len() != corpus.manifest.archive_bytes
+            {
+                return Err("ODS cell-sweep source archive changed during measurement".into());
+            }
+            if ArchiveReader::new(&source_bytes)?.file_names().count()
+                != corpus.manifest.archive_member_count
+            {
+                return Err("ODS cell-sweep source member topology changed".into());
+            }
+            verify_ods_media_archive(&source_bytes, false)?;
+            if iteration >= warmup_iterations {
+                summary.sweep_stored_cell_counts.push(stored_cells);
+                summary.sweep_cell_digest_sha256.push(digest);
+            }
+            record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        }
+
+        if matches!(case, Case::OdsFileSourceCellSweep) {
+            let mut expected_preparation = None;
+            for _ in 0..samples {
+                let source = Arc::new(InstrumentedSource::new(corpus.archive.clone(), Vec::new()));
+                let owner = litchi_ods::SourceBackedSpreadsheet::from_read_at(source.clone())?;
+                let preparation = source.snapshot();
+                source.reset();
+                run_ods_source_cell_sweep(&owner, &sheet_names, &coordinates)?;
+                let sweep = source.snapshot();
+                if sweep.read_calls != 0 || sweep.read_bytes != 0 {
+                    return Err(
+                        "ODS source cell sweep performed a source read after preparation".into(),
+                    );
+                }
+                let preparation_counters = (preparation.read_calls, preparation.read_bytes);
+                if let Some(expected) = expected_preparation {
+                    if expected != preparation_counters {
+                        return Err("ODS source preparation counters are not deterministic".into());
+                    }
+                } else {
+                    expected_preparation = Some(preparation_counters);
+                }
+                summary
+                    .source_preparation_read_calls
+                    .push(preparation.read_calls);
+                summary
+                    .source_preparation_read_bytes
+                    .push(preparation.read_bytes);
+                summary.source_sweep_read_calls.push(sweep.read_calls);
+                summary.source_sweep_read_bytes.push(sweep.read_bytes);
+                summary
+                    .source_sweep_read_range_overlap_bytes
+                    .push(sweep.read_range_overlap_bytes);
+            }
+        }
+
+        Ok(CaseResult {
+            case: case.name(),
+            cache_state: None,
+            corpus: corpus.manifest.clone(),
+            elapsed_ns: statistics(elapsed),
+            sink: None,
+            source: Some(SourceSummary {
+                ods_cell_sweep: Some(summary),
+                ..SourceSummary::default()
+            }),
+            execution: None,
+            output_sha256: None,
+        })
+    })();
+    let cleanup = fs::remove_file(&source_path);
+    match (result, cleanup) {
+        (Ok(result), Ok(())) => Ok(result),
+        (Ok(_), Err(error)) => Err(error.into()),
+        (Err(error), _) => Err(error),
+    }
 }
 
 fn ods_root_source_cell(
@@ -28158,6 +28491,91 @@ mod tests {
         assert_eq!(
             source_media.selected_media_read_prior_range_overlap_bytes[0],
             source_media.selected_media_read_prior_range_overlap_bytes[1]
+        );
+    }
+
+    #[test]
+    fn media_rich_ods_cell_sweep_selectors_are_matched_and_source_lazy() {
+        for (name, case) in [
+            ("ods_file_eager_cell_sweep", Case::OdsFileEagerCellSweep),
+            ("ods_file_source_cell_sweep", Case::OdsFileSourceCellSweep),
+        ] {
+            assert_eq!(parse_case(name), Some(case));
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        let corpus = build_ods_media_corpus().unwrap();
+        let eager = run_case(Case::OdsFileEagerCellSweep, &corpus, 0, 2)
+            .unwrap()
+            .source
+            .unwrap()
+            .ods_cell_sweep
+            .unwrap();
+        let source = run_case(Case::OdsFileSourceCellSweep, &corpus, 0, 2)
+            .unwrap()
+            .source
+            .unwrap()
+            .ods_cell_sweep
+            .unwrap();
+
+        assert_eq!(eager.implementation, "eager");
+        assert_eq!(source.implementation, "source_backed");
+        assert_eq!(eager.source_evidence_scope, "not_applicable");
+        assert_eq!(
+            source.source_evidence_scope,
+            "separate_untimed_instrumented_replay_after_owner_preparation_per_measured_sample"
+        );
+        assert_eq!(eager.query_count, 2 * 32 * 32);
+        assert_eq!(source.query_count, eager.query_count);
+        assert_eq!(eager.sweep_repetitions, super::ODS_CELL_SWEEP_REPETITIONS);
+        assert_eq!(source.sweep_repetitions, eager.sweep_repetitions);
+        assert_eq!(eager.stored_cell_count, eager.query_count);
+        assert_eq!(source.stored_cell_count, eager.stored_cell_count);
+        assert_eq!(
+            eager.sweep_stored_cell_counts,
+            vec![eager.query_count * eager.sweep_repetitions; 2]
+        );
+        assert_eq!(
+            source.sweep_stored_cell_counts,
+            eager.sweep_stored_cell_counts
+        );
+        assert_eq!(
+            eager.canonical_cell_digest_sha256,
+            source.canonical_cell_digest_sha256
+        );
+        assert_eq!(
+            eager.sweep_cell_digest_sha256,
+            source.sweep_cell_digest_sha256
+        );
+        assert_eq!(eager.source_path_sha256, corpus.manifest.archive_sha256);
+        assert_eq!(source.source_path_sha256, corpus.manifest.archive_sha256);
+        assert!(eager.source_preparation_read_calls.is_empty());
+        assert!(eager.source_sweep_read_calls.is_empty());
+        let eager_json = serde_json::to_value(&eager).unwrap();
+        assert!(eager_json.get("source_preparation_read_calls").is_none());
+        assert!(eager_json.get("source_sweep_read_calls").is_none());
+        assert_eq!(source.source_preparation_read_calls.len(), 2);
+        assert_eq!(source.source_preparation_read_bytes.len(), 2);
+        assert_eq!(source.source_sweep_read_calls, vec![0, 0]);
+        assert_eq!(source.source_sweep_read_bytes, vec![0, 0]);
+        assert_eq!(source.source_sweep_read_range_overlap_bytes, vec![0, 0]);
+        assert_eq!(source.sweep_stored_cell_counts.len(), 2);
+        assert_eq!(source.sweep_cell_digest_sha256.len(), 2);
+        let source_json = serde_json::to_value(&source).unwrap();
+        assert_eq!(
+            source_json["source_sweep_read_calls"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            source_json["sweep_stored_cell_counts"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
         );
     }
 

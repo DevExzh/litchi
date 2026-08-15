@@ -360,7 +360,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The committed HEAD harness has
-**253 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**255 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -454,6 +454,19 @@ correctness/logical-range evidence only; it makes no latency, physical-I/O,
 decompression, allocation, RSS, cold-cache, ABBA, broad-security, or Markdown
 performance claim. See
 [`0126`](changes/0126-docx-root-source-path-evidence.md).
+
+Change 0127 adds two matched ODS repeated-cell sweep selectors, bringing the
+selectable matrix to 255 names while preserving the default 36-case /
+198-record tranche. The fixed corpus is the existing two-sheet 32 by 32
+media-rich ODS archive. Each owner is opened before timing; the timer covers
+four identical row-major sweeps, including the adaptive locator threshold
+transition. An independent instrumented source replay per measured sample
+resets counters after preparation and requires zero reads during the sweep.
+Digest/count, source SHA, member topology, semantic grid, manifest media type,
+and retained-media payload checks remain outside timing. This is
+correctness/logical-read evidence only; it makes no latency, physical-I/O,
+decompression, allocation, RSS, cold-cache, ABBA, or release claim. See
+[`0127`](changes/0127-ods-source-cell-sweep-evidence.md).
 
 The earlier five-case filesystem smoke exercises eager/source-backed OPC open,
 eager/source-backed one-Part atomic save, and same-length CFB atomic overlay
