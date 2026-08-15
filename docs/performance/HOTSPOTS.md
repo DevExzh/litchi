@@ -2,9 +2,9 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0124`](changes/0124-ods-unified-root-filesystem-evidence.md)
-(current-HEAD ODS unified-root/source logical-range observation; the latest
-bounded CFB substrate evidence remains [`0094`](changes/0094-cfb-selective-read-evidence.md),
+Evidence through: [`change 0125`](changes/0125-cfb-minifat-physical-run-evidence.md)
+(current-HEAD CFB MiniFAT request-amplification observation; the latest
+release CFB selective-range evidence remains [`0094`](changes/0094-cfb-selective-read-evidence.md),
 and release filesystem evidence is [`0089`](changes/0089-filesystem-release-repeated-evidence.md))
 
 This document records facts established by source inspection. It is not a
@@ -654,6 +654,15 @@ Confirmed source facts:
   filesystem, simulated high-latency range, allocation, and peak-RSS claims
   remain open. This is substrate evidence only, not DOC/XLS/PPT semantic
   adoption.
+- Change 0125 adds a distinct 4095-byte MiniFAT boundary pair over the same
+  256- and 2,048-sibling shapes. The target occupies 64 logical 64-byte
+  mini-sectors (eight regular 512-byte sectors);
+  the matched legacy/positional controls record separate open/read/total
+  timing, exact source calls/bytes/range sizes, and payload hashes. The focused
+  gate requires legacy source-byte amplification and one exact positional
+  4095-byte request, exposing physical-run coalescing without
+  making a latency or resource claim. Release ABBA, tails, cold/high-latency,
+  allocation/RSS, and native semantic consumers remain open.
 - Open eagerly materializes FAT, directory, MiniFAT, and allocation topology,
   while ordinary large stream payloads remain lazy.
 - MiniFAT now parses directly into its final `Vec<u32>`; FAT/DIFAT/MiniFAT use
@@ -1002,7 +1011,9 @@ changes. Remaining gaps are:
   neither proves a cold device or storage result.
 - CFB selective-range acceptance is bounded to exact source-byte counters,
   MiniFAT read-stage p50/p95, and the modest total-p50 direction in change
-  0094. FAT tail behavior, p99, simulated high-latency range sources,
+  0094. Change 0125 adds correctness/request-amplification evidence for the
+  4095-byte MiniFAT boundary but no release speed claim. FAT tail behavior,
+  p99, simulated high-latency range sources,
   allocation, and peak-RSS evidence remain open, and no DOC/XLS/PPT semantic
   consumer is covered.
 - Decompressed and recompressed byte observers. Positional range-request

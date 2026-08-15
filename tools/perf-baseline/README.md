@@ -58,7 +58,7 @@ bound), one bounded unmanaged source-backed two-worksheet case, and four
 managed source-backed scalar-cell cases (one cell, `ceil(1%)`, exact 256, and
 two worksheets),
 two bounded XLSX/RTF streaming-creation cases,
-four matched CFB selective-read cases,
+six matched CFB selective-read cases,
 four matched native XLS existing-comment publication cases,
 four matched native XLS worksheet-visibility publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 24 native OLE2 semantic cases, 16
@@ -70,7 +70,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 use an uninstrumented `litchi_core::OwnedSource`; independent untimed
 `InstrumentedSource` replays provide the source-read counters. The current
-`Case` matrix exposes 243 selectable case names in total. Eight additional
+`Case` matrix exposes 245 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
 default 36 cases / 198 records. Two repeated native-PPT selected-shape query
@@ -94,6 +94,11 @@ exact compressed-member range coverage, and zero-read selected-cell behavior;
 compressed ranges and uncompressed payloads remain separate fields. Together
 these additions bring the selectable matrix to 243 names while leaving the
 default 36 cases / 198 records unchanged;
+two additional matched CFB MiniFAT selectors (`cfb_selective_mini_4095_legacy_read`
+and `cfb_selective_mini_4095_shared_read`) exercise a distinct 4095-byte
+boundary target alongside the existing 36-byte control. Together these CFB
+additions bring the selectable matrix to 245 names while leaving the default
+36 cases / 198 records unchanged;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 
@@ -1357,8 +1362,16 @@ remain distinguishable.
   deterministic 36-byte MiniFAT target at the final position among 256 or
   2,048 sibling streams. The positional case allocates an exact caller buffer
   inside the read stage and does not populate the root-mini-stream cache.
+- `cfb_selective_mini_4095_legacy_read` /
+  `cfb_selective_mini_4095_shared_read`: the same paired controls for a
+  deterministic 4095-byte MiniFAT target at the final position. The target
+  occupies 64 logical 64-byte mini-sectors and exposes physical-run request
+  amplification: legacy materializes the complete root mini-stream, while the
+  positional path records the exact source ranges used to fill the 4095-byte
+  caller buffer. Source call/byte/range vectors and separate open/read/total
+  timings are evidence only; no speed claim is implied.
 - `cfb_selective_fat_legacy_read` / `cfb_selective_fat_shared_read`: the same
-  paired control for a deterministic 4 MiB FAT target. These four selectors
+  paired control for a deterministic 4 MiB FAT target. These six selectors
   are opt-in and only emit the `many-small` and `wide-root` shapes; each result
   records separate open/read/total timings, stage-local instrumented read
   calls/bytes/range sizes, returned payload bytes, and hashes. They retain no
@@ -1372,6 +1385,7 @@ matrix):
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 3 --samples 15 --shape many-small,wide-root \
   --case cfb_selective_mini_legacy_read,cfb_selective_mini_shared_read,\
+cfb_selective_mini_4095_legacy_read,cfb_selective_mini_4095_shared_read,\
 cfb_selective_fat_legacy_read,cfb_selective_fat_shared_read \
   --json target/perf/cfb-selective-read.json
 ```
