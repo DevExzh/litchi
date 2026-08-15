@@ -12,7 +12,7 @@ use std::{
     io::{self, Read, Seek, SeekFrom},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicU8, Ordering as AtomicOrdering},
+        atomic::{AtomicU64, Ordering as AtomicOrdering},
     },
 };
 
@@ -70,11 +70,40 @@ struct PendingPhysicalRange {
 // another public limit: it is an invariant of the format, not caller policy.
 const MINIFAT_DIRECT_READ_MAX_BYTES: u64 = 4095;
 const MINIFAT_DIRECT_ROOT_SIZE_RATIO: u64 = 2;
+// Keep the direct target SID and the state in one atomic word. A direct read
+// may be repeated only after the exact same directory entry has completed;
+// observing another SID, or an in-flight direct read, takes over permanently
+// through the root Mini Stream cache. The high 32 bits carry the target SID;
+// the low byte carries the state. The remaining bits stay zero so this can be
+// extended without changing the synchronization layout.
+const MINIFAT_STATE_MASK: u64 = 0xFF;
+const MINIFAT_SID_SHIFT: u32 = 32;
+const MINIFAT_CACHE_SID: u32 = u32::MAX;
 const MINIFAT_DIRECT_UNCLAIMED: u8 = 0;
 const MINIFAT_DIRECT_IN_FLIGHT: u8 = 1;
 const MINIFAT_DIRECT_DONE: u8 = 2;
 const MINIFAT_CACHE_IN_FLIGHT: u8 = 3;
 const MINIFAT_CACHE_READY: u8 = 4;
+const MINIFAT_CACHE_RETRY: u8 = 5;
+const MINIFAT_CACHE_REQUESTED: u8 = 6;
+
+const fn minifat_state(sid: u32, state: u8) -> u64 {
+    ((sid as u64) << MINIFAT_SID_SHIFT) | state as u64
+}
+
+const fn minifat_state_sid(value: u64) -> u32 {
+    (value >> MINIFAT_SID_SHIFT) as u32
+}
+
+const fn minifat_state_kind(value: u64) -> u8 {
+    (value & MINIFAT_STATE_MASK) as u8
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MiniFATOpenMode {
+    DirectIfEligible,
+    ForceCache,
+}
 
 /// One parsed, immutable CFB view over a thread-safe positional source.
 ///
@@ -90,9 +119,9 @@ pub struct SharedOleFile {
     /// Serializes only lazy mini-stream initialization. Regular streams never
     /// acquire this lock or any shared cursor lock.
     ministream: Mutex<Option<Arc<[u8]>>>,
-    /// Coordinates the one-shot direct MiniFAT open with concurrent/root-cache
-    /// opens. The cache path takes over permanently once it is initialized.
-    minifat_direct_state: AtomicU8,
+    /// Coordinates target-aware direct MiniFAT opens with concurrent/root-
+    /// cache opens. The cache path takes over permanently once it is selected.
+    minifat_direct_state: AtomicU64,
 }
 
 impl std::fmt::Debug for SharedOleFile {
@@ -180,7 +209,7 @@ impl SharedOleFile {
             expected_version,
             index: Arc::new(index),
             ministream: Mutex::new(None),
-            minifat_direct_state: AtomicU8::new(MINIFAT_DIRECT_UNCLAIMED),
+            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
         })
     }
 
@@ -228,10 +257,11 @@ impl SharedOleFile {
     /// MiniFAT stream uses a bounded positional range when the complete root
     /// mini stream would be at least twice as large; this avoids retaining
     /// unrelated mini-stream bytes. The existing root mini-stream cache remains
-    /// the path after the first eligible direct open or whenever materialization
-    /// is justified. A successful eligible direct open is deliberately one-shot
-    /// per shared file: repeats and concurrent callers use the cache, avoiding
-    /// repeated bounded-read overhead.
+    /// the path after a different target, concurrent caller, multi-target bulk
+    /// read, or whenever materialization is justified. A successful eligible
+    /// direct open can be repeated for the exact same directory entry while it
+    /// remains the active target; a direct failure is retryable, but cache
+    /// takeover is permanent.
     /// Initialization errors are not retained, so a later cached read can
     /// retry.
     ///
@@ -240,16 +270,34 @@ impl SharedOleFile {
     /// Returns an error if the path does not name a stream, source I/O fails,
     /// or the source version changes before or after the payload read.
     pub fn open_stream(&self, path: &[&str]) -> Result<Vec<u8>, OleError> {
-        let (is_minifat, start_sector, size) = {
+        self.open_stream_with_mode(path, MiniFATOpenMode::DirectIfEligible)
+    }
+
+    /// Opens a stream while forcing MiniFAT streams through the shared root
+    /// Mini Stream cache. This is crate-private because bulk sessions need a
+    /// stable cache policy across their scheduled requests, while the public
+    /// single-stream API retains target-aware direct reads.
+    pub(crate) fn open_stream_force_cache(&self, path: &[&str]) -> Result<Vec<u8>, OleError> {
+        self.open_stream_with_mode(path, MiniFATOpenMode::ForceCache)
+    }
+
+    fn open_stream_with_mode(
+        &self,
+        path: &[&str],
+        mode: MiniFATOpenMode,
+    ) -> Result<Vec<u8>, OleError> {
+        let (is_minifat, entry_sid, start_sector, size) = {
             let entry = self.find_entry(path)?;
             if entry.entry_type != STGTY_STREAM {
                 return Err(OleError::InvalidFormat("Not a stream".to_string()));
             }
-            (entry.is_minifat, entry.start_sector, entry.size)
+            (entry.is_minifat, entry.sid, entry.start_sector, entry.size)
         };
 
         self.check_source_version()?;
-        let direct = is_minifat && self.claim_minifat_direct(size);
+        let direct = is_minifat
+            && mode == MiniFATOpenMode::DirectIfEligible
+            && self.claim_minifat_direct(entry_sid, size);
         let result = if direct {
             self.read_minifat_stream_range(start_sector, size)
         } else if is_minifat {
@@ -259,7 +307,7 @@ impl SharedOleFile {
         };
         let version = self.check_source_version();
         if direct {
-            self.finish_minifat_direct(version.is_ok() && result.is_ok());
+            self.finish_minifat_direct(entry_sid, version.is_ok() && result.is_ok());
         }
         version?;
         result
@@ -413,48 +461,109 @@ impl SharedOleFile {
         root.size >= direct_threshold
     }
 
-    fn claim_minifat_direct(&self, size: u64) -> bool {
+    fn claim_minifat_direct(&self, sid: u32, size: u64) -> bool {
         if !self.should_read_minifat_range(size) {
+            self.request_ministream_cache();
             return false;
         }
-        self.minifat_direct_state
-            .compare_exchange(
-                MINIFAT_DIRECT_UNCLAIMED,
-                MINIFAT_DIRECT_IN_FLIGHT,
-                AtomicOrdering::AcqRel,
-                AtomicOrdering::Acquire,
-            )
-            .is_ok()
+        loop {
+            let observed = self.minifat_direct_state.load(AtomicOrdering::Acquire);
+            let observed_sid = minifat_state_sid(observed);
+            let observed_kind = minifat_state_kind(observed);
+            let claimable = match observed_kind {
+                MINIFAT_DIRECT_UNCLAIMED => true,
+                // A sequential repeat of the exact same directory entry can
+                // stay selective. A different target must use the cache.
+                MINIFAT_DIRECT_DONE => observed_sid == sid,
+                _ => false,
+            };
+            if !claimable {
+                // Preserve the observation in the atomic state before the
+                // caller returns to its cache path. This closes the window in
+                // which the direct owner could finish and another same-target
+                // caller could reclaim a bounded read before cache takeover.
+                self.request_ministream_cache();
+                return false;
+            }
+            let desired = minifat_state(sid, MINIFAT_DIRECT_IN_FLIGHT);
+            if self
+                .minifat_direct_state
+                .compare_exchange(
+                    observed,
+                    desired,
+                    AtomicOrdering::AcqRel,
+                    AtomicOrdering::Acquire,
+                )
+                .is_ok()
+            {
+                return true;
+            }
+        }
     }
 
-    fn finish_minifat_direct(&self, success: bool) {
+    fn finish_minifat_direct(&self, sid: u32, success: bool) {
         let target = if success {
-            MINIFAT_DIRECT_DONE
+            minifat_state(sid, MINIFAT_DIRECT_DONE)
         } else {
-            MINIFAT_DIRECT_UNCLAIMED
+            minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)
         };
         // A concurrent cached read may have taken ownership while this direct
         // read was in flight. Leave that cache state untouched; its failure
-        // path consumes the one direct opportunity before retrying the cache.
+        // path keeps the reader in cache mode before retrying.
         let _ = self.minifat_direct_state.compare_exchange(
-            MINIFAT_DIRECT_IN_FLIGHT,
+            minifat_state(sid, MINIFAT_DIRECT_IN_FLIGHT),
             target,
             AtomicOrdering::AcqRel,
             AtomicOrdering::Acquire,
         );
     }
 
-    fn begin_ministream_cache(&self) -> u8 {
+    fn request_ministream_cache(&self) {
+        loop {
+            let observed = self.minifat_direct_state.load(AtomicOrdering::Acquire);
+            let kind = minifat_state_kind(observed);
+            if matches!(
+                kind,
+                MINIFAT_CACHE_REQUESTED | MINIFAT_CACHE_IN_FLIGHT | MINIFAT_CACHE_READY
+            ) {
+                return;
+            }
+            let desired = minifat_state(MINIFAT_CACHE_SID, MINIFAT_CACHE_REQUESTED);
+            if self
+                .minifat_direct_state
+                .compare_exchange(
+                    observed,
+                    desired,
+                    AtomicOrdering::AcqRel,
+                    AtomicOrdering::Acquire,
+                )
+                .is_ok()
+            {
+                return;
+            }
+        }
+    }
+
+    fn begin_ministream_cache(&self) -> u64 {
         loop {
             let state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-            if state == MINIFAT_CACHE_READY {
+            let kind = minifat_state_kind(state);
+            if kind == MINIFAT_CACHE_READY {
                 return state;
             }
+            if kind == MINIFAT_CACHE_IN_FLIGHT {
+                // Cache initialization is serialized by `ministream`; a
+                // second caller cannot observe this state after acquiring the
+                // mutex unless an earlier initializer left it stranded. Do
+                // not spin while holding the mutex.
+                return state;
+            }
+            let desired = minifat_state(MINIFAT_CACHE_SID, MINIFAT_CACHE_IN_FLIGHT);
             if self
                 .minifat_direct_state
                 .compare_exchange(
                     state,
-                    MINIFAT_CACHE_IN_FLIGHT,
+                    desired,
                     AtomicOrdering::AcqRel,
                     AtomicOrdering::Acquire,
                 )
@@ -465,20 +574,19 @@ impl SharedOleFile {
         }
     }
 
-    fn finish_ministream_cache(&self, previous: u8, success: bool) {
-        if success {
-            self.minifat_direct_state
-                .store(MINIFAT_CACHE_READY, AtomicOrdering::Release);
-            return;
-        }
-        let target = match previous {
-            MINIFAT_DIRECT_IN_FLIGHT => MINIFAT_DIRECT_DONE,
-            MINIFAT_DIRECT_DONE => MINIFAT_DIRECT_DONE,
-            MINIFAT_CACHE_READY => MINIFAT_CACHE_READY,
-            _ => MINIFAT_DIRECT_UNCLAIMED,
+    fn finish_ministream_cache(&self, _previous: u64, success: bool) {
+        let in_flight = minifat_state(MINIFAT_CACHE_SID, MINIFAT_CACHE_IN_FLIGHT);
+        let target = if success {
+            minifat_state(MINIFAT_CACHE_SID, MINIFAT_CACHE_READY)
+        } else {
+            // Once a caller has selected the root cache, a failed cache load
+            // must remain retryable through that cache. Returning to the
+            // direct state could reintroduce a second bounded read after a
+            // concurrent/different target already observed this path.
+            minifat_state(MINIFAT_CACHE_SID, MINIFAT_CACHE_RETRY)
         };
         let _ = self.minifat_direct_state.compare_exchange(
-            MINIFAT_CACHE_IN_FLIGHT,
+            in_flight,
             target,
             AtomicOrdering::AcqRel,
             AtomicOrdering::Acquire,
@@ -732,14 +840,23 @@ impl SharedOleFile {
     }
 
     fn read_minifat_stream(&self, start_sector: u32, size: u64) -> Result<Vec<u8>, OleError> {
+        // Request cache ownership before acquiring the initialization mutex.
+        // Automatic noneligible paths, forced bulk paths, and internal cache
+        // callers therefore all publish the takeover before another direct
+        // claimant can observe the old state.
+        self.request_ministream_cache();
         let ministream = {
             let mut cached = self.ministream.lock().map_err(|_error| {
                 OleError::InvalidData("shared mini-stream cache is poisoned".to_string())
             })?;
+            // Enter cache mode even when a previous caller already populated
+            // the bytes. This is important for a forced bulk read that follows
+            // a successful direct read: after that point future automatic
+            // opens must not return to direct mode.
+            let previous = self.begin_ministream_cache();
             if cached.is_none() {
-                // Do not publish failed initialization: a transient source I/O
-                // error must leave a subsequent mini-stream read free to retry.
-                let previous = self.begin_ministream_cache();
+                // Do not publish failed initialization: a transient source
+                // I/O error leaves a subsequent cache read free to retry.
                 let loaded: Result<Arc<[u8]>, OleError> = (|| {
                     self.check_source_version()?;
                     let loaded = self.load_ministream()?;
@@ -754,8 +871,8 @@ impl SharedOleFile {
                     },
                 };
                 *cached = Some(loaded);
-                self.finish_ministream_cache(previous, true);
             }
+            self.finish_ministream_cache(previous, true);
             cached.as_ref().cloned().ok_or_else(|| {
                 OleError::CorruptedFile("shared mini-stream cache is missing".to_string())
             })?
@@ -1284,7 +1401,7 @@ mod tests {
             expected_version,
             index: Arc::new(index),
             ministream: Mutex::new(None),
-            minifat_direct_state: AtomicU8::new(MINIFAT_DIRECT_UNCLAIMED),
+            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
         };
         (file, source, physical_start, present)
     }
@@ -1434,7 +1551,7 @@ mod tests {
     }
 
     #[test]
-    fn selected_ministream_reads_are_bounded_and_cache_path_handles_repeats() {
+    fn selected_ministream_reads_are_bounded_and_same_target_repeats_stay_direct() {
         let source = Arc::new(TestSource::new(sample_bytes()));
         let file = shared(source.clone());
         source.reset_read_count();
@@ -1447,13 +1564,10 @@ mod tests {
 
         assert_eq!(file.open_stream(&["Small"]).unwrap(), b"mini stream");
         assert!(source.reads.load(AtomicOrdering::SeqCst) > after_first_small);
-        assert!(file.mini_stream_is_materialized());
+        assert!(!file.mini_stream_is_materialized());
         let after_second_small = source.reads.load(AtomicOrdering::SeqCst);
         assert_eq!(file.open_stream(&["Small"]).unwrap(), b"mini stream");
-        assert_eq!(
-            source.reads.load(AtomicOrdering::SeqCst),
-            after_second_small
-        );
+        assert!(source.reads.load(AtomicOrdering::SeqCst) > after_second_small);
 
         // A root containing only the selected 4095-byte stream is not twice
         // as large as that stream, so repeated reads retain the existing root
@@ -1464,6 +1578,10 @@ mod tests {
         source.reset_read_count();
         assert_eq!(file.open_stream(&["Mini"]).unwrap(), expected);
         assert!(file.mini_stream_is_materialized());
+        assert_eq!(
+            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
+            MINIFAT_CACHE_READY
+        );
         let after_first_cached = source.reads.load(AtomicOrdering::SeqCst);
         assert_eq!(file.open_stream(&["Mini"]).unwrap().len(), 4095);
         assert_eq!(
@@ -1493,7 +1611,36 @@ mod tests {
     }
 
     #[test]
-    fn eligible_minifat_open_is_one_shot_then_reuses_the_root_cache() {
+    fn minifat_range_reads_do_not_consume_the_direct_repeat_state() {
+        let (bytes, expected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(source.clone());
+        let mut range = vec![0u8; 17];
+
+        source.reset_read_count();
+        file.read_stream_range(&["Selected"], 31, &mut range)
+            .unwrap();
+        assert_eq!(range, expected[31..48]);
+        assert!(!file.mini_stream_is_materialized());
+        assert_eq!(
+            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
+            MINIFAT_DIRECT_UNCLAIMED
+        );
+
+        assert_eq!(file.open_stream(&["Selected"]).unwrap(), expected);
+        assert!(!file.mini_stream_is_materialized());
+        assert_eq!(
+            source
+                .read_ranges()
+                .into_iter()
+                .filter(|(_, length)| *length == expected.len())
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn eligible_minifat_open_repeats_same_target_without_root_cache() {
         let (bytes, expected) = two_mini_bytes(4095);
         let source = Arc::new(TestSource::new(bytes));
         let file = shared(source.clone());
@@ -1511,10 +1658,325 @@ mod tests {
         );
 
         assert_eq!(file.open_stream(&["Selected"]).unwrap(), expected);
-        assert!(file.mini_stream_is_materialized());
-        let after_cache = source.reads.load(AtomicOrdering::SeqCst);
+        assert!(!file.mini_stream_is_materialized());
+        let direct_ranges = source
+            .read_ranges()
+            .into_iter()
+            .filter(|(_, length)| *length == expected.len())
+            .count();
+        assert_eq!(direct_ranges, 2);
         assert_eq!(file.open_stream(&["Selected"]).unwrap(), expected);
-        assert_eq!(source.reads.load(AtomicOrdering::SeqCst), after_cache);
+        assert!(!file.mini_stream_is_materialized());
+        assert_eq!(
+            source
+                .read_ranges()
+                .into_iter()
+                .filter(|(_, length)| *length == expected.len())
+                .count(),
+            3
+        );
+    }
+
+    #[test]
+    fn same_target_repeat3_and_repeat8_keep_exact_direct_ranges() {
+        for repeat in [3_usize, 8] {
+            let (bytes, expected) = two_mini_bytes(4095);
+            let source = Arc::new(TestSource::new(bytes));
+            let file = shared(source.clone());
+            source.reset_read_count();
+
+            for _ in 0..repeat {
+                assert_eq!(file.open_stream(&["Selected"]).unwrap(), expected);
+            }
+
+            assert!(!file.mini_stream_is_materialized(), "repeat {repeat}");
+            assert_eq!(
+                source
+                    .read_ranges()
+                    .into_iter()
+                    .filter(|(_, length)| *length == expected.len())
+                    .count(),
+                repeat,
+                "repeat {repeat}"
+            );
+        }
+    }
+
+    #[test]
+    fn case_aliases_resolve_to_the_same_direct_target_sid() {
+        let (bytes, expected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(source.clone());
+        let selected_sid = file.find_entry(&["Selected"]).unwrap().sid;
+        let alias_sid = file.find_entry(&["sElEcTeD"]).unwrap().sid;
+        assert_eq!(selected_sid, alias_sid);
+
+        source.reset_read_count();
+        assert_eq!(file.open_stream(&["Selected"]).unwrap(), expected);
+        assert_eq!(file.open_stream(&["sElEcTeD"]).unwrap(), expected);
+        assert!(!file.mini_stream_is_materialized());
+        assert_eq!(
+            source
+                .read_ranges()
+                .into_iter()
+                .filter(|(_, length)| *length == expected.len())
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn different_minifat_target_takes_cache_and_a_b_a_stays_cached() {
+        let (bytes, selected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(source.clone());
+
+        source.reset_read_count();
+        assert_eq!(file.open_stream(&["Selected"]).unwrap(), selected);
+        assert!(!file.mini_stream_is_materialized());
+        assert_eq!(file.open_stream(&["Other"]).unwrap(), vec![0xD3; 4095]);
+        assert!(file.mini_stream_is_materialized());
+        let after_other = source.reads.load(AtomicOrdering::SeqCst);
+        assert_eq!(file.open_stream(&["Selected"]).unwrap(), selected);
+        assert_eq!(source.reads.load(AtomicOrdering::SeqCst), after_other);
+
+        let ranges = source.read_ranges();
+        assert_eq!(
+            ranges
+                .iter()
+                .filter(|(_, length)| *length == selected.len())
+                .count(),
+            1
+        );
+        assert!(ranges.iter().any(|(_, length)| *length > selected.len()));
+    }
+
+    #[test]
+    fn fat_interleave_does_not_change_the_active_minifat_direct_target() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+
+        source.reset_read_count();
+        assert_eq!(file.open_stream(&["Small"]).unwrap(), b"mini stream");
+        assert_eq!(file.open_stream(&["Large"]).unwrap(), vec![0xA5; 8192]);
+        assert_eq!(file.open_stream(&["small"]).unwrap(), b"mini stream");
+        assert!(!file.mini_stream_is_materialized());
+
+        let ranges = source.read_ranges();
+        assert_eq!(
+            ranges
+                .iter()
+                .filter(|(_, length)| *length == b"mini stream".len())
+                .count(),
+            2
+        );
+        assert!(ranges.iter().any(|(_, length)| *length == 8192));
+    }
+
+    #[test]
+    fn cache_failure_retries_cache_without_returning_to_direct() {
+        let (bytes, selected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(source.clone());
+
+        source.reset_read_count();
+        assert_eq!(file.open_stream(&["Selected"]).unwrap(), selected);
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+        assert!(matches!(file.open_stream(&["Other"]), Err(OleError::Io(_))));
+        assert!(!file.mini_stream_is_materialized());
+        assert_eq!(
+            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
+            MINIFAT_CACHE_RETRY
+        );
+
+        assert_eq!(file.open_stream(&["Other"]).unwrap(), vec![0xD3; 4095]);
+        assert!(file.mini_stream_is_materialized());
+        assert_eq!(
+            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
+            MINIFAT_CACHE_READY
+        );
+        let after_retry = source.reads.load(AtomicOrdering::SeqCst);
+        assert_eq!(file.open_stream(&["Selected"]).unwrap(), selected);
+        assert_eq!(source.reads.load(AtomicOrdering::SeqCst), after_retry);
+
+        let ranges = source.read_ranges();
+        assert_eq!(
+            ranges
+                .iter()
+                .filter(|(_, length)| *length == selected.len())
+                .count(),
+            1,
+            "cache retry must not admit a second direct range"
+        );
+        assert!(
+            ranges
+                .iter()
+                .filter(|(_, length)| *length > selected.len())
+                .count()
+                >= 2
+        );
+    }
+
+    #[test]
+    fn bulk_single_minifat_keeps_direct_width_one_and_two() {
+        for workers in [1, 2] {
+            let (bytes, selected) = two_mini_bytes(4095);
+            let source = Arc::new(TestSource::new(bytes));
+            let file = shared(source.clone());
+            let (_cancel, token) = CancellationSource::pair();
+            source.reset_read_count();
+
+            let outputs = file
+                .bulk_read(context(workers, 2, 8190, 1, token, 16_384))
+                .read_streams(&[&["Selected"]])
+                .unwrap();
+            assert_eq!(outputs, vec![selected.clone()]);
+            assert!(!file.mini_stream_is_materialized(), "workers {workers}");
+            assert_eq!(
+                source
+                    .read_ranges()
+                    .into_iter()
+                    .filter(|(_, length)| *length == selected.len())
+                    .count(),
+                1,
+                "workers {workers}"
+            );
+
+            let (_cancel, token) = CancellationSource::pair();
+            let repeated = file
+                .bulk_read(context(workers, 2, 8190, 1, token, 8_192))
+                .read_streams(&[&["Selected"]])
+                .unwrap();
+            assert_eq!(repeated, vec![selected.clone()]);
+            assert!(!file.mini_stream_is_materialized(), "workers {workers}");
+            assert_eq!(
+                source
+                    .read_ranges()
+                    .into_iter()
+                    .filter(|(_, length)| *length == selected.len())
+                    .count(),
+                2,
+                "workers {workers}"
+            );
+        }
+    }
+
+    #[test]
+    fn bulk_multi_minifat_batch_converges_on_one_root_cache() {
+        for workers in [1, 2] {
+            let (bytes, selected) = two_mini_bytes(4095);
+            let source = Arc::new(TestSource::new(bytes));
+            let file = shared(source.clone());
+            let (_cancel, token) = CancellationSource::pair();
+            source.reset_read_count();
+
+            let outputs = file
+                .bulk_read(context(workers, 2, 8190, 1, token, 16_384))
+                .read_streams(&[&["Selected"], &["Other"]])
+                .unwrap();
+            assert_eq!(outputs, vec![selected, vec![0xD3; 4095]]);
+            assert!(file.mini_stream_is_materialized(), "workers {workers}");
+            let after_bulk = source.reads.load(AtomicOrdering::SeqCst);
+            let (_cancel, token) = CancellationSource::pair();
+            assert_eq!(
+                file.bulk_read(context(workers, 2, 8190, 1, token, 8_192))
+                    .read_streams(&[&["Selected"]])
+                    .unwrap()[0]
+                    .len(),
+                4095
+            );
+            assert_eq!(source.reads.load(AtomicOrdering::SeqCst), after_bulk);
+        }
+    }
+
+    #[test]
+    fn minifat_direct_thresholds_cover_zero_ratio_and_size_cutoffs() {
+        let (bytes, _expected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let mut file = shared(source);
+
+        assert!(!file.should_read_minifat_range(0));
+        assert!(!file.should_read_minifat_range(MINIFAT_DIRECT_READ_MAX_BYTES + 1));
+
+        Arc::get_mut(&mut file.index)
+            .unwrap()
+            .root
+            .as_mut()
+            .unwrap()
+            .size = MINIFAT_DIRECT_READ_MAX_BYTES * MINIFAT_DIRECT_ROOT_SIZE_RATIO;
+        assert!(file.should_read_minifat_range(MINIFAT_DIRECT_READ_MAX_BYTES));
+        Arc::get_mut(&mut file.index)
+            .unwrap()
+            .root
+            .as_mut()
+            .unwrap()
+            .size -= 1;
+        assert!(!file.should_read_minifat_range(MINIFAT_DIRECT_READ_MAX_BYTES));
+    }
+
+    #[test]
+    fn delayed_three_callers_publish_cache_request_before_direct_finishes() {
+        let (bytes, _expected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = Arc::new(shared(source));
+        let selected = file.find_entry(&["Selected"]).unwrap();
+        let other = file.find_entry(&["Other"]).unwrap();
+        let selected_sid = selected.sid;
+        let selected_size = selected.size;
+        let other_sid = other.sid;
+        let other_size = other.size;
+
+        assert!(file.claim_minifat_direct(selected_sid, selected_size));
+        let gate = Arc::new(Barrier::new(3));
+        let (other_claim, repeat_claim) = thread::scope(|scope| {
+            let direct_file = Arc::clone(&file);
+            let direct_gate = Arc::clone(&gate);
+            let direct = scope.spawn(move || {
+                direct_gate.wait();
+                direct_file.finish_minifat_direct(selected_sid, true);
+            });
+            let other_file = Arc::clone(&file);
+            let other_gate = Arc::clone(&gate);
+            let other = scope.spawn(move || {
+                let claim = other_file.claim_minifat_direct(other_sid, other_size);
+                other_gate.wait();
+                claim
+            });
+            let repeat_file = Arc::clone(&file);
+            let repeat_gate = Arc::clone(&gate);
+            let repeat = scope.spawn(move || {
+                let claim = repeat_file.claim_minifat_direct(selected_sid, selected_size);
+                repeat_gate.wait();
+                claim
+            });
+            assert!(direct.join().is_ok());
+            (other.join().unwrap(), repeat.join().unwrap())
+        });
+
+        assert!(!other_claim);
+        assert!(!repeat_claim);
+        assert_eq!(
+            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
+            MINIFAT_CACHE_REQUESTED
+        );
+    }
+
+    #[test]
+    fn direct_failure_after_cache_request_cannot_reopen_direct() {
+        let (bytes, _expected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(source);
+        let selected = file.find_entry(&["Selected"]).unwrap();
+        let other = file.find_entry(&["Other"]).unwrap();
+
+        assert!(file.claim_minifat_direct(selected.sid, selected.size));
+        assert!(!file.claim_minifat_direct(other.sid, other.size));
+        file.finish_minifat_direct(selected.sid, false);
+        assert_eq!(
+            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
+            MINIFAT_CACHE_REQUESTED
+        );
+        assert!(!file.claim_minifat_direct(selected.sid, selected.size));
     }
 
     #[test]
@@ -1548,6 +2010,42 @@ mod tests {
     }
 
     #[test]
+    fn force_cache_requests_before_a_delayed_direct_read_finishes() {
+        let (bytes, selected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = Arc::new(shared(source.clone()));
+        source.reset_read_count();
+        source.synchronize_next_two_reads();
+
+        let (direct, cached) = thread::scope(|scope| {
+            let direct_file = Arc::clone(&file);
+            let direct = scope.spawn(move || direct_file.open_stream(&["Selected"]));
+            while source.reads.load(AtomicOrdering::SeqCst) < 1 {
+                thread::yield_now();
+            }
+            let cache_file = Arc::clone(&file);
+            let cached = scope.spawn(move || cache_file.open_stream_force_cache(&["Other"]));
+            (direct.join().unwrap(), cached.join().unwrap())
+        });
+        assert_eq!(direct.unwrap(), selected);
+        assert_eq!(cached.unwrap(), vec![0xD3; 4095]);
+        assert!(file.mini_stream_is_materialized());
+        assert_eq!(
+            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
+            MINIFAT_CACHE_READY
+        );
+        let ranges = source.read_ranges();
+        assert_eq!(
+            ranges
+                .iter()
+                .filter(|(_, length)| *length == selected.len())
+                .count(),
+            1
+        );
+        assert!(ranges.iter().any(|(_, length)| *length > selected.len()));
+    }
+
+    #[test]
     fn failed_direct_open_and_cache_takeover_do_not_admit_a_second_direct_read() {
         let (bytes, expected) = two_mini_bytes(4095);
         let source = Arc::new(TestSource::new(bytes));
@@ -1576,6 +2074,10 @@ mod tests {
             failure.expect("one concurrent direct read must fail"),
             OleError::Io(_)
         ));
+        assert_eq!(
+            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
+            MINIFAT_CACHE_READY
+        );
         let ranges = source.read_ranges();
         assert_eq!(
             ranges
@@ -1588,6 +2090,52 @@ mod tests {
         source.reset_read_count();
         assert_eq!(file.open_stream(&["Selected"]).unwrap(), expected);
         assert!(source.read_ranges().is_empty());
+    }
+
+    #[test]
+    fn failed_cache_takeover_during_direct_read_leaves_retryable_cache_state() {
+        let (bytes, selected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = Arc::new(shared(source.clone()));
+        let root_size = usize::try_from(file.index.root.as_ref().unwrap().size).unwrap();
+        source.reset_read_count();
+        source.fail_next_read_of_length(root_size);
+        source.synchronize_next_two_reads();
+
+        let (selected_result, other_result) = thread::scope(|scope| {
+            let selected_file = Arc::clone(&file);
+            let selected = scope.spawn(move || selected_file.open_stream(&["Selected"]));
+            while source.reads.load(AtomicOrdering::SeqCst) < 1 {
+                thread::yield_now();
+            }
+            let other_file = Arc::clone(&file);
+            let other = scope.spawn(move || other_file.open_stream(&["Other"]));
+            (selected.join().unwrap(), other.join().unwrap())
+        });
+        assert_eq!(selected_result.unwrap(), selected);
+        assert!(matches!(other_result, Err(OleError::Io(_))));
+        assert!(!file.mini_stream_is_materialized());
+        assert_eq!(
+            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
+            MINIFAT_CACHE_RETRY
+        );
+
+        assert_eq!(file.open_stream(&["Other"]).unwrap(), vec![0xD3; 4095]);
+        assert!(file.mini_stream_is_materialized());
+        assert_eq!(
+            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
+            MINIFAT_CACHE_READY
+        );
+        let ranges = source.read_ranges();
+        assert_eq!(
+            ranges
+                .iter()
+                .filter(|(_, length)| *length == selected.len())
+                .count(),
+            1,
+            "cache failure must not re-admit a second direct read"
+        );
+        assert!(ranges.iter().any(|(_, length)| *length == root_size));
     }
 
     #[test]
@@ -1617,6 +2165,12 @@ mod tests {
         let direct = file.open_stream(&["Other"]).unwrap();
         assert_eq!(&direct[..present], &vec![0xD3; present]);
         assert!(direct[present..].iter().all(|&byte| byte == 0));
+        assert_eq!(source.read_ranges(), vec![(physical_start, present)]);
+
+        source.reset_read_count();
+        let repeated = file.open_stream(&["Other"]).unwrap();
+        assert_eq!(repeated, direct);
+        assert!(!file.mini_stream_is_materialized());
         assert_eq!(source.read_ranges(), vec![(physical_start, present)]);
 
         source.reset_read_count();
@@ -1715,7 +2269,7 @@ mod tests {
             expected_version,
             index: Arc::new(index),
             ministream: Mutex::new(None),
-            minifat_direct_state: AtomicU8::new(MINIFAT_DIRECT_UNCLAIMED),
+            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
         };
 
         source.reset_read_count();
@@ -1932,7 +2486,7 @@ mod tests {
             expected_version,
             index: Arc::new(index),
             ministream: Mutex::new(None),
-            minifat_direct_state: AtomicU8::new(MINIFAT_DIRECT_UNCLAIMED),
+            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
         };
 
         source.reset_read_count();
@@ -2011,7 +2565,7 @@ mod tests {
             expected_version,
             index: Arc::new(index),
             ministream: Mutex::new(None),
-            minifat_direct_state: AtomicU8::new(MINIFAT_DIRECT_UNCLAIMED),
+            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
         };
 
         let mut output = vec![0_u8; expected.len()];
@@ -2253,6 +2807,47 @@ mod tests {
                 .read_streams(&[&["First"]]),
             Err(SharedOleBulkError::Execution(ExecutionError::Cancelled))
         ));
+    }
+
+    #[test]
+    fn bulk_preflight_failures_do_not_consume_minifat_direct_state() {
+        let (bytes, selected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(source.clone());
+        source.reset_read_count();
+
+        let (_cancel, token) = CancellationSource::pair();
+        assert!(matches!(
+            file.bulk_read(context(1, 1, 4095, 0, token, 8_192))
+                .read_streams(&[&["Missing"]]),
+            Err(SharedOleBulkError::Ole(OleError::StreamNotFound))
+        ));
+        assert_eq!(source.reads.load(AtomicOrdering::SeqCst), 0);
+        assert_eq!(
+            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
+            MINIFAT_DIRECT_UNCLAIMED
+        );
+
+        let (cancel, token) = CancellationSource::pair();
+        cancel.cancel();
+        assert!(matches!(
+            file.bulk_read(context(1, 1, 4095, 0, token, 8_192))
+                .read_streams(&[&["Selected"]]),
+            Err(SharedOleBulkError::Execution(ExecutionError::Cancelled))
+        ));
+        assert_eq!(source.reads.load(AtomicOrdering::SeqCst), 0);
+        assert_eq!(
+            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
+            MINIFAT_DIRECT_UNCLAIMED
+        );
+
+        let (_cancel, token) = CancellationSource::pair();
+        let output = file
+            .bulk_read(context(1, 1, 4095, 0, token, 8_192))
+            .read_streams(&[&["Selected"]])
+            .unwrap();
+        assert_eq!(output, vec![selected]);
+        assert!(!file.mini_stream_is_materialized());
     }
 
     #[test]

@@ -73,7 +73,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 285
+provide their source-read counters. The current `Case` matrix exposes 291
 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -207,6 +207,23 @@ one-shot source work falls from the complete root Mini Stream to one 36- or
 cost from the extra first direct request, so no generic repeat improvement is
 claimed. Local wall-clock tails, allocation/RSS, physical-I/O, native-format,
 and cross-format claims remain open.
+
+Change 0148 extends the same shared-baseline harness with six production-only
+selectors for different-SID A-B-A, public bulk A-B-A, and overlapping
+same-target calls at the 36-byte and 4095-byte targets:
+`cfb_open_stream_mini_shared_{different_sid,bulk,concurrent}` and
+`cfb_open_stream_mini_4095_shared_{different_sid,bulk,concurrent}`. The
+selectable matrix is now 291 names; the default remains 36 cases / 198
+records. The runner accepts the control root-only vector, the prior
+direct-then-root vector, and the target-aware same-SID repeat vector, while
+recording ordered workload names, exact positional ranges, output hashes,
+source-version stability, and typed missing-stream refusal. Concurrent
+workers use only a harness-side overlap gate for deterministic entry; the
+bulk selector exercises the public `bulk_read` API. This tranche is
+correctness/evidence-only and makes no latency, allocation, RSS, physical-I/O,
+release, or generic performance claim. Failure/retry, ineligible-root, FAT,
+native semantic, resource, and performance acceptance remain open. See
+[`0148-cfb-same-target-repeat-policy.md`](../../docs/performance/changes/0148-cfb-same-target-repeat-policy.md).
 
 The validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:

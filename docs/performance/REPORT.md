@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **285 selectable cases**; 200 was the count before the
+HEAD harness contains **291 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -1019,7 +1019,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 285 selectable cases. Change
+The committed HEAD standalone harness provides 291 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1063,6 +1063,15 @@ claimed. Local wall-clock, resource, physical-I/O, native-format, and
 cross-format claims remain open. See
 [`0147`](changes/0147-cfb-open-stream-release-abba.md) and the
 [compact summary](results/cfb-open-stream-abba-0147-summary.json).
+
+Change 0148 extends the current harness with six production-only CFB selectors
+for different-SID A-B-A, public bulk A-B-A, and overlapping same-target calls
+at 36-byte and 4,095-byte MiniFAT targets. They retain ordered workload names,
+output hashes/lengths, exact source positional events, source-version checks,
+and typed missing-stream refusal. This is correctness/source-event evidence
+only; failure/retry, ineligible-root, FAT, native semantic, resource, and
+performance acceptance remain open. See
+[`0148`](changes/0148-cfb-same-target-repeat-policy.md).
 
 Change 0119 adds three opt-in native PPT selected-shape controls and preserves
 the 36-case / 198-record default. The query-only and fresh-open-plus-query
