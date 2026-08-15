@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0148`](changes/0148-cfb-same-target-repeat-policy.md)
+Evidence through: [`change 0149`](changes/0149-cfb-same-target-repeat-release-abba.md)
 (the newest accepted semantic-format optimization remains limited to four repeated
 source-backed ODP full-text projections; the latest release CFB selective-range
 evidence is the configured simulator result in
@@ -13,7 +13,10 @@ correctness/counter instrumentation and
 configured-simulator one-shot result while retaining the repeat tradeoff, and
 [`0148`](changes/0148-cfb-same-target-repeat-policy.md) adds correctness/source-
 event coverage for different-SID A-B-A, public bulk A-B-A, and overlapping
-same-target calls, while
+same-target calls, and
+[`0149`](changes/0149-cfb-same-target-repeat-release-abba.md) accepts only the
+configured simulator's aggregate same-target repeat result while withholding
+local/per-invocation/bulk/concurrent/resource claims;
 [`0094`](changes/0094-cfb-selective-read-evidence.md) retains the non-simulated
 exact-range result, and the latest accepted
 generic multi-format filesystem result remains
@@ -731,8 +734,19 @@ Confirmed source facts:
   same-target calls at 36- and 4095-byte MiniFAT targets. The selectors cover
   source ranges, ordered workload outputs, source-version stability, and typed
   refusal only; failure/retry, ineligible-root, FAT, native semantic, resource,
-  and performance acceptance remain open. See
+  and performance acceptance for those extended selectors remain open. See
   [`0148`](changes/0148-cfb-same-target-repeat-policy.md).
+- Change 0149 compares the target-aware repeat policy against the immediate
+  pre-change policy with four clean CPU-2 release legs and 28,800 retained
+  samples. Under the named 100 us + 25 us/request, 50 MiB/s, 4 KiB-ceiling
+  simulator, repeat-3 aggregate total p50/p95/p99/mean improves about 60-64%
+  and repeat-8 about 56-64% in both adjacent ABBA directions. Same-target work
+  changes from `[L,R,0...]` to `[L,L,...]`; later calls are direct reads rather
+  than zero-source cache hits. Local bulk/concurrent cells contain >5% review
+  triggers and substantial control drift, so local, per-invocation, bulk,
+  concurrent, allocation/RSS, physical-I/O, and native-format claims remain
+  withheld. See
+  [`0149`](changes/0149-cfb-same-target-repeat-release-abba.md).
 - Change 0126 adds eight ordinary-root DOCX filesystem selectors over the
   unchanged 200-paragraph/eight-incompressible-2 MiB-media corpus. The eager
   control times `fs::read` plus `Document::from_bytes`; the source control
@@ -1134,8 +1148,12 @@ changes. Remaining gaps are:
   simulator's one-shot timing and exact source-work result, but repeats add one
   target-sized request before root-cache materialization. Change 0148 adds
   correctness/source-event coverage for different-SID A-B-A, public bulk A-B-A,
-  and overlapping same-target calls. Failure/retry, ineligible-root, FAT,
-  native semantic, resource, and performance acceptance remain open.
+  and overlapping same-target calls. Change 0149 accepts the target-aware
+  policy only for aggregate repeat-3/repeat-8 totals under the configured
+  simulator; it explicitly withholds local/per-invocation/bulk/concurrent and
+  resource claims after noisy >5% review triggers. Failure/retry,
+  ineligible-root, FAT, native semantic, and complete resource acceptance
+  remain open.
 - Decompressed and recompressed byte observers. Positional range-request
   distributions now exist for OPC and XLSX, but not yet for every format/source.
 - Broad hardware-counter evidence. A matched targeted-OPC run is committed now

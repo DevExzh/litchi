@@ -84,6 +84,7 @@ is still not broad program or CRUD coverage.
 | Positional CFB/ZIP and explicit execution | Large-task p50 scaling at 12 CPUs: OPC **4.52x**, CFB **5.93x**; no hidden global Rayon | Many-small tasks regress at high worker counts; default/legacy paths remain serial |
 | CFB selective exact-range read | MiniFAT source bytes **261,184 -> 36** (many-small) and **2,096,192 -> 36** (wide-root), one request in each; read-stage p50 **-95.1%/-94.8%** and **-99.2%/-99.2%** across ABBA directions; read-stage p95 **-94.4%/-94.8%** and **-98.9%/-99.1%**; total p50 **-8.4%/-14.2%** and **-6.6%/-11.9%** | FAT retains one 4 MiB request/call and paired read/total p50 changes stay within 5% control drift. That record makes no p95/p99 FAT, MiniFAT p99, cold-filesystem, simulated high-latency range, allocation, peak-RSS, or DOC/XLS/PPT semantic claim |
 | CFB selective simulated-range read | With a harness-only 100 us + 25 us/request, 50 MiB/s, 64 KiB-ceiling model, both MiniFAT targets reduce selective-read work to one exact request. Total p50 improves **40.12%/39.99%** and **40.09%/39.82%** on many-small, and **41.96%/41.83%** and **42.00%/41.84%** on wide-root; p95 agrees in both directions | The 4 MiB FAT controls retain 64 requests / 4 MiB / 88 ms modeled read floor and stay near neutral. This accepts only configured simulator latency and request/byte/service-floor evidence; no real cold/network/device, production scheduling, allocation/RSS, or native semantic claim |
+| CFB same-target MiniFAT repeat policy | Same-target source work changes from `[L,R,0...]` to `[L,L,...]`. In the 100 us + 25 us/request, 50 MiB/s, 4 KiB-ceiling model, aggregate total repeat-3 p50 improves **60.70-64.09%** and repeat-8 **55.86-63.67%** across both adjacent ABBA directions; p95/p99/mean agree | Local/per-invocation/bulk/concurrent distributions are withheld: later zero-source cache hits become exact target reads, and special-workload local tails contain reversing >5% review triggers with substantial control drift. No resource, physical-I/O, cold/network/device, or native semantic claim |
 | CFB MiniFAT 4095-byte physical-run evidence | Focused matched legacy/positional controls record exact open/read/total timing, source calls/bytes/range sizes, 4095-byte payload hash, and request amplification across 64 logical mini-sectors | Correctness/request-amplification evidence only; no release latency, p99, cold/high-latency, allocation/RSS, physical-I/O, or native semantic claim |
 | Ordinary-root DOCX source-path evidence | Eight opt-in eager/source filesystem selectors over the unchanged 200-paragraph/eight-incompressible-2 MiB-media corpus; untimed parity covers paragraphs, full text, tables, elements, and metadata, while exact source SHA plus logical OPC part/relationship/content-type/blob-hash gates cover package preservation, including all media hashes and source immutability; typed replays classify zero-payload-overlap open, complete main-range preparation for query selectors, and zero-overlap queries | Selectable matrix 245 -> 253; correctness/logical compressed-range evidence only; no latency, physical-I/O, decompression, allocation, RSS, cold-cache, ABBA, broad-security, or Markdown-performance claim |
 | Source-backed OPC and DOCX/XLSX/PPTX facades | EOCD structural-open source bytes **-73.6% to -98.5%**; ordinary payload overlap zero | No latency claim: later EntryId/cache-diagnostic changes confound comparison and some cells exceed 5% variance |
@@ -1070,8 +1071,26 @@ at 36-byte and 4,095-byte MiniFAT targets. They retain ordered workload names,
 output hashes/lengths, exact source positional events, source-version checks,
 and typed missing-stream refusal. This is correctness/source-event evidence
 only; failure/retry, ineligible-root, FAT, native semantic, resource, and
-performance acceptance remain open. See
+performance acceptance for those extended selectors remain open. See
 [`0148`](changes/0148-cfb-same-target-repeat-policy.md).
+
+Change 0149 retains a clean release comparison for the target-aware repeat
+policy. Four CPU-2 legs in strict `A1 control, B1 candidate, B2 candidate, A2
+control` order cover 36 records each, 20 warmups, and 200 samples, for 28,800
+retained samples. The identical-harness control restores only `shared.rs` and
+`shared_bulk.rs` from the immediate pre-change production revision.
+
+Under the configured range model, all eight repeat-3/repeat-8 aggregate-total
+cells improve in both adjacent directions: roughly 60-64% for repeat-3 and
+56-64% for repeat-8 at p50, with matching p95/p99/mean direction. Exact source
+work changes from `[L,R,0...]` to `[L,L,...]`; configured-simulator one-shot
+controls remain near neutral. Later per-invocation calls are target reads rather
+than zero-source cache hits, and the noisy local bulk/concurrent distributions
+contain explicit >5% review triggers. Consequently no local, per-invocation,
+bulk, concurrent, allocation/RSS, physical-I/O, cold/network/device, native-
+format, or generic claim is accepted. See the
+[release record](changes/0149-cfb-same-target-repeat-release-abba.md) and
+[machine-readable summary](results/cfb-repeat-abba-0149-summary.json).
 
 Change 0119 adds three opt-in native PPT selected-shape controls and preserves
 the 36-case / 198-record default. The query-only and fresh-open-plus-query

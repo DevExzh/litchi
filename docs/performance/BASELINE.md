@@ -329,9 +329,46 @@ target-aware same-SID repeat vector; concurrent overlap uses only a harness-side
 entry gate, and bulk calls the public `bulk_read` API.
 
 This is correctness/source-event evidence only. Failure/retry, ineligible-root,
-FAT, native semantic, resource, and performance acceptance remain open; no
-release, latency, allocation, RSS, physical-I/O, or generic CRUD claim is made.
+FAT, native semantic, resource, and performance acceptance for those extended
+selectors remain open; no release, latency, allocation, RSS, physical-I/O, or
+generic CRUD claim is made by change 0148 itself.
 See [change 0148](changes/0148-cfb-same-target-repeat-policy.md).
+
+## CFB same-target repeat release ABBA (change 0149)
+
+Four clean CPU-2 release processes compared the current target-aware policy
+with the immediate pre-change production policy in strict
+`A1 control, B1 candidate, B2 candidate, A2 control` order. The matrix uses 20
+warmups and 200 samples for each of 36 records per leg, retaining 28,800
+samples. Both revisions use the exact same harness and deterministic 36-/4095-
+byte `many-small` / `wide-root` corpora.
+
+Sequential same-target source work changes from control `[L,R,0...]` to
+candidate `[L,L,...]`: the candidate avoids root Mini Stream materialization,
+but later calls are exact target reads rather than zero-source cache hits.
+Different-SID remains `[D,C,0]`, public multi-MiniFAT bulk changes from
+control `{D,C}` to candidate `{C}`, and overlap changes from control `{D,C}`
+to bounded `{D,D}` or `{D,C}` candidate outcomes. Output hashes,
+source versions, returned lengths, and typed refusal remain exact.
+
+Under the harness-only 100 us fixed latency + 25 us/request, 50 MiB/s, 4 KiB-
+range model, aggregate total improvements agree in both ABBA directions:
+
+| Operation | many / 36 p50 | many / 4,095 p50 | wide / 36 p50 | wide / 4,095 p50 |
+|---|---:|---:|---:|---:|
+| repeat-3 | 61.47% / 61.55% | 60.70% / 60.70% | 64.09% / 64.01% | 63.85% / 63.69% |
+| repeat-8 | 58.19% / 58.15% | 55.92% / 55.86% | 63.67% / 63.57% | 63.16% / 63.16% |
+
+P95, p99, and mean agree at roughly the same 56-64% aggregate-total scale.
+Configured-simulator one-shot totals remain near neutral. The local
+in-memory, per-invocation, bulk, and concurrent distributions are not accepted:
+later cache-hit positions deliberately regress, and local special-workload
+tails include reversing >5% review triggers with substantial same-
+implementation drift. No allocation/RSS, bounded-memory, physical-I/O,
+cold/network/device, native-format, or generic performance claim is made. See
+the [release record](changes/0149-cfb-same-target-repeat-release-abba.md),
+[summary](results/cfb-repeat-abba-0149-summary.json), and retained compressed
+raw legs.
 
 ## CFB MiniFAT physical-run boundary evidence (change 0125)
 

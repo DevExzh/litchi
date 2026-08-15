@@ -2,8 +2,10 @@
 
 Date: 2026-08-16
 
-Status: harness and correctness evidence only. This change has no release or
-performance claim and does not modify iWork coverage.
+Status: production policy and correctness evidence accepted. The follow-up
+[clean release ABBA](0149-cfb-same-target-repeat-release-abba.md) accepts only
+the named configured-simulator aggregate repeat result; local and resource
+claims remain withheld. This change does not modify iWork coverage.
 
 Change 0148 extends the production `SharedOleFile::open_stream` evidence
 runner from the one-shot/repeat workloads in [0146](0146-cfb-open-stream-evidence.md)
@@ -72,18 +74,20 @@ Bulk coverage calls only the public `SharedOleFile::bulk_read` /
 worker and a byte budget covering the three returned payloads. It does not
 call candidate-only production helpers.
 
-## Evidence boundary and future release comparison
+## Evidence boundary and release follow-up
 
 These selectors are correctness and source-event evidence. They do not claim a
 latency, allocation, RSS, physical-I/O, native-format, CRUD, or generic
 performance improvement. Failure/retry, ineligible-root, FAT, native semantic,
-resource, and performance acceptance remain open. The existing 0147 raw/results
-are historical and are left untouched.
+resource, and performance acceptance for the extended bulk/concurrent selectors
+remain open. The existing 0147 raw/results are historical and are left
+untouched.
 
-A future release comparison must use the same runner revision and an explicit
-ABBA sequence (`A1 control`, `B1 candidate`, `B2 candidate`, `A2 control`).
-Because the candidate tranche also changes the bulk MiniFAT path, the control
-worktree for that comparison must restore both `crates/litchi-cfb/src/shared.rs`
-and `crates/litchi-cfb/src/shared_bulk.rs`, not only `shared.rs`. Release
-artifacts should identify the runner SHA, corpus hashes, source vectors, and
-environment; this change intentionally adds no result artifact.
+The required comparison is now retained in
+[change 0149](0149-cfb-same-target-repeat-release-abba.md): identical harness,
+clean release worktrees, and explicit `A1 control, B1 candidate, B2 candidate,
+A2 control` order. Its control restores both `shared.rs` and `shared_bulk.rs`.
+The configured simulator accepts aggregate repeat-3/repeat-8 total improvements
+of roughly 56-64% in both directions while retaining the later-invocation
+direct-read tradeoff. Local wall-clock, per-invocation, bulk, concurrent,
+allocation/RSS, physical-I/O, native-format, and generic claims remain withheld.
