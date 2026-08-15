@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::sync::Arc;
 
-use litchi_core::ReadAt;
-use litchi_opc::ReadLimits;
+use litchi_core::{ExecutionContext, ReadAt};
+use litchi_opc::{ReadLimits, SourceBackedPackage, SourceCacheLimits};
 use litchi_sheet::Row;
 
 use super::{Commit, Patch, Snapshot, rewrite};
@@ -71,6 +71,62 @@ impl SourceBackedEditor {
     pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
         Ok(Self {
             inner: cell_values::SourceBackedEditor::from_read_at_with_limits(source, limits)?,
+        })
+    }
+
+    /// Open with an explicit caller-owned execution context and the default
+    /// finite deferred-Part cache. Retained and in-flight worksheet payloads
+    /// remain attached to the context's hierarchical budget through the
+    /// delegated cell-values editor.
+    pub fn from_read_at_with_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            source,
+            limits,
+            SourceCacheLimits::default(),
+            context,
+        )
+    }
+
+    /// Open with explicit read and caller-owned execution policies while
+    /// retaining the default finite deferred-Part cache.
+    pub fn from_read_at_with_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Self::from_read_at_with_execution_context(source, limits, context)
+    }
+
+    /// Open with explicit read, cache, and caller-owned execution policies.
+    /// The managed budget covers only retained and in-flight OPC `PartData`
+    /// payload reservations; parsed row state, rewritten XML, and output
+    /// buffers remain governed by their existing bounded operations.
+    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        cache_limits: SourceCacheLimits,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                limits,
+                cache_limits,
+                context,
+            )?,
+        })
+    }
+
+    /// Build a row-visibility editor from an already indexed source-backed
+    /// package. Managed package execution and payload retention are delegated
+    /// unchanged to the cell-values editor.
+    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
+        Ok(Self {
+            inner: cell_values::SourceBackedEditor::from_source_backed_package(package)?,
         })
     }
 
@@ -157,6 +213,7 @@ impl SourceEdit {
         &mut self,
         edits: impl IntoIterator<Item = RowVisibilityEdit>,
     ) -> Result<()> {
+        self.before.check_execution()?;
         let mut pending = Vec::new();
         pending
             .try_reserve_exact(MAX_BATCH_EDITS.saturating_sub(self.staged.len()))
@@ -165,6 +222,7 @@ impl SourceEdit {
                 source,
             })?;
         for edit in edits {
+            self.before.check_execution()?;
             if self.staged.len() + pending.len() == MAX_BATCH_EDITS {
                 return Err(invalid(format!(
                     "row-visibility batch exceeds {MAX_BATCH_EDITS} unique rows"
@@ -189,23 +247,33 @@ impl SourceEdit {
             }
             pending.push(edit);
         }
+        self.before.check_execution()?;
+        let original_len = self.staged.len();
         self.staged.extend(pending);
+        if let Err(error) = self.before.check_execution() {
+            self.staged.truncate(original_len);
+            return Err(error);
+        }
         Ok(())
     }
 
     /// Validate, rewrite once, and freeze an exact reversible commit.
     pub fn commit(self) -> Result<Commit> {
+        self.before.check_execution()?;
         let actions = self
             .staged
             .iter()
             .map(|edit| (edit.row, edit.hidden))
             .collect::<BTreeMap<_, _>>();
         let (output, changed_rows) = rewrite::rewrite(self.before.source_xml(), &actions)?;
+        self.before.check_execution()?;
         if changed_rows == 0 {
             let patch = Patch::new(self.before.clone(), self.before.clone());
+            self.before.check_execution()?;
             return Ok(Commit::new(self.before, patch, 0));
         }
         let snapshot = Snapshot::from_rewritten_source(&self.before, output)?;
+        snapshot.check_execution()?;
         for edit in &self.staged {
             if snapshot.is_hidden(edit.row) != Some(edit.hidden) {
                 return Err(invalid(
@@ -213,6 +281,7 @@ impl SourceEdit {
                 ));
             }
         }
+        self.before.check_execution()?;
         let patch = Patch::new(self.before, snapshot.clone());
         Ok(Commit::new(snapshot, patch, changed_rows))
     }

@@ -25,6 +25,7 @@ impl Snapshot {
 
     pub(crate) fn from_inner(inner: cell_values::Snapshot) -> Result<Self> {
         let rows = rewrite::scan(inner.source_xml())?;
+        inner.check_execution()?;
         Ok(Self {
             inner,
             rows: Arc::from(rows),
@@ -32,6 +33,7 @@ impl Snapshot {
     }
 
     pub(crate) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
+        source.check_execution()?;
         Self::from_inner(cell_values::Snapshot::from_rewritten_source(
             &source.inner,
             bytes,
@@ -87,5 +89,9 @@ impl Snapshot {
 
     pub(crate) fn same_source(&self, other: &Self) -> bool {
         self.inner.same_source(&other.inner)
+    }
+
+    pub(crate) fn check_execution(&self) -> Result<()> {
+        self.inner.check_execution()
     }
 }
