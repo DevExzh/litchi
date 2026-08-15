@@ -17,6 +17,71 @@ use crate::model::names::{Definition, Expression, Range, Scope};
 pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 pub use source::{ReadLimits, SourceBackedSpreadsheet};
 
+/// Maximum number of positional cell selectors accepted by one lookup batch.
+///
+/// The bound keeps result-vector allocation and lookup work finite even when
+/// selectors originate outside the parsed document.  A batch at the bound is
+/// accepted; larger batches fail before any cell lookup or index construction.
+pub const MAX_CELL_SELECTORS: usize = 4_096;
+
+/// A reusable selector for one logical ODS cell.
+///
+/// The sheet name is borrowed so callers can build selector arrays without
+/// copying names.  Rows and columns are zero-based logical coordinates; ODF
+/// repeated rows and cells remain represented by their physical owners in the
+/// returned [`crate::worksheet::CellView`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CellSelector<'a> {
+    sheet_name: &'a str,
+    row: usize,
+    column: usize,
+}
+
+impl<'a> CellSelector<'a> {
+    /// Construct a selector for one zero-based logical cell.
+    #[must_use]
+    pub const fn new(sheet_name: &'a str, row: usize, column: usize) -> Self {
+        Self {
+            sheet_name,
+            row,
+            column,
+        }
+    }
+
+    /// Return the exact worksheet name selected by this value.
+    #[must_use]
+    pub const fn sheet_name(self) -> &'a str {
+        self.sheet_name
+    }
+
+    /// Return the zero-based logical row selected by this value.
+    #[must_use]
+    pub const fn row(self) -> usize {
+        self.row
+    }
+
+    /// Return the zero-based logical column selected by this value.
+    #[must_use]
+    pub const fn column(self) -> usize {
+        self.column
+    }
+}
+
+impl<'a> From<(&'a str, usize, usize)> for CellSelector<'a> {
+    fn from((sheet_name, row, column): (&'a str, usize, usize)) -> Self {
+        Self::new(sheet_name, row, column)
+    }
+}
+
+fn validate_cell_batch_len(length: usize) -> Result<()> {
+    if length > MAX_CELL_SELECTORS {
+        return Err(litchi_core::Error::InvalidFormat(format!(
+            "ODS cell lookup batch exceeds the {MAX_CELL_SELECTORS} selector safety limit"
+        )));
+    }
+    Ok(())
+}
+
 /// Immutable ODS document facade.
 pub struct Spreadsheet {
     package: Arc<crate::package::Package>,
@@ -477,15 +542,19 @@ impl Spreadsheet {
         row: usize,
         column: usize,
     ) -> Option<crate::worksheet::CellView<'_>> {
+        self.cell_unchecked(CellSelector::new(sheet_name, row, column))
+    }
+
+    fn cell_unchecked(&self, selector: CellSelector<'_>) -> Option<crate::worksheet::CellView<'_>> {
         let sheet_index = self
             .sheets
             .iter()
-            .position(|sheet| sheet.name == sheet_name)?;
-        let direct = || self.sheets[sheet_index].cell_view(row, column);
+            .position(|sheet| sheet.name == selector.sheet_name)?;
+        let direct = || self.sheets[sheet_index].cell_view(selector.row, selector.column);
 
         if let Some(locator) = self.cell_locator.get() {
             return Some(locator.as_ref().map_or_else(direct, |locator| {
-                locator.cell_view(&self.sheets, sheet_index, row, column)
+                locator.cell_view(&self.sheets, sheet_index, selector.row, selector.column)
             }));
         }
 
@@ -500,11 +569,50 @@ impl Spreadsheet {
                 .cell_locator
                 .get_or_init(|| cell_locator::CellLocator::try_build(&self.sheets));
             return Some(locator.as_ref().map_or_else(direct, |locator| {
-                locator.cell_view(&self.sheets, sheet_index, row, column)
+                locator.cell_view(&self.sheets, sheet_index, selector.row, selector.column)
             }));
         }
 
         Some(direct())
+    }
+
+    /// Look up an ordered batch of logical cells with one bounded result
+    /// allocation.
+    ///
+    /// A missing worksheet produces `None` for that selector, while an
+    /// existing worksheet with no physical cell at the coordinate produces
+    /// `Some(CellView::Missing)`, exactly matching [`Self::cell`].  Results
+    /// retain selector order and duplicate selectors are allowed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed allocation error when the result vector cannot be
+    /// reserved, or an invalid-format error when the selector bound is
+    /// exceeded.  The bound is checked before lookup or locator construction.
+    pub fn cell_batch(
+        &self,
+        selectors: &[CellSelector<'_>],
+    ) -> Result<Vec<Option<crate::worksheet::CellView<'_>>>> {
+        validate_cell_batch_len(selectors.len())?;
+        let mut values = Vec::new();
+        values
+            .try_reserve_exact(selectors.len())
+            .map_err(|source| litchi_core::Error::Allocation {
+                resource: "ODS cell lookup batch results",
+                source,
+            })?;
+        for &selector in selectors {
+            values.push(self.cell_unchecked(selector));
+        }
+        Ok(values)
+    }
+
+    /// Alias for [`Self::cell_batch`].
+    pub fn cells(
+        &self,
+        selectors: &[CellSelector<'_>],
+    ) -> Result<Vec<Option<crate::worksheet::CellView<'_>>>> {
+        self.cell_batch(selectors)
     }
 
     /// Discover package, inline, missing, and inert linked images.
@@ -924,6 +1032,146 @@ mod tests {
             spreadsheet.cell("Data", 0, 0),
             Some(crate::worksheet::CellView::Stored(_))
         ));
+        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
+    }
+
+    #[test]
+    fn cell_batch_matches_scalar_order_missing_distinction_and_identity() {
+        let bytes = Builder::new()
+            .content_xml(ANNOTATED_CONTENT)
+            .build()
+            .expect("test fixture or operation should succeed");
+        let spreadsheet =
+            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+        let selectors = [
+            CellSelector::new("Data", 0, 1),
+            CellSelector::new("Data", 0, 0),
+            CellSelector::new("Data", 0, 2),
+            CellSelector::new("Missing", 0, 0),
+            CellSelector::new("Data", 0, 0),
+            CellSelector::new("Data", usize::MAX, usize::MAX),
+        ];
+
+        let batch = spreadsheet
+            .cell_batch(&selectors)
+            .expect("test fixture or operation should succeed");
+        let scalar = selectors
+            .iter()
+            .map(|selector| {
+                spreadsheet.cell(selector.sheet_name(), selector.row(), selector.column())
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(batch, scalar);
+        assert!(matches!(
+            batch[2],
+            Some(crate::worksheet::CellView::Missing)
+        ));
+        assert_eq!(batch[3], None);
+
+        for (selector, actual) in selectors.iter().zip(batch) {
+            if let Some(crate::worksheet::CellView::Stored(actual)) = actual {
+                let Some(crate::worksheet::CellView::Stored(expected)) =
+                    spreadsheet.cell(selector.sheet_name(), selector.row(), selector.column())
+                else {
+                    panic!("scalar lookup lost a stored cell");
+                };
+                assert!(std::ptr::eq(actual, expected));
+            }
+        }
+    }
+
+    #[test]
+    fn cell_batch_is_empty_and_bounded_before_lookup_work() {
+        let bytes = Builder::new()
+            .content_xml(ANNOTATED_CONTENT)
+            .build()
+            .expect("test fixture or operation should succeed");
+        let spreadsheet =
+            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+        assert!(
+            spreadsheet
+                .cell_batch(&[])
+                .expect("empty batch should succeed")
+                .is_empty()
+        );
+
+        let exact = (0..MAX_CELL_SELECTORS)
+            .map(|index| match index % 4 {
+                0 => CellSelector::new("Data", 0, 0),
+                1 => CellSelector::new("Data", 0, 2),
+                2 => CellSelector::new("Missing", 0, 0),
+                _ => CellSelector::new("Data", usize::MAX, usize::MAX),
+            })
+            .collect::<Vec<_>>();
+        let values = spreadsheet
+            .cell_batch(&exact)
+            .expect("exact selector bound should succeed");
+        assert_eq!(values.len(), MAX_CELL_SELECTORS);
+        for (index, value) in values.iter().enumerate() {
+            match index % 4 {
+                0 => assert!(matches!(
+                    value,
+                    Some(crate::worksheet::CellView::Stored(cell)) if cell.text == "existing"
+                )),
+                1 | 3 => assert!(matches!(value, Some(crate::worksheet::CellView::Missing))),
+                _ => assert_eq!(*value, None),
+            }
+        }
+
+        let bounded = Spreadsheet::from_bytes(
+            Builder::new()
+                .content_xml(ANNOTATED_CONTENT)
+                .build()
+                .expect("test fixture or operation should succeed"),
+        )
+        .expect("test fixture or operation should succeed");
+        let selectors = vec![CellSelector::new("Data", 0, 0); MAX_CELL_SELECTORS + 1];
+        let error = bounded.cell_batch(&selectors).expect_err("bound must fail");
+        assert!(matches!(
+            error,
+            litchi_core::Error::InvalidFormat(message)
+                if message.contains("selector safety limit")
+        ));
+        assert!(bounded.cell_locator.get().is_none());
+        assert_eq!(bounded.cell_queries.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn cell_batch_is_send_sync_and_concurrent_locator_build_is_shared() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<CellSelector<'static>>();
+
+        let bytes = Builder::new()
+            .content_xml(ANNOTATED_CONTENT)
+            .build()
+            .expect("test fixture or operation should succeed");
+        let spreadsheet = Arc::new(
+            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed"),
+        );
+        let expected = match spreadsheet.sheet("Data").and_then(|sheet| sheet.cell(0, 0)) {
+            Some(cell) => std::ptr::from_ref(cell) as usize,
+            None => panic!("fixture cell"),
+        };
+        let selector = CellSelector::new("Data", 0, 0);
+        let threads = (0..8)
+            .map(|_| {
+                let spreadsheet = Arc::clone(&spreadsheet);
+                std::thread::spawn(move || {
+                    for _ in 0..cell_locator::BUILD_QUERY_THRESHOLD {
+                        let result = spreadsheet.cell_batch(&[selector]).expect("batch lookup");
+                        let Some(crate::worksheet::CellView::Stored(cell)) =
+                            result.first().copied().flatten()
+                        else {
+                            panic!("fixture cell");
+                        };
+                        assert_eq!(std::ptr::from_ref(cell) as usize, expected);
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        for thread in threads {
+            thread.join().expect("cell batch thread");
+        }
         assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
     }
 
