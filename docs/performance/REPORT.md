@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **273 selectable cases**; 200 was the count before the
+HEAD harness contains **285 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -1019,7 +1019,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 273 selectable cases. Change
+The committed HEAD standalone harness provides 285 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1043,6 +1043,15 @@ patches, and refusal paths are checked outside timing. This is correctness and
 sink-counter evidence only; no speedup, allocation, RSS, release-ABBA, or
 physical-I/O claim is made. See
 [`0145`](changes/0145-pptx-cross-slide-copy-evidence.md).
+
+Change 0146 adds twelve opt-in selectors that call the public generic-CFB
+`SharedOleFile::open_stream` path for exact 36-byte and 4,095-byte MiniFAT
+targets. One-shot, repeat-3, and sequential repeat-8 operations retain exact
+per-invocation hashes, source events, root identity, version/refusal gates, and
+matched deterministic-range-model evidence. This is correctness/counter
+evidence only; release ABBA and all latency, allocation, RSS, physical-I/O,
+native DOC/XLS/PPT, cross-format, and iWork claims remain open. See
+[`0146`](changes/0146-cfb-open-stream-evidence.md).
 
 Change 0119 adds three opt-in native PPT selected-shape controls and preserves
 the 36-case / 198-record default. The query-only and fresh-open-plus-query
@@ -1221,6 +1230,13 @@ stays near neutral. The claim is limited to the named configured simulator;
 real cold/network/device I/O, production scheduling, allocation/RSS, and
 native DOC/XLS/PPT semantic adoption remain open. See
 [`0144`](changes/0144-cfb-simulated-range-source-evidence.md).
+
+Change 0146 adds twelve generic CFB `open_stream` selectors, taking the current
+selectable matrix from 273 to 285 while preserving the default 36 cases / 198
+records. The current tree's exact counter/range formulas and the parent
+revision's root-materializing shape are both supported by the same runner.
+This is correctness/counter evidence only, pending clean release ABBA. See
+[`0146`](changes/0146-cfb-open-stream-evidence.md).
 
 Change 0103 adds a separate pinned release ABBA capture for
 `cfb_file_same_length_overlay_atomic_save` on CPU 2 (five warm-ups and 30
