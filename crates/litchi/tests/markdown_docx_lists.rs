@@ -32,12 +32,15 @@ fn docx(document_xml: &str, numbering_xml: &str) -> Vec<u8> {
 fn renders_resolved_numbering_semantics() {
     let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="10"/></w:numPr></w:pPr><w:r><w:t>bullet &amp; *</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="20"/></w:numPr></w:pPr><w:r><w:t>one</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="1"/><w:numId w:val="20"/></w:numPr></w:pPr><w:r><w:t>nested</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="1"/><w:numId w:val="20"/></w:numPr></w:pPr><w:r><w:t>nested two</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="21"/></w:numPr></w:pPr><w:r><w:t>restart</w:t></w:r></w:p></w:body></w:document>"#;
     let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/></w:lvl></w:abstractNum><w:abstractNum w:abstractNumId="2"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl><w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%2."/></w:lvl></w:abstractNum><w:num w:numId="10"><w:abstractNumId w:val="1"/></w:num><w:num w:numId="20"><w:abstractNumId w:val="2"/></w:num><w:num w:numId="21"><w:abstractNumId w:val="2"/><w:lvlOverride w:ilvl="0"><w:startOverride w:val="3"/></w:lvlOverride></w:num></w:numbering>"#;
-    let document = Document::from_bytes(docx(document_xml, numbering_xml)).unwrap();
+    let bytes = docx(document_xml, numbering_xml);
+    let document = Document::from_bytes(bytes.clone()).unwrap();
+    let temporary = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(temporary.path(), bytes).unwrap();
+    let source_document = Document::open(temporary.path()).unwrap();
 
-    assert_eq!(
-        document.to_markdown().unwrap(),
-        "- bullet \\& \\*\n\n1. one\n\n  1. nested\n\n  2. nested two\n\n3. restart\n\n"
-    );
+    let expected = "- bullet \\& \\*\n\n1. one\n\n  1. nested\n\n  2. nested two\n\n3. restart\n\n";
+    assert_eq!(document.to_markdown().unwrap(), expected);
+    assert_eq!(source_document.to_markdown().unwrap(), expected);
 }
 
 #[test]

@@ -679,6 +679,135 @@ pub(crate) enum PptxSourcePathError {
     Pptx(crate::pptx::Error),
 }
 
+/// Result of the private source-backed DOCX path probe.
+#[cfg(all(feature = "docx", any(unix, windows)))]
+pub(crate) enum DocxSourcePathDetection {
+    /// A validated, source-retaining DOCX owner.
+    Docx(crate::docx::source_backed::Package),
+    /// A recognized OOXML family whose facade is not a document.
+    OtherOoxml(litchi_core::detection::FileFormat),
+    /// A recognized non-document OOXML family whose facade feature is
+    /// disabled. Retaining this result prevents a lower-precedence ODF
+    /// marker in the same ZIP from taking ownership while preserving the
+    /// byte detector's `NotOfficeFile` result.
+    DisabledOtherOoxml(litchi_core::detection::FileFormat),
+}
+
+/// Error from the private source-backed DOCX path probe.
+#[cfg(all(feature = "docx", any(unix, windows)))]
+#[derive(Debug)]
+pub(crate) enum DocxSourcePathError {
+    /// A source or OPC catalog failure, retaining its typed OPC error.
+    Opc(crate::opc::OpcError),
+    /// A validated DOCX catalog failed WordprocessingML semantic opening.
+    Docx(crate::docx::Error),
+}
+
+/// Open a filesystem DOCX through one positional source-backed OPC package.
+///
+/// This private facade handoff keeps byte-backed smart detection unchanged:
+/// only the unified filesystem document path retains the source identity and
+/// defers ordinary package payloads. Non-OPC packages return `None` so the
+/// existing ODF, RTF, OLE, and byte-backed fallback paths remain in control.
+/// A valid non-DOCX OPC package is classified privately even when its leaf
+/// owner is disabled, so a lower-precedence ODF marker cannot take ownership.
+#[cfg(all(feature = "docx", any(unix, windows)))]
+pub(crate) fn detect_docx_source_path_with_limits(
+    path: &std::path::Path,
+    limits: crate::opc::ReadLimits,
+) -> std::result::Result<Option<DocxSourcePathDetection>, DocxSourcePathError> {
+    use litchi_core::ReadAt;
+
+    let ooxml_extension = has_ooxml_extension(path);
+    let source = std::sync::Arc::new(
+        litchi_core::FileSource::open(path)
+            .map_err(crate::opc::OpcError::IoError)
+            .map_err(DocxSourcePathError::Opc)?,
+    );
+    let mut signature = [0_u8; 4];
+    let read = source
+        .read_at(0, &mut signature)
+        .map_err(crate::opc::OpcError::IoError)
+        .map_err(DocxSourcePathError::Opc)?;
+    let zip_magic = read == signature.len()
+        && litchi_core::detection::simd_utils::signature_matches(
+            &signature,
+            litchi_core::detection::utils::ZIP_SIGNATURE,
+        );
+    if !ooxml_extension && !zip_magic {
+        return Ok(None);
+    }
+
+    // Match the eager path's candidate policy: arbitrary non-ZIP inputs have
+    // already returned `None`; every remaining candidate is checked against
+    // the bounded input-byte policy before an OOXML suffix receives its typed
+    // ZIP-magic refusal.
+    let input_bytes = source
+        .len()
+        .map_err(crate::opc::OpcError::IoError)
+        .map_err(DocxSourcePathError::Opc)?;
+    if input_bytes > limits.max_input_bytes() {
+        return Err(DocxSourcePathError::Opc(crate::opc::OpcError::ReadLimit {
+            resource: crate::opc::ReadResource::InputBytes,
+            actual: input_bytes,
+            maximum: limits.max_input_bytes(),
+        }));
+    }
+
+    if !zip_magic {
+        return Err(DocxSourcePathError::Opc(crate::opc::OpcError::ZipError(
+            "OOXML-suffixed input does not have ZIP magic".to_owned(),
+        )));
+    }
+
+    let package = match crate::opc::SourceBackedPackage::from_read_at_with_limits(source, limits) {
+        Ok(package) => package,
+        Err(error @ crate::opc::OpcError::ReadLimit { .. })
+        | Err(error @ crate::opc::OpcError::Allocation { .. }) => {
+            return Err(DocxSourcePathError::Opc(error));
+        },
+        Err(error) if ooxml_extension => return Err(DocxSourcePathError::Opc(error)),
+        Err(_) => {
+            if crate::detection_smart::detect_file_format(path).is_some() {
+                return Ok(None);
+            }
+            return Err(DocxSourcePathError::Opc(crate::opc::OpcError::ZipError(
+                "ZIP input is not a supported Office package".to_owned(),
+            )));
+        },
+    };
+
+    let Some(format) =
+        crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package)
+    else {
+        return Ok(None);
+    };
+    if format != litchi_core::detection::FileFormat::Docx {
+        // Match the eager detector's feature-gated result: retain the
+        // classification even when its leaf owner is disabled, while telling
+        // the caller to report `NotOfficeFile` instead of falling through to
+        // a lower-precedence package family.
+        let enabled_other_owner = match format {
+            #[cfg(feature = "pptx")]
+            litchi_core::detection::FileFormat::Pptx => true,
+            #[cfg(feature = "xlsx")]
+            litchi_core::detection::FileFormat::Xlsx => true,
+            #[cfg(feature = "xlsb")]
+            litchi_core::detection::FileFormat::Xlsb => true,
+            _ => false,
+        };
+        return Ok(Some(if enabled_other_owner {
+            DocxSourcePathDetection::OtherOoxml(format)
+        } else {
+            DocxSourcePathDetection::DisabledOtherOoxml(format)
+        }));
+    }
+
+    crate::docx::source_backed::Package::from_source_backed_package(package)
+        .map(|package| Some(DocxSourcePathDetection::Docx(package)))
+        .map_err(DocxSourcePathError::Docx)
+}
+
 /// Open a filesystem PPTX through one positional source-backed OPC package.
 ///
 /// This is intentionally a private facade handoff rather than an additional

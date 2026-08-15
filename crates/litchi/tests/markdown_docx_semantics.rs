@@ -36,15 +36,39 @@ fn docx(document_xml: &str) -> Vec<u8> {
     archive.finish().unwrap().into_inner()
 }
 
+fn table_text(table: &litchi::document::Table) -> String {
+    let mut text = String::new();
+    for row in table.rows().unwrap() {
+        for cell in row.cells().unwrap() {
+            text.push_str(&cell.text().unwrap());
+            text.push('|');
+        }
+    }
+    text
+}
+
 #[test]
 fn package_semantics_have_compact_golden_markdown() {
     let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body><w:p><w:r><w:t xml:space="preserve">Before </w:t></w:r><w:hyperlink r:id="rIdLink" w:tooltip="tip &quot;q&quot;"><w:r><w:rPr><w:b/></w:rPr><w:t>site [x]</w:t></w:r></w:hyperlink><w:r><w:t xml:space="preserve"> after</w:t></w:r></w:p><w:p><w:r><w:drawing><wp:inline><wp:extent cx="1" cy="1"/><wp:docPr id="1" name="Picture &quot;one&quot;" descr="alt [image]"/><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="rIdImage"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p><w:p><w:r><w:t>With note</w:t></w:r><w:r><w:footnoteReference w:id="1"/></w:r><w:r><w:t xml:space="preserve"> and end</w:t></w:r><w:r><w:endnoteReference w:id="2"/></w:r></w:p></w:body></w:document>"#;
-    let document = Document::from_bytes(docx(document_xml)).unwrap();
+    let bytes = docx(document_xml);
+    let document = Document::from_bytes(bytes.clone()).unwrap();
+    let temporary = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(temporary.path(), bytes).unwrap();
+    let source_document = Document::open(temporary.path()).unwrap();
 
-    assert_eq!(
-        document.to_markdown().unwrap(),
-        "Before [**site \\[x\\]**](<https://example.test/a%20b> \"tip \\\"q\\\"\") after\n\n![alt \\[image\\]](<data:image/png;base64,iVBORw0KGgo=> \"Picture &quot;one&quot;\")\n\nWith note[^fn-1] and end[^en-2]\n\n[^fn-1]: note \\& \\*body\\*\n[^en-2]: end note\n"
-    );
+    let expected = "Before [**site \\[x\\]**](<https://example.test/a%20b> \"tip \\\"q\\\"\") after\n\n![alt \\[image\\]](<data:image/png;base64,iVBORw0KGgo=> \"Picture &quot;one&quot;\")\n\nWith note[^fn-1] and end[^en-2]\n\n[^fn-1]: note \\& \\*body\\*\n[^en-2]: end note\n";
+    assert_eq!(document.to_markdown().unwrap(), expected);
+    assert_eq!(source_document.to_markdown().unwrap(), expected);
+
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(temporary.path())
+        .unwrap();
+    file.write_all(b"source mutation").unwrap();
+    assert!(matches!(
+        source_document.to_markdown(),
+        Err(litchi_core::Error::SourceChanged { .. })
+    ));
 }
 
 #[test]
@@ -60,6 +84,44 @@ fn parallel_option_preserves_serial_docx_markdown_output() {
         .unwrap();
 
     assert_eq!(requested_parallel, serial);
+}
+
+#[test]
+fn source_path_table_projection_matches_eager_markdown() {
+    let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Before</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>B</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>C</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>D</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:t>After</w:t></w:r></w:p></w:body></w:document>"#;
+    let bytes = docx(document_xml);
+    let eager = Document::from_bytes(bytes.clone()).unwrap();
+    let temporary = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(temporary.path(), bytes).unwrap();
+    let source = Document::open(temporary.path()).unwrap();
+
+    let eager_tables = eager
+        .tables()
+        .unwrap()
+        .into_iter()
+        .map(|table| table_text(&table))
+        .collect::<Vec<_>>();
+    let source_tables = source
+        .tables()
+        .unwrap()
+        .into_iter()
+        .map(|table| table_text(&table))
+        .collect::<Vec<_>>();
+    assert_eq!(source_tables, eager_tables);
+    assert_eq!(source.to_markdown().unwrap(), eager.to_markdown().unwrap());
+}
+
+#[test]
+fn source_path_mce_projection_matches_eager_markdown() {
+    let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><w:body><mc:AlternateContent><mc:Choice Requires="x"><w:p><w:r><w:t>choice</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>fallback</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:body></w:document>"#;
+    let bytes = docx(document_xml);
+    let eager = Document::from_bytes(bytes.clone()).unwrap();
+    let temporary = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(temporary.path(), bytes).unwrap();
+    let source = Document::open(temporary.path()).unwrap();
+
+    assert_eq!(source.text().unwrap(), "fallback");
+    assert_eq!(source.to_markdown().unwrap(), eager.to_markdown().unwrap());
 }
 
 #[test]

@@ -221,6 +221,7 @@ impl ToMarkdown for Document {
         if let Some(bundle) = docx_bundle {
             markdown.push_str(&bundle.render_note_definitions(options)?);
         }
+        self.check_source_freshness_after_markdown()?;
         Ok(markdown)
     }
 }
