@@ -7,7 +7,7 @@ to accept an optimization.
 
 The checked policy is
 [`perf-regression-policy-v1.json`](perf-regression-policy-v1.json). Policy
-schema 1 pins the release Linux tool identity, all 36 default case names and
+schema 2 pins the release Linux tool identity, all 36 default case names and
 the required count of 198 case/corpus records, the default
 corpus/writer/semantic shape selections, range settings, warmup count and
 filesystem flags, a 15-sample minimum, build identity fields, and explicit
@@ -15,17 +15,33 @@ upper regression thresholds:
 
 - p50 latency: 5%
 - p95 latency: 10%
+- p99 latency: 15%
 - allocation, RSS, and work counters when present: 5%
 
-The optional counter classes cover allocation calls/bytes, RSS, instructions,
-cycles, faults, source reads, sink writes, materializations, copied,
-decompressed and recompressed bytes, work units, and maximum in-flight work.
-Output byte counts and maximum write size are excluded because corpus identity
-and semantic validation already require them to be exact correctness values;
-smaller is not inherently better. A numeric sample vector is reduced to its
-p50 and must independently meet the 15-sample floor. Deterministic scalar
-counters are compared directly. A counter present on only one side makes the
-inputs incomparable.
+The schema-2 metric-class `presence` field distinguishes required and optional
+counters and is mandatory for every class. Required classes must match at least
+one metric in every result, and every required path must be present and valid in
+both reports. Missing or malformed required vectors fail closed as invalid
+input. Optional classes may be absent from both reports; if an optional path is
+present, it must be present and valid on both sides. The checked policy's
+counter classes cover allocation calls/bytes, RSS, instructions, cycles, faults,
+source reads,
+sink writes, materializations, copied, decompressed and recompressed bytes,
+work units, and maximum in-flight work. Output byte counts and maximum write
+size are excluded because corpus identity and semantic validation already
+require them to be exact correctness values; smaller is not inherently better.
+A numeric sample vector is reduced to its p50 and must independently meet the
+15-sample floor. Deterministic scalar counters are compared directly.
+
+Policy schema 1 is intentionally rejected; the existing policy filename is
+retained for the workflow path, but its document now carries schema 2. Any
+other policy must likewise migrate to schema 2 and declare each counter class's
+presence explicitly before comparison.
+
+Latency p50, p95, and p99 are always required. Each reported percentile must be
+finite, agree with the nearest-rank (median for p50) value computed from its
+finite positive sample vector, and remain non-decreasing. The three latency
+percentiles are compared independently against their policy thresholds.
 
 ## Fail-closed contract
 
@@ -35,9 +51,9 @@ when comparison is unsafe. Unsafe input includes malformed or unsupported
 schema, unexpected tool identity, dirty reports, build or configuration
 identity differences, identical reference/current revisions, changed corpus
 identity, duplicate/missing case-corpus keys, absent required cases, an
-unexpected result count, too few samples, non-finite or negative metrics, a
-reported percentile inconsistent with its samples, and asymmetric optional
-metrics.
+unexpected result count, too few samples, non-finite, overflowing, or negative
+metrics, a missing or reported percentile inconsistent with its samples,
+missing or asymmetric required metrics, and asymmetric optional metrics.
 
 The policy also requires a SHA-256 digest of all 198 exact `(case, canonical
 corpus JSON)` keys. Keys are sorted, then hashed as UTF-8 case name, a zero
@@ -78,9 +94,10 @@ The default `execution_workers` list is derived from the recorded positive
 logical CPU count using the harness's `1,2,4,8,available` selection and must
 match exactly on both sides.
 
-Both outputs are always produced when the comparator itself can write files:
-a versioned machine-readable JSON report and a short human summary. Exit 2 is
-used if either output cannot be written.
+The machine-readable JSON report is always required. A short human summary is
+also written when `--summary-out` is supplied, and is always printed to stdout.
+Exit 2 is used if the required JSON output or a requested summary output cannot
+be written.
 
 ## Exact invocation
 
@@ -128,9 +145,9 @@ The `Performance baseline` workflow exposes an optional manual
 `reference_run_id`. When supplied, the full release job first produces the
 current 15-sample matrix, then a separate reference-gated hosted comparison
 downloads the named prior full-run artifact and the current artifact, applies
-policy v1, and uploads both summaries. A regression or any identity/input
-defect fails that manual job. Leaving the input empty records the
-scheduled/manual baseline without a latency gate.
+the checked schema-2 policy, and uploads both summaries. A regression or any
+identity/input defect fails that manual job. Leaving the input empty records
+the scheduled/manual baseline without a latency gate.
 
 GitHub-hosted runner labels and the report identity fields are compatibility
 checks; they do not prove identical CPU frequency, host model, thermals, or
