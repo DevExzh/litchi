@@ -24,6 +24,58 @@ use smallvec::SmallVec;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+const MAX_DOCUMENT_SEMANTIC_VALUES: usize = 1_000_000;
+
+fn reserve_document_value<T>(values: &mut Vec<T>, resource: &'static str) -> Result<()> {
+    if values.len() >= MAX_DOCUMENT_SEMANTIC_VALUES {
+        return Err(crate::Error::InvalidFormat(format!(
+            "document semantic value count exceeds {MAX_DOCUMENT_SEMANTIC_VALUES}"
+        )));
+    }
+    values
+        .try_reserve(1)
+        .map_err(|source| crate::Error::Allocation { resource, source })
+}
+
+fn push_document_smallvec<T, const N: usize>(
+    inline: &mut SmallVec<[T; N]>,
+    spill: &mut Option<Vec<T>>,
+    value: T,
+    resource: &'static str,
+) -> Result<()> {
+    if let Some(values) = spill {
+        reserve_document_value(values, resource)?;
+        values.push(value);
+        return Ok(());
+    }
+    if inline.len() < N {
+        inline.push(value);
+        return Ok(());
+    }
+    if inline.len() >= MAX_DOCUMENT_SEMANTIC_VALUES {
+        return Err(crate::Error::InvalidFormat(format!(
+            "document semantic value count exceeds {MAX_DOCUMENT_SEMANTIC_VALUES}"
+        )));
+    }
+    let capacity = N.checked_add(1).ok_or_else(|| {
+        crate::Error::InvalidFormat("document semantic value capacity overflow".into())
+    })?;
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(capacity)
+        .map_err(|source| crate::Error::Allocation { resource, source })?;
+    values.extend(inline.drain(..));
+    values.push(value);
+    *spill = Some(values);
+    Ok(())
+}
+
+pub(crate) fn is_xml_outer_whitespace(bytes: &[u8]) -> bool {
+    bytes
+        .iter()
+        .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+}
+
 /// The main document part of a Word document.
 ///
 /// This corresponds to the `/word/document.xml` part in the package.
@@ -61,12 +113,20 @@ pub(crate) fn visible_document_xml(raw: Arc<Vec<u8>>) -> Result<Arc<Vec<u8>>> {
 
 /// Extract all visible paragraphs from a normalized main-document payload.
 pub(crate) fn document_paragraphs(xml: Arc<Vec<u8>>) -> Result<SmallVec<[Paragraph; 32]>> {
-    let mut paragraphs = SmallVec::new();
+    let mut inline = SmallVec::new();
+    let mut spill = None;
     scan_word_element_ranges(xml.as_slice(), &[b"p".as_slice()], |_, start, length| {
-        paragraphs.push(Paragraph::from_arc_range(Arc::clone(&xml), start, length));
-        Ok(())
+        push_document_smallvec(
+            &mut inline,
+            &mut spill,
+            Paragraph::from_arc_range(Arc::clone(&xml), start, length),
+            "document paragraph views",
+        )
     })?;
-    Ok(paragraphs)
+    match spill {
+        Some(values) => Ok(SmallVec::from_vec(values)),
+        None => Ok(inline),
+    }
 }
 
 /// Select one visible paragraph without materializing every paragraph view.
@@ -112,14 +172,21 @@ pub(crate) fn active_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> 
         xml,
         &[b"p".as_slice(), b"tbl".as_slice(), b"altChunk".as_slice()],
         |target, start, length| {
+            reserve_document_value(&mut ranges, "active document block ranges")?;
             ranges.push((target, start, length));
             Ok(())
         },
     )?;
-    let starts = ranges
-        .iter()
-        .map(|&(_, start, _)| start)
-        .collect::<Vec<_>>();
+    let mut starts = Vec::new();
+    starts
+        .try_reserve_exact(ranges.len())
+        .map_err(|source| crate::Error::Allocation {
+            resource: "active document block offsets",
+            source,
+        })?;
+    for &(_, start, _) in &ranges {
+        starts.push(start);
+    }
     let selected = active(xml, &starts)?.into_iter().collect::<BTreeSet<_>>();
     ranges.retain(|&(_, start, _)| selected.contains(&start));
     Ok(ranges)
@@ -130,7 +197,7 @@ pub(crate) fn active_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> 
 /// `DocumentPart::from_part` has already selected MCE branches for this
 /// source, so every returned range addresses the visible XML and unmodeled
 /// body children can remain lossless instead of being silently discarded.
-fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
+pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
     const PARAGRAPH: usize = 0;
     const TABLE: usize = 1;
     const ALT: usize = 2;
@@ -144,6 +211,8 @@ fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
     let mut pending = None::<(usize, usize)>;
     let mut depth = 0usize;
     let mut nodes = 0usize;
+    let mut saw_root = false;
+    let mut root_closed = false;
 
     loop {
         let start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
@@ -172,6 +241,14 @@ fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
 
         match event {
             Event::Start(element) => {
+                if depth == 0 {
+                    if saw_root || root_closed {
+                        return Err(crate::Error::InvalidFormat(
+                            "document XML has multiple roots".into(),
+                        ));
+                    }
+                    saw_root = true;
+                }
                 depth = depth.checked_add(1).ok_or_else(|| {
                     crate::Error::InvalidFormat("document XML nesting is too deep".into())
                 })?;
@@ -198,6 +275,15 @@ fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
                 }
             },
             Event::Empty(element) => {
+                if depth == 0 {
+                    if saw_root || root_closed {
+                        return Err(crate::Error::InvalidFormat(
+                            "document XML has multiple roots".into(),
+                        ));
+                    }
+                    saw_root = true;
+                    root_closed = true;
+                }
                 let child_depth = depth.checked_add(1).ok_or_else(|| {
                     crate::Error::InvalidFormat("document XML nesting is too deep".into())
                 })?;
@@ -229,6 +315,7 @@ fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
                     .map_err(|_source_error| {
                         crate::Error::InvalidFormat("document XML range does not fit u32".into())
                     })?;
+                    reserve_document_value(&mut ranges, "document body block ranges")?;
                     ranges.push((kind, range_start, length));
                 }
             },
@@ -246,6 +333,7 @@ fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
                     .map_err(|_source_error| {
                         crate::Error::InvalidFormat("document XML range does not fit u32".into())
                     })?;
+                    reserve_document_value(&mut ranges, "document body block ranges")?;
                     ranges.push((kind, start, length));
                 }
                 if body_depth == Some(depth)
@@ -257,15 +345,29 @@ fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
                 depth = depth.checked_sub(1).ok_or_else(|| {
                     crate::Error::InvalidFormat("invalid document XML nesting".into())
                 })?;
+                if depth == 0 {
+                    root_closed = true;
+                }
             },
-            Event::Eof if depth != 0 || pending.is_some() => {
+            Event::Eof if !saw_root || depth != 0 || pending.is_some() => {
                 return Err(crate::Error::InvalidFormat(
-                    "unterminated document XML".into(),
+                    "document XML does not contain exactly one root".into(),
                 ));
             },
             Event::Eof => break,
-            Event::Text(_)
-            | Event::CData(_)
+            Event::Text(text) => {
+                if depth == 0 && !is_xml_outer_whitespace(text.as_ref()) {
+                    return Err(crate::Error::InvalidFormat(
+                        "document XML has character data outside its root".into(),
+                    ));
+                }
+            },
+            Event::CData(_) if depth == 0 => {
+                return Err(crate::Error::InvalidFormat(
+                    "document XML has CDATA outside its root".into(),
+                ));
+            },
+            Event::CData(_)
             | Event::Comment(_)
             | Event::Decl(_)
             | Event::PI(_)
@@ -274,6 +376,88 @@ fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
         }
     }
     Ok(ranges)
+}
+
+/// Extract all visible table views from a normalized main-document payload.
+pub(crate) fn document_tables(xml: Arc<Vec<u8>>) -> Result<SmallVec<[Table; 8]>> {
+    let mut inline = SmallVec::new();
+    let mut spill = None;
+    scan_word_element_ranges(xml.as_slice(), &[b"tbl".as_slice()], |_, start, length| {
+        push_document_smallvec(
+            &mut inline,
+            &mut spill,
+            Table::from_arc_range(Arc::clone(&xml), start, length),
+            "document table views",
+        )
+    })?;
+    match spill {
+        Some(values) => Ok(SmallVec::from_vec(values)),
+        None => Ok(inline),
+    }
+}
+
+/// Extract all visible blocks in direct body order from a normalized payload.
+///
+/// Every active direct body child is represented. Typed paragraphs, tables,
+/// and `altChunk` anchors retain their existing semantic models while
+/// unmodeled children remain inert [`crate::OpaqueBlock`] values. The helper
+/// is shared by eager and source-backed documents so MCE-visible ordering and
+/// unknown-block retention cannot drift between the two paths.
+pub(crate) fn document_blocks(xml: Arc<Vec<u8>>) -> Result<Vec<crate::Block>> {
+    use crate::Block;
+
+    let mut alts = scan(xml.as_slice())?;
+    let mut elements = Vec::new();
+    for (target, start, length) in body_block_ranges(xml.as_slice())? {
+        reserve_document_value(&mut elements, "document block views")?;
+        let block_source = Arc::clone(&xml);
+        elements.push(if target == 0 {
+            Block::Paragraph(Box::new(Paragraph::from_arc_range(
+                block_source,
+                start,
+                length,
+            )))
+        } else if target == 1 {
+            Block::Table(Box::new(Table::from_arc_range(block_source, start, length)))
+        } else if target == 2 {
+            let chunk = alts.remove(&start).ok_or_else(|| {
+                crate::error::Error::InvalidFormat(
+                    "ordered altChunk lacks parsed anchor metadata".into(),
+                )
+            })?;
+            Block::Alt(Box::new(chunk))
+        } else {
+            Block::Unknown(Box::new(crate::OpaqueBlock::from_arc_range(
+                block_source,
+                start,
+                length,
+            )))
+        });
+    }
+    Ok(elements)
+}
+
+/// Extract visible paragraph/table/unknown elements in direct body order.
+/// Alternative-format anchors remain available through [`document_blocks`]
+/// but are intentionally omitted from this historical element view.
+pub(crate) fn document_elements(xml: Arc<Vec<u8>>) -> Result<Vec<crate::Element>> {
+    use crate::Element;
+
+    let blocks = document_blocks(xml)?;
+    let mut elements = Vec::new();
+    for block in blocks {
+        let element = match block {
+            crate::Block::Paragraph(paragraph) => Some(Element::Paragraph(paragraph)),
+            crate::Block::Table(table) => Some(Element::Table(table)),
+            crate::Block::Alt(_) => None,
+            crate::Block::Unknown(value) => Some(Element::Unknown(value)),
+        };
+        if let Some(element) = element {
+            reserve_document_value(&mut elements, "document element views")?;
+            elements.push(element);
+        }
+    }
+    Ok(elements)
 }
 
 impl<'a> DocumentPart<'a> {
@@ -391,17 +575,7 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn tables(&self) -> Result<SmallVec<[Table; 8]>> {
-        let source = self.get_xml_arc();
-        let mut tables = SmallVec::new();
-        scan_word_element_ranges(
-            source.as_slice(),
-            &[b"tbl".as_slice()],
-            |_, start, length| {
-                tables.push(Table::from_arc_range(Arc::clone(&source), start, length));
-                Ok(())
-            },
-        )?;
-        Ok(tables)
+        document_tables(self.get_xml_arc())
     }
 
     /// Get all document elements (paragraphs and tables) in document order.
@@ -424,18 +598,7 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn elements(&self) -> Result<Vec<crate::Element>> {
-        use crate::Element;
-
-        Ok(self
-            .blocks()?
-            .into_iter()
-            .filter_map(|block| match block {
-                crate::Block::Paragraph(paragraph) => Some(Element::Paragraph(paragraph)),
-                crate::Block::Table(table) => Some(Element::Table(table)),
-                crate::Block::Alt(_) => None,
-                crate::Block::Unknown(value) => Some(Element::Unknown(value)),
-            })
-            .collect())
+        document_elements(self.get_xml_arc())
     }
 
     /// Get paragraphs, tables, and alternative-format anchors in document order.
@@ -444,37 +607,7 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn blocks(&self) -> Result<Vec<crate::Block>> {
-        use crate::Block;
-
-        let source = self.get_xml_arc();
-        let mut alts = scan(source.as_slice())?;
-        let mut elements = Vec::new();
-        for (target, start, length) in body_block_ranges(source.as_slice())? {
-            let block_source = Arc::clone(&source);
-            elements.push(if target == 0 {
-                Block::Paragraph(Box::new(Paragraph::from_arc_range(
-                    block_source,
-                    start,
-                    length,
-                )))
-            } else if target == 1 {
-                Block::Table(Box::new(Table::from_arc_range(block_source, start, length)))
-            } else if target == 2 {
-                let chunk = alts.remove(&start).ok_or_else(|| {
-                    crate::error::Error::InvalidFormat(
-                        "ordered altChunk lacks parsed anchor metadata".into(),
-                    )
-                })?;
-                Block::Alt(Box::new(chunk))
-            } else {
-                Block::Unknown(Box::new(crate::OpaqueBlock::from_arc_range(
-                    block_source,
-                    start,
-                    length,
-                )))
-            });
-        }
-        Ok(elements)
+        document_blocks(self.get_xml_arc())
     }
 
     /// Return all alternative-format anchors in XML order.
@@ -483,16 +616,14 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn alts(&self) -> Result<Vec<Chunk>> {
-        Ok(self
-            .blocks()?
-            .into_iter()
-            .filter_map(|block| match block {
-                crate::Block::Alt(chunk) => Some(*chunk),
-                crate::Block::Paragraph(_) | crate::Block::Table(_) | crate::Block::Unknown(_) => {
-                    None
-                },
-            })
-            .collect())
+        let mut alts = Vec::new();
+        for block in self.blocks()? {
+            if let crate::Block::Alt(chunk) = block {
+                reserve_document_value(&mut alts, "document alternative-format anchors")?;
+                alts.push(*chunk);
+            }
+        }
+        Ok(alts)
     }
 }
 

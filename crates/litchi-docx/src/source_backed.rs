@@ -17,7 +17,8 @@ use crate::namespace::scan_word_element_ranges;
 use crate::package::validate_document_main_content_type;
 use crate::paragraph::Paragraph;
 use crate::parts::document_part::{
-    document_paragraph, document_paragraph_count, document_paragraphs, visible_document_xml,
+    document_blocks, document_elements, document_paragraph, document_paragraph_count,
+    document_paragraphs, document_tables, is_xml_outer_whitespace, visible_document_xml,
 };
 use crate::redact;
 use crate::sanitize::{self, RelationshipState};
@@ -339,6 +340,42 @@ impl Package {
         Ok(Self { package, execution })
     }
 
+    /// Adopt an already-indexed source-backed OPC package.
+    ///
+    /// The package is validated exactly once at this DOCX boundary: the
+    /// caller-owned OPC catalog is retained without reparsing, while the
+    /// unique main-document relationship and WordprocessingML content type
+    /// receive the same checks as the regular source constructors. The
+    /// package's execution context is carried into every deferred semantic
+    /// query.
+    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
+        let execution = package.execution_context();
+        Self::with_execution(package, execution)
+    }
+
+    /// Materialize this source-backed DOCX into the established owning
+    /// package facade without reparsing the source catalog.
+    ///
+    /// This is the explicit compatibility seam for consumers whose semantic
+    /// operation needs package-wide relationship access (for example, the
+    /// Markdown adapter). Unmanaged sources copy the validated catalog and
+    /// payloads into one owning package; managed sources are refused by the
+    /// OPC layer before ordinary payload reads so their budget reservations
+    /// cannot be detached accidentally.
+    pub fn to_owned_package(&self) -> Result<crate::Package> {
+        let package = self.package.to_opc_package()?;
+        let result = crate::Package::from_opc_package(package);
+        // The OPC conversion checks freshness through its final payload read,
+        // but the owning DOCX constructor still performs graph/property
+        // validation after that point. Re-check the original source before
+        // exposing either success or a constructor error so a mutation in
+        // this publication window cannot yield a stale owner (or mask the
+        // stale-source failure with an eager parse error).
+        self.package.source_version()?;
+        self.package.check_execution()?;
+        result
+    }
+
     /// Load and pin the main document for read-only semantic queries.
     ///
     /// The first call reads only the main-document part. The returned document
@@ -351,19 +388,26 @@ impl Package {
         validate_document_main_content_type(main.content_type())?;
         let data = main.data()?;
         let managed = self.package.cache_diagnostics().budget_managed;
-        let xml = if managed {
-            ensure_source_document_xml(data.as_bytes())?;
-            DocumentPayload::Managed(data)
-        } else {
-            DocumentPayload::Owned(visible_document_xml(data.into_arc()?)?)
-        };
-        let source_version = self.package.source_version()?;
+        let document: Result<Document> = (|| {
+            let xml = if managed {
+                ensure_source_document_xml(data.as_bytes())?;
+                DocumentPayload::Managed(data)
+            } else {
+                DocumentPayload::Owned(visible_document_xml(data.into_arc()?)?)
+            };
+            let source_version = self.package.source_version()?;
+            Ok(Document {
+                xml,
+                source_version,
+                execution: self.execution.clone(),
+            })
+        })();
+        // The semantic/MCE stage can fail after the payload read has
+        // completed. Check freshness once more before exposing that error so
+        // a source mutation during parsing wins over a stale parse result.
+        self.package.source_version()?;
         self.package.check_execution()?;
-        Ok(Document {
-            xml,
-            source_version,
-            execution: self.execution.clone(),
-        })
+        document
     }
 
     /// Load only the mandatory main-document payload and capture its immutable
@@ -385,9 +429,10 @@ impl Package {
         validate_document_main_content_type(main.content_type())?;
         let source_version = self.package.source_version()?;
         let raw = main.data()?;
-        ensure_source_section_inventory_xml(raw.as_bytes(), limits)?;
-        let snapshot =
-            crate::section::Snapshot::from_source_xml(raw.as_bytes(), source_version, limits)?;
+        let snapshot = (|| {
+            ensure_source_section_inventory_xml(raw.as_bytes(), limits)?;
+            crate::section::Snapshot::from_source_xml(raw.as_bytes(), source_version, limits)
+        })();
         // Detect hostile adapters that mutate immediately after the payload
         // read and semantic scan, before publishing the closure to the caller.
         let observed = self.package.source_version()?;
@@ -399,7 +444,7 @@ impl Package {
             .into());
         }
         self.package.check_execution()?;
-        Ok(snapshot)
+        snapshot
     }
 
     /// Return content-free cache activity for this source-backed DOCX.
@@ -411,6 +456,22 @@ impl Package {
     /// Return the exact source identity and revision captured at open.
     pub fn source_version(&self) -> Result<SourceVersion> {
         Ok(self.package.source_version()?)
+    }
+
+    /// Read relationship-selected OOXML core properties without loading the
+    /// main document or unrelated package members.
+    ///
+    /// A missing core-properties relationship yields empty metadata. Present
+    /// properties retain the shared strict graph and dialect validation used
+    /// by eager OOXML readers. Source freshness is checked before and after
+    /// the selected payload read by the common source-backed property reader;
+    /// execution cancellation is checked at the same boundaries.
+    pub fn metadata(&self) -> Result<litchi_core::Metadata> {
+        self.package.check_execution()?;
+        let properties = litchi_ooxml_common::properties::read_source_backed(&self.package);
+        self.package.source_version()?;
+        self.package.check_execution()?;
+        Ok(properties?.map(Into::into).unwrap_or_default())
     }
 
     /// Load the exact raw main-document bytes as a semantic transaction
@@ -882,16 +943,21 @@ impl Package {
         }
         let data = main.data().map_err(Error::from)?;
         let raw = data.into_arc().map_err(Error::from)?;
-        let visible = visible_document_xml(Arc::clone(&raw))?;
-        if !Arc::ptr_eq(&raw, &visible) {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "source-backed document transactions do not support markup-compatibility branch selection",
+        let snapshot: TransactionResult<Snapshot> = (|| {
+            let visible = visible_document_xml(Arc::clone(&raw))?;
+            if !Arc::ptr_eq(&raw, &visible) {
+                return Err(Error::UnsafeEdit {
+                    format: "DOCX",
+                    operation,
+                    reason: "source-backed document transactions do not support markup-compatibility branch selection",
+                }
+                .into());
             }
-            .into());
-        }
-        Ok((partname, Snapshot::from_shared_xml(raw)?))
+            Snapshot::from_shared_xml(raw)
+        })();
+        self.package.source_version().map_err(Error::from)?;
+        self.package.check_execution().map_err(Error::from)?;
+        Ok((partname, snapshot?))
     }
 
     fn settings_document_variables_source(
@@ -1167,6 +1233,9 @@ fn ensure_source_document_xml(xml: &[u8]) -> Result<()> {
     let mut open_name_bytes = 0usize;
     let mut events = 0usize;
     let mut depth = 0usize;
+    let mut saw_root = false;
+    let mut root_closed = false;
+    let mut saw_declaration = false;
     loop {
         events = events
             .checked_add(1)
@@ -1184,6 +1253,14 @@ fn ensure_source_document_xml(xml: &[u8]) -> Result<()> {
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
+                if depth == 0 {
+                    if saw_root || root_closed {
+                        return Err(Error::InvalidFormat(
+                            "source-backed document XML has multiple roots".into(),
+                        ));
+                    }
+                    saw_root = true;
+                }
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| Error::InvalidFormat("document XML depth overflow".into()))?;
@@ -1201,6 +1278,15 @@ fn ensure_source_document_xml(xml: &[u8]) -> Result<()> {
                 ensure_source_mce_element(&resolver, decoder, &namespace, &element, "document")?;
             },
             Event::Empty(element) => {
+                if depth == 0 {
+                    if saw_root || root_closed {
+                        return Err(Error::InvalidFormat(
+                            "source-backed document XML has multiple roots".into(),
+                        ));
+                    }
+                    saw_root = true;
+                    root_closed = true;
+                }
                 let element_depth = depth
                     .checked_add(1)
                     .ok_or_else(|| Error::InvalidFormat("document XML depth overflow".into()))?;
@@ -1228,8 +1314,16 @@ fn ensure_source_document_xml(xml: &[u8]) -> Result<()> {
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| Error::InvalidFormat("document XML depth underflow".into()))?;
+                if depth == 0 {
+                    root_closed = true;
+                }
             },
             Event::Eof => {
+                if !saw_root {
+                    return Err(Error::InvalidFormat(
+                        "source-backed document XML does not contain exactly one root".into(),
+                    ));
+                }
                 if !open_names.is_empty() || depth != 0 {
                     return Err(Error::InvalidFormat(
                         "unclosed source-backed document XML element".into(),
@@ -1237,13 +1331,77 @@ fn ensure_source_document_xml(xml: &[u8]) -> Result<()> {
                 }
                 break;
             },
-            Event::Text(_)
-            | Event::CData(_)
-            | Event::Comment(_)
-            | Event::Decl(_)
-            | Event::PI(_)
-            | Event::DocType(_)
-            | Event::GeneralRef(_) => {},
+            Event::Text(text) => {
+                if depth == 0 && !is_xml_outer_whitespace(text.as_ref()) {
+                    return Err(Error::InvalidFormat(
+                        "source-backed document XML has character data outside its root".into(),
+                    ));
+                }
+            },
+            Event::CData(_) => {
+                if depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "source-backed document XML has CDATA outside its root".into(),
+                    ));
+                }
+            },
+            Event::Comment(_) => {},
+            Event::Decl(_) => {
+                if saw_declaration || saw_root || root_closed {
+                    return Err(Error::InvalidFormat(
+                        "source-backed document XML declaration is not in the prolog".into(),
+                    ));
+                }
+                saw_declaration = true;
+            },
+            Event::PI(_) => {
+                return Err(Error::UnsafeEdit {
+                    format: "DOCX",
+                    operation: "source-backed document read",
+                    reason: "processing instructions are not accepted in a managed source-backed document",
+                });
+            },
+            Event::DocType(_) => {
+                return Err(Error::UnsafeEdit {
+                    format: "DOCX",
+                    operation: "source-backed document read",
+                    reason: "DTD declarations are not accepted in a managed source-backed document",
+                });
+            },
+            Event::GeneralRef(reference) => {
+                if depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "source-backed document XML has a reference outside its root".into(),
+                    ));
+                }
+                if reference.is_char_ref() {
+                    let value = reference
+                        .resolve_char_ref()
+                        .map_err(|error| Error::Xml(error.to_string()))?
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "numeric source-backed document reference did not resolve".into(),
+                            )
+                        })?;
+                    if !is_legal_xml_character(value) {
+                        return Err(Error::InvalidFormat(
+                            "numeric source-backed document reference is not a legal XML character"
+                                .into(),
+                        ));
+                    }
+                } else {
+                    let name = reference
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    if !matches!(name.as_ref(), "amp" | "apos" | "gt" | "lt" | "quot") {
+                        return Err(Error::UnsafeEdit {
+                            format: "DOCX",
+                            operation: "source-backed document read",
+                            reason: "non-predefined entity references are not accepted in a managed source-backed document",
+                        });
+                    }
+                }
+            },
         }
     }
     Ok(())
@@ -1271,6 +1429,12 @@ fn retain_source_document_name(
             source,
         })?;
     owned.extend_from_slice(name);
+    open_names
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed document XML topology stack",
+            source,
+        })?;
     open_names.push(owned);
     *open_name_bytes = next_name_bytes;
     Ok(())
@@ -1304,6 +1468,9 @@ fn ensure_source_section_inventory_xml(xml: &[u8], limits: &crate::section::Limi
     reader.config_mut().trim_text(false);
     let mut events = 0usize;
     let mut depth = 0usize;
+    let mut saw_root = false;
+    let mut root_closed = false;
+    let mut saw_declaration = false;
     loop {
         events = events
             .checked_add(1)
@@ -1323,6 +1490,14 @@ fn ensure_source_section_inventory_xml(xml: &[u8], limits: &crate::section::Limi
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
+                if depth == 0 {
+                    if saw_root || root_closed {
+                        return Err(Error::InvalidFormat(
+                            "source-backed section XML has multiple roots".into(),
+                        ));
+                    }
+                    saw_root = true;
+                }
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| Error::InvalidFormat("section XML depth overflow".into()))?;
@@ -1336,6 +1511,15 @@ fn ensure_source_section_inventory_xml(xml: &[u8], limits: &crate::section::Limi
                 validate_source_section_element(&resolver, decoder, &namespace, &element)?;
             },
             Event::Empty(element) => {
+                if depth == 0 {
+                    if saw_root || root_closed {
+                        return Err(Error::InvalidFormat(
+                            "source-backed section XML has multiple roots".into(),
+                        ));
+                    }
+                    saw_root = true;
+                    root_closed = true;
+                }
                 let element_depth = depth
                     .checked_add(1)
                     .ok_or_else(|| Error::InvalidFormat("section XML depth overflow".into()))?;
@@ -1352,6 +1536,9 @@ fn ensure_source_section_inventory_xml(xml: &[u8], limits: &crate::section::Limi
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| Error::InvalidFormat("section XML depth underflow".into()))?;
+                if depth == 0 {
+                    root_closed = true;
+                }
             },
             Event::DocType(_) => {
                 return Err(Error::UnsafeEdit {
@@ -1361,6 +1548,11 @@ fn ensure_source_section_inventory_xml(xml: &[u8], limits: &crate::section::Limi
                 });
             },
             Event::GeneralRef(reference) => {
+                if depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "source-backed section XML has a reference outside its root".into(),
+                    ));
+                }
                 if reference.is_char_ref() {
                     let value = reference
                         .resolve_char_ref()
@@ -1388,12 +1580,40 @@ fn ensure_source_section_inventory_xml(xml: &[u8], limits: &crate::section::Limi
                     }
                 }
             },
-            Event::Eof => break,
-            Event::Text(_)
-            | Event::CData(_)
-            | Event::Comment(_)
-            | Event::Decl(_)
-            | Event::PI(_) => {},
+            Event::Eof => {
+                if !saw_root {
+                    return Err(Error::InvalidFormat(
+                        "source-backed section XML does not contain exactly one root".into(),
+                    ));
+                }
+                if depth != 0 {
+                    return Err(Error::InvalidFormat(
+                        "unclosed source-backed section XML element".into(),
+                    ));
+                }
+                break;
+            },
+            Event::Text(text) => {
+                if depth == 0 && !is_xml_outer_whitespace(text.as_ref()) {
+                    return Err(Error::InvalidFormat(
+                        "source-backed section XML has character data outside its root".into(),
+                    ));
+                }
+            },
+            Event::CData(_) if depth == 0 => {
+                return Err(Error::InvalidFormat(
+                    "source-backed section XML has CDATA outside its root".into(),
+                ));
+            },
+            Event::CData(_) | Event::Comment(_) | Event::PI(_) => {},
+            Event::Decl(_) => {
+                if saw_declaration || saw_root || root_closed {
+                    return Err(Error::InvalidFormat(
+                        "source-backed section XML declaration is not in the prolog".into(),
+                    ));
+                }
+                saw_declaration = true;
+            },
         }
     }
     Ok(())
@@ -1440,10 +1660,26 @@ fn ensure_source_mce_element(
 
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        validate_source_attribute_value(
+            attribute.value.as_ref(),
+            if operation == "document" {
+                "source-backed document read"
+            } else {
+                "source-backed section inventory"
+            },
+        )?;
         let (attribute_namespace, _) = resolver.resolve_attribute(attribute.key);
         if is_mce_namespace(&attribute_namespace)
             || is_namespace_declaration(attribute.key)
-                && source_namespace_binding_is_mce(attribute.value.as_ref(), decoder)?
+                && source_namespace_binding_is_mce(
+                    attribute.value.as_ref(),
+                    decoder,
+                    if operation == "document" {
+                        "source-backed document read"
+                    } else {
+                        "source-backed section inventory"
+                    },
+                )?
         {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
@@ -1474,42 +1710,81 @@ fn is_namespace_declaration(key: quick_xml::name::QName<'_>) -> bool {
 fn source_namespace_binding_is_mce(
     value: &[u8],
     decoder: quick_xml::encoding::Decoder,
+    operation: &'static str,
 ) -> Result<bool> {
+    // The MCE namespace is ASCII. Rejecting non-ASCII source bytes here
+    // avoids asking the decoder to allocate a converted copy merely to prove
+    // that the value cannot equal the bounded target namespace.
+    if value.iter().any(|byte| !byte.is_ascii()) {
+        return Ok(false);
+    }
     let decoded = decoder
         .decode(value)
         .map_err(|error| Error::Xml(error.to_string()))?;
-    if !decoded.as_bytes().contains(&b'&') {
-        return Ok(decoded.as_ref() == litchi_ooxml_common::mce::NAMESPACE);
-    }
-
     let source = decoded.as_ref();
-    let mut output = String::new();
+    let target = litchi_ooxml_common::mce::NAMESPACE.as_bytes();
+    let mut target_position = 0usize;
+    let mut matches = true;
+    let mut compare = |character: char| {
+        if !matches {
+            return;
+        }
+        if character.is_ascii()
+            && target_position < target.len()
+            && target[target_position] == character as u8
+        {
+            target_position += 1;
+        } else {
+            matches = false;
+        }
+    };
     let mut start = 0usize;
     while let Some(relative) = source[start..].find('&') {
         let ampersand = start + relative;
-        output.push_str(&source[start..ampersand]);
+        for character in source[start..ampersand].chars() {
+            compare(character);
+        }
         let Some(relative_end) = source[ampersand + 1..].find(';') else {
-            output.push_str(&source[ampersand..]);
-            return Ok(output == litchi_ooxml_common::mce::NAMESPACE);
+            for character in source[ampersand..].chars() {
+                compare(character);
+            }
+            return Ok(matches && target_position == target.len());
         };
         let end = ampersand + 1 + relative_end;
         let name = &source[ampersand + 1..end];
         if let Some(entity) = predefined_xml_entity(name) {
-            output.push_str(entity);
+            for character in entity.chars() {
+                compare(character);
+            }
         } else if name.starts_with('#') {
             let reference = BytesRef::new(name);
-            if let Ok(Some(character)) = reference.resolve_char_ref() {
-                output.push(character);
-            } else {
-                output.push_str(&source[ampersand..=end]);
+            let character = reference
+                .resolve_char_ref()
+                .map_err(|error| Error::Xml(error.to_string()))?
+                .ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "numeric source namespace reference did not resolve".into(),
+                    )
+                })?;
+            if !is_legal_xml_character(character) {
+                return Err(Error::InvalidFormat(
+                    "numeric source namespace reference is not a legal XML character".into(),
+                ));
             }
+            compare(character);
         } else {
-            output.push_str(&source[ampersand..=end]);
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation,
+                reason: "non-predefined entity references are not accepted in a source-backed XML namespace binding",
+            });
         }
         start = end + 1;
     }
-    output.push_str(&source[start..]);
-    Ok(output == litchi_ooxml_common::mce::NAMESPACE)
+    for character in source[start..].chars() {
+        compare(character);
+    }
+    Ok(matches && target_position == target.len())
 }
 
 fn predefined_xml_entity(name: &str) -> Option<&'static str> {
@@ -1524,6 +1799,10 @@ fn predefined_xml_entity(name: &str) -> Option<&'static str> {
 }
 
 fn validate_source_section_attribute_value(value: &[u8]) -> Result<()> {
+    validate_source_attribute_value(value, "source-backed section inventory")
+}
+
+fn validate_source_attribute_value(value: &[u8], operation: &'static str) -> Result<()> {
     let mut start = 0usize;
     while let Some(relative) = value[start..].iter().position(|byte| *byte == b'&') {
         let ampersand = start + relative;
@@ -1550,7 +1829,7 @@ fn validate_source_section_attribute_value(value: &[u8]) -> Result<()> {
         } else if !matches!(name, "amp" | "apos" | "gt" | "lt" | "quot") {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
-                operation: "source-backed section inventory",
+                operation,
                 reason: "non-predefined entity references are not accepted in a source-bound attribute",
             });
         }
@@ -1627,7 +1906,7 @@ impl Document {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
                 operation,
-                reason: "this query would return Arc-backed paragraph views that cannot retain the managed PartData reservation",
+                reason: "this query would return Arc-backed semantic views that cannot retain the managed PartData reservation",
             });
         }
         Ok(())
@@ -1695,6 +1974,15 @@ impl Document {
         document_paragraphs(Arc::clone(xml))
     }
 
+    /// Return visible tables sharing the pinned main-document allocation.
+    pub fn tables(&self) -> Result<SmallVec<[crate::Table; 8]>> {
+        self.check_selective_operation("document tables")?;
+        let DocumentPayload::Owned(xml) = &self.xml else {
+            unreachable!("managed document payload rejected above")
+        };
+        document_tables(Arc::clone(xml))
+    }
+
     /// Return one visible paragraph without allocating all paragraph views.
     pub fn paragraph(&self, index: usize) -> Result<Option<Paragraph>> {
         self.check_selective_operation("document paragraph")?;
@@ -1702,6 +1990,26 @@ impl Document {
             unreachable!("managed document payload rejected above")
         };
         document_paragraph(Arc::clone(xml), index)
+    }
+
+    /// Return all visible direct body blocks in source order, including inert
+    /// alternative-format anchors and unknown direct children.
+    pub fn blocks(&self) -> Result<Vec<crate::Block>> {
+        self.check_selective_operation("document blocks")?;
+        let DocumentPayload::Owned(xml) = &self.xml else {
+            unreachable!("managed document payload rejected above")
+        };
+        document_blocks(Arc::clone(xml))
+    }
+
+    /// Return visible paragraph, table, and unknown elements in direct body
+    /// order. Alternative-format anchors are omitted as in the eager view.
+    pub fn elements(&self) -> Result<Vec<crate::Element>> {
+        self.check_selective_operation("document elements")?;
+        let DocumentPayload::Owned(xml) = &self.xml else {
+            unreachable!("managed document payload rejected above")
+        };
+        document_elements(Arc::clone(xml))
     }
 
     /// Capture the immutable section inventory from the pinned main document.
