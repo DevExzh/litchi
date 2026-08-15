@@ -25,6 +25,7 @@ use litchi_odf_common::{
 use std::path::Path;
 use zeroize::Zeroizing;
 
+use super::CellSelector;
 use crate::{
     codec::names,
     model::names::Definition,
@@ -398,38 +399,89 @@ impl SourceBackedSpreadsheet {
         column: usize,
     ) -> Result<Option<CellView<'_>>> {
         self.check_source()?;
-        let value = self
-            .sheets
-            .iter()
-            .position(|sheet| sheet.name == sheet_name)
-            .map(|sheet_index| {
-                let direct = || self.sheets[sheet_index].cell_view(row, column);
-
-                if let Some(locator) = self.cell_locator.get() {
-                    return locator.as_ref().map_or_else(direct, |locator| {
-                        locator.cell_view(&self.sheets, sheet_index, row, column)
-                    });
-                }
-
-                let previous = self
-                    .cell_queries
-                    .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
-                        Some(count.saturating_add(1))
-                    })
-                    .unwrap_or(usize::MAX);
-                if previous.saturating_add(1) >= super::cell_locator::BUILD_QUERY_THRESHOLD {
-                    let locator = self
-                        .cell_locator
-                        .get_or_init(|| super::cell_locator::CellLocator::try_build(&self.sheets));
-                    locator.as_ref().map_or_else(direct, |locator| {
-                        locator.cell_view(&self.sheets, sheet_index, row, column)
-                    })
-                } else {
-                    direct()
-                }
-            });
+        let value = self.cell_unchecked(CellSelector::new(sheet_name, row, column));
         self.check_source()?;
         Ok(value)
+    }
+
+    fn cell_unchecked(&self, selector: CellSelector<'_>) -> Option<CellView<'_>> {
+        let sheet_index = self
+            .sheets
+            .iter()
+            .position(|sheet| sheet.name == selector.sheet_name)?;
+        let direct = || self.sheets[sheet_index].cell_view(selector.row, selector.column);
+
+        if let Some(locator) = self.cell_locator.get() {
+            return Some(locator.as_ref().map_or_else(direct, |locator| {
+                locator.cell_view(&self.sheets, sheet_index, selector.row, selector.column)
+            }));
+        }
+
+        let previous = self
+            .cell_queries
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
+                Some(count.saturating_add(1))
+            })
+            .unwrap_or(usize::MAX);
+        if previous.saturating_add(1) >= super::cell_locator::BUILD_QUERY_THRESHOLD {
+            let locator = self
+                .cell_locator
+                .get_or_init(|| super::cell_locator::CellLocator::try_build(&self.sheets));
+            return Some(locator.as_ref().map_or_else(direct, |locator| {
+                locator.cell_view(&self.sheets, sheet_index, selector.row, selector.column)
+            }));
+        }
+
+        Some(direct())
+    }
+
+    /// Look up an ordered batch of logical cells with one source freshness
+    /// check before and one after the complete operation.
+    ///
+    /// A missing worksheet produces `None` for that selector, while an
+    /// existing worksheet with no physical cell at the coordinate produces
+    /// `Some(CellView::Missing)`, exactly matching [`Self::cell`].  Results
+    /// retain selector order and duplicate selectors are allowed.  The
+    /// lookup and any adaptive index construction perform no source I/O.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::SourceChanged`] if the source is stale before or during
+    /// the batch, a typed allocation error when the result vector cannot be
+    /// reserved, or an invalid-format error when the selector bound is
+    /// exceeded.  A stale source takes precedence over an operation error
+    /// observed while finalizing the batch.
+    pub fn cell_batch(&self, selectors: &[CellSelector<'_>]) -> Result<Vec<Option<CellView<'_>>>> {
+        self.check_source()?;
+        let result = self.cell_batch_unchecked(selectors);
+        let final_check = self.check_source();
+        match final_check {
+            Err(error) => Err(error),
+            Ok(()) => result,
+        }
+    }
+
+    fn cell_batch_unchecked(
+        &self,
+        selectors: &[CellSelector<'_>],
+    ) -> Result<Vec<Option<CellView<'_>>>> {
+        super::validate_cell_batch_len(selectors.len())?;
+        let mut values = Vec::new();
+        values
+            .try_reserve_exact(selectors.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODS source cell lookup batch results",
+                source,
+            })?;
+        for &selector in selectors {
+            values.push(self.cell_unchecked(selector));
+        }
+        Ok(values)
+    }
+
+    /// Alias for [`Self::cell_batch`].
+    pub fn cells(&self, selectors: &[CellSelector<'_>]) -> Result<Vec<Option<CellView<'_>>>> {
+        self.cell_batch(selectors)
     }
 
     /// Extract displayed worksheet text using tab-separated cells and
@@ -623,6 +675,7 @@ fn text_capacity(sheets: &[Sheet]) -> Result<usize> {
 mod tests {
     use super::{ReadLimits, SourceBackedSpreadsheet, project_text};
     use crate::worksheet::{Cell, CellValue, Row, Sheet};
+    use crate::{CellSelector, MAX_CELL_SELECTORS};
     use litchi_core::{OwnedSource, ReadAt, SourceVersion};
     use std::io::{Cursor, Read, Write};
     use std::ptr;
@@ -750,6 +803,153 @@ mod tests {
         ));
         assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
         assert_eq!(source.reads(), after_open);
+    }
+
+    #[test]
+    fn source_cell_batch_matches_scalar_and_observes_version_once_at_each_boundary() {
+        let source = Arc::new(CountingSource::new(package()));
+        let spreadsheet =
+            SourceBackedSpreadsheet::from_read_at(source.clone()).expect("source ODS");
+        let owned = crate::Spreadsheet::from_bytes(package()).expect("owned ODS");
+        let after_open_reads = source.reads();
+        let after_open_versions = source.versions();
+        let selectors = [
+            CellSelector::new("Sheet1", 1, 1),
+            CellSelector::new("Sheet1", 0, 0),
+            CellSelector::new("Sheet1", 2, 0),
+            CellSelector::new("Sheet2", 0, 0),
+            CellSelector::new("Missing", 0, 0),
+            CellSelector::new("Sheet1", 0, 0),
+            CellSelector::new("Sheet1", usize::MAX, usize::MAX),
+        ];
+
+        let batch = spreadsheet
+            .cell_batch(&selectors)
+            .expect("source cell batch");
+        let expected = selectors
+            .iter()
+            .map(|selector| owned.cell(selector.sheet_name(), selector.row(), selector.column()))
+            .collect::<Vec<_>>();
+        assert_eq!(batch, expected);
+        assert_eq!(source.versions() - after_open_versions, 2);
+        assert_eq!(source.reads(), after_open_reads);
+    }
+
+    #[test]
+    fn source_cell_batch_empty_and_selector_bound_are_atomic_and_read_free() {
+        let source = Arc::new(CountingSource::new(package()));
+        let spreadsheet =
+            SourceBackedSpreadsheet::from_read_at(source.clone()).expect("source ODS");
+        let after_open_reads = source.reads();
+        assert!(
+            spreadsheet
+                .cell_batch(&[])
+                .expect("empty source cell batch")
+                .is_empty()
+        );
+        assert_eq!(source.reads(), after_open_reads);
+
+        let exact = (0..MAX_CELL_SELECTORS)
+            .map(|index| match index % 4 {
+                0 => CellSelector::new("Sheet1", 0, 0),
+                1 => CellSelector::new("Sheet1", 0, 2),
+                2 => CellSelector::new("Sheet2", 0, 0),
+                _ => CellSelector::new("Missing", 0, 0),
+            })
+            .collect::<Vec<_>>();
+        let before_exact_reads = source.reads();
+        let before_exact_versions = source.versions();
+        let values = spreadsheet
+            .cell_batch(&exact)
+            .expect("exact selector bound should succeed");
+        assert_eq!(values.len(), MAX_CELL_SELECTORS);
+        for (index, value) in values.iter().enumerate() {
+            match index % 4 {
+                0 => assert!(matches!(
+                    value,
+                    Some(crate::worksheet::CellView::Stored(cell)) if cell.text == "hello"
+                )),
+                1 | 2 => assert!(matches!(value, Some(crate::worksheet::CellView::Missing))),
+                _ => assert_eq!(*value, None),
+            }
+        }
+        assert_eq!(source.versions() - before_exact_versions, 2);
+        assert_eq!(source.reads(), before_exact_reads);
+        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
+
+        let bounded_source = Arc::new(CountingSource::new(package()));
+        let bounded =
+            SourceBackedSpreadsheet::from_read_at(bounded_source.clone()).expect("source ODS");
+        let bounded_reads = bounded_source.reads();
+        let selectors = vec![CellSelector::new("Sheet1", 0, 0); MAX_CELL_SELECTORS + 1];
+        let error = bounded.cell_batch(&selectors).expect_err("bound must fail");
+        assert!(matches!(
+            error,
+            litchi_core::Error::InvalidFormat(message)
+                if message.contains("selector safety limit")
+        ));
+        assert_eq!(bounded_source.reads(), bounded_reads);
+        assert!(bounded.cell_locator.get().is_none());
+    }
+
+    #[test]
+    fn source_cell_batch_prefers_stale_before_and_during_lookup() {
+        let source = Arc::new(MutableSource::new(package()));
+        let spreadsheet =
+            SourceBackedSpreadsheet::from_read_at(source.clone()).expect("source ODS");
+        let selectors = [CellSelector::new("Sheet1", 0, 0)];
+
+        source.bump();
+        assert!(matches!(
+            spreadsheet.cell_batch(&selectors),
+            Err(litchi_core::Error::SourceChanged { .. })
+        ));
+
+        let source = Arc::new(MutableSource::new(package()));
+        let spreadsheet =
+            SourceBackedSpreadsheet::from_read_at(source.clone()).expect("source ODS");
+        source.flip_after_next_version();
+        assert!(matches!(
+            spreadsheet.cell_batch(&selectors),
+            Err(litchi_core::Error::SourceChanged { .. })
+        ));
+    }
+
+    #[test]
+    fn source_cell_batch_concurrent_lookup_preserves_pointer_identity() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<SourceBackedSpreadsheet>();
+
+        let source = Arc::new(OwnedSource::new(package()));
+        let spreadsheet =
+            Arc::new(SourceBackedSpreadsheet::from_read_at(source).expect("source ODS"));
+        let expected = match spreadsheet.sheets[0].cell_view(0, 0) {
+            crate::worksheet::CellView::Stored(cell) => ptr::from_ref(cell) as usize,
+            crate::worksheet::CellView::Missing => panic!("fixture cell"),
+        };
+        let selector = CellSelector::new("Sheet1", 0, 0);
+        let threads = (0..8)
+            .map(|_| {
+                let spreadsheet = Arc::clone(&spreadsheet);
+                std::thread::spawn(move || {
+                    for _ in 0..super::super::cell_locator::BUILD_QUERY_THRESHOLD {
+                        let result = spreadsheet
+                            .cell_batch(&[selector])
+                            .expect("source cell batch");
+                        let Some(crate::worksheet::CellView::Stored(cell)) =
+                            result.first().copied().flatten()
+                        else {
+                            panic!("fixture cell");
+                        };
+                        assert_eq!(ptr::from_ref(cell) as usize, expected);
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        for thread in threads {
+            thread.join().expect("cell batch thread");
+        }
+        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
     }
 
     #[test]
@@ -1031,6 +1231,7 @@ mod tests {
     struct CountingSource {
         bytes: OwnedSource,
         reads: AtomicUsize,
+        versions: AtomicUsize,
         ranges: std::sync::Mutex<Vec<(u64, usize)>>,
     }
 
@@ -1039,12 +1240,17 @@ mod tests {
             Self {
                 bytes: OwnedSource::new(bytes),
                 reads: AtomicUsize::new(0),
+                versions: AtomicUsize::new(0),
                 ranges: std::sync::Mutex::new(Vec::new()),
             }
         }
 
         fn reads(&self) -> usize {
             self.reads.load(Ordering::Relaxed)
+        }
+
+        fn versions(&self) -> usize {
+            self.versions.load(Ordering::Relaxed)
         }
 
         fn range_count(&self) -> usize {
@@ -1077,6 +1283,7 @@ mod tests {
         }
 
         fn version(&self) -> std::io::Result<SourceVersion> {
+            self.versions.fetch_add(1, Ordering::Relaxed);
             self.bytes.version()
         }
     }
@@ -1084,6 +1291,7 @@ mod tests {
     struct MutableSource {
         bytes: Arc<Vec<u8>>,
         revision: AtomicU64,
+        flip_after_version: std::sync::atomic::AtomicBool,
     }
 
     impl MutableSource {
@@ -1091,11 +1299,16 @@ mod tests {
             Self {
                 bytes: Arc::new(bytes),
                 revision: AtomicU64::new(0),
+                flip_after_version: std::sync::atomic::AtomicBool::new(false),
             }
         }
 
         fn bump(&self) {
             self.revision.fetch_add(1, Ordering::Relaxed);
+        }
+
+        fn flip_after_next_version(&self) {
+            self.flip_after_version.store(true, Ordering::Relaxed);
         }
     }
 
@@ -1116,10 +1329,12 @@ mod tests {
         }
 
         fn version(&self) -> std::io::Result<SourceVersion> {
-            Ok(SourceVersion::new(
-                0x4f44,
-                self.revision.load(Ordering::Relaxed),
-            ))
+            let revision = self.revision.load(Ordering::Relaxed);
+            let value = SourceVersion::new(0x4f44, revision);
+            if self.flip_after_version.swap(false, Ordering::Relaxed) {
+                self.revision.fetch_add(1, Ordering::Relaxed);
+            }
+            Ok(value)
         }
     }
 }

@@ -76,7 +76,10 @@ pub mod worksheet;
 pub use charts::Chart;
 pub use drawing::{Frame, Part};
 pub use embedded::{Kind, Object, Parameter, Root};
-pub use facade::{Builder, MutableSpreadsheet, ReadLimits, SourceBackedSpreadsheet, Spreadsheet};
+pub use facade::{
+    Builder, CellSelector, MAX_CELL_SELECTORS, MutableSpreadsheet, ReadLimits,
+    SourceBackedSpreadsheet, Spreadsheet,
+};
 pub use flat::{
     FlatCommit, FlatEdit, FlatSpreadsheet, Limits as FlatLimits, Patch as FlatPatch,
     SheetSelector as FlatSheetSelector, Snapshot as FlatSnapshot,
