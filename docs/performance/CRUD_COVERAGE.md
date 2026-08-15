@@ -2,7 +2,7 @@
 
 Date: 2026-08-15
 
-This is a coverage map, not a completion claim. It compares the 263 selectable
+This is a coverage map, not a completion claim. It compares the 265 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -1011,6 +1011,18 @@ these deterministic fixed-width families only; it does not claim operation-
 only allocation, bounded total memory, physical I/O, cold-cache behavior or
 broad producer coverage. See
 [`0138`](changes/0138-xls-numeric-plan-only-release-abba.md).
+
+Change 0139 adds two opt-in source-backed ODP repeated-text selectors, taking
+the current selectable matrix from 263 to 265 while preserving the default 36
+cases / 198 records. Both use the same 12-slide, eight-picture corpus and time
+four full-text projections on a prepared owner. The control reproduces the
+historical uncached public sequence; the candidate exercises
+`SourceBackedPresentation::text()` and its threshold-two cache. Untimed gates
+bind text parity, archive/media identity, zero post-preparation source reads,
+and exact freshness vectors. This is correctness and logical replay evidence
+only, with no latency, physical-I/O, decompression, allocation, RSS,
+cold-cache, ABBA, or release claim. See
+[`0139`](changes/0139-odp-repeated-text-cache-evidence.md).
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

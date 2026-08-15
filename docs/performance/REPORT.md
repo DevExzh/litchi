@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **263 selectable cases**; 200 was the count before the
+HEAD harness contains **265 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -1017,7 +1017,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 263 selectable cases. Change
+The committed HEAD standalone harness provides 265 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1168,6 +1168,19 @@ is accepted. Exact family output hashes and complete plan-only
 zero-target-artifact/correctness gates hold on every leg. See
 [`0138`](changes/0138-xls-numeric-plan-only-release-abba.md) and the linked
 schema-1 raw results.
+
+Change 0139 adds two opt-in source-backed ODP repeated-text selectors, taking
+the selectable matrix from 263 to 265 while preserving the default 36 cases /
+198 records. Both selectors prepare the same 12-slide, eight-picture owner and
+four output slots before timing, then perform four full-text projections. The
+control reproduces the historical uncached public sequence; the candidate
+calls `SourceBackedPresentation::text()` and exercises the threshold-two
+cache. Untimed source replays bind zero post-preparation reads and exact
+freshness vectors `[3,3,3,3]` and `[3,5,2,2]`, with archive, text, and 16 MiB
+media identity retained. This is correctness and logical replay evidence
+only; no latency, physical-I/O, decompression, allocation, RSS, cold-cache,
+ABBA, or release claim is accepted. See
+[`0139`](changes/0139-odp-repeated-text-cache-evidence.md).
 
 Change 0103 adds a separate pinned release ABBA capture for
 `cfb_file_same_length_overlay_atomic_save` on CPU 2 (five warm-ups and 30

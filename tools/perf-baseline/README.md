@@ -138,6 +138,26 @@ to 257 names while leaving the default 36 cases / 198 records unchanged;
 the four opt-in fixed-width native XLS numeric selectors bring the current
 selectable matrix to 261 names while leaving that default unchanged; two
 additional plan-only native XLS numeric selectors bring it to 263 names;
+two additional matched source-backed ODP repeated-text selectors
+(`odp_source_backed_repeated_text_uncached` and
+`odp_source_backed_repeated_text_cached`) are also opt-in over that same
+12-slide, eight-2 MiB-media corpus. Each `SourceBackedPresentation` owner and
+four output slots are prepared outside timing. The control reconstructs the
+pre-cache public sequence (`slides()` plus `Slide::all_text()`, filtered and
+joined with exact `\n\n`, followed by the trailing source check); the candidate
+calls `SourceBackedPresentation::text()` four times, exercising the
+threshold-two cache.
+The timer contains only those four projections. An independent untimed
+`InstrumentedSource` replay records preparation and post-preparation counters:
+the four-call replay must have zero reads, bytes, compressed-range overlap,
+and `Pictures` payload reads; freshness vectors are `[3, 3, 3, 3]` for the
+control and `[3, 5, 2, 2]` for the candidate (12 observations total in each
+case). Archive topology, eight-picture/16 MiB media identity, text parity and
+hashes remain untimed. These additions bring the selectable matrix to 265
+names while leaving the default 36 cases / 198 records unchanged. This is
+correctness and logical replay evidence only: no latency, physical-I/O,
+decompression, allocation, RSS, cold-cache, ABBA, or release claim is made
+until a frozen measured ABBA run;
 the validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 

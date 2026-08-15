@@ -141,6 +141,11 @@ const PPTX_MULTI_SLIDE_BATCH_COUNT: usize = 8;
 const PPT_PICTURE_COUNT: usize = 32;
 const PPT_PICTURE_BYTES: usize = 256 * 1024;
 const ODP_TEXT_BOX_BATCH_COUNT: usize = 8;
+const ODP_REPEATED_TEXT_CALLS: usize = 4;
+const ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS: u64 = 12;
+const ODP_REPEATED_TEXT_CONTROL_VERSION_OBSERVATIONS: [u64; ODP_REPEATED_TEXT_CALLS] = [3, 3, 3, 3];
+const ODP_REPEATED_TEXT_CANDIDATE_VERSION_OBSERVATIONS: [u64; ODP_REPEATED_TEXT_CALLS] =
+    [3, 5, 2, 2];
 const ODT_RESOURCE_BATCH_COUNT: usize = 64;
 const ODT_RESOURCE_PAYLOAD_BYTES: usize = 4 * 1024;
 const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
@@ -728,6 +733,8 @@ enum Case {
     OdpFileSourceOpen,
     OdpFileEagerSelectedSlide,
     OdpFileSourceSelectedSlide,
+    OdpSourceBackedRepeatedTextUncached,
+    OdpSourceBackedRepeatedTextCached,
     OdsFileEagerOpen,
     OdsFileSourceOpen,
     OdsFileEagerSelectedCell,
@@ -1087,6 +1094,8 @@ impl Case {
             Self::OdpFileSourceOpen => "odp_file_source_open",
             Self::OdpFileEagerSelectedSlide => "odp_file_eager_selected_slide",
             Self::OdpFileSourceSelectedSlide => "odp_file_source_selected_slide",
+            Self::OdpSourceBackedRepeatedTextUncached => "odp_source_backed_repeated_text_uncached",
+            Self::OdpSourceBackedRepeatedTextCached => "odp_source_backed_repeated_text_cached",
             Self::OdsFileEagerOpen => "ods_file_eager_open",
             Self::OdsFileSourceOpen => "ods_file_source_open",
             Self::OdsFileEagerSelectedCell => "ods_file_eager_selected_cell",
@@ -1522,6 +1531,13 @@ impl Case {
                 | Self::OdpFileSourceOpen
                 | Self::OdpFileEagerSelectedSlide
                 | Self::OdpFileSourceSelectedSlide
+        )
+    }
+
+    const fn is_odp_repeated_text(self) -> bool {
+        matches!(
+            self,
+            Self::OdpSourceBackedRepeatedTextUncached | Self::OdpSourceBackedRepeatedTextCached
         )
     }
 
@@ -1998,6 +2014,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     odp_root: Option<OdpRootSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    odp_repeated_text: Option<OdpRepeatedTextSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     ods_root: Option<OdsRootSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ods_cell_sweep: Option<OdsCellSweepSummary>,
@@ -2115,6 +2133,56 @@ struct OdpRootSourceSummary {
     selected_media_read_prior_range_overlap_bytes: Vec<u64>,
     selected_media_read_compressed_range_overlap_bytes: Vec<u64>,
     selected_media_read_non_picture_overlap_bytes: Vec<u64>,
+}
+
+/// Matched repeated-text evidence for the committed ODP source-backed cache.
+/// Both selectors use the same media-rich source owner and four projection
+/// calls. The control reconstructs the pre-cache public semantics through
+/// `slides()` and `Slide::all_text()`; the candidate calls `text()`, so its
+/// second and later calls exercise the threshold-2 cache. Owner preparation,
+/// output-slot reservation, parity/digest checks, and package/media checks are
+/// outside the timed interval.
+#[derive(Clone, Debug, Default, Serialize)]
+struct OdpRepeatedTextSummary {
+    implementation: &'static str,
+    phase: &'static str,
+    timing_scope: &'static str,
+    source_evidence_scope: &'static str,
+    projection_calls: usize,
+    slide_count: usize,
+    archive_member_count: usize,
+    pictures_count: usize,
+    pictures_uncompressed_payload_bytes: u64,
+    canonical_text_sha256: String,
+    source_path_bytes: u64,
+    source_path_sha256: String,
+    pictures_uncompressed_payload_sha256: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_payload_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_payload_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_version_observations: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_range_overlap_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_payload_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_payload_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_version_observations: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_version_observations_per_call: Vec<Vec<u64>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    projection_text_sha256: Vec<String>,
 }
 
 /// Matched ODS filesystem/root and typed selected-owner evidence. Root open
@@ -4303,6 +4371,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_odp()
                     && !case.uses_odp_media()
                     && !case.is_odp_root_file()
+                    && !case.is_odp_repeated_text()
                     && !case.is_ods_root_file()
                     && !case.uses_odp_text_box_batch()
                     && !case.is_opc_source_overlay_save()
@@ -5108,6 +5177,24 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options.cases.iter().any(|case| case.is_odp_repeated_text()) {
+        let corpus = build_odp_media_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_odp_repeated_text())
+        {
+            results.push(run_case_with_config(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
+        }
+    }
+
     if options.cases.iter().any(|case| case.is_ods_root_file()) {
         let corpus = build_ods_media_corpus()?;
         for case in options
@@ -5860,6 +5947,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_file_source_open" => Some(Case::OdpFileSourceOpen),
         "odp_file_eager_selected_slide" => Some(Case::OdpFileEagerSelectedSlide),
         "odp_file_source_selected_slide" => Some(Case::OdpFileSourceSelectedSlide),
+        "odp_source_backed_repeated_text_uncached" => {
+            Some(Case::OdpSourceBackedRepeatedTextUncached)
+        },
+        "odp_source_backed_repeated_text_cached" => Some(Case::OdpSourceBackedRepeatedTextCached),
         "ods_file_eager_open" => Some(Case::OdsFileEagerOpen),
         "ods_file_source_open" => Some(Case::OdsFileSourceOpen),
         "ods_file_eager_selected_cell" => Some(Case::OdsFileEagerSelectedCell),
@@ -6119,6 +6210,8 @@ fn print_usage() {
                                        odp_media_eager_one_slide,odp_media_source_backed_one_slide,\n\
                                        odp_file_eager_open,odp_file_source_open,\n\
                                        odp_file_eager_selected_slide,odp_file_source_selected_slide,\n\
+                                       odp_source_backed_repeated_text_uncached,\n\
+                                       odp_source_backed_repeated_text_cached,\n\
                                        ods_file_eager_open,ods_file_source_open,\n\
                                        ods_file_eager_selected_cell,ods_file_source_selected_cell,\n\
                                        ods_file_eager_selected_media,ods_file_source_selected_media,\n\
@@ -10453,6 +10546,9 @@ fn run_case_with_config(
         | Case::OdpFileEagerSelectedSlide
         | Case::OdpFileSourceSelectedSlide => {
             run_odp_root_file_access(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdpSourceBackedRepeatedTextUncached | Case::OdpSourceBackedRepeatedTextCached => {
+            run_odp_repeated_text(case, corpus, warmup_iterations, samples)
         },
         Case::OdsFileEagerOpen
         | Case::OdsFileSourceOpen
@@ -17175,6 +17271,399 @@ fn run_odp_root_file_access(
         (Ok(_), Err(error)) => Err(error.into()),
         (Err(error), _) => Err(error),
     }
+}
+
+fn odp_repeated_text_uncached(
+    presentation: &litchi_odp::SourceBackedPresentation,
+) -> Result<String, Box<dyn Error>> {
+    let slides = presentation.slides()?;
+    let mut all_text = Vec::new();
+    for slide in slides {
+        let text = slide.all_text();
+        if !text.is_empty() {
+            all_text.push(text);
+        }
+    }
+    // Keep the control's source-freshness work identical to the old
+    // source-backed `text_uncached` path, including its trailing check.
+    presentation.check_source()?;
+    Ok(all_text.join("\n\n"))
+}
+
+fn odp_repeated_text_digest(values: &[String]) -> String {
+    let mut digest = Sha256::new();
+    for (index, value) in values.iter().enumerate() {
+        digest.update((index as u64).to_le_bytes());
+        digest.update((value.len() as u64).to_le_bytes());
+        digest.update(value.as_bytes());
+    }
+    fingerprint_hex(&digest.finalize().into())
+}
+
+fn verify_odp_repeated_text_archive(corpus: &Corpus) -> Result<(), Box<dyn Error>> {
+    if ArchiveReader::new(&corpus.archive)?.file_names().count()
+        != corpus.manifest.archive_member_count
+    {
+        return Err("ODP repeated-text archive member topology differs from corpus".into());
+    }
+    verify_odp_media_archive(&corpus.archive, false)
+}
+
+fn run_odp_repeated_text(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !matches!(
+        case,
+        Case::OdpSourceBackedRepeatedTextUncached | Case::OdpSourceBackedRepeatedTextCached
+    ) {
+        return Err("non-repeated-text ODP case passed to repeated-text runner".into());
+    }
+    if corpus.manifest.generator != ODP_MEDIA_CORPUS_GENERATOR {
+        return Err("ODP repeated-text cases require the fixed media-rich corpus".into());
+    }
+
+    let eager = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+    let expected_text = eager.text()?;
+    let expected_slides = eager.slides()?;
+    let expected_single_text_sha256 = sha256_hex(expected_text.as_bytes());
+    let mut expected_outputs = Vec::new();
+    expected_outputs
+        .try_reserve_exact(ODP_REPEATED_TEXT_CALLS)
+        .map_err(|error| format!("ODP repeated-text expected-output allocation failed: {error}"))?;
+    for _ in 0..ODP_REPEATED_TEXT_CALLS {
+        expected_outputs.push(expected_text.clone());
+    }
+    let expected_repeated_digest = odp_repeated_text_digest(&expected_outputs);
+    let (picture_members, _selected_range) = odp_media_payload_inventory(corpus)?;
+    let mut picture_ranges = Vec::new();
+    picture_ranges
+        .try_reserve_exact(picture_members.len())
+        .map_err(|error| format!("ODP repeated-text picture-range allocation failed: {error}"))?;
+    for (_name, range) in &picture_members {
+        picture_ranges.push(range.clone());
+    }
+    let pictures_uncompressed_payload_sha256 = odp_media_payload_digest();
+    let pictures_uncompressed_payload_bytes = u64::try_from(
+        ODS_MEDIA_ENTRY_COUNT
+            .checked_mul(ODS_MEDIA_ENTRY_BYTES)
+            .ok_or("ODP repeated-text Pictures byte count overflows usize")?,
+    )?;
+    // This is a complete untimed semantic/package/media preservation gate for
+    // the exact corpus used by both matched selectors.
+    verify_odp_repeated_text_archive(corpus)?;
+
+    let implementation = match case {
+        Case::OdpSourceBackedRepeatedTextUncached => "source_backed_uncached_public_control",
+        Case::OdpSourceBackedRepeatedTextCached => "source_backed_text_cache_candidate",
+        _ => unreachable!("repeated-text case validated above"),
+    };
+    let mut elapsed = Vec::new();
+    elapsed
+        .try_reserve_exact(samples)
+        .map_err(|error| format!("ODP repeated-text elapsed allocation failed: {error}"))?;
+    let mut summary = OdpRepeatedTextSummary {
+        implementation,
+        phase: "four_repeated_full_text_projections",
+        timing_scope: "source-backed owner and four output slots prepared outside timer; four public text projections inside timer; parity, digest, freshness, and package/media gates outside timer",
+        source_evidence_scope: "separate_untimed_instrumented_source_replay_per_measured_sample",
+        projection_calls: ODP_REPEATED_TEXT_CALLS,
+        slide_count: expected_slides.len(),
+        archive_member_count: corpus.manifest.archive_member_count,
+        pictures_count: picture_members.len(),
+        pictures_uncompressed_payload_bytes,
+        canonical_text_sha256: expected_single_text_sha256,
+        source_path_bytes: u64::try_from(corpus.archive.len())?,
+        source_path_sha256: corpus.manifest.archive_sha256.clone(),
+        pictures_uncompressed_payload_sha256,
+        ..OdpRepeatedTextSummary::default()
+    };
+    summary
+        .projection_text_sha256
+        .try_reserve_exact(samples)
+        .map_err(|error| format!("ODP repeated-text digest allocation failed: {error}"))?;
+    summary
+        .source_preparation_read_calls
+        .try_reserve_exact(samples)
+        .map_err(|error| {
+            format!("ODP repeated-text preparation-call allocation failed: {error}")
+        })?;
+    summary
+        .source_preparation_read_bytes
+        .try_reserve_exact(samples)
+        .map_err(|error| {
+            format!("ODP repeated-text preparation-byte allocation failed: {error}")
+        })?;
+    summary
+        .source_preparation_payload_read_calls
+        .try_reserve_exact(samples)
+        .map_err(|error| {
+            format!("ODP repeated-text preparation-payload-call allocation failed: {error}")
+        })?;
+    summary
+        .source_preparation_payload_read_bytes
+        .try_reserve_exact(samples)
+        .map_err(|error| {
+            format!("ODP repeated-text preparation-payload-byte allocation failed: {error}")
+        })?;
+    summary
+        .source_preparation_version_observations
+        .try_reserve_exact(samples)
+        .map_err(|error| {
+            format!("ODP repeated-text preparation-version allocation failed: {error}")
+        })?;
+    summary
+        .source_replay_read_calls
+        .try_reserve_exact(samples)
+        .map_err(|error| format!("ODP repeated-text replay-call allocation failed: {error}"))?;
+    summary
+        .source_replay_read_bytes
+        .try_reserve_exact(samples)
+        .map_err(|error| format!("ODP repeated-text replay-byte allocation failed: {error}"))?;
+    summary
+        .source_replay_range_overlap_bytes
+        .try_reserve_exact(samples)
+        .map_err(|error| format!("ODP repeated-text replay-overlap allocation failed: {error}"))?;
+    summary
+        .source_replay_payload_read_calls
+        .try_reserve_exact(samples)
+        .map_err(|error| {
+            format!("ODP repeated-text replay-payload-call allocation failed: {error}")
+        })?;
+    summary
+        .source_replay_payload_read_bytes
+        .try_reserve_exact(samples)
+        .map_err(|error| {
+            format!("ODP repeated-text replay-payload-byte allocation failed: {error}")
+        })?;
+    summary
+        .source_replay_version_observations
+        .try_reserve_exact(samples)
+        .map_err(|error| format!("ODP repeated-text replay-version allocation failed: {error}"))?;
+    summary
+        .source_replay_version_observations_per_call
+        .try_reserve_exact(samples)
+        .map_err(|error| {
+            format!("ODP repeated-text per-call version allocation failed: {error}")
+        })?;
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+        let presentation = litchi_odp::SourceBackedPresentation::from_read_at(source)?;
+        let mut outputs = Vec::new();
+        outputs
+            .try_reserve_exact(ODP_REPEATED_TEXT_CALLS)
+            .map_err(|error| format!("ODP repeated-text output allocation failed: {error}"))?;
+
+        let started = Instant::now();
+        for _ in 0..ODP_REPEATED_TEXT_CALLS {
+            let text = match case {
+                Case::OdpSourceBackedRepeatedTextUncached => {
+                    odp_repeated_text_uncached(&presentation)?
+                },
+                Case::OdpSourceBackedRepeatedTextCached => presentation.text()?,
+                _ => unreachable!("repeated-text case validated above"),
+            };
+            outputs.push(text);
+        }
+        let duration = started.elapsed();
+
+        if outputs.len() != ODP_REPEATED_TEXT_CALLS
+            || outputs.iter().any(|value| value != &expected_text)
+        {
+            return Err("ODP repeated-text projection differs from canonical text".into());
+        }
+        let digest = odp_repeated_text_digest(&outputs);
+        if digest != expected_repeated_digest {
+            return Err("ODP repeated-text projection digest differs from canonical text".into());
+        }
+        if presentation.slides()? != expected_slides {
+            return Err(
+                "ODP repeated-text full slide projection differs from canonical slides".into(),
+            );
+        }
+        presentation.check_source()?;
+        verify_odp_repeated_text_archive(corpus)?;
+        if iteration >= warmup_iterations {
+            summary.projection_text_sha256.push(digest);
+        }
+        std::hint::black_box(outputs);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let mut expected_preparation = None;
+    let mut expected_replay = None;
+    for _ in 0..samples {
+        let source = odp_media_instrumented_source(&corpus.archive, &picture_ranges);
+        let presentation = litchi_odp::SourceBackedPresentation::from_read_at(source.clone())?;
+        let preparation = source.snapshot();
+        let preparation_versions = source.version_calls();
+        if preparation_versions == 0 {
+            return Err("ODP repeated-text source preparation observed no version checks".into());
+        }
+        source.reset();
+
+        let mut outputs = Vec::new();
+        outputs
+            .try_reserve_exact(ODP_REPEATED_TEXT_CALLS)
+            .map_err(|error| {
+                format!("ODP repeated-text replay output allocation failed: {error}")
+            })?;
+        let mut per_call_version_observations = Vec::new();
+        per_call_version_observations
+            .try_reserve_exact(ODP_REPEATED_TEXT_CALLS)
+            .map_err(|error| {
+                format!("ODP repeated-text per-call replay allocation failed: {error}")
+            })?;
+        for _ in 0..ODP_REPEATED_TEXT_CALLS {
+            let before_versions = source.version_calls();
+            let text = match case {
+                Case::OdpSourceBackedRepeatedTextUncached => {
+                    odp_repeated_text_uncached(&presentation)?
+                },
+                Case::OdpSourceBackedRepeatedTextCached => presentation.text()?,
+                _ => unreachable!("repeated-text case validated above"),
+            };
+            let after_versions = source.version_calls();
+            per_call_version_observations.push(
+                after_versions
+                    .checked_sub(before_versions)
+                    .ok_or("ODP repeated-text version counter moved backwards")?,
+            );
+            outputs.push(text);
+        }
+        let replay = source.snapshot();
+        let replay_versions = source.version_calls();
+        if replay.read_calls != 0
+            || replay.read_bytes != 0
+            || replay.ordinary_payload_read_calls != 0
+            || replay.ordinary_payload_read_bytes != 0
+            || replay.read_range_overlap_bytes != 0
+        {
+            return Err(
+                "ODP repeated-text replay read source or media payload after preparation".into(),
+            );
+        }
+        if replay_versions != ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS {
+            return Err(format!(
+                "ODP repeated-text replay observed {replay_versions} version checks, expected {ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS}"
+            )
+            .into());
+        }
+        let expected_per_call = match case {
+            Case::OdpSourceBackedRepeatedTextUncached => {
+                &ODP_REPEATED_TEXT_CONTROL_VERSION_OBSERVATIONS
+            },
+            Case::OdpSourceBackedRepeatedTextCached => {
+                &ODP_REPEATED_TEXT_CANDIDATE_VERSION_OBSERVATIONS
+            },
+            _ => unreachable!("repeated-text case validated above"),
+        };
+        if per_call_version_observations.as_slice() != expected_per_call.as_slice() {
+            return Err(format!(
+                "ODP repeated-text replay observed per-call version checks {:?}, expected {:?}",
+                per_call_version_observations, expected_per_call
+            )
+            .into());
+        }
+        if outputs.len() != ODP_REPEATED_TEXT_CALLS
+            || outputs.iter().any(|value| value != &expected_text)
+            || odp_repeated_text_digest(&outputs) != expected_repeated_digest
+        {
+            return Err("ODP repeated-text source replay differs from canonical text".into());
+        }
+        // The semantic parity check is deliberately after the exact four-call
+        // freshness observation, so it does not alter the recorded 12-check
+        // replay contract.
+        if presentation.slides()? != expected_slides {
+            return Err(
+                "ODP repeated-text source replay slides differ from canonical slides".into(),
+            );
+        }
+        let final_replay = source.snapshot();
+        if final_replay.read_calls != 0 || final_replay.read_bytes != 0 {
+            return Err("ODP repeated-text semantic parity replay read source bytes".into());
+        }
+        verify_odp_repeated_text_archive(corpus)?;
+
+        let preparation_tuple = (
+            preparation.read_calls,
+            preparation.read_bytes,
+            preparation.ordinary_payload_read_calls,
+            preparation.ordinary_payload_read_bytes,
+            preparation_versions,
+        );
+        if let Some(expected) = expected_preparation {
+            if expected != preparation_tuple {
+                return Err("ODP repeated-text preparation counters are not deterministic".into());
+            }
+        } else {
+            expected_preparation = Some(preparation_tuple);
+        }
+        let replay_tuple = (
+            replay.read_calls,
+            replay.read_bytes,
+            replay.read_range_overlap_bytes,
+            replay.ordinary_payload_read_calls,
+            replay.ordinary_payload_read_bytes,
+            replay_versions,
+        );
+        if let Some(expected) = expected_replay {
+            if expected != replay_tuple {
+                return Err("ODP repeated-text replay counters are not deterministic".into());
+            }
+        } else {
+            expected_replay = Some(replay_tuple);
+        }
+
+        summary
+            .source_preparation_read_calls
+            .push(preparation.read_calls);
+        summary
+            .source_preparation_read_bytes
+            .push(preparation.read_bytes);
+        summary
+            .source_preparation_payload_read_calls
+            .push(preparation.ordinary_payload_read_calls);
+        summary
+            .source_preparation_payload_read_bytes
+            .push(preparation.ordinary_payload_read_bytes);
+        summary
+            .source_preparation_version_observations
+            .push(preparation_versions);
+        summary.source_replay_read_calls.push(replay.read_calls);
+        summary.source_replay_read_bytes.push(replay.read_bytes);
+        summary
+            .source_replay_range_overlap_bytes
+            .push(replay.read_range_overlap_bytes);
+        summary
+            .source_replay_payload_read_calls
+            .push(replay.ordinary_payload_read_calls);
+        summary
+            .source_replay_payload_read_bytes
+            .push(replay.ordinary_payload_read_bytes);
+        summary
+            .source_replay_version_observations
+            .push(replay_versions);
+        summary
+            .source_replay_version_observations_per_call
+            .push(per_call_version_observations);
+    }
+
+    // The source owner is immutable, but retain a final complete package and
+    // media check alongside the untimed semantic parity gates.
+    verify_odp_repeated_text_archive(corpus)?;
+    Ok(result_with_source(
+        case,
+        corpus,
+        elapsed,
+        SourceSummary {
+            odp_repeated_text: Some(summary),
+            ..SourceSummary::default()
+        },
+    ))
 }
 
 fn ods_root_file_case_parameters(
@@ -28901,6 +29390,119 @@ mod tests {
                 vec![selected_compressed_bytes; 2]
             );
         }
+    }
+
+    #[test]
+    fn media_rich_odp_repeated_text_selectors_are_matched_and_source_fresh() {
+        for (name, case) in [
+            (
+                "odp_source_backed_repeated_text_uncached",
+                Case::OdpSourceBackedRepeatedTextUncached,
+            ),
+            (
+                "odp_source_backed_repeated_text_cached",
+                Case::OdpSourceBackedRepeatedTextCached,
+            ),
+        ] {
+            assert_eq!(parse_case(name), Some(case));
+            assert_eq!(case.name(), name);
+            assert!(!Case::DEFAULT.contains(&case));
+            assert!(!case.is_odp_root_file());
+            assert!(case.is_odp_repeated_text());
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        let corpus = build_odp_media_corpus().unwrap();
+        let uncached = run_case(Case::OdpSourceBackedRepeatedTextUncached, &corpus, 0, 2)
+            .unwrap()
+            .source
+            .unwrap()
+            .odp_repeated_text
+            .unwrap();
+        let cached = run_case(Case::OdpSourceBackedRepeatedTextCached, &corpus, 0, 2)
+            .unwrap()
+            .source
+            .unwrap()
+            .odp_repeated_text
+            .unwrap();
+
+        assert_eq!(
+            uncached.implementation,
+            "source_backed_uncached_public_control"
+        );
+        assert_eq!(cached.implementation, "source_backed_text_cache_candidate");
+        assert_eq!(uncached.projection_calls, super::ODP_REPEATED_TEXT_CALLS);
+        assert_eq!(cached.projection_calls, uncached.projection_calls);
+        assert_eq!(uncached.slide_count, 12);
+        assert_eq!(cached.slide_count, uncached.slide_count);
+        assert_eq!(
+            uncached.archive_member_count,
+            corpus.manifest.archive_member_count
+        );
+        assert_eq!(cached.archive_member_count, uncached.archive_member_count);
+        assert_eq!(uncached.pictures_count, super::ODS_MEDIA_ENTRY_COUNT);
+        assert_eq!(cached.pictures_count, uncached.pictures_count);
+        assert_eq!(
+            uncached.pictures_uncompressed_payload_bytes,
+            (super::ODS_MEDIA_ENTRY_COUNT * super::ODS_MEDIA_ENTRY_BYTES) as u64
+        );
+        assert_eq!(
+            cached.pictures_uncompressed_payload_bytes,
+            uncached.pictures_uncompressed_payload_bytes
+        );
+        assert_eq!(
+            uncached.pictures_uncompressed_payload_sha256,
+            cached.pictures_uncompressed_payload_sha256
+        );
+        assert_eq!(uncached.canonical_text_sha256, cached.canonical_text_sha256);
+        assert_eq!(
+            uncached.projection_text_sha256,
+            cached.projection_text_sha256
+        );
+        assert_eq!(uncached.source_replay_read_calls, vec![0, 0]);
+        assert_eq!(uncached.source_replay_read_bytes, vec![0, 0]);
+        assert_eq!(cached.source_replay_read_calls, vec![0, 0]);
+        assert_eq!(cached.source_replay_read_bytes, vec![0, 0]);
+        assert_eq!(uncached.source_replay_range_overlap_bytes, vec![0, 0]);
+        assert_eq!(cached.source_replay_range_overlap_bytes, vec![0, 0]);
+        assert_eq!(uncached.source_replay_payload_read_calls, vec![0, 0]);
+        assert_eq!(uncached.source_replay_payload_read_bytes, vec![0, 0]);
+        assert_eq!(cached.source_replay_payload_read_calls, vec![0, 0]);
+        assert_eq!(cached.source_replay_payload_read_bytes, vec![0, 0]);
+        assert_eq!(
+            uncached.source_replay_version_observations,
+            vec![super::ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS; 2]
+        );
+        assert_eq!(
+            cached.source_replay_version_observations,
+            vec![super::ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS; 2]
+        );
+        assert_eq!(
+            uncached.source_replay_version_observations_per_call,
+            vec![super::ODP_REPEATED_TEXT_CONTROL_VERSION_OBSERVATIONS.to_vec(); 2]
+        );
+        assert_eq!(
+            cached.source_replay_version_observations_per_call,
+            vec![super::ODP_REPEATED_TEXT_CANDIDATE_VERSION_OBSERVATIONS.to_vec(); 2]
+        );
+        assert_eq!(uncached.source_preparation_read_calls.len(), 2);
+        assert_eq!(cached.source_preparation_read_calls.len(), 2);
+        assert_eq!(
+            uncached.source_preparation_payload_read_calls,
+            cached.source_preparation_payload_read_calls
+        );
+        assert_eq!(
+            uncached.source_preparation_payload_read_bytes,
+            cached.source_preparation_payload_read_bytes
+        );
+        let source_json = serde_json::to_value(&cached).unwrap();
+        assert_eq!(
+            source_json["source_replay_version_observations_per_call"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
     }
 
     #[test]
