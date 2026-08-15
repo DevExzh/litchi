@@ -732,6 +732,14 @@ production-performance evidence remain absent. See
 [`0086`](changes/0086-opc-source-cache-budget-management.md) and
 [`0088`](changes/0088-opc-source-cache-contention-evidence.md).
 
+The current managed direct `SourceBackedPackage` sequential sinks also charge
+`Resource::OutputBytes` per write and commit only the exact bytes accepted by
+the caller sink. Exact/no-op copies and changed overlays retain typed
+zero-output refusals, partial/cancelled/source-changed `IncompleteOutput`, and
+content-free refusal diagnostics. This accounting is correctness evidence
+only: it does not extend to `OpcPackage` atomic saves, `to_bytes`, or the
+unmanaged compatibility path, and makes no performance claim.
+
 The five filesystem cases also have a repeated release capture: 30 fresh-child
 samples in each of `warm` and `cold-requested` state on a CPU-pinned tmpfs
 process (300 samples total). It records logical and process I/O counters,

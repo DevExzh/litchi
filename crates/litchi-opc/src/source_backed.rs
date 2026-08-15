@@ -160,8 +160,9 @@ pub struct SourceCacheDiagnostics {
     /// supplied hierarchical memory budget.
     pub budget_managed: bool,
     /// Managed budget reservations rejected by the hierarchical budget. A
-    /// final `InputBytes` refusal is counted; a temporary oversized read
-    /// window that is shrunk to the remaining capacity is not.
+    /// final `InputBytes` or managed direct-publication `OutputBytes` refusal
+    /// is counted; a temporary oversized read window that is shrunk to the
+    /// remaining capacity is not.
     pub budget_reservation_failures: u64,
     /// Current memory usage observed on the managed context's local budget.
     /// This is content-free and may include sibling operations sharing the
@@ -181,6 +182,12 @@ pub struct SourceCacheDiagnostics {
     pub budget_input_bytes_used: u64,
     /// Local cumulative input-byte limit, or `None` for an unmanaged cache.
     pub budget_input_bytes_limit: Option<u64>,
+    /// Cumulative physical bytes accepted by managed source-backed publication
+    /// sinks. Shared contexts may include sibling operations. This is never
+    /// released after acceptance, including an incomplete publication.
+    pub budget_output_bytes_used: u64,
+    /// Local cumulative output-byte limit, or `None` for an unmanaged cache.
+    pub budget_output_bytes_limit: Option<u64>,
     /// Cumulative declared cold-load work charged before payload I/O. A
     /// successful ZIP read proves that the declared uncompressed size is also
     /// the actual materialized size; hits and waiters add no work. Shared
@@ -260,6 +267,7 @@ struct SourceSnapshot {
     context: Option<ExecutionContext>,
     execution_failure: Option<Arc<Mutex<Option<ExecutionError>>>>,
     input_reservation_failures: Option<Arc<AtomicU64>>,
+    output_reservation_failures: Option<Arc<AtomicU64>>,
 }
 
 /// Process-local identity for one opened source-backed package lineage.
@@ -338,6 +346,11 @@ impl SourceArtifact {
     }
 
     /// Copy the retained source artifact exactly to a sequential sink.
+    ///
+    /// A managed artifact reserves `Resource::OutputBytes` for each sink
+    /// write and commits only the accepted count. A refusal before any bytes
+    /// are accepted returns the typed output resource-limit error; a sink or
+    /// policy failure after accepted bytes returns [`OpcError::IncompleteOutput`].
     pub fn write_to_stream<W: Write>(&self, writer: W) -> Result<()> {
         write_exact_snapshot(&self.snapshot, writer, self.snapshot.context.as_ref())
     }
@@ -466,6 +479,115 @@ impl<W: Write> Write for ContextCheckedSink<W> {
             }
         }
         result
+    }
+}
+
+/// Managed-only output-budget adapter. The compatibility path deliberately
+/// stays on [`ContextCheckedSink`] and does not instantiate this wrapper.
+struct OutputBudgetedSink<W> {
+    inner: W,
+    context: ExecutionContext,
+    failure: Arc<Mutex<Option<ExecutionError>>>,
+    output_reservation_failures: Arc<AtomicU64>,
+}
+
+impl<W: Write> OutputBudgetedSink<W> {
+    fn record_failure(&self, error: ExecutionError) {
+        let mut failure = self
+            .failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if failure.is_none() {
+            *failure = Some(error);
+        }
+    }
+
+    fn check_before_write(&self) -> std::io::Result<()> {
+        self.context.check().map_err(|error| {
+            let message = error.to_string();
+            self.record_failure(error);
+            // `Write::write_all` retries `Interrupted` indefinitely. Use a
+            // terminal I/O classification; the shared failure slot below
+            // restores the typed execution error after ZIP writing returns.
+            std::io::Error::other(message)
+        })
+    }
+
+    fn reserve_output(&self, requested: usize) -> std::io::Result<Option<Reservation>> {
+        if requested == 0 {
+            return Ok(None);
+        }
+        let requested = u64::try_from(requested).map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "source-backed OPC output request exceeds u64",
+            )
+        })?;
+        self.context
+            .reserve(Resource::OutputBytes, requested)
+            .map(Some)
+            .map_err(|error| {
+                if matches!(
+                    &error,
+                    ExecutionError::ResourceLimit(limit)
+                        if limit.resource == Resource::OutputBytes
+                ) {
+                    self.output_reservation_failures
+                        .fetch_add(1, Ordering::Relaxed);
+                }
+                let message = error.to_string();
+                self.record_failure(error);
+                // The ZIP preservation layer communicates sink failures through
+                // std::io::Error. The shared failure slot restores the typed
+                // execution error after that adapter returns.
+                std::io::Error::other(message)
+            })
+    }
+}
+
+impl<W: Write> Write for OutputBudgetedSink<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.check_before_write()?;
+        let reservation = self.reserve_output(bytes.len())?;
+        let result = self.inner.write(bytes);
+        match result {
+            Ok(written) if written > bytes.len() => {
+                drop(reservation);
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "source-backed OPC sink reported {written} bytes for a {}-byte write",
+                        bytes.len()
+                    ),
+                ))
+            },
+            Ok(written) => {
+                let written = u64::try_from(written).map_err(|_| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "source-backed OPC sink progress exceeds u64",
+                    )
+                })?;
+                if let Some(reservation) = reservation {
+                    if !reservation.commit(written) {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "source-backed OPC output reservation underflow",
+                        ));
+                    }
+                }
+                Ok(usize::try_from(written).unwrap_or(usize::MAX))
+            },
+            Err(error) => {
+                drop(reservation);
+                Err(error)
+            },
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.check_before_write()?;
+        self.inner.flush()
     }
 }
 
@@ -710,6 +832,7 @@ struct PartCache {
     counters: CacheCounters,
     budget: Option<ExecutionContext>,
     input_reservation_failures: Option<Arc<AtomicU64>>,
+    output_reservation_failures: Option<Arc<AtomicU64>>,
 }
 
 impl PartCache {
@@ -720,6 +843,7 @@ impl PartCache {
             counters: CacheCounters::default(),
             budget: None,
             input_reservation_failures: None,
+            output_reservation_failures: None,
         }
     }
 
@@ -727,6 +851,7 @@ impl PartCache {
         limits: SourceCacheLimits,
         context: ExecutionContext,
         input_reservation_failures: Arc<AtomicU64>,
+        output_reservation_failures: Arc<AtomicU64>,
     ) -> Self {
         Self {
             limits,
@@ -734,6 +859,7 @@ impl PartCache {
             counters: CacheCounters::default(),
             budget: Some(context),
             input_reservation_failures: Some(input_reservation_failures),
+            output_reservation_failures: Some(output_reservation_failures),
         }
     }
 
@@ -1098,6 +1224,13 @@ impl PartCache {
                     Some(context.budget().limit(Resource::Work)),
                 )
             });
+        let (budget_output_bytes_used, budget_output_bytes_limit) =
+            self.budget.as_ref().map_or((0, None), |context| {
+                (
+                    context.budget().used(Resource::OutputBytes),
+                    Some(context.budget().limit(Resource::OutputBytes)),
+                )
+            });
         let (budget_objects_used, budget_objects_limit) =
             self.budget.as_ref().map_or((0, None), |context| {
                 (
@@ -1111,6 +1244,11 @@ impl PartCache {
             .load(Ordering::Relaxed)
             .saturating_add(
                 self.input_reservation_failures
+                    .as_ref()
+                    .map_or(0, |counter| counter.load(Ordering::Relaxed)),
+            )
+            .saturating_add(
+                self.output_reservation_failures
                     .as_ref()
                     .map_or(0, |counter| counter.load(Ordering::Relaxed)),
             );
@@ -1140,6 +1278,8 @@ impl PartCache {
                 .map(|context| context.budget().limit(Resource::Memory)),
             budget_input_bytes_used,
             budget_input_bytes_limit,
+            budget_output_bytes_used,
+            budget_output_bytes_limit,
             budget_work_used,
             budget_work_limit,
             budget_objects_used,
@@ -1233,6 +1373,7 @@ impl SourceBackedPackage {
             context: None,
             execution_failure: None,
             input_reservation_failures: None,
+            output_reservation_failures: None,
         };
         snapshot
             .ensure_current()
@@ -1399,6 +1540,7 @@ impl SourceBackedPackage {
             .as_ref()
             .map(|_| Arc::new(Mutex::new(None::<ExecutionError>)));
         let input_reservation_failures = context.as_ref().map(|_| Arc::new(AtomicU64::new(0)));
+        let output_reservation_failures = context.as_ref().map(|_| Arc::new(AtomicU64::new(0)));
         let version = source.version()?;
         let length = source.len()?;
         limits.check(ReadResource::InputBytes, length, limits.max_input_bytes())?;
@@ -1414,6 +1556,7 @@ impl SourceBackedPackage {
             context: context.clone(),
             execution_failure: execution_failure.clone(),
             input_reservation_failures: input_reservation_failures.clone(),
+            output_reservation_failures: output_reservation_failures.clone(),
         };
         snapshot.ensure_current()?;
         if let Some(context) = context.as_ref() {
@@ -1524,7 +1667,15 @@ impl SourceBackedPackage {
             let input_reservation_failures = input_reservation_failures.ok_or_else(|| {
                 overlay_unavailable("managed source input reservation counter is unavailable")
             })?;
-            PartCache::new_managed(cache_limits, context, input_reservation_failures)
+            let output_reservation_failures = output_reservation_failures.ok_or_else(|| {
+                overlay_unavailable("managed source output reservation counter is unavailable")
+            })?;
+            PartCache::new_managed(
+                cache_limits,
+                context,
+                input_reservation_failures,
+                output_reservation_failures,
+            )
         } else {
             PartCache::new(cache_limits)
         };
@@ -1614,10 +1765,14 @@ impl SourceBackedPackage {
         &self.non_part_members
     }
 
-    /// Return content-free payload-cache activity and current occupancy.
+    /// Return content-free payload-cache and managed-publication activity.
     ///
     /// See [`SourceCacheDiagnostics`] for the precise event definitions. This
-    /// operation does not read part payloads or expose member identifiers.
+    /// operation does not read part payloads or expose member identifiers. For
+    /// managed packages it also reports cumulative direct-publication
+    /// `OutputBytes` usage/limit and budget refusal counts; this includes
+    /// [`SourceArtifact::write_to_stream`] and bounded overlay sinks, while
+    /// unmanaged compatibility publication remains uncharged.
     #[must_use]
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
         let mut diagnostics = self.cache.diagnostics();
@@ -2611,7 +2766,14 @@ impl SourceBackedPackage {
         self.cache.check_context().map_err(map_execution_error)?;
         let mut written = 0_u64;
         let execution_failure = Arc::new(Mutex::new(None));
-        let result = {
+        let result = if let Some(context) = self.cache.context() {
+            let Some(output_reservation_failures) =
+                self.source.output_reservation_failures.as_ref()
+            else {
+                return Err(overlay_unavailable(
+                    "managed source output reservation counter is unavailable",
+                ));
+            };
             let counted = Counted {
                 inner: writer,
                 written: &mut written,
@@ -2622,11 +2784,34 @@ impl SourceBackedPackage {
             };
             let cooperative = ContextCheckedSink {
                 inner: checked,
-                context: self.cache.context().cloned(),
+                context: Some(context.clone()),
                 failure: Arc::clone(&execution_failure),
             };
-            let result = index.write_to(&plan, Chunked { inner: cooperative });
-            match result {
+            let budgeted = OutputBudgetedSink {
+                inner: cooperative,
+                context: context.clone(),
+                failure: Arc::clone(&execution_failure),
+                output_reservation_failures: output_reservation_failures.clone(),
+            };
+            match index.write_to(&plan, Chunked { inner: budgeted }) {
+                Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
+                Err(error) => Err(OpcError::ZipError(error.to_string())),
+            }
+        } else {
+            let counted = Counted {
+                inner: writer,
+                written: &mut written,
+            };
+            let checked = SourceCheckedSink {
+                inner: counted,
+                snapshot: self.source.clone(),
+            };
+            let cooperative = ContextCheckedSink {
+                inner: checked,
+                context: None,
+                failure: Arc::clone(&execution_failure),
+            };
+            match index.write_to(&plan, Chunked { inner: cooperative }) {
                 Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
                 Err(error) => Err(OpcError::ZipError(error.to_string())),
             }
@@ -3119,7 +3304,67 @@ fn write_exact_snapshot<W: Write>(
         })?;
     buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
     let mut written = 0_u64;
-    let result = {
+    let result = if let Some(context) = context {
+        let Some(output_reservation_failures) = source.output_reservation_failures.as_ref() else {
+            return Err(overlay_unavailable(
+                "managed source output reservation counter is unavailable",
+            ));
+        };
+        let execution_failure = Arc::new(Mutex::new(None));
+        let counted = Counted {
+            inner: writer,
+            written: &mut written,
+        };
+        let checked = SourceCheckedSink {
+            inner: counted,
+            snapshot: source.clone(),
+        };
+        let cooperative = ContextCheckedSink {
+            inner: checked,
+            context: Some(context.clone()),
+            failure: Arc::clone(&execution_failure),
+        };
+        let mut sink = OutputBudgetedSink {
+            inner: cooperative,
+            context: context.clone(),
+            failure: Arc::clone(&execution_failure),
+            output_reservation_failures: output_reservation_failures.clone(),
+        };
+        let mut offset = 0_u64;
+        let result = (|| {
+            while offset < source.length {
+                context.check().map_err(map_execution_error)?;
+                let remaining = usize::try_from((source.length - offset).min(buffer.len() as u64))
+                    .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
+                let read = read_source_at_with_context(
+                    source,
+                    Some(context),
+                    offset,
+                    &mut buffer[..remaining],
+                    "publication",
+                )?;
+                if read == 0 {
+                    return Err(OpcError::IoError(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "source-backed OPC source ended during publication",
+                    )));
+                }
+                context.check().map_err(map_execution_error)?;
+                sink.write_all(&buffer[..read])?;
+                offset = offset
+                    .checked_add(read as u64)
+                    .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+            }
+            context.check().map_err(map_execution_error)?;
+            sink.flush()?;
+            Ok(())
+        })();
+        execution_failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+            .map_or(result, |error| Err(map_execution_error(error)))
+    } else {
         let counted = Counted {
             inner: writer,
             written: &mut written,
@@ -3131,14 +3376,11 @@ fn write_exact_snapshot<W: Write>(
         let mut offset = 0_u64;
         (|| {
             while offset < source.length {
-                if let Some(context) = context {
-                    context.check().map_err(map_execution_error)?;
-                }
                 let remaining = usize::try_from((source.length - offset).min(buffer.len() as u64))
                     .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
                 let read = read_source_at_with_context(
                     source,
-                    context,
+                    None,
                     offset,
                     &mut buffer[..remaining],
                     "publication",
@@ -3149,16 +3391,10 @@ fn write_exact_snapshot<W: Write>(
                         "source-backed OPC source ended during publication",
                     )));
                 }
-                if let Some(context) = context {
-                    context.check().map_err(map_execution_error)?;
-                }
                 sink.write_all(&buffer[..read])?;
                 offset = offset
                     .checked_add(read as u64)
                     .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
-            }
-            if let Some(context) = context {
-                context.check().map_err(map_execution_error)?;
             }
             sink.flush()?;
             Ok(())
@@ -3658,15 +3894,16 @@ mod tests {
         (budget, cancellation_source, context)
     }
 
-    fn managed_context_with_resources(
+    fn managed_context_with_all_resources(
         memory: u64,
         input_bytes: u64,
+        output_bytes: u64,
         objects: u64,
         work: u64,
     ) -> (Budget, CancellationSource, ExecutionContext) {
         let budget = Budget::root(
             "opc-source-cache-test",
-            Limits::new(memory, input_bytes, u64::MAX, objects, u64::MAX, work),
+            Limits::new(memory, input_bytes, output_bytes, objects, u64::MAX, work),
         );
         let (cancellation_source, cancellation) = CancellationSource::pair();
         let execution_limits = ExecutionLimits::new(
@@ -3678,6 +3915,21 @@ mod tests {
         .unwrap();
         let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
         (budget, cancellation_source, context)
+    }
+
+    fn managed_context_with_resources(
+        memory: u64,
+        input_bytes: u64,
+        objects: u64,
+        work: u64,
+    ) -> (Budget, CancellationSource, ExecutionContext) {
+        managed_context_with_all_resources(memory, input_bytes, u64::MAX, objects, work)
+    }
+
+    fn managed_context_with_output(
+        output_bytes: u64,
+    ) -> (Budget, CancellationSource, ExecutionContext) {
+        managed_context_with_all_resources(4096, u64::MAX, output_bytes, u64::MAX, u64::MAX)
     }
 
     fn managed_context(memory: u64) -> (Budget, ExecutionContext) {
@@ -3704,6 +3956,30 @@ mod tests {
         if include_junk {
             writer.write_stored("scratch.bin", b"not a part").unwrap();
         }
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn large_archive_bytes(
+        root_relationships: &[u8],
+        document: &[u8],
+        junk_bytes: usize,
+    ) -> Vec<u8> {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored("_rels/.rels", root_relationships)
+            .unwrap();
+        writer.write_stored("word/document.xml", document).unwrap();
+        writer
+            .write_stored("custom/orphan.xml", b"<orphan/>")
+            .unwrap();
+        let junk = vec![0xA5; junk_bytes];
+        writer.write_stored("scratch.bin", &junk).unwrap();
         writer.finish_to_bytes().unwrap()
     }
 
@@ -3959,6 +4235,16 @@ mod tests {
         cancelled: bool,
     }
 
+    struct ShortInterruptedSink {
+        bytes: Vec<u8>,
+        maximum_write: usize,
+        interrupted: bool,
+    }
+
+    struct FlushFailingSink {
+        bytes: Vec<u8>,
+    }
+
     impl Write for CancelAfterWriteSink {
         fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
             self.bytes.extend_from_slice(bytes);
@@ -3988,6 +4274,39 @@ mod tests {
 
         fn flush(&mut self) -> std::io::Result<()> {
             Ok(())
+        }
+    }
+
+    impl Write for ShortInterruptedSink {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            if !self.interrupted {
+                self.interrupted = true;
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "injected retryable interruption",
+                ));
+            }
+            if bytes.is_empty() {
+                return Ok(0);
+            }
+            let written = self.maximum_write.min(bytes.len());
+            self.bytes.extend_from_slice(&bytes[..written]);
+            Ok(written)
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl Write for FlushFailingSink {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.bytes.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Err(std::io::Error::other("injected flush failure"))
         }
     }
 
@@ -5894,6 +6213,24 @@ mod tests {
     }
 
     #[test]
+    fn unmanaged_exact_source_publication_remains_unbudgeted() {
+        let source_bytes = archive_bytes(root_relationships(), b"unmanaged exact source", true);
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+                .unwrap();
+        let artifact = package.source_artifact();
+        let mut output = Vec::new();
+        artifact.write_to_stream(&mut output).unwrap();
+
+        assert_eq!(output, source_bytes);
+        let diagnostics = package.cache_diagnostics();
+        assert!(!diagnostics.budget_managed);
+        assert_eq!(diagnostics.budget_output_bytes_used, 0);
+        assert_eq!(diagnostics.budget_output_bytes_limit, None);
+        assert_eq!(diagnostics.budget_reservation_failures, 0);
+    }
+
+    #[test]
     fn exact_source_publication_checks_one_fewer_version_per_copy_chunk() {
         let source = Arc::new(CountingSource::new(archive_bytes(
             root_relationships(),
@@ -6103,5 +6440,394 @@ mod tests {
         }
         assert!(!sink.bytes.is_empty());
         assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::OutputBytes), sink.bytes.len() as u64);
+    }
+
+    #[test]
+    fn managed_exact_noop_overlay_charges_physical_output_bytes() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        package
+            .write_part_overlay_to_stream(&mut output, &target, b"<before/>".to_vec())
+            .unwrap();
+
+        assert_eq!(output, source_bytes);
+        assert_eq!(budget.used(Resource::OutputBytes), output.len() as u64);
+    }
+
+    #[test]
+    fn managed_exact_output_limit_accepts_exact_small_artifact() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
+        let (budget, _cancellation_source, context) =
+            managed_context_with_output(source_bytes.len() as u64);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let artifact = package.source_artifact();
+        let mut output = Vec::new();
+        artifact.write_to_stream(&mut output).unwrap();
+
+        assert_eq!(output, source_bytes);
+        assert_eq!(
+            budget.used(Resource::OutputBytes),
+            source_bytes.len() as u64
+        );
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.budget_reservation_failures, 0);
+        assert_eq!(
+            diagnostics.budget_output_bytes_used,
+            source_bytes.len() as u64
+        );
+        assert_eq!(
+            diagnostics.budget_output_bytes_limit,
+            Some(source_bytes.len() as u64)
+        );
+    }
+
+    #[test]
+    fn managed_exact_output_limit_one_under_refuses_before_small_artifact_output() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
+        let (budget, _cancellation_source, context) =
+            managed_context_with_output((source_bytes.len() as u64).saturating_sub(1));
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source_bytes)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let artifact = package.source_artifact();
+        let mut output = Vec::new();
+        let error = artifact.write_to_stream(&mut output).unwrap_err();
+
+        assert!(matches!(
+            error,
+            OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                if limit.resource == Resource::OutputBytes
+        ));
+        assert!(output.is_empty());
+        assert_eq!(budget.used(Resource::OutputBytes), 0);
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.budget_reservation_failures, 1);
+        assert_eq!(diagnostics.budget_output_bytes_used, 0);
+    }
+
+    #[test]
+    fn managed_large_exact_publication_refuses_mid_stream_with_exact_partial_charge() {
+        let source_bytes = large_archive_bytes(root_relationships(), b"<before/>", 150_000);
+        assert!(source_bytes.len() > SOURCE_PUBLICATION_CHUNK_BYTES * 2);
+        let output_limit = SOURCE_PUBLICATION_CHUNK_BYTES as u64 + 100;
+        let (budget, _cancellation_source, context) = managed_context_with_output(output_limit);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source_bytes)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let artifact = package.source_artifact();
+        let mut output = Vec::new();
+        let error = artifact.write_to_stream(&mut output).unwrap_err();
+
+        match error {
+            OpcError::IncompleteOutput { written, source } => {
+                assert_eq!(written, SOURCE_PUBLICATION_CHUNK_BYTES as u64);
+                match *source {
+                    OpcError::Execution(ExecutionError::ResourceLimit(limit)) => {
+                        assert_eq!(limit.resource, Resource::OutputBytes);
+                    },
+                    other => panic!("unexpected mid-stream source error: {other:?}"),
+                }
+            },
+            other => panic!("unexpected mid-stream output error: {other:?}"),
+        }
+        assert_eq!(output.len(), SOURCE_PUBLICATION_CHUNK_BYTES);
+        assert_eq!(
+            budget.used(Resource::OutputBytes),
+            SOURCE_PUBLICATION_CHUNK_BYTES as u64
+        );
+        assert_eq!(package.cache_diagnostics().budget_reservation_failures, 1);
+    }
+
+    #[test]
+    fn managed_output_charge_reaches_hierarchical_parent_and_child_budgets() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
+        let output_bytes = source_bytes.len() as u64;
+        let root = Budget::root(
+            "opc-source-output-root",
+            Limits::new(4096, u64::MAX, output_bytes, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let child = root.child(
+            "opc-source-output-child",
+            Limits::new(4096, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(4096).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(child.clone(), cancellation, execution_limits);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let artifact = package.source_artifact();
+        let mut output = Vec::new();
+        artifact.write_to_stream(&mut output).unwrap();
+
+        assert_eq!(output, source_bytes);
+        assert_eq!(root.used(Resource::OutputBytes), output_bytes);
+        assert_eq!(child.used(Resource::OutputBytes), output_bytes);
+        drop(cancellation_source);
+    }
+
+    #[test]
+    fn managed_cumulative_output_retry_exhaustion_refuses_second_exact_publication() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
+        let output_bytes = source_bytes.len() as u64;
+        let (budget, _cancellation_source, context) = managed_context_with_output(output_bytes);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let artifact = package.source_artifact();
+        let mut first = Vec::new();
+        artifact.write_to_stream(&mut first).unwrap();
+        let mut retry = Vec::new();
+        let error = artifact.write_to_stream(&mut retry).unwrap_err();
+
+        assert!(matches!(
+            error,
+            OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                if limit.resource == Resource::OutputBytes
+        ));
+        assert_eq!(first, source_bytes);
+        assert!(retry.is_empty());
+        assert_eq!(budget.used(Resource::OutputBytes), output_bytes);
+        assert_eq!(package.cache_diagnostics().budget_reservation_failures, 1);
+    }
+
+    #[test]
+    fn managed_flush_failure_reports_exact_output_charge_as_incomplete() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
+        let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let artifact = package.source_artifact();
+        let mut sink = FlushFailingSink { bytes: Vec::new() };
+        let error = artifact.write_to_stream(&mut sink).unwrap_err();
+
+        match error {
+            OpcError::IncompleteOutput { written, source } => {
+                assert_eq!(written, source_bytes.len() as u64);
+                assert!(matches!(
+                    *source,
+                    OpcError::IoError(error)
+                        if error.kind() == std::io::ErrorKind::Other
+                ));
+            },
+            other => panic!("unexpected flush error: {other:?}"),
+        }
+        assert_eq!(sink.bytes, source_bytes);
+        assert_eq!(
+            budget.used(Resource::OutputBytes),
+            source_bytes.len() as u64
+        );
+    }
+
+    #[test]
+    fn managed_changed_overlay_charges_exact_accepted_output_bytes() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source_bytes)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        package
+            .write_part_overlay_to_stream(&mut output, &target, b"<after/>".to_vec())
+            .unwrap();
+
+        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        assert_eq!(reopened.get_part(&target).unwrap().blob(), b"<after/>");
+        assert_eq!(budget.used(Resource::OutputBytes), output.len() as u64);
+    }
+
+    #[test]
+    fn managed_exact_noop_refuses_the_first_output_write_at_zero_limit() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"<before/>",
+            true,
+        )));
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let (budget, _cancellation_source, context) = managed_context_with_output(0);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        let error = package
+            .write_part_overlay_to_stream(&mut output, &target, b"<before/>".to_vec())
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                if limit.resource == Resource::OutputBytes
+        ));
+        assert!(output.is_empty());
+        assert_eq!(budget.used(Resource::OutputBytes), 0);
+    }
+
+    #[test]
+    fn managed_partial_sink_failure_commits_only_accepted_output_bytes() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"<before/>",
+            true,
+        )));
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let mut sink = BoundedFailingSink {
+            accepted: 0,
+            limit: 100,
+            largest_write: 0,
+        };
+        let error = package
+            .write_part_overlay_to_stream(&mut sink, &target, b"<after/>".to_vec())
+            .unwrap_err();
+
+        match error {
+            OpcError::IncompleteOutput { written, .. } => assert_eq!(written, 100),
+            other => panic!("unexpected sink error: {other:?}"),
+        }
+        assert_eq!(budget.used(Resource::OutputBytes), 100);
+    }
+
+    #[test]
+    fn managed_source_change_after_accepted_output_preserves_partial_accounting() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"<before/>",
+            true,
+        )));
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let mut sink = MutatingSink {
+            source,
+            bytes: Vec::new(),
+            change_after: 0,
+            changed: false,
+        };
+        let error = package
+            .write_part_overlay_to_stream(&mut sink, &target, b"<after/>".to_vec())
+            .unwrap_err();
+
+        match error {
+            OpcError::IncompleteOutput { written, source } => {
+                assert_eq!(written, sink.bytes.len() as u64);
+                assert!(matches!(*source, OpcError::SourceChanged { .. }));
+            },
+            other => panic!("unexpected source-change error: {other:?}"),
+        }
+        assert_eq!(budget.used(Resource::OutputBytes), sink.bytes.len() as u64);
+    }
+
+    #[test]
+    fn managed_short_interrupted_source_copy_charges_only_accepted_bytes() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
+        let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let artifact = package.source_artifact();
+        let mut sink = ShortInterruptedSink {
+            bytes: Vec::new(),
+            maximum_write: 7,
+            interrupted: false,
+        };
+        artifact.write_to_stream(&mut sink).unwrap();
+
+        assert_eq!(sink.bytes, source_bytes);
+        assert_eq!(
+            budget.used(Resource::OutputBytes),
+            source_bytes.len() as u64
+        );
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(
+            diagnostics.budget_output_bytes_used,
+            source_bytes.len() as u64
+        );
+        assert_eq!(diagnostics.budget_output_bytes_limit, Some(u64::MAX));
+    }
+
+    #[test]
+    fn managed_overreporting_sink_does_not_commit_output_budget() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"<before/>",
+            false,
+        )));
+        let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let artifact = package.source_artifact();
+        let mut sink = OverReportingSink {
+            calls: 0,
+            accepted: 0,
+        };
+
+        assert!(matches!(
+            artifact.write_to_stream(&mut sink),
+            Err(OpcError::IoError(error)) if error.kind() == std::io::ErrorKind::InvalidData
+        ));
+        assert_eq!(sink.calls, 1);
+        assert_eq!(sink.accepted, 0);
+        assert_eq!(budget.used(Resource::OutputBytes), 0);
     }
 }

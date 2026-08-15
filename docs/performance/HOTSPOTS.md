@@ -253,6 +253,12 @@ Confirmed source facts:
   structural/distribution evidence but accepts no speedup. Allocation,
   peak-memory/RSS, hardware, copied/decompressed-byte, CPU, and
   production-performance evidence remain missing.
+- Managed direct `SourceBackedPackage` sequential publication now charges
+  `Resource::OutputBytes` per sink write and commits only exact accepted bytes;
+  exact/no-op and changed overlays retain typed refusal, partial-output,
+  cancellation and source-freshness behavior. This is a bounded correctness
+  accounting change only and excludes `OpcPackage` atomic saves, `to_bytes`,
+  and unmanaged compatibility sinks; no performance result is claimed.
 - The additive source-backed calculation-metadata editor loads only the
   workbook Part, stages existing typed `calcPr`/feature edits, reparses the
   complete candidate workbook XML, and consumes the commit into the accepted
@@ -1053,7 +1059,7 @@ pattern elsewhere.
 |---:|---|---|
 | 1 | Refined: legacy OPC path and `Read` ingress slurp the source; source-backed ingress is positional. Five filesystem cases now record process-isolated warm/cold-requested counters and atomic-save hashes, including a repeated release tmpfs capture. | Repeat on a controlled block-backed filesystem/cache host. The release run's accepted cold advice and zero process `read_bytes` on tmpfs are counters/output evidence only, not physical cold-cache behavior. |
 | 2 | Confirmed: ordinary OPC open inflates every admitted Part. | Open/list/one-object scaling against total uncompressed bytes and member count. |
-| 3 | Implemented for managed source-backed OPC: finite weighted eviction, pinned-handle preservation, per-entry single-flight, exact physical `InputBytes`, cumulative declared cold-load `Work`, retained catalog/flight/payload `Objects`, retained/in-flight payload `Memory` Budget charging and content-free diagnostics exist; compatibility/unmanaged opens retain finite `SourceCacheLimits`, and legacy eager open does not use that managed cache. | Correctness tests cover all managed resource dimensions and charging/release invariants. Release contention ABBA covers structural/distribution counters but accepts no speedup. Add allocation, peak-memory/RSS, hardware, copied/decompressed-byte, CPU-utilization and production-performance evidence. |
+| 3 | Implemented for managed source-backed OPC: finite weighted eviction, pinned-handle preservation, per-entry single-flight, exact physical `InputBytes`, exact accepted direct-sink `OutputBytes`, cumulative declared cold-load `Work`, retained catalog/flight/payload `Objects`, retained/in-flight payload `Memory` Budget charging and content-free diagnostics exist; compatibility/unmanaged opens retain finite `SourceCacheLimits`, and legacy eager open does not use that managed cache. | Correctness tests cover all managed resource dimensions and charging/release invariants. Release contention ABBA covers structural/distribution counters but accepts no speedup. Add allocation, peak-memory/RSS, hardware, copied/decompressed-byte, CPU-utilization and production-performance evidence. |
 | 4 | Measured: ordinary OPC open is serial and explicit eager open has a local bounded session. Six large ZIP tasks reach 4.52x p50 at 12 CPUs; small tasks regress. | Broader real-package scaling and threshold tuning. |
 | 5 | Confirmed: stored entries are CRC-checked then copied. | Stored-media one-Part read and package-open copied-byte/RSS deltas. |
 | 6 | Refined by measurement: exact unchanged saves copy the source; owned same-topology mutations raw-copy unchanged entries; changed Parts share their immutable logical payload and validated generated local span without extra copies; the bounded source-backed publisher materializes only selected targets and raw-copies the rest; guarded DOCX, atomic same-slide and multi-slide PPTX shape-text batches, and XLSX calculation-metadata/defined-name/page-break/page-margin/print-options/page-setup/sheet-protection/data-validation/auto-filter facades consume it; borrowed/topology-changing paths rewrite fully, while unsupported source-backed layouts refuse. | Real-producer media-heavy multi-Part updates, broader semantic closures, signature/topology policies, and attribution of the remaining selected-Part/compressor-buffer memory cost. |
