@@ -9,7 +9,6 @@ use litchi_opc::{ReadLimits, SourceBackedPackage};
 use super::{Commit, Patch, Snapshot};
 use crate::error::{Result, invalid};
 use crate::raw::{self, DefinedName};
-use crate::source_provenance::SourceProvenance;
 
 /// An owning source-backed editor for the workbook defined-name catalog.
 ///
@@ -73,25 +72,14 @@ impl SourceBackedEditor {
         writer: W,
         commit: &Commit,
     ) -> Result<Snapshot> {
-        let before = commit.patch().before();
-        let current = match before.matches_source_backed(&self.package)? {
-            SourceProvenance::Matched => None,
-            SourceProvenance::Mismatched => {
-                return Err(crate::Error::PatchConflict {
-                    part: before.workbook_part_name().to_string(),
-                });
-            },
-            SourceProvenance::Unavailable => Some(Snapshot::load_source_backed(&self.package)?),
-        };
-        if let Some(current) = &current
-            && !current.same_source(before)
-        {
+        let current = Snapshot::load_source_backed(&self.package)?;
+        if !current.same_source(commit.patch().before()) {
             return Err(crate::Error::PatchConflict {
                 part: current.workbook_part_name().to_string(),
             });
         }
         let target = if commit.patch().is_empty() {
-            current.unwrap_or_else(|| before.clone())
+            current
         } else {
             commit.patch().after().clone()
         };
