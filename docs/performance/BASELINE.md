@@ -498,6 +498,25 @@ outside timing. This is correctness/coverage evidence only: no positional-I/O,
 allocation/RSS, bounded-artifact-memory, speedup, or broad-producer claim is
 made. See [`0135`](changes/0135-xls-numeric-source-publication.md).
 
+Change 0136 binds those four selectors to a clean-revision, CPU-2-pinned
+release baseline at `9577cd16f` with 20 warmups and 200 samples per case:
+
+| XLS fixed-width numeric selector | p50 | p95 | p99 | mean | commit p50 | publication p50 | complete target retained |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| eager Number | 31.492 ms | 34.116 ms | 35.916 ms | 31.763 ms | 30.741 ms | 0.729 ms | 16,995,840 B |
+| source-backed Number | 146.410 ms | 149.108 ms | 150.693 ms | 146.642 ms | 101.618 ms | 44.783 ms | 16,995,840 B |
+| eager RK/MulRK | 0.100 ms | 0.120 ms | 0.127 ms | 0.103 ms | 0.097 ms | 0.003 ms | 202,752 B |
+| source-backed RK/MulRK | 1.627 ms | 1.659 ms | 1.690 ms | 1.630 ms | 1.117 ms | 0.509 ms | 202,752 B |
+
+The source-backed/eager p50 ratios are 4.65x and 16.25x respectively, with
+byte-identical output within each family. This is a descriptive before
+baseline, not an optimization or regression classification: all four paths
+retain a complete target, source ingress and verification are untimed, and the
+single-process run has no allocation, peak-memory/RSS, hardware-counter,
+physical-I/O, cold-cache, or fresh-process evidence. The raw schema-1 artifact,
+exact binary/result hashes, environment, commands, and interpretation are in
+[`0136`](changes/0136-xls-numeric-current-revision-baseline.md).
+
 The earlier five-case filesystem smoke exercises eager/source-backed OPC open,
 eager/source-backed one-Part atomic save, and same-length CFB atomic overlay
 save. A
