@@ -11,9 +11,10 @@ it does not change production ODP behavior. The selectors are:
 
 They bring the selectable `Case` matrix to 265 names while preserving the
 default 36 cases / 198 records. This change accepts the matched correctness
-and source-replay gates only. It makes no latency, physical-I/O,
-decompression, allocation, RSS, cold-cache, or release claim until a frozen,
-CPU-pinned measured ABBA run.
+and source-replay gates only. The subsequent frozen CPU-pinned selector-pair
+result is recorded separately in
+[change 0140](0140-odp-repeated-text-cache-release-abba.md); physical-I/O,
+decompression, cold-cache, peak-memory, and generic ODF claims remain open.
 
 ## Matched corpus and owner
 
@@ -111,8 +112,8 @@ The one-test run passes for both selectors and two samples. A two-sample
 selector smoke also passes with the four-call replay gates and records the
 corpus values above. The smoke is intentionally not release evidence: it is
 not CPU-pinned, does not use a clean detached release binary, and does not
-run balanced ABBA legs. The release decision remains deferred until those
-conditions are met.
+run balanced ABBA legs. The later release decision and its exact conditions
+are recorded in [change 0140](0140-odp-repeated-text-cache-release-abba.md).
 
 ## Applicability and limitations
 

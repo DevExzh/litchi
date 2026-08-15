@@ -1182,6 +1182,19 @@ only; no latency, physical-I/O, decompression, allocation, RSS, cold-cache,
 ABBA, or release claim is accepted. See
 [`0139`](changes/0139-odp-repeated-text-cache-evidence.md).
 
+Change 0140 supplies the clean-revision release result for that exact matched
+selector pair. Four fresh CPU-2 processes ran in `A1, B1, B2, A2` order with
+20 warmups and 200 samples: p50 improves 45.80%/46.32%, p95 45.25%/45.83%,
+p99 39.91%/45.41%, and mean 45.74%/46.33% in the paired directions. Four
+Heaptrack profiles record identical-direction whole-process reductions of
+14.31% in allocation calls and 17.25% in temporary allocations; peak heap is
+unchanged at 89.22M. Process VmHWM is near-neutral (0.00%/0.16%), so no RSS or
+peak-heap reduction is accepted. The result applies only to four repeated
+full-text projections on the prepared source-backed corpus and makes no
+single-call, open, physical-I/O, decompression, cold-cache, operation-local
+allocated-byte, or generic ODF claim. See
+[`0140`](changes/0140-odp-repeated-text-cache-release-abba.md).
+
 Change 0103 adds a separate pinned release ABBA capture for
 `cfb_file_same_length_overlay_atomic_save` on CPU 2 (five warm-ups and 30
 fresh-child samples per leg). The atomic save's duplicate post-emission scan
