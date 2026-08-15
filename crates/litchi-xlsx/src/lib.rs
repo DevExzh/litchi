@@ -123,6 +123,7 @@ pub mod slicer;
 mod slicer_cache;
 pub mod smart_tags;
 pub mod sort;
+mod source_provenance;
 /// Bounded, sequential creation of one-sheet XLSX workbooks.
 pub mod streaming;
 pub mod style;

@@ -7,12 +7,14 @@ use litchi_opc::{OpcPackage, PackURI, PartView, Relationship, SourceBackedPackag
 
 use crate::error::{Error, Result, invalid};
 use crate::raw::{self, DefinedName};
+use crate::source_provenance::{SourceBinding, SourceProvenance};
 
 /// Exact workbook owner state plus its inert defined-name catalog.
 #[derive(Clone, Debug)]
 pub struct Snapshot {
     names: Box<[DefinedName]>,
     source: SourceState,
+    binding: SourceBinding,
 }
 
 impl Snapshot {
@@ -36,7 +38,9 @@ impl Snapshot {
         let bytes = workbook.data()?.into_arc()?;
         let owner = current_owner_relationship(package.rels())
             .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?;
-        Self::from_source_backed_parts(&workbook, bytes, owner)
+        let mut snapshot = Self::from_source_backed_parts(&workbook, bytes, owner)?;
+        snapshot.binding = SourceBinding::capture(package)?;
+        Ok(snapshot)
     }
 
     fn from_source_backed_parts(
@@ -69,6 +73,7 @@ impl Snapshot {
                 bytes,
                 owner_relationship: SourceRelationship::capture(owner)?,
             },
+            binding: SourceBinding::default(),
         })
     }
 
@@ -111,7 +116,15 @@ impl Snapshot {
     }
 
     pub(super) fn same_source(&self, other: &Self) -> bool {
-        self.source == other.source
+        self.source == other.source && self.binding.same_or_unavailable(&other.binding)
+    }
+
+    /// Check the retained source lineage and revision without reloading XML.
+    pub(super) fn matches_source_backed(
+        &self,
+        package: &SourceBackedPackage,
+    ) -> Result<SourceProvenance> {
+        self.binding.check(package)
     }
 
     pub(super) fn matches_current_source(&self, package: &OpcPackage) -> bool {

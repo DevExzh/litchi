@@ -8,7 +8,8 @@ use litchi_opc::{ReadLimits, SourceBackedPackage};
 
 use super::{Collection, Commit, PageBreaks, Patch, Snapshot};
 use crate::Selector;
-use crate::error::{Result, invalid};
+use crate::error::{Error, Result, invalid};
+use crate::source_provenance::SourceProvenance;
 
 /// An owning source-backed page-break editor.
 ///
@@ -69,15 +70,28 @@ impl SourceBackedEditor {
         writer: W,
         commit: &Commit,
     ) -> Result<Snapshot> {
-        let current =
-            Snapshot::load_source_backed(&self.package, commit.patch().before().sheet_position())?;
-        if !current.same_source(commit.patch().before()) {
-            return Err(crate::Error::PatchConflict {
+        let before = commit.patch().before();
+        let current = match before.matches_source_backed(&self.package)? {
+            SourceProvenance::Matched => None,
+            SourceProvenance::Mismatched => {
+                return Err(Error::PatchConflict {
+                    part: before.worksheet_part_name().to_string(),
+                });
+            },
+            SourceProvenance::Unavailable => Some(Snapshot::load_source_backed(
+                &self.package,
+                before.sheet_position(),
+            )?),
+        };
+        if let Some(current) = &current
+            && !current.same_source(before)
+        {
+            return Err(Error::PatchConflict {
                 part: current.worksheet_part_name().to_string(),
             });
         }
         let target = if commit.patch().is_empty() {
-            current
+            current.unwrap_or_else(|| before.clone())
         } else {
             commit.patch().after().clone()
         };
