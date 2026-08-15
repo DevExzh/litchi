@@ -2,13 +2,15 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0146`](changes/0146-cfb-open-stream-evidence.md)
+Evidence through: [`change 0147`](changes/0147-cfb-open-stream-release-abba.md)
 (the newest accepted semantic-format optimization remains limited to four repeated
 source-backed ODP full-text projections; the latest release CFB selective-range
 evidence is the configured simulator result in
 [`0144`](changes/0144-cfb-simulated-range-source-evidence.md), while
 [`0146`](changes/0146-cfb-open-stream-evidence.md) adds `open_stream`-specific
-correctness/counter instrumentation without a performance result,
+correctness/counter instrumentation and
+[`0147`](changes/0147-cfb-open-stream-release-abba.md) accepts only its
+configured-simulator one-shot result while retaining the repeat tradeoff,
 and [`0094`](changes/0094-cfb-selective-read-evidence.md) retains the non-simulated
 exact-range result, and the latest accepted
 generic multi-format filesystem result remains
@@ -1117,10 +1119,12 @@ changes. Remaining gaps are:
   neutral. Real cold/network/device range sources, FAT tail behavior, p99,
   allocation, and peak-RSS evidence remain open, and no DOC/XLS/PPT semantic
   consumer is covered.
-- CFB `open_stream` now has direct one-shot and sequential repeat
-  correctness/counter selectors for 36-byte and 4,095-byte MiniFAT targets.
-  Change 0146 has no release ABBA, allocation/RSS, physical-I/O, bulk,
-  concurrency, ineligible-root, FAT, or native semantic result yet.
+- CFB `open_stream` now has direct one-shot and sequential repeat selectors for
+  36-byte and 4,095-byte MiniFAT targets. Change 0147 accepts the configured
+  simulator's one-shot timing and exact source-work result, but repeats add one
+  target-sized request before root-cache materialization. Allocation/RSS,
+  physical-I/O, bulk, concurrency, failure/retry, ineligible-root, FAT, and
+  native semantic evidence remain open.
 - Decompressed and recompressed byte observers. Positional range-request
   distributions now exist for OPC and XLSX, but not yet for every format/source.
 - Broad hardware-counter evidence. A matched targeted-OPC run is committed now

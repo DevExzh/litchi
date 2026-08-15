@@ -1053,6 +1053,17 @@ evidence only; release ABBA and all latency, allocation, RSS, physical-I/O,
 native DOC/XLS/PPT, cross-format, and iWork claims remain open. See
 [`0146`](changes/0146-cfb-open-stream-evidence.md).
 
+Change 0147 supplies the clean CPU-2 release `A1/B1/B2/A2` comparison for all
+24 target/shape records. Under the exact configured range simulator, all four
+one-shot cells improve total p50/p95/p99/mean by about 62-64% in both
+directions and reduce exact source work from the complete root Mini Stream to
+one target range. Repeats retain the candidate's extra first request and show
+small many-small modeled regressions, so no generic repeat improvement is
+claimed. Local wall-clock, resource, physical-I/O, native-format, and
+cross-format claims remain open. See
+[`0147`](changes/0147-cfb-open-stream-release-abba.md) and the
+[compact summary](results/cfb-open-stream-abba-0147-summary.json).
+
 Change 0119 adds three opt-in native PPT selected-shape controls and preserves
 the 36-case / 198-record default. The query-only and fresh-open-plus-query
 eager/source-backed pairs use the same deterministic target; separate untimed
@@ -1237,6 +1248,12 @@ records. The current tree's exact counter/range formulas and the parent
 revision's root-materializing shape are both supported by the same runner.
 This is correctness/counter evidence only, pending clean release ABBA. See
 [`0146`](changes/0146-cfb-open-stream-evidence.md).
+
+Change 0147 adds no selector. Its 19,200-sample clean release matrix accepts
+only exact one-shot source-work reduction and the named configured simulator's
+one-shot latency direction. The repeated-work cost remains explicit and no
+generic local or resource claim is made. See
+[`0147`](changes/0147-cfb-open-stream-release-abba.md).
 
 Change 0103 adds a separate pinned release ABBA capture for
 `cfb_file_same_length_overlay_atomic_save` on CPU 2 (five warm-ups and 30
