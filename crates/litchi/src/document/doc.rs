@@ -60,6 +60,32 @@ pub(crate) fn docx_unknown_is_section_properties(block: &crate::docx::OpaqueBloc
     name == b"sectPr" || name.strip_prefix(b"w:") == Some(b"sectPr")
 }
 
+/// Validate the lossless DOCX body stream before Markdown starts rendering.
+/// `elements()` intentionally omits alternative-format anchors, so using it
+/// here would silently drop active `altChunk` content. Keep unknown body
+/// children inert only when they are section properties; every other child
+/// must be refused rather than discarded.
+#[cfg(all(feature = "docx", feature = "markdown"))]
+fn validate_docx_markdown_blocks(blocks: Vec<crate::docx::Block>) -> Result<()> {
+    for block in blocks {
+        match block {
+            crate::docx::Block::Paragraph(_) | crate::docx::Block::Table(_) => {},
+            crate::docx::Block::Alt(_) => {
+                return Err(Error::Unsupported(
+                    "Markdown export cannot preserve active DOCX altChunk body blocks".to_owned(),
+                ));
+            },
+            crate::docx::Block::Unknown(block) if !docx_unknown_is_section_properties(&block) => {
+                return Err(Error::Unsupported(
+                    "Markdown export cannot preserve unmodeled DOCX body blocks".to_owned(),
+                ));
+            },
+            crate::docx::Block::Unknown(_) => {},
+        }
+    }
+    Ok(())
+}
+
 #[cfg(feature = "rtf")]
 fn rtf_timestamp_to_naive(
     timestamp: Option<litchi_rtf::RtfTimestamp>,
@@ -177,6 +203,88 @@ pub struct Document {
 }
 
 impl Document {
+    /// Preserve typed source-change failures across the unified DOCX facade;
+    /// other semantic failures retain the established invalid-format mapping.
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn map_source_docx_error(error: crate::docx::Error) -> Error {
+        match error {
+            crate::docx::Error::Opc(error) => Self::map_source_opc_error(error),
+            other => crate::map_ooxml_error(other),
+        }
+    }
+
+    /// Keep the source revision payload intact when an OPC operation crosses
+    /// the unified facade boundary. The generic `From<OpcError>` mapping is
+    /// intentionally lossy for legacy callers, so source-backed DOCX paths
+    /// must translate this variant explicitly.
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn map_source_opc_error(error: crate::opc::OpcError) -> Error {
+        match error {
+            crate::opc::OpcError::SourceChanged { expected, actual } => Error::SourceChanged {
+                expected,
+                observed: actual,
+            },
+            other => other.into(),
+        }
+    }
+
+    /// Prefer a final source revision failure over a parser or projection
+    /// result produced while the filesystem-backed DOCX was being read.
+    /// Checking after the operation closes the TOCTOU window between the
+    /// source-backed leaf's payload read and the unified facade's return.
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn finish_source_docx_result<T>(
+        source: &crate::docx::source_backed::Package,
+        result: Result<T>,
+    ) -> Result<T> {
+        match source.source_version().map_err(Self::map_source_docx_error) {
+            Err(error) => Err(error),
+            Ok(_) => result,
+        }
+    }
+
+    /// Materialize a source-backed DOCX only for the package-aware Markdown
+    /// adapter.  The source owner remains the authority for freshness: a
+    /// source mutation after a successful Markdown conversion is reported on
+    /// the next conversion instead of being hidden by the eager cache.
+    #[cfg(all(feature = "markdown", feature = "docx", any(unix, windows)))]
+    fn materialized_docx_package(&self) -> Result<&crate::docx::Package> {
+        let (source, cache) = match &self.inner {
+            DocumentImpl::DocxSource(source, cache) => (source, cache),
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "document is not a source-backed DOCX".to_owned(),
+                ));
+            },
+        };
+
+        // `to_owned_package` validates the exact source snapshot. Re-checking
+        // the source before consulting the retryable cache prevents a package
+        // materialized by an earlier Markdown call from becoming a stale
+        // authority after the filesystem source changes.
+        source
+            .source_version()
+            .map_err(Self::map_source_docx_error)?;
+        if let Some(package) = cache.get() {
+            return Self::finish_source_docx_result(source, Ok(package.as_ref()));
+        }
+
+        // Do not publish failures. Two concurrent callers may each perform
+        // the bounded materialization; `OnceLock::set` makes the winner
+        // visible and the loser safely discards its equivalent package.
+        let package = Self::finish_source_docx_result(
+            source,
+            source
+                .to_owned_package()
+                .map_err(Self::map_source_docx_error),
+        )?;
+        let _ = cache.set(Box::new(package));
+        let result = cache.get().map(Box::as_ref).ok_or_else(|| {
+            Error::InvalidFormat("DOCX Markdown materialization cache unavailable".to_owned())
+        });
+        Self::finish_source_docx_result(source, result)
+    }
+
     /// Reject source semantics that the Markdown adapter cannot place without
     /// guessing.  The adapter never follows targets or activates content.
     #[cfg(feature = "markdown")]
@@ -185,6 +293,7 @@ impl Document {
         reason = "the fallback is required when a subset of document-format features is enabled"
     )]
     pub(crate) fn validate_markdown_projection(&self) -> Result<()> {
+        #[cfg(any(feature = "doc", feature = "rtf", feature = "odt"))]
         let unsupported = |kind: &str| {
             Error::Unsupported(format!(
                 "Markdown export cannot preserve {kind} without its source placement context"
@@ -217,16 +326,17 @@ impl Document {
             #[cfg(feature = "docx")]
             DocumentImpl::Docx(package, _) => {
                 let document = package.document().map_err(crate::map_ooxml_error)?;
-                if document
-                    .elements()
-                    .map_err(crate::map_ooxml_error)?
-                    .iter()
-                    .any(|element| {
-                        matches!(element, crate::docx::Element::Unknown(block) if !docx_unknown_is_section_properties(block))
-                    })
-                {
-                    return Err(unsupported("unmodeled DOCX body blocks"));
-                }
+                validate_docx_markdown_blocks(document.blocks().map_err(crate::map_ooxml_error)?)?;
+            },
+            #[cfg(all(feature = "docx", any(unix, windows)))]
+            DocumentImpl::DocxSource(package, _) => {
+                let result = (|| {
+                    let document = package.document().map_err(Self::map_source_docx_error)?;
+                    validate_docx_markdown_blocks(
+                        document.blocks().map_err(Self::map_source_docx_error)?,
+                    )
+                })();
+                Self::finish_source_docx_result(package, result)?;
             },
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(document) => {
@@ -286,6 +396,15 @@ impl Document {
         match &self.inner {
             DocumentImpl::Docx(package, _) => {
                 package.document().map(Some).map_err(crate::map_ooxml_error)
+            },
+            #[cfg(all(feature = "docx", any(unix, windows)))]
+            DocumentImpl::DocxSource(source, _) => {
+                let package = self.materialized_docx_package()?;
+                let result = package
+                    .document()
+                    .map(Some)
+                    .map_err(Self::map_source_docx_error);
+                Self::finish_source_docx_result(source, result)
             },
             _ => Ok(None),
         }
@@ -383,8 +502,32 @@ impl Document {
                 let document = package.document().map_err(crate::map_ooxml_error)?;
                 crate::markdown::resolve_docx_lists(&document)
             },
+            #[cfg(all(feature = "docx", any(unix, windows)))]
+            DocumentImpl::DocxSource(source, _) => {
+                let package = self.materialized_docx_package()?;
+                let result = (|| {
+                    let document = package.document().map_err(Self::map_source_docx_error)?;
+                    crate::markdown::resolve_docx_lists(&document)
+                })();
+                Self::finish_source_docx_result(source, result)
+            },
             _ => Ok(Vec::new()),
         }
+    }
+
+    /// Check the source revision after a complete Markdown conversion. The
+    /// Markdown adapter may use the cached eager package for relationships,
+    /// notes, images, and numbering, so its final return boundary must still
+    /// be bound to the source-backed package's exact revision.
+    #[cfg(feature = "markdown")]
+    pub(crate) fn check_source_freshness_after_markdown(&self) -> Result<()> {
+        #[cfg(all(feature = "docx", any(unix, windows)))]
+        if let DocumentImpl::DocxSource(source, _) = &self.inner {
+            source
+                .source_version()
+                .map_err(Self::map_source_docx_error)?;
+        }
+        Ok(())
     }
 
     /// Open a Word document from a file path.
@@ -435,6 +578,44 @@ impl Document {
         path: P,
         limits: crate::docx::ReadLimits,
     ) -> Result<Self> {
+        #[cfg(any(unix, windows))]
+        if let Some(detected) =
+            crate::detection_smart::detected::detect_docx_source_path_with_limits(
+                path.as_ref(),
+                limits,
+            )
+            .map_err(|error| match error {
+                crate::detection_smart::detected::DocxSourcePathError::Opc(error) => {
+                    Self::map_source_opc_error(error)
+                },
+                crate::detection_smart::detected::DocxSourcePathError::Docx(error) => {
+                    Self::map_source_docx_error(error)
+                },
+            })?
+        {
+            match detected {
+                crate::detection_smart::detected::DocxSourcePathDetection::Docx(package) => {
+                    return Ok(Self {
+                        inner: DocumentImpl::DocxSource(package, Default::default()),
+                    });
+                },
+                crate::detection_smart::detected::DocxSourcePathDetection::OtherOoxml(format) => {
+                    let _ = format;
+                    return Err(Error::InvalidFormat(
+                        "Detected format is not a document format or feature not enabled"
+                            .to_owned(),
+                    ));
+                },
+                crate::detection_smart::detected::DocxSourcePathDetection::DisabledOtherOoxml(
+                    format,
+                ) => {
+                    let _ = format;
+                    return Err(Error::NotOfficeFile);
+                },
+            }
+        }
+
+        #[cfg(not(any(unix, windows)))]
         if let Some(detected) =
             crate::detection_smart::detected::detect_ooxml_path_with_limits(path.as_ref(), limits)
                 .map_err(crate::map_ooxml_error)?
@@ -540,7 +721,13 @@ impl Document {
                 );
 
                 // Validate the read view before retaining the owned package.
-                package.document().map_err(crate::map_ooxml_error)?;
+                let document = package.document().map_err(crate::map_ooxml_error)?;
+                // `document()` pins the visible payload but deliberately
+                // defers semantic XML traversal. Eager byte opens retain
+                // their historical validation boundary by forcing one
+                // linear text pass here; filesystem source opens keep this
+                // work deferred until their first query.
+                document.text().map_err(crate::map_ooxml_error)?;
 
                 // Move a clone of the already validated semantic cache across the facade seam.
                 let metadata = package
@@ -615,6 +802,14 @@ impl Document {
                 .document()
                 .and_then(|document| document.text())
                 .map_err(crate::map_ooxml_error),
+            #[cfg(all(feature = "docx", any(unix, windows)))]
+            DocumentImpl::DocxSource(package, _) => {
+                let result = package
+                    .document()
+                    .and_then(|document| document.extract_text())
+                    .map_err(Self::map_source_docx_error);
+                Self::finish_source_docx_result(package, result)
+            },
             #[cfg(feature = "pages")]
             DocumentImpl::Pages(doc) => doc.text().map_err(|e| {
                 Error::ParseError(format!("Failed to extract text from Pages: {}", e))
@@ -652,6 +847,14 @@ impl Document {
                 .document()
                 .and_then(|document| document.paragraph_count())
                 .map_err(crate::map_ooxml_error),
+            #[cfg(all(feature = "docx", any(unix, windows)))]
+            DocumentImpl::DocxSource(package, _) => {
+                let result = package
+                    .document()
+                    .and_then(|document| document.paragraph_count())
+                    .map_err(Self::map_source_docx_error);
+                Self::finish_source_docx_result(package, result)
+            },
             #[cfg(feature = "pages")]
             DocumentImpl::Pages(doc) => Ok(pages_paragraph_texts(doc).count()),
             #[cfg(feature = "rtf")]
@@ -694,6 +897,27 @@ impl Document {
                     .and_then(|document| document.paragraphs())
                     .map_err(crate::map_ooxml_error)?;
                 Ok(paras.into_iter().map(Paragraph::Docx).collect())
+            },
+            #[cfg(all(feature = "docx", any(unix, windows)))]
+            DocumentImpl::DocxSource(package, _) => {
+                let result = (|| {
+                    let paras = package
+                        .document()
+                        .and_then(|document| document.paragraphs())
+                        .map_err(Self::map_source_docx_error)?;
+                    let mut projected = Vec::new();
+                    projected.try_reserve_exact(paras.len()).map_err(|source| {
+                        Error::Allocation {
+                            resource: "unified source-backed DOCX paragraphs",
+                            source,
+                        }
+                    })?;
+                    for paragraph in paras {
+                        projected.push(Paragraph::Docx(paragraph));
+                    }
+                    Ok(projected)
+                })();
+                Self::finish_source_docx_result(package, result)
             },
             #[cfg(feature = "pages")]
             DocumentImpl::Pages(doc) => Ok(pages_paragraph_texts(doc)
@@ -766,6 +990,27 @@ impl Document {
                     .into_iter()
                     .map(|t| Table::Docx(Box::new(t)))
                     .collect())
+            },
+            #[cfg(all(feature = "docx", any(unix, windows)))]
+            DocumentImpl::DocxSource(package, _) => {
+                let result = (|| {
+                    let tables = package
+                        .document()
+                        .and_then(|document| document.tables())
+                        .map_err(Self::map_source_docx_error)?;
+                    let mut projected = Vec::new();
+                    projected
+                        .try_reserve_exact(tables.len())
+                        .map_err(|source| Error::Allocation {
+                            resource: "unified source-backed DOCX tables",
+                            source,
+                        })?;
+                    for table in tables {
+                        projected.push(Table::Docx(Box::new(table)));
+                    }
+                    Ok(projected)
+                })();
+                Self::finish_source_docx_result(package, result)
             },
             #[cfg(feature = "pages")]
             DocumentImpl::Pages(_doc) => {
@@ -872,6 +1117,47 @@ impl Document {
                     }
                 }
                 Ok(elements)
+            },
+            #[cfg(all(feature = "docx", any(unix, windows)))]
+            DocumentImpl::DocxSource(package, _) => {
+                let result = (|| {
+                    use super::DocumentElement;
+                    use crate::docx::Element;
+                    let raw = package
+                        .document()
+                        .and_then(|document| document.elements())
+                        .map_err(Self::map_source_docx_error)?;
+                    let mut elements = Vec::new();
+                    elements
+                        .try_reserve_exact(raw.len())
+                        .map_err(|source| Error::Allocation {
+                            resource: "unified DOCX document elements",
+                            source,
+                        })?;
+                    for element in raw {
+                        match element {
+                            Element::Paragraph(p) => {
+                                elements.push(DocumentElement::Paragraph(Box::new(
+                                    super::Paragraph::Docx(*p),
+                                )));
+                            },
+                            Element::Table(t) => {
+                                elements
+                                    .push(DocumentElement::Table(Box::new(super::Table::Docx(t))));
+                            },
+                            Element::Unknown(block) => {
+                                if !docx_unknown_is_section_properties(&block) {
+                                    return Err(Error::Unsupported(
+                                        "The unified document facade cannot represent an active unmodeled DOCX body block"
+                                            .to_owned(),
+                                    ));
+                                }
+                            },
+                        }
+                    }
+                    Ok(elements)
+                })();
+                Self::finish_source_docx_result(package, result)
             },
             #[cfg(feature = "pages")]
             DocumentImpl::Pages(doc) => {
@@ -1001,6 +1287,11 @@ impl Document {
             DocumentImpl::Doc(_, metadata) => Ok(metadata.clone()),
             #[cfg(feature = "docx")]
             DocumentImpl::Docx(_, metadata) => Ok(metadata.clone()),
+            #[cfg(all(feature = "docx", any(unix, windows)))]
+            DocumentImpl::DocxSource(package, _) => {
+                let result = package.metadata().map_err(Self::map_source_docx_error);
+                Self::finish_source_docx_result(package, result)
+            },
             #[cfg(feature = "pages")]
             DocumentImpl::Pages(doc) => Ok(doc.metadata()),
             #[cfg(feature = "rtf")]
@@ -1016,10 +1307,87 @@ impl Document {
 #[cfg(all(test, any(feature = "doc", feature = "docx", feature = "rtf")))]
 mod tests {
     use super::*;
+    #[cfg(feature = "docx")]
+    use crate::document::DocumentElement;
+    #[cfg(feature = "docx")]
+    use std::io::{Cursor, Write};
     use std::path::PathBuf;
+
+    #[cfg(feature = "markdown")]
+    use crate::markdown::ToMarkdown;
 
     fn test_data_path() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data")
+    }
+
+    #[cfg(feature = "docx")]
+    fn minimal_ooxml(
+        main_part: &str,
+        content_type: &str,
+        main_xml: &[u8],
+        odf_mime: Option<&str>,
+    ) -> Vec<u8> {
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        let content_types = format!(
+            r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/{main_part}" ContentType="{content_type}"/></Types>"#
+        );
+        let root_relationships = format!(
+            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{main_part}"/></Relationships>"#
+        );
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer.write_all(content_types.as_bytes()).unwrap();
+        writer.start_file("_rels/.rels", options).unwrap();
+        writer.write_all(root_relationships.as_bytes()).unwrap();
+        writer.start_file(main_part, options).unwrap();
+        writer.write_all(main_xml).unwrap();
+        if let Some(odf_mime) = odf_mime {
+            writer.start_file("mimetype", options).unwrap();
+            writer.write_all(odf_mime.as_bytes()).unwrap();
+            let manifest = format!(
+                r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{odf_mime}"/></manifest:manifest>"#
+            );
+            writer.start_file("META-INF/manifest.xml", options).unwrap();
+            writer.write_all(manifest.as_bytes()).unwrap();
+        }
+        writer.finish().unwrap().into_inner()
+    }
+
+    #[cfg(feature = "docx")]
+    fn minimal_docx(document_xml: &[u8]) -> Vec<u8> {
+        minimal_ooxml(
+            "word/document.xml",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+            document_xml,
+            None,
+        )
+    }
+
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn assert_source_changed(error: Error, expected: litchi_core::SourceVersion) {
+        match error {
+            Error::SourceChanged {
+                expected: observed_expected,
+                observed,
+            } => {
+                assert_eq!(observed_expected, expected);
+                assert_ne!(observed, expected);
+            },
+            other => panic!("expected typed source change, got {other:?}"),
+        }
+    }
+
+    #[cfg(feature = "docx")]
+    fn table_text(table: &Table) -> String {
+        let mut text = String::new();
+        for row in table.rows().expect("table rows") {
+            for cell in row.cells().expect("table cells") {
+                text.push_str(&cell.text().expect("cell text"));
+                text.push('|');
+            }
+        }
+        text
     }
 
     #[test]
@@ -1028,6 +1396,340 @@ mod tests {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path);
         assert!(doc.is_ok(), "Failed to open DOCX file: {:?}", doc.err());
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn filesystem_docx_uses_source_owner_and_matches_eager_projection() {
+        let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
+        let bytes = std::fs::read(&path).expect("read DOCX fixture");
+        let source = Document::open(&path).expect("open source-backed DOCX");
+        let eager = Document::from_bytes(bytes).expect("open eager DOCX");
+
+        assert!(matches!(&source.inner, DocumentImpl::DocxSource(_, _)));
+        assert!(matches!(&eager.inner, DocumentImpl::Docx(_, _)));
+        let cold_loads_before = match &source.inner {
+            DocumentImpl::DocxSource(package, _) => package.cache_diagnostics().cold_loads,
+            _ => unreachable!("filesystem DOCX must retain source owner"),
+        };
+        assert_eq!(cold_loads_before, 0);
+        assert_eq!(source.text().unwrap(), eager.text().unwrap());
+        let cold_loads_after = match &source.inner {
+            DocumentImpl::DocxSource(package, _) => package.cache_diagnostics().cold_loads,
+            _ => unreachable!("filesystem DOCX must retain source owner"),
+        };
+        assert!(cold_loads_after > cold_loads_before);
+        assert_eq!(
+            source.paragraph_count().unwrap(),
+            eager.paragraph_count().unwrap()
+        );
+        let source_paragraphs = source
+            .paragraphs()
+            .unwrap()
+            .into_iter()
+            .map(|paragraph| paragraph.text().unwrap())
+            .collect::<Vec<_>>();
+        let eager_paragraphs = eager
+            .paragraphs()
+            .unwrap()
+            .into_iter()
+            .map(|paragraph| paragraph.text().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(source_paragraphs, eager_paragraphs);
+        let source_tables = source
+            .tables()
+            .unwrap()
+            .into_iter()
+            .map(|table| table_text(&table))
+            .collect::<Vec<_>>();
+        let eager_tables = eager
+            .tables()
+            .unwrap()
+            .into_iter()
+            .map(|table| table_text(&table))
+            .collect::<Vec<_>>();
+        assert_eq!(source_tables, eager_tables);
+        let source_elements = source
+            .elements()
+            .unwrap()
+            .into_iter()
+            .map(|element| match element {
+                DocumentElement::Paragraph(paragraph) => {
+                    format!("p:{}", paragraph.text().unwrap())
+                },
+                DocumentElement::Table(table) => format!("t:{}", table_text(&table)),
+            })
+            .collect::<Vec<_>>();
+        let eager_elements = eager
+            .elements()
+            .unwrap()
+            .into_iter()
+            .map(|element| match element {
+                DocumentElement::Paragraph(paragraph) => {
+                    format!("p:{}", paragraph.text().unwrap())
+                },
+                DocumentElement::Table(table) => format!("t:{}", table_text(&table)),
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(source_elements, eager_elements);
+        let source_metadata = source.metadata().unwrap();
+        let eager_metadata = eager.metadata().unwrap();
+        assert_eq!(source_metadata.has_data(), eager_metadata.has_data());
+        assert_eq!(source_metadata.title, eager_metadata.title);
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn filesystem_docx_reports_source_mutation_on_deferred_queries() {
+        let fixture = test_data_path().join("ooxml/docx/FancyFoot.docx");
+        let temporary = tempfile::NamedTempFile::new().expect("temporary DOCX path");
+        std::fs::copy(&fixture, temporary.path()).expect("copy DOCX fixture");
+        let document = Document::open(temporary.path()).expect("open source-backed DOCX");
+        let expected = match &document.inner {
+            DocumentImpl::DocxSource(package, _) => {
+                package.source_version().expect("capture source version")
+            },
+            _ => unreachable!("filesystem DOCX must retain source owner"),
+        };
+
+        let _ = document.text().expect("initial source query");
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(temporary.path())
+            .expect("reopen DOCX source");
+        file.write_all(b"source mutation")
+            .expect("mutate DOCX source");
+
+        assert_source_changed(
+            document.text().expect_err("text must reject stale source"),
+            expected,
+        );
+        assert_source_changed(
+            document
+                .metadata()
+                .expect_err("metadata must reject stale source"),
+            expected,
+        );
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", feature = "markdown", any(unix, windows)))]
+    fn filesystem_docx_reports_typed_source_mutation_after_markdown_cache() {
+        let fixture = test_data_path().join("ooxml/docx/FancyFoot.docx");
+        let temporary = tempfile::Builder::new()
+            .suffix(".docx")
+            .tempfile()
+            .expect("temporary source-backed DOCX path");
+        std::fs::copy(&fixture, temporary.path()).expect("copy source-backed DOCX");
+        let document = Document::open(temporary.path()).expect("open source-backed DOCX");
+        let expected = match &document.inner {
+            DocumentImpl::DocxSource(package, _) => {
+                package.source_version().expect("capture source version")
+            },
+            _ => unreachable!("filesystem DOCX must retain source owner"),
+        };
+
+        document
+            .markdown_docx_document()
+            .expect("source Markdown package should populate the eager compatibility cache");
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(temporary.path())
+            .expect("reopen DOCX source");
+        file.write_all(b"source mutation")
+            .expect("mutate DOCX source");
+
+        assert_source_changed(
+            document
+                .to_markdown()
+                .expect_err("Markdown must reject a stale cached package"),
+            expected,
+        );
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn filesystem_docx_defers_malformed_main_xml_until_query() {
+        let bytes = minimal_docx(b"<w:document>");
+        let temporary = tempfile::Builder::new()
+            .suffix(".docx")
+            .tempfile()
+            .expect("temporary malformed DOCX path");
+        std::fs::write(temporary.path(), &bytes).expect("write malformed DOCX");
+
+        let source = Document::open(temporary.path()).expect("catalog-only source open");
+        assert!(matches!(&source.inner, DocumentImpl::DocxSource(_, _)));
+        assert!(
+            source.text().is_err(),
+            "malformed main XML must fail on query"
+        );
+
+        assert!(
+            Document::from_bytes(bytes).is_err(),
+            "eager byte opening must validate malformed main XML immediately"
+        );
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", feature = "markdown"))]
+    fn eager_docx_markdown_refuses_active_alt_chunk_blocks() {
+        let bytes = minimal_docx(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:altChunk r:id="rIdChunk"/><w:p><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let document = Document::from_bytes(bytes).expect("eager DOCX should open");
+        let error = document
+            .to_markdown()
+            .expect_err("Markdown must not silently drop altChunk blocks");
+        assert!(matches!(
+            error,
+            Error::Unsupported(message) if message.contains("altChunk")
+        ));
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", feature = "markdown", any(unix, windows)))]
+    fn source_docx_markdown_refuses_active_alt_chunk_blocks() {
+        let bytes = minimal_docx(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:altChunk r:id="rIdChunk"/><w:p><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let temporary = tempfile::Builder::new()
+            .suffix(".docx")
+            .tempfile()
+            .expect("temporary source-backed DOCX path");
+        std::fs::write(temporary.path(), bytes).expect("write source-backed DOCX");
+        let document = Document::open(temporary.path()).expect("source DOCX should open");
+        let error = document
+            .to_markdown()
+            .expect_err("Markdown must not silently drop altChunk blocks");
+        assert!(matches!(
+            error,
+            Error::Unsupported(message) if message.contains("altChunk")
+        ));
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", feature = "markdown"))]
+    fn eager_docx_markdown_refuses_active_unknown_blocks() {
+        let bytes = minimal_docx(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:customBodyBlock/><w:p><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let document = Document::from_bytes(bytes).expect("eager DOCX should open");
+        let error = document
+            .to_markdown()
+            .expect_err("Markdown must not silently drop unknown body blocks");
+        assert!(matches!(
+            error,
+            Error::Unsupported(message) if message.contains("unmodeled DOCX body blocks")
+        ));
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", feature = "markdown", any(unix, windows)))]
+    fn source_docx_markdown_refuses_active_unknown_blocks() {
+        let bytes = minimal_docx(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:customBodyBlock/><w:p><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let temporary = tempfile::Builder::new()
+            .suffix(".docx")
+            .tempfile()
+            .expect("temporary source-backed DOCX path");
+        std::fs::write(temporary.path(), bytes).expect("write source-backed DOCX");
+        let document = Document::open(temporary.path()).expect("source DOCX should open");
+        let error = document
+            .to_markdown()
+            .expect_err("Markdown must not silently drop unknown body blocks");
+        assert!(matches!(
+            error,
+            Error::Unsupported(message) if message.contains("unmodeled DOCX body blocks")
+        ));
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn filesystem_docx_suffix_and_input_limits_keep_detector_precedence() {
+        let temporary = tempfile::Builder::new()
+            .suffix(".docx")
+            .tempfile()
+            .expect("temporary invalid DOCX path");
+        std::fs::write(temporary.path(), b"not a ZIP").expect("write non-ZIP DOCX");
+
+        let error = match Document::open(temporary.path()) {
+            Ok(_) => panic!("OOXML suffix without ZIP magic must be rejected"),
+            Err(error) => error,
+        };
+        assert!(matches!(error, Error::ZipError(_)));
+
+        let oversized = tempfile::Builder::new()
+            .suffix(".docx")
+            .tempfile()
+            .expect("temporary oversized DOCX path");
+        std::fs::write(oversized.path(), vec![b'x'; 4096]).expect("write oversized non-ZIP DOCX");
+        let limits = crate::docx::ReadLimits::builder()
+            .max_input_bytes(1)
+            .expect("positive input limit")
+            .build()
+            .expect("valid input limit");
+        let error = match crate::detection_smart::detected::detect_docx_source_path_with_limits(
+            oversized.path(),
+            limits,
+        ) {
+            Ok(_) => {
+                panic!("source detector must enforce input limits before suffix ZIP validation")
+            },
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            crate::detection_smart::detected::DocxSourcePathError::Opc(
+                crate::opc::OpcError::ReadLimit { .. }
+            )
+        ));
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn filesystem_docx_preserves_other_ooxml_precedence_when_owner_disabled() {
+        let bytes = minimal_ooxml(
+            "ppt/presentation.xml",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+            br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+            None,
+        );
+        let temporary = tempfile::Builder::new()
+            .suffix(".docx")
+            .tempfile()
+            .expect("temporary other-OOXML path");
+        std::fs::write(temporary.path(), bytes).expect("write other-OOXML package");
+
+        let error = match Document::open(temporary.path()) {
+            Ok(_) => panic!("a non-document OOXML package must not open as DOCX"),
+            Err(error) => error,
+        };
+        #[cfg(feature = "pptx")]
+        assert!(matches!(error, Error::InvalidFormat(_)));
+        #[cfg(not(feature = "pptx"))]
+        assert!(matches!(error, Error::NotOfficeFile));
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", feature = "odt", any(unix, windows)))]
+    fn filesystem_docx_wins_over_a_lower_precedence_odf_marker() {
+        let bytes = minimal_ooxml(
+            "word/document.xml",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>OOXML wins</w:t></w:r></w:p></w:body></w:document>"#,
+            Some("application/vnd.oasis.opendocument.text"),
+        );
+        let temporary = tempfile::Builder::new()
+            .suffix(".odt")
+            .tempfile()
+            .expect("temporary OOXML/ODF polyglot path");
+        std::fs::write(temporary.path(), bytes).expect("write OOXML/ODF polyglot");
+
+        let document = Document::open(temporary.path()).expect("OOXML precedence");
+        assert!(matches!(&document.inner, DocumentImpl::DocxSource(_, _)));
+        assert_eq!(document.text().unwrap(), "OOXML wins");
     }
 
     #[test]
