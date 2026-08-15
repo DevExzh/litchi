@@ -222,8 +222,24 @@ workers use only a harness-side overlap gate for deterministic entry; the
 bulk selector exercises the public `bulk_read` API. This tranche is
 correctness/evidence-only and makes no latency, allocation, RSS, physical-I/O,
 release, or generic performance claim. Failure/retry, ineligible-root, FAT,
-native semantic, resource, and performance acceptance remain open. See
+native semantic, resource, and performance acceptance for those extended
+selectors remain open. See
 [`0148-cfb-same-target-repeat-policy.md`](../../docs/performance/changes/0148-cfb-same-target-repeat-policy.md).
+
+Change 0149 retains the clean release comparison for that target-aware policy:
+four strict `A1 control, B1 candidate, B2 candidate, A2 control` CPU-2 legs,
+20 warmups, 200 samples, and 36 records per leg (28,800 samples total). The
+control and candidate use the same runner and deterministic corpora. Under the
+exact 100 us fixed + 25 us/request, 50 MiB/s, 4 KiB-ceiling simulator, all
+eight aggregate repeat-3/repeat-8 total cells improve by roughly 56-64% at
+p50/p95/p99/mean in both adjacent directions. Same-target work changes from
+`[D,C,0...]` to `[D,D,...]`; later calls remain target-sized reads rather than
+zero-source cache hits. One-shot model controls are neutral. Local,
+per-invocation, bulk, concurrent, allocation/RSS, physical-I/O, native-format,
+and generic claims are withheld after explicit local tail/drift review
+triggers. See the
+[`0149` release record](../../docs/performance/changes/0149-cfb-same-target-repeat-release-abba.md)
+and [summary](../../docs/performance/results/cfb-repeat-abba-0149-summary.json).
 
 The validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
