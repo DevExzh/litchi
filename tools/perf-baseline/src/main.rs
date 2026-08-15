@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 mod filesystem;
+mod operation_metrics;
 mod process_metrics;
 
 use std::{
@@ -1838,6 +1839,8 @@ struct CaseResult {
     execution: Option<ExecutionSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     output_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    operation_metrics: Option<operation_metrics::OperationMetrics>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -6960,6 +6963,7 @@ fn run_ppt_pictures(
         source,
         execution: None,
         output_sha256: None,
+        operation_metrics: None,
     })
 }
 
@@ -12431,6 +12435,7 @@ fn run_xls_visibility_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -12933,6 +12938,7 @@ fn run_xls_comments_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -14556,6 +14562,7 @@ fn run_odf_mimetype_repair_plan(
         }),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -17302,6 +17309,7 @@ fn run_ods_cell_sweep(
             }),
             execution: None,
             output_sha256: None,
+            operation_metrics: None,
         })
     })();
     let cleanup = fs::remove_file(&source_path);
@@ -19257,6 +19265,7 @@ fn run_xlsx_cell_values_edit_save(
         source: source_backed.then_some(source_summary),
         execution: None,
         output_sha256: output_digests.first().cloned().or(Some(expected_digest)),
+        operation_metrics: None,
     })
 }
 
@@ -19420,6 +19429,7 @@ fn run_xlsx_merge_edit_save(
         source: None,
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -21464,6 +21474,7 @@ fn run_opc_source_overlay_one_part_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -21632,6 +21643,7 @@ fn run_docx_source_backed_one_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -21839,6 +21851,7 @@ fn run_pptx_source_backed_one_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -22009,6 +22022,7 @@ fn run_pptx_batch_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -22184,6 +22198,7 @@ fn run_pptx_multi_slide_batch_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -22386,6 +22401,7 @@ fn run_xlsx_defined_names_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -22571,6 +22587,7 @@ fn run_xlsx_calculation_metadata_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -22765,6 +22782,7 @@ fn run_xlsx_page_break_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -22968,6 +22986,7 @@ fn run_xlsx_page_margin_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -23176,6 +23195,7 @@ fn run_xlsx_page_setup_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -23375,6 +23395,7 @@ fn run_xlsx_print_options_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -23613,6 +23634,7 @@ fn run_xlsx_sheet_protection_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -23902,6 +23924,7 @@ fn run_xlsx_auto_filter_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -24259,6 +24282,7 @@ fn run_xlsx_conditional_formatting_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -24450,6 +24474,7 @@ fn run_xlsx_data_validation_edit_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
+        operation_metrics: None,
     })
 }
 
@@ -25598,6 +25623,7 @@ fn run_streaming_creation(
         source: None,
         execution: None,
         output_sha256: Some(corpus.manifest.archive_sha256.clone()),
+        operation_metrics: None,
     })
 }
 
@@ -25649,6 +25675,7 @@ fn result(case: Case, corpus: &Corpus, elapsed: Vec<u64>, sink: Option<SinkSumma
         source: None,
         execution: None,
         output_sha256: None,
+        operation_metrics: None,
     }
 }
 
@@ -25667,6 +25694,7 @@ fn result_with_source(
         source: Some(source),
         execution: None,
         output_sha256: None,
+        operation_metrics: None,
     }
 }
 
@@ -25685,6 +25713,7 @@ fn result_with_execution(
         source: None,
         execution: Some(execution),
         output_sha256: None,
+        operation_metrics: None,
     }
 }
 

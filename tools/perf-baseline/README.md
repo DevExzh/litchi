@@ -1734,6 +1734,25 @@ list replay classification requires every slide range. Eager PPTX samples set
 the replay object to null and mark the generic counter scope
 `not_applicable_eager_pptx`; their zero generic fields must not be interpreted
 as source-read measurements.
+Eager OPC filesystem samples use the same explicit boundary,
+`not_applicable_eager_opc`, because their timed `fs::read` path has no
+`ReadAt` counter; source-backed OPC and CFB overlay samples retain
+`timed_read_at` when their positional counter is active.
+
+Each filesystem `CaseResult` additionally carries an additive
+`operation_metrics` envelope. Its `sample_count` and `alignment` identify the
+sorted `elapsed_ns.samples` vector, and every measured numeric vector has that
+same cardinality and order. The envelope separates logical source-read
+vectors, procfs process vectors, post-operation output length, publication
+counters, and OPC materialization counts. A vector with a measured zero is
+serialized as a numeric zero; unsupported or unavailable values omit the
+numeric vector and retain an explicit `status` (`not_applicable` or
+`unavailable`). Procfs CPU/fault/context-switch/RSS values are operation
+deltas. `peak_rss_bytes` is the process-lifetime after-sample `VmHWM`, not an
+operation peak, and `rss_delta_bytes` is not a peak. The envelope makes no
+allocation, copied-byte, decompressed-byte, or recompressed-byte claim because
+the filesystem child does not instrument those quantities. The existing raw
+`filesystem_evidence` samples remain unchanged.
 
 ODP media-rich selectors additionally record `source.odp_media`: the exact
 phase/timing scope, selected middle slide and media member, canonical full
