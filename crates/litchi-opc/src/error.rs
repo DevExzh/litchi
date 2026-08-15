@@ -152,6 +152,14 @@ pub enum OpcError {
     #[error("managed source-backed OPC PartData cannot escape its budgeted handle")]
     ManagedPartDataArcEscape,
 
+    /// A managed source-backed package cannot be converted into an owning
+    /// package without detaching materialized payloads from their budgeted
+    /// cache handles. Use the source-backed view while the execution context
+    /// is active, or materialize only after reopening through an unmanaged
+    /// compatibility constructor.
+    #[error("managed source-backed OPC package cannot be materialized into an owning package")]
+    ManagedPackageMaterialization,
+
     /// The destination was atomically replaced, but its parent directory
     /// could not be synchronized. Callers must not blindly retry as if the
     /// old destination were still present.
@@ -269,6 +277,7 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::SourceBackedOverlayUnavailable { .. }
             | OpcError::SignedSourceRequiresExplicitPolicy
             | OpcError::ManagedPartDataArcEscape
+            | OpcError::ManagedPackageMaterialization
             | OpcError::PackageNotFound(_)
             | OpcError::InvalidPackUri(_)
             | OpcError::DuplicatePartName(_)

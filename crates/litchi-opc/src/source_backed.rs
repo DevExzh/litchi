@@ -1672,23 +1672,95 @@ impl SourceBackedPackage {
     }
 
     /// Fully materialize this immutable view into the existing mutable package type.
+    ///
+    /// This conversion refuses managed packages before any ordinary payload
+    /// read. An owning package would detach copied payloads from the cache
+    /// handles that retain the execution context's hierarchical reservations;
+    /// use the source-backed view while that context is active.
     pub fn into_opc_package(self) -> Result<OpcPackage> {
         self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if self.cache.is_managed() {
+            return Err(OpcError::ManagedPackageMaterialization);
+        }
+        let mut package = self;
+        let non_part_members = std::mem::take(&mut package.non_part_members);
+        let result = package.materialize_opc_package(non_part_members);
+        package.finish_stage(result)
+    }
+
+    /// Materialize this immutable view into an owning package without
+    /// consuming the source-backed package.
+    ///
+    /// The borrowed conversion is intentionally unavailable for packages
+    /// opened with an execution context. An owning package would detach the
+    /// copied payloads from the cache handles that retain the context's
+    /// hierarchical memory and object reservations. The refusal occurs after
+    /// source and execution checks, but before any ordinary payload read.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OpcError::ManagedPackageMaterialization`] for a managed
+    /// package, or the same source, limit, relationship, ZIP, and allocation
+    /// errors as [`Self::into_opc_package`]. A source mutation or cancellation
+    /// observed before, during, or after materialization rejects the result.
+    pub fn to_opc_package(&self) -> Result<OpcPackage> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if self.cache.is_managed() {
+            return Err(OpcError::ManagedPackageMaterialization);
+        }
+        let non_part_members = self.finish_stage(self.cloned_non_part_members())?;
+        let result = self.materialize_opc_package(non_part_members);
+        self.finish_stage(result)
+    }
+
+    fn cloned_non_part_members(&self) -> Result<Vec<NonPartMember>> {
+        let mut members = Vec::new();
+        let reserve = members
+            .try_reserve_exact(self.non_part_members.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC non-part members",
+                source,
+            });
+        self.finish_stage(reserve)?;
+        for member in &self.non_part_members {
+            let result = NonPartMember::new(member.name(), member.reason());
+            members.push(self.finish_stage(result)?);
+        }
+        Ok(members)
+    }
+
+    fn materialize_opc_package(&self, non_part_members: Vec<NonPartMember>) -> Result<OpcPackage> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
         let mut package = OpcPackage::new();
-        copy_relationships(&self.package_relationships, package.rels_mut())?;
+        let result = copy_relationships(&self.package_relationships, package.rels_mut());
+        self.finish_stage(result)?;
         for index in 0..self.parts.len() {
-            let bytes = self.read_part(index)?;
+            let bytes = self.finish_stage(self.read_part(index))?;
             let catalog_part = &self.parts[index];
-            let mut part = PartFactory::load(
+            let part_result = PartFactory::load(
                 catalog_part.partname.clone(),
                 catalog_part.content_type.clone(),
                 bytes.as_bytes().to_vec(),
-            )?;
-            copy_relationships(&catalog_part.relationships, part.rels_mut())?;
-            package.try_add_part(part)?;
+            );
+            let mut part = self.finish_stage(part_result)?;
+            let result = copy_relationships(&catalog_part.relationships, part.rels_mut());
+            self.finish_stage(result)?;
+            let result = package.try_add_source_part(part);
+            self.finish_stage(result)?;
         }
-        package.set_non_part_members(self.non_part_members);
+        package.set_non_part_members(non_part_members);
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
         Ok(package)
+    }
+
+    fn finish_stage<T>(&self, result: Result<T>) -> Result<T> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        result
     }
 
     /// Replace one existing ordinary Part and publish to a sequential stream.
@@ -5071,6 +5143,212 @@ mod tests {
         assert_eq!(owned.part_count(), 2);
         assert_eq!(owned.non_part_members().len(), 1);
         assert_eq!(owned.main_document_part().unwrap().blob(), b"document");
+    }
+
+    #[test]
+    fn borrowed_materialization_preserves_source_and_matches_eager_graph() {
+        let bytes = archive_bytes(root_relationships(), b"document", true);
+        let source = Arc::new(CountingSource::new(bytes.clone()));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let owned = package.to_opc_package().unwrap();
+        let eager = OpcPackage::from_bytes(&bytes).unwrap();
+
+        assert_eq!(owned.part_count(), eager.part_count());
+        assert_eq!(owned.non_part_members(), eager.non_part_members());
+        assert_eq!(owned.rels().iter().count(), eager.rels().iter().count());
+        for partname in [
+            PackURI::new("/word/document.xml").unwrap(),
+            PackURI::new("/custom/orphan.xml").unwrap(),
+        ] {
+            assert_eq!(
+                owned.get_part(&partname).unwrap().blob(),
+                eager.get_part(&partname).unwrap().blob()
+            );
+        }
+
+        // The borrowed conversion must leave the source-backed catalog usable;
+        // this second read is a cache hit and therefore does not touch the
+        // positional source again.
+        let reads_after_materialization = source.reads.load(Ordering::SeqCst);
+        assert_eq!(
+            package
+                .main_document_part()
+                .unwrap()
+                .data()
+                .unwrap()
+                .as_bytes(),
+            b"document"
+        );
+        assert_eq!(
+            source.reads.load(Ordering::SeqCst),
+            reads_after_materialization
+        );
+    }
+
+    #[test]
+    fn borrowed_materialization_rejects_managed_package_before_payload_reads() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"managed document",
+            true,
+        )));
+        let (budget, context) = managed_context(4096);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        let read_bytes_before = source.read_bytes.load(Ordering::SeqCst);
+
+        assert!(matches!(
+            package.to_opc_package(),
+            Err(OpcError::ManagedPackageMaterialization)
+        ));
+        assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
+        assert_eq!(source.read_bytes.load(Ordering::SeqCst), read_bytes_before);
+        assert!(package.main_document_part().is_ok());
+        drop(package);
+        assert_eq!(budget.used(Resource::Objects), 0);
+    }
+
+    #[test]
+    fn consuming_materialization_rejects_managed_package_before_payload_reads() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"managed consuming document",
+            true,
+        )));
+        let (budget, context) = managed_context(4096);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        let read_bytes_before = source.read_bytes.load(Ordering::SeqCst);
+
+        assert!(matches!(
+            package.into_opc_package(),
+            Err(OpcError::ManagedPackageMaterialization)
+        ));
+        assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
+        assert_eq!(source.read_bytes.load(Ordering::SeqCst), read_bytes_before);
+        assert_eq!(budget.used(Resource::Objects), 0);
+    }
+
+    #[test]
+    fn borrowed_materialization_rejects_stale_source_before_payload_reads() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"stable document",
+            false,
+        )));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        source.changed();
+
+        assert!(matches!(
+            package.to_opc_package(),
+            Err(OpcError::SourceChanged { .. })
+        ));
+        assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
+    }
+
+    #[test]
+    fn borrowed_materialization_rejects_source_changed_during_payload_and_keeps_no_partial_result()
+    {
+        const DOCUMENT: &[u8] = b"document changes during materialization";
+        let bytes = archive_bytes(root_relationships(), DOCUMENT, true);
+        let payload_offset = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        let source = Arc::new(ChangeDuringPayloadSource::new(bytes, payload_offset));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        source.armed.store(true, Ordering::SeqCst);
+
+        assert!(matches!(
+            package.to_opc_package(),
+            Err(OpcError::SourceChanged { .. })
+        ));
+        assert!(package.main_document_part().is_err());
+    }
+
+    #[test]
+    fn borrowed_materialization_rejects_cancellation_before_payload_reads() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"cancelled document",
+            false,
+        )));
+        let (budget, cancellation_source, context) = managed_context_with_cancellation(4096);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        cancellation_source.cancel();
+
+        assert!(matches!(package.to_opc_package(), Err(OpcError::Cancelled)));
+        assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
+        drop(package);
+        assert_eq!(budget.used(Resource::Objects), 0);
+    }
+
+    #[test]
+    fn borrowed_materialization_reports_malformed_payload_without_partial_result() {
+        const DOCUMENT: &[u8] = b"payload whose CRC is invalid";
+        let mut bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let payload_offset = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        bytes[payload_offset] ^= 0xff;
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
+
+        assert!(matches!(
+            package.to_opc_package(),
+            Err(OpcError::ZipError(_))
+        ));
+        assert!(package.main_document_part().is_ok());
+        assert!(package.main_document_part().unwrap().data().is_err());
+    }
+
+    #[test]
+    fn borrowed_materialization_preserves_opaque_xml_like_eager_unmarshal() {
+        const DOCUMENT: &[u8] = b"<document> <child/></document>";
+        let source_bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let source_package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+                .unwrap();
+        let materialized = source_package.to_opc_package().unwrap();
+        let eager = OpcPackage::from_bytes(&source_bytes).unwrap();
+
+        let mut materialized_bytes = Vec::new();
+        materialized.to_stream(&mut materialized_bytes).unwrap();
+        let mut eager_bytes = Vec::new();
+        eager.to_stream(&mut eager_bytes).unwrap();
+        let materialized_reader =
+            crate::phys_pkg::OwnedPhysPkgReader::from_bytes(materialized_bytes).unwrap();
+        let eager_reader = crate::phys_pkg::OwnedPhysPkgReader::from_bytes(eager_bytes).unwrap();
+        assert_eq!(
+            materialized_reader
+                .read_member("word/document.xml")
+                .unwrap(),
+            DOCUMENT
+        );
+        assert_eq!(
+            materialized_reader
+                .read_member("word/document.xml")
+                .unwrap(),
+            eager_reader.read_member("word/document.xml").unwrap()
+        );
     }
 
     #[test]

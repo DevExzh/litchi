@@ -511,6 +511,40 @@ impl OpcPackage {
         Ok(())
     }
 
+    /// Add a source-materialized part while retaining its exact XML bytes for
+    /// the publication audit. Source-backed conversion uses this narrow seam
+    /// so unchanged opaque XML remains publishable without reparsing or
+    /// normalizing it. The source blob is shared with the inserted part and
+    /// the metadata map grows through a fallible reservation.
+    pub(crate) fn try_add_source_part(&mut self, part: Box<dyn Part + Send + Sync>) -> Result<()> {
+        self.revoke_exact_source();
+        let partname = part.partname().clone();
+        self.validate_new_part_name(&partname)?;
+        self.parts
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC source-materialized parts",
+                source,
+            })?;
+        let source_blob =
+            if xml_minifier::audit::package::is_xml_part(partname.as_str(), part.content_type()) {
+                self.source_xml_parts
+                    .try_reserve(1)
+                    .map_err(|source| OpcError::Allocation {
+                        resource: "OPC source-preserved XML parts",
+                        source,
+                    })?;
+                Some(part.blob_arc())
+            } else {
+                None
+            };
+        self.parts.insert(partname.clone(), part);
+        if let Some(source_blob) = source_blob {
+            self.source_xml_parts.insert(partname, source_blob);
+        }
+        Ok(())
+    }
+
     /// Validate that a new part name would not replace or conflict with an existing part.
     ///
     /// # Errors
