@@ -8,9 +8,11 @@ mod codec;
 mod model;
 mod package;
 mod semantic;
+mod source;
 mod validation;
 
 #[cfg(test)]
 mod tests;
 
 pub use model::Document;
+pub use source::{ReadLimits, SourceBackedDocument};
