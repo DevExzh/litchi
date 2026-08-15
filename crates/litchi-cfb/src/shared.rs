@@ -10,7 +10,10 @@ use litchi_core::{ExecutionContext, ReadAt, SourceVersion};
 use std::{
     cmp::Ordering,
     io::{self, Read, Seek, SeekFrom},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU8, Ordering as AtomicOrdering},
+    },
 };
 
 /// Bounded ingress settings for [`SharedOleFile`].
@@ -59,7 +62,19 @@ struct PendingPhysicalRange {
     physical: u64,
     output_start: usize,
     length: usize,
+    sector: u32,
 }
+
+// MS-CFB routes streams strictly smaller than the 4096-byte cutoff through
+// MiniFAT. Keep this bound local to the positional reader rather than adding
+// another public limit: it is an invariant of the format, not caller policy.
+const MINIFAT_DIRECT_READ_MAX_BYTES: u64 = 4095;
+const MINIFAT_DIRECT_ROOT_SIZE_RATIO: u64 = 2;
+const MINIFAT_DIRECT_UNCLAIMED: u8 = 0;
+const MINIFAT_DIRECT_IN_FLIGHT: u8 = 1;
+const MINIFAT_DIRECT_DONE: u8 = 2;
+const MINIFAT_CACHE_IN_FLIGHT: u8 = 3;
+const MINIFAT_CACHE_READY: u8 = 4;
 
 /// One parsed, immutable CFB view over a thread-safe positional source.
 ///
@@ -75,6 +90,9 @@ pub struct SharedOleFile {
     /// Serializes only lazy mini-stream initialization. Regular streams never
     /// acquire this lock or any shared cursor lock.
     ministream: Mutex<Option<Arc<[u8]>>>,
+    /// Coordinates the one-shot direct MiniFAT open with concurrent/root-cache
+    /// opens. The cache path takes over permanently once it is initialized.
+    minifat_direct_state: AtomicU8,
 }
 
 impl std::fmt::Debug for SharedOleFile {
@@ -162,6 +180,7 @@ impl SharedOleFile {
             expected_version,
             index: Arc::new(index),
             ministream: Mutex::new(None),
+            minifat_direct_state: AtomicU8::new(MINIFAT_DIRECT_UNCLAIMED),
         })
     }
 
@@ -205,9 +224,16 @@ impl SharedOleFile {
 
     /// Materializes one stream through immutable positional reads.
     ///
-    /// Regular streams never acquire a shared lock or cursor. Small streams
-    /// lazily initialize the root mini stream once; an initialization error is
-    /// not retained, so a later read can retry.
+    /// Regular streams never acquire a shared lock or cursor. A selected small
+    /// MiniFAT stream uses a bounded positional range when the complete root
+    /// mini stream would be at least twice as large; this avoids retaining
+    /// unrelated mini-stream bytes. The existing root mini-stream cache remains
+    /// the path after the first eligible direct open or whenever materialization
+    /// is justified. A successful eligible direct open is deliberately one-shot
+    /// per shared file: repeats and concurrent callers use the cache, avoiding
+    /// repeated bounded-read overhead.
+    /// Initialization errors are not retained, so a later cached read can
+    /// retry.
     ///
     /// # Errors
     ///
@@ -223,12 +249,19 @@ impl SharedOleFile {
         };
 
         self.check_source_version()?;
-        let result = if is_minifat {
+        let direct = is_minifat && self.claim_minifat_direct(size);
+        let result = if direct {
+            self.read_minifat_stream_range(start_sector, size)
+        } else if is_minifat {
             self.read_minifat_stream(start_sector, size)
         } else {
             self.read_fat_stream(start_sector, size)
         };
-        self.check_source_version()?;
+        let version = self.check_source_version();
+        if direct {
+            self.finish_minifat_direct(version.is_ok() && result.is_ok());
+        }
+        version?;
         result
     }
 
@@ -282,114 +315,7 @@ impl SharedOleFile {
 
         self.check_source_version()?;
         if is_minifat {
-            let root = self.index.root.as_ref().ok_or_else(|| {
-                OleError::CorruptedFile("mini stream has no root entry".to_string())
-            })?;
-            let mini_sector_size = self.index.mini_sector_size;
-            let first_ordinal =
-                usize::try_from(offset / mini_sector_size as u64).map_err(|_error| {
-                    OleError::InvalidData("MiniFAT range sector does not fit usize".to_string())
-                })?;
-            let mut mini_sector = start_sector;
-            for _ in 0..first_ordinal {
-                mini_sector = next_chain_sector(&self.index.minifat, mini_sector, "MiniFAT")?;
-                if mini_sector == ENDOFCHAIN {
-                    return Err(OleError::CorruptedFile(
-                        "MiniFAT chain ends before stream range".to_string(),
-                    ));
-                }
-            }
-            let mut within =
-                usize::try_from(offset % mini_sector_size as u64).map_err(|_error| {
-                    OleError::InvalidData("MiniFAT range offset does not fit usize".to_string())
-                })?;
-            let mut written = 0_usize;
-            // A MiniFAT chain describes logical mini-sectors, while the root
-            // chain describes their physical sectors. Keep one pending span
-            // when those mappings happen to be physically adjacent. This
-            // preserves the logical destination order without materializing
-            // the root mini-stream or requiring a temporary staging buffer.
-            // Validated MiniFAT entries use the fixed 4096-byte cutoff, so a
-            // single target is inherently bounded at 4095 bytes.
-            let mut pending: Option<PendingPhysicalRange> = None;
-            while written < output.len() {
-                let count = (mini_sector_size - within).min(output.len() - written);
-                let current = match self.minifat_physical_range(
-                    root.size,
-                    mini_sector,
-                    within,
-                    count,
-                    written,
-                ) {
-                    Ok(current) => current,
-                    Err(error) => {
-                        // The previous implementation had already read the
-                        // preceding chunk before discovering this mapping
-                        // error. Preserve that source/error precedence.
-                        self.flush_pending_range(&mut pending, output)?;
-                        return Err(error);
-                    },
-                };
-                if let Some(previous) = pending {
-                    let contiguous = match previous.physical.checked_add(previous.length as u64) {
-                        Some(contiguous) => contiguous,
-                        None => {
-                            let error = OleError::CorruptedFile(
-                                "mini-stream physical run end overflow".to_string(),
-                            );
-                            self.flush_pending_range(&mut pending, output)?;
-                            return Err(error);
-                        },
-                    };
-                    if current.physical == contiguous {
-                        let length = match previous.length.checked_add(count) {
-                            Some(length) => length,
-                            None => {
-                                let error = OleError::CorruptedFile(
-                                    "mini-stream run size overflow".to_string(),
-                                );
-                                self.flush_pending_range(&mut pending, output)?;
-                                return Err(error);
-                            },
-                        };
-                        pending = Some(PendingPhysicalRange {
-                            physical: previous.physical,
-                            output_start: previous.output_start,
-                            length,
-                        });
-                    } else {
-                        self.flush_pending_range(&mut pending, output)?;
-                        pending = Some(current);
-                    }
-                } else {
-                    pending = Some(current);
-                }
-                written += count;
-                within = 0;
-                if written < output.len() {
-                    let next = match next_chain_sector(&self.index.minifat, mini_sector, "MiniFAT")
-                    {
-                        Ok(next) => next,
-                        Err(error) => {
-                            // The previous implementation had already read
-                            // the current chunk before following the next
-                            // MiniFAT link. Flush the pending span before
-                            // returning a structural error so source failures
-                            // and error precedence remain unchanged.
-                            self.flush_pending_range(&mut pending, output)?;
-                            return Err(error);
-                        },
-                    };
-                    mini_sector = next;
-                    if mini_sector == ENDOFCHAIN {
-                        self.flush_pending_range(&mut pending, output)?;
-                        return Err(OleError::CorruptedFile(
-                            "MiniFAT chain ends within stream range".to_string(),
-                        ));
-                    }
-                }
-            }
-            self.flush_pending_range(&mut pending, output)?;
+            self.read_minifat_range(start_sector, offset, output, false, false)?;
         } else {
             let sector_size = self.index.sector_size;
             if offset == 0 && size == output.len() as u64 {
@@ -472,10 +398,229 @@ impl SharedOleFile {
         self.check_source_version()
     }
 
+    fn should_read_minifat_range(&self, size: u64) -> bool {
+        if size == 0 || size > MINIFAT_DIRECT_READ_MAX_BYTES {
+            return false;
+        }
+        let Some(root) = self.index.root.as_ref() else {
+            // Keep the existing cached path's error and source-check order
+            // when a malformed synthetic index has no root entry.
+            return false;
+        };
+        let Some(direct_threshold) = size.checked_mul(MINIFAT_DIRECT_ROOT_SIZE_RATIO) else {
+            return false;
+        };
+        root.size >= direct_threshold
+    }
+
+    fn claim_minifat_direct(&self, size: u64) -> bool {
+        if !self.should_read_minifat_range(size) {
+            return false;
+        }
+        self.minifat_direct_state
+            .compare_exchange(
+                MINIFAT_DIRECT_UNCLAIMED,
+                MINIFAT_DIRECT_IN_FLIGHT,
+                AtomicOrdering::AcqRel,
+                AtomicOrdering::Acquire,
+            )
+            .is_ok()
+    }
+
+    fn finish_minifat_direct(&self, success: bool) {
+        let target = if success {
+            MINIFAT_DIRECT_DONE
+        } else {
+            MINIFAT_DIRECT_UNCLAIMED
+        };
+        // A concurrent cached read may have taken ownership while this direct
+        // read was in flight. Leave that cache state untouched; its failure
+        // path consumes the one direct opportunity before retrying the cache.
+        let _ = self.minifat_direct_state.compare_exchange(
+            MINIFAT_DIRECT_IN_FLIGHT,
+            target,
+            AtomicOrdering::AcqRel,
+            AtomicOrdering::Acquire,
+        );
+    }
+
+    fn begin_ministream_cache(&self) -> u8 {
+        loop {
+            let state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
+            if state == MINIFAT_CACHE_READY {
+                return state;
+            }
+            if self
+                .minifat_direct_state
+                .compare_exchange(
+                    state,
+                    MINIFAT_CACHE_IN_FLIGHT,
+                    AtomicOrdering::AcqRel,
+                    AtomicOrdering::Acquire,
+                )
+                .is_ok()
+            {
+                return state;
+            }
+        }
+    }
+
+    fn finish_ministream_cache(&self, previous: u8, success: bool) {
+        if success {
+            self.minifat_direct_state
+                .store(MINIFAT_CACHE_READY, AtomicOrdering::Release);
+            return;
+        }
+        let target = match previous {
+            MINIFAT_DIRECT_IN_FLIGHT => MINIFAT_DIRECT_DONE,
+            MINIFAT_DIRECT_DONE => MINIFAT_DIRECT_DONE,
+            MINIFAT_CACHE_READY => MINIFAT_CACHE_READY,
+            _ => MINIFAT_DIRECT_UNCLAIMED,
+        };
+        let _ = self.minifat_direct_state.compare_exchange(
+            MINIFAT_CACHE_IN_FLIGHT,
+            target,
+            AtomicOrdering::AcqRel,
+            AtomicOrdering::Acquire,
+        );
+    }
+
+    fn read_minifat_stream_range(&self, start_sector: u32, size: u64) -> Result<Vec<u8>, OleError> {
+        let size = usize::try_from(size)
+            .map_err(|_error| OleError::CorruptedFile("MiniFAT stream is too large".to_string()))?;
+        let mut data = try_zeroed_vec(size, "MiniFAT stream data")?;
+        // `open_stream` has already performed lookup and bounds validation.
+        // Require the exact chain terminator here so a malformed synthetic
+        // index cannot turn the bounded reader into a weaker full-read check.
+        self.read_minifat_range(start_sector, 0, &mut data, true, true)?;
+        Ok(data)
+    }
+
+    fn read_minifat_range(
+        &self,
+        start_sector: u32,
+        offset: u64,
+        output: &mut [u8],
+        require_chain_end: bool,
+        zero_fill_truncated: bool,
+    ) -> Result<(), OleError> {
+        let root =
+            self.index.root.as_ref().ok_or_else(|| {
+                OleError::CorruptedFile("mini stream has no root entry".to_string())
+            })?;
+        let mini_sector_size = self.index.mini_sector_size;
+        let first_ordinal =
+            usize::try_from(offset / mini_sector_size as u64).map_err(|_error| {
+                OleError::InvalidData("MiniFAT range sector does not fit usize".to_string())
+            })?;
+        let mut mini_sector = start_sector;
+        for _ in 0..first_ordinal {
+            mini_sector = next_chain_sector(&self.index.minifat, mini_sector, "MiniFAT")?;
+            if mini_sector == ENDOFCHAIN {
+                return Err(OleError::CorruptedFile(
+                    "MiniFAT chain ends before stream range".to_string(),
+                ));
+            }
+        }
+        let mut within = usize::try_from(offset % mini_sector_size as u64).map_err(|_error| {
+            OleError::InvalidData("MiniFAT range offset does not fit usize".to_string())
+        })?;
+        let mut written = 0_usize;
+        // A MiniFAT chain describes logical mini-sectors, while the root
+        // chain describes their physical sectors. Keep one pending span when
+        // those mappings happen to be physically adjacent. This preserves the
+        // logical destination order without materializing the root mini-stream
+        // or requiring a temporary staging buffer.
+        let mut pending: Option<PendingPhysicalRange> = None;
+        while written < output.len() {
+            let count = (mini_sector_size - within).min(output.len() - written);
+            let current =
+                match self.minifat_physical_range(root.size, mini_sector, within, count, written) {
+                    Ok(current) => current,
+                    Err(error) => {
+                        // The previous implementation had already read the
+                        // preceding chunk before discovering this mapping error.
+                        // Preserve that source/error precedence.
+                        self.flush_pending_range(&mut pending, output, zero_fill_truncated)?;
+                        return Err(error);
+                    },
+                };
+            if let Some(previous) = pending {
+                let contiguous = match previous.physical.checked_add(previous.length as u64) {
+                    Some(contiguous) => contiguous,
+                    None => {
+                        let error = OleError::CorruptedFile(
+                            "mini-stream physical run end overflow".to_string(),
+                        );
+                        self.flush_pending_range(&mut pending, output, zero_fill_truncated)?;
+                        return Err(error);
+                    },
+                };
+                if current.physical == contiguous {
+                    let length = match previous.length.checked_add(count) {
+                        Some(length) => length,
+                        None => {
+                            let error = OleError::CorruptedFile(
+                                "mini-stream run size overflow".to_string(),
+                            );
+                            self.flush_pending_range(&mut pending, output, zero_fill_truncated)?;
+                            return Err(error);
+                        },
+                    };
+                    pending = Some(PendingPhysicalRange {
+                        physical: previous.physical,
+                        output_start: previous.output_start,
+                        length,
+                        sector: previous.sector,
+                    });
+                } else {
+                    self.flush_pending_range(&mut pending, output, zero_fill_truncated)?;
+                    pending = Some(current);
+                }
+            } else {
+                pending = Some(current);
+            }
+            written += count;
+            within = 0;
+            if written < output.len() {
+                let next = match next_chain_sector(&self.index.minifat, mini_sector, "MiniFAT") {
+                    Ok(next) => next,
+                    Err(error) => {
+                        // The previous implementation had already read the
+                        // current chunk before following the next MiniFAT
+                        // link. Flush the pending span before returning a
+                        // structural error so source failures and error
+                        // precedence remain unchanged.
+                        self.flush_pending_range(&mut pending, output, zero_fill_truncated)?;
+                        return Err(error);
+                    },
+                };
+                mini_sector = next;
+                if mini_sector == ENDOFCHAIN {
+                    self.flush_pending_range(&mut pending, output, zero_fill_truncated)?;
+                    return Err(OleError::CorruptedFile(
+                        "MiniFAT chain ends within stream range".to_string(),
+                    ));
+                }
+            }
+        }
+        self.flush_pending_range(&mut pending, output, zero_fill_truncated)?;
+        if require_chain_end && !output.is_empty() {
+            let next = next_chain_sector(&self.index.minifat, mini_sector, "MiniFAT")?;
+            if next != ENDOFCHAIN {
+                return Err(OleError::CorruptedFile(
+                    "MiniFAT chain exceeds its declared length".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn flush_pending_range(
         &self,
         pending: &mut Option<PendingPhysicalRange>,
         output: &mut [u8],
+        zero_fill_truncated: bool,
     ) -> Result<(), OleError> {
         let Some(range) = pending.take() else {
             return Ok(());
@@ -486,8 +631,30 @@ impl SharedOleFile {
             .ok_or_else(|| {
                 OleError::CorruptedFile("mini-stream output range overflow".to_string())
             })?;
-        self.source
-            .read_exact_at(range.physical, &mut output[range.output_start..output_end])?;
+        if range.physical >= self.index.file_size {
+            return Err(OleError::CorruptedFile(format!(
+                "Sector {} is outside the file",
+                range.sector
+            )));
+        }
+        let present = usize::try_from(
+            self.index
+                .file_size
+                .saturating_sub(range.physical)
+                .min(range.length as u64),
+        )
+        .map_err(|_error| OleError::CorruptedFile("sector read is too large".to_string()))?;
+        if zero_fill_truncated {
+            if present > 0 {
+                self.source.read_exact_at(
+                    range.physical,
+                    &mut output[range.output_start..range.output_start + present],
+                )?;
+            }
+        } else {
+            self.source
+                .read_exact_at(range.physical, &mut output[range.output_start..output_end])?;
+        }
         Ok(())
     }
 
@@ -532,6 +699,7 @@ impl SharedOleFile {
             physical,
             output_start,
             length: count,
+            sector: root_sector,
         })
     }
 
@@ -571,10 +739,22 @@ impl SharedOleFile {
             if cached.is_none() {
                 // Do not publish failed initialization: a transient source I/O
                 // error must leave a subsequent mini-stream read free to retry.
-                self.check_source_version()?;
-                let loaded = self.load_ministream()?;
-                self.check_source_version()?;
+                let previous = self.begin_ministream_cache();
+                let loaded: Result<Arc<[u8]>, OleError> = (|| {
+                    self.check_source_version()?;
+                    let loaded = self.load_ministream()?;
+                    self.check_source_version()?;
+                    Ok(loaded)
+                })();
+                let loaded = match loaded {
+                    Ok(loaded) => loaded,
+                    Err(error) => {
+                        self.finish_ministream_cache(previous, false);
+                        return Err(error);
+                    },
+                };
                 *cached = Some(loaded);
+                self.finish_ministream_cache(previous, true);
             }
             cached.as_ref().cloned().ok_or_else(|| {
                 OleError::CorruptedFile("shared mini-stream cache is missing".to_string())
@@ -906,6 +1086,7 @@ mod tests {
         max_active_reads: AtomicUsize,
         change_on_read: AtomicBool,
         fail_next_read: AtomicBool,
+        fail_read_length: AtomicUsize,
         short_next_read: AtomicBool,
         interrupt_next_read: AtomicBool,
         cancel_on_read: AtomicBool,
@@ -925,6 +1106,7 @@ mod tests {
                 max_active_reads: AtomicUsize::new(0),
                 change_on_read: AtomicBool::new(false),
                 fail_next_read: AtomicBool::new(false),
+                fail_read_length: AtomicUsize::new(0),
                 short_next_read: AtomicBool::new(false),
                 interrupt_next_read: AtomicBool::new(false),
                 cancel_on_read: AtomicBool::new(false),
@@ -947,6 +1129,10 @@ mod tests {
             *self.barrier.lock().unwrap() = Some(Arc::new(Barrier::new(2)));
             self.barrier_reads.store(0, AtomicOrdering::SeqCst);
             self.max_active_reads.store(0, AtomicOrdering::SeqCst);
+        }
+
+        fn fail_next_read_of_length(&self, length: usize) {
+            self.fail_read_length.store(length, AtomicOrdering::SeqCst);
         }
 
         fn cancel_on_next_read(&self, source: CancellationSource) {
@@ -983,6 +1169,22 @@ mod tests {
                 if let Some(source) = self.cancellation.lock().unwrap().as_ref() {
                     source.cancel();
                 }
+            }
+            let fail_length = self.fail_read_length.load(AtomicOrdering::SeqCst);
+            if fail_length == output.len()
+                && fail_length != 0
+                && self
+                    .fail_read_length
+                    .compare_exchange(
+                        fail_length,
+                        0,
+                        AtomicOrdering::SeqCst,
+                        AtomicOrdering::SeqCst,
+                    )
+                    .is_ok()
+            {
+                self.active_reads.fetch_sub(1, AtomicOrdering::SeqCst);
+                return Err(io::Error::other("injected length-specific read failure"));
             }
             if self.fail_next_read.swap(false, AtomicOrdering::SeqCst) {
                 self.active_reads.fetch_sub(1, AtomicOrdering::SeqCst);
@@ -1031,6 +1233,60 @@ mod tests {
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
         output.into_inner()
+    }
+
+    fn two_mini_bytes(length: usize) -> (Vec<u8>, Vec<u8>) {
+        assert!(length < 4096);
+        let mut writer = OleWriter::new();
+        let selected: Vec<u8> = (0..length)
+            .map(|index| u8::try_from((index * 31 + 7) % 251).unwrap())
+            .collect();
+        writer
+            .create_stream_owned(&["Selected"], selected.clone())
+            .unwrap();
+        writer
+            .create_stream_owned(&["Other"], vec![0xD3; length])
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        (output.into_inner(), selected)
+    }
+
+    fn truncated_two_mini_file() -> (SharedOleFile, Arc<TestSource>, u64, usize) {
+        let (bytes, _selected) = two_mini_bytes(4095);
+        let parsed = SharedOleFile::open(Arc::new(TestSource::new(bytes.clone()))).unwrap();
+        let other = parsed.find_entry(&["Other"]).unwrap();
+        let other_start = other.start_sector;
+        let mini_sector_size = parsed.index.mini_sector_size;
+        let sector_size = parsed.index.sector_size;
+        let root_chain = parsed.index.root_chain.clone();
+        let root_last = *root_chain.last().unwrap();
+        let truncated_len =
+            usize::try_from((u64::from(root_last) + 1) * sector_size as u64 + 3).unwrap();
+        assert!(truncated_len < bytes.len());
+
+        let mini_offset = usize::try_from(other_start).unwrap() * mini_sector_size;
+        let root_sector = root_chain[mini_offset / sector_size];
+        let physical_start =
+            (u64::from(root_sector) + 1) * sector_size as u64 + (mini_offset % sector_size) as u64;
+        let present = truncated_len.saturating_sub(usize::try_from(physical_start).unwrap());
+        assert!(present < 4095);
+
+        let mut index = match Arc::try_unwrap(parsed.index) {
+            Ok(index) => index,
+            Err(_index) => panic!("test owns the parsed index"),
+        };
+        index.file_size = u64::try_from(truncated_len).unwrap();
+        let source = Arc::new(TestSource::new(bytes[..truncated_len].to_vec()));
+        let expected_version = source.version().unwrap();
+        let file = SharedOleFile {
+            source: source.clone(),
+            expected_version,
+            index: Arc::new(index),
+            ministream: Mutex::new(None),
+            minifat_direct_state: AtomicU8::new(MINIFAT_DIRECT_UNCLAIMED),
+        };
+        (file, source, physical_start, present)
     }
 
     fn large_mini_bytes(sector_size: usize, length: usize) -> (Vec<u8>, Vec<u8>) {
@@ -1178,25 +1434,358 @@ mod tests {
     }
 
     #[test]
-    fn ministream_is_lazy_and_initialization_is_cached() {
+    fn selected_ministream_reads_are_bounded_and_cache_path_handles_repeats() {
         let source = Arc::new(TestSource::new(sample_bytes()));
         let file = shared(source.clone());
         source.reset_read_count();
 
-        assert_eq!(file.open_stream(&["Large"]).unwrap().len(), 8192);
-        let after_regular = source.reads.load(AtomicOrdering::SeqCst);
-        assert!(after_regular > 0);
-
         assert_eq!(file.open_stream(&["Small"]).unwrap(), b"mini stream");
         let after_first_small = source.reads.load(AtomicOrdering::SeqCst);
-        assert!(after_first_small > after_regular);
+        assert_eq!(source.read_ranges().len(), 1);
+        assert_eq!(source.read_ranges()[0].1, b"mini stream".len());
+        assert!(!file.mini_stream_is_materialized());
 
+        assert_eq!(file.open_stream(&["Small"]).unwrap(), b"mini stream");
+        assert!(source.reads.load(AtomicOrdering::SeqCst) > after_first_small);
+        assert!(file.mini_stream_is_materialized());
+        let after_second_small = source.reads.load(AtomicOrdering::SeqCst);
         assert_eq!(file.open_stream(&["Small"]).unwrap(), b"mini stream");
         assert_eq!(
             source.reads.load(AtomicOrdering::SeqCst),
-            after_first_small,
-            "the root mini stream must not be read twice"
+            after_second_small
         );
+
+        // A root containing only the selected 4095-byte stream is not twice
+        // as large as that stream, so repeated reads retain the existing root
+        // mini-stream cache behavior.
+        let (bytes, expected) = large_mini_bytes(512, 4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(source.clone());
+        source.reset_read_count();
+        assert_eq!(file.open_stream(&["Mini"]).unwrap(), expected);
+        assert!(file.mini_stream_is_materialized());
+        let after_first_cached = source.reads.load(AtomicOrdering::SeqCst);
+        assert_eq!(file.open_stream(&["Mini"]).unwrap().len(), 4095);
+        assert_eq!(
+            source.reads.load(AtomicOrdering::SeqCst),
+            after_first_cached
+        );
+    }
+
+    #[test]
+    fn open_stream_selected_minifat_reads_one_exact_cross_sector_range() {
+        let (bytes, expected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(source.clone());
+        let entry = file.find_entry(&["Selected"]).unwrap();
+        let mini_offset = usize::try_from(entry.start_sector)
+            .unwrap()
+            .checked_mul(file.index.mini_sector_size)
+            .unwrap();
+        let root_sector = file.index.root_chain[mini_offset / file.index.sector_size];
+        let physical = (u64::from(root_sector) + 1) * file.index.sector_size as u64
+            + (mini_offset % file.index.sector_size) as u64;
+
+        source.reset_read_count();
+        assert_eq!(file.open_stream(&["Selected"]).unwrap(), expected);
+        assert_eq!(source.read_ranges(), vec![(physical, 4095)]);
+        assert!(!file.mini_stream_is_materialized());
+    }
+
+    #[test]
+    fn eligible_minifat_open_is_one_shot_then_reuses_the_root_cache() {
+        let (bytes, expected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(source.clone());
+
+        source.reset_read_count();
+        assert_eq!(file.open_stream(&["Selected"]).unwrap(), expected);
+        assert!(!file.mini_stream_is_materialized());
+        assert_eq!(
+            source
+                .read_ranges()
+                .iter()
+                .filter(|(_, length)| *length == expected.len())
+                .count(),
+            1
+        );
+
+        assert_eq!(file.open_stream(&["Selected"]).unwrap(), expected);
+        assert!(file.mini_stream_is_materialized());
+        let after_cache = source.reads.load(AtomicOrdering::SeqCst);
+        assert_eq!(file.open_stream(&["Selected"]).unwrap(), expected);
+        assert_eq!(source.reads.load(AtomicOrdering::SeqCst), after_cache);
+    }
+
+    #[test]
+    fn concurrent_eligible_opens_claim_at_most_one_direct_range() {
+        let (bytes, expected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = Arc::new(shared(source.clone()));
+        source.reset_read_count();
+        source.synchronize_next_two_reads();
+
+        thread::scope(|scope| {
+            let first = Arc::clone(&file);
+            let second = Arc::clone(&file);
+            let first = scope.spawn(move || first.open_stream(&["Selected"]));
+            let second = scope.spawn(move || second.open_stream(&["Selected"]));
+            assert_eq!(first.join().unwrap().unwrap(), expected);
+            assert_eq!(second.join().unwrap().unwrap(), expected);
+        });
+
+        let ranges = source.read_ranges();
+        assert_eq!(
+            ranges
+                .iter()
+                .filter(|(_, length)| *length == expected.len())
+                .count(),
+            1
+        );
+        assert!(ranges.iter().any(|(_, length)| *length > expected.len()));
+        assert!(source.max_active_reads.load(AtomicOrdering::SeqCst) >= 2);
+        assert!(file.mini_stream_is_materialized());
+    }
+
+    #[test]
+    fn failed_direct_open_and_cache_takeover_do_not_admit_a_second_direct_read() {
+        let (bytes, expected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = Arc::new(shared(source.clone()));
+        source.reset_read_count();
+        source.fail_next_read_of_length(expected.len());
+        source.synchronize_next_two_reads();
+
+        let (first, second) = thread::scope(|scope| {
+            let first = Arc::clone(&file);
+            let second = Arc::clone(&file);
+            let first = scope.spawn(move || first.open_stream(&["Selected"]));
+            let second = scope.spawn(move || second.open_stream(&["Selected"]));
+            (first.join().unwrap(), second.join().unwrap())
+        });
+        let mut success = None;
+        let mut failure = None;
+        for result in [first, second] {
+            match result {
+                Ok(value) => success = Some(value),
+                Err(error) => failure = Some(error),
+            }
+        }
+        assert_eq!(success.expect("cache takeover must succeed"), expected);
+        assert!(matches!(
+            failure.expect("one concurrent direct read must fail"),
+            OleError::Io(_)
+        ));
+        let ranges = source.read_ranges();
+        assert_eq!(
+            ranges
+                .iter()
+                .filter(|(_, length)| *length == expected.len())
+                .count(),
+            1
+        );
+        assert!(file.mini_stream_is_materialized());
+        source.reset_read_count();
+        assert_eq!(file.open_stream(&["Selected"]).unwrap(), expected);
+        assert!(source.read_ranges().is_empty());
+    }
+
+    #[test]
+    fn bulk_preload_materializes_once_and_repeated_eligible_open_is_cached() {
+        let (bytes, selected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(source.clone());
+        let (_cancel, token) = CancellationSource::pair();
+
+        source.reset_read_count();
+        let outputs = file
+            .bulk_read(context(1, 2, 8190, 0, token, 16_384))
+            .read_streams(&[&["Selected"], &["Other"]])
+            .unwrap();
+        assert_eq!(outputs[0], selected);
+        assert_eq!(outputs[1], vec![0xD3; 4095]);
+        assert!(file.mini_stream_is_materialized());
+        let after_bulk = source.reads.load(AtomicOrdering::SeqCst);
+
+        assert_eq!(file.open_stream(&["Selected"]).unwrap(), outputs[0]);
+        assert_eq!(source.reads.load(AtomicOrdering::SeqCst), after_bulk);
+    }
+
+    #[test]
+    fn direct_open_zero_fills_a_truncated_final_root_sector_like_the_cache() {
+        let (file, source, physical_start, present) = truncated_two_mini_file();
+        let direct = file.open_stream(&["Other"]).unwrap();
+        assert_eq!(&direct[..present], &vec![0xD3; present]);
+        assert!(direct[present..].iter().all(|&byte| byte == 0));
+        assert_eq!(source.read_ranges(), vec![(physical_start, present)]);
+
+        source.reset_read_count();
+        let cached = file
+            .read_minifat_stream(file.find_entry(&["Other"]).unwrap().start_sector, 4095)
+            .unwrap();
+        assert_eq!(cached, direct);
+        assert_eq!(&cached[..present], &vec![0xD3; present]);
+        assert!(cached[present..].iter().all(|&byte| byte == 0));
+    }
+
+    #[test]
+    fn public_minifat_range_keeps_truncated_eof_error_and_destination_tail() {
+        let (file, source, physical_start, present) = truncated_two_mini_file();
+        let mut output = vec![0xA5; 4095];
+
+        assert!(matches!(
+            file.read_stream_range(&["Other"], 0, &mut output),
+            Err(OleError::Io(error)) if error.kind() == io::ErrorKind::UnexpectedEof
+        ));
+        assert_eq!(&output[..present], &vec![0xD3; present]);
+        assert!(output[present..].iter().all(|&byte| byte == 0xA5));
+        assert_eq!(
+            source.read_ranges(),
+            vec![
+                (physical_start, output.len()),
+                (
+                    physical_start + u64::try_from(present).unwrap(),
+                    output.len() - present,
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn direct_open_rejects_a_mini_sector_start_outside_the_captured_file() {
+        let (bytes, _expected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let mut file = shared(source.clone());
+        let sector_size = file.index.sector_size as u64;
+        let file_size = file.index.file_size;
+        let outside = u32::try_from(file_size.div_ceil(sector_size)).unwrap();
+        Arc::get_mut(&mut file.index).unwrap().root_chain[0] = outside;
+
+        source.reset_read_count();
+        assert!(matches!(
+            file.open_stream(&["Selected"]),
+            Err(OleError::CorruptedFile(message)) if message.contains("Sector") && message.contains("outside the file")
+        ));
+        assert!(source.read_ranges().is_empty());
+        assert!(!file.mini_stream_is_materialized());
+    }
+
+    #[test]
+    fn open_stream_selected_minifat_preserves_fragmented_logical_order() {
+        let (mut bytes, expected) = two_mini_bytes(4095);
+        let parsed = SharedOleFile::open(Arc::new(TestSource::new(bytes.clone()))).unwrap();
+        let entry = parsed.find_entry(&["Selected"]).unwrap();
+        let start_sector = entry.start_sector;
+        let mini_sector_size = parsed.index.mini_sector_size;
+        let sector_size = parsed.index.sector_size;
+        let root_chain = parsed.index.root_chain.clone();
+        let mini_count = expected.len().div_ceil(mini_sector_size);
+        let physical_mini = |mini_sector: usize| {
+            let mini_offset = mini_sector * mini_sector_size;
+            let root_sector = root_chain[mini_offset / sector_size];
+            (u64::from(root_sector) + 1) * sector_size as u64 + (mini_offset % sector_size) as u64
+        };
+
+        // Make the logical chain visit mini-sector 2 before mini-sector 1.
+        // Swap their physical payloads too, so the logical stream remains the
+        // same while the source ranges prove that physical ordering is not
+        // assumed from MiniFAT ordering.
+        let first = physical_mini(1) as usize;
+        let second = physical_mini(2) as usize;
+        for index in 0..mini_sector_size {
+            bytes.swap(first + index, second + index);
+        }
+
+        let mut index = match Arc::try_unwrap(parsed.index) {
+            Ok(index) => index,
+            Err(_index) => panic!("test owns the parsed index"),
+        };
+        let mut chain: Vec<u32> = (0..mini_count)
+            .map(|mini_sector| u32::try_from(start_sector as usize + mini_sector).unwrap())
+            .collect();
+        chain.swap(1, 2);
+        for window in chain.windows(2) {
+            index.minifat[window[0] as usize] = window[1];
+        }
+        index.minifat[*chain.last().unwrap() as usize] = ENDOFCHAIN;
+        let source = Arc::new(TestSource::new(bytes));
+        let expected_version = source.version().unwrap();
+        let file = SharedOleFile {
+            source: source.clone(),
+            expected_version,
+            index: Arc::new(index),
+            ministream: Mutex::new(None),
+            minifat_direct_state: AtomicU8::new(MINIFAT_DIRECT_UNCLAIMED),
+        };
+
+        source.reset_read_count();
+        assert_eq!(file.open_stream(&["Selected"]).unwrap(), expected);
+        assert_eq!(
+            source.read_ranges(),
+            vec![
+                (physical_mini(0), mini_sector_size),
+                (physical_mini(2), mini_sector_size),
+                (physical_mini(1), mini_sector_size),
+                (physical_mini(3), expected.len() - mini_sector_size * 3,),
+            ]
+        );
+        assert!(!file.mini_stream_is_materialized());
+    }
+
+    #[test]
+    fn open_stream_selected_minifat_refuses_source_change_during_payload_read() {
+        let (bytes, _expected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(source.clone());
+        source.change_on_read.store(true, AtomicOrdering::SeqCst);
+
+        assert!(matches!(
+            file.open_stream(&["Selected"]),
+            Err(OleError::SourceChanged { .. })
+        ));
+        assert!(!file.mini_stream_is_materialized());
+    }
+
+    #[test]
+    fn open_stream_fat_control_keeps_full_contiguous_chain_read() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let entry = file.find_entry(&["Large"]).unwrap();
+        let physical = (u64::from(entry.start_sector) + 1) * file.index.sector_size as u64;
+
+        source.reset_read_count();
+        assert_eq!(file.open_stream(&["Large"]).unwrap(), vec![0xA5; 8192]);
+        assert_eq!(source.read_ranges(), vec![(physical, 8192)]);
+        assert!(!file.mini_stream_is_materialized());
+    }
+
+    #[test]
+    fn selected_minifat_open_refuses_short_or_excess_chain_without_materialization() {
+        let (bytes, _expected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let mut file = shared(source.clone());
+        let start = file.find_entry(&["Selected"]).unwrap().start_sector as usize;
+        Arc::get_mut(&mut file.index).unwrap().minifat[start] = ENDOFCHAIN;
+        assert!(matches!(
+            file.open_stream(&["Selected"]),
+            Err(OleError::CorruptedFile(message)) if message.contains("ends within stream range")
+        ));
+        assert!(!file.mini_stream_is_materialized());
+
+        let (bytes, _expected) = two_mini_bytes(4095);
+        let source = Arc::new(TestSource::new(bytes));
+        let mut file = shared(source);
+        let start = file.find_entry(&["Selected"]).unwrap().start_sector as usize;
+        let mut last = start;
+        for _ in 1..64 {
+            last = usize::try_from(Arc::get_mut(&mut file.index).unwrap().minifat[last]).unwrap();
+        }
+        Arc::get_mut(&mut file.index).unwrap().minifat[last] = last as u32;
+        assert!(matches!(
+            file.open_stream(&["Selected"]),
+            Err(OleError::CorruptedFile(message)) if message.contains("exceeds its declared length")
+        ));
+        assert!(!file.mini_stream_is_materialized());
     }
 
     #[test]
@@ -1343,6 +1932,7 @@ mod tests {
             expected_version,
             index: Arc::new(index),
             ministream: Mutex::new(None),
+            minifat_direct_state: AtomicU8::new(MINIFAT_DIRECT_UNCLAIMED),
         };
 
         source.reset_read_count();
@@ -1421,6 +2011,7 @@ mod tests {
             expected_version,
             index: Arc::new(index),
             ministream: Mutex::new(None),
+            minifat_direct_state: AtomicU8::new(MINIFAT_DIRECT_UNCLAIMED),
         };
 
         let mut output = vec![0_u8; expected.len()];
