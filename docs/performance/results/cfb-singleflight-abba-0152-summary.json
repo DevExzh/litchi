@@ -260,7 +260,7 @@
       "requested_bytes",
       "returned_bytes"
     ],
-    "scope": "per-operation logical positional source events; parser-open physical reads are summarized separately by open_read_calls/open_read_bytes",
+    "scope": "per-operation logical positional source events; parser-open logical source reads are summarized separately by open_read_calls/open_read_bytes; neither counter is physical-I/O evidence",
     "L": "selected target payload bytes",
     "R": "declared root Mini Stream bytes",
     "D": "[target_start,L,L]",
