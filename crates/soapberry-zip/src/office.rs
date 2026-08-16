@@ -519,6 +519,7 @@ pub struct IndexedArchive<R> {
     entries: Vec<IndexedEntry>,
     directories: HashMap<String, Metadata>,
     order: Vec<EntryId>,
+    has_encrypted_entries: bool,
 }
 
 /// Zero-allocation iterator over an [`IndexedArchive`] file-name order.
@@ -1036,11 +1037,13 @@ where
         let mut total_metadata_bytes = 0_u64;
         let mut total_uncompressed_size = 0_u64;
         let mut strict_mimetype = None;
+        let mut has_encrypted_entries = false;
         let mut buffer = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
 
         {
             let mut central_entries = archive.entries(&mut buffer);
             while let Some(entry) = central_entries.next_entry()? {
+                has_encrypted_entries |= entry.flags() & 1 != 0;
                 let path = entry.file_path();
                 let member_name_bytes = path.as_ref().len() as u64;
                 if member_name_bytes > limits.max_member_name_bytes {
@@ -1170,6 +1173,7 @@ where
             entries,
             directories,
             order,
+            has_encrypted_entries,
         })
     }
 
@@ -1177,6 +1181,28 @@ where
     #[inline]
     pub fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    /// Number of central-directory entries, including directory records.
+    #[inline]
+    pub fn preservation_entry_count(&self) -> usize {
+        usize::try_from(self.archive.entries_hint()).unwrap_or(usize::MAX)
+    }
+
+    /// Exact source bytes occupied by the central directory, EOCD, and
+    /// archive comment retained by raw-preservation planning.
+    #[inline]
+    pub fn preservation_metadata_bytes(&self) -> u64 {
+        self.archive
+            .end_offset()
+            .saturating_sub(self.archive.directory_offset())
+    }
+
+    /// Whether any central-directory entry declares traditional ZIP
+    /// encryption through general-purpose bit zero.
+    #[inline]
+    pub fn has_encrypted_entries(&self) -> bool {
+        self.has_encrypted_entries
     }
 
     /// Whether this archive has no indexed non-directory members.
@@ -1265,8 +1291,9 @@ where
         })?;
         let mut output = Vec::new();
         output.try_reserve_exact(size).map_err(|error| {
-            Error::from(ErrorKind::InvalidInput {
-                msg: format!("could not allocate {size} bytes for archive entry: {error}"),
+            Error::from(ErrorKind::Allocation {
+                resource: "indexed archive entry output",
+                source: error,
             })
         })?;
 

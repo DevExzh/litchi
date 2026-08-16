@@ -8,12 +8,15 @@
 use crate::package::{self, Archive, PreparedArchive};
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
-use litchi_core::{Error, ReadAt, Resource, ResourceLimit, Result, SourceVersion};
+use litchi_core::{
+    Error, ExecutionContext, ExecutionError, ReadAt, Resource, ResourceLimit, Result, SourceVersion,
+};
 use soapberry_zip::office::{
     ArchiveLimits as SourceArchiveLimits, ArchiveValidationPolicy as SourceArchiveValidationPolicy,
     IndexedArchive as SourceIndexedArchive,
 };
 use soapberry_zip::{ErrorKind as ZipErrorKind, ReaderAt as ZipReaderAt};
+use std::cell::RefCell;
 use std::io::{self, Read};
 #[cfg(any(unix, windows))]
 use std::path::Path;
@@ -176,9 +179,9 @@ impl std::fmt::Debug for SourceBackedPackage {
 }
 
 #[derive(Debug)]
-struct SourceChangedIo {
-    expected: SourceVersion,
-    observed: SourceVersion,
+pub(crate) struct SourceChangedIo {
+    pub(crate) expected: SourceVersion,
+    pub(crate) observed: SourceVersion,
 }
 
 impl std::fmt::Display for SourceChangedIo {
@@ -193,10 +196,156 @@ impl std::fmt::Display for SourceChangedIo {
 
 impl std::error::Error for SourceChangedIo {}
 
+#[derive(Debug)]
+pub(crate) struct SourceReadIo {
+    pub(crate) source: io::Error,
+}
+
+#[derive(Debug)]
+pub(crate) struct SourceExecutionIo {
+    pub(crate) source: ExecutionError,
+}
+
+impl std::fmt::Display for SourceExecutionIo {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.source.fmt(formatter)
+    }
+}
+
+impl std::error::Error for SourceExecutionIo {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+#[derive(Clone)]
+struct PublicationInputAccounting {
+    source: *const (),
+    execution: Option<ExecutionContext>,
+}
+
+thread_local! {
+    static PUBLICATION_INPUT_ACCOUNTING: RefCell<Vec<PublicationInputAccounting>> =
+        const { RefCell::new(Vec::new()) };
+}
+
+pub(crate) struct PublicationInputGuard {
+    source: *const (),
+    active: bool,
+}
+
+impl Drop for PublicationInputGuard {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        PUBLICATION_INPUT_ACCOUNTING.with(|stack| {
+            let mut stack = stack.borrow_mut();
+            if stack
+                .last()
+                .is_some_and(|entry| entry.source == self.source)
+            {
+                stack.pop();
+            } else if let Some(position) =
+                stack.iter().rposition(|entry| entry.source == self.source)
+            {
+                stack.remove(position);
+            }
+        });
+    }
+}
+
+fn source_identity(source: &Arc<dyn ReadAt>) -> *const () {
+    Arc::as_ptr(source).cast::<()>()
+}
+
+fn active_publication_execution(source: &Arc<dyn ReadAt>) -> Option<ExecutionContext> {
+    let identity = source_identity(source);
+    PUBLICATION_INPUT_ACCOUNTING.with(|stack| {
+        stack
+            .borrow()
+            .iter()
+            .rev()
+            .find(|entry| entry.source == identity)
+            .and_then(|entry| entry.execution.clone())
+    })
+}
+
+fn source_execution_io(source: ExecutionError) -> io::Error {
+    io::Error::other(SourceExecutionIo { source })
+}
+
+fn read_source_at_accounted(
+    source: &Arc<dyn ReadAt>,
+    offset: u64,
+    output: &mut [u8],
+) -> io::Result<usize> {
+    let Some(execution) = active_publication_execution(source) else {
+        return source.read_at(offset, output);
+    };
+    execution.check().map_err(source_execution_io)?;
+    if output.is_empty() {
+        return source.read_at(offset, output);
+    }
+
+    let mut attempt = u64::try_from(output.len())
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "source read length overflow"))?;
+    let (length, reservation) = loop {
+        match execution.reserve(Resource::InputBytes, attempt) {
+            Ok(reservation) => {
+                let length = usize::try_from(attempt).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "source read length overflow")
+                })?;
+                break (length, reservation);
+            },
+            Err(error) => {
+                let ExecutionError::ResourceLimit(limit) = &error else {
+                    return Err(source_execution_io(error));
+                };
+                let previous = limit.observed.saturating_sub(attempt);
+                let available = limit.limit.saturating_sub(previous);
+                let next = available.min(attempt.saturating_sub(1));
+                if next == 0 {
+                    return Err(source_execution_io(error));
+                }
+                attempt = next;
+            },
+        }
+    };
+
+    let read = source.read_at(offset, &mut output[..length])?;
+    if read > length {
+        let _ = reservation.commit(length as u64);
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "positional source reported more bytes than requested",
+        ));
+    }
+    if !reservation.commit(read as u64) {
+        return Err(io::Error::other(
+            "source input reservation could not commit its accepted bytes",
+        ));
+    }
+    execution.check().map_err(source_execution_io)?;
+    Ok(read)
+}
+
+impl std::fmt::Display for SourceReadIo {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.source.fmt(formatter)
+    }
+}
+
+impl std::error::Error for SourceReadIo {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
 /// Adapter from Litchi's positional source contract to soapberry ZIP's
 /// positional reader contract.
 #[derive(Clone)]
-struct SourceReader {
+pub(crate) struct SourceReader {
     source: Arc<dyn ReadAt>,
     expected: SourceVersion,
     length: u64,
@@ -204,7 +353,10 @@ struct SourceReader {
 
 impl SourceReader {
     fn check_version(&self) -> io::Result<()> {
-        let observed = self.source.version()?;
+        let observed = self.source.version().map_err(|source| {
+            let kind = source.kind();
+            io::Error::new(kind, SourceReadIo { source })
+        })?;
         if observed != self.expected {
             return Err(io::Error::other(SourceChangedIo {
                 expected: self.expected,
@@ -224,15 +376,68 @@ impl ZipReaderAt for SourceReader {
         };
         let available = usize::try_from(available).unwrap_or(usize::MAX);
         let requested = output.len().min(available);
-        let read = self.source.read_at(offset, &mut output[..requested])?;
+        let read = match read_source_at_accounted(&self.source, offset, &mut output[..requested]) {
+            Ok(read) => read,
+            Err(source) => {
+                self.check_version()?;
+                let kind = source.kind();
+                return Err(io::Error::new(kind, SourceReadIo { source }));
+            },
+        };
         if read > requested {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "positional source reported more bytes than requested",
+                SourceReadIo {
+                    source: io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "positional source reported more bytes than requested",
+                    ),
+                },
             ));
         }
         self.check_version()?;
         Ok(read)
+    }
+
+    fn read_exact_at(&self, output: &mut [u8], offset: u64) -> io::Result<()> {
+        let mut filled = 0_usize;
+        while filled < output.len() {
+            let current = offset.checked_add(filled as u64).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    SourceReadIo {
+                        source: io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "positional source exact-read offset overflow",
+                        ),
+                    },
+                )
+            })?;
+            let read = self.read_at(&mut output[filled..], current)?;
+            if read == 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    SourceReadIo {
+                        source: io::Error::new(
+                            io::ErrorKind::UnexpectedEof,
+                            "positional source ended before the requested range",
+                        ),
+                    },
+                ));
+            }
+            filled = filled.checked_add(read).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    SourceReadIo {
+                        source: io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "positional source exact-read progress overflow",
+                        ),
+                    },
+                )
+            })?;
+        }
+        Ok(())
     }
 }
 
@@ -635,6 +840,119 @@ impl SourceBackedPackage {
         ensure_source_version(self.source.as_ref(), self.source_version)
     }
 
+    pub(crate) fn ensure_current_for_publication(&self) -> Result<()> {
+        self.ensure_current()
+    }
+
+    pub(crate) const fn source_version_snapshot(&self) -> SourceVersion {
+        self.source_version
+    }
+
+    pub(crate) fn source_version_observed(&self) -> io::Result<SourceVersion> {
+        self.source.version()
+    }
+
+    pub(crate) fn source_length_observed(&self) -> io::Result<u64> {
+        self.source.len()
+    }
+
+    pub(crate) fn begin_publication_input_accounting(
+        &self,
+        execution: Option<&ExecutionContext>,
+    ) -> std::result::Result<PublicationInputGuard, std::collections::TryReserveError> {
+        let source = source_identity(&self.source);
+        let active = if let Some(execution) = execution {
+            PUBLICATION_INPUT_ACCOUNTING.with(|stack| {
+                let mut stack = stack.borrow_mut();
+                stack.try_reserve(2)?;
+                stack.push(PublicationInputAccounting {
+                    source,
+                    execution: Some(execution.clone()),
+                });
+                Ok::<(), std::collections::TryReserveError>(())
+            })?;
+            true
+        } else {
+            false
+        };
+        Ok(PublicationInputGuard { source, active })
+    }
+
+    pub(crate) fn suspend_publication_input_accounting(&self) -> PublicationInputGuard {
+        let source = source_identity(&self.source);
+        let active = PUBLICATION_INPUT_ACCOUNTING.with(|stack| {
+            let mut stack = stack.borrow_mut();
+            let accounting_active = stack
+                .iter()
+                .rev()
+                .find(|entry| entry.source == source)
+                .is_some_and(|entry| entry.execution.is_some());
+            if !accounting_active {
+                return false;
+            }
+            stack.push(PublicationInputAccounting {
+                source,
+                execution: None,
+            });
+            true
+        });
+        PublicationInputGuard { source, active }
+    }
+
+    pub(crate) fn source_read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        read_source_at_accounted(&self.source, offset, output)
+    }
+
+    pub(crate) fn source_read_exact_at(&self, offset: u64, output: &mut [u8]) -> io::Result<()> {
+        let reader = SourceReader {
+            source: Arc::clone(&self.source),
+            expected: self.source_version,
+            length: self.source_length,
+        };
+        reader.read_exact_at(output, offset)
+    }
+
+    pub(crate) fn publication_entry_count(&self) -> usize {
+        self.archive.preservation_entry_count()
+    }
+
+    pub(crate) fn publication_metadata_bytes(&self) -> u64 {
+        self.archive.preservation_metadata_bytes()
+    }
+
+    pub(crate) fn publication_has_zip_encrypted_entries(&self) -> bool {
+        self.archive.has_encrypted_entries()
+    }
+
+    pub(crate) fn publication_member_size(&self, path: &str) -> Result<u64> {
+        self.archive
+            .metadata(path)
+            .map(|metadata| metadata.uncompressed_size())
+            .map_err(map_zip_error)
+    }
+
+    pub(crate) fn publication_max_member_size(&self) -> Result<u64> {
+        let mut maximum = 0_u64;
+        for path in self.archive.file_names() {
+            maximum = maximum.max(self.publication_member_size(path)?);
+        }
+        Ok(maximum)
+    }
+
+    pub(crate) fn publication_file_names(&self) -> impl Iterator<Item = &str> {
+        self.archive.file_names()
+    }
+
+    pub(crate) fn preservation_index<'archive>(
+        &'archive self,
+        scratch: &mut [u8],
+    ) -> std::result::Result<
+        soapberry_zip::PreservationIndex<'archive, SourceReader>,
+        soapberry_zip::Error,
+    > {
+        self.archive.preservation_index(scratch)
+    }
+
     fn read_entry(&self, path: &str) -> Result<Vec<u8>> {
         self.ensure_current()?;
         let result = self.archive.read(path).map_err(map_zip_error);
@@ -811,12 +1129,13 @@ fn read_indexed_string_with_limit<R: ZipReaderAt>(
 }
 
 fn map_zip_error(error: soapberry_zip::Error) -> Error {
-    match error.kind() {
+    match error.into_kind() {
+        ZipErrorKind::Allocation { resource, source } => Error::Allocation { resource, source },
         ZipErrorKind::LimitExceeded {
             resource,
             actual,
             maximum,
-        } => zip_limit_error(*resource, *actual, *maximum),
+        } => zip_limit_error(resource, actual, maximum),
         ZipErrorKind::IO(io_error) | ZipErrorKind::Io(io_error) => {
             if let Some(source) = io_error
                 .get_ref()
@@ -827,10 +1146,10 @@ fn map_zip_error(error: soapberry_zip::Error) -> Error {
                     observed: source.observed,
                 }
             } else {
-                Error::Io(io::Error::new(io_error.kind(), io_error.to_string()))
+                Error::Io(io_error)
             }
         },
-        _ => Error::InvalidFormat(error.to_string()),
+        kind => Error::InvalidFormat(soapberry_zip::Error::from(kind).to_string()),
     }
 }
 

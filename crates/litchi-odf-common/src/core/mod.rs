@@ -69,6 +69,8 @@ mod manifest;
 pub mod metadata;
 /// ODF package handling
 pub mod package;
+/// Source-backed, content-only raw ZIP publication.
+pub mod source_publication;
 /// ODF package writing
 pub mod writer;
 /// ODF XML utilities
@@ -94,6 +96,11 @@ pub use metadata::{
 };
 pub use metadata::{MetaXmlPatch, patch_meta_xml};
 pub use package::{OwnedPackage, SourceBackedPackage, SourcePackageLimits};
+pub use source_publication::{
+    SourceContentPublicationError, SourceContentPublicationOptions,
+    SourceContentPublicationProgress, SourceContentPublicationReport, write_content_xml_to_stream,
+    write_content_xml_to_stream_with_options,
+};
 pub use writer::{
     PackageCompression, PackageWriter, PackageWriterError, PackageWriterLimitExceeded,
     PackageWriterLimitResource, PackageWriterLimits, PackageWriterResult, Structure,

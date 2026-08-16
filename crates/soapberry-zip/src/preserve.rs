@@ -30,6 +30,7 @@ pub struct PreservedEntry {
     local_span: Range<u64>,
     central_record: Range<u64>,
     central_bytes: Vec<u8>,
+    compression_method: CompressionMethod,
 }
 
 impl PreservedEntry {
@@ -47,6 +48,16 @@ impl PreservedEntry {
     /// The exact source range of this central-directory record.
     pub fn central_record(&self) -> Range<u64> {
         self.central_record.clone()
+    }
+
+    /// The compression method declared by this entry's central-directory
+    /// record.
+    ///
+    /// The central record is parsed and structurally validated while the
+    /// [`PreservationIndex`] is built, so this accessor does not read the
+    /// member payload.
+    pub fn compression_method(&self) -> CompressionMethod {
+        self.compression_method
     }
 
     /// The exact raw member-name bytes from this entry's central-directory
@@ -158,6 +169,14 @@ impl PreservationPlan {
         self.actions.push(action);
     }
 
+    /// Fallibly reserve action capacity before building a bounded plan.
+    pub fn try_reserve_exact(
+        &mut self,
+        additional: usize,
+    ) -> Result<(), std::collections::TryReserveError> {
+        self.actions.try_reserve_exact(additional)
+    }
+
     pub fn actions(&self) -> &[PreservationAction] {
         &self.actions
     }
@@ -169,6 +188,7 @@ pub struct PreservationIndex<'source, R> {
     entries: Vec<PreservedEntry>,
     local_order: Vec<usize>,
     archive_comment: Vec<u8>,
+    archive_end_offset: u64,
 }
 
 impl<'source, R> PreservationIndex<'source, R>
@@ -209,7 +229,12 @@ where
             comment_len,
         )?;
 
+        let entry_count = usize::try_from(archive.entries_hint())
+            .map_err(|_| unsupported("central-directory entry count"))?;
         let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(entry_count)
+            .map_err(|source| allocation("preservation-index entries", source))?;
         let mut iterator = archive.entries(buffer);
         while let Some(record) = iterator.next_entry()? {
             if record.is_zip64() {
@@ -250,6 +275,7 @@ where
                 local_span: record.local_header_offset()..record.local_header_offset(),
                 central_record: central_offset..central_end,
                 central_bytes,
+                compression_method: central_fixed.compression_method.as_method(),
             });
         }
 
@@ -268,7 +294,11 @@ where
             return Err(unsupported("central-directory trailing bytes"));
         }
 
-        let mut local_order: Vec<_> = (0..entries.len()).collect();
+        let mut local_order = Vec::new();
+        local_order
+            .try_reserve_exact(entries.len())
+            .map_err(|source| allocation("preservation local order", source))?;
+        local_order.extend(0..entries.len());
         local_order.sort_unstable_by_key(|&index| entries[index].local_span.start);
         if let Some(&first) = local_order.first() {
             if entries[first].local_span.start != 0 {
@@ -296,12 +326,22 @@ where
             entries,
             local_order,
             archive_comment,
+            archive_end_offset: archive_end,
         })
     }
 
     /// The source members in original central-directory order.
     pub fn entries(&self) -> &[PreservedEntry] {
         &self.entries
+    }
+
+    /// The exact exclusive end offset of the located ZIP archive.
+    ///
+    /// This is the EOCD signature offset plus the fixed EOCD record and its
+    /// comment. It deliberately excludes any bytes trailing the located
+    /// archive in the underlying source.
+    pub fn archive_end_offset(&self) -> u64 {
+        self.archive_end_offset
     }
 
     /// Validates `plan` completely, then writes it to a non-seekable sink.
@@ -312,7 +352,11 @@ where
         let prepared = self.prepare(plan)?;
         self.validate_output_layout(&prepared)?;
 
-        let mut local_offsets = vec![0u64; self.entries.len()];
+        let mut local_offsets = Vec::new();
+        local_offsets
+            .try_reserve_exact(self.entries.len())
+            .map_err(|source| allocation("preservation local offsets", source))?;
+        local_offsets.resize(self.entries.len(), 0_u64);
         let mut output_offset = 0u64;
         let mut copy_buffer = [0u8; COPY_CHUNK_SIZE];
         for &index in &self.local_order {
@@ -337,9 +381,10 @@ where
         for (index, entry) in prepared.iter().enumerate() {
             let local_offset = u32::try_from(local_offsets[index])
                 .map_err(|_| unsupported("ZIP64 output promotion"))?;
-            let mut central = entry.central.clone();
-            central[CENTRAL_LOCAL_HEADER_OFFSET].copy_from_slice(&local_offset.to_le_bytes());
-            sink.write_all(&central)?;
+            let central = entry.central.bytes(&self.entries);
+            sink.write_all(&central[..CENTRAL_LOCAL_HEADER_OFFSET.start])?;
+            sink.write_all(&local_offset.to_le_bytes())?;
+            sink.write_all(&central[CENTRAL_LOCAL_HEADER_OFFSET.end..])?;
             output_offset = output_offset
                 .checked_add(central.len() as u64)
                 .ok_or_else(|| unsupported("output offset overflow"))?;
@@ -366,8 +411,11 @@ where
             return Err(unsupported("plan does not cover every entry exactly once"));
         }
 
-        let mut prepared: Vec<Option<PreparedEntry>> =
-            (0..self.entries.len()).map(|_| None).collect();
+        let mut prepared = Vec::new();
+        prepared
+            .try_reserve_exact(self.entries.len())
+            .map_err(|source| allocation("preservation plan", source))?;
+        prepared.resize_with(self.entries.len(), || None);
         for action in &plan.actions {
             let (id, generated) = match action {
                 PreservationAction::Copy(id) => (*id, None),
@@ -384,16 +432,22 @@ where
             prepared[index] = Some(match generated {
                 None => PreparedEntry {
                     local: PreparedLocal::Copy(source_entry.local_span.clone()),
-                    central: source_entry.central_bytes.clone(),
+                    central: PreparedCentral::Copy(index),
                 },
                 Some(entry) => generated_entry(entry)?,
             });
         }
 
-        prepared
-            .into_iter()
-            .collect::<Option<Vec<_>>>()
-            .ok_or_else(|| unsupported("plan does not cover every entry exactly once"))
+        let mut complete = Vec::new();
+        complete
+            .try_reserve_exact(self.entries.len())
+            .map_err(|source| allocation("prepared preservation plan", source))?;
+        for entry in prepared {
+            complete.push(
+                entry.ok_or_else(|| unsupported("plan does not cover every entry exactly once"))?,
+            );
+        }
+        Ok(complete)
     }
 
     fn validate_output_layout(&self, prepared: &[PreparedEntry]) -> Result<(), Error> {
@@ -404,7 +458,7 @@ where
                 .ok_or_else(|| unsupported("output offset overflow"))?;
         }
         let central_size = prepared.iter().try_fold(0u64, |size, entry| {
-            size.checked_add(entry.central.len() as u64)
+            size.checked_add(entry.central.bytes(&self.entries).len() as u64)
                 .ok_or_else(|| unsupported("output offset overflow"))
         })?;
         if local_size > u64::from(u32::MAX)
@@ -424,7 +478,21 @@ where
 
 struct PreparedEntry {
     local: PreparedLocal,
-    central: Vec<u8>,
+    central: PreparedCentral,
+}
+
+enum PreparedCentral {
+    Copy(usize),
+    Generated(Vec<u8>),
+}
+
+impl PreparedCentral {
+    fn bytes<'a>(&'a self, entries: &'a [PreservedEntry]) -> &'a [u8] {
+        match self {
+            Self::Copy(index) => &entries[*index].central_bytes,
+            Self::Generated(bytes) => bytes,
+        }
+    }
 }
 
 enum PreparedLocal {
@@ -442,7 +510,17 @@ impl PreparedLocal {
 }
 
 fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
-    let mut writer = ZipArchiveWriter::new(Vec::new());
+    let payload_len = entry.data.as_slice().len();
+    let capacity = payload_len
+        .checked_add(payload_len / 8)
+        .and_then(|size| size.checked_add(entry.name.len()))
+        .and_then(|size| size.checked_add(4 * 1024))
+        .ok_or_else(|| unsupported("generated member allocation size"))?;
+    let mut generated = Vec::new();
+    generated
+        .try_reserve_exact(capacity)
+        .map_err(|source| allocation("generated member", source))?;
+    let mut writer = ZipArchiveWriter::new(generated);
     match entry.compression {
         CompressionMethod::Store => writer.write_stored_file(&entry.name, entry.data.as_slice())?,
         CompressionMethod::Deflate => {
@@ -484,11 +562,16 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
         }
         (directory_offset, eocd_offset)
     };
-    let mut central = bytes.split_off(directory_offset);
-    central.truncate(eocd_offset - directory_offset);
+    let central_len = eocd_offset - directory_offset;
+    let mut central = Vec::new();
+    central
+        .try_reserve_exact(central_len)
+        .map_err(|source| allocation("generated central record", source))?;
+    central.extend_from_slice(&bytes[directory_offset..eocd_offset]);
+    bytes.truncate(directory_offset);
     Ok(PreparedEntry {
         local: PreparedLocal::Generated(bytes),
-        central,
+        central: PreparedCentral::Generated(central),
     })
 }
 
@@ -548,13 +631,21 @@ where
 }
 
 fn read_vec<R: ReaderAt>(source: &R, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
-    let mut bytes = vec![0; len];
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(len)
+        .map_err(|source| allocation("preservation byte buffer", source))?;
+    bytes.resize(len, 0);
     source.read_exact_at(&mut bytes, offset)?;
     Ok(bytes)
 }
 
 fn unsupported(reason: &'static str) -> Error {
     Error::from(ErrorKind::UnsupportedPreservation { reason })
+}
+
+fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> Error {
+    Error::from(ErrorKind::Allocation { resource, source })
 }
 
 #[cfg(test)]
@@ -686,6 +777,35 @@ mod tests {
             .unwrap();
 
         assert_eq!(output, data);
+    }
+
+    #[test]
+    fn exposes_compression_methods_and_excludes_trailing_source_suffix() {
+        let archive_bytes = ordinary_archive();
+        let mut source_bytes = archive_bytes.clone();
+        source_bytes.extend_from_slice(b"source suffix");
+
+        let (archive, mut buffer) = indexed(&source_bytes);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+
+        assert_eq!(index.archive_end_offset(), archive_bytes.len() as u64);
+        assert_eq!(
+            index
+                .entries()
+                .iter()
+                .map(PreservedEntry::compression_method)
+                .collect::<Vec<_>>(),
+            vec![
+                CompressionMethod::Store,
+                CompressionMethod::Deflate,
+                CompressionMethod::Store,
+            ]
+        );
+
+        let output = index
+            .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+            .unwrap();
+        assert_eq!(output, archive_bytes);
     }
 
     #[test]
@@ -846,7 +966,8 @@ mod tests {
             panic!("generated entry must retain generated local bytes");
         };
         let local_header = ZipLocalFileHeaderFixed::parse(&local).unwrap();
-        let central_header = ZipFileHeaderFixed::parse(&prepared.central).unwrap();
+        let central = prepared.central.bytes(&[]);
+        let central_header = ZipFileHeaderFixed::parse(central).unwrap();
 
         assert_eq!(local_header.file_name_len as usize, b"large.bin".len());
         assert_eq!(
@@ -855,7 +976,7 @@ mod tests {
             b"large.bin"
         );
         assert_eq!(
-            prepared.central.len(),
+            central.len(),
             ZipFileHeaderFixed::SIZE + central_header.variable_length()
         );
         assert_eq!(central_header.local_header_offset, 0);
