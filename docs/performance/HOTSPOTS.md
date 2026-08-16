@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0158`](changes/0158-pptx-additive-topology-release-abba.md)
+Evidence through: [`change 0164`](changes/0164-rtf-paragraph-split-merge-evidence.md)
 (0152 is a final clean release ABBA for same-target MiniFAT single-flight;
 all correctness/source-event invariants passed and the existing concurrent
 scenarios recorded 6,473 versus 8,000 logical source calls, but only that
@@ -796,8 +796,8 @@ Confirmed source facts:
   adds four RTF selectors measured at the pre-staged publication-call interval,
   making that matrix 295. Change 0154 adds six ODF publication selectors,
   making that matrix 301; change 0159 later made it 302, change 0160 made it
-  303, change 0162 made the matrix 305, and change 0163 makes the current
-  matrix 309.
+  303, change 0162 made the matrix 305, change 0163 made it 309, and change
+  0164 makes the current matrix 311.
   Only `cfg(test)` source-event acceptance and tests changed in 0152. Root
   MiniStream cache and resource-accounting boundaries, broader performance
   gaps, and local/generic latency, allocation/RSS/peak-memory, physical
@@ -940,6 +940,24 @@ correctness evidence, not an optimization result; `Edit::commit` still owns a
 complete candidate and reparses it. Allocation/RSS and a clean balanced release
 comparison are required before choosing a picture-path optimization. See
 [`0162`](changes/0162-rtf-picture-crud-evidence.md).
+
+Change 0164 closes the adjacent ordinary-paragraph split/merge evidence gap.
+The two opt-in selectors reuse the exact plain lifecycle corpus at
+tiny/medium/large sizes and call the committed `Edit::split_paragraph` or
+`Edit::merge_paragraphs` API once per transaction. Split inserts one canonical
+five-byte `\\par ` boundary and merge removes only the authenticated adjacent
+boundary. Independent raw splice, semantic reopen, exact no-op, volatile and
+deterministic durable forward/inverse, stale/foreign, bounded refusal,
+partial/zero-sink and hash gates are outside the named phase intervals. The
+public writer publishes to a fixed 16-KiB windowed sink retaining zero output;
+the candidate transaction remains outside that sink bound. This is a
+correctness/phase baseline only. It makes no latency, speedup, allocation/RSS,
+transaction-memory, physical-I/O, cold-cache, source-backed, real-producer,
+or rich-RTF claim. The selector summary exposes
+`forged_result_artifact_refusal_verified`; the existing focused RTF tests
+remain the authority for exact boundary-byte restoration and forged-boundary
+precondition refusal.
+See [`0164`](changes/0164-rtf-paragraph-split-merge-evidence.md).
 
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Change `0091` adds four opt-in eager/source-backed

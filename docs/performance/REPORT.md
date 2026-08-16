@@ -1,6 +1,6 @@
 # Performance program phase report
 
-Date: 2026-08-16
+Date: 2026-08-17
 Branch: `feat/office-format-completeness`
 Historical production base for the original measured tranche:
 `6df5d4a1fbe53a8216e63f24cc1392be60b714a8`
@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **309 selectable cases**; 200 was the count before the
+harness contains **311 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -165,6 +165,34 @@ default 36/198 tranche. This is correctness/phase/counter evidence only, with
 no latency, allocation/RSS, physical-I/O, cold-cache, decompression, or
 real-producer claim.
 
+## RTF ordinary paragraph split/adjacent merge evidence (change 0164)
+
+[Change 0164](changes/0164-rtf-paragraph-split-merge-evidence.md) adds two
+opt-in selectors, `rtf_semantic_split_paragraph_save` and
+`rtf_semantic_merge_paragraph_save`, over the exact generated plain RTF
+lifecycle corpus at tiny, medium, and large shapes (24, 200, and 10,000
+ordinary paragraphs). Split inserts exactly one canonical five-byte `\\par `
+boundary at a checked interior offset; merge removes only the authenticated
+adjacent five-byte boundary. Expected output is an independent raw splice,
+with unchanged surrounding bytes and complete semantic paragraph projection
+checked separately.
+
+Each selector reports open, stage, commit, fixed 16-KiB windowed sequential
+publication, and complete lifecycle vectors. The publication sink retains zero
+output bytes and hashes the complete accepted stream; the candidate transaction
+is not covered by that sink window. Untimed gates include exact no-op/source
+identity, volatile and deterministic durable forward/inverse, stale/foreign
+source refusal, forged result-artifact refusal, bounded invalid/unsafe/
+protected refusal, partial/zero sink failure, and deterministic source/output
+hashes. The selectors raise the matrix from 309 to 311 while preserving the
+historical default 36 cases / 198 records.
+
+This is correctness, phase, and sequential-sink evidence only. It makes no
+latency, speedup, transaction-memory, allocation/RSS, physical-I/O,
+cold-cache, source-backed, real-producer, or general rich-RTF claim. The
+literal-ASCII root-level ordinary-body closure and existing native focused
+tests remain the authority for unsupported and forged-input boundaries.
+
 ## Managed XLSX source-editor production freeze (change 0151)
 
 [Change 0151](changes/0151-xlsx-managed-source-editors.md) freezes managed
@@ -200,8 +228,8 @@ Only this named source-event/correctness scope is accepted. At the 0152
 revision the 291-name selector matrix was unchanged; change 0153 adds four RTF
 selectors measured at the pre-staged publication-call interval, making that
 matrix 295. Change 0154 adds six ODF publication selectors, making the current
-matrix 301; change 0159 later made it 302, change 0160 made it 303, and change
-0162 made the current matrix 305, and 0163 makes it 309. No runtime
+matrix 301; change 0159 later made it 302, change 0160 made it 303, change
+0162 made it 305, change 0163 made it 309, and change 0164 makes it 311. No runtime
 selector was added to 0152; only `cfg(test)` source-event acceptance and tests
 changed. Local or generic latency,
 allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/network,
@@ -1212,7 +1240,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 309 selectable cases. Change
+The current standalone harness provides 311 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1294,8 +1322,8 @@ evidence only. At the 0152 revision the 291-name matrix was unchanged; change
 0153 adds four RTF selectors measured at the pre-staged publication-call
 interval, making that matrix 295. Change 0154 adds six ODF content-COW
 publication selectors, making that matrix 301; change 0159 later made it 302,
-change 0160 made it 303, change 0162 made it 305, and change 0163 makes the
-current matrix 309.
+change 0160 made it 303, change 0162 made it 305, change 0163 made it 309,
+and change 0164 makes the current matrix 311.
 No runtime selector was added to 0152; only `cfg(test)` source-event
 acceptance and tests changed. Root
 MiniStream cache/resource-accounting boundaries and broader performance gaps
