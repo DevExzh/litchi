@@ -161,6 +161,16 @@ impl ContentTypeMap {
             .ok_or_else(|| OpcError::ContentTypeNotFound(pack_uri.to_string()))
     }
 
+    /// Return an explicitly declared Override mapping without consulting a
+    /// Default extension mapping. Source-backed topology publication uses
+    /// this distinction to reject a conflicting existing override while still
+    /// allowing a new override to supersede a default mapping.
+    pub(crate) fn override_for(&self, pack_uri: &PackURI) -> Option<&ContentType> {
+        self.overrides
+            .get(&pack_uri.as_str().to_ascii_lowercase())
+            .map(|(_, content_type)| content_type)
+    }
+
     fn add_default(&mut self, extension: String, content_type: ContentType) -> Result<()> {
         validate_extension(&extension)?;
         let key = extension.to_ascii_lowercase();

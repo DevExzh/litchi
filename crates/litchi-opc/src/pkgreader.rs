@@ -122,6 +122,8 @@ pub(crate) struct SourceCatalog {
     pub(crate) pkg_srels: SmallVec<[SerializedRelationship; 8]>,
     pub(crate) parts: Vec<DeferredPart>,
     pub(crate) non_part_members: Vec<NonPartMember>,
+    /// Exact spelling of the reserved content-types member in the source ZIP.
+    pub(crate) content_types_member: String,
 }
 
 /// Exact source-catalog phase used only by the validation entry point.
@@ -997,6 +999,7 @@ impl PackageReader {
             pkg_srels,
             parts,
             non_part_members,
+            content_types_member: content_types_member.to_string(),
         })
     }
 
@@ -1068,6 +1071,7 @@ impl PackageReader {
             pkg_srels,
             parts,
             non_part_members,
+            content_types_member: content_types_member.to_string(),
         })
     }
 
@@ -1421,7 +1425,7 @@ fn required_relationship_attribute(value: Option<String>, name: &str) -> Result<
     })
 }
 
-fn is_xml_id(value: &str) -> bool {
+pub(crate) fn is_xml_id(value: &str) -> bool {
     let mut characters = value.chars();
     characters.next().is_some_and(is_ncname_start) && characters.all(is_ncname_char)
 }
