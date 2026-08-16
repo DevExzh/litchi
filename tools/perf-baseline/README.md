@@ -71,14 +71,15 @@ six matched native XLS fixed-width numeric publication cases,
 four matched native XLS worksheet-visibility publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 24 native OLE2 semantic cases, 16
 DOCX/PPTX semantic cases, 19 RTF semantic cases (13 transport/read/edit
-cases plus six logical-tail publication cases), 38 ODF semantic cases, and one
-ODF `mimetype` repair-plan case are opt-in. Eight additional native PPT
+cases plus six logical-tail publication cases), 38 ODF semantic cases, one
+ODF `mimetype` repair-plan case, and six matched ODF content-COW publication
+cases are opt-in. Eight additional native PPT
 `Pictures` selectors are available for matched eager/source-backed open,
 cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 295
+provide their source-read counters. The current `Case` matrix exposes 301
 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -218,8 +219,8 @@ selectors for different-SID A-B-A, public bulk A-B-A, and overlapping
 same-target calls at the 36-byte and 4095-byte targets:
 `cfb_open_stream_mini_shared_{different_sid,bulk,concurrent}` and
 `cfb_open_stream_mini_4095_shared_{different_sid,bulk,concurrent}`. The
-selectable matrix is now 295 names; the default remains 36 cases / 198
-records. The runner accepts the control root-only vector, the prior
+selectable matrix was 291 names at that revision; the current matrix is 301.
+The default remains 36 cases / 198 records. The runner accepts the control root-only vector, the prior
 direct-then-root vector, and the target-aware same-SID repeat vector, while
 recording ordered workload names, exact positional ranges, output hashes,
 source-version stability, and typed missing-stream refusal. Concurrent
@@ -254,8 +255,9 @@ event invariants passed. Existing concurrent scenarios recorded 6,473
 candidate versus 8,000 control logical source calls, 19.09% fewer. This is
 accepted only as source-event/correctness evidence. At the 0152 revision the
 291-name selector matrix was unchanged; change 0153 adds four RTF selectors
-measured at the pre-staged publication-call interval, making the current
-matrix 295. No runtime selector was added
+measured at the pre-staged publication-call interval, making that matrix 295.
+Change 0154 adds six ODT/ODS/ODP content-COW publication selectors, making the
+current matrix 301. No runtime selector was added
 to 0152; only `cfg(test)` source-event acceptance and tests changed. Root
 MiniStream cache and
 resource-accounting boundaries and broader performance gaps remain. Local or
@@ -264,6 +266,20 @@ cold-cache/device/network, decompression, native semantic, OOXML, ODF, RTF,
 and iWork claims are withheld. See the
 [`0152` release record](../../docs/performance/changes/0152-cfb-same-target-singleflight-release-abba.md)
 and [summary](../../docs/performance/results/cfb-singleflight-abba-0152-summary.json).
+
+Change 0154 adds matched owned-rebuild and source-positional content-only
+publication selectors for ODT, ODS, and ODP. Each selector prepares the real
+semantic edit and owner outside timing, then measures one public publication
+call plus the same fixed 16 KiB non-seek hashing sink. Exact content, semantic
+reopen, package inventory, positional untouched-member raw identity, physical
+and central order, no-op, limits, cancellation, source immutability, and
+logical `ReadAt` counters remain untimed gates. A clean CPU-2 release ABBA with
+20 warmups and 100 samples per record accepts p50 improvements of
+96.35%-96.63% in both pair directions for this prepared in-memory publication
+boundary. It makes no end-to-end, allocation/RSS, physical-I/O, decompression,
+cold-cache, filesystem, real-producer, or iWork claim. See the
+[`0154` record](../../docs/performance/changes/0154-odf-content-cow-publication-evidence.md)
+and [summary](../../docs/performance/results/odf-content-cow-abba-0154-summary.json).
 
 The validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:

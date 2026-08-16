@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0153`](changes/0153-rtf-tail-publication-plan-evidence.md)
+Evidence through: [`change 0154`](changes/0154-odf-content-cow-publication-evidence.md)
 (0152 is a final clean release ABBA for same-target MiniFAT single-flight;
 all correctness/source-event invariants passed and the existing concurrent
 scenarios recorded 6,473 versus 8,000 logical source calls, but only that
@@ -782,7 +782,8 @@ Confirmed source facts:
   source calls (19.09% fewer). Only this source-event/correctness scope is
   accepted. At that revision the 291-name matrix was unchanged; change 0153
   adds four RTF selectors measured at the pre-staged publication-call interval,
-  making the current matrix 295.
+  making that matrix 295. Change 0154 adds six ODF publication selectors,
+  making the current matrix 301.
   Only `cfg(test)` source-event acceptance and tests changed in 0152. Root
   MiniStream cache and resource-accounting boundaries, broader performance
   gaps, and local/generic latency, allocation/RSS/peak-memory, physical
@@ -1040,6 +1041,19 @@ publication-window bytes explicitly. This is a
 publication-boundary tranche only: no end-to-end, rich-format,
 allocation/RSS, physical-I/O, or ABBA latency claim is accepted. See
 [`change 0153`](changes/0153-rtf-tail-publication-plan-evidence.md).
+
+Change 0154 closes the evidence gap for the generic source-positional ODF
+`content.xml` publisher at its prepared publication boundary. Across matched
+media-rich ODT/ODS/ODP corpora, a clean CPU-2 A/B/B/A run accepts p50
+improvements of 96.35%-96.63% in both pair directions; p95, p99, and mean
+agree, while maximum absolute same-implementation p50 drift is 1.441%. The
+positional path retains no complete output and preserves every untouched raw
+member plus physical and central order. This does not close end-to-end edit,
+archive-open/indexing, allocation/RSS, physical-I/O, decompression,
+cold-cache, filesystem, real-producer, or richer structural/resource-adding
+ODF gaps. See
+[`change 0154`](changes/0154-odf-content-cow-publication-evidence.md) and the
+[summary](results/odf-content-cow-abba-0154-summary.json).
 
 The standalone harness now records a fixed six-bucket distribution for every
 serialized sink summary. It counts logical `Write::write` calls at the point

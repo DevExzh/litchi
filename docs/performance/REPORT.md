@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **295 selectable cases**; 200 was the count before the
+harness contains **301 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -110,8 +110,9 @@ scenarios recorded 6,473 candidate versus 8,000 control logical source calls,
 
 Only this named source-event/correctness scope is accepted. At the 0152
 revision the 291-name selector matrix was unchanged; change 0153 adds four RTF
-selectors measured at the pre-staged publication-call interval, making the
-current matrix 295. No runtime
+selectors measured at the pre-staged publication-call interval, making that
+matrix 295. Change 0154 adds six ODF publication selectors, making the current
+matrix 301. No runtime
 selector was added to 0152; only `cfg(test)` source-event acceptance and tests
 changed. Local or generic latency,
 allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/network,
@@ -119,6 +120,25 @@ decompression, native semantic, OOXML, ODF, RTF, and iWork claims are
 withheld. The root MiniStream cache and resource-accounting boundaries remain,
 as do broader performance gaps. See the
 [machine-readable summary](results/cfb-singleflight-abba-0152-summary.json).
+
+## ODF content-COW publication release ABBA (change 0154)
+
+[Change 0154](changes/0154-odf-content-cow-publication-evidence.md) adds six
+matched ODT/ODS/ODP owned-rebuild and source-positional `content.xml`
+publication selectors. A clean CPU-2 `A1 owned, B1 positional, B2 positional,
+A2 owned` run used 20 warmups and 100 samples per record. Both pair directions
+accept p50 improvements of 96.35%-96.63%; p95, p99, and mean agree, and the
+largest absolute same-implementation p50 drift is 1.441%.
+
+The timer covers a prepared owner/candidate publication call plus the same
+fixed 16 KiB non-seek hashing sink. Semantic edit construction, archive
+open/indexing, reopen, exact content/inventory, positional untouched-member raw
+identity and order, no-op, limits, cancellation, source immutability, and
+logical `ReadAt` replay are untimed. This is therefore a prepared in-memory
+publication result, not end-to-end edit/save, allocation/RSS, physical-I/O,
+decompression, cold-cache, filesystem, real-producer, or iWork evidence. See
+the [summary](results/odf-content-cow-abba-0154-summary.json) and compressed raw
+reports.
 
 | Change | Current evidence | Scope / limitation |
 |---|---|---|
@@ -1077,7 +1097,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 295 selectable cases. Change
+The current standalone harness provides 301 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1157,7 +1177,8 @@ existing concurrent scenarios record 6,473 candidate versus 8,000 control
 logical source calls (19.09% fewer). This accepts source-event/correctness
 evidence only. At the 0152 revision the 291-name matrix was unchanged; change
 0153 adds four RTF selectors measured at the pre-staged publication-call
-interval, making the current matrix 295.
+interval, making that matrix 295. Change 0154 adds six ODF content-COW
+publication selectors, making the current matrix 301.
 No runtime selector was added to 0152; only `cfg(test)` source-event
 acceptance and tests changed. Root
 MiniStream cache/resource-accounting boundaries and broader performance gaps
@@ -1177,6 +1198,16 @@ source/candidate/window bytes are explicit.
 No end-to-end, rich-format, allocation/RSS, physical-I/O, or ABBA latency
 claim is made. See
 [0153](changes/0153-rtf-tail-publication-plan-evidence.md).
+
+Change 0154 adds matched owned-rebuild/source-positional publication selectors
+for ODT, ODS, and ODP. Clean CPU-2 A/B/B/A evidence accepts 96.35%-96.63% p50
+improvement in both pair directions at the prepared publication-call boundary;
+p95, p99, and mean agree. Exact semantic/content/raw-order/no-op/limit/
+cancellation/source gates remain outside timing. No end-to-end,
+allocation/RSS, physical-I/O, decompression, cold-cache, filesystem,
+real-producer, broad ODF CRUD, or iWork claim is made. See
+[0154](changes/0154-odf-content-cow-publication-evidence.md) and the
+[summary](results/odf-content-cow-abba-0154-summary.json).
 
 Change 0119 adds three opt-in native PPT selected-shape controls and preserves
 the 36-case / 198-record default. The query-only and fresh-open-plus-query
