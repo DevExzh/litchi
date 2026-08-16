@@ -90,8 +90,7 @@ conversion for other formats remain.
    +33.78%/+33.21% for tiny, +12.27%/+13.81% for large, and +17.33%/+17.80%
    for payload-heavy; the immediate fingerprint-demand workflow records
    +14.56%/+13.90%, +4.49%/+5.82%, and +6.55%/+7.08% respectively. Same-lineage
-   apply/patch work is approximately 99.6%-99.99% lower across the reported
-   statistics, while the deferred
+   apply/patch p50/mean/p95 deltas are approximately 99.6%-99.99%, while the deferred
    fingerprint scan remains explicit. DOC guard cases pass and DOC open is
    within the disclosed final guard deltas: noop +78.84%/+79.89% (tiny) and
    +71.08%/+70.40% (large), one-edit +37.23%/+40.81% and +20.45%/+19.79%,
@@ -1277,8 +1276,7 @@ per shape (6,000 primary samples) plus 24,000 guard samples. Paired lifecycle
 p50 deltas are +33.78%/+33.21% (tiny), +12.27%/+13.81% (large), and
 +17.33%/+17.80% (payload-heavy); the immediate fingerprint-demand workflow
 is +14.56%/+13.90%, +4.49%/+5.82%, and +6.55%/+7.08% respectively.
-Same-lineage apply/patch work is approximately 99.6%-99.99% lower across the
-reported statistics, and the
+Same-lineage apply/patch p50/mean/p95 deltas are approximately 99.6%-99.99%, and the
 deferred scan is reported explicitly. Final DOC guard p50 deltas are noop
 +78.84%/+79.89% (tiny) and +71.08%/+70.40% (large), one-edit
 +37.23%/+40.81% and +20.45%/+19.79%, while DOC open is -3.52%/+0.13% and

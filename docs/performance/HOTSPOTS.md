@@ -988,7 +988,7 @@ immediate fingerprint demand, workflow p50/mean/p95 positive-faster deltas are
 `+4.49/+4.82/+10.24`, `+5.82/+5.64/+4.26`,
 `+6.55/+6.41/+6.26`, and `+7.08/+7.08/+6.33` in shape/direction order.
 The isolated patch/apply extension spans about 99.6-99.99% across the reported
-statistics, while its
+p50/mean/p95 deltas, while its
 deferred first scan is visible at roughly 25.7 us, 164 us, and 8.37-8.39 ms
 for the three candidate shapes.
 
