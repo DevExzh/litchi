@@ -946,6 +946,16 @@ impl<R> IndexedArchive<R>
 where
     R: ReaderAt,
 {
+    /// Return the exclusive byte offset of the located ZIP archive.
+    ///
+    /// This is retained from the initial EOCD location and therefore requires
+    /// no source read or central-directory rescan. Callers can compare it with
+    /// the positional source length before promising raw-member preservation.
+    #[must_use]
+    pub fn archive_end_offset(&self) -> u64 {
+        self.archive.end_offset()
+    }
+
     /// Build a raw-member preservation index from this already located ZIP.
     ///
     /// This borrows the positional archive held by this index and does not run
@@ -4582,6 +4592,19 @@ mod tests {
             ]
         );
         assert_eq!(preservation.entries().len(), 4);
+    }
+
+    #[test]
+    fn indexed_archive_retains_the_located_archive_end_without_rescanning() {
+        let mut bytes = fixture(&[FixtureEntry::stored(b"payload.bin", b"payload")]);
+        let archive_end = bytes.len() as u64;
+        bytes.extend_from_slice(b"opaque trailing bytes");
+        let source_len = bytes.len() as u64;
+        let indexed = IndexedArchive::from_reader(std::io::Cursor::new(bytes), source_len)
+            .expect("ZIP before the opaque suffix remains locatable");
+
+        assert_eq!(indexed.archive_end_offset(), archive_end);
+        assert_ne!(indexed.archive_end_offset(), source_len);
     }
 
     #[test]

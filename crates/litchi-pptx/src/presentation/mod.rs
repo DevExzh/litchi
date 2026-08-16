@@ -8,6 +8,7 @@ mod codec;
 mod model;
 mod package;
 mod source;
+mod source_cross_copy;
 mod transition;
 
 #[cfg(test)]
@@ -24,3 +25,4 @@ pub use source::{
     SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImage, SourceImageDescriptor,
     SourceImageTarget, SourceSlide,
 };
+pub use source_cross_copy::{SourceBackedCrossSlideCopyPlan, SourceBackedCrossSlideCopySnapshot};
