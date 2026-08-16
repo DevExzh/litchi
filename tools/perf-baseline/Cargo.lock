@@ -1284,6 +1284,7 @@ dependencies = [
  "litchi-codepage",
  "litchi-core",
  "serde_json",
+ "sha2 0.11.0",
  "smallvec",
  "zerocopy",
  "zerocopy-derive",

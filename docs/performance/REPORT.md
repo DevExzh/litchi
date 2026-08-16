@@ -57,8 +57,8 @@ remote-range, before/after, and allocation-attribution claims remain open.
 
 ## Current stable tranche
 
-The original stage-1 results below remain historical evidence. The committed
-HEAD harness contains **291 selectable cases**; 200 was the count before the
+The original stage-1 results below remain historical evidence. The current
+harness contains **295 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -108,9 +108,12 @@ correctness and logical source-event invariants passed. Existing concurrent
 scenarios recorded 6,473 candidate versus 8,000 control logical source calls,
 19.09% fewer.
 
-Only this named source-event/correctness scope is accepted. The 291-name
-selector matrix is unchanged: no runtime selector was added; only `cfg(test)`
-source-event acceptance and tests changed. Local or generic latency,
+Only this named source-event/correctness scope is accepted. At the 0152
+revision the 291-name selector matrix was unchanged; change 0153 adds four RTF
+selectors measured at the pre-staged publication-call interval, making the
+current matrix 295. No runtime
+selector was added to 0152; only `cfg(test)` source-event acceptance and tests
+changed. Local or generic latency,
 allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/network,
 decompression, native semantic, OOXML, ODF, RTF, and iWork claims are
 withheld. The root MiniStream cache and resource-accounting boundaries remain,
@@ -146,7 +149,7 @@ as do broader performance gaps. See the
 | Rejected generic XLSX publisher provenance reuse | Seven typed source-backed publishers: pooled p50 geomean **+1.04%**; individual pooled p50 **-1.52% to +3.84%**; whole-process allocation calls **-2.84%**; peak heap unchanged | Fully reverted by `a12387478`. The skipped reload usually hit retained cache state, source/materialization/sink/output evidence was unchanged, and the small allocation reduction did not justify the added snapshot/conflict complexity; see [change 0141](changes/0141-xlsx-source-provenance-negative-result.md) |
 | Bounded forward-only XLSX/RTF creation | RTF streaming p50 geomean **-76.41%/-76.47%**, p95 **-75.23%/-75.76%**; large sink calls **7,208,970 -> 1,441,802**; exact output hashes | RTF escape-free ASCII only, hard 32-byte request ceiling and unchanged 37-byte retained encoder state. XLSX streaming latency/memory evidence and allocation/RSS claims remain pending |
 | Bounded semantic validation and ODF repair | DOCX, PPTX, RTF and XLS reports now complement CFB, OPC and ODF reports; one opt-in selector exercises ODF's typed non-destructive `mimetype` local-extra repair plan with exact forward/inverse and zero-retained-output sink evidence | Correctness-only, finite and fail-closed. Planning still performs a bounded full-candidate preflight, so no memory or latency claim is made; structural, encrypted, signed, macro and semantic repairs remain unsupported |
-| RTF logical-tail append | Two opt-in existing-document cases cover tiny/medium/large append and exact no-op publication through a fixed 16 KiB non-seek hashing window that caps accepted bytes per write and retains zero output | Correctness/coverage only: candidate snapshot is not window-bounded, and no release ABBA, allocation, RSS, or speedup claim exists; see [change 0090](changes/0090-rtf-logical-tail-append-evidence.md) |
+| RTF logical-tail append | Two historical staging/commit/publication-timing cases plus four matched Commit/PublicationPlan controls cover tiny/medium/large append and exact no-op publication; the four new selectors use the pre-staged publication-call interval and a fixed 16 KiB non-seek counting sink, while separate planning/publication/reopen/lifecycle vectors and retained-byte fields are emitted. Planning/publication vectors are per-sample; reopen/lifecycle vectors are one-element preflight-only gates run outside the sample loop | Correctness/coverage only: candidate snapshot is not window-bounded, and no end-to-end, rich-format, release ABBA, allocation/RSS, physical-I/O, or speedup claim exists; see [changes 0090](changes/0090-rtf-logical-tail-append-evidence.md) and [0153](changes/0153-rtf-tail-publication-plan-evidence.md) |
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |
 | Coalesced DOCX paragraph edits | Large 100-edit/save p50 **-94.99% (19.97x)** and mean **-95.02%**; medium two-edit/save p50 **-12.98%**; scalar one-edit guardrail neutral | Direct-body, strictly ordered paragraph text replacement; generated corpus; scalar API remains separate |
 | ODF semantic baselines and ODS snapshot reuse | Medium/large ODS no-op edit-save p50 **-7.45% / -11.78%**; one-cell edit-save **-3.57% / -2.06%** | Generated ODT/ODS/ODP baseline corpora; focused ODP/ODT publication follow-ups are listed below |
@@ -502,6 +505,20 @@ reopen, sequential bytes, in-memory and durable patch/inverse, and foreign-sourc
 refusal remain untimed gates. The sink window does not bound the transaction's
 validated candidate snapshot. See
 [`change 0090`](changes/0090-rtf-logical-tail-append-evidence.md).
+
+Change 0153 adds matched Commit-versus-PublicationPlan append and exact-no-op
+selectors. Their `elapsed_ns` is the pre-staged publication-call interval
+around the respective public write call; `planning_ns` and `publication_ns`
+are per-sample vectors, while `reopen_ns` and `lifecycle_ns` are one-element
+preflight-only vectors for expensive gates run once outside the sample loop.
+The planning, reopen, lifecycle, durable patch, cancellation, sink
+failure/partial progress, limits, and source-version checks are separate
+untimed evidence.
+Source-retained, complete-candidate-retained, and publication-window bytes are
+reported explicitly. This tranche makes no end-to-end, rich-format,
+allocation/RSS, physical-I/O, or ABBA latency claim; no release measurement is
+run without root approval after code review. See
+[`change 0153`](changes/0153-rtf-tail-publication-plan-evidence.md).
 
 The source-backed PPTX selected-slide publication evidence is
 [`before A`](results/abba-pptx-source-edit-before-a.json),
@@ -1060,7 +1077,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The committed HEAD standalone harness provides 291 selectable cases. Change
+The current standalone harness provides 295 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1138,14 +1155,28 @@ single-flight: control `e486e4b1` versus candidate `f46381c6` (introduced by
 48,000 retained samples. All correctness/source-event invariants pass, and
 existing concurrent scenarios record 6,473 candidate versus 8,000 control
 logical source calls (19.09% fewer). This accepts source-event/correctness
-evidence only. The 291-name matrix is unchanged; no runtime selector was
-added, only `cfg(test)` source-event acceptance and tests changed. Root
+evidence only. At the 0152 revision the 291-name matrix was unchanged; change
+0153 adds four RTF selectors measured at the pre-staged publication-call
+interval, making the current matrix 295.
+No runtime selector was added to 0152; only `cfg(test)` source-event
+acceptance and tests changed. Root
 MiniStream cache/resource-accounting boundaries and broader performance gaps
 remain, while local/generic latency, allocation/RSS/peak memory, physical
 I/O/syscalls, cold-cache/device/network, decompression, native semantic,
 OOXML/ODF/RTF/iWork claims are withheld. See the
 [0152 release record](changes/0152-cfb-same-target-singleflight-release-abba.md)
 and [summary](results/cfb-singleflight-abba-0152-summary.json).
+
+Change 0153 adds four matched RTF tail selectors. Their pre-staged
+Commit/PublicationPlan `elapsed_ns` is exactly the publication-call interval
+around the respective public write call to a fixed 16 KiB sink; the calls have
+intentionally asymmetric validation and publication work. Planning, reopen,
+lifecycle, durable patch, cancellation, sink failure/partial progress, limits,
+source-version and exact semantic gates remain untimed. Retained
+source/candidate/window bytes are explicit.
+No end-to-end, rich-format, allocation/RSS, physical-I/O, or ABBA latency
+claim is made. See
+[0153](changes/0153-rtf-tail-publication-plan-evidence.md).
 
 Change 0119 adds three opt-in native PPT selected-shape controls and preserves
 the 36-case / 198-record default. The query-only and fresh-open-plus-query

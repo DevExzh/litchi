@@ -319,7 +319,7 @@ native-format, or cross-format claim is accepted. See the
 
 ## CFB target-aware repeat-policy harness (change 0148)
 
-The current 291-name harness adds six production-only selectors for different-
+The 0148-era 291-name harness added six production-only selectors for different-
 SID A-B-A, public bulk A-B-A, and overlapping same-target calls at 36-byte and
 4095-byte MiniFAT targets. Their correctness/source-event records retain
 ordered workload names, output hashes and lengths, exact positional ranges,
@@ -381,8 +381,10 @@ concurrent scenarios, the candidate recorded 6,473 logical source calls versus
 8,000 for control, a 19.09% reduction.
 
 This accepts only the named source-event/correctness result. The existing
-291-name selector matrix is unchanged: no runtime selector was added; only
-`cfg(test)` source-event acceptance and tests changed. Local or generic
+At the 0152 revision the 291-name selector matrix was unchanged: no runtime
+selector was added; only `cfg(test)` source-event acceptance and tests changed.
+Change 0153 adds four RTF selectors measured at the pre-staged
+publication-call interval, making the current matrix 295. Local or generic
 latency, allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/
 network behavior, decompression, native semantic, OOXML, ODF, RTF, and iWork
 claims are withheld. The root MiniStream cache and resource-accounting
@@ -578,8 +580,8 @@ machine-noisy latency thresholds.
 
 ## Current stable tranche update
 
-The stage-1 records above are retained unchanged. The committed HEAD harness has
-**291 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+The stage-1 records above are retained unchanged. The current harness has
+**295 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -891,6 +893,23 @@ publication, complete reopen, patch/inverse and foreign-source refusal. The
 it does not bound the transaction's validated candidate snapshot. No release
 latency, allocation, RSS, or speedup claim is made. See
 [`0090`](changes/0090-rtf-logical-tail-append-evidence.md).
+
+Change 0153 adds four matched RTF tail selectors: Commit versus
+PublicationPlan for changed append and exact no-op. Their `elapsed_ns` is the
+pre-staged publication-call interval around the respective public write call,
+using the same fixed 16 KiB non-seek sink; separate planning, publication,
+reopen, and lifecycle vectors report their scopes. `planning_ns` and
+`publication_ns` have one entry per retained sample, while `reopen_ns` and
+`lifecycle_ns` are one-element preflight-only vectors because the expensive
+correctness gates run once outside the sample loop rather than repeating for
+each sample. The results explicitly distinguish retained source, complete
+candidate, and publication-window bytes.
+Commit and PublicationPlan intentionally perform asymmetric validation and
+publication work. Exact output/digest/semantic/no-op, durable
+apply/inverse/stale/foreign, cancellation, sink failure/partial progress,
+limits, and source-version gates remain untimed correctness checks. No
+end-to-end, rich-format, allocation/RSS, physical-I/O, or ABBA latency claim is
+made. See [`0153`](changes/0153-rtf-tail-publication-plan-evidence.md).
 
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Committed change `0091` adds four opt-in eager

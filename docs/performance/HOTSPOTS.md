@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0152`](changes/0152-cfb-same-target-singleflight-release-abba.md)
+Evidence through: [`change 0153`](changes/0153-rtf-tail-publication-plan-evidence.md)
 (0152 is a final clean release ABBA for same-target MiniFAT single-flight;
 all correctness/source-event invariants passed and the existing concurrent
 scenarios recorded 6,473 versus 8,000 logical source calls, but only that
@@ -780,8 +780,10 @@ Confirmed source facts:
   retained samples). All correctness/source-event invariants passed; existing
   concurrent scenarios recorded 6,473 candidate versus 8,000 control logical
   source calls (19.09% fewer). Only this source-event/correctness scope is
-  accepted. The 291-name matrix is unchanged: no runtime selector was added;
-  only `cfg(test)` source-event acceptance and tests changed. Root
+  accepted. At that revision the 291-name matrix was unchanged; change 0153
+  adds four RTF selectors measured at the pre-staged publication-call interval,
+  making the current matrix 295.
+  Only `cfg(test)` source-event acceptance and tests changed in 0152. Root
   MiniStream cache and resource-accounting boundaries, broader performance
   gaps, and local/generic latency, allocation/RSS/peak-memory, physical
   I/O/syscall, cold-cache/device/network, decompression, native semantic,
@@ -1026,6 +1028,18 @@ window caps accepted bytes per write and retains zero output, but does not bound
 the transaction's validated candidate snapshot. This is correctness/coverage
 evidence only; no release latency, allocation, RSS, or speedup claim exists.
 See [`change 0090`](changes/0090-rtf-logical-tail-append-evidence.md).
+
+Change 0153 adds matched Commit-versus-PublicationPlan append and exact-no-op
+selectors over the same three plain shapes. The timer covers only publication
+of pre-staged objects to the fixed sink; planning and publication vectors are
+per-sample, while reopen and lifecycle vectors are one-element preflight-only
+gates run once outside the sample loop. Durable patch, cancellation,
+sink-failure/partial-progress, limits, and source-version gates are separate
+untimed evidence. Results report retained source, complete-candidate, and
+publication-window bytes explicitly. This is a
+publication-boundary tranche only: no end-to-end, rich-format,
+allocation/RSS, physical-I/O, or ABBA latency claim is accepted. See
+[`change 0153`](changes/0153-rtf-tail-publication-plan-evidence.md).
 
 The standalone harness now records a fixed six-bucket distribution for every
 serialized sink summary. It counts logical `Write::write` calls at the point
