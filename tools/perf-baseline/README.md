@@ -82,10 +82,11 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 311
+provide their source-read counters. The current `Case` matrix exposes 315
 selectable case names in total, including two opt-in RTF standalone-picture
 CRUD selectors, two opt-in RTF ordinary-paragraph split/adjacent-merge
-selectors, and four opt-in XLSX scalar-cell clear/remove lifecycle selectors.
+selectors, four opt-in XLSX scalar-cell clear/remove lifecycle selectors, and
+four opt-in XLSX existing-row visibility lifecycle selectors.
 Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -294,6 +295,24 @@ cold-cache/device/network, decompression, native semantic, OOXML, ODF, RTF,
 and iWork claims are withheld. See the
 [`0152` release record](../../docs/performance/changes/0152-cfb-same-target-singleflight-release-abba.md)
 and [summary](../../docs/performance/results/cfb-singleflight-abba-0152-summary.json).
+
+Change 0166 adds four opt-in XLSX existing-row visibility selectors, taking
+the current selectable matrix from 311 to 315 names while leaving the default
+36 cases / 198 records unchanged. The matched eager/source-backed controls
+cover one-row hide from a visible source and exact-256-row unhide from a
+source whose first 256 rows are hidden. Each selector runs on the same
+single-sheet media-rich corpus in `medium` (512 × 16) and `large` (2,048 ×
+32) shapes. Open, stage/plan, commit, sequential publication, and lifecycle
+vectors are separate; source-backed records add generic logical `ReadAt`
+counters and pre-publication cache diagnostics only. Measured publication is
+bound by exact length/SHA-256 to an untimed semantically reopened expected
+artifact, and raw untouched-member identity is checked separately. Exact
+no-op, foreign/stale, signed/protected/formula/MCE/macro/relationship, and
+partial/zero-sink refusal fields are source-backed-only and omitted from eager
+records. This is correctness/phase evidence only and makes no
+latency, speedup, allocation/RSS, physical-I/O, cold-cache, decompression, or
+real-producer claim. See
+[`0166`](../../docs/performance/changes/0166-xlsx-row-visibility-evidence.md).
 
 Change 0154 adds matched owned-rebuild and source-positional content-only
 publication selectors for ODT, ODS, and ODP. Each selector prepares the real
@@ -1285,6 +1304,18 @@ complete logical cell order and rounds up to one cell where necessary.
 Its narrow range is `B1:B256`, which returns 256 cells while making the
 worksheet store examine the 65,536 stored cells in those rows. This preserves a
 high-contrast public end-to-end case without relying on internal APIs.
+
+The row-visibility selectors use a separate one-sheet corpus so worksheet
+selection and row-state work remain explicit:
+
+| Row-visibility shape | Rows × columns | Logical cells | Fixed media | Batch bound |
+|---|---:|---:|---:|---:|
+| `medium` | 512 × 16 | 8,192 | 8 × 512 KiB | 256 rows |
+| `large` | 2,048 × 32 | 65,536 | 8 × 512 KiB | 256 rows |
+
+The corpus contains deterministic numeric cells and untouched media members;
+the row-visibility evidence does not reuse the multi-sheet scalar-cell CRUD
+shape or make a claim about broad worksheet/row structural editing.
 
 ## Opt-in bounded streaming creation
 
@@ -2420,6 +2451,40 @@ source reads/materializations; source-backed records report generic positional
 semantic hash requires the target owner to remain with an empty payload, while
 the remove hash requires that owner to be absent and all other numeric owners
 unchanged. Their publication sink reports `retained_output_bytes: 0`.
+
+### XLSX existing-row visibility lifecycle controls
+
+The four opt-in selectors are:
+
+- `xlsx_eager_row_visibility_edit_save`
+- `xlsx_source_backed_row_visibility_edit_save`
+- `xlsx_eager_row_visibility_batch_edit_save`
+- `xlsx_source_backed_row_visibility_batch_edit_save`
+
+`--xlsx-row-visibility-shape medium,large` selects a deterministic one-sheet,
+media-rich corpus with eight fixed 512-KiB media entries. `medium` contains
+512 × 16 cells and `large` contains 2,048 × 32 cells. The scalar pair hides
+one existing visible row; the batch pair unhides exactly 256 existing rows
+whose initial state is hidden. Eager and source-backed outputs are checked
+against their own deterministic expected bytes, while semantic row-state
+digests must agree across implementations.
+Each retained sample reports separate `open_ns`, `plan_or_stage_ns`,
+`commit_ns`, `publication_ns`, and `lifecycle_ns` vectors plus its semantic
+SHA-256. `lifecycle_ns` reopens the untimed expected artifact; exact measured
+sink length/SHA-256 binds that artifact to the zero-retention publication.
+Source-backed records additionally expose logical owned-source `ReadAt`
+calls/bytes, selected versus unselected worksheet reads, source-version
+checks, and cache diagnostics. These are ingress and pre-publication
+diagnostics only; they do not describe physical I/O, allocations, total
+memory, or post-publication cache state. The fixed windowed hashing sink
+retains zero output bytes.
+
+Common untimed gates cover exact output, semantic reopen, and raw untouched
+ZIP-member identity. Exact no-op, foreign/stale package and source revisions,
+signed, protected, formula, markup-compatibility, macro, relationship,
+partial-sink, zero-output, and source-counter gates exercise the source-backed
+transaction only and are omitted from eager records. The controls are
+correctness/phase evidence only; they make no release speedup or latency claim.
 
 ### Native DOC owner/public phase evidence
 

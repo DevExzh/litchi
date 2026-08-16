@@ -2,7 +2,7 @@
 
 Date: 2026-08-17
 
-This is a coverage map, not a completion claim. It compares the 311 selectable
+This is a coverage map, not a completion claim. It compares the 315 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -137,9 +137,10 @@ conversion for other formats remain.
    deterministic media-rich multi-sheet corpora; change 0096 accepts the
    source-backed provenance-reuse result without an eager, I/O, allocation or
    RSS claim. Scalar-cell clear/physical-remove now have selectable
-   phase/counter/correctness evidence (change 0163), while row visibility
-   remains source-backed correctness coverage; no durable-source-patch or
-   performance claim is made. Conditional-formatting replacement is selectable
+   phase/counter/correctness evidence (change 0163), while row visibility now
+   has matched eager/source-backed correctness and phase evidence (change
+   0166); no durable-source-patch or performance claim is made.
+   Conditional-formatting replacement is selectable
    without an ABBA claim and tab visibility remains unmeasured.
    Direct writer-local action regrouping was measured and rejected
    in change 0030; broader coverage must not present that immaterial prototype
@@ -1291,6 +1292,22 @@ is a capability change, not a deprecation. See
 [`0165`](changes/0165-doc-lazy-fingerprint.md), the
 [summary](results/doc-lazy-fingerprint-0165-summary.json), and the
 [release manifest](results/doc-lazy-fingerprint-0165-manifest.json).
+
+Change 0166 adds four opt-in XLSX existing-row visibility lifecycle selectors:
+matched eager/source-backed one-row hide and exact-256-row unhide controls.
+They use one-sheet media-rich `medium` (512 × 16) and `large` (2,048 × 32)
+corpora with eight untouched 512-KiB media members. Open, stage/plan, commit,
+publication, and lifecycle vectors are separate; source-backed records expose
+only logical owned-source `ReadAt` and pre-publication cache diagnostics.
+Measured publication is bound by exact length/SHA-256 to an untimed
+semantically reopened expected artifact. Raw untouched-member identity is
+common; exact no-op, foreign/stale,
+signed/protected/formula/MCE/macro/relationship, and partial/zero-sink refusal
+fields are source-backed-only and omitted from eager records. This raises the selectable matrix
+from 311 to 315 while preserving the default 36 cases / 198 records, and adds
+correctness/phase evidence only—no speedup, latency, allocation/RSS,
+physical-I/O, cold-cache, decompression, or real-producer claim. See
+[`0166`](changes/0166-xlsx-row-visibility-evidence.md).
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

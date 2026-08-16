@@ -46,7 +46,7 @@ use litchi_opc::{
     constants::{content_type as opc_content_type, relationship_type},
 };
 use litchi_xlsx::{
-    Cell as XlsxCell, Rect, SourceBackedWorkbook, StreamingCell, StreamingCellValue,
+    Cell as XlsxCell, Rect, RowIndex, SourceBackedWorkbook, StreamingCell, StreamingCellValue,
     StreamingWorkbookLimits, StreamingWorkbookWriter, Value as XlsxValue, Workbook,
 };
 use serde::Serialize;
@@ -99,6 +99,8 @@ const XLSX_CONDITIONAL_FORMATTING_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-conditional-formatting-source-edit-media-v1";
 const XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1";
+const XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR: &str =
+    "litchi-xlsx-row-visibility-source-edit-media-one-sheet-v1";
 const XLSX_MERGE_EDIT_CORPUS_GENERATOR: &str = "litchi-xlsx-merge-edit-sparse-a1-b2-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
 const ODF_REPAIR_CORPUS_GENERATOR: &str = "litchi-odf-mimetype-repair-v1";
@@ -249,6 +251,41 @@ impl XlsxCellCrudShape {
         match self {
             Self::Medium => "medium",
             Self::DenseSparse => "dense-sparse",
+        }
+    }
+}
+
+/// Deterministic one-sheet row-owner corpora for the opt-in XLSX row
+/// visibility evidence.  The medium and large shapes both retain a fixed
+/// media payload so raw-copy preservation remains observable while the
+/// selected worksheet remains the only semantic source closure.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum XlsxRowVisibilityShape {
+    Medium,
+    Large,
+}
+
+impl XlsxRowVisibilityShape {
+    const ALL: [Self; 2] = [Self::Medium, Self::Large];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Medium => "medium",
+            Self::Large => "large",
+        }
+    }
+
+    const fn row_count(self) -> usize {
+        match self {
+            Self::Medium => 512,
+            Self::Large => 2_048,
+        }
+    }
+
+    const fn column_count(self) -> usize {
+        match self {
+            Self::Medium => 16,
+            Self::Large => 32,
         }
     }
 }
@@ -626,6 +663,10 @@ enum Case {
     XlsxSourceBackedCellClearEditSave,
     XlsxEagerCellRemoveEditSave,
     XlsxSourceBackedCellRemoveEditSave,
+    XlsxEagerRowVisibilityEditSave,
+    XlsxSourceBackedRowVisibilityEditSave,
+    XlsxEagerRowVisibilityBatchEditSave,
+    XlsxSourceBackedRowVisibilityBatchEditSave,
     CfbOpen,
     CfbListStreams,
     CfbReadOne,
@@ -1014,12 +1055,18 @@ impl Case {
                 "xlsx_source_backed_managed_cell_values_multi_sheet_edit_save"
             },
             Self::XlsxEagerCellClearEditSave => "xlsx_eager_cell_clear_edit_save",
-            Self::XlsxSourceBackedCellClearEditSave => {
-                "xlsx_source_backed_cell_clear_edit_save"
-            },
+            Self::XlsxSourceBackedCellClearEditSave => "xlsx_source_backed_cell_clear_edit_save",
             Self::XlsxEagerCellRemoveEditSave => "xlsx_eager_cell_remove_edit_save",
-            Self::XlsxSourceBackedCellRemoveEditSave => {
-                "xlsx_source_backed_cell_remove_edit_save"
+            Self::XlsxSourceBackedCellRemoveEditSave => "xlsx_source_backed_cell_remove_edit_save",
+            Self::XlsxEagerRowVisibilityEditSave => "xlsx_eager_row_visibility_edit_save",
+            Self::XlsxSourceBackedRowVisibilityEditSave => {
+                "xlsx_source_backed_row_visibility_edit_save"
+            },
+            Self::XlsxEagerRowVisibilityBatchEditSave => {
+                "xlsx_eager_row_visibility_batch_edit_save"
+            },
+            Self::XlsxSourceBackedRowVisibilityBatchEditSave => {
+                "xlsx_source_backed_row_visibility_batch_edit_save"
             },
             Self::CfbOpen => "cfb_open",
             Self::CfbListStreams => "cfb_list_streams",
@@ -2113,6 +2160,32 @@ impl Case {
         )
     }
 
+    const fn is_xlsx_row_visibility_edit_save(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxEagerRowVisibilityEditSave
+                | Self::XlsxSourceBackedRowVisibilityEditSave
+                | Self::XlsxEagerRowVisibilityBatchEditSave
+                | Self::XlsxSourceBackedRowVisibilityBatchEditSave
+        )
+    }
+
+    const fn is_xlsx_row_visibility_source_backed(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxSourceBackedRowVisibilityEditSave
+                | Self::XlsxSourceBackedRowVisibilityBatchEditSave
+        )
+    }
+
+    const fn is_xlsx_row_visibility_batch(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxEagerRowVisibilityBatchEditSave
+                | Self::XlsxSourceBackedRowVisibilityBatchEditSave
+        )
+    }
+
     const fn is_xlsx_cell_lifecycle_edit_save(self) -> bool {
         matches!(
             self,
@@ -2169,6 +2242,7 @@ struct Options {
     writer_shapes: Vec<WriterShape>,
     xlsx_shapes: Vec<XlsxShape>,
     xlsx_cell_crud_shapes: Vec<XlsxCellCrudShape>,
+    xlsx_row_visibility_shapes: Vec<XlsxRowVisibilityShape>,
     semantic_shapes: Vec<SemanticShape>,
     rtf_variants: Vec<RtfSemanticVariant>,
     range_simulation: RangeSimulationConfig,
@@ -2332,6 +2406,7 @@ struct Configuration {
     writer_shapes: Vec<&'static str>,
     xlsx_shapes: Vec<&'static str>,
     xlsx_cell_crud_shapes: Vec<&'static str>,
+    xlsx_row_visibility_shapes: Vec<&'static str>,
     semantic_shapes: Vec<&'static str>,
     rtf_variants: Vec<&'static str>,
     range_simulation: RangeSimulationConfig,
@@ -2669,6 +2744,8 @@ struct SourceSummary {
     xlsx: Option<XlsxSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx_cell_values: Option<XlsxCellValuesSourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xlsx_row_visibility: Option<XlsxRowVisibilitySourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xls_comments: Option<XlsCommentsSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3428,6 +3505,117 @@ struct XlsxCellValuesSourceSummary {
     untouched_member_count: usize,
     untouched_member_sha256: Vec<String>,
     output_budget_refusal: XlsxCellValuesOutputRefusalEvidence,
+}
+
+/// Matched existing-row visibility evidence over a single selected worksheet.
+/// The selector intentionally records phase vectors for eager and
+/// source-backed implementations alike; source counters and cache diagnostics
+/// are populated only for the source-backed implementation.  This is a
+/// correctness/phase evidence tranche and makes no release speedup claim.
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
+struct XlsxRowVisibilitySourceSummary {
+    implementation: &'static str,
+    operation: &'static str,
+    shape: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    source_counter_scope: &'static str,
+    initially_hidden: bool,
+    update_count: usize,
+    open_ns: Vec<u64>,
+    plan_or_stage_ns: Vec<u64>,
+    commit_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    lifecycle_ns: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    workbook_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    workbook_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    selected_worksheet_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    selected_worksheet_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    unselected_worksheet_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    unselected_worksheet_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cache_hits: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cache_cold_loads: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cache_successful_loads: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cache_retained_entries: Vec<usize>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cache_retained_bytes: Vec<usize>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_version_calls: Vec<u64>,
+    source_sha256: String,
+    output_sha256: Vec<String>,
+    semantic_sha256: Vec<String>,
+    untouched_member_count: usize,
+    untouched_member_sha256: String,
+    gates: XlsxRowVisibilityGateSummary,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, PartialEq, Eq)]
+struct XlsxRowVisibilityGateSummary {
+    exact_output_verified: bool,
+    semantic_reopen_verified: bool,
+    untouched_member_preservation_verified: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    exact_noop_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stale_source_refusal_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    foreign_source_refusal_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    protected_source_refusal_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    formula_source_refusal_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    markup_compatibility_source_refusal_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    macro_source_refusal_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    relationship_source_refusal_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    signed_source_refusal_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    partial_sink_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    zero_output_on_refusal_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_counter_gate_verified: Option<bool>,
+}
+
+#[derive(Clone, Debug)]
+struct XlsxRowVisibilityIterationEvidence {
+    implementation: &'static str,
+    operation: &'static str,
+    shape: &'static str,
+    timing_scope: &'static str,
+    initially_hidden: bool,
+    update_count: usize,
+    open_ns: u64,
+    plan_or_stage_ns: u64,
+    commit_ns: u64,
+    publication_ns: u64,
+    lifecycle_ns: u64,
+    source: SourceSnapshot,
+    diagnostics: SourceCacheDiagnostics,
+    source_version_calls: u64,
+    output_sha256: String,
+    semantic_sha256: String,
+    source_sha256: String,
+    untouched_member_count: usize,
+    untouched_member_sha256: String,
+    gates: XlsxRowVisibilityGateSummary,
 }
 
 /// Resource dimensions observed around managed cell-value publication.
@@ -5387,6 +5575,91 @@ impl SourceSummary {
         Ok(())
     }
 
+    fn record_xlsx_row_visibility(
+        &mut self,
+        snapshot: SourceSnapshot,
+        evidence: XlsxRowVisibilityIterationEvidence,
+    ) -> Result<(), Box<dyn Error>> {
+        self.record(snapshot);
+        let summary = self
+            .xlsx_row_visibility
+            .get_or_insert_with(|| XlsxRowVisibilitySourceSummary {
+                implementation: evidence.implementation,
+                operation: evidence.operation,
+                shape: evidence.shape,
+                timing_scope: evidence.timing_scope,
+                initially_hidden: evidence.initially_hidden,
+                update_count: evidence.update_count,
+                source_sha256: evidence.source_sha256.clone(),
+                untouched_member_count: evidence.untouched_member_count,
+                untouched_member_sha256: evidence.untouched_member_sha256.clone(),
+                gates: evidence.gates,
+                source_counter_scope: "owned-source-ingress-only; logical ReadAt counters, not physical I/O",
+                performance_claim: "correctness-and-phase evidence only; no release speedup claim",
+                ..XlsxRowVisibilitySourceSummary::default()
+            });
+        if summary.implementation != evidence.implementation
+            || summary.operation != evidence.operation
+            || summary.shape != evidence.shape
+            || summary.timing_scope != evidence.timing_scope
+            || summary.initially_hidden != evidence.initially_hidden
+            || summary.update_count != evidence.update_count
+            || summary.source_sha256 != evidence.source_sha256
+            || summary.untouched_member_count != evidence.untouched_member_count
+            || summary.untouched_member_sha256 != evidence.untouched_member_sha256
+            || summary.gates != evidence.gates
+        {
+            return Err("XLSX row-visibility source evidence mixed incompatible controls".into());
+        }
+        summary.open_ns.push(evidence.open_ns);
+        summary.plan_or_stage_ns.push(evidence.plan_or_stage_ns);
+        summary.commit_ns.push(evidence.commit_ns);
+        summary.publication_ns.push(evidence.publication_ns);
+        summary.lifecycle_ns.push(evidence.lifecycle_ns);
+        summary.output_sha256.push(evidence.output_sha256);
+        summary.semantic_sha256.push(evidence.semantic_sha256);
+        if evidence.implementation == "source-backed" {
+            let source = evidence.source;
+            summary.source_read_calls.push(source.read_calls);
+            summary.source_read_bytes.push(source.read_bytes);
+            summary
+                .workbook_read_calls
+                .push(source.xlsx.workbook.read_calls);
+            summary
+                .workbook_read_bytes
+                .push(source.xlsx.workbook.read_bytes);
+            summary
+                .selected_worksheet_read_calls
+                .push(source.xlsx.selected_worksheet.read_calls);
+            summary
+                .selected_worksheet_read_bytes
+                .push(source.xlsx.selected_worksheet.read_bytes);
+            summary
+                .unselected_worksheet_read_calls
+                .push(source.xlsx.unselected_worksheets.read_calls);
+            summary
+                .unselected_worksheet_read_bytes
+                .push(source.xlsx.unselected_worksheets.read_bytes);
+            summary.cache_hits.push(evidence.diagnostics.hits);
+            summary
+                .cache_cold_loads
+                .push(evidence.diagnostics.cold_loads);
+            summary
+                .cache_successful_loads
+                .push(evidence.diagnostics.successful_loads);
+            summary
+                .cache_retained_entries
+                .push(evidence.diagnostics.retained_entries);
+            summary
+                .cache_retained_bytes
+                .push(evidence.diagnostics.retained_bytes);
+            summary
+                .source_version_calls
+                .push(evidence.source_version_calls);
+        }
+        Ok(())
+    }
+
     fn record_xls_comments(
         &mut self,
         snapshot: SourceSnapshot,
@@ -5879,6 +6152,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_ppt_pictures()
                     && !case.uses_xlsx()
                     && !case.uses_xlsx_cell_values()
+                    && !case.is_xlsx_row_visibility_edit_save()
                     && !case.uses_streaming_creation()
                     && !case.uses_semantic_rtf()
                     && !case.is_rtf_picture_crud()
@@ -6562,6 +6836,34 @@ fn main() -> Result<(), Box<dyn Error>> {
     if options
         .cases
         .iter()
+        .any(|case| case.is_xlsx_row_visibility_edit_save())
+    {
+        for shape in &options.xlsx_row_visibility_shapes {
+            for initially_hidden in [false, true] {
+                let selected = options.cases.iter().filter(|case| {
+                    case.is_xlsx_row_visibility_edit_save()
+                        && case.is_xlsx_row_visibility_batch() == initially_hidden
+                });
+                let cases = selected.copied().collect::<Vec<_>>();
+                if cases.is_empty() {
+                    continue;
+                }
+                let corpus = build_xlsx_row_visibility_corpus(*shape, initially_hidden)?;
+                for case in cases {
+                    results.push(run_xlsx_row_visibility_edit_save(
+                        case,
+                        &corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                    )?);
+                }
+            }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
         .any(|case| case.uses_streaming_creation())
     {
         for shape in &options.semantic_shapes {
@@ -6609,16 +6911,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             {
                 let semantic_corpus = build_semantic_rtf_corpus(*shape, *variant)?;
                 let lifecycle_corpus = (*variant == RtfSemanticVariant::Plain
-                    && options
-                        .cases
-                        .iter()
-                        .any(|case| {
-                            case.is_rtf_lifecycle()
-                                || case.is_rtf_paragraph_split_merge()
-                                || case.is_rtf_logical_tail()
-                        }))
-                    .then(|| build_rtf_lifecycle_corpus(*shape))
-                    .transpose()?;
+                    && options.cases.iter().any(|case| {
+                        case.is_rtf_lifecycle()
+                            || case.is_rtf_paragraph_split_merge()
+                            || case.is_rtf_logical_tail()
+                    }))
+                .then(|| build_rtf_lifecycle_corpus(*shape))
+                .transpose()?;
                 for case in options
                     .cases
                     .iter()
@@ -7126,6 +7425,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .iter()
                 .map(|shape| shape.name())
                 .collect(),
+            xlsx_row_visibility_shapes: options
+                .xlsx_row_visibility_shapes
+                .iter()
+                .map(|shape| shape.name())
+                .collect(),
             semantic_shapes: options
                 .semantic_shapes
                 .iter()
@@ -7157,6 +7461,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut writer_shapes = WriterShape::ALL.to_vec();
     let mut xlsx_shapes = XlsxShape::ALL.to_vec();
     let mut xlsx_cell_crud_shapes = XlsxCellCrudShape::ALL.to_vec();
+    let mut xlsx_row_visibility_shapes = XlsxRowVisibilityShape::ALL.to_vec();
     let mut semantic_shapes = SemanticShape::ALL.to_vec();
     let mut rtf_variants = vec![RtfSemanticVariant::Plain];
     let mut range_simulation = RangeSimulationConfig::default();
@@ -7210,6 +7515,13 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
                     arguments.next(),
                     "--xlsx-cell-crud-shape",
                     parse_xlsx_cell_crud_shape,
+                )?;
+            },
+            "--xlsx-row-visibility-shape" => {
+                xlsx_row_visibility_shapes = parse_selection(
+                    arguments.next(),
+                    "--xlsx-row-visibility-shape",
+                    parse_xlsx_row_visibility_shape,
                 )?;
             },
             "--semantic-shape" => {
@@ -7267,6 +7579,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         writer_shapes,
         xlsx_shapes,
         xlsx_cell_crud_shapes,
+        xlsx_row_visibility_shapes,
         semantic_shapes,
         rtf_variants,
         range_simulation,
@@ -7520,12 +7833,20 @@ fn parse_case(value: &str) -> Option<Case> {
             Some(Case::XlsxSourceBackedManagedCellValuesMultiSheetEditSave)
         },
         "xlsx_eager_cell_clear_edit_save" => Some(Case::XlsxEagerCellClearEditSave),
-        "xlsx_source_backed_cell_clear_edit_save" => {
-            Some(Case::XlsxSourceBackedCellClearEditSave)
-        },
+        "xlsx_source_backed_cell_clear_edit_save" => Some(Case::XlsxSourceBackedCellClearEditSave),
         "xlsx_eager_cell_remove_edit_save" => Some(Case::XlsxEagerCellRemoveEditSave),
         "xlsx_source_backed_cell_remove_edit_save" => {
             Some(Case::XlsxSourceBackedCellRemoveEditSave)
+        },
+        "xlsx_eager_row_visibility_edit_save" => Some(Case::XlsxEagerRowVisibilityEditSave),
+        "xlsx_source_backed_row_visibility_edit_save" => {
+            Some(Case::XlsxSourceBackedRowVisibilityEditSave)
+        },
+        "xlsx_eager_row_visibility_batch_edit_save" => {
+            Some(Case::XlsxEagerRowVisibilityBatchEditSave)
+        },
+        "xlsx_source_backed_row_visibility_batch_edit_save" => {
+            Some(Case::XlsxSourceBackedRowVisibilityBatchEditSave)
         },
         "cfb_open" => Some(Case::CfbOpen),
         "cfb_list_streams" => Some(Case::CfbListStreams),
@@ -7799,6 +8120,14 @@ fn parse_xlsx_cell_crud_shape(value: &str) -> Option<XlsxCellCrudShape> {
     }
 }
 
+fn parse_xlsx_row_visibility_shape(value: &str) -> Option<XlsxRowVisibilityShape> {
+    match value {
+        "medium" => Some(XlsxRowVisibilityShape::Medium),
+        "large" => Some(XlsxRowVisibilityShape::Large),
+        _ => None,
+    }
+}
+
 fn parse_semantic_shape(value: &str) -> Option<SemanticShape> {
     match value {
         "tiny" => Some(SemanticShape::Tiny),
@@ -7975,6 +8304,10 @@ fn print_usage() {
                                        xlsx_source_backed_cell_clear_edit_save,\n\
                                        xlsx_eager_cell_remove_edit_save,\n\
                                        xlsx_source_backed_cell_remove_edit_save,\n\
+                                       xlsx_eager_row_visibility_edit_save,\n\
+                                       xlsx_source_backed_row_visibility_edit_save,\n\
+                                       xlsx_eager_row_visibility_batch_edit_save,\n\
+                                       xlsx_source_backed_row_visibility_batch_edit_save,\n\
                                        xlsx_source_open,xlsx_source_list_sheets,\n\
                                        xlsx_source_first_cell,\n\
                                        xlsx_source_narrow_column_range_scan,\n\
@@ -8048,6 +8381,7 @@ fn print_usage() {
            --writer-shape LIST         tiny,large,payload-heavy\n\
            --xlsx-shape LIST           tiny,medium,dense-wide\n\
            --xlsx-cell-crud-shape LIST medium,dense-sparse (only used by matched scalar-cell cases)\n\
+           --xlsx-row-visibility-shape LIST medium,large (only used by matched row-visibility cases)\n\
            --semantic-shape LIST       tiny,medium,large (only used by opt-in Office semantic cases)\n\
            --rtf-variant LIST          plain,byte1252,lzfu,watermark (default: plain)\n\
            --range-fixed-latency-us N  Fixed latency per request (default: {DEFAULT_RANGE_FIXED_LATENCY_US})\n\
@@ -12855,6 +13189,518 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
     })
 }
 
+fn xlsx_row_visibility_inventory(shape: XlsxRowVisibilityShape) -> Vec<Vec<XlsxCoordinate>> {
+    vec![
+        (0..shape.row_count())
+            .flat_map(|row| {
+                (0..shape.column_count()).map(move |column| XlsxCoordinate {
+                    sheet: 0,
+                    row,
+                    column,
+                })
+            })
+            .collect(),
+    ]
+}
+
+fn build_xlsx_row_visibility_corpus(
+    shape: XlsxRowVisibilityShape,
+    initially_hidden: bool,
+) -> Result<Corpus, Box<dyn Error>> {
+    let inventory = xlsx_row_visibility_inventory(shape);
+    let cell_count = inventory[0].len();
+    let spec = XlsxCorpus {
+        sheet_count: 1,
+        row_count: shape.row_count(),
+        column_count: shape.column_count(),
+        one_percent_updates: Vec::new(),
+        cell_inventory: Some(inventory),
+    };
+    let workbook = build_xlsx_workbook(&spec)?;
+    let mut archive = workbook.to_bytes()?;
+    if initially_hidden {
+        let workbook = Workbook::from_bytes(archive.clone())?;
+        let mut edit = workbook.edit()?;
+        let mut sheet = edit
+            .sheet("Sheet1")?
+            .ok_or("XLSX row-visibility corpus is missing Sheet1")?;
+        for row in 0..litchi_xlsx::row_visibility::MAX_BATCH_EDITS {
+            sheet.row(u32::try_from(row)?)?.hide();
+        }
+        archive = edit.commit()?.workbook().to_bytes()?;
+    }
+    let mut package = OpcPackage::from_bytes(&archive)?;
+    strip_xlsx_cell_crud_calc_properties(&mut package)?;
+    for index in 0..XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT {
+        package.try_add_part(Box::new(BlobPart::new(
+            PackURI::new(format!("/xl/media/litchi-row-visibility-{index:02}.png"))?,
+            opc_content_type::PNG.to_owned(),
+            xlsx_cell_crud_media_payload(index),
+        )))?;
+    }
+    archive = PackageWriter::to_bytes(&package)?;
+    let reopened = Workbook::from_bytes(archive.clone())?;
+    verify_xlsx_cells(&reopened, &spec, &[])?;
+    let sheet = reopened
+        .sheet("Sheet1")?
+        .ok_or("XLSX row-visibility corpus is missing Sheet1")?;
+    for row in 0..litchi_xlsx::row_visibility::MAX_BATCH_EDITS {
+        let row = u32::try_from(row)?;
+        if !sheet.row(row)?.stored() || sheet.row(row)?.hidden() != initially_hidden {
+            return Err("XLSX row-visibility corpus has an unexpected initial row state".into());
+        }
+    }
+    let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    let target_payload = package.get_part(&worksheet_uri)?.blob().to_vec();
+    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
+    let media_bytes = XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT
+        .checked_mul(XLSX_CELL_VALUES_MEDIA_ENTRY_BYTES)
+        .ok_or("XLSX row-visibility media byte count overflows usize")?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!(
+                "xlsx-row-visibility-{}-{}",
+                shape.name(),
+                if initially_hidden { "unhide" } else { "hide" }
+            ),
+            generator: XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR,
+            package_format: "XLSX/OPC/ZIP",
+            shape: shape.name(),
+            payload_kind: "deterministic-one-sheet-row-grid-with-media",
+            compression: "deflate",
+            entry_count: cell_count,
+            archive_member_count,
+            entry_bytes: std::mem::size_of::<i32>(),
+            uncompressed_payload_bytes: cell_count
+                .checked_mul(std::mem::size_of::<i32>())
+                .and_then(|bytes| bytes.checked_add(media_bytes))
+                .ok_or("XLSX row-visibility logical byte count overflows usize")?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "worksheet:Sheet1:existing-rows".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: Some(XlsxManifest {
+                sheet_count: spec.sheet_count,
+                rows_per_sheet: spec.row_count,
+                columns_per_sheet: spec.column_count,
+                one_percent_update_count: spec.one_percent_updates.len(),
+                source_members,
+            }),
+        },
+        archive,
+        target_name: "xl/worksheets/sheet1.xml".to_owned(),
+        target_payload,
+        xlsx: Some(spec),
+    })
+}
+
+fn xlsx_row_visibility_updates(
+    batch: bool,
+    initially_hidden: bool,
+) -> Result<Vec<(RowIndex, bool)>, Box<dyn Error>> {
+    let count = if batch {
+        litchi_xlsx::row_visibility::MAX_BATCH_EDITS
+    } else {
+        1
+    };
+    let hidden = !initially_hidden;
+    (0..count)
+        .map(|index| {
+            let index = u32::try_from(index)
+                .map_err(|_| "XLSX row-visibility row index does not fit u32")?;
+            let row = RowIndex::new(index)
+                .map_err(|_| "XLSX row-visibility row index is outside the grid")?;
+            Ok((row, hidden))
+        })
+        .collect()
+}
+
+fn xlsx_row_visibility_operation_name(batch: bool, initially_hidden: bool) -> &'static str {
+    match (batch, initially_hidden) {
+        (false, false) => "hide-one",
+        (true, true) => "unhide-256",
+        (false, true) => "unhide-one",
+        (true, false) => "hide-256",
+    }
+}
+
+fn xlsx_row_visibility_semantic_hash(
+    output: &[u8],
+    spec: &XlsxCorpus,
+    initially_hidden: bool,
+    updates: &[(RowIndex, bool)],
+) -> Result<String, Box<dyn Error>> {
+    let workbook = Workbook::from_bytes(output.to_vec())?;
+    verify_xlsx_cells(&workbook, spec, &[])?;
+    let sheet = workbook
+        .sheet("Sheet1")?
+        .ok_or("XLSX row-visibility output is missing Sheet1")?;
+    let initial_hidden_limit = u32::try_from(litchi_xlsx::row_visibility::MAX_BATCH_EDITS)?;
+    let mut states = Vec::with_capacity(spec.row_count);
+    for index in 0..spec.row_count {
+        let row = u32::try_from(index)?;
+        let observed = sheet.row(row)?;
+        if !observed.stored() {
+            return Err(format!("XLSX row-visibility row {index} is not stored").into());
+        }
+        let expected = updates
+            .iter()
+            .find(|(target, _)| target.get() == row)
+            .map_or(
+                initially_hidden && row < initial_hidden_limit,
+                |(_, hidden)| *hidden,
+            );
+        if observed.hidden() != expected {
+            return Err(format!(
+                "XLSX row-visibility row {index} has hidden={} expected {expected}",
+                observed.hidden()
+            )
+            .into());
+        }
+        states.push(format!("{index}={}", observed.hidden()));
+    }
+    Ok(sha256_hex(states.join("\n").as_bytes()))
+}
+
+fn xlsx_row_visibility_eager_output(
+    corpus: &Corpus,
+    updates: &[(RowIndex, bool)],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+    let mut edit = workbook.edit()?;
+    let mut sheet = edit
+        .sheet("Sheet1")?
+        .ok_or("XLSX row-visibility eager target sheet is missing")?;
+    for (row, hidden) in updates {
+        let mut target = sheet.row(*row)?;
+        if *hidden {
+            target.hide();
+        } else {
+            target.show();
+        }
+    }
+    let commit = edit.commit()?;
+    let output = commit.workbook().to_bytes()?;
+    Ok(output)
+}
+
+fn xlsx_row_visibility_source_output(
+    corpus: &Corpus,
+    updates: &[(RowIndex, bool)],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+        OwnedSource::new(corpus.archive.clone()),
+    ))?;
+    let mut edit = editor.edit("Sheet1")?;
+    let operations = updates.iter().map(|(row, hidden)| {
+        if *hidden {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+        } else {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+        }
+    });
+    edit.apply_batch(operations)?;
+    let commit = edit.commit()?;
+    if !commit.changed() || commit.diagnostics().changed_rows() != updates.len() {
+        return Err("XLSX row-visibility source output changed an unexpected row count".into());
+    }
+    let mut output = Vec::new();
+    editor.publish_commit_to_stream(&mut output, &commit)?;
+    Ok(output)
+}
+
+fn xlsx_row_visibility_variant_bytes(
+    corpus: &Corpus,
+    variant: &str,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let worksheet = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    match variant {
+        "protected" | "formula" | "markup-compatibility" => {
+            let part = package.get_part_mut(&worksheet)?;
+            let mut xml = String::from_utf8(part.blob().to_vec())?;
+            match variant {
+                "protected" => {
+                    let root = xml
+                        .find("<worksheet")
+                        .ok_or("XLSX row-visibility protected fixture has no root")?;
+                    let root_end = xml[root..]
+                        .find('>')
+                        .ok_or("XLSX row-visibility protected fixture has no root end")?;
+                    let start = root
+                        .checked_add(root_end)
+                        .and_then(|offset| offset.checked_add(1))
+                        .ok_or("XLSX row-visibility protected fixture offset overflows")?;
+                    xml.insert_str(start, "<sheetProtection sheet=\"1\"/>");
+                },
+                "formula" => {
+                    let marker = "<v>";
+                    let position = xml
+                        .find(marker)
+                        .ok_or("XLSX row-visibility formula fixture has no cell value")?;
+                    xml.insert_str(position, "<f>A1</f>");
+                },
+                "markup-compatibility" => {
+                    let marker = "<worksheet ";
+                    let position = xml
+                        .find(marker)
+                        .ok_or("XLSX row-visibility MCE fixture has no worksheet root")?
+                        + marker.len();
+                    xml.insert_str(
+                        position,
+                        "xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"x\" ",
+                    );
+                },
+                _ => unreachable!(),
+            }
+            part.set_blob(xml.into_bytes());
+        },
+        "macro" => {
+            package
+                .get_part_mut(&worksheet)?
+                .set_content_type(opc_content_type::SML_SHEET_MACRO_MAIN.to_owned())?;
+        },
+        "relationship" => {
+            let relationship_part = PackURI::new("/xl/row-visibility-relationship.bin")?;
+            package.try_add_part(Box::new(BlobPart::new(
+                relationship_part,
+                CONTENT_TYPE.to_owned(),
+                b"unsupported relationship payload".to_vec(),
+            )))?;
+            let workbook = PackURI::new("/xl/workbook.xml")?;
+            package
+                .get_part_mut(&workbook)?
+                .rels_mut()
+                .try_add_relationship(
+                    "urn:litchi:unsupported-row-visibility".to_owned(),
+                    "row-visibility-relationship.bin".to_owned(),
+                    "rIdUnsupportedRowVisibility".to_owned(),
+                    TargetMode::Internal,
+                )?;
+        },
+        "signed" => {
+            let signature = PackURI::new("/_xmlsignatures/origin.sigs")?;
+            package.try_add_part(Box::new(BlobPart::new(
+                signature,
+                opc_content_type::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+                b"<origin/>".to_vec(),
+            )))?;
+            package.relate_to(
+                "_xmlsignatures/origin.sigs",
+                relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+            );
+        },
+        _ => return Err(format!("unknown XLSX row-visibility fixture {variant}").into()),
+    }
+    Ok(PackageWriter::to_bytes(&package)?)
+}
+
+fn xlsx_row_visibility_variant_refused(
+    corpus: &Corpus,
+    variant: &str,
+) -> Result<bool, Box<dyn Error>> {
+    let bytes = xlsx_row_visibility_variant_bytes(corpus, variant)?;
+    let editor = match litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+        OwnedSource::new(bytes),
+    )) {
+        Ok(editor) => editor,
+        Err(_) => return Ok(true),
+    };
+    Ok(editor.edit("Sheet1").is_err())
+}
+
+fn xlsx_row_visibility_lifecycle_gates(
+    corpus: &Corpus,
+    updates: &[(RowIndex, bool)],
+    initially_hidden: bool,
+) -> Result<XlsxRowVisibilityGateSummary, Box<dyn Error>> {
+    let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
+    let editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(source)?;
+    let mut noop = editor.edit("Sheet1")?;
+    let noop_operations = updates.iter().map(|(row, _)| {
+        if initially_hidden {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+        } else {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+        }
+    });
+    noop.apply_batch(noop_operations)?;
+    let noop_commit = noop.commit()?;
+    let mut noop_output = Vec::new();
+    editor.publish_commit_to_stream(&mut noop_output, &noop_commit)?;
+    let exact_noop_verified =
+        !noop_commit.changed() && noop_commit.patch().is_empty() && noop_output == corpus.archive;
+    if !exact_noop_verified {
+        return Err("XLSX row-visibility exact no-op gate failed".into());
+    }
+
+    let source_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+        OwnedSource::new(corpus.archive.clone()),
+    ))?;
+    let mut staged = source_editor.edit("Sheet1")?;
+    staged.apply_batch(updates.iter().map(|(row, hidden)| {
+        if *hidden {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+        } else {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+        }
+    }))?;
+    let commit = staged.commit()?;
+    if !commit.changed() || commit.diagnostics().changed_rows() != updates.len() {
+        return Err("XLSX row-visibility lifecycle commit gate changed an unexpected count".into());
+    }
+
+    let mut foreign_output = Vec::new();
+    let foreign_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+        OwnedSource::new(corpus.archive.clone()),
+    ))?;
+    let foreign_source_refusal_verified = foreign_editor
+        .publish_commit_to_stream(&mut foreign_output, &commit)
+        .is_err()
+        && foreign_output.is_empty();
+    if !foreign_source_refusal_verified {
+        return Err("XLSX row-visibility foreign-source gate accepted output".into());
+    }
+
+    let mut stale_package = OpcPackage::from_bytes(&corpus.archive)?;
+    let worksheet = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    stale_package
+        .get_part_mut(&worksheet)?
+        .set_blob(b"<stale-row-visibility-source/>".to_vec());
+    let stale_fixture = PackageWriter::to_bytes(&stale_package)?;
+    let stale_source_refusal_verified = commit.patch().apply(&mut stale_package).is_err()
+        && PackageWriter::to_bytes(&stale_package)? == stale_fixture;
+    if !stale_source_refusal_verified {
+        return Err("XLSX row-visibility stale package gate failed".into());
+    }
+
+    let revision_source = Arc::new(PptxRevisionSource::new(corpus.archive.clone()));
+    let revision_editor =
+        litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(revision_source.clone())?;
+    let mut revision_edit = revision_editor.edit("Sheet1")?;
+    revision_edit.apply_batch(updates.iter().map(|(row, hidden)| {
+        if *hidden {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+        } else {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+        }
+    }))?;
+    let revision_commit = revision_edit.commit()?;
+    revision_source.replace(corpus.archive.clone())?;
+    let mut stale_output = Vec::new();
+    let stale_revision_refused = revision_editor
+        .publish_commit_to_stream(&mut stale_output, &revision_commit)
+        .is_err()
+        && stale_output.is_empty();
+    if !stale_revision_refused {
+        return Err("XLSX row-visibility stale source revision was accepted".into());
+    }
+
+    let protected_source_refusal_verified =
+        xlsx_row_visibility_variant_refused(corpus, "protected")?;
+    let formula_source_refusal_verified = xlsx_row_visibility_variant_refused(corpus, "formula")?;
+    let markup_compatibility_source_refusal_verified =
+        xlsx_row_visibility_variant_refused(corpus, "markup-compatibility")?;
+    let macro_source_refusal_verified = xlsx_row_visibility_variant_refused(corpus, "macro")?;
+    let relationship_source_refusal_verified =
+        xlsx_row_visibility_variant_refused(corpus, "relationship")?;
+    if !protected_source_refusal_verified
+        || !formula_source_refusal_verified
+        || !markup_compatibility_source_refusal_verified
+        || !macro_source_refusal_verified
+        || !relationship_source_refusal_verified
+    {
+        return Err("XLSX row-visibility semantic refusal gates failed".into());
+    }
+
+    let signed_bytes = xlsx_row_visibility_variant_bytes(corpus, "signed")?;
+    let signed_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+        OwnedSource::new(signed_bytes),
+    ))?;
+    let mut signed_edit = signed_editor.edit("Sheet1")?;
+    signed_edit.apply_batch(updates.iter().map(|(row, hidden)| {
+        if *hidden {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+        } else {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+        }
+    }))?;
+    let signed_commit = signed_edit.commit()?;
+    let mut signed_output = Vec::new();
+    let signed_source_refusal_verified = signed_editor
+        .publish_commit_to_stream(&mut signed_output, &signed_commit)
+        .is_err()
+        && signed_output.is_empty();
+    if !signed_source_refusal_verified {
+        return Err("XLSX row-visibility signed-source gate accepted output".into());
+    }
+
+    let partial_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+        OwnedSource::new(corpus.archive.clone()),
+    ))?;
+    let mut partial_edit = partial_editor.edit("Sheet1")?;
+    partial_edit.apply_batch(updates.iter().map(|(row, hidden)| {
+        if *hidden {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+        } else {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+        }
+    }))?;
+    let partial_commit = partial_edit.commit()?;
+    let mut partial_sink = PrefixFailSink {
+        accepted: 0,
+        fail_after: 7,
+    };
+    let partial_sink_verified = partial_editor
+        .publish_commit_to_stream(&mut partial_sink, &partial_commit)
+        .is_err()
+        && partial_sink.accepted > 0;
+
+    let zero_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+        OwnedSource::new(corpus.archive.clone()),
+    ))?;
+    let mut zero_edit = zero_editor.edit("Sheet1")?;
+    zero_edit.apply_batch(updates.iter().map(|(row, hidden)| {
+        if *hidden {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+        } else {
+            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+        }
+    }))?;
+    let zero_commit = zero_edit.commit()?;
+    let mut zero_sink = PrefixFailSink {
+        accepted: 0,
+        fail_after: 0,
+    };
+    let zero_output_on_refusal_verified = zero_editor
+        .publish_commit_to_stream(&mut zero_sink, &zero_commit)
+        .is_err()
+        && zero_sink.accepted == 0;
+
+    Ok(XlsxRowVisibilityGateSummary {
+        exact_output_verified: true,
+        semantic_reopen_verified: true,
+        untouched_member_preservation_verified: true,
+        exact_noop_verified: Some(exact_noop_verified),
+        stale_source_refusal_verified: Some(stale_revision_refused),
+        foreign_source_refusal_verified: Some(foreign_source_refusal_verified),
+        protected_source_refusal_verified: Some(protected_source_refusal_verified),
+        formula_source_refusal_verified: Some(formula_source_refusal_verified),
+        markup_compatibility_source_refusal_verified: Some(
+            markup_compatibility_source_refusal_verified,
+        ),
+        macro_source_refusal_verified: Some(macro_source_refusal_verified),
+        relationship_source_refusal_verified: Some(relationship_source_refusal_verified),
+        signed_source_refusal_verified: Some(signed_source_refusal_verified),
+        partial_sink_verified: Some(partial_sink_verified),
+        zero_output_on_refusal_verified: Some(zero_output_on_refusal_verified),
+        source_counter_gate_verified: Some(true),
+    })
+}
+
 fn build_xlsx_workbook(spec: &XlsxCorpus) -> Result<Workbook, Box<dyn Error>> {
     let workbook = Workbook::new()?;
     let mut edit = workbook.edit()?;
@@ -13244,10 +14090,9 @@ fn run_xlsx_cell_value_lifecycle_gates(
                 "XLSX cell CRUD clear/remove lifecycle gate did not change one cell".into(),
             );
         }
-        let foreign_editor =
-            litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
-                OwnedSource::new(corpus.archive.clone()),
-            ))?;
+        let foreign_editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
+            OwnedSource::new(corpus.archive.clone()),
+        ))?;
         let mut foreign_output = Vec::new();
         if foreign_editor
             .publish_multi_commit_to_stream(&mut foreign_output, &commit)
@@ -13751,6 +14596,12 @@ fn run_case_with_config(
         | Case::XlsxEagerCellRemoveEditSave
         | Case::XlsxSourceBackedCellRemoveEditSave => {
             run_xlsx_cell_lifecycle_edit_save(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsxEagerRowVisibilityEditSave
+        | Case::XlsxSourceBackedRowVisibilityEditSave
+        | Case::XlsxEagerRowVisibilityBatchEditSave
+        | Case::XlsxSourceBackedRowVisibilityBatchEditSave => {
+            run_xlsx_row_visibility_edit_save(case, corpus, warmup_iterations, samples)
         },
         Case::XlsxSourceOpen => run_xlsx_source_open(corpus, warmup_iterations, samples),
         Case::XlsxSourceListSheets => {
@@ -18469,8 +19320,7 @@ fn rtf_paragraph_split_merge_expectation(
 fn forge_rtf_result_artifact(value: &mut serde_json::Value) -> bool {
     match value {
         serde_json::Value::Object(map) => {
-            if let Some(serde_json::Value::String(hash)) =
-                map.get_mut("result_artifact_sha256")
+            if let Some(serde_json::Value::String(hash)) = map.get_mut("result_artifact_sha256")
                 && let Some(first) = hash.as_bytes().first().copied()
             {
                 let replacement = if first == b'0' { b'1' } else { b'0' };
@@ -18502,10 +19352,7 @@ fn stage_rtf_paragraph_split_merge(
             )?;
         },
         Case::RtfSemanticMergeParagraphSave => {
-            edit.merge_paragraphs(
-                expectation.selected_position,
-                expectation.adjacent_position,
-            )?;
+            edit.merge_paragraphs(expectation.selected_position, expectation.adjacent_position)?;
         },
         _ => return Err("non-split/merge case reached RTF staging".into()),
     }
@@ -18539,7 +19386,8 @@ fn verify_rtf_paragraph_split_merge_gates(
         .expected_output
         .get(expectation.output_changed.end..)
         .ok_or("RTF paragraph output splice suffix is outside output")?;
-    let exact_source_splice_verified = source_prefix == output_prefix && source_suffix == output_suffix;
+    let exact_source_splice_verified =
+        source_prefix == output_prefix && source_suffix == output_suffix;
     if !exact_source_splice_verified {
         return Err("RTF paragraph split/merge expected output changed unrelated bytes".into());
     }
@@ -18577,10 +19425,10 @@ fn verify_rtf_paragraph_split_merge_gates(
 
     let durable = commit.patch().to_durable(limits)?;
     let encoded = durable.to_deterministic_json()?;
-    let decoded = litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
-        &encoded,
-        limits,
-    )?;
+    let decoded =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &encoded, limits,
+        )?;
     let durable_forward = source.apply_durable(&decoded)?;
     let durable_forward_verified = durable_forward.to_bytes()? == expectation.expected_output;
     let durable_inverse = durable_forward.apply_durable(&decoded.inverse())?;
@@ -18646,17 +19494,13 @@ fn verify_rtf_paragraph_split_merge_gates(
             Err(litchi_rtf::edit::Error::OperationLimit { .. })
         ),
         Case::RtfSemanticMergeParagraphSave => matches!(
-            limited.merge_paragraphs(
-                expectation.selected_position,
-                expectation.adjacent_position,
-            ),
+            limited.merge_paragraphs(expectation.selected_position, expectation.adjacent_position,),
             Err(litchi_rtf::edit::Error::OperationLimit { .. })
         ),
         _ => false,
     } && limited.operation_count() == 0;
-    let unsafe_source = litchi_rtf::Document::parse(
-        r"{\rtf1\ansi First{\b nested}Second\par Third}",
-    )?;
+    let unsafe_source =
+        litchi_rtf::Document::parse(r"{\rtf1\ansi First{\b nested}Second\par Third}")?;
     let unsafe_refusal_verified = match case {
         Case::RtfSemanticSplitParagraphSave => unsafe_source.edit().split_paragraph(0, 1).is_err(),
         Case::RtfSemanticMergeParagraphSave => unsafe_source.edit().merge_paragraphs(0, 1).is_err(),
@@ -18694,7 +19538,9 @@ fn verify_rtf_paragraph_split_merge_gates(
 
     let mut partial = PrefixFailSink {
         accepted: 0,
-        fail_after: u64::try_from(expectation.expected_output.len() / 2).unwrap_or(1).max(1),
+        fail_after: u64::try_from(expectation.expected_output.len() / 2)
+            .unwrap_or(1)
+            .max(1),
     };
     let partial_sink_verified = commit.snapshot().write_to(&mut partial).is_err()
         && partial.accepted > 0
@@ -18709,8 +19555,8 @@ fn verify_rtf_paragraph_split_merge_gates(
     }
 
     let source_hash_verified = sha256_hex(&corpus.archive) == corpus.manifest.archive_sha256;
-    let output_hash_verified = sha256_hex(&reopened.to_bytes()?)
-        == sha256_hex(&expectation.expected_output);
+    let output_hash_verified =
+        sha256_hex(&reopened.to_bytes()?) == sha256_hex(&expectation.expected_output);
     if !source_hash_verified || !output_hash_verified {
         return Err("RTF paragraph split/merge source/output hash gate failed".into());
     }
@@ -18756,10 +19602,7 @@ fn run_rtf_paragraph_split_merge(
     let mut publication_output_sha256 = Vec::with_capacity(samples);
     let mut sinks = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let mut sink = WindowedHashingSink::new(
-            output_bytes,
-            RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
-        )?;
+        let mut sink = WindowedHashingSink::new(output_bytes, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?;
         let lifecycle_started = Instant::now();
         let open_started = Instant::now();
         let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
@@ -18773,10 +19616,9 @@ fn run_rtf_paragraph_split_merge(
                     .split_offset
                     .ok_or("RTF split expectation has no offset")?,
             )?,
-            Case::RtfSemanticMergeParagraphSave => edit.merge_paragraphs(
-                expectation.selected_position,
-                expectation.adjacent_position,
-            )?,
+            Case::RtfSemanticMergeParagraphSave => {
+                edit.merge_paragraphs(expectation.selected_position, expectation.adjacent_position)?
+            },
             _ => return Err("non-split/merge case reached RTF timed staging".into()),
         };
         let stage_duration = stage_started.elapsed();
@@ -26411,7 +27253,11 @@ fn xlsx_cell_lifecycle_semantic_hash(
         } else {
             "value"
         };
-        semantic.push(format!("{}!{}={state}", xlsx_cell_name(*coordinate), xlsx_value(*coordinate)));
+        semantic.push(format!(
+            "{}!{}={state}",
+            xlsx_cell_name(*coordinate),
+            xlsx_value(*coordinate)
+        ));
     }
     Ok(sha256_hex(semantic.join("\n").as_bytes()))
 }
@@ -26450,10 +27296,8 @@ fn xlsx_cell_lifecycle_source_output(
     let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
     let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source)?;
     let mut edit = editor.edit_sheets([litchi_xlsx::Selector::from(target.sheet)])?;
-    let address = litchi_xlsx::Address::at(
-        u32::try_from(target.row)?,
-        u32::try_from(target.column)?,
-    )?;
+    let address =
+        litchi_xlsx::Address::at(u32::try_from(target.row)?, u32::try_from(target.column)?)?;
     if remove {
         edit.remove(target.sheet, address)?;
     } else {
@@ -26500,12 +27344,10 @@ fn run_xlsx_cell_lifecycle_edit_save(
     };
     let expected_digest = sha256_hex(&expected);
     let expected_semantic = xlsx_cell_lifecycle_semantic_hash(&expected, spec, target, remove)?;
-    let untouched = source_backed.then(|| {
-        xlsx_cell_crud_untouched_member_evidence(corpus, &expected, &[target])
-    });
-    let (untouched_member_count, untouched_member_sha256) = untouched
-        .transpose()?
-        .unwrap_or_default();
+    let untouched = source_backed
+        .then(|| xlsx_cell_crud_untouched_member_evidence(corpus, &expected, &[target]));
+    let (untouched_member_count, untouched_member_sha256) =
+        untouched.transpose()?.unwrap_or_default();
     let maximum = xlsx_output_ceiling(expected.len())?;
     let payload_ranges = source_backed
         .then(|| xlsx_cell_crud_payload_ranges(corpus))
@@ -26531,9 +27373,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 .clone()
                 .expect("XLSX lifecycle source backing is present");
             let open_started = Instant::now();
-            let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(
-                read_at,
-            )?;
+            let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(read_at)?;
             let open_duration = open_started.elapsed();
             let open_ns = elapsed_ns(open_duration)?;
             duration += open_duration;
@@ -26567,7 +27407,9 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 || diagnostics.budget_memory_used != 0
                 || diagnostics.budget_cache_reserved_bytes != 0
             {
-                return Err("XLSX source lifecycle diagnostics are outside unmanaged bounds".into());
+                return Err(
+                    "XLSX source lifecycle diagnostics are outside unmanaged bounds".into(),
+                );
             }
             let publication_started = Instant::now();
             editor.publish_multi_commit_to_stream(&mut sink, &commit)?;
@@ -26685,7 +27527,10 @@ fn run_xlsx_cell_lifecycle_edit_save(
     }
 
     let sink = deterministic_sink_summary(&sink_summaries, case.name())?;
-    if output_digests.iter().any(|digest| digest != &expected_digest) {
+    if output_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
         return Err("XLSX cell lifecycle output hashes are not deterministic".into());
     }
     Ok(CaseResult {
@@ -26694,6 +27539,308 @@ fn run_xlsx_cell_lifecycle_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: Some(expected_digest),
+        operation_metrics: None,
+    })
+}
+
+fn run_xlsx_row_visibility_edit_save(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR
+        || !case.is_xlsx_row_visibility_edit_save()
+    {
+        return Err("XLSX row-visibility case requires its fixed one-sheet media corpus".into());
+    }
+    let spec = xlsx_spec(corpus)?;
+    let initially_hidden = corpus.manifest.name.ends_with("-unhide");
+    let batch = case.is_xlsx_row_visibility_batch();
+    let source_backed = case.is_xlsx_row_visibility_source_backed();
+    let updates = xlsx_row_visibility_updates(batch, initially_hidden)?;
+    let operation = xlsx_row_visibility_operation_name(batch, initially_hidden);
+
+    let expected = if source_backed {
+        xlsx_row_visibility_source_output(corpus, &updates)?
+    } else {
+        xlsx_row_visibility_eager_output(corpus, &updates)?
+    };
+    let expected_digest = sha256_hex(&expected);
+    let expected_semantic =
+        xlsx_row_visibility_semantic_hash(&expected, spec, initially_hidden, &updates)?;
+    let (untouched_member_count, untouched_member_sha256) =
+        xlsx_cell_crud_untouched_member_evidence(
+            corpus,
+            &expected,
+            &[XlsxCoordinate {
+                sheet: 0,
+                row: 0,
+                column: 0,
+            }],
+        )?;
+    let gates = xlsx_row_visibility_lifecycle_gates(corpus, &updates, initially_hidden)?;
+    let payload_ranges = if source_backed {
+        Some(xlsx_source_layout(&corpus.archive, spec.sheet_count)?.0)
+    } else {
+        None
+    };
+    let maximum = u64::try_from(expected.len())?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut output_digests = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let backing = source_backed.then(|| {
+            let ranges = payload_ranges
+                .as_ref()
+                .expect("XLSX row-visibility source ranges are present");
+            let mut ordinary = Vec::new();
+            ordinary.extend(ranges.workbook.iter().cloned());
+            ordinary.extend(ranges.selected_worksheet.iter().cloned());
+            ordinary.extend(ranges.unselected_worksheets.iter().cloned());
+            ordinary.extend(ranges.shared_strings.iter().cloned());
+            ordinary.extend(ranges.styles.iter().cloned());
+            Arc::new(InstrumentedSource::new_xlsx(
+                corpus.archive.clone(),
+                ordinary,
+                ranges.clone(),
+            ))
+        });
+        let mut sink = WindowedHashingSink::new(maximum, 64 * 1024)?;
+        let mut duration = Duration::ZERO;
+        let open_ns;
+        let plan_or_stage_ns;
+        let commit_ns;
+        let publication_ns;
+        let source;
+        let diagnostics;
+        let source_version_calls;
+
+        if source_backed {
+            let read_at: Arc<dyn ReadAt> = backing
+                .clone()
+                .expect("XLSX row-visibility source backing is present");
+            let started = Instant::now();
+            let editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(read_at)?;
+            let open_duration = started.elapsed();
+            open_ns = elapsed_ns(open_duration)?;
+            duration += open_duration;
+
+            let started = Instant::now();
+            let mut edit = editor.edit("Sheet1")?;
+            edit.apply_batch(updates.iter().map(|(row, hidden)| {
+                if *hidden {
+                    litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+                } else {
+                    litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+                }
+            }))?;
+            let stage_duration = started.elapsed();
+            plan_or_stage_ns = elapsed_ns(stage_duration)?;
+            duration += stage_duration;
+
+            let started = Instant::now();
+            let commit = edit.commit()?;
+            let commit_duration = started.elapsed();
+            commit_ns = elapsed_ns(commit_duration)?;
+            duration += commit_duration;
+            if !commit.changed() || commit.diagnostics().changed_rows() != updates.len() {
+                return Err("XLSX row-visibility sample changed an unexpected row count".into());
+            }
+            diagnostics = editor.cache_diagnostics();
+            if diagnostics.successful_loads == 0
+                || diagnostics.budget_managed
+                || diagnostics.budget_memory_used != 0
+                || diagnostics.budget_cache_reserved_bytes != 0
+            {
+                return Err(
+                    "XLSX row-visibility cache diagnostics left the unmanaged scope".into(),
+                );
+            }
+            let started = Instant::now();
+            editor.publish_commit_to_stream(&mut sink, &commit)?;
+            let publication_duration = started.elapsed();
+            publication_ns = elapsed_ns(publication_duration)?;
+            duration += publication_duration;
+            let backing = backing
+                .as_ref()
+                .expect("XLSX row-visibility source backing is present");
+            source = backing.snapshot();
+            source_version_calls = backing.version_calls();
+        } else {
+            let started = Instant::now();
+            let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+            let open_duration = started.elapsed();
+            open_ns = elapsed_ns(open_duration)?;
+            duration += open_duration;
+
+            let started = Instant::now();
+            let mut edit = workbook.edit()?;
+            let mut sheet = edit
+                .sheet("Sheet1")?
+                .ok_or("XLSX row-visibility eager target sheet is missing")?;
+            for (row, hidden) in &updates {
+                let mut target = sheet.row(*row)?;
+                if *hidden {
+                    target.hide();
+                } else {
+                    target.show();
+                }
+            }
+            let stage_duration = started.elapsed();
+            plan_or_stage_ns = elapsed_ns(stage_duration)?;
+            duration += stage_duration;
+
+            let started = Instant::now();
+            let commit = edit.commit()?;
+            let commit_duration = started.elapsed();
+            commit_ns = elapsed_ns(commit_duration)?;
+            duration += commit_duration;
+            let started = Instant::now();
+            commit.workbook().write_to(&mut sink)?;
+            let publication_duration = started.elapsed();
+            publication_ns = elapsed_ns(publication_duration)?;
+            duration += publication_duration;
+            source = SourceSnapshot::default();
+            diagnostics = SourceCacheDiagnostics::default();
+            source_version_calls = 0;
+        }
+
+        let (sink_summary, digest) = sink.finish();
+        if digest != expected_digest || sink_summary.accepted_bytes != maximum {
+            return Err(
+                "XLSX row-visibility publication digest differs from expected output".into(),
+            );
+        }
+        if sink_summary.retained_output_bytes != Some(0) || sink_summary.largest_write > 64 * 1024 {
+            return Err("XLSX row-visibility publication exceeded the fixed sink bound".into());
+        }
+        let started = Instant::now();
+        let semantic =
+            xlsx_row_visibility_semantic_hash(&expected, spec, initially_hidden, &updates)?;
+        let lifecycle_ns = elapsed_ns(started.elapsed())?;
+        if semantic != expected_semantic {
+            return Err("XLSX row-visibility lifecycle semantic hash is unstable".into());
+        }
+        let sample_gates = XlsxRowVisibilityGateSummary {
+            exact_output_verified: digest == expected_digest,
+            semantic_reopen_verified: digest == expected_digest && semantic == expected_semantic,
+            untouched_member_preservation_verified: true,
+            exact_noop_verified: if source_backed {
+                gates.exact_noop_verified
+            } else {
+                None
+            },
+            stale_source_refusal_verified: if source_backed {
+                gates.stale_source_refusal_verified
+            } else {
+                None
+            },
+            foreign_source_refusal_verified: if source_backed {
+                gates.foreign_source_refusal_verified
+            } else {
+                None
+            },
+            protected_source_refusal_verified: if source_backed {
+                gates.protected_source_refusal_verified
+            } else {
+                None
+            },
+            formula_source_refusal_verified: if source_backed {
+                gates.formula_source_refusal_verified
+            } else {
+                None
+            },
+            markup_compatibility_source_refusal_verified: if source_backed {
+                gates.markup_compatibility_source_refusal_verified
+            } else {
+                None
+            },
+            macro_source_refusal_verified: if source_backed {
+                gates.macro_source_refusal_verified
+            } else {
+                None
+            },
+            relationship_source_refusal_verified: if source_backed {
+                gates.relationship_source_refusal_verified
+            } else {
+                None
+            },
+            signed_source_refusal_verified: if source_backed {
+                gates.signed_source_refusal_verified
+            } else {
+                None
+            },
+            partial_sink_verified: if source_backed {
+                gates.partial_sink_verified
+            } else {
+                None
+            },
+            zero_output_on_refusal_verified: if source_backed {
+                gates.zero_output_on_refusal_verified
+            } else {
+                None
+            },
+            source_counter_gate_verified: source_backed.then_some(
+                source.read_calls > 0
+                    && source.read_bytes > 0
+                    && source.xlsx.selected_worksheet.read_bytes > 0
+                    && source.xlsx.unselected_worksheets.read_bytes == 0
+                    && source_version_calls > 0,
+            ),
+        };
+        if sample_gates != gates && source_backed {
+            return Err("XLSX row-visibility sample gate state changed".into());
+        }
+        if iteration >= warmup_iterations {
+            source_summary.record_xlsx_row_visibility(
+                source,
+                XlsxRowVisibilityIterationEvidence {
+                    implementation: if source_backed { "source-backed" } else { "eager" },
+                    operation,
+                    shape: corpus.manifest.shape,
+                    timing_scope: "open, selector staging, commit, and sequential publication; expected-output semantic reopen tied to the measured digest and all refusal/preservation gates are separate",
+                    initially_hidden,
+                    update_count: updates.len(),
+                    open_ns,
+                    plan_or_stage_ns,
+                    commit_ns,
+                    publication_ns,
+                    lifecycle_ns,
+                    source,
+                    diagnostics,
+                    source_version_calls,
+                    output_sha256: digest.clone(),
+                    semantic_sha256: semantic,
+                    source_sha256: corpus.manifest.archive_sha256.clone(),
+                    untouched_member_count,
+                    untouched_member_sha256: untouched_member_sha256.clone(),
+                    gates: sample_gates,
+                },
+            )?;
+            sink_summaries.push(sink_summary);
+            output_digests.push(digest);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    if output_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("XLSX row-visibility output hashes are not deterministic".into());
+    }
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(deterministic_sink_summary(&sink_summaries, case.name())?),
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
@@ -35721,7 +36868,8 @@ mod tests {
         SimulatedCursor, SimulatedRangeMetrics, SimulatedRangeSource, SinkSummary,
         SourceBackedPackage, WindowedHashingSink, WriteSizeBuckets, WriterShape,
         XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
-        XlsxCellCrudShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
+        XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape,
+        XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
         build_docx_source_edit_corpus, build_odf_repair_corpus, build_odp_media_corpus,
         build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
         build_odt_resource_batch_corpus, build_ole_common_corpus, build_opc_corpus,
@@ -35737,13 +36885,13 @@ mod tests {
         build_xlsx_defined_names_edit_corpus, build_xlsx_merge_edit_corpus,
         build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
         build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
-        build_xlsx_sheet_protection_edit_corpus, cfb_open_stream_expected_payload,
-        cfb_target_aware_repeat_formula, doc_body_text_fnv1a, expected_opc_overlay_output,
-        ole_common_changed_output, opc_overlay_replacement_payload, parse_case, payload_bytes,
-        resolve_execution_workers, run_case, run_case_with_config, run_cfb_open_stream,
-        run_cfb_open_stream_simulated, run_cfb_selective_read, run_cfb_selective_simulated_read,
-        run_docx_source_backed_one_edit_save, run_odf_content_cow,
-        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        build_xlsx_row_visibility_corpus, build_xlsx_sheet_protection_edit_corpus,
+        cfb_open_stream_expected_payload, cfb_target_aware_repeat_formula, doc_body_text_fnv1a,
+        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
+        parse_case, payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
+        run_cfb_open_stream, run_cfb_open_stream_simulated, run_cfb_selective_read,
+        run_cfb_selective_simulated_read, run_docx_source_backed_one_edit_save,
+        run_odf_content_cow, run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
         run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,
@@ -36154,7 +37302,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 311);
+        assert_eq!(selectable_count, 315);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -40112,6 +41260,126 @@ mod tests {
     }
 
     #[test]
+    fn xlsx_row_visibility_matched_controls_cover_single_and_bounded_batch() {
+        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(XlsxRowVisibilityShape::ALL.len(), 2);
+        assert_eq!(XlsxRowVisibilityShape::Medium.row_count(), 512);
+        assert_eq!(XlsxRowVisibilityShape::Large.row_count(), 2_048);
+        assert_eq!(
+            parse_case("xlsx_eager_row_visibility_edit_save"),
+            Some(Case::XlsxEagerRowVisibilityEditSave)
+        );
+        assert_eq!(
+            parse_case("xlsx_source_backed_row_visibility_edit_save"),
+            Some(Case::XlsxSourceBackedRowVisibilityEditSave)
+        );
+        assert_eq!(
+            parse_case("xlsx_eager_row_visibility_batch_edit_save"),
+            Some(Case::XlsxEagerRowVisibilityBatchEditSave)
+        );
+        assert_eq!(
+            parse_case("xlsx_source_backed_row_visibility_batch_edit_save"),
+            Some(Case::XlsxSourceBackedRowVisibilityBatchEditSave)
+        );
+        let visible =
+            build_xlsx_row_visibility_corpus(XlsxRowVisibilityShape::Medium, false).unwrap();
+        let hidden =
+            build_xlsx_row_visibility_corpus(XlsxRowVisibilityShape::Medium, true).unwrap();
+        assert_eq!(
+            visible.archive,
+            build_xlsx_row_visibility_corpus(XlsxRowVisibilityShape::Medium, false)
+                .unwrap()
+                .archive
+        );
+        assert_eq!(
+            visible.manifest.generator,
+            XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR
+        );
+        assert!(visible.manifest.archive_member_count >= XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT);
+        assert_ne!(visible.archive, hidden.archive);
+        let mut semantic_by_operation = BTreeMap::new();
+
+        for (case, corpus, operation, update_count) in [
+            (
+                Case::XlsxEagerRowVisibilityEditSave,
+                &visible,
+                "hide-one",
+                1,
+            ),
+            (
+                Case::XlsxSourceBackedRowVisibilityEditSave,
+                &visible,
+                "hide-one",
+                1,
+            ),
+            (
+                Case::XlsxEagerRowVisibilityBatchEditSave,
+                &hidden,
+                "unhide-256",
+                256,
+            ),
+            (
+                Case::XlsxSourceBackedRowVisibilityBatchEditSave,
+                &hidden,
+                "unhide-256",
+                256,
+            ),
+        ] {
+            assert!(!Case::DEFAULT.contains(&case));
+            let measured = run_case(case, corpus, 0, 1).unwrap();
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            assert_eq!(
+                measured.sink.as_ref().unwrap().retained_output_bytes,
+                Some(0)
+            );
+            let evidence = measured.source.unwrap().xlsx_row_visibility.unwrap();
+            assert_eq!(evidence.operation, operation);
+            assert_eq!(evidence.update_count, update_count);
+            assert_eq!(evidence.open_ns.len(), 1);
+            assert_eq!(evidence.plan_or_stage_ns.len(), 1);
+            assert_eq!(evidence.commit_ns.len(), 1);
+            assert_eq!(evidence.publication_ns.len(), 1);
+            assert_eq!(evidence.lifecycle_ns.len(), 1);
+            assert_eq!(evidence.output_sha256.len(), 1);
+            assert_eq!(evidence.semantic_sha256.len(), 1);
+            if let Some(previous) =
+                semantic_by_operation.insert(operation, evidence.semantic_sha256[0].clone())
+            {
+                assert_eq!(previous, evidence.semantic_sha256[0]);
+            }
+            assert!(evidence.untouched_member_count > 0);
+            assert!(evidence.gates.exact_output_verified);
+            assert!(evidence.gates.semantic_reopen_verified);
+            assert!(evidence.gates.untouched_member_preservation_verified);
+            let source_only_gates = [
+                evidence.gates.exact_noop_verified,
+                evidence.gates.stale_source_refusal_verified,
+                evidence.gates.foreign_source_refusal_verified,
+                evidence.gates.protected_source_refusal_verified,
+                evidence.gates.formula_source_refusal_verified,
+                evidence.gates.markup_compatibility_source_refusal_verified,
+                evidence.gates.macro_source_refusal_verified,
+                evidence.gates.relationship_source_refusal_verified,
+                evidence.gates.signed_source_refusal_verified,
+                evidence.gates.partial_sink_verified,
+                evidence.gates.zero_output_on_refusal_verified,
+                evidence.gates.source_counter_gate_verified,
+            ];
+            if case.is_xlsx_row_visibility_source_backed() {
+                assert!(source_only_gates.iter().all(|gate| *gate == Some(true)));
+                assert!(evidence.source_read_calls[0] > 0);
+                assert!(evidence.selected_worksheet_read_calls[0] > 0);
+                assert_eq!(evidence.unselected_worksheet_read_calls[0], 0);
+                assert!(evidence.source_version_calls[0] > 0);
+            } else {
+                assert!(source_only_gates.iter().all(Option::is_none));
+                assert!(evidence.source_read_calls.is_empty());
+                assert!(evidence.source_version_calls.is_empty());
+            }
+        }
+    }
+
+    #[test]
     fn xlsx_cell_values_matched_controls_are_deterministic_and_bounded() {
         let first = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
         let second = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
@@ -40420,7 +41688,10 @@ mod tests {
             assert_eq!(evidence.selected_worksheet_count, 1);
             assert_eq!(evidence.output_sha256.len(), 1);
             assert_eq!(evidence.semantic_sha256.len(), 1);
-            assert_eq!(evidence.untouched_member_count > 0, case.is_xlsx_cell_lifecycle_source_backed());
+            assert_eq!(
+                evidence.untouched_member_count > 0,
+                case.is_xlsx_cell_lifecycle_source_backed()
+            );
             if case.is_xlsx_cell_lifecycle_source_backed() {
                 assert!(evidence.source_read_calls[0] > 0);
                 assert!(evidence.source_read_bytes[0] > 0);
@@ -40437,10 +41708,9 @@ mod tests {
             } else {
                 "clear"
             };
-            if let Some(previous) = semantic_by_operation.insert(
-                operation,
-                evidence.semantic_sha256[0].clone(),
-            ) {
+            if let Some(previous) =
+                semantic_by_operation.insert(operation, evidence.semantic_sha256[0].clone())
+            {
                 assert_eq!(previous, evidence.semantic_sha256[0]);
             }
         }
