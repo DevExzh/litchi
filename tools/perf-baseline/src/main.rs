@@ -296,6 +296,8 @@ impl RtfSemanticVariant {
                     | Case::RtfSemanticOnePercentEditSave
                     | Case::RtfSemanticRemoveParagraphSave
                     | Case::RtfSemanticMoveParagraphSave
+                    | Case::RtfSemanticSplitParagraphSave
+                    | Case::RtfSemanticMergeParagraphSave
                     | Case::RtfLogicalTailAppend
                     | Case::RtfLogicalTailNoopSave
                     | Case::RtfLogicalTailCommitAppend
@@ -757,6 +759,8 @@ enum Case {
     RtfSemanticOnePercentEditSave,
     RtfSemanticRemoveParagraphSave,
     RtfSemanticMoveParagraphSave,
+    RtfSemanticSplitParagraphSave,
+    RtfSemanticMergeParagraphSave,
     RtfLogicalTailAppend,
     RtfLogicalTailNoopSave,
     RtfLogicalTailCommitAppend,
@@ -1186,6 +1190,8 @@ impl Case {
             Self::RtfSemanticOnePercentEditSave => "rtf_semantic_one_percent_edit_save",
             Self::RtfSemanticRemoveParagraphSave => "rtf_semantic_remove_paragraph_save",
             Self::RtfSemanticMoveParagraphSave => "rtf_semantic_move_paragraph_save",
+            Self::RtfSemanticSplitParagraphSave => "rtf_semantic_split_paragraph_save",
+            Self::RtfSemanticMergeParagraphSave => "rtf_semantic_merge_paragraph_save",
             Self::RtfLogicalTailAppend => "rtf_logical_tail_append",
             Self::RtfLogicalTailNoopSave => "rtf_logical_tail_noop_save",
             Self::RtfLogicalTailCommitAppend => "rtf_logical_tail_commit_append",
@@ -1519,6 +1525,8 @@ impl Case {
                 | Self::RtfSemanticOnePercentEditSave
                 | Self::RtfSemanticRemoveParagraphSave
                 | Self::RtfSemanticMoveParagraphSave
+                | Self::RtfSemanticSplitParagraphSave
+                | Self::RtfSemanticMergeParagraphSave
                 | Self::RtfLogicalTailAppend
                 | Self::RtfLogicalTailNoopSave
                 | Self::RtfLogicalTailCommitAppend
@@ -1539,6 +1547,13 @@ impl Case {
         matches!(
             self,
             Self::RtfSemanticRemoveParagraphSave | Self::RtfSemanticMoveParagraphSave
+        )
+    }
+
+    const fn is_rtf_paragraph_split_merge(self) -> bool {
+        matches!(
+            self,
+            Self::RtfSemanticSplitParagraphSave | Self::RtfSemanticMergeParagraphSave
         )
     }
 
@@ -2700,6 +2715,8 @@ struct SourceSummary {
     rtf_tail_publication: Option<RtfTailPublicationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rtf_picture_crud: Option<RtfPictureCrudSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rtf_paragraph_split_merge: Option<RtfParagraphSplitMergeSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     doc_owner_public_phases: Option<DocOwnerPublicPhaseSummary>,
 }
@@ -4249,6 +4266,51 @@ struct RtfPictureCrudGateSummary {
     volatile_inverse_verified: bool,
     stale_source_refusal_verified: bool,
     foreign_source_refusal_verified: bool,
+    refusal_verified: bool,
+    partial_sink_verified: bool,
+    zero_sink_verified: bool,
+    source_hash_verified: bool,
+    output_hash_verified: bool,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct RtfParagraphSplitMergeSummary {
+    implementation: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    shape: &'static str,
+    paragraph_count_before: usize,
+    paragraph_count_after: usize,
+    selected_position: usize,
+    adjacent_position: usize,
+    split_offset: Option<usize>,
+    source_bytes: u64,
+    output_bytes: u64,
+    source_sha256: String,
+    expected_output_sha256: String,
+    open_ns: Vec<u64>,
+    stage_ns: Vec<u64>,
+    commit_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    lifecycle_ns: Vec<u64>,
+    publication_output_sha256: Vec<String>,
+    gates: RtfParagraphSplitMergeGateSummary,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct RtfParagraphSplitMergeGateSummary {
+    semantic_reopen_verified: bool,
+    exact_source_splice_verified: bool,
+    unchanged_surrounding_bytes_verified: bool,
+    exact_noop_verified: bool,
+    volatile_forward_verified: bool,
+    volatile_inverse_verified: bool,
+    durable_forward_verified: bool,
+    durable_inverse_verified: bool,
+    durable_deterministic_verified: bool,
+    stale_source_refusal_verified: bool,
+    foreign_source_refusal_verified: bool,
+    forged_result_artifact_refusal_verified: bool,
     refusal_verified: bool,
     partial_sink_verified: bool,
     zero_sink_verified: bool,
@@ -6533,15 +6595,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && options
                         .cases
                         .iter()
-                        .any(|case| case.is_rtf_lifecycle() || case.is_rtf_logical_tail()))
-                .then(|| build_rtf_lifecycle_corpus(*shape))
-                .transpose()?;
+                        .any(|case| {
+                            case.is_rtf_lifecycle()
+                                || case.is_rtf_paragraph_split_merge()
+                                || case.is_rtf_logical_tail()
+                        }))
+                    .then(|| build_rtf_lifecycle_corpus(*shape))
+                    .transpose()?;
                 for case in options
                     .cases
                     .iter()
                     .filter(|case| variant.supports_case(**case))
                 {
-                    let corpus = if case.is_rtf_lifecycle() || case.is_rtf_logical_tail() {
+                    let corpus = if case.is_rtf_lifecycle()
+                        || case.is_rtf_paragraph_split_merge()
+                        || case.is_rtf_logical_tail()
+                    {
                         lifecycle_corpus
                             .as_ref()
                             .ok_or("RTF lifecycle case has no plain lifecycle corpus")?
@@ -7560,6 +7629,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "rtf_semantic_one_percent_edit_save" => Some(Case::RtfSemanticOnePercentEditSave),
         "rtf_semantic_remove_paragraph_save" => Some(Case::RtfSemanticRemoveParagraphSave),
         "rtf_semantic_move_paragraph_save" => Some(Case::RtfSemanticMoveParagraphSave),
+        "rtf_semantic_split_paragraph_save" => Some(Case::RtfSemanticSplitParagraphSave),
+        "rtf_semantic_merge_paragraph_save" => Some(Case::RtfSemanticMergeParagraphSave),
         "rtf_logical_tail_append" => Some(Case::RtfLogicalTailAppend),
         "rtf_logical_tail_noop_save" => Some(Case::RtfLogicalTailNoopSave),
         "rtf_logical_tail_commit_append" => Some(Case::RtfLogicalTailCommitAppend),
@@ -7903,6 +7974,7 @@ fn print_usage() {
                                        rtf_semantic_stream_save,rtf_semantic_noop_edit_save,\n\
                                        rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save,\n\
                                        rtf_semantic_remove_paragraph_save,rtf_semantic_move_paragraph_save,\n\
+                                       rtf_semantic_split_paragraph_save,rtf_semantic_merge_paragraph_save,\n\
                                        rtf_logical_tail_append,rtf_logical_tail_noop_save,\n\
                                        rtf_picture_payload_batch_replace,rtf_picture_batch_remove,\n\
                                        rtf_streaming_create,\n\
@@ -13712,6 +13784,9 @@ fn run_case_with_config(
         | Case::RtfSemanticMoveParagraphSave => {
             run_semantic_rtf(case, corpus, warmup_iterations, samples)
         },
+        Case::RtfSemanticSplitParagraphSave | Case::RtfSemanticMergeParagraphSave => {
+            run_rtf_paragraph_split_merge(case, corpus, warmup_iterations, samples)
+        },
         Case::RtfValidationReport => run_rtf_validation_report(corpus, warmup_iterations, samples),
         Case::RtfPicturePayloadBatchReplace | Case::RtfPictureBatchRemove => {
             Err("RTF picture CRUD cases use their dedicated corpus runner".into())
@@ -18126,6 +18201,548 @@ fn run_semantic_rtf(
         result.output_sha256 = Some(sha256_hex(&expected_changed));
     }
     Ok(result)
+}
+
+#[derive(Debug)]
+struct RtfParagraphSplitMergeExpectation {
+    expected_output: Vec<u8>,
+    expected_projection: Vec<String>,
+    selected_position: usize,
+    adjacent_position: usize,
+    split_offset: Option<usize>,
+    source_changed: Range<usize>,
+    output_changed: Range<usize>,
+}
+
+fn rtf_plain_paragraph_projection(document: &litchi_rtf::Document) -> Vec<String> {
+    document
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.to_text())
+        .collect()
+}
+
+fn rtf_unique_subslice(bytes: &[u8], needle: &[u8]) -> Result<usize, Box<dyn Error>> {
+    if needle.is_empty() {
+        return Err("RTF paragraph splice needle must not be empty".into());
+    }
+    let mut matches = bytes
+        .windows(needle.len())
+        .enumerate()
+        .filter_map(|(index, window)| (window == needle).then_some(index));
+    let first = matches
+        .next()
+        .ok_or("RTF paragraph splice needle is missing from source")?;
+    if matches.next().is_some() {
+        return Err("RTF paragraph splice needle is not unique in source".into());
+    }
+    Ok(first)
+}
+
+fn rtf_paragraph_split_merge_expectation(
+    case: Case,
+    corpus: &Corpus,
+) -> Result<RtfParagraphSplitMergeExpectation, Box<dyn Error>> {
+    if !case.is_rtf_paragraph_split_merge()
+        || corpus.manifest.generator != RTF_LIFECYCLE_CORPUS_GENERATOR
+        || corpus.manifest.rtf_variant != Some(RtfSemanticVariant::Plain.name())
+    {
+        return Err("RTF paragraph split/merge requires the plain lifecycle corpus".into());
+    }
+    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let source_projection = rtf_plain_paragraph_projection(&source);
+    if source_projection.len() != source.paragraph_count()
+        || source_projection.len() != corpus.manifest.entry_count
+        || source_projection.len() < 3
+    {
+        return Err("RTF paragraph split/merge corpus projection differs from manifest".into());
+    }
+    if !corpus.archive.is_ascii() {
+        return Err("RTF paragraph split/merge corpus is not literal ASCII".into());
+    }
+    let selected_position = source_projection.len() / 2;
+    let adjacent_position = selected_position
+        .checked_add(1)
+        .ok_or("RTF paragraph split/merge adjacent position overflows")?;
+    let (expected_output, split_offset, source_changed, output_changed, expected_projection) =
+        match case {
+            Case::RtfSemanticSplitParagraphSave => {
+                let text = source_projection
+                    .get(selected_position)
+                    .ok_or("RTF split target paragraph is missing")?;
+                if !text.is_ascii() || text.len() < 2 {
+                    return Err("RTF split target is not an interior ASCII paragraph".into());
+                }
+                let offset = text.len() / 2;
+                if offset == 0 || offset >= text.len() || !text.is_char_boundary(offset) {
+                    return Err("RTF split target midpoint is not an interior boundary".into());
+                }
+                let text_start = rtf_unique_subslice(&corpus.archive, text.as_bytes())?;
+                let insertion = text_start
+                    .checked_add(offset)
+                    .ok_or("RTF split insertion offset overflows")?;
+                let boundary = br"\par ";
+                let mut expected = corpus.archive.clone();
+                expected.splice(insertion..insertion, boundary.iter().copied());
+                let mut projection = source_projection;
+                let text = projection.remove(selected_position);
+                let (left, right) = text.split_at(offset);
+                projection.insert(selected_position, left.to_owned());
+                projection.insert(selected_position + 1, right.to_owned());
+                (
+                    expected,
+                    Some(offset),
+                    insertion..insertion,
+                    insertion..insertion + boundary.len(),
+                    projection,
+                )
+            },
+            Case::RtfSemanticMergeParagraphSave => {
+                let left = source_projection
+                    .get(selected_position)
+                    .ok_or("RTF merge left paragraph is missing")?;
+                let right = source_projection
+                    .get(adjacent_position)
+                    .ok_or("RTF merge right paragraph is missing")?;
+                let left_start = rtf_unique_subslice(&corpus.archive, left.as_bytes())?;
+                let boundary_start = left_start
+                    .checked_add(left.len())
+                    .ok_or("RTF merge boundary offset overflows")?;
+                let boundary = br"\par ";
+                if corpus
+                    .archive
+                    .get(boundary_start..)
+                    .is_none_or(|tail| !tail.starts_with(boundary))
+                {
+                    return Err("RTF merge source has no canonical adjacent boundary".into());
+                }
+                let right_start = boundary_start
+                    .checked_add(boundary.len())
+                    .ok_or("RTF merge right paragraph offset overflows")?;
+                if corpus
+                    .archive
+                    .get(right_start..)
+                    .is_none_or(|tail| !tail.starts_with(right.as_bytes()))
+                {
+                    return Err("RTF merge source paragraphs are not raw-byte adjacent".into());
+                }
+                let mut expected = corpus.archive.clone();
+                expected.drain(boundary_start..boundary_start + boundary.len());
+                let mut projection = source_projection;
+                let right = projection.remove(adjacent_position);
+                projection[selected_position].push_str(&right);
+                (
+                    expected,
+                    None,
+                    boundary_start..boundary_start + boundary.len(),
+                    boundary_start..boundary_start,
+                    projection,
+                )
+            },
+            _ => return Err("non-split/merge case reached RTF expectation builder".into()),
+        };
+    Ok(RtfParagraphSplitMergeExpectation {
+        expected_output,
+        expected_projection,
+        selected_position,
+        adjacent_position,
+        split_offset,
+        source_changed,
+        output_changed,
+    })
+}
+
+fn forge_rtf_result_artifact(value: &mut serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Object(map) => {
+            if let Some(serde_json::Value::String(hash)) =
+                map.get_mut("result_artifact_sha256")
+                && let Some(first) = hash.as_bytes().first().copied()
+            {
+                let replacement = if first == b'0' { b'1' } else { b'0' };
+                let mut forged = hash.as_bytes().to_vec();
+                forged[0] = replacement;
+                *hash = String::from_utf8(forged).unwrap_or_else(|_| "0".repeat(64));
+                return true;
+            }
+            map.values_mut().any(forge_rtf_result_artifact)
+        },
+        serde_json::Value::Array(values) => values.iter_mut().any(forge_rtf_result_artifact),
+        _ => false,
+    }
+}
+
+fn stage_rtf_paragraph_split_merge(
+    case: Case,
+    source: &litchi_rtf::Document,
+    expectation: &RtfParagraphSplitMergeExpectation,
+) -> Result<litchi_rtf::edit::Commit, Box<dyn Error>> {
+    let mut edit = source.edit();
+    match case {
+        Case::RtfSemanticSplitParagraphSave => {
+            edit.split_paragraph(
+                expectation.selected_position,
+                expectation
+                    .split_offset
+                    .ok_or("RTF split expectation has no offset")?,
+            )?;
+        },
+        Case::RtfSemanticMergeParagraphSave => {
+            edit.merge_paragraphs(
+                expectation.selected_position,
+                expectation.adjacent_position,
+            )?;
+        },
+        _ => return Err("non-split/merge case reached RTF staging".into()),
+    }
+    Ok(edit.commit()?)
+}
+
+fn verify_rtf_paragraph_split_merge_gates(
+    case: Case,
+    corpus: &Corpus,
+    expectation: &RtfParagraphSplitMergeExpectation,
+) -> Result<RtfParagraphSplitMergeGateSummary, Box<dyn Error>> {
+    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    if source.to_bytes()? != corpus.archive
+        || sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256
+    {
+        return Err("RTF paragraph split/merge source identity differs from corpus".into());
+    }
+    let source_prefix = corpus
+        .archive
+        .get(..expectation.source_changed.start)
+        .ok_or("RTF paragraph source splice prefix is outside source")?;
+    let output_prefix = expectation
+        .expected_output
+        .get(..expectation.output_changed.start)
+        .ok_or("RTF paragraph output splice prefix is outside output")?;
+    let source_suffix = corpus
+        .archive
+        .get(expectation.source_changed.end..)
+        .ok_or("RTF paragraph source splice suffix is outside source")?;
+    let output_suffix = expectation
+        .expected_output
+        .get(expectation.output_changed.end..)
+        .ok_or("RTF paragraph output splice suffix is outside output")?;
+    let exact_source_splice_verified = source_prefix == output_prefix && source_suffix == output_suffix;
+    if !exact_source_splice_verified {
+        return Err("RTF paragraph split/merge expected output changed unrelated bytes".into());
+    }
+    let reopened = litchi_rtf::Document::from_bytes(&expectation.expected_output)?;
+    let semantic_reopen_verified = rtf_plain_paragraph_projection(&reopened)
+        == expectation.expected_projection
+        && reopened.text() == expectation.expected_projection.join("\n")
+        && reopened.paragraph_count() == expectation.expected_projection.len();
+    if !semantic_reopen_verified {
+        return Err("RTF paragraph split/merge semantic reopen differs from projection".into());
+    }
+    let commit = stage_rtf_paragraph_split_merge(case, &source, expectation)?;
+    if !commit.diagnostics().changed()
+        || commit.diagnostics().operation_count() != 1
+        || commit.snapshot().to_bytes()? != expectation.expected_output
+    {
+        return Err("RTF paragraph split/merge commit differs from expected splice".into());
+    }
+
+    let noop = source.edit().commit()?;
+    let limits = semantic_rtf_durable_limits();
+    let exact_noop_verified = !noop.diagnostics().changed()
+        && noop.diagnostics().operation_count() == 0
+        && noop.snapshot().same_snapshot(&source)
+        && noop.snapshot().to_bytes()? == corpus.archive
+        && noop.patch().to_durable(limits)?.operations().is_empty();
+    if !exact_noop_verified {
+        return Err("RTF paragraph split/merge exact no-op gate failed".into());
+    }
+
+    let volatile_forward = commit.patch().apply(&source)?;
+    let volatile_forward_verified = volatile_forward.to_bytes()? == expectation.expected_output;
+    let volatile_inverse = commit.patch().inverse().apply(&volatile_forward)?;
+    let volatile_inverse_verified = volatile_inverse.to_bytes()? == corpus.archive;
+
+    let durable = commit.patch().to_durable(limits)?;
+    let encoded = durable.to_deterministic_json()?;
+    let decoded = litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+        &encoded,
+        limits,
+    )?;
+    let durable_forward = source.apply_durable(&decoded)?;
+    let durable_forward_verified = durable_forward.to_bytes()? == expectation.expected_output;
+    let durable_inverse = durable_forward.apply_durable(&decoded.inverse())?;
+    let durable_inverse_verified = durable_inverse.to_bytes()? == corpus.archive;
+    let durable_deterministic_verified = decoded.to_deterministic_json()? == encoded;
+
+    let mut forged_json: serde_json::Value = serde_json::from_slice(&encoded)?;
+    let forged_result_refusal_verified = forge_rtf_result_artifact(&mut forged_json)
+        && source
+            .apply_durable(&litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+                &serde_json::to_vec(&forged_json)?,
+                limits,
+            )?)
+            .is_err();
+    let mut stale_edit = source.edit();
+    stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-stale-source")?;
+    let stale = stale_edit.commit()?.into_snapshot();
+    let stale_source_refusal_verified = stale.apply_durable(&decoded).is_err();
+    let foreign = litchi_rtf::Document::parse(r"{\rtf1\ansi Foreign\par Source}")?;
+    let foreign_source_refusal_verified = foreign.apply_durable(&decoded).is_err();
+    if !volatile_forward_verified
+        || !volatile_inverse_verified
+        || !durable_forward_verified
+        || !durable_inverse_verified
+        || !durable_deterministic_verified
+        || !forged_result_refusal_verified
+        || !stale_source_refusal_verified
+        || !foreign_source_refusal_verified
+    {
+        return Err("RTF paragraph split/merge patch/refusal gate failed".into());
+    }
+
+    let source_projection = rtf_plain_paragraph_projection(&source);
+    let invalid_selector_verified = match case {
+        Case::RtfSemanticSplitParagraphSave => {
+            let text = source_projection
+                .get(expectation.selected_position)
+                .ok_or("RTF split target is missing for refusal gate")?;
+            let mut edit = source.edit();
+            matches!(
+                edit.split_paragraph(expectation.selected_position, text.len() + 1),
+                Err(litchi_rtf::edit::Error::ParagraphSplitOffsetOutOfRange { .. })
+            ) && edit.operation_count() == 0
+        },
+        Case::RtfSemanticMergeParagraphSave => {
+            let mut edit = source.edit();
+            matches!(
+                edit.merge_paragraphs(0, 2),
+                Err(litchi_rtf::edit::Error::ParagraphMergeNonAdjacent { .. })
+            ) && edit.operation_count() == 0
+        },
+        _ => false,
+    };
+    let mut limited = source.edit_with_limits(litchi_rtf::edit::Limits::new(0));
+    let limit_refusal_verified = match case {
+        Case::RtfSemanticSplitParagraphSave => matches!(
+            limited.split_paragraph(
+                expectation.selected_position,
+                expectation
+                    .split_offset
+                    .ok_or("RTF split expectation has no offset")?,
+            ),
+            Err(litchi_rtf::edit::Error::OperationLimit { .. })
+        ),
+        Case::RtfSemanticMergeParagraphSave => matches!(
+            limited.merge_paragraphs(
+                expectation.selected_position,
+                expectation.adjacent_position,
+            ),
+            Err(litchi_rtf::edit::Error::OperationLimit { .. })
+        ),
+        _ => false,
+    } && limited.operation_count() == 0;
+    let unsafe_source = litchi_rtf::Document::parse(
+        r"{\rtf1\ansi First{\b nested}Second\par Third}",
+    )?;
+    let unsafe_refusal_verified = match case {
+        Case::RtfSemanticSplitParagraphSave => unsafe_source.edit().split_paragraph(0, 1).is_err(),
+        Case::RtfSemanticMergeParagraphSave => unsafe_source.edit().merge_paragraphs(0, 1).is_err(),
+        _ => false,
+    };
+    let protected = litchi_rtf::Document::parse(
+        r"{\rtf1\ansi\readprot\enforceprot1 First\par Second\par Third}",
+    )?;
+    let protected_refusal_verified = match case {
+        Case::RtfSemanticSplitParagraphSave => {
+            let mut edit = protected.edit();
+            edit.split_paragraph(0, 1)?;
+            matches!(
+                edit.commit(),
+                Err(litchi_rtf::edit::Error::ProtectedDocument { .. })
+            )
+        },
+        Case::RtfSemanticMergeParagraphSave => {
+            let mut edit = protected.edit();
+            edit.merge_paragraphs(0, 1)?;
+            matches!(
+                edit.commit(),
+                Err(litchi_rtf::edit::Error::ProtectedDocument { .. })
+            )
+        },
+        _ => false,
+    };
+    let refusal_verified = invalid_selector_verified
+        && limit_refusal_verified
+        && unsafe_refusal_verified
+        && protected_refusal_verified;
+    if !refusal_verified {
+        return Err("RTF paragraph split/merge strict refusal gate failed".into());
+    }
+
+    let mut partial = PrefixFailSink {
+        accepted: 0,
+        fail_after: u64::try_from(expectation.expected_output.len() / 2).unwrap_or(1).max(1),
+    };
+    let partial_sink_verified = commit.snapshot().write_to(&mut partial).is_err()
+        && partial.accepted > 0
+        && partial.accepted < u64::try_from(expectation.expected_output.len())?;
+    let mut zero = PrefixFailSink {
+        accepted: 0,
+        fail_after: 0,
+    };
+    let zero_sink_verified = commit.snapshot().write_to(&mut zero).is_err() && zero.accepted == 0;
+    if !partial_sink_verified || !zero_sink_verified {
+        return Err("RTF paragraph split/merge partial/zero sink gate failed".into());
+    }
+
+    let source_hash_verified = sha256_hex(&corpus.archive) == corpus.manifest.archive_sha256;
+    let output_hash_verified = sha256_hex(&reopened.to_bytes()?)
+        == sha256_hex(&expectation.expected_output);
+    if !source_hash_verified || !output_hash_verified {
+        return Err("RTF paragraph split/merge source/output hash gate failed".into());
+    }
+    Ok(RtfParagraphSplitMergeGateSummary {
+        semantic_reopen_verified,
+        exact_source_splice_verified,
+        unchanged_surrounding_bytes_verified: exact_source_splice_verified,
+        exact_noop_verified,
+        volatile_forward_verified,
+        volatile_inverse_verified,
+        durable_forward_verified,
+        durable_inverse_verified,
+        durable_deterministic_verified,
+        stale_source_refusal_verified,
+        foreign_source_refusal_verified,
+        forged_result_artifact_refusal_verified: forged_result_refusal_verified,
+        refusal_verified,
+        partial_sink_verified,
+        zero_sink_verified,
+        source_hash_verified,
+        output_hash_verified,
+    })
+}
+
+fn run_rtf_paragraph_split_merge(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let expectation = rtf_paragraph_split_merge_expectation(case, corpus)?;
+    let gates = verify_rtf_paragraph_split_merge_gates(case, corpus, &expectation)?;
+    let source_bytes = u64::try_from(corpus.archive.len())?;
+    let output_bytes = u64::try_from(expectation.expected_output.len())?;
+    let output_digest = sha256_hex(&expectation.expected_output);
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut open_ns = Vec::with_capacity(samples);
+    let mut stage_ns = Vec::with_capacity(samples);
+    let mut commit_ns = Vec::with_capacity(samples);
+    let mut publication_ns = Vec::with_capacity(samples);
+    let mut lifecycle_ns = Vec::with_capacity(samples);
+    let mut publication_output_sha256 = Vec::with_capacity(samples);
+    let mut sinks = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut sink = WindowedHashingSink::new(
+            output_bytes,
+            RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
+        )?;
+        let lifecycle_started = Instant::now();
+        let open_started = Instant::now();
+        let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+        let open_duration = open_started.elapsed();
+        let stage_started = Instant::now();
+        let mut edit = source.edit();
+        match case {
+            Case::RtfSemanticSplitParagraphSave => edit.split_paragraph(
+                expectation.selected_position,
+                expectation
+                    .split_offset
+                    .ok_or("RTF split expectation has no offset")?,
+            )?,
+            Case::RtfSemanticMergeParagraphSave => edit.merge_paragraphs(
+                expectation.selected_position,
+                expectation.adjacent_position,
+            )?,
+            _ => return Err("non-split/merge case reached RTF timed staging".into()),
+        };
+        let stage_duration = stage_started.elapsed();
+        let commit_started = Instant::now();
+        let commit = edit.commit()?;
+        let commit_duration = commit_started.elapsed();
+        let publication_started = Instant::now();
+        commit.snapshot().write_to(&mut sink)?;
+        let publication_duration = publication_started.elapsed();
+        let lifecycle_duration = lifecycle_started.elapsed();
+        let (sink_summary, digest) = sink.finish();
+        if digest != output_digest || sink_summary.accepted_bytes != output_bytes {
+            return Err("RTF paragraph split/merge timed publication hash differs".into());
+        }
+        std::hint::black_box(commit.snapshot());
+        record_elapsed(
+            &mut elapsed,
+            iteration,
+            warmup_iterations,
+            lifecycle_duration,
+        )?;
+        if iteration >= warmup_iterations {
+            open_ns.push(elapsed_ns(open_duration)?);
+            stage_ns.push(elapsed_ns(stage_duration)?);
+            commit_ns.push(elapsed_ns(commit_duration)?);
+            publication_ns.push(elapsed_ns(publication_duration)?);
+            lifecycle_ns.push(elapsed_ns(lifecycle_duration)?);
+            publication_output_sha256.push(digest);
+            sinks.push(sink_summary);
+        }
+    }
+    let sink = deterministic_sink_summary(&sinks, "RTF paragraph split/merge publication")?;
+    if sink.retained_output_bytes != Some(0)
+        || sink.retained_authoring_window_bytes
+            != Some(u64::try_from(RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?)
+        || sink.largest_write > u64::try_from(RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?
+        || sink.accepted_bytes != output_bytes
+    {
+        return Err("RTF paragraph split/merge publication exceeded retained-window bound".into());
+    }
+    let summary = RtfParagraphSplitMergeSummary {
+        implementation: match case {
+            Case::RtfSemanticSplitParagraphSave => "edit.split_paragraph",
+            Case::RtfSemanticMergeParagraphSave => "edit.merge_paragraphs",
+            _ => unreachable!("validated RTF paragraph split/merge case"),
+        },
+        timing_scope: "one opened plain lifecycle document, one paragraph stage, one commit, and one windowed sequential public write; correctness gates are preflight-only",
+        performance_claim: "none; correctness and phase evidence only",
+        shape: shape.name(),
+        paragraph_count_before: corpus.manifest.entry_count,
+        paragraph_count_after: expectation.expected_projection.len(),
+        selected_position: expectation.selected_position,
+        adjacent_position: expectation.adjacent_position,
+        split_offset: expectation.split_offset,
+        source_bytes,
+        output_bytes,
+        source_sha256: corpus.manifest.archive_sha256.clone(),
+        expected_output_sha256: output_digest,
+        open_ns,
+        stage_ns,
+        commit_ns,
+        publication_ns,
+        lifecycle_ns,
+        publication_output_sha256,
+        gates,
+    };
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(SourceSummary {
+            rtf_paragraph_split_merge: Some(summary),
+            ..SourceSummary::default()
+        }),
+        execution: None,
+        output_sha256: Some(sha256_hex(&expectation.expected_output)),
+        operation_metrics: None,
+    })
 }
 
 fn rtf_picture_group_ranges(bytes: &[u8]) -> Result<Vec<Range<usize>>, Box<dyn Error>> {
@@ -35423,7 +36040,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 309);
+        assert_eq!(selectable_count, 311);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -37396,6 +38013,8 @@ mod tests {
             Case::RtfSemanticOnePercentEditSave,
             Case::RtfSemanticRemoveParagraphSave,
             Case::RtfSemanticMoveParagraphSave,
+            Case::RtfSemanticSplitParagraphSave,
+            Case::RtfSemanticMergeParagraphSave,
             Case::RtfLogicalTailAppend,
             Case::RtfLogicalTailNoopSave,
             Case::RtfLogicalTailCommitAppend,
@@ -37413,7 +38032,10 @@ mod tests {
             assert_eq!(rtf.manifest.rtf_variant, Some(variant.name()));
 
             for case in cases {
-                let selected_corpus = if case.is_rtf_lifecycle() || case.is_rtf_logical_tail() {
+                let selected_corpus = if case.is_rtf_lifecycle()
+                    || case.is_rtf_paragraph_split_merge()
+                    || case.is_rtf_logical_tail()
+                {
                     lifecycle.as_ref().unwrap_or(&rtf)
                 } else {
                     &rtf
@@ -37481,7 +38103,7 @@ mod tests {
                 .flat_map(|variant| cases.iter().map(move |case| (*variant, *case)))
                 .filter(|(variant, case)| variant.supports_case(*case))
                 .count(),
-            45
+            47
         );
     }
 
@@ -37788,6 +38410,80 @@ mod tests {
         assert!(!opaque_noop.diagnostics().changed());
         assert!(opaque_noop.snapshot().same_snapshot(&opaque));
         assert_eq!(opaque_noop.snapshot().to_bytes().unwrap(), exact);
+    }
+
+    #[test]
+    fn rtf_paragraph_split_merge_selectors_are_opt_in_bounded_and_gate_complete() {
+        let corpus = build_rtf_lifecycle_corpus(SemanticShape::Tiny).unwrap();
+        let cases = [
+            Case::RtfSemanticSplitParagraphSave,
+            Case::RtfSemanticMergeParagraphSave,
+        ];
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            let result = run_case(case, &corpus, 0, 1).unwrap();
+            assert_eq!(result.case, case.name());
+            assert_eq!(result.elapsed_ns.samples.len(), 1);
+            let evidence = result
+                .source
+                .unwrap()
+                .rtf_paragraph_split_merge
+                .expect("RTF paragraph split/merge evidence");
+            assert_eq!(evidence.shape, SemanticShape::Tiny.name());
+            assert_eq!(evidence.paragraph_count_before, 24);
+            assert_eq!(
+                evidence.output_bytes as isize - evidence.source_bytes as isize,
+                if case == Case::RtfSemanticSplitParagraphSave {
+                    5
+                } else {
+                    -5
+                }
+            );
+            for phases in [
+                &evidence.open_ns,
+                &evidence.stage_ns,
+                &evidence.commit_ns,
+                &evidence.publication_ns,
+                &evidence.lifecycle_ns,
+            ] {
+                assert_eq!(phases.len(), 1, "{}", case.name());
+            }
+            assert_eq!(evidence.publication_output_sha256.len(), 1);
+            let gates = &evidence.gates;
+            assert!(gates.semantic_reopen_verified);
+            assert!(gates.exact_source_splice_verified);
+            assert!(gates.unchanged_surrounding_bytes_verified);
+            assert!(gates.exact_noop_verified);
+            assert!(gates.volatile_forward_verified);
+            assert!(gates.volatile_inverse_verified);
+            assert!(gates.durable_forward_verified);
+            assert!(gates.durable_inverse_verified);
+            assert!(gates.durable_deterministic_verified);
+            assert!(gates.stale_source_refusal_verified);
+            assert!(gates.foreign_source_refusal_verified);
+            assert!(gates.forged_result_artifact_refusal_verified);
+            assert!(gates.refusal_verified);
+            assert!(gates.partial_sink_verified);
+            assert!(gates.zero_sink_verified);
+            assert!(gates.source_hash_verified);
+            assert!(gates.output_hash_verified);
+            let sink = result.sink.expect("RTF paragraph publication sink");
+            assert_eq!(sink.retained_output_bytes, Some(0));
+            assert_eq!(
+                sink.retained_authoring_window_bytes,
+                Some(u64::try_from(RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES).unwrap())
+            );
+            assert!(sink.largest_write <= 16 * 1024);
+            assert_eq!(sink.accepted_bytes, evidence.output_bytes);
+        }
+
+        for variant in [RtfSemanticVariant::Byte1252, RtfSemanticVariant::Lzfu] {
+            let corpus = build_semantic_rtf_corpus(SemanticShape::Tiny, variant).unwrap();
+            assert!(!variant.supports_case(Case::RtfSemanticSplitParagraphSave));
+            assert!(!variant.supports_case(Case::RtfSemanticMergeParagraphSave));
+            assert!(run_case(Case::RtfSemanticSplitParagraphSave, &corpus, 0, 1).is_err());
+            assert!(run_case(Case::RtfSemanticMergeParagraphSave, &corpus, 0, 1).is_err());
+        }
     }
 
     #[test]

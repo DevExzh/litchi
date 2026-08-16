@@ -6,7 +6,7 @@ public-API XLSX snapshot/edit/save flows, matched opt-in XLSX scalar-cell
 eager/source-backed and managed source-backed publication controls, one-cell
 eager/source-backed clear/remove lifecycle controls, and opt-in DOC/XLS/PPT,
 DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows, including the opt-in RTF logical-tail
-append transaction, bounded RTF/XLS/DOCX/PPTX/ODF validation reports, and a
+append and ordinary-paragraph split/adjacent-merge transactions, bounded RTF/XLS/DOCX/PPTX/ODF validation reports, and a
 source-backed DOCX section inventory. It creates every corpus in memory; it also exercises
 source-backed XLSX catalog, worksheet reads, and guarded calculation-metadata,
 defined-name, page-break/page-margin/page-setup/print-options/sheet-protection/data-validation/auto-filter
@@ -73,7 +73,7 @@ four matched native XLS existing-comment publication cases,
 six matched native XLS fixed-width numeric publication cases,
 four matched native XLS worksheet-visibility publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 24 native OLE2 semantic cases, 16
-DOCX/PPTX semantic cases, 19 RTF semantic cases (13 transport/read/edit
+DOCX/PPTX semantic cases, 21 RTF semantic cases (15 transport/read/edit
 cases plus six logical-tail publication cases), 38 ODF semantic cases, one
 ODF `mimetype` repair-plan case, and six matched ODF content-COW publication
 cases are opt-in. Eight additional native PPT
@@ -82,10 +82,11 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 309
+provide their source-read counters. The current `Case` matrix exposes 311
 selectable case names in total, including two opt-in RTF standalone-picture
-CRUD selectors and four opt-in XLSX scalar-cell clear/remove lifecycle
-selectors. Eight additional
+CRUD selectors, two opt-in RTF ordinary-paragraph split/adjacent-merge
+selectors, and four opt-in XLSX scalar-cell clear/remove lifecycle selectors.
+Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
 default 36 cases / 198 records. Two repeated native-PPT selected-shape query
@@ -280,8 +281,9 @@ accepted only as source-event/correctness evidence. At the 0152 revision the
 measured at the pre-staged publication-call interval, making that matrix 295.
 Change 0154 adds six ODT/ODS/ODP content-COW publication selectors, making the
 matrix 301 at that revision; change 0159 made it 302, change 0160 made it 303,
-change 0162 made it 305, and change 0163 makes it 309. No runtime selector was added
-to 0152; only `cfg(test)` source-event acceptance and tests changed. Root
+change 0162 made it 305, change 0163 made it 309, and change 0164 makes it 311.
+No runtime selector was added to 0152; only `cfg(test)` source-event acceptance
+and tests changed. Root
 MiniStream cache and
 resource-accounting boundaries and broader performance gaps remain. Local or
 generic latency, allocation/RSS/peak memory, physical I/O/syscalls,
@@ -1372,11 +1374,23 @@ corpus.
 The two lifecycle cases use a matched default-formatted plain corpus because
 the read/edit corpus's explicit font formatting is outside their changed
 publication closure.
+The split/merge cases use that same literal-ASCII ordinary-body corpus across
+the 24/200/10,000 paragraph shapes. Split targets paragraph `count/2` at its
+interior ASCII midpoint; merge targets that paragraph and its immediate
+successor. Independent raw splices establish the exact `+5`/`-5` byte output
+delta and unchanged surrounding bytes before timing. Each selector reports
+separate open, stage, commit, publication, and lifecycle vectors and uses a
+16 KiB windowed non-seek sink that retains zero output bytes. Untimed gates
+cover semantic reopen, volatile and deterministic durable forward/inverse
+replay, forged result-artifact, stale/foreign refusal, strict limits and
+unsupported/protected refusal, partial/zero sinks, and source/output hashes.
+These selectors provide correctness and phase evidence only; they make no
+performance or transaction-memory claim.
 `--rtf-variant` defaults to `plain`.
 
 | Variant | Source | Shapes | Supported cases |
 |---|---|---|---|
-| `plain` | Deterministic direct ASCII RTF | tiny, medium, large | All 19, including six logical-tail selectors |
+| `plain` | Deterministic direct ASCII RTF | tiny, medium, large | All 21, including six logical-tail and two ordinary-paragraph split/merge selectors |
 | `byte1252` | Deterministic raw CP-1252 bytes containing literal `0xe9` | tiny, medium, large | The original 13 open/read/text-to-sink/stream/no-op cases; changed splice and logical tail are excluded because candidate validation refuses this byte layout |
 | `lzfu` | Deterministic LZFu compression of the plain bytes | tiny, medium, large | The original 13 open/read/text-to-sink/stream/no-op cases; changed transport and logical-tail rewrites are explicitly unsupported |
 | `watermark` | Content-addressed real-producer `test-data/rtf/watermark.rtf` | tiny selector only | The original open/read/stream/no-op cases; semantic body-text output and logical-tail publication are excluded because the meaningful content is header drawing metadata rather than editable body text |

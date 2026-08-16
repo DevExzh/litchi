@@ -413,8 +413,8 @@ selector was added; only `cfg(test)` source-event acceptance and tests changed.
 Change 0153 adds four RTF selectors measured at the pre-staged
 publication-call interval, making that matrix 295. Change 0154 adds six ODF
 content-COW publication selectors, making that matrix 301; change 0159 later
-made it 302, change 0160 made it 303, change 0162 made it 305, and change
-0163 makes the current matrix 309. Local or generic
+made it 302, change 0160 made it 303, change 0162 made it 305, change 0163
+made it 309, and change 0164 makes the current matrix 311. Local or generic
 latency, allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/
 network behavior, decompression, native semantic, OOXML, ODF, RTF, and iWork
 claims are withheld. The root MiniStream cache and resource-accounting
@@ -611,7 +611,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**309 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**311 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -680,6 +680,29 @@ the default 36/198 tranche. This is correctness/phase/counter evidence only:
 no latency, allocation/RSS, physical-I/O, cold-cache, decompression,
 durable-source-patch, or real-producer claim is accepted. See
 [`0163`](changes/0163-xlsx-cell-clear-remove-evidence.md).
+
+Change 0164 adds two opt-in RTF ordinary-paragraph structure selectors:
+`rtf_semantic_split_paragraph_save` and
+`rtf_semantic_merge_paragraph_save`. Both reuse the exact generated plain
+lifecycle corpus at tiny/medium/large sizes (24/200/10,000 paragraphs). Split
+inserts one canonical five-byte `\\par ` boundary at a checked interior
+source position; merge removes only the authenticated adjacent boundary, so
+their independent raw expected outputs are respectively five bytes larger and
+smaller. The selectors report separate open, stage, commit, publication and
+lifecycle vectors and publish through a fixed 16-KiB windowed hashing sink
+that retains zero output bytes. Untimed gates cover semantic reopen, exact raw
+splice and unchanged surrounding bytes, exact no-op/source identity, volatile
+and deterministic durable patch forward/inverse, stale/foreign refusal,
+bounded refusal cases, partial/zero sinks and source/output hashes. The
+selector gate also verifies `forged_result_artifact_refusal_verified`; the
+existing focused RTF tests remain the authority for exact boundary-byte
+restoration and forged-boundary precondition refusal. The two selectors raise
+the matrix from 309 to 311 without changing the default 36/198 tranche. This is
+correctness,
+phase and sequential-sink evidence only: no latency, speedup, transaction
+memory, allocation/RSS, physical-I/O, cold-cache, source-backed,
+real-producer, or general rich-RTF claim is accepted. See
+[`0164`](changes/0164-rtf-paragraph-split-merge-evidence.md).
 
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32
