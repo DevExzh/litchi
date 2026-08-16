@@ -2738,6 +2738,8 @@ struct DocOwnerPublicPhaseSummary {
     candidate_bytes: u64,
     source_archive_sha256: String,
     expected_output_sha256: String,
+    expected_source_fingerprint: u64,
+    expected_target_fingerprint: u64,
     open_owner_ns: Vec<u64>,
     open_public_ns: Vec<u64>,
     open_retain_ns: Vec<u64>,
@@ -2756,6 +2758,17 @@ struct DocOwnerPublicPhaseSummary {
     open_outer_ns: Vec<u64>,
     edit_total_ns: Vec<u64>,
     measured_total_ns: Vec<u64>,
+    /// Same-lineage patch replay measured after the established lifecycle
+    /// boundary.  This is a workflow extension, not part of `measured_total_ns`.
+    same_lineage_apply_ns: Vec<u64>,
+    /// First source/target patch-fingerprint demand measured after the
+    /// established lifecycle boundary.  The values are intentionally retained
+    /// beside the timing so the deferred scan is visible in the evidence.
+    deferred_fingerprint_ns: Vec<u64>,
+    workflow_no_diagnostic_ns: Vec<u64>,
+    workflow_with_fingerprint_demand_ns: Vec<u64>,
+    source_fingerprints: Vec<u64>,
+    target_fingerprints: Vec<u64>,
     attributed_total_ns: Vec<u64>,
     unattributed_ns: Vec<u64>,
     output_sha256: Vec<String>,
@@ -2769,6 +2782,10 @@ struct DocOwnerPublicPhaseGateSummary {
     changed_semantics_verified: bool,
     exact_noop_verified: bool,
     patch_round_trip_verified: bool,
+    same_lineage_apply_verified: bool,
+    reopened_source_apply_verified: bool,
+    independent_fingerprints_verified: bool,
+    workflow_arithmetic_verified: bool,
     inverse_round_trip_verified: bool,
     stale_source_refusal_verified: bool,
     malformed_source_refusal_verified: bool,
@@ -15463,6 +15480,20 @@ fn verify_doc_untouched_streams(source: &[u8], candidate: &[u8]) -> Result<(), B
     Ok(())
 }
 
+/// Independent harness copy of the lazy body-text diagnostic fingerprint.
+///
+/// Keep this implementation local to the evidence tool rather than reusing a
+/// production helper: the per-sample values must be checked against the exact
+/// expected source and target bytes independently of `Snapshot::fingerprint`.
+fn doc_body_text_fnv1a(bytes: &[u8]) -> u64 {
+    let mut value = 0xcbf2_9ce4_8422_2325u64;
+    for byte in bytes {
+        value ^= u64::from(*byte);
+        value = value.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    value
+}
+
 fn run_doc_owner_public_phases(
     corpus: &Corpus,
     warmup_iterations: usize,
@@ -15498,6 +15529,14 @@ fn run_doc_owner_public_phases(
         || applied.bytes() != expected_changed.as_slice()
     {
         return Err("DOC changed patch replay differs from the expected output".into());
+    }
+    let reopened_source = Snapshot::from_bytes(corpus.archive.clone())?;
+    let reopened_applied = ordinary_commit.patch().apply(&reopened_source)?;
+    if reopened_applied.bytes() != expected_changed.as_slice() {
+        return Err(
+            "DOC independently reopened source patch replay differs from the expected output"
+                .into(),
+        );
     }
     let restored = ordinary_commit.patch().inverse().apply(&applied)?;
     if restored.bytes() != source.bytes() {
@@ -15548,17 +15587,21 @@ fn run_doc_owner_public_phases(
     }
     verify_doc_untouched_streams(&corpus.archive, &expected_changed)?;
     let expected_output_sha256 = sha256_hex(&expected_changed);
+    let expected_source_fingerprint = doc_body_text_fnv1a(source.bytes());
+    let expected_target_fingerprint = doc_body_text_fnv1a(&expected_changed);
 
     let mut elapsed = Vec::with_capacity(samples);
     let mut summary = DocOwnerPublicPhaseSummary {
         implementation: "litchi-doc::body_text::Snapshot/Edit profiled owner-public seam",
-        timing_scope: "native DOC owner/public validation and in-memory owner rendering; deterministic replacement text is prepared before the lifecycle timer; output materialization separately timed",
-        performance_claim: "attribution-only correctness evidence; synchronous observer overhead is included and no speedup, I/O, allocation, RSS, cold-start, or producer claim is made",
+        timing_scope: "measured_total_ns covers native DOC owner/public validation, in-memory owner rendering, and output materialization; deterministic replacement text is prepared before the lifecycle timer; same-lineage patch apply and first source/target FNV-1a fingerprint demand are timed after that boundary as workflow extensions",
+        performance_claim: "attribution-only correctness and deferred-work accounting; measured_total_ns is the established lifecycle boundary, synchronous observer overhead is included, and no speedup, I/O, allocation, RSS, cold-start, or producer claim is made",
         selected_paragraph: selected,
         source_bytes: u64::try_from(corpus.archive.len())?,
         candidate_bytes: u64::try_from(expected_changed.len())?,
         source_archive_sha256: corpus.manifest.archive_sha256.clone(),
         expected_output_sha256: expected_output_sha256.clone(),
+        expected_source_fingerprint,
+        expected_target_fingerprint,
         ..DocOwnerPublicPhaseSummary::default()
     };
     let event_order_cardinality_verified = true;
@@ -15584,6 +15627,55 @@ fn run_doc_owner_public_phases(
         let output = commit.snapshot().finish();
         let output_materialization_ns = elapsed_ns(output_started.elapsed())?;
         let measured_total_ns = elapsed_ns(lifecycle_started.elapsed())?;
+
+        // Keep the historical lifecycle interval above comparable with change
+        // 0160.  Same-lineage replay and the first lazy fingerprint demand are
+        // explicit post-lifecycle workflow extensions rather than hidden in
+        // `measured_total_ns`.
+        let apply_started = Instant::now();
+        let applied = commit.patch().apply(&snapshot)?;
+        let same_lineage_apply_ns = elapsed_ns(apply_started.elapsed())?;
+        if applied.bytes() != expected_changed.as_slice() || applied.bytes() != output.as_slice() {
+            return Err("DOC same-lineage patch replay differs from the expected output".into());
+        }
+
+        let fingerprint_started = Instant::now();
+        let source_fingerprint = commit.patch().source_fingerprint();
+        let target_fingerprint = commit.patch().target_fingerprint();
+        let deferred_fingerprint_ns = elapsed_ns(fingerprint_started.elapsed())?;
+        if commit.patch().before().bytes() != snapshot.bytes()
+            || commit.patch().after().bytes() != expected_changed.as_slice()
+            || source_fingerprint != expected_source_fingerprint
+            || target_fingerprint != expected_target_fingerprint
+        {
+            return Err(
+                "DOC deferred patch fingerprints differ from independent FNV-1a evidence".into(),
+            );
+        }
+        let workflow_no_diagnostic_ns = measured_total_ns
+            .checked_add(same_lineage_apply_ns)
+            .ok_or("DOC no-diagnostic workflow duration overflows u64")?;
+        let workflow_with_fingerprint_demand_ns = workflow_no_diagnostic_ns
+            .checked_add(deferred_fingerprint_ns)
+            .ok_or("DOC fingerprint-demand workflow duration overflows u64")?;
+        if workflow_no_diagnostic_ns
+            != measured_total_ns
+                .checked_add(same_lineage_apply_ns)
+                .ok_or("DOC no-diagnostic workflow verification overflows u64")?
+            || workflow_with_fingerprint_demand_ns
+                != workflow_no_diagnostic_ns
+                    .checked_add(deferred_fingerprint_ns)
+                    .ok_or("DOC fingerprint-demand workflow verification overflows u64")?
+        {
+            return Err("DOC deferred workflow duration arithmetic is inconsistent".into());
+        }
+        std::hint::black_box((
+            applied.bytes(),
+            source_fingerprint,
+            target_fingerprint,
+            workflow_no_diagnostic_ns,
+            workflow_with_fingerprint_demand_ns,
+        ));
 
         if !commit.changed()
             || commit.patch().is_noop()
@@ -15660,6 +15752,18 @@ fn run_doc_owner_public_phases(
             summary.open_outer_ns.push(open_outer_ns);
             summary.edit_total_ns.push(edit_total_ns);
             summary.measured_total_ns.push(measured_total_ns);
+            summary.same_lineage_apply_ns.push(same_lineage_apply_ns);
+            summary
+                .deferred_fingerprint_ns
+                .push(deferred_fingerprint_ns);
+            summary
+                .workflow_no_diagnostic_ns
+                .push(workflow_no_diagnostic_ns);
+            summary
+                .workflow_with_fingerprint_demand_ns
+                .push(workflow_with_fingerprint_demand_ns);
+            summary.source_fingerprints.push(source_fingerprint);
+            summary.target_fingerprints.push(target_fingerprint);
             summary.attributed_total_ns.push(attributed_total_ns);
             summary.unattributed_ns.push(unattributed_ns);
             summary.output_sha256.push(sha256_hex(&output));
@@ -15677,6 +15781,12 @@ fn run_doc_owner_public_phases(
     if summary.measured_total_ns.len() != samples
         || summary.open_owner_ns.len() != samples
         || summary.edit_finish_ns.len() != samples
+        || summary.same_lineage_apply_ns.len() != samples
+        || summary.deferred_fingerprint_ns.len() != samples
+        || summary.workflow_no_diagnostic_ns.len() != samples
+        || summary.workflow_with_fingerprint_demand_ns.len() != samples
+        || summary.source_fingerprints.len() != samples
+        || summary.target_fingerprints.len() != samples
         || elapsed.len() != summary.measured_total_ns.len()
     {
         return Err("DOC profiled phase vectors have unexpected sample cardinality".into());
@@ -15688,6 +15798,10 @@ fn run_doc_owner_public_phases(
         changed_semantics_verified: true,
         exact_noop_verified: true,
         patch_round_trip_verified: true,
+        same_lineage_apply_verified: true,
+        reopened_source_apply_verified: true,
+        independent_fingerprints_verified: true,
+        workflow_arithmetic_verified: true,
         inverse_round_trip_verified: true,
         stale_source_refusal_verified: true,
         malformed_source_refusal_verified: true,
@@ -35594,7 +35708,7 @@ mod tests {
         time::Duration,
     };
 
-    use litchi_core::ReadAt;
+    use litchi_core::{Position, ReadAt};
 
     use super::{
         Case, CfbOpenStreamOperation, CfbSelectiveSimulationPhase, CfbSelectiveTarget, CorpusShape,
@@ -35624,10 +35738,10 @@ mod tests {
         build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
         build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
         build_xlsx_sheet_protection_edit_corpus, cfb_open_stream_expected_payload,
-        cfb_target_aware_repeat_formula, expected_opc_overlay_output, ole_common_changed_output,
-        opc_overlay_replacement_payload, parse_case, payload_bytes, resolve_execution_workers,
-        run_case, run_case_with_config, run_cfb_open_stream, run_cfb_open_stream_simulated,
-        run_cfb_selective_read, run_cfb_selective_simulated_read,
+        cfb_target_aware_repeat_formula, doc_body_text_fnv1a, expected_opc_overlay_output,
+        ole_common_changed_output, opc_overlay_replacement_payload, parse_case, payload_bytes,
+        resolve_execution_workers, run_case, run_case_with_config, run_cfb_open_stream,
+        run_cfb_open_stream_simulated, run_cfb_selective_read, run_cfb_selective_simulated_read,
         run_docx_source_backed_one_edit_save, run_odf_content_cow,
         run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
@@ -35640,7 +35754,7 @@ mod tests {
         run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
         run_xlsx_page_setup_edit_save, run_xlsx_print_options_edit_save,
         run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
-        xlsx_cell_count,
+        updated_writer_text, writer_shape, xlsx_cell_count,
     };
 
     #[test]
@@ -37922,6 +38036,12 @@ mod tests {
     }
 
     #[test]
+    fn doc_body_text_fnv1a_harness_reference_is_stable() {
+        assert_eq!(doc_body_text_fnv1a(b""), 0xcbf2_9ce4_8422_2325);
+        assert_eq!(doc_body_text_fnv1a(b"hello"), 0xa430_d846_80aa_bd0b);
+    }
+
+    #[test]
     fn doc_owner_public_phase_case_is_opt_in_and_checked() {
         let corpus = build_writer_corpus(Case::DocFreshWriteTo, WriterShape::Tiny).unwrap();
         assert_eq!(
@@ -37949,11 +38069,42 @@ mod tests {
             evidence.output_sha256,
             vec![evidence.expected_output_sha256.clone(); 2]
         );
+        assert_eq!(
+            evidence.expected_source_fingerprint,
+            doc_body_text_fnv1a(&corpus.archive)
+        );
+        let selected = writer_shape(&corpus).unwrap().doc_paragraph_count() / 2;
+        let source_snapshot =
+            litchi_doc::body_text::Snapshot::from_bytes(corpus.archive.clone()).unwrap();
+        let mut expected_edit = source_snapshot.edit().unwrap();
+        expected_edit
+            .replace_paragraph(
+                Position::new(selected),
+                &updated_writer_text("doc", 0, selected, 0),
+            )
+            .unwrap();
+        let expected_target = expected_edit.commit().unwrap().snapshot().finish();
+        assert_eq!(
+            evidence.expected_target_fingerprint,
+            doc_body_text_fnv1a(&expected_target)
+        );
+        assert_eq!(
+            evidence.source_fingerprints,
+            vec![evidence.expected_source_fingerprint; 2]
+        );
+        assert_eq!(
+            evidence.target_fingerprints,
+            vec![evidence.expected_target_fingerprint; 2]
+        );
         assert!(evidence.gates.event_order_cardinality_verified);
         assert!(evidence.gates.source_semantics_verified);
         assert!(evidence.gates.changed_semantics_verified);
         assert!(evidence.gates.exact_noop_verified);
         assert!(evidence.gates.patch_round_trip_verified);
+        assert!(evidence.gates.same_lineage_apply_verified);
+        assert!(evidence.gates.reopened_source_apply_verified);
+        assert!(evidence.gates.independent_fingerprints_verified);
+        assert!(evidence.gates.workflow_arithmetic_verified);
         assert!(evidence.gates.inverse_round_trip_verified);
         assert!(evidence.gates.stale_source_refusal_verified);
         assert!(evidence.gates.malformed_source_refusal_verified);
@@ -37970,6 +38121,16 @@ mod tests {
                 evidence.attributed_total_ns[index].checked_add(evidence.unattributed_ns[index]),
                 Some(evidence.measured_total_ns[index])
             );
+            assert_eq!(
+                evidence.measured_total_ns[index]
+                    .checked_add(evidence.same_lineage_apply_ns[index]),
+                Some(evidence.workflow_no_diagnostic_ns[index])
+            );
+            assert_eq!(
+                evidence.workflow_no_diagnostic_ns[index]
+                    .checked_add(evidence.deferred_fingerprint_ns[index]),
+                Some(evidence.workflow_with_fingerprint_demand_ns[index])
+            );
         }
     }
 
@@ -37982,6 +38143,32 @@ mod tests {
         assert_eq!(evidence.source_bytes, corpus.archive.len() as u64);
         assert_eq!(evidence.output_sha256.len(), 1);
         assert_eq!(evidence.output_sha256[0], evidence.expected_output_sha256);
+        assert_eq!(evidence.same_lineage_apply_ns.len(), 1);
+        assert_eq!(evidence.deferred_fingerprint_ns.len(), 1);
+        assert_eq!(evidence.workflow_no_diagnostic_ns.len(), 1);
+        assert_eq!(evidence.workflow_with_fingerprint_demand_ns.len(), 1);
+        assert_eq!(evidence.source_fingerprints.len(), 1);
+        assert_eq!(evidence.target_fingerprints.len(), 1);
+        assert_eq!(
+            evidence.source_fingerprints[0],
+            evidence.expected_source_fingerprint
+        );
+        assert_eq!(
+            evidence.target_fingerprints[0],
+            evidence.expected_target_fingerprint
+        );
+        assert_eq!(
+            evidence.measured_total_ns[0].checked_add(evidence.same_lineage_apply_ns[0]),
+            Some(evidence.workflow_no_diagnostic_ns[0])
+        );
+        assert_eq!(
+            evidence.workflow_no_diagnostic_ns[0].checked_add(evidence.deferred_fingerprint_ns[0]),
+            Some(evidence.workflow_with_fingerprint_demand_ns[0])
+        );
+        assert!(evidence.gates.same_lineage_apply_verified);
+        assert!(evidence.gates.reopened_source_apply_verified);
+        assert!(evidence.gates.independent_fingerprints_verified);
+        assert!(evidence.gates.workflow_arithmetic_verified);
         assert!(evidence.gates.changed_semantics_verified);
         assert!(evidence.gates.untouched_streams_verified);
     }
