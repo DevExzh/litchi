@@ -180,4 +180,7 @@ pub use view_properties::{
     OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,
     ViewKind, ViewProperties, load_from_package as load_view_properties,
 };
-pub use writer::{MutablePresentation, MutableShape, MutableSlide};
+pub use writer::{
+    MutablePresentation, MutableShape, MutableSlide, StreamingPresentationLimits,
+    StreamingPresentationOptions, StreamingPresentationWriter, StreamingSlideWriter, TextBoxSpec,
+};
